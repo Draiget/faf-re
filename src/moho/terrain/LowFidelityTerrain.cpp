@@ -1,4 +1,6 @@
 #include "moho/terrain/LowFidelityTerrain.h"
+#include "moho/terrain/SplatChunkRenderer.h"
+#include "moho/terrain/SplatBudget.h"
 
 #include <algorithm>
 #include <cmath>
@@ -40,7 +42,6 @@ namespace
   constexpr std::int32_t kSkirtMaxIndexCount = 199998;
   constexpr std::int32_t kTriangleListPrimitiveType = 4;
   constexpr float kMinDecalAlpha = 0.0039215689f; // 1/255
-  constexpr std::int32_t kMaxSplatsPerFrame = 250;
 
   /**
    * x87 "frndint" (round-to-nearest) + correction is the binary's idiom for
@@ -62,67 +63,6 @@ namespace
 
     delete lane;
     lane = nullptr;
-  }
-
-  void ReleaseSharedCount(boost::detail::sp_counted_base*& sharedCount) noexcept
-  {
-    if (sharedCount != nullptr) {
-      sharedCount->release();
-      sharedCount = nullptr;
-    }
-  }
-
-  struct LowFidelityTriangleBatch
-  {
-    std::uint32_t pad00[5];         // +0x00
-    moho::CD3DVertexSheet* vtx;     // +0x14
-    moho::CD3DIndexSheet* idx;      // +0x18
-    std::uint32_t pad1C;            // +0x1C
-    std::int32_t indexCount;        // +0x20
-    std::int32_t endVertexInclusive; // +0x24
-  };
-  static_assert(offsetof(LowFidelityTriangleBatch, vtx) == 0x14, "LowFidelityTriangleBatch::vtx");
-  static_assert(offsetof(LowFidelityTriangleBatch, idx) == 0x18, "LowFidelityTriangleBatch::idx");
-  static_assert(
-    offsetof(LowFidelityTriangleBatch, indexCount) == 0x20,
-    "LowFidelityTriangleBatch::indexCount"
-  );
-  static_assert(
-    offsetof(LowFidelityTriangleBatch, endVertexInclusive) == 0x24,
-    "LowFidelityTriangleBatch::endVertexInclusive"
-  );
-
-  /**
-   * Address: 0x00807F50 (FUN_00807F50, low-fidelity indexed draw helper)
-   *
-   * What it does:
-   * Issues one triangle-list draw for one prebuilt low-fidelity terrain batch
-   * when the batch has a non-zero index count.
-   */
-  void DrawLowFidelityTerrainBatch(const LowFidelityTriangleBatch& batch)
-  {
-    if (batch.indexCount == 0 || batch.vtx == nullptr || batch.idx == nullptr) {
-      return;
-    }
-
-    moho::CD3DDevice* const device = moho::D3D_GetDevice();
-    if (device == nullptr) {
-      return;
-    }
-
-    moho::SD3DVertexRange vertexView{};
-    vertexView.sheet = batch.vtx;
-    vertexView.startVertex = 0;
-    vertexView.baseVertex = 0;
-    vertexView.endVertex = batch.endVertexInclusive;
-
-    moho::SD3DIndexRange indexView{};
-    indexView.sheet = batch.idx;
-    indexView.startIndex = 0;
-    indexView.indexCount = batch.indexCount;
-
-    std::int32_t primitiveType = 4;
-    (void)device->DrawTriangleList(&vertexView, &indexView, &primitiveType);
   }
 
   // ----- Decal / splat draw helpers -----
@@ -368,7 +308,7 @@ namespace moho
     }
 
     if (texture_batcher == nullptr) {
-      texture_batcher = new CD3DTextureBatcher();
+      texture_batcher = REN_NewSplatTextureBatcher();
     }
 
     ID3DDeviceResources* const dynamicResources = D3D_GetDevice()->GetResources();
@@ -414,6 +354,40 @@ namespace moho
   }
 
   /**
+   * Address: 0x00807F50 (FUN_00807F50, low-fidelity indexed draw helper)
+   *
+   * What it does:
+   * Issues one triangle-list draw of the prebuilt terrain batch when it has a
+   * non-zero index count. The binary reads this+0x14 and +0x18 for the sheets,
+   * +0x20 for the index count and +0x24 for the end vertex (0x00807F59-0x00807F7D).
+   */
+  void LowFidelityTerrain::DrawTriangles()
+  {
+    if (mSkirtStartIndex == 0u || mTerrainVertexSheet == nullptr || mTerrainIndexSheet == nullptr) {
+      return;
+    }
+
+    CD3DDevice* const device = D3D_GetDevice();
+    if (device == nullptr) {
+      return;
+    }
+
+    SD3DVertexRange vertexView{};
+    vertexView.sheet = mTerrainVertexSheet;
+    vertexView.startVertex = 0;
+    vertexView.baseVertex = 0;
+    vertexView.endVertex = static_cast<std::int32_t>(mTerrainEndVertex);
+
+    SD3DIndexRange indexView{};
+    indexView.sheet = mTerrainIndexSheet;
+    indexView.startIndex = 0;
+    indexView.indexCount = static_cast<std::int32_t>(mSkirtStartIndex);
+
+    std::int32_t primitiveType = kTriangleListPrimitiveType;
+    (void)device->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+  }
+
+  /**
    * Address: 0x00808F90 (FUN_00808F90, Moho::LowFidelityTerrain::DrawTerrainDepth)
    *
    * IDA signature:
@@ -449,7 +423,7 @@ namespace moho
       shaderVars.heightScale.SetFloat(mTesselator->GetHeightScale());
     }
 
-    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatch&>(*this));
+    DrawTriangles();
   }
 
   /**
@@ -500,7 +474,7 @@ namespace moho
       shaderVars.heightScale.SetFloat(heightScale);
     }
 
-    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatch&>(*this));
+    DrawTriangles();
   }
 
   /**
@@ -605,7 +579,7 @@ namespace moho
    */
   void LowFidelityTerrain::DrawTerrain(
     boost::shared_ptr<CD3DDynamicTextureSheet> /*overlayTexture*/,
-    const msvc8::string* /*techniqueName*/
+    const fa::string* /*techniqueName*/
   )
   {}
 
@@ -844,6 +818,17 @@ namespace moho
       return;
     }
 
+    // Keep the original single-draw path for ordinary views. Only overflow
+    // uses pass-major chunks, so every existing sheet/index stays in bounds.
+    if (splatVertexCount > 1000U) {
+      D3D_GetDevice()->SelectTechnique("LowFidelitySplat");
+      GetTerrainShaderVars().decalAlbedoTexture.GetTexture(
+        boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture_batcher->GetCompositeTexture()));
+      DrawSplatChunksPassMajor(
+        D3D_GetDevice(), mDynamicVertexSheet, mDynamicIndexSheet, mSplatVertices.data(), splatVertexCount, 250);
+      return;
+    }
+
     void* const lockedVertices =
       mDynamicVertexSheet->GetVertStream(0U)->Lock(0, static_cast<std::int32_t>(splatVertexCount), false, true);
     // Raw GPU upload: splat vertex blob into the locked stream.
@@ -892,7 +877,7 @@ namespace moho
     CD3DDevice* const device = D3D_GetDevice();
 
     LoadShaderVars();
-    DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatch&>(*this));
+    DrawTriangles();
     LoadTerrainLighting(shadowContext);
 
     auto* const terrainRes = mTerrainResource;
@@ -1008,7 +993,7 @@ namespace moho
       }
 
       mSkirtStartIndex = static_cast<std::uint32_t>(mTesselator->GetSkirtIndexStart());
-      mUnknown24 = static_cast<std::uint32_t>(mTesselator->GetSkirtVertexStart() - 1);
+      mTerrainEndVertex = static_cast<std::uint32_t>(mTesselator->GetSkirtVertexStart() - 1);
       mSkirtEndIndex = static_cast<std::uint32_t>(mTesselator->GetCollisionIndexCount());
       mSkirtEndVertex = mTesselator->GetRectCacheCount() - 1;
 
@@ -1085,8 +1070,7 @@ namespace moho
                 sEngineStatRenderFlatDecals = engineStats->GetItem("Render_FlatDecals", true);
                 (void)sEngineStatRenderFlatDecals->Release(0);
               }
-              _InterlockedExchangeAdd(
-                reinterpret_cast<volatile long*>(&sEngineStatRenderFlatDecals->mPrimaryValueBits), 1);
+              sEngineStatRenderFlatDecals->AddPrimaryBits(1);
             }
           } else {
             std::int32_t baselineIndexCount = 0;
@@ -1111,14 +1095,14 @@ namespace moho
                 sEngineStatRenderDecals = engineStats->GetItem("Render_Decals", true);
                 (void)sEngineStatRenderDecals->Release(0);
               }
-              _InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&sEngineStatRenderDecals->mPrimaryValueBits), 1);
+              sEngineStatRenderDecals->AddPrimaryBits(1);
             }
           }
         }
       }
     }
 
-    mSplatVertices.ResetStorageToInline();
+    auto splatOutputBudget = PrepareSplatOutput(mSplatVertices, ren_SplatBudgetTier);
 
     if (!minimapPass && ren_Splats) {
       auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
@@ -1126,51 +1110,73 @@ namespace moho
       gpg::fastvector<CWldTerrainDecal*> visibleSplats;
       (void)decalManager->PropsInView(mCamera, visibleSplats, ren_IgnoreDecalLOD);
 
-      std::int32_t splatBudget = 0;
-      for (CWldTerrainDecal* const decalEntry : visibleSplats) {
-        auto* const splat = static_cast<CWldSplat*>(decalEntry);
+      auto& splatVertexLane = mSplatVertices;
 
-        if (splat->mFidelity > 0) {
-          continue;
+      // Engine fix (ren_SplatAtlasFix): when the atlas has no room for a splat, it is cleared and
+      // the walk runs once more, so only this frame's textures hold places.
+      for (bool mayRestart = true;; mayRestart = false) {
+        bool restart = false;
+        std::size_t splatBudget = 0;
+        for (CWldTerrainDecal* const decalEntry : visibleSplats) {
+          auto* const splat = static_cast<CWldSplat*>(decalEntry);
+
+          if (splat->mFidelity > 0) {
+            continue;
+          }
+
+          const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
+          const Vector4f& row1 = mCamera->viewport.r[1];
+          const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
+            + (firstVertex.mPosition.x * row1.x) + row1.w;
+
+          if (worldDistance > splat->mCutoffLOD) {
+            continue;
+          }
+          if (splatBudget++ >= splatOutputBudget.available
+            && !TryGrowSplatOutput(mSplatVertices, splatOutputBudget)) {
+            break;
+          }
+
+          float fadeAlpha;
+          if (splat->mNearCutoff <= 0.0f) {
+            const float farFadeStart = splat->mCutoffLOD * ren_DecalFadeFraction;
+            const float clampedDistance = std::min(worldDistance, splat->mCutoffLOD);
+            const float fadeFloor = std::max(farFadeStart, std::min(clampedDistance, farFadeStart));
+            fadeAlpha = 1.0f - ((clampedDistance - fadeFloor) / (splat->mCutoffLOD - fadeFloor));
+          } else {
+            const float nearFadeStart = splat->mNearCutoff * ren_DecalFadeFraction;
+            const float clampedDistance = std::min(worldDistance, splat->mNearCutoff);
+            const float fadeCeiling = std::max(clampedDistance, nearFadeStart);
+            fadeAlpha = (fadeCeiling - nearFadeStart) / (splat->mNearCutoff - nearFadeStart);
+          }
+          const float bakedAlpha = fadeAlpha * splat->mCurrentAlpha;
+
+          const CWldSplat::AtlasMiss atlas =
+            splat->OnAtlasResult(splat->UpdateBatchTexture(texture_batcher), mayRestart);
+          if (atlas == CWldSplat::AtlasMiss::Restart) {
+            restart = true;
+            break;
+          }
+          if (atlas == CWldSplat::AtlasMiss::Skip) {
+            continue;
+          }
+
+          const std::size_t countBeforeAppend = splatVertexLane.Size();
+          for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
+            splatVertexLane.PushBack(sourceVertex);
+          }
+
+          for (std::size_t v = countBeforeAppend; v < splatVertexLane.Size(); ++v) {
+            splatVertexLane[v].mAlpha = bakedAlpha;
+          }
         }
-
-        const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
-        const Vector4f& row1 = mCamera->viewport.r[1];
-        const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
-          + (firstVertex.mPosition.x * row1.x) + row1.w;
-
-        if (worldDistance > splat->mCutoffLOD) {
-          continue;
-        }
-        if (++splatBudget >= kMaxSplatsPerFrame) {
+        if (!restart) {
           break;
         }
-
-        float fadeAlpha;
-        if (splat->mNearCutoff <= 0.0f) {
-          const float farFadeStart = splat->mCutoffLOD * ren_DecalFadeFraction;
-          const float clampedDistance = std::min(worldDistance, splat->mCutoffLOD);
-          const float fadeFloor = std::max(farFadeStart, std::min(clampedDistance, farFadeStart));
-          fadeAlpha = 1.0f - ((clampedDistance - fadeFloor) / (splat->mCutoffLOD - fadeFloor));
-        } else {
-          const float nearFadeStart = splat->mNearCutoff * ren_DecalFadeFraction;
-          const float clampedDistance = std::min(worldDistance, splat->mNearCutoff);
-          const float fadeCeiling = std::max(clampedDistance, nearFadeStart);
-          fadeAlpha = (fadeCeiling - nearFadeStart) / (splat->mNearCutoff - nearFadeStart);
-        }
-        const float bakedAlpha = fadeAlpha * splat->mCurrentAlpha;
-
-        splat->UpdateBatchTexture(texture_batcher);
-
-        auto& splatVertexLane = mSplatVertices;
-        const std::size_t countBeforeAppend = splatVertexLane.Size();
-        for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
-          splatVertexLane.PushBack(sourceVertex);
-        }
-
-        for (std::size_t v = countBeforeAppend; v < splatVertexLane.Size(); ++v) {
-          splatVertexLane[v].mAlpha = bakedAlpha;
-        }
+        REN_ResetSplatTextureBatcher(texture_batcher);
+        // Rebuild every UV after the atlas reset, retaining capacity and the
+        // per-view budget so restart does not bypass guarded growth.
+        splatVertexLane.Clear();
       }
     }
 

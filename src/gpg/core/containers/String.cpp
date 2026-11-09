@@ -4,7 +4,7 @@
 #include <string_view>
 using namespace gpg;
 
-msvc8::string gpg::sWhitespaceChars{" \n\t\r"};
+fa::string gpg::sWhitespaceChars{" \n\t\r"};
 
 /**
  * Address: 0x009380A0 (FUN_009380A0, gpg::STR_Utf8ByteOffset)
@@ -95,7 +95,7 @@ const char* gpg::STR_PreviousUtf8Char(
  * Walks UTF-8 codepoint boundaries to extract one `[pos, pos+len)` codepoint
  * range; throws `std::out_of_range` when `pos` is past end-of-string.
  */
-msvc8::string gpg::STR_Utf8SubString(
+fa::string gpg::STR_Utf8SubString(
   StrArg str,
   const int pos,
   const int len
@@ -108,7 +108,7 @@ msvc8::string gpg::STR_Utf8SubString(
     }
     if (i == pos + len) {
       if (str != nullptr) {
-        return msvc8::string{start, static_cast<std::size_t>(str - start)};
+        return fa::string{start, static_cast<std::size_t>(str - start)};
       }
       break;
     }
@@ -118,9 +118,9 @@ msvc8::string gpg::STR_Utf8SubString(
     str = STR_NextUtf8Char(str);
   }
   if (start == nullptr) {
-    throw std::out_of_range{msvc8::string{"offset past end of string"}.to_std()};
+    throw std::out_of_range{fa::string{"offset past end of string"}.to_std()};
   }
-  return msvc8::string{start, static_cast<std::size_t>(str - start)};
+  return fa::string{start, static_cast<std::size_t>(str - start)};
 }
 
 /**
@@ -140,13 +140,13 @@ char* gpg::STR_EncodeUtf8Char(
     if (chr >= 0x800) {
       if (!limit || dest + 3 <= limit) {
         dest[0] = (chr >> 12) | 0xE0;
-        dest[1] = (chr >> 6) & 0x3F | 0x80;
-        dest[2] = chr & 0x3F | 0x80;
+        dest[1] = ((chr >> 6) & 0x3F) | 0x80;
+        dest[2] = (chr & 0x3F) | 0x80;
         return dest + 3;
       }
     } else if (!limit || dest + 2 <= limit) {
       dest[0] = (chr >> 6) | 0xC0;
-      dest[1] = chr & 0x3F | 0x80;
+      dest[1] = (chr & 0x3F) | 0x80;
       return dest + 2;
     }
   } else if (!limit || dest + 1 <= limit) {
@@ -224,11 +224,11 @@ const char* gpg::STR_DecodeUtf8Char(
  * Encodes one wide-character string as UTF-8 via `STR_EncodeUtf8Char`,
  * appending each codepoint until the terminating NUL.
  */
-msvc8::string gpg::STR_WideToUtf8(
+fa::string gpg::STR_WideToUtf8(
   const wchar_t* str
 )
 {
-  msvc8::string builder{};
+  fa::string builder{};
   if (str != nullptr) {
     char buff[4];
     for (wchar_t c = *str; c; c = *++str) {
@@ -272,7 +272,7 @@ std::wstring gpg::STR_Utf8ToWide(
 bool gpg::STR_GetToken(
   StrArg& find,
   const char* str,
-  msvc8::string& dest
+  fa::string& dest
 )
 {
   int c = *find;
@@ -309,10 +309,10 @@ bool gpg::STR_GetToken(
 void gpg::STR_GetTokens(
   StrArg find,
   const char* str,
-  msvc8::vector<msvc8::string>& vec
+  fa::vector<fa::string>& vec
 )
 {
-  msvc8::string token{};
+  fa::string token{};
   const char* const delimiters = str;
   if (STR_GetToken(find, delimiters, token)) {
     do {
@@ -329,7 +329,7 @@ void gpg::STR_GetTokens(
  * start index of the current/previous word boundary.
  */
 int gpg::STR_GetWordStartIndex(
-  msvc8::string& str,
+  fa::string& str,
   const int pos
 )
 {
@@ -348,11 +348,11 @@ int gpg::STR_GetWordStartIndex(
     const auto whitespacePos = sWhitespaceChars.find(&c, 0, 1);
 
     if (boundary) {
-      if (whitespacePos != msvc8::string::npos) {
+      if (whitespacePos != fa::string::npos) {
         return index;
       }
     } else {
-      boundary = whitespacePos == msvc8::string::npos;
+      boundary = whitespacePos == fa::string::npos;
     }
 
     --index;
@@ -364,7 +364,7 @@ int gpg::STR_GetWordStartIndex(
 /**
  * Address: 0x00938570 (FUN_00938570, gpg::STR_GetNextWordStartIndex)
  *
- * msvc8::string &, int
+ * fa::string &, int
  *
  * IDA signature:
  * int __cdecl gpg::STR_GetNextWordStartIndex(std::string *str, int pos);
@@ -374,7 +374,7 @@ int gpg::STR_GetWordStartIndex(
  * after the next whitespace separator; returns UTF-8 length when none exists.
  */
 int gpg::STR_GetNextWordStartIndex(
-  msvc8::string& str,
+  fa::string& str,
   int pos
 )
 {
@@ -390,7 +390,7 @@ int gpg::STR_GetNextWordStartIndex(
 
   while (*cursor != '\0') {
     const char c = *cursor;
-    const bool isWhitespace = (sWhitespaceChars.find(&c, 0, 1) != msvc8::string::npos);
+    const bool isWhitespace = (sWhitespaceChars.find(&c, 0, 1) != fa::string::npos);
 
     if (seenWhitespace) {
       if (!isWhitespace) {
@@ -521,6 +521,21 @@ int gpg::STR_CompareNoCase(
   return _stricmp(lhs, rhs);
 }
 
+bool gpg::STR_FileNameOrderLess(const StrArg lhs, const StrArg rhs) noexcept
+{
+  const auto upper = [](const char c) noexcept {
+    const auto byte = static_cast<unsigned char>(c);
+    return byte >= 'a' && byte <= 'z' ? static_cast<unsigned char>(byte - ('a' - 'A')) : byte;
+  };
+  std::size_t at = 0;
+  for (; upper(lhs[at]) == upper(rhs[at]); ++at) {
+    if (lhs[at] == '\0') {
+      return std::strcmp(lhs, rhs) < 0; // equal apart from case: byte order
+    }
+  }
+  return upper(lhs[at]) < upper(rhs[at]);
+}
+
 bool gpg::STR_ContainsNoCase(
   const StrArg str,
   const StrArg needle
@@ -533,9 +548,9 @@ bool gpg::STR_ContainsNoCase(
     return false;
   }
 
-  const msvc8::string haystackLower = STR_ToLower(str);
-  const msvc8::string needleLower = STR_ToLower(needle);
-  return haystackLower.find(needleLower.data(), 0, needleLower.size()) != msvc8::string::npos;
+  const fa::string haystackLower = STR_ToLower(str);
+  const fa::string needleLower = STR_ToLower(needle);
+  return haystackLower.find(needleLower.data(), 0, needleLower.size()) != fa::string::npos;
 }
 
 bool gpg::STR_EqualsNoCase(
@@ -561,7 +576,7 @@ bool gpg::STR_IsIdent(
 )
 {
   char c = *str++;
-  if (c == '\0' || (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && c != '_') {
+  if (c == '\0' || ((c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && c != '_')) {
     return false;
   }
   c = *str++;
@@ -582,7 +597,7 @@ bool gpg::STR_IsIdent(
  * non-zero, returning the number of replacements performed.
  */
 int gpg::STR_Replace(
-  msvc8::string& str,
+  fa::string& str,
   const StrArg what,
   const StrArg with,
   const unsigned int unk
@@ -594,7 +609,7 @@ int gpg::STR_Replace(
   int replaceCount = 0;
   if (unk != 0u) {
     std::size_t searchPos = 0u;
-    while ((searchPos = str.find(what, searchPos, whatLength)) != msvc8::string::npos) {
+    while ((searchPos = str.find(what, searchPos, whatLength)) != fa::string::npos) {
       str.replace(searchPos, whatLength, std::string_view{with, withLength});
       searchPos += withLength;
       ++replaceCount;
@@ -910,9 +925,9 @@ bool gpg::STR_WildcardValidPrefix(
 }
 
 // 0x00938C80
-msvc8::string gpg::STR_GetWhitespaceCharacters()
+fa::string gpg::STR_GetWhitespaceCharacters()
 {
-  return msvc8::string{sWhitespaceChars};
+  return fa::string{sWhitespaceChars};
 }
 
 /**
@@ -922,7 +937,7 @@ msvc8::string gpg::STR_GetWhitespaceCharacters()
  * Returns `str` without its trailing `chr` delimiter (or without the last
  * character when `chr==0`).
  */
-msvc8::string gpg::STR_Chop(
+fa::string gpg::STR_Chop(
   const StrArg str,
   const char chr
 )
@@ -932,11 +947,14 @@ msvc8::string gpg::STR_Chop(
     if (!chr || str[size - 1] == chr) {
       --size;
     }
-    return msvc8::string{str, &str[size]};
+    return fa::string{str, &str[size]};
   } else {
-    return msvc8::string{""};
+    return fa::string{""};
   }
 }
+
+/// Engine addition (`res_LowerInPlace`, String.h): STR_ToLower and STR_CanonizeFilename edit one copy in place.
+bool gpg::str_LowerInPlace = true;
 
 /**
  * Address: 0x00938A80 (FUN_00938A80, gpg::STR_ToLower)
@@ -951,17 +969,30 @@ msvc8::string gpg::STR_Chop(
  * then produced "cZ\programdata\...\supcomdatapathNlua", so no absolute path
  * could ever be opened and startup died in gpg::Die on the data-path script.
  */
-msvc8::string gpg::STR_ToLower(
+fa::string gpg::STR_ToLower(
   StrArg str
 )
 {
-  msvc8::string builder{};
-  builder.reserve(strlen(str));
-  for (char c = *str; c != '\0'; c = *++str) {
-    if (c >= 'A' && c <= 'Z') {
-      c += 'a' - 'A';
+  fa::string builder{};
+  if (!str_LowerInPlace) {
+    builder.reserve(strlen(str));
+    for (char c = *str; c != '\0'; c = *++str) {
+      if (c >= 'A' && c <= 'Z') {
+        c += 'a' - 'A';
+      }
+      builder.append(1, c);
     }
-    builder.append(1, c);
+    return builder;
+  }
+
+  // Engine addition (res_LowerInPlace): copied whole and lowered in place; appending one character
+  // at a time was a fifth of blueprint loading, through the path lookups that canonize every name.
+  builder.assign_owned(std::string_view(str, strlen(str)));
+  char* const text = builder.raw_data_mut_unsafe();
+  for (std::size_t i = 0; i < builder.size(); ++i) {
+    if (text[i] >= 'A' && text[i] <= 'Z') {
+      text[i] += 'a' - 'A';
+    }
   }
   return builder;
 }
@@ -975,11 +1006,11 @@ msvc8::string gpg::STR_ToLower(
  * `lea ecx, [eax-61h] / cmp ecx, 19h / ja` - the same unsigned range test as
  * STR_ToLower, so only 'a'..'z' are touched.
  */
-msvc8::string gpg::STR_ToUpper(
+fa::string gpg::STR_ToUpper(
   StrArg str
 )
 {
-  msvc8::string builder{};
+  fa::string builder{};
   builder.reserve(strlen(str));
   for (char c = *str; c != '\0'; c = *++str) {
     if (c >= 'a' && c <= 'z') {
@@ -991,7 +1022,7 @@ msvc8::string gpg::STR_ToUpper(
 }
 
 void gpg::STR_NormalizeFilenameLowerSlash(
-  msvc8::string& inOut
+  fa::string& inOut
 )
 {
   for (std::size_t i = 0; i < inOut.size(); ++i) {
@@ -1029,8 +1060,8 @@ void gpg::STR_NormalizeFilenameLowerSlash(
  * Initializes destination string into empty SSO state, then canonicalizes one
  * filename/path token to lowercase backslash form.
  */
-msvc8::string* gpg::STR_InitFilename(
-  msvc8::string* const out,
+fa::string* gpg::STR_InitFilename(
+  fa::string* const out,
   const StrArg in
 )
 {
@@ -1043,8 +1074,8 @@ msvc8::string* gpg::STR_InitFilename(
   return out;
 }
 
-msvc8::string* gpg::STR_SetFilename(
-  msvc8::string* const out,
+fa::string* gpg::STR_SetFilename(
+  fa::string* const out,
   const StrArg in
 )
 {
@@ -1057,9 +1088,9 @@ msvc8::string* gpg::STR_SetFilename(
  * What it does:
  * Routes one source filename string through `STR_SetFilename` into `out`.
  */
-msvc8::string* gpg::STR_CopyFilename(
-  msvc8::string* const out,
-  const msvc8::string* const filename
+fa::string* gpg::STR_CopyFilename(
+  fa::string* const out,
+  const fa::string* const filename
 )
 {
   return STR_SetFilename(out, filename->raw_data_unsafe());
@@ -1072,7 +1103,7 @@ msvc8::string* gpg::STR_CopyFilename(
  * Lowercases one path and normalizes `/` separators to `\\`.
  */
 void gpg::STR_CanonizeFilename(
-  msvc8::string* const out,
+  fa::string* const out,
   const StrArg in
 )
 {
@@ -1080,10 +1111,32 @@ void gpg::STR_CanonizeFilename(
     return;
   }
 
-  out->assign_owned(STR_ToLower(in ? in : "").view());
+  if (!str_LowerInPlace) {
+    out->assign_owned(STR_ToLower(in ? in : "").view());
+    for (std::size_t i = 0; i < out->size(); ++i) {
+      if ((*out)[i] == '/') {
+        (*out)[i] = '\\';
+      }
+    }
+    return;
+  }
+
+  // Engine addition (res_LowerInPlace): one copy, lowered and separated in place, rather than
+  // through a lowered temporary. A source inside `out` itself is already in place: assigning would
+  // free it first.
+  const char* const source = in ? in : "";
+  const char* const current = out->raw_data_unsafe();
+  if (source < current || source > current + out->size()) {
+    out->assign_owned(std::string_view(source, strlen(source)));
+  } else if (source != current) {
+    out->assign_owned(std::string(source));
+  }
+  char* const text = out->raw_data_mut_unsafe();
   for (std::size_t i = 0; i < out->size(); ++i) {
-    if ((*out)[i] == '/') {
-      (*out)[i] = '\\';
+    if (text[i] >= 'A' && text[i] <= 'Z') {
+      text[i] += 'a' - 'A';
+    } else if (text[i] == '/') {
+      text[i] = '\\';
     }
   }
 }
@@ -1095,11 +1148,11 @@ void gpg::STR_CanonizeFilename(
  * Skips leading ASCII whitespace bytes, copies the remaining text, then trims
  * trailing ASCII whitespace bytes from the copied buffer.
  */
-msvc8::string gpg::STR_TrimWhitespace(
+fa::string gpg::STR_TrimWhitespace(
   StrArg str
 )
 {
-  msvc8::string builder{};
+  fa::string builder{};
   if (str != nullptr) {
     const char* cursor = str;
     while (*cursor == ' ' || *cursor == '\t' || *cursor == '\r' || *cursor == '\n') {
@@ -1127,7 +1180,7 @@ msvc8::string gpg::STR_TrimWhitespace(
  * What it does:
  * Starts one varargs lane at `fmt` and forwards formatting through `STR_Va`.
  */
-msvc8::string gpg::STR_Printf(
+fa::string gpg::STR_Printf(
   const char* fmt,
   ...
 )
@@ -1135,7 +1188,7 @@ msvc8::string gpg::STR_Printf(
   va_list va;
   va_start(va, fmt);
   const char* forwardedFormat = fmt;
-  const msvc8::string ret = STR_Va(forwardedFormat, va);
+  const fa::string ret = STR_Va(forwardedFormat, va);
   va_end(va);
   return ret;
 }
@@ -1148,24 +1201,21 @@ msvc8::string gpg::STR_Printf(
  * Formats one vararg message into a 256-byte stack buffer first, then retries
  * in a growable heap buffer until `_vsnprintf` returns a concrete length.
  */
-msvc8::string gpg::STR_Va(
+fa::string gpg::STR_Va(
   const char*& fmt,
-  const va_list va
+  va_list va
 )
 {
-  // Build through msvc8::string's concatenation path, not append().
+  // Build through fa::string's concatenation path, not append().
   //
-  // msvc8::string is the legacy non-owning wrapper: it holds an inline buffer
+  // fa::string is the legacy non-owning wrapper: it holds an inline buffer
   // of 15 chars and never reallocates, so append() returns false and copies
   // nothing once mySize + n exceeds myRes. Formatted diagnostics are almost
   // always longer than 15 characters, so appending into a default-constructed
   // string silently produced an empty result - every Logf/Die/exception
   // message the engine formatted came out blank.
   //
-  // Concatenation is the wrapper's supported route for longer strings: it
-  // stages them in the thread-local arena behind get_concat_buffer and adopts
-  // that storage, which is the same lifetime contract every operator+ already
-  // relies on.
+  // Concatenation is the wrapper's supported route for longer strings.
   // 0x00938E1F / 0x00938E6B call MSVC8's `_vsnprintf`, whose truncation signal
   // is a -1 return; the binary's `while (n == -1)` loop is built on that.
   // `std::vsnprintf` here is the C99/UCRT function, which instead returns the
@@ -1180,27 +1230,35 @@ msvc8::string gpg::STR_Va(
     return written < 0 || static_cast<std::size_t>(written) >= capacity;
   };
 
+  // Each pass formats from its own copy of `va`: a va_list is consumed by the call that reads
+  // it (on System V x64 it is a cursor into the register save area; on Windows a pointer the
+  // callee copies, so there the copy changes nothing).
   char stackBuffer[256]{};
-  int formattedLength = std::vsnprintf(stackBuffer, sizeof(stackBuffer), fmt, va);
+  va_list attempt;
+  va_copy(attempt, va);
+  int formattedLength = std::vsnprintf(stackBuffer, sizeof(stackBuffer), fmt, attempt);
+  va_end(attempt);
   if (didNotFit(formattedLength, sizeof(stackBuffer))) {
-    msvc8::vector<char> dynamicBuffer{};
+    fa::vector<char> dynamicBuffer{};
     std::size_t capacity = sizeof(stackBuffer);
     do {
       capacity *= 2;
       dynamicBuffer.resize(capacity, 0);
-      formattedLength = std::vsnprintf(dynamicBuffer.data(), capacity, fmt, va);
+      va_copy(attempt, va);
+      formattedLength = std::vsnprintf(dynamicBuffer.data(), capacity, fmt, attempt);
+      va_end(attempt);
       if (formattedLength < 0) {
         // `_vsnprintf` only ever returned -1 for truncation, so the binary's
         // loop always terminated. The C99 function also returns negative for a
         // genuine encoding error, which would spin here forever; there is no
         // message to recover in that case.
-        return msvc8::string{};
+        return fa::string{};
       }
     } while (didNotFit(formattedLength, capacity));
 
-    return msvc8::string{} +
+    return fa::string{} +
            std::string_view(dynamicBuffer.data(), static_cast<std::size_t>(formattedLength));
   }
 
-  return msvc8::string{} + std::string_view(stackBuffer, static_cast<std::size_t>(formattedLength));
+  return fa::string{} + std::string_view(stackBuffer, static_cast<std::size_t>(formattedLength));
 }

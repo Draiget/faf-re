@@ -84,12 +84,12 @@ namespace moho
    */
   bool DUMP_PromptFilename()
   {
-    msvc8::string defaultDirectory;
-    defaultDirectory.assign(dump_frameDumpName, 0, msvc8::string::npos);
+    fa::string defaultDirectory;
+    defaultDirectory.assign(dump_frameDumpName, 0, fa::string::npos);
 
     if (defaultDirectory.empty()) {
       defaultDirectory.assign(
-        gpg::STR_Printf("%s/Desktop/SC_CAPTURE", std::getenv("USERPROFILE")), 0, msvc8::string::npos
+        gpg::STR_Printf("%s/Desktop/SC_CAPTURE", std::getenv("USERPROFILE")), 0, fa::string::npos
       );
     }
 
@@ -103,7 +103,7 @@ namespace moho
     );
     if (directoryDialog.ShowModal() == wxID_OK) {
       dump_frameDumpName.assign(
-        gpg::STR_WideToUtf8(directoryDialog.GetPath().c_str()), 0, msvc8::string::npos
+        gpg::STR_WideToUtf8(directoryDialog.GetPath().c_str()), 0, fa::string::npos
       );
       accepted = true;
     }
@@ -124,7 +124,7 @@ namespace moho
    *
    * The binary reads no command arguments here.
    */
-  void DUMP_Frames(const msvc8::vector<msvc8::string>& /*args*/)
+  void DUMP_Frames(const fa::vector<fa::string>& /*args*/)
   {
     if (dump_frameRate != 0) {
       dump_frameRate = 0;
@@ -156,14 +156,14 @@ namespace moho
    * The `.` test is the binary's `compare(0, size, ".", 1)` at 0x007F589F,
    * which is simply "this token is not exactly a dot".
    */
-  void DUMP_Frame(const msvc8::vector<msvc8::string>& args)
+  void DUMP_Frame(const fa::vector<fa::string>& args)
   {
 
     if (args.size() == 2u) {
-      const msvc8::string& directoryToken = *ConCommandArg(args, 1);
+      const fa::string& directoryToken = *ConCommandArg(args, 1);
 
       if (directoryToken.view() != ".") {
-        dump_frameDumpName.assign(directoryToken, 0, msvc8::string::npos);
+        dump_frameDumpName.assign(directoryToken, 0, fa::string::npos);
       } else if (dump_frameDumpName.empty()) {
         dump_frameRate = DUMP_PromptFilename() ? 1 : 0;
         if (dump_frameRate == 0) {
@@ -176,7 +176,7 @@ namespace moho
 
       dump_frameRate = 1;
     } else {
-      dump_frameDumpName.assign(USER_GetScreenshotDir(), 0, msvc8::string::npos);
+      dump_frameDumpName.assign(USER_GetScreenshotDir(), 0, fa::string::npos);
       dump_frameRate = 1;
     }
 

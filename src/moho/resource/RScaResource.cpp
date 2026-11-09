@@ -22,15 +22,6 @@ gpg::RType* RScaResource::sType = nullptr;
 
 namespace
 {
-  [[nodiscard]] gpg::RType* ResolveRScaResourceTypeCached() noexcept
-  {
-    gpg::RType* type = moho::RScaResource::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::RScaResource));
-      moho::RScaResource::sType = type;
-    }
-    return type;
-  }
 
   class RScaResourceTypeInfo final : public gpg::RType
   {
@@ -115,7 +106,7 @@ bool RScaResource::LoadScaFile(const char* filename)
   }
 
   // Store filename and take ownership of the file data buffer.
-  new (&mFilename) msvc8::string(filename, std::strlen(filename));
+  new (&mFilename) fa::string(filename, std::strlen(filename));
   mMem = fileData;
 
   // Parse header pointers.
@@ -268,7 +259,7 @@ namespace moho
 {
   void RScaResource::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
   {
-    msvc8::string path;
+    fa::string path;
     archive.ReadString(&path);
     result.SetShared(GetScaResource(path.c_str()), 1u);
   }
@@ -280,7 +271,7 @@ namespace moho
     gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
   )
   {
-    msvc8::string mountedPath;
+    fa::string mountedPath;
     (void)FILE_ToMountedPath(&mountedPath, mFilename.c_str());
     archive.WriteString(&mountedPath);
     result.SetShared(1u);

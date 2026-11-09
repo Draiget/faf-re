@@ -28,19 +28,9 @@ namespace
     gpg::PreRegisterRType(typeid(moho::EntityCategorySet), typeInfo);
   }
 
-  [[nodiscard]] gpg::RType* CachedEntityCategorySetType()
-  {
-    gpg::RType* type = moho::EntityCategorySet::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntityCategorySet));
-      moho::EntityCategorySet::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] moho::EntityCategorySet* TryUpcastEntityCategoryOrThrow(const gpg::RRef& sourceRef)
   {
-    gpg::RType* const entityCategoryType = CachedEntityCategorySetType();
+    gpg::RType* const entityCategoryType = gpg::RTypeOf<moho::EntityCategorySet>();
     const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, entityCategoryType);
     auto* const categorySet = static_cast<moho::EntityCategorySet*>(upcast.mObj);
     if (!categorySet) {
@@ -212,10 +202,7 @@ void EntityCategoryTypeInfo::Delete(void* const objectStorage)
  */
 gpg::RRef EntityCategoryTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const categorySet = static_cast<EntityCategorySet*>(objectStorage);
-  if (categorySet) {
-    new (categorySet) EntityCategorySet();
-  }
+  auto* const categorySet = gpg::ConstructInStorage<EntityCategorySet>(objectStorage);
   return MakeEntityCategoryRef(categorySet);
 }
 

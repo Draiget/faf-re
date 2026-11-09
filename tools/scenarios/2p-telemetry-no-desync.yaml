@@ -1,0 +1,49 @@
+name: 2p-telemetry-no-desync
+description: >
+  Issue #218 acceptance check, the normal game: two clients of our x64 build
+  (bin_x64\desync_test.exe) with telemetry on and no desync. Each must send
+  only one faf.game.end record when /exitattick quits it at tick 300. Start an
+  OpenTelemetry collector on 127.0.0.1:4318 first. Needs
+  init_mpemu_localvault.lua; run with -advertise 192.168.42.77 on the
+  isolated account.
+timeout: 12m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: demoralization
+  GameSpeed: fast
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\desync_test.exe'
+  init: init_mpemu_localvault.lua
+  nosound: true
+  tile: true
+
+players:
+  - uid: 1
+    name: Telemetry-A
+    faction: uef
+    args: ['/title', 'telemetry-A', '/telemetry', '/telemetryendpoint', 'http://127.0.0.1:4318',
+           '/savereplay', 'gpgnet://127.0.0.1:1/424243/Telemetry-A.SCFAreplay', '/exitattick', '300']
+  - uid: 2
+    name: Telemetry-B
+    faction: cybran
+    args: ['/title', 'telemetry-B', '/telemetry', '/telemetryendpoint', 'http://127.0.0.1:4318',
+           '/savereplay', 'gpgnet://127.0.0.1:1/424243/Telemetry-B.SCFAreplay', '/exitattick', '300']
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 6m }
+  - wait: 2m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  logsContain:
+    - { uids: all, pattern: 'exitattick: quitting at game tick' }
+    - { uids: all, pattern: 'Telemetry: 1 record\(s\) sent' }

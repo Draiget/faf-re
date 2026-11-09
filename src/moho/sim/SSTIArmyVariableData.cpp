@@ -234,7 +234,7 @@ namespace moho
 
     archive->WriteUInt(mPlayerColorBgra);
     archive->WriteUInt(mArmyColorBgra);
-    archive->WriteString(const_cast<msvc8::string*>(&mArmyType));
+    archive->WriteString(const_cast<fa::string*>(&mArmyType));
     archive->WriteInt(mFaction);
     archive->WriteBool(mUseWholeMap != 0u);
     archive->WriteBool(mShowScore != 0u);

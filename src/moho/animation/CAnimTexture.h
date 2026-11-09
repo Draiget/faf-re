@@ -54,7 +54,7 @@ namespace moho
     void GetFrameAt(FrameRef& outFrame, float frameIndex) const;
 
 
-    [[nodiscard]] const msvc8::string& GetBaseTextureName() const noexcept;
+    [[nodiscard]] const fa::string& GetBaseTextureName() const noexcept;
 
     CAnimTexture(const CAnimTexture&) = delete;
     CAnimTexture& operator=(const CAnimTexture&) = delete;
@@ -77,7 +77,7 @@ namespace moho
      * Increments the trailing numeric suffix in-place and wraps carries to `0`.
      * Returns false only when no suitable numeric suffix exists.
      */
-    static bool IncrementFrameNameSuffix(msvc8::string& textureName);
+    static bool IncrementFrameNameSuffix(fa::string& textureName);
 
     /**
      * Address: 0x00423310 (FUN_00423310)
@@ -88,8 +88,8 @@ namespace moho
     void AppendFrameRef(const FrameRef& frame);
 
   public:
-    msvc8::vector<FrameRef> mFrames; // +0x08
-    msvc8::string mBaseTextureName;  // +0x18
+    fa::vector<FrameRef> mFrames; // +0x08
+    fa::string mBaseTextureName;  // +0x18
   };
 
   static_assert(sizeof(CAnimTexture::FrameRef) == 0x08, "CAnimTexture::FrameRef size must be 0x08");

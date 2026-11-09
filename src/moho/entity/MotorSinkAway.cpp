@@ -1,4 +1,5 @@
 #include "moho/entity/MotorSinkAway.h"
+#include "gpg/core/reflection/Reflection.h"
 
 #include <cstdint>
 #include <new>
@@ -85,7 +86,7 @@ namespace
    * Deserializes one `Motor` object lane through archive owner context and
    * returns the archive instance.
    */
-  gpg::ReadArchive* ReadMotorArchiveAdapter(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
+  [[maybe_unused]] gpg::ReadArchive* ReadMotorArchiveAdapter(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
   {
     archive->Read(CachedMotorType(), object, *ownerRef);
     return archive;
@@ -98,7 +99,7 @@ namespace
    * Serializes one `Motor` object lane through archive owner context and
    * returns the archive instance.
    */
-  gpg::WriteArchive* WriteMotorArchiveAdapter(
+  [[maybe_unused]] gpg::WriteArchive* WriteMotorArchiveAdapter(
     gpg::WriteArchive* const archive,
     void** const objectSlot,
     const gpg::RRef* const ownerRef
@@ -114,7 +115,7 @@ namespace
    * What it does:
    * Deserializes one `Motor` object lane through archive owner context.
    */
-  void ReadMotorArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
+  [[maybe_unused]] void ReadMotorArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
   {
     archive->Read(CachedMotorType(), object, *ownerRef);
   }
@@ -125,7 +126,7 @@ namespace
    * What it does:
    * Serializes one `Motor` object lane through archive owner context.
    */
-  void WriteMotorArchiveObjectLane1(
+  [[maybe_unused]] void WriteMotorArchiveObjectLane1(
     gpg::WriteArchive* const archive,
     void** const objectSlot,
     const gpg::RRef* const ownerRef
@@ -140,37 +141,6 @@ namespace
   [[nodiscard]] LuaPlus::LuaObject GetMotorSinkAwayLuaFactoryObject(LuaPlus::LuaState* const state)
   {
     return moho::CScrLuaMetatableFactory<moho::MotorSinkAway>::Instance().Get(state);
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived =
-      dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
   }
 
   /**
@@ -267,10 +237,7 @@ namespace moho
    */
   gpg::RRef MotorSinkAway::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -306,12 +273,7 @@ namespace moho
    */
   void DestroyMotorSinkAwayTypeInfoBody(MotorSinkAwayTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**
@@ -336,13 +298,7 @@ namespace moho
   void MotorSinkAwayTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedCScriptObjectType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::RType::BaseSubobjectOffset<MotorSinkAway, CScriptObject>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::RType::BaseSubobjectOffset<MotorSinkAway, CScriptObject>());
   }
 
   /**
@@ -352,13 +308,7 @@ namespace moho
   void MotorSinkAwayTypeInfo::AddBase_Motor(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedMotorType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType);
   }
 
   /**
@@ -458,12 +408,7 @@ namespace gpg
    */
   gpg::RRef* RRef_MotorSinkAway(gpg::RRef* const out, moho::MotorSinkAway* const value)
   {
-    if (!out) {
-      return nullptr;
-    }
-
-    *out = MakeDerivedRef(value, CachedMotorSinkAwayType());
-    return out;
+    return gpg::WriteDerivedRef(out, value, &CachedMotorSinkAwayType);
   }
 } // namespace gpg
 

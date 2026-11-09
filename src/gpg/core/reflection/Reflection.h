@@ -1,9 +1,11 @@
 #pragma once
+#include <new>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <map>
 #include <type_traits>
+#include <initializer_list>
 #include <typeinfo>
 #include <vector>
 
@@ -278,7 +280,7 @@ namespace gpg
    * Base of every `Ser{Construct,SaveConstruct,SaveLoad}Helper_<T>` reflection
    * bootstrap singleton (`CIntelPosHandleConstruct`, `Rect2iSerializer`, the
    * per-file `...ConstructHelper`/`...Serializer` globals throughout
-   * `src/**`). Each of those helpers self-registers at static-init time,
+   * `src/ **`). Each of those helpers self-registers at static-init time,
    * waits on the process-global pending list below, then gets dispatched once
    * (via `Init()`) to bind its construct/delete or load/save callback(s) onto
    * a reflected `RType`.
@@ -366,7 +368,7 @@ namespace gpg
   // keyed on `RRef` and ordered by it, and that header sits below this one.
 
   using TypeMap = std::map<const char*, RType*, CStrLess>;
-  using TypeVec = msvc8::vector<RType*>;
+  using TypeVec = fa::vector<RType*>;
   using TypeInfoMap = std::map<const std::type_info*, RType*, TypeInfoLess>;
 
   class RObject
@@ -578,7 +580,7 @@ namespace gpg
      * What it does:
      * Reads the reference value as lexical text through the bound `RType`.
      */
-    msvc8::string GetLexical() const;
+    fa::string GetLexical() const;
 
     /**
      * Address: 0x004A3600 (FUN_004A3600)
@@ -1091,10 +1093,50 @@ namespace gpg
    * in moho/sim/CDamage.cpp, removed 2026-09-30.)
    * Address: 0x0054CFC0 (FUN_0054CFC0 -- `RTypeOf<moho::CAniDefaultSkel>`; formerly `CachedDefaultSkelType` in
    * moho/animation/CAniDefaultSkelConstruct.cpp, removed 2026-09-30.)
+   * Address: 0x00786160 (FUN_00786160 -- `RTypeOf<moho::CMauiBorder>`; formerly `CachedCMauiBorderUpcastType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
+   * Address: 0x0078D920 (FUN_0078D920 -- `RTypeOf<moho::CMauiCursor>`; formerly `CachedCMauiCursorUpcastType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
+   * Address: 0x00794E40 (FUN_00794E40 -- `RTypeOf<moho::CMauiEdit>`; formerly `CachedCMauiEditType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
+   * Address: 0x007A23C0 (FUN_007A23C0 -- `RTypeOf<moho::CMauiScrollbar>`; formerly `CachedCMauiScrollbarType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
+   * Address: 0x007C8D70 (FUN_007C8D70 -- `RTypeOf<moho::CLobby>`; formerly `CachedCLobbyTypeBridge` in moho/net/CLobby.cpp, removed 2026-11-04.)
+   * Address: 0x0086A380 (FUN_0086A380 -- `RTypeOf<moho::CLuaWldUIProvider>`; formerly `CachedCLuaWldUIProviderUpcastType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
+   * Address: 0x0087F010 (FUN_0087F010 -- `RTypeOf<ScriptedDecal>`; formerly `CachedScriptedDecalType` in moho/script/ScriptedDecal.cpp, removed 2026-11-04.)
+   * Address: 0x004023E0 (FUN_004023E0 -- `RTypeOf<RType>`; formerly `CachedRTypeDescriptor` in gpg/core/reflection/Reflection.cpp, removed 2026-11-04.)
+   * Address: 0x00402890 (FUN_00402890 -- `RTypeOf<unsigned int>`; formerly `CachedUIntType` in gpg/core/containers/FastVectorUIntReflection.cpp, removed 2026-11-04.)
+   * Address: 0x0040E140 (FUN_0040E140 -- `RTypeOf<float>`; formerly `CachedFloatType` in gpg/core/reflection/Reflection.cpp, removed 2026-11-04.)
+   * Address: 0x004A4E10 (FUN_004A4E10 -- `RTypeOf<char>`; formerly `GetCharRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4E30 (FUN_004A4E30 -- `RTypeOf<short>`; formerly `GetShortRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4E50 (FUN_004A4E50 -- `RTypeOf<int>`; formerly `GetIntRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4E70 (FUN_004A4E70 -- `RTypeOf<long>`; formerly `GetLongRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4E90 (FUN_004A4E90 -- `RTypeOf<signed char>`; formerly `GetSignedCharRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4EB0 (FUN_004A4EB0 -- `RTypeOf<unsigned char>`; formerly `GetUnsignedCharRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4ED0 (FUN_004A4ED0 -- `RTypeOf<bool>`; formerly `GetBoolRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4EF0 (FUN_004A4EF0 -- `RTypeOf<fa::string>`; formerly `GetStringRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x0050CAB0 (FUN_0050CAB0 -- `RTypeOf<moho::SCoordsVec2>`; formerly `ResolveSCoordsVec2Type` in moho/containers/SCoordsVec2TypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x0050CAD0 (FUN_0050CAD0 -- `RTypeOf<moho::SOCellPos>`; formerly `ResolveSOCellPosType` in moho/sim/SOCellPosTypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x0050CB10 (FUN_0050CB10 -- `RTypeOf<SPointVector>`; formerly `CachedSPointVectorType` in moho/ai/SPointVectorTypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x00510450 (FUN_00510450 -- `RTypeOf<moho::REmitterBlueprintCurve>`; formerly `CachedEmitterBlueprintCurveType` in moho/resource/blueprints/REmitterCurveTypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x00510490 (FUN_00510490 -- `RTypeOf<moho::REmitterBlueprint>`; formerly `CachedEmitterBlueprintType` in moho/resource/blueprints/REmitterBlueprintTypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x005104B0 (FUN_005104B0 -- `RTypeOf<moho::RTrailBlueprint>`; formerly `CachedTrailBlueprintType` in moho/resource/blueprints/RTrailBlueprintTypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x0051CC40 (FUN_0051CC40 -- `RTypeOf<RProjectileBlueprint>`; formerly `ResolveRProjectileBlueprintType` in moho/resource/blueprints/RProjectileBlueprint.cpp, removed 2026-11-04.)
+   * Address: 0x00528340 (FUN_00528340 -- `RTypeOf<RMeshBlueprint>`; formerly `ResolveRMeshBlueprintType` in moho/resource/blueprints/RMeshBlueprint.cpp, removed 2026-11-04.)
+   * Address: 0x0054CFE0 (FUN_0054CFE0 -- `RTypeOf<CAniPose>`; formerly `CachedCAniPoseType` in moho/animation/CAniPoseTypeInfo.cpp, removed 2026-11-04.)
+   * Address: 0x0072AA20 (FUN_0072AA20 -- `RTypeOf<moho::CSquad>`; formerly `CachedCSquadType` in moho/sim/CPlatoon.cpp, removed 2026-11-04.)
+   * Address: 0x0077B940 (FUN_0077B940 -- `RTypeOf<moho::SDecalInfo>`; formerly `CachedSDecalInfoType` in moho/render/CDecalTypes.cpp, removed 2026-11-04.)
+   * Address: 0x0094F4D0 (FUN_0094F4D0 -- `RTypeOf<gpg::ArchiveToken>`; formerly `CachedArchiveTokenType` in gpg/core/containers/ArchiveTokenTypeInfo.cpp, removed 2026-11-04.)
    * Address: 0x0050D390 (FUN_0050D390 -- `RTypeOf<gpg::Rect2i>`, slot 0x010C6D98; formerly `CachedRect2iType`
    * in gpg/core/reflection/Reflection.cpp, removed 2026-10-01.)
    * Address: 0x006D2EA0 (FUN_006D2EA0 -- `RTypeOf<moho::WeakEntitySetTemplate<moho::Unit>>`; formerly
    * `ResolveWeakUnitSetType` in moho/serialization/WeakUnitSetSerializer.cpp, removed 2026-10-01.)
+   * Address: 0x00508290 (FUN_00508290 -- `RTypeOf<moho::CIntelGrid>`; formerly `ResolveCIntelGridType` in moho/sim/SDelayedSubVizInfoReflection.cpp, removed 2026-11-05.)
+   * Address: 0x006EBFA0 (FUN_006EBFA0 -- `RTypeOf<Broadcaster<ECommandEvent>>`; formerly `ResolveLegacyBroadcasterCommandEventType` in moho/unit/CUnitCommand.cpp, removed 2026-11-05.)
+   * Address: 0x0071EF60 (FUN_0071EF60 -- `RTypeOf<UIntInfluenceMapEntryMap>`; formerly `CachedInfluenceMapEntryMapType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x0071EF80 (FUN_0071EF80 -- `RTypeOf<fa::vector<moho::SThreat>>`; formerly `CachedSThreatVectorType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x0071FEA0 (FUN_0071FEA0 -- `RTypeOf<UIntIntMap>`; formerly `CachedUIntIntMapTypeLegacyLane` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x0071FEC0 (FUN_0071FEC0 -- `RTypeOf<InfluenceGridVector>`; formerly `CachedInfluenceGridVectorTypeLegacyLane` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x0078B440 (FUN_0078B440 -- `RTypeOf<moho::EMauiScrollAxis>`; formerly `CachedEMauiScrollAxisType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-05.)
+   * Address: 0x0078EB20 (FUN_0078EB20 -- `RTypeOf<moho::EMauiKeyCode>`; formerly `CachedEMauiKeyCodeType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-05.)
+   * Address: 0x00795FA0 (FUN_00795FA0 -- `RTypeOf<moho::EMauiEventType>`; formerly `CachedEMauiEventType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-05.)
+   * Address: 0x008C6520 (FUN_008C6520 -- `RTypeOf<moho::UserEntity>`; formerly `ResolveUserEntityTypeCacheLane` in moho/entity/UserEntity.cpp, removed 2026-11-05.)
    *
    * A pointer type is the exception: its descriptor is the pointee's
    * `RPointerType` object, which `U::GetPointerType()` constructs before it
@@ -2405,7 +2447,7 @@ namespace gpg
      * Address: 0x008DB100 (FUN_008DB100)
      * SLOT: 4
      */
-    virtual msvc8::string GetLexical(const RRef&) const;
+    virtual fa::string GetLexical(const RRef&) const;
 
     /**
      * Unknown (base: no-op/false).
@@ -2527,8 +2569,8 @@ namespace gpg
     load_func_t serLoadFunc_;
     int v8;
     int v9;
-    msvc8::vector<RField> bases_;
-    msvc8::vector<RField> fields_;
+    fa::vector<RField> bases_;
+    fa::vector<RField> fields_;
     new_ref_func_t newRefFunc_;
     cpy_ref_func_t cpyRefFunc_;
     delete_func_t deleteFunc_;
@@ -2553,22 +2595,22 @@ namespace gpg
      * Address: 0x0040E020 (FUN_0040E020 -- `AddField<unsigned int>`, binary name `AddField_uint`.)
      * Address: 0x004EDC10 (FUN_004EDC10 -- `AddField<int>`, binary name `AddField_int`.)
      * Address: 0x00510DD0 (FUN_00510DD0 -- `AddField<bool>`, binary name `AddFieldBool`.)
-     * Address: 0x0050E1F0 (FUN_0050E1F0 -- `AddField<msvc8::string>`, binary name `AddField_string`.)
+     * Address: 0x0050E1F0 (FUN_0050E1F0 -- `AddField<fa::string>`, binary name `AddField_string`.)
      * Address: 0x004EDFD0 (FUN_004EDFD0 -- `AddField<Wm3::Vector3f>`, binary name `AddField_Vector3f`.)
      * Address: 0x00510D50 (FUN_00510D50 -- `AddField<moho::RResId>`, binary name `AddField_RResId`.)
      * Address: 0x0050D010 (FUN_0050D010 -- `AddField<unsigned char>`, binary name `AddField_uchar`.)
      * Address: 0x00510F10 (FUN_00510F10 -- `AddField<moho::REmitterBlueprintCurve>`, binary name `AddField_REmitterBlueprintCurve`.)
      * Address: 0x00510FF0 (FUN_00510FF0 -- `AddField<moho::Vector4f>`, binary name `AddField_Vector4f`.)
-     * Address: 0x00513230 (FUN_00513230 -- `AddField<msvc8::vector<msvc8::string>>`, binary name `AddField_vector_string`.)
+     * Address: 0x00513230 (FUN_00513230 -- `AddField<fa::vector<fa::string>>`, binary name `AddField_vector_string`.)
      * Address: 0x00513330 (FUN_00513330 -- `AddField<moho::SFootprint>`, binary name `AddField_SFootprint`.)
-     * Address: 0x005146E0 (FUN_005146E0 -- `AddField<msvc8::list<moho::SNamedFootprint>>`, with its name
+     * Address: 0x005146E0 (FUN_005146E0 -- `AddField<fa::list<moho::SNamedFootprint>>`, with its name
      * `"Footprints"` and offset 0 folded in: `SRuleFootprintsBlueprintTypeInfo::AddFields` 0x00513FA0 and
      * `Init` 0x00513ED0 reach it with the type in ESI.)
      * Address: 0x004F08F0 (FUN_004F08F0 -- `AddField<Wm3::Quaternionf>("r", ...)` for `VTransform::orient_`, name and offset folded in;
      * formerly `AddQuaternionRotationField in moho/render/camera/VTransform.cpp` (RULE ONE), removed 2026-09-30.)
      * Address: 0x005132B0 (FUN_005132B0 -- `AddField<moho::ECollisionShape>("CollisionShape", ...)` for `REntityBlueprint::mCollisionShape`, name and offset folded in;
      * formerly `REntityBlueprintTypeInfo::AddFieldCollisionShape` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0051A330 (FUN_0051A330 -- `AddField<msvc8::vector<moho::RMeshBlueprintLOD>>("LODs", ...)` for `RMeshBlueprint::mLods`, name and offset folded in;
+     * Address: 0x0051A330 (FUN_0051A330 -- `AddField<fa::vector<moho::RMeshBlueprintLOD>>("LODs", ...)` for `RMeshBlueprint::mLods`, name and offset folded in;
      * formerly `RMeshBlueprintTypeInfo::AddFieldLods` (RULE ONE), removed 2026-09-30.)
      * Address: 0x0051CDC0 (FUN_0051CDC0 -- `AddField<moho::RProjectileBlueprintDisplay>("Display", ...)` for `RProjectileBlueprint::Display`, name and offset folded in;
      * formerly `RProjectileBlueprintTypeInfo::AddFieldDisplay` (RULE ONE), removed 2026-09-30.)
@@ -2614,7 +2656,7 @@ namespace gpg
      * formerly `RUnitBlueprintTypeInfo::AddFieldAiSection` (RULE ONE), removed 2026-09-30.)
      * Address: 0x00525C00 (FUN_00525C00 -- `AddField<moho::RUnitBlueprintIntel>("Intel", ...)` for `RUnitBlueprint::Intel`, name and offset folded in;
      * formerly `RUnitBlueprintTypeInfo::AddFieldIntelSection` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525C80 (FUN_00525C80 -- `AddField<msvc8::vector<moho::RUnitBlueprintWeapon>>("Weapons", ...)` for `RUnitBlueprint::Weapons`, name and offset folded in;
+     * Address: 0x00525C80 (FUN_00525C80 -- `AddField<fa::vector<moho::RUnitBlueprintWeapon>>("Weapons", ...)` for `RUnitBlueprint::Weapons`, name and offset folded in;
      * formerly `RUnitBlueprintTypeInfo::AddFieldWeaponSection` (RULE ONE), removed 2026-09-30.)
      * Address: 0x00525D00 (FUN_00525D00 -- `AddField<moho::RUnitBlueprintEconomy>("Economy", ...)` for `RUnitBlueprint::Economy`, name and offset folded in;
      * formerly `RUnitBlueprintTypeInfo::AddFieldEconomySection` (RULE ONE), removed 2026-09-30.)
@@ -2922,7 +2964,7 @@ namespace gpg
 
     static void Delete(void* const object)
     {
-      delete static_cast<T*>(object);
+      GPG_NONVIRTUAL_DESTROY(delete static_cast<T*>(object));
     }
 
     RType::construct_func_t mConstructFunc; // +0x0C
@@ -3396,7 +3438,7 @@ namespace gpg
      * VFTable SLOT: 4
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * In binary:
@@ -3417,7 +3459,7 @@ namespace gpg
       return this;
     }
 
-    const msvc8::vector<ROptionValue>& GetEnumOptions() const
+    const fa::vector<ROptionValue>& GetEnumOptions() const
     {
       return mEnumNames;
     }
@@ -3447,7 +3489,7 @@ namespace gpg
 
   public:
     const char* mPrefix;
-    msvc8::vector<ROptionValue> mEnumNames;
+    fa::vector<ROptionValue> mEnumNames;
   };
   static_assert(sizeof(REnumType) == 0x78, "REnumType must be 0x78 bytes on x86");
 
@@ -3539,7 +3581,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_CTaskThread::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x0040CAD0 (FUN_0040CAD0)
@@ -3595,7 +3637,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_CAcquireTargetTask::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x005DE230 (FUN_005DE230)
@@ -3662,7 +3704,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_SimArmy::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x00750090 (FUN_00750090)
@@ -3741,7 +3783,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_Shield::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x007504A0 (FUN_007504A0)
@@ -3819,7 +3861,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_CDecalHandle::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x0077EDC0 (FUN_0077EDC0)
@@ -3897,7 +3939,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_RBlueprint::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x00557210 (FUN_00557210)
@@ -3983,7 +4025,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_UnitWeapon::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x005DDE20 (FUN_005DDE20)
@@ -4069,7 +4111,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_IAniManipulator::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x0063DE50 (FUN_0063DE50)
@@ -4144,7 +4186,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_IEffect::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x0066CD50 (FUN_0066CD50)
@@ -4208,7 +4250,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_CUnitCommand::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x006E39C0 (FUN_006E39C0)
@@ -4272,7 +4314,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_Entity::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x0067E630 (FUN_0067E630)
@@ -4336,7 +4378,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_CEconomyEvent::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x006B2820 (FUN_006B2820)
@@ -4410,7 +4452,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_CLuaConOutputHandler::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x004214C0 (FUN_004214C0)
@@ -4471,7 +4513,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_CScriptObject::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x004C8900 (FUN_004C8900)
@@ -4551,7 +4593,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_CSndParams::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x004E5ED0 (FUN_004E5ED0)
@@ -4625,7 +4667,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_IFormationInstance::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x0059D7D0 (FUN_0059D7D0)
@@ -4691,7 +4733,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_RUnitBlueprint::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x005A1800 (FUN_005A1800)
@@ -4779,7 +4821,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_ReconBlip::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x005C8390 (FUN_005C8390)
@@ -4843,7 +4885,7 @@ namespace gpg
      * Demangled: gpg::RPointerType_CArmyStatItem::GetLexical
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x007118E0 (FUN_007118E0)
@@ -4899,7 +4941,7 @@ namespace gpg
    * This is a DISTINCT binary class (own primary + RIndexed vtables and RTTI)
    * whose complete-object layout is byte-identical to `RPointerTypeBase`
    * (bases `RType`/`RObject` (via RType)/`RIndexed`; the RType base owns the two
-   * `msvc8::vector<RField>` members `bases_`/`fields_` whose storage lanes at
+   * `fa::vector<RField>` members `bases_`/`fields_` whose storage lanes at
    * +0x2C and +0x3C are freed by the scalar-deleting dtor; size 0x68). It
    * mirrors that layout intentionally — it is not a duplicate-layout of the
    * pointer base, it is the vector base with its own vtable identity.
@@ -4952,7 +4994,7 @@ namespace gpg
      * Demangled: gpg::RVectorType_SimArmy_P::dtr (scalar-deleting)
      *
      * What it does:
-     * Frees the RType base's two `msvc8::vector<RField>` storage lanes
+     * Frees the RType base's two `fa::vector<RField>` storage lanes
      * (`bases_._Myfirst` @ +0x2C, `fields_._Myfirst` @ +0x3C), restores the
      * `gpg::RObject` vftable, and conditionally deletes `this`. Defaulted in
      * source: the compiler-generated `~RType()` reproduces this behavior.
@@ -4978,7 +5020,7 @@ namespace gpg
      * Renders the reflected vector as `"<base RType lexical>, size=<count>"`.
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const RRef& ref) const override;
+    fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x0074CCA0 (FUN_0074CCA0)
@@ -5907,7 +5949,7 @@ namespace gpg
    * Address: 0x00511400 (FUN_00511400 -- `MakeRRef<moho::RTrailBlueprint>`; formerly `gpg::RRef_RTrailBlueprint`.)
    * Address: 0x005115B0 (FUN_005115B0 -- `MakeRRef<moho::RBeamBlueprint>`; formerly `gpg::RRef_RBeamBlueprint`.)
    * Address: 0x00511940 (FUN_00511940 -- `MakeRRef<moho::RRuleGameRules>`; formerly `gpg::RRef_RRuleGameRules`.)
-   * Address: 0x00513760 (FUN_00513760 -- `MakeRRef<msvc8::string>`; formerly `gpg::RRef_string`.)
+   * Address: 0x00513760 (FUN_00513760 -- `MakeRRef<fa::string>`; formerly `gpg::RRef_string`.)
    * Address: 0x00517940 (FUN_00517940 -- `MakeRRef<Wm3::Vector3f>`; formerly `gpg::RRef_Vector3f`.)
    * Address: 0x00517AE0 (FUN_00517AE0 -- `MakeRRef<moho::REmitterCurveKey>`; formerly `gpg::RRef_REmitterCurveKey`.)
    * Address: 0x00517D20 (FUN_00517D20 -- `MakeRRef<moho::REmitterBlueprintCurve>`; formerly `gpg::RRef_REmitterBlueprintCurve`.)
@@ -6130,6 +6172,293 @@ namespace gpg
    * pointer `T` that is the pointee's `RPointerType`, the reference to a
    * pointer slot.
    */
+  /**
+   * Engine addition: fills a caller's type slot from the first lookup and returns it.
+   * Address: 0x00508270 (FUN_00508270 -- `CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType)`; formerly `ResolveSDelayedSubVizInfoType` in moho/sim/SDelayedSubVizInfoReflection.cpp, removed 2026-11-05.)
+   * Address: 0x0054D000 (FUN_0054D000 -- `CachedLookup<moho::CAniPoseBone>(moho::CAniPoseBone::sType)`; formerly `CachedCAniPoseBoneType` in moho/animation/CAniPose.cpp, removed 2026-11-05.)
+   * Address: 0x00579570 (FUN_00579570 -- `CachedLookup<moho::CAiBrain>(moho::CAiBrain::sType)`; formerly `ResolveCAiBrainTypeCachePrimary` in moho/ai/CAiBrain.cpp, removed 2026-11-05.)
+   * Address: 0x005D4220 (FUN_005D4220 -- `CachedLookup<CAiSteeringImpl>(CAiSteeringImpl::sType)`; formerly `CachedCAiSteeringImplType` in moho/ai/CAiSteeringImplTypeInfo.cpp, removed 2026-11-05.)
+   * Address: 0x006358F0 (FUN_006358F0 -- `CachedLookup<moho::CBuilderArmManipulator>(moho::CBuilderArmManipulator::sType)`; formerly `ResolveCBuilderArmManipulatorTypeCachePrimary` in moho/ai/CBuilderArmManipulatorTypeInfo.cpp, removed 2026-11-05.)
+   * Address: 0x00636F10 (FUN_00636F10 -- `CachedLookup<moho::CBuilderArmManipulator>(moho::CBuilderArmManipulator::sType)`; formerly `ResolveCBuilderArmManipulatorTypeCacheSecondary` in moho/ai/CBuilderArmManipulatorTypeInfo.cpp, removed 2026-11-05.)
+   * Address: 0x00637840 (FUN_00637840 -- `CachedLookup<moho::CCollisionManipulator>(moho::CCollisionManipulator::sType)`; formerly `ResolveCCollisionManipulatorTypeCachePrimary` in moho/collision/CCollisionManipulator.cpp, removed 2026-11-05.)
+   * Address: 0x00638670 (FUN_00638670 -- `CachedLookup<moho::CCollisionManipulator>(moho::CCollisionManipulator::sType)`; formerly `ResolveCCollisionManipulatorTypeCacheSecondary` in moho/collision/CCollisionManipulator.cpp, removed 2026-11-05.)
+   * Address: 0x0064D000 (FUN_0064D000 -- `CachedLookup<moho::RDebugGrid>(moho::RDebugGrid::sType)`; formerly `ResolveRDebugGridTypeCachePrimary` in moho/debug/RDebugGrid.cpp, removed 2026-11-05.)
+   * Address: 0x0064D860 (FUN_0064D860 -- `CachedLookup<moho::RDebugRadar>(moho::RDebugRadar::sType)`; formerly `ResolveRDebugRadarTypeCachePrimary` in moho/debug/RDebugRadar.cpp, removed 2026-11-05.)
+   * Address: 0x0064E250 (FUN_0064E250 -- `CachedLookup<moho::RDebugGrid>(moho::RDebugGrid::sType)`; formerly `ResolveRDebugGridTypeCachePrimary` in moho/debug/RDebugGrid.cpp, removed 2026-11-05.)
+   * Address: 0x0064E290 (FUN_0064E290 -- `CachedLookup<moho::RDebugRadar>(moho::RDebugRadar::sType)`; formerly `ResolveRDebugRadarTypeCachePrimary` in moho/debug/RDebugRadar.cpp, removed 2026-11-05.)
+   * Address: 0x00652C70 (FUN_00652C70 -- `CachedLookup<moho::RDebugWeapons>(moho::RDebugWeapons::sType)`; formerly `ResolveRDebugWeaponsTypeCachePrimary` in moho/unit/core/RDebugWeapons.cpp, removed 2026-11-05.)
+   * Address: 0x00653260 (FUN_00653260 -- `CachedLookup<moho::RDebugWeapons>(moho::RDebugWeapons::sType)`; formerly `ResolveRDebugWeaponsTypeCacheSecondary` in moho/unit/core/RDebugWeapons.cpp, removed 2026-11-05.)
+   * Address: 0x00658EC0 (FUN_00658EC0 -- `CachedLookup<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType)`; formerly `CachedSEntAttachInfoType` in moho/effects/rendering/CEfxBeam.cpp, removed 2026-11-05.)
+   * Address: 0x006831D0 (FUN_006831D0 -- `CachedLookup<moho::Motor>(moho::Motor::sType)`; formerly `ResolveLegacyMotorAliasType` in moho/entity/MotorReflection.cpp, removed 2026-11-05.)
+   * Address: 0x00689740 (FUN_00689740 -- `CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType)`; formerly `ResolveEntitySetBaseType` in moho/entity/EntitySetReflection.cpp, removed 2026-11-05.)
+   * Address: 0x006940F0 (FUN_006940F0 -- `CachedLookup<WeakEntitySet>(WeakEntitySet::sType)`; formerly `ResolveWeakEntitySetType` in moho/entity/EntitySetReflection.cpp, removed 2026-11-05.)
+   * Address: 0x006ADF70 (FUN_006ADF70 -- `CachedLookup<moho::CEconomyEvent>(moho::CEconomyEvent::sType)`; formerly `CachedCEconomyEventType` in moho/misc/CEconomyEvent.cpp, removed 2026-11-05.)
+   * Address: 0x0071A8C0 (FUN_0071A8C0 -- `CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType)`; formerly `CachedInfluenceMapEntryType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x0071A8E0 (FUN_0071A8E0 -- `CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)`; formerly `CachedInfluenceGridType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x0071A900 (FUN_0071A900 -- `CachedLookup<moho::SThreat>(moho::SThreat::sType)`; formerly `CachedSThreatType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
+   * Address: 0x00739B30 (FUN_00739B30 -- `CachedLookup<moho::CDamage>(moho::CDamage::sType)`; formerly `CachedCDamageTypeBridge` in moho/sim/CDamage.cpp, removed 2026-11-05.)
+   * Address: 0x007B5C30 (FUN_007B5C30 -- `CachedLookup<moho::CPathDebugger>(moho::CPathDebugger::sType)`; formerly `CachedCPathDebuggerTypePrimary` in moho/debug/CPathDebugger.cpp, removed 2026-11-05.)
+   * Address: 0x007B6210 (FUN_007B6210 -- `CachedLookup<moho::CPathDebugger>(moho::CPathDebugger::sType)`; formerly `CachedCPathDebuggerTypeSecondary` in moho/debug/CPathDebugger.cpp, removed 2026-11-05.)
+   */
+  template <class T>
+  [[nodiscard]] RType* CachedLookup(RType*& slot)
+  {
+    if (!slot) {
+      slot = LookupRType(typeid(T));
+    }
+    return slot;
+  }
+
+  /**
+   * Engine addition: as above, for a type the caller holds as a `type_info`.
+   */
+  [[nodiscard]] inline RType* CachedLookup(RType*& slot, const std::type_info& typeInfo)
+  {
+    if (!slot) {
+      slot = LookupRType(typeInfo);
+    }
+    return slot;
+  }
+
+  /**
+   * Engine addition: the first registered type among several spellings of a name.
+   */
+  [[nodiscard]] inline RType* REF_FindFirstTypeNamed(const std::initializer_list<const char*> names)
+  {
+    for (const char* const name : names) {
+      if (!name) {
+        continue;
+      }
+      if (RType* const type = REF_FindTypeNamed(name)) {
+        return type;
+      }
+    }
+    return nullptr;
+  }
+
+  /**
+   * Engine addition: reads a tracked pointer and upcasts it to `expectedType`.
+   */
+  template <typename TObject>
+  [[nodiscard]] TObject* ReadPointerAs(ReadArchive* const archive, const RRef& owner, RType* const expectedType)
+  {
+    const TrackedPointerInfo tracked = ReadRawPointer(archive, owner);
+    if (!tracked.object) {
+      return nullptr;
+    }
+
+    RRef source{};
+    source.mObj = tracked.object;
+    source.mType = tracked.type;
+    const RRef upcast = REF_UpcastPtr(source, expectedType);
+    return static_cast<TObject*>(upcast.mObj);
+  }
+
+  /**
+   * Engine addition: the reference the recovered code built by hand in each
+   * file. Asks the object for its dynamic type and rebases the pointer to it.
+   */
+  template <class TObject>
+  [[nodiscard]] RRef MakeDerivedRef(TObject* const object, RType* const baseType)
+  {
+    RRef out{};
+    out.mObj = nullptr;
+    out.mType = baseType;
+    if (!object) {
+      return out;
+    }
+
+    RType* dynamicType = baseType;
+    try {
+      dynamicType = LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = baseType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
+    if (!isDerived) {
+      out.mObj = object;
+      out.mType = dynamicType;
+      return out;
+    }
+
+    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
+    out.mType = dynamicType;
+    return out;
+  }
+
+  /**
+   * Engine addition: a class's `GetDerivedObjectRef`: itself, under the type it reports.
+   */
+  template <class T>
+  [[nodiscard]] RRef MakeSelfRef(T* const self)
+  {
+    RRef out{};
+    out.mObj = self;
+    out.mType = self->GetClass();
+    return out;
+  }
+
+  /**
+   * Engine addition: an `RRef_*` function: `MakeDerivedRef` into `out`, unless `out` is null. The type
+   * is looked up only then.
+   */
+  template <class TObject>
+  RRef* WriteDerivedRef(RRef* const out, TObject* const value, RType* (*const baseType)())
+  {
+    if (!out) {
+      return nullptr;
+    }
+
+    *out = MakeDerivedRef(value, baseType());
+    return out;
+  }
+
+  /**
+   * Engine addition: as above, with the type `RTypeOf` finds for the object's static type.
+   */
+  template <class TObject>
+  RRef* WriteDerivedRef(RRef* const out, TObject* const value)
+  {
+    if (!out) {
+      return nullptr;
+    }
+
+    *out = MakeDerivedRef(value, RTypeOf<TObject>());
+    return out;
+  }
+
+  /**
+   * Engine addition: an `RType` teardown lane: empties the field and base lists, unless null.
+   */
+  template <class TType>
+  void ClearTypeLists(TType* const typeInfo)
+  {
+    if (typeInfo == nullptr) {
+      return;
+    }
+
+    typeInfo->fields_ = {};
+    typeInfo->bases_ = {};
+  }
+
+  /**
+   * Engine addition: the construct step of a TypeInfo's `CtrRef`: default-constructs `T` in
+   * `storage` unless it is null, and returns it.
+   */
+  template <class T>
+  T* ConstructInStorage(void* const storage)
+  {
+    auto* const object = static_cast<T*>(storage);
+    if (object) {
+      new (object) T();
+    }
+    return object;
+  }
+
+  /**
+   * Engine addition: a TypeInfo's `Destruct`: destroys the `T` in `storage` unless it is null.
+   */
+  template <class T>
+  void DestructInStorage(void* const storage)
+  {
+    auto* const object = static_cast<T*>(storage);
+    if (object) {
+      GPG_NONVIRTUAL_DESTROY(object->~T());
+    }
+  }
+
+  /**
+   * Engine addition: as MakeDerivedRef, for a type that must derive from
+   * `staticType`, which it asserts.
+   */
+  template <class T>
+  [[nodiscard]] RRef MakeTypedRef(T* object, RType* staticType)
+  {
+    RRef out{};
+    out.mObj = nullptr;
+    out.mType = staticType;
+    if (!object) {
+      return out;
+    }
+
+    RType* dynamicType = staticType;
+    try {
+      dynamicType = LookupRType(typeid(*object));
+    } catch (...) {
+      dynamicType = staticType;
+    }
+
+    std::int32_t baseOffset = 0;
+    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
+    GPG_ASSERT(derived);
+    if (!derived) {
+      out.mObj = object;
+      out.mType = dynamicType;
+      return out;
+    }
+
+    out.mObj =
+      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
+    out.mType = dynamicType;
+    return out;
+  }
+
+  /**
+   * Engine addition: declares `Base` as a reflected base of `typeInfo`, the body
+   * of every `AddBase_*`. `offset` is where the base sits in the object.
+   */
+  template <class Base>
+  void AddReflectedBase(RType* const typeInfo, const int offset = 0)
+  {
+    RType* const baseType = RTypeOf<Base>();
+
+    RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = offset;
+    baseField.mFlags = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
+  /**
+   * Engine addition: as AddReflectedBase, for a base type the caller already has.
+   */
+  inline void AddReflectedBaseType(RType* const typeInfo, RType* const baseType, const int offset = 0)
+  {
+    RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = offset;
+    baseField.mFlags = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
+  /**
+   * Engine addition: as AddReflectedBase, for code that fills `Base::sType` on
+   * the way, which RTypeOf doesn't.
+   */
+  template <class Base>
+  void AddReflectedBaseViaSlot(RType* const typeInfo, const int offset = 0)
+  {
+    RType* baseType = Base::sType;
+    if (!baseType) {
+      baseType = LookupRType(typeid(Base));
+      Base::sType = baseType;
+    }
+
+    RField baseField{};
+    baseField.mName = baseType->GetName();
+    baseField.mType = baseType;
+    baseField.mOffset = offset;
+    baseField.mFlags = 0;
+    baseField.mDesc = nullptr;
+    typeInfo->AddBase(baseField);
+  }
+
   template <class T>
   [[nodiscard]] RRef MakeRRef(T* const value)
   {

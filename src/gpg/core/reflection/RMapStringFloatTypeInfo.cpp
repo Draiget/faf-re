@@ -47,8 +47,8 @@ namespace gpg
     // The key descriptor is registered under the engine ABI string type by
     // RStringType.cpp; typeid(std::string) is a different type here (the
     // 2007 build had only one).
-    static const msvc8::string sName = gpg::STR_Printf(
-      "map<%s,%s>", gpg::LookupRType(typeid(msvc8::string))->GetName(), gpg::LookupRType(typeid(float))->GetName()
+    static const fa::string sName = gpg::STR_Printf(
+      "map<%s,%s>", gpg::LookupRType(typeid(fa::string))->GetName(), gpg::LookupRType(typeid(float))->GetName()
     );
     return sName.c_str();
   }
@@ -59,10 +59,10 @@ namespace gpg
    * What it does:
    * Formats inherited lexical text and appends current map element count.
    */
-  msvc8::string RMapStringFloatTypeInfo::GetLexical(const gpg::RRef& ref) const
+  fa::string RMapStringFloatTypeInfo::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
-    const auto* const map = static_cast<const msvc8::map<msvc8::string, float>*>(ref.mObj);
+    const fa::string base = gpg::RType::GetLexical(ref);
+    const auto* const map = static_cast<const fa::map<fa::string, float>*>(ref.mObj);
     const int size = map ? static_cast<int>(map->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
   }
@@ -80,13 +80,13 @@ namespace gpg
       return;
     }
 
-    auto* const destination = reinterpret_cast<msvc8::map<msvc8::string, float>*>(objectPtr);
+    auto* const destination = reinterpret_cast<fa::map<fa::string, float>*>(objectPtr);
     unsigned int count = 0u;
     archive->ReadUInt(&count);
 
     destination->clear();
     for (unsigned int index = 0u; index < count; ++index) {
-      msvc8::string key{};
+      fa::string key{};
       float value = 0.0f;
       archive->ReadString(&key);
       archive->ReadFloat(&value);
@@ -106,7 +106,7 @@ namespace gpg
       return;
     }
 
-    const auto* const source = reinterpret_cast<const msvc8::map<msvc8::string, float>*>(objectPtr);
+    const auto* const source = reinterpret_cast<const fa::map<fa::string, float>*>(objectPtr);
     const unsigned int count = source != nullptr ? static_cast<unsigned int>(source->size()) : 0u;
     archive->WriteUInt(count);
 
@@ -115,7 +115,7 @@ namespace gpg
     }
 
     for (const auto& entry : *source) {
-      msvc8::string key(entry.first);
+      fa::string key(entry.first);
       archive->WriteString(&key);
       archive->WriteFloat(entry.second);
     }
@@ -129,8 +129,8 @@ namespace gpg
    */
   void RMapStringFloatTypeInfo::Init()
   {
-    static_assert(sizeof(msvc8::map<msvc8::string, float>) == 0x0C, "msvc8::map<msvc8::string, float> is 0x0C bytes on x86");
-    size_ = sizeof(msvc8::map<msvc8::string, float>);
+    static_assert(sizeof(fa::map<fa::string, float>) == 0x0C, "fa::map<fa::string, float> is 0x0C bytes on x86");
+    size_ = sizeof(fa::map<fa::string, float>);
     version_ = 1;
     serLoadFunc_ = &RMapStringFloatTypeInfo::SerLoad;
     serSaveFunc_ = &RMapStringFloatTypeInfo::SerSave;

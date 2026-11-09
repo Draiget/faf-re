@@ -13,7 +13,7 @@ namespace moho
    * What it does:
    * Formats one `Vector4f` lane set as `x=%f,y=%f,z=%f,w=%f`.
    */
-  msvc8::string ToString(const Vector4f& value)
+  fa::string ToString(const Vector4f& value)
   {
     return gpg::STR_Printf("x=%f,y=%f,z=%f,w=%f", value.x, value.y, value.z, value.w);
   }
@@ -118,7 +118,7 @@ namespace moho
     // roll (X-axis rotation)
     const float sinr_cosp = 2.0f * (qw * qx + qy * qz);
     const float cosr_cosp = 1.0f - 2.0f * (qx * qx + qy * qy);
-    const float roll = msvc8::atan2(sinr_cosp, cosr_cosp);
+    const float roll = fa::atan2(sinr_cosp, cosr_cosp);
 
     // pitch (Y-axis rotation)
     const float sinp = 2.0f * (qw * qy - qz * qx);
@@ -127,13 +127,13 @@ namespace moho
       // use 90 degrees if out of range
       pitch = std::copysign(3.14159265358979323846f / 2.0f, sinp);
     } else {
-      pitch = msvc8::asin(sinp);
+      pitch = fa::asin(sinp);
     }
 
     // yaw (Z-axis rotation)
     const float siny_cosp = 2.0f * (qw * qz + qx * qy);
     const float cosy_cosp = 1.0f - 2.0f * (qy * qy + qz * qz);
-    const float yaw = msvc8::atan2(siny_cosp, cosy_cosp);
+    const float yaw = fa::atan2(siny_cosp, cosy_cosp);
 
     return {roll, pitch, yaw};
   }

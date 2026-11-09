@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "gpg/core/utils/BoostWrappers.h"
+#include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DTextureSheet.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -11,13 +12,39 @@
 
 namespace moho
 {
+  bool ren_TextureAtlasCache = true;
+
   namespace
   {
     using BatchTextureHandle = boost::shared_ptr<CD3DBatchTexture>;
 
+    // The atlas holds a shared handle to each of its textures, so an address here can't have been
+    // reused while the entry exists; Reset and the destructor, which free entries, clear the table.
+    struct AtlasCacheSlot
+    {
+      const CD3DTextureBatcher* mOwner;
+      const CD3DBatchTexture* mTexture;
+      const gpg::Rect2f* mUvRect;
+    };
+
+    constexpr std::size_t kAtlasCacheSlots = 1024u;
+    AtlasCacheSlot sAtlasCache[kAtlasCacheSlots]{};
+
+    TConVar<bool> gTConVar_ren_TextureAtlasCache(
+      "ren_TextureAtlasCache",
+      "The texture atlas finds a texture it holds through a table of recent lookups (1, the default), or always "
+      "searches its tree (0). Read at each lookup.",
+      &ren_TextureAtlasCache
+    );
+
+    [[nodiscard]] AtlasCacheSlot& AtlasCacheSlotFor(const CD3DBatchTexture* const texture) noexcept
+    {
+      const std::uintptr_t address = reinterpret_cast<std::uintptr_t>(texture);
+      return sAtlasCache[((address >> 4U) ^ (address >> 14U)) & (kAtlasCacheSlots - 1U)];
+    }
+
     constexpr std::int32_t kCompositeWidth = 1024;
     constexpr std::int32_t kCompositeHeight = 1024;
-    constexpr std::uint32_t kCompositeBytes = 0x00100000u;
     constexpr std::int32_t kDynamicTextureFormat = 12;
 
     /**
@@ -67,7 +94,7 @@ namespace moho
      * Disposes one `sp_counted_impl_p<CD3DTextureBatcher>` payload by running
      * non-deleting `CD3DTextureBatcher` teardown and releasing owned storage.
      */
-    void DisposeCountedTextureBatcherStorage(
+    [[maybe_unused]] void DisposeCountedTextureBatcherStorage(
       boost::SpCountedImplStorage<CD3DTextureBatcher>* const countedStorage
     )
     {
@@ -107,8 +134,13 @@ namespace moho
    * backing store, and creates one dynamic texture sheet.
    */
   CD3DTextureBatcher::CD3DTextureBatcher()
-    : mWidth(kCompositeWidth)
-    , mHeight(kCompositeHeight)
+    : CD3DTextureBatcher(kCompositeWidth, kCompositeHeight)
+  {
+  }
+
+  CD3DTextureBatcher::CD3DTextureBatcher(const std::int32_t width, const std::int32_t height)
+    : mWidth(width)
+    , mHeight(height)
     , mRects()
     , mDynTexSheet()
     , mMap()
@@ -118,16 +150,12 @@ namespace moho
   {
     if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
       if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
-        (void)resources->NewDynamicTextureSheet(
-          mDynTexSheet,
-          kCompositeWidth,
-          kCompositeHeight,
-          kDynamicTextureFormat
-        );
+        (void)resources->NewDynamicTextureSheet(mDynTexSheet, width, height, kDynamicTextureFormat);
       }
     }
 
-    mPixels.resize(kCompositeBytes);
+    // One byte per texel, rows in blocks of four (GetCompositeTexture): 0x100000 bytes at 1024x1024.
+    mPixels.resize(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
     Reset();
   }
 
@@ -140,6 +168,7 @@ namespace moho
   CD3DTextureBatcher::~CD3DTextureBatcher()
   {
     // FUN_00448B30: the explicit atlas-tree clear ahead of member teardown.
+    std::memset(sAtlasCache, 0, sizeof(sAtlasCache));
     mMap.clear();
   }
 
@@ -154,6 +183,11 @@ namespace moho
   {
     if (!texture) {
       return nullptr;
+    }
+
+    AtlasCacheSlot& cacheSlot = AtlasCacheSlotFor(texture.get());
+    if (ren_TextureAtlasCache && cacheSlot.mTexture == texture.get() && cacheSlot.mOwner == this) {
+      return cacheSlot.mUvRect;
     }
 
     TextureAtlasEntry lookupEntry{};
@@ -191,6 +225,7 @@ namespace moho
       mDirty = 1;
     }
 
+    cacheSlot = AtlasCacheSlot{this, texture.get(), &found->mUvRect};
     return &found->mUvRect;
   }
 
@@ -203,6 +238,7 @@ namespace moho
    */
   void CD3DTextureBatcher::Reset()
   {
+    std::memset(sAtlasCache, 0, sizeof(sAtlasCache));
     mMap.clear();
     mRects.clear();
 

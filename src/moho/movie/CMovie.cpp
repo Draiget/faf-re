@@ -240,7 +240,7 @@ namespace moho
 
     // Resolve the movie path through the process file wait-handle set.
     FWaitHandleSet* const waitSet = FILE_GetWaitHandleSet();
-    msvc8::string resolvedPath{};
+    fa::string resolvedPath{};
     waitSet->mHandle->FindFile(&resolvedPath, path, nullptr);
     if (resolvedPath.empty()) {
       gpg::Warnf("Movie \"%s\" doesn't exist.", path);
@@ -251,7 +251,7 @@ namespace moho
 
     // Open the resolved file and read up to the 5000-byte Sofdec header. The
     // stream is closed as soon as the header is parsed (before the create work).
-    msvc8::auto_ptr<gpg::Stream> movieStream = DISK_OpenFileRead(mMovieName.c_str());
+    fa::auto_ptr<gpg::Stream> movieStream = DISK_OpenFileRead(mMovieName.c_str());
     gpg::Stream* const stream = movieStream.get();
 
     char headerBuffer[5004] = {};
@@ -473,10 +473,7 @@ namespace moho
     boost::shared_ptr<ID3DTextureSheet>* const outHandle
   )
   {
-    (void)boost::AssignSharedPairRetain(
-      reinterpret_cast<boost::SharedCountPair*>(outHandle),
-      reinterpret_cast<const boost::SharedCountPair*>(&mTextureSheet)
-    );
+    (void)boost::AssignSharedPairRetain(outHandle, &mTextureSheet);
     return outHandle;
   }
 
@@ -572,7 +569,7 @@ namespace moho
    * Hands out the subtitle string lane itself - `lea eax, [ecx+60h]`, not a
    * copy - which UpdatePlaybackFrame refreshes on every tick.
    */
-  const msvc8::string* CMovie::GetSubtitleText()
+  const fa::string* CMovie::GetSubtitleText()
   {
     return &mSubtitleText;
   }

@@ -81,6 +81,12 @@ namespace gpg::gal::effects
     /** The input signature of a DXIL shader (empty when it cannot be read). */
     [[nodiscard]] std::vector<ShaderInput> ReflectInputs(const std::vector<std::uint8_t>& dxil) const;
 
+    /**
+     * Engine addition (ren_UsedTextureTable): bit t for every texture register t (0..63) a DXIL shader reads, from
+     * its resource bindings; all bits when the reflection can't be read.
+     */
+    [[nodiscard]] std::uint64_t ReflectTextureSlots(const std::vector<std::uint8_t>& dxil) const;
+
     /** A digest of the loaded compiler, for shader cache keys. */
     [[nodiscard]] const std::string& Version() const noexcept;
 

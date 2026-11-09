@@ -21,16 +21,6 @@ namespace gpg
 namespace
 {
 
-  [[nodiscard]] gpg::RType* CachedIdPoolType()
-  {
-    gpg::RType* type = moho::IdPool::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::IdPool));
-      moho::IdPool::sType = type;
-    }
-    return type;
-  }
-
 } // namespace
 
 namespace moho
@@ -80,7 +70,7 @@ namespace moho
     const gpg::RRef simRef{};
     (void)ar->ReadPointer(&mSim, &simRef);
 
-    ar->Read(CachedIdPoolType(), &mPool, gpg::RRef{});
+    ar->Read(gpg::RTypeOf<moho::IdPool>(), &mPool, gpg::RRef{});
 
     ReadDecalHandles(ar);
   }
@@ -100,7 +90,7 @@ namespace moho
   {
     ar->WritePointer<moho::Sim>(mSim, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 
-    ar->Write(CachedIdPoolType(), &mPool, gpg::RRef{});
+    ar->Write(gpg::RTypeOf<moho::IdPool>(), &mPool, gpg::RRef{});
 
     WriteDecalHandles(this, ar);
   }

@@ -1,0 +1,372 @@
+#include "editor/EdTools.h"
+
+#include <cmath>
+#include <cstdio>
+
+#include "imgui.h"
+
+namespace faf::editor
+{
+  namespace
+  {
+    const ImU32 kAccent = IM_COL32(227, 148, 67, 255);
+    const ImU32 kAccentSoft = IM_COL32(227, 148, 67, 40);
+    const ImU32 kIconIdle = IM_COL32(139, 147, 157, 255);
+    const ImU32 kIconHot = IM_COL32(216, 220, 225, 255);
+    const ImU32 kCellBack = IM_COL32(21, 24, 29, 255);
+    const ImU32 kCellLine = IM_COL32(58, 65, 75, 255);
+
+    struct ToolInfo
+    {
+      const char* name;
+      const char* key;
+    };
+    constexpr ToolInfo kTools[] = {
+      {"Select", "S"}, {"Terrain", "T"}, {"Texture", "P"}, {"Water", "W"}, {"Props", "O"}, {"Decals", "D"}, {"Markers", "M"},
+    };
+
+    /** Draws tool `index`'s icon in the square at `p`, `s` wide. */
+    void DrawToolIcon(ImDrawList* const draw, const int index, const ImVec2 p, const float s, const ImU32 color)
+    {
+      const auto at = [&](const float x, const float y) { return ImVec2(p.x + x * s, p.y + y * s); };
+      switch (index) {
+      case 0: // arrow
+        draw->AddTriangleFilled(at(0.25f, 0.1f), at(0.25f, 0.8f), at(0.78f, 0.58f), color);
+        draw->AddQuadFilled(at(0.47f, 0.55f), at(0.58f, 0.5f), at(0.76f, 0.88f), at(0.65f, 0.93f), color);
+        break;
+      case 1: // mountain
+        draw->AddTriangleFilled(at(0.1f, 0.85f), at(0.4f, 0.4f), at(0.62f, 0.85f), color);
+        draw->AddTriangleFilled(at(0.45f, 0.85f), at(0.7f, 0.5f), at(0.92f, 0.85f), color);
+        break;
+      case 2: // brush
+        draw->AddQuadFilled(at(0.62f, 0.12f), at(0.88f, 0.38f), at(0.52f, 0.72f), at(0.28f, 0.48f), color);
+        draw->AddTriangleFilled(at(0.26f, 0.55f), at(0.45f, 0.74f), at(0.12f, 0.9f), color);
+        break;
+      case 3: // waves
+        for (int row = 0; row < 2; ++row) {
+          const float y = 0.42f + 0.24f * static_cast<float>(row);
+          ImVec2 points[13];
+          for (int i = 0; i < 13; ++i) {
+            const float t = static_cast<float>(i) / 12.0f;
+            points[i] = at(0.1f + 0.8f * t, y + 0.07f * std::sin(t * 6.2831853f * 2.0f));
+          }
+          draw->AddPolyline(points, 13, color, ImDrawFlags_None, s * 0.08f);
+        }
+        break;
+      case 4: // tree
+        draw->AddTriangleFilled(at(0.5f, 0.08f), at(0.78f, 0.5f), at(0.22f, 0.5f), color);
+        draw->AddTriangleFilled(at(0.5f, 0.3f), at(0.86f, 0.78f), at(0.14f, 0.78f), color);
+        draw->AddRectFilled(at(0.45f, 0.78f), at(0.55f, 0.94f), color);
+        break;
+      case 5: // decal
+        draw->AddRect(at(0.15f, 0.15f), at(0.85f, 0.85f), color, s * 0.08f, ImDrawFlags_None, s * 0.08f);
+        draw->AddCircleFilled(at(0.5f, 0.5f), s * 0.17f, color);
+        break;
+      default: // marker pin
+        draw->AddCircleFilled(at(0.5f, 0.38f), s * 0.28f, color);
+        draw->AddTriangleFilled(at(0.25f, 0.5f), at(0.75f, 0.5f), at(0.5f, 0.94f), color);
+        draw->AddCircleFilled(at(0.5f, 0.38f), s * 0.11f, kCellBack);
+        break;
+      }
+    }
+
+    struct SymmetryMode
+    {
+      const char* name;
+      int copies;
+      bool square;
+    };
+    constexpr SymmetryMode kSymmetry[] = {
+      {"None", 1, false},           {"Left-right", 2, false},   {"Top-bottom", 2, false},     {"Diagonal \\", 2, true},
+      {"Diagonal /", 2, true},      {"Half turn", 2, false},    {"Both axes", 4, false},      {"Both diagonals", 4, true},
+      {"Quarter turns", 4, true},   {"N-way turn", 0, true},
+    };
+
+    /** The symmetry mode's copies of the point (u, v) in [0, 1]; `n` for the N-way turn. */
+    int SymmetryCopies(const int mode, const float u, const float v, const int n, ImVec2* const out)
+    {
+      const ImVec2 id(u, v), mx(1.0f - u, v), mz(u, 1.0f - v), d1(v, u), d2(1.0f - v, 1.0f - u), pt(1.0f - u, 1.0f - v);
+      switch (mode) {
+      case 0: out[0] = id; return 1;
+      case 1: out[0] = id; out[1] = mx; return 2;
+      case 2: out[0] = id; out[1] = mz; return 2;
+      case 3: out[0] = id; out[1] = d1; return 2;
+      case 4: out[0] = id; out[1] = d2; return 2;
+      case 5: out[0] = id; out[1] = pt; return 2;
+      case 6: out[0] = id; out[1] = mx; out[2] = mz; out[3] = pt; return 4;
+      case 7: out[0] = id; out[1] = d1; out[2] = d2; out[3] = pt; return 4;
+      case 8: out[0] = id; out[1] = ImVec2(1.0f - v, u); out[2] = pt; out[3] = ImVec2(v, 1.0f - u); return 4;
+      default:
+        for (int k = 0; k < n; ++k) {
+          const float a = 6.2831853f * static_cast<float>(k) / static_cast<float>(n);
+          const float du = u - 0.5f;
+          const float dv = v - 0.5f;
+          out[k] = ImVec2(0.5f + du * std::cos(a) - dv * std::sin(a), 0.5f + du * std::sin(a) + dv * std::cos(a));
+        }
+        return n;
+      }
+    }
+
+    /** The mode's diagram: the map square, its mirror lines or turn centre, and one sample point's copies. */
+    void DrawSymmetryIcon(ImDrawList* const draw, const int mode, const int n, const ImVec2 p, const float s)
+    {
+      const float pad = s * 0.08f;
+      const ImVec2 a(p.x + pad, p.y + pad);
+      const float w = s - 2.0f * pad;
+      const auto at = [&](const float u, const float v) { return ImVec2(a.x + u * w, a.y + v * w); };
+      draw->AddRectFilled(a, ImVec2(a.x + w, a.y + w), kCellBack, 2.0f);
+      draw->AddRect(a, ImVec2(a.x + w, a.y + w), kCellLine, 2.0f);
+      const auto line = [&](const ImVec2 from, const ImVec2 to) {
+        // dashed
+        for (int i = 0; i < 8; i += 2) {
+          const float t0 = static_cast<float>(i) / 8.0f;
+          const float t1 = static_cast<float>(i + 1) / 8.0f;
+          draw->AddLine(ImVec2(from.x + (to.x - from.x) * t0, from.y + (to.y - from.y) * t0),
+                        ImVec2(from.x + (to.x - from.x) * t1, from.y + (to.y - from.y) * t1), kAccent, 1.2f);
+        }
+      };
+      if (mode == 1 || mode == 6) line(at(0.5f, 0.0f), at(0.5f, 1.0f));
+      if (mode == 2 || mode == 6) line(at(0.0f, 0.5f), at(1.0f, 0.5f));
+      if (mode == 3 || mode == 7) line(at(0.0f, 0.0f), at(1.0f, 1.0f));
+      if (mode == 4 || mode == 7) line(at(1.0f, 0.0f), at(0.0f, 1.0f));
+      if (mode == 5 || mode == 8 || mode == 9) draw->AddCircleFilled(at(0.5f, 0.5f), s * 0.05f, kAccent);
+      ImVec2 copies[8];
+      const int count = SymmetryCopies(mode, 0.27f, 0.22f, n, copies);
+      for (int i = 0; i < count; ++i) {
+        draw->AddCircleFilled(at(copies[i].x, copies[i].y), s * 0.075f, i == 0 ? IM_COL32(255, 255, 255, 255) : kAccent);
+      }
+    }
+
+    void Note(const char* const text)
+    {
+      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+      ImGui::TextWrapped("%s", text);
+      ImGui::PopStyleColor();
+    }
+
+    void SectionHeader(const char* const text)
+    {
+      ImGui::Spacing();
+      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+      ImGui::TextUnformatted(text);
+      ImGui::PopStyleColor();
+    }
+
+    /** A row of buttons, the chosen one marked, like the mockup's segmented buttons. */
+    void Segmented(const char* const* labels, const int count, int& chosen)
+    {
+      const float width = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x * static_cast<float>(count - 1)) /
+                          static_cast<float>(count);
+      for (int i = 0; i < count; ++i) {
+        if (i > 0) {
+          ImGui::SameLine();
+        }
+        const bool on = i == chosen;
+        if (on) {
+          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.89f, 0.58f, 0.26f, 0.30f));
+          ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.83f, 0.65f, 1.0f));
+        }
+        if (ImGui::Button(labels[i], ImVec2(width, 0.0f))) {
+          chosen = i;
+        }
+        if (on) {
+          ImGui::PopStyleColor(2);
+        }
+      }
+    }
+  } // namespace
+
+  void EdTools::Draw()
+  {
+    DrawStrip();
+    ImGui::SameLine();
+    if (ImGui::BeginChild("##toolsettings", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None)) {
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.67f, 0.70f, 0.74f, 1.0f));
+      ImGui::TextUnformatted(kTools[mTool].name);
+      ImGui::PopStyleColor();
+      ImGui::Separator();
+      switch (mTool) {
+      case 0: DrawSelect(); break;
+      case 1: DrawTerrain(); break;
+      case 2: DrawTexture(); break;
+      case 3: DrawWater(); break;
+      case 4: DrawProps(); break;
+      case 5: DrawDecals(); break;
+      default: DrawMarkers(); break;
+      }
+    }
+    ImGui::EndChild();
+  }
+
+  void EdTools::DrawStrip()
+  {
+    const float cell = ImGui::GetFrameHeight() * 1.55f;
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 3.0f));
+    if (ImGui::BeginChild("##toolstrip", ImVec2(cell + 4.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar)) {
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      for (int i = 0; i < static_cast<int>(IM_ARRAYSIZE(kTools)); ++i) {
+        ImGui::PushID(i);
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        if (ImGui::InvisibleButton("##tool", ImVec2(cell, cell))) {
+          mTool = i;
+        }
+        const bool hovered = ImGui::IsItemHovered();
+        if (hovered) {
+          ImGui::SetTooltip("%s (%s)", kTools[i].name, kTools[i].key);
+        }
+        const ImVec2 q(p.x + cell, p.y + cell);
+        if (i == mTool) {
+          draw->AddRectFilled(p, q, kAccentSoft, 4.0f);
+          draw->AddRectFilled(p, ImVec2(p.x + 2.0f, q.y), kAccent);
+        } else if (hovered) {
+          draw->AddRectFilled(p, q, IM_COL32(42, 47, 55, 255), 4.0f);
+        }
+        const float icon = cell * 0.56f;
+        DrawToolIcon(draw, i, ImVec2(p.x + (cell - icon) * 0.5f, p.y + (cell - icon) * 0.5f), icon,
+                     i == mTool ? kAccent : (hovered ? kIconHot : kIconIdle));
+        draw->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 0.62f, ImVec2(q.x - ImGui::GetFontSize() * 0.45f, q.y - ImGui::GetFontSize() * 0.7f),
+                      IM_COL32(93, 100, 109, 255), kTools[i].key);
+        ImGui::PopID();
+      }
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+  }
+
+  void EdTools::DrawBrush(const bool withModes)
+  {
+    SectionHeader("BRUSH");
+    if (withModes) {
+      static const char* const kModes[] = {"Raise", "Lower", "Smooth", "Flatten", "Noise"};
+      Segmented(kModes, 3, mBrushMode);
+      int second = mBrushMode - 3;
+      Segmented(kModes + 3, 2, second);
+      if (second >= 0 && second != mBrushMode - 3) {
+        mBrushMode = second + 3;
+      }
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::SliderFloat("##radius", &mRadius, 3.0f, 40.0f, "Radius %.0f");
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::SliderFloat("##strength", &mStrength, 0.05f, 1.0f, "Strength %.2f");
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::SliderFloat("##falloff", &mFalloff, 0.0f, 1.0f, "Falloff %.2f");
+  }
+
+  void EdTools::DrawSymmetry()
+  {
+    SectionHeader("SYMMETRY");
+    const float available = ImGui::GetContentRegionAvail().x;
+    const int columns = 5;
+    const float spacing = ImGui::GetStyle().ItemSpacing.x * 0.6f;
+    const float cell = (available - spacing * static_cast<float>(columns - 1)) / static_cast<float>(columns);
+    const float labelHeight = ImGui::GetFontSize() * 1.6f;
+    ImDrawList* const draw = ImGui::GetWindowDrawList();
+    for (int i = 0; i < static_cast<int>(IM_ARRAYSIZE(kSymmetry)); ++i) {
+      if (i % columns != 0) {
+        ImGui::SameLine(0.0f, spacing);
+      }
+      ImGui::PushID(i);
+      const ImVec2 p = ImGui::GetCursorScreenPos();
+      if (ImGui::InvisibleButton("##sym", ImVec2(cell, cell + labelHeight))) {
+        mSymmetry = i;
+      }
+      const bool on = i == mSymmetry;
+      const bool hovered = ImGui::IsItemHovered();
+      if (hovered) {
+        ImGui::SetTooltip("%s%s", kSymmetry[i].name, kSymmetry[i].square ? " (square maps)" : "");
+      }
+      draw->AddRectFilled(p, ImVec2(p.x + cell, p.y + cell + labelHeight), on ? kAccentSoft : IM_COL32(34, 38, 45, 255), 4.0f);
+      draw->AddRect(p, ImVec2(p.x + cell, p.y + cell + labelHeight), on ? kAccent : (hovered ? IM_COL32(74, 83, 95, 255) : kCellLine), 4.0f);
+      DrawSymmetryIcon(draw, i, mNWay, ImVec2(p.x + cell * 0.12f, p.y + cell * 0.06f), cell * 0.76f);
+      const float labelSize = ImGui::GetFontSize() * 0.66f;
+      const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(labelSize, cell, cell, kSymmetry[i].name);
+      draw->AddText(ImGui::GetFont(), labelSize, ImVec2(p.x + (cell - textSize.x) * 0.5f, p.y + cell * 0.86f),
+                    on ? IM_COL32(255, 211, 166, 255) : kIconIdle, kSymmetry[i].name, nullptr, cell);
+      ImGui::PopID();
+    }
+    if (mSymmetry == 9) {
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::SliderInt("##nway", &mNWay, 3, 8, "Copies %d");
+    }
+    const int copies = mSymmetry == 9 ? mNWay : kSymmetry[mSymmetry].copies;
+    char note[200];
+    (void)std::snprintf(note, sizeof(note),
+                        "Every edit is written to all %d copies. Where copies overlap, each vertex takes the strongest copy, "
+                        "so the halves stay identical.",
+                        copies);
+    Note(note);
+  }
+
+  void EdTools::DrawSelect()
+  {
+    Note("Pick props, decals, markers or water-body seeds to move, rotate or delete them. Linked symmetric copies move together.");
+    DrawSymmetry();
+    Note("Selection comes with the objects, stage 6 of the plan.");
+  }
+
+  void EdTools::DrawTerrain()
+  {
+    DrawBrush(true);
+    DrawSymmetry();
+    SectionHeader("LIMIT");
+    ImGui::Checkbox("Only between heights", &mLimitHeight);
+    ImGui::Checkbox("Only below slope", &mLimitSlope);
+    SectionHeader("HEIGHT FIELD");
+    ImGui::BeginDisabled();
+    ImGui::Button("Import PNG...");
+    ImGui::SameLine();
+    ImGui::Button("Export...");
+    ImGui::SameLine();
+    ImGui::Button("Copy source part");
+    ImGui::EndDisabled();
+    Note("The brushes act on an open map from stage 3 of the plan.");
+  }
+
+  void EdTools::DrawTexture()
+  {
+    DrawBrush(false);
+    DrawSymmetry();
+    SectionHeader("RULES");
+    Note("Sand below sea + 4, rock above slope 0.3, snow above 72.");
+    ImGui::BeginDisabled();
+    ImGui::Button("Apply rules to whole map", ImVec2(-1.0f, 0.0f));
+    ImGui::EndDisabled();
+    Note("Layer painting, previews and names come in stage 4.");
+  }
+
+  void EdTools::DrawWater()
+  {
+    Note("Click a basin to add a water body: it fills the terrain connected to the click that lies below its level.");
+    SectionHeader("SEA");
+    ImGui::Checkbox("Sea", &mSea);
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::SliderFloat("##sea", &mWaterLevel, 0.0f, 128.0f, "Level %.1f");
+    DrawSymmetry();
+    Note("Water bodies at their own levels come in stage 5.");
+  }
+
+  void EdTools::DrawProps()
+  {
+    DrawBrush(false);
+    DrawSymmetry();
+    Note("Props with 3D previews and the scatter brush come in stage 6.");
+  }
+
+  void EdTools::DrawDecals()
+  {
+    SectionHeader("PLACEMENT");
+    static const char* const kModes[] = {"Single", "Spline"};
+    Segmented(kModes, 2, mDecalMode);
+    DrawSymmetry();
+    Note("The decal texture browser and spline decals come in stage 6.");
+  }
+
+  void EdTools::DrawMarkers()
+  {
+    static const char* const kTypes[] = {"Mass", "Hydro", "Start"};
+    Segmented(kTypes, 3, mMarkerType);
+    DrawSymmetry();
+    Note("Markers in _save.lua come in stage 6.");
+  }
+} // namespace faf::editor

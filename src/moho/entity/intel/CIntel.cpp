@@ -17,19 +17,11 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCIntelPosHandleType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CIntelPosHandle));
-    }
-    return cached;
-  }
 
   [[nodiscard]] gpg::RRef MakePosHandleRef(moho::CIntelPosHandle* const handle)
   {
     gpg::RRef out{};
-    gpg::RType* const baseType = CachedCIntelPosHandleType();
+    gpg::RType* const baseType = gpg::RTypeOf<moho::CIntelPosHandle>();
     out.mObj = handle;
     out.mType = baseType;
     if (!handle || !baseType) {

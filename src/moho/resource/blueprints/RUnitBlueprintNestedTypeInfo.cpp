@@ -28,7 +28,7 @@ namespace
   using IntelTypeInfo = moho::RUnitBlueprintIntelTypeInfo;
   using EconomyTypeInfo = moho::RUnitBlueprintEconomyTypeInfo;
   using WeaponTypeInfo = moho::RUnitBlueprintWeaponTypeInfo;
-  using VectorFloatType = msvc8::vector<float>;
+  using VectorFloatType = fa::vector<float>;
   void EnsureVectorFloatLoadCapacity(VectorFloatType& storage, std::size_t requiredCount);
   [[nodiscard]] gpg::RType* CachedFloatType();
 
@@ -49,7 +49,7 @@ namespace
    * Copies one contiguous float range `[sourceBegin, sourceEnd)` into
    * destination storage and returns one-past the last destination lane.
    */
-  float* CopyFloatRangeNullable(
+  [[maybe_unused]] float* CopyFloatRangeNullable(
     float* destination,
     const float* const sourceBegin,
     const float* const sourceEnd
@@ -86,7 +86,7 @@ namespace
      *
      * What it does:
      * Constructs and preregisters startup reflection RTTI for
-     * `msvc8::vector<float>`.
+     * `fa::vector<float>`.
      */
     VectorFloatReflectionType();
 
@@ -120,7 +120,7 @@ namespace
      * reflected vector size formatted as ", size=%d". Mirrors the binary's
      * `??_7?$RVectorType@M@gpg@@6B@` slot at `+0x04`.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override
     {
@@ -168,7 +168,7 @@ namespace
      * Address: 0x005241C0 (FUN_005241C0, gpg::RVectorType_float::SetCount)
      *
      * What it does:
-     * Resizes one reflected `msvc8::vector<float>` lane and default-fills
+     * Resizes one reflected `fa::vector<float>` lane and default-fills
      * appended elements with `0.0f`.
      */
     void SetCount(void* const obj, const int count) const override
@@ -189,11 +189,11 @@ namespace
      * void __cdecl gpg::RVectorType_float::SerLoad(int a1, _DWORD *a2);
      *
      * What it does:
-     * Reflected `SerLoad` callback for `msvc8::vector<float>`: reads the
+     * Reflected `SerLoad` callback for `fa::vector<float>`: reads the
      * incoming element count from the archive, clears the destination, and
      * loads each float with push_back -- the binary's emission either appends
      * into spare capacity or routes a fill-insert through the geometric grow
-     * lane (`_Insert_n`, FUN_00524780, cited on msvc8::vector<T>::insert),
+     * lane (`_Insert_n`, FUN_00524780, cited on fa::vector<T>::insert),
      * which is exactly what push_back does.
      *
      * Bound at runtime by `gpg::RVectorType_float::Init` (FUN_00523360) which
@@ -254,7 +254,7 @@ namespace
    * Address: 0x00526340 (FUN_00526340, gpg::RVectorType_float::RVectorType_float)
    *
    * What it does:
-   * Preregisters this descriptor under `typeid(msvc8::vector<float>)`.
+   * Preregisters this descriptor under `typeid(fa::vector<float>)`.
    */
   VectorFloatReflectionType::VectorFloatReflectionType()
   {
@@ -273,7 +273,7 @@ namespace
    */
   const char* VectorFloatReflectionType::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedFloatType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", CachedFloatType()->GetName());
     return sName.c_str();
   }
 
@@ -285,9 +285,9 @@ namespace
    * with the reflected vector size as ", size=%d". Out-of-line definition
    * binds the binary symbol to the `??_7?$RVectorType@M@gpg@@6B@ +0x04` slot.
    */
-  msvc8::string VectorFloatReflectionType::GetLexical(const gpg::RRef& ref) const
+  fa::string VectorFloatReflectionType::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -313,7 +313,7 @@ namespace
    * Address: 0x005240D0 (FUN_005240D0)
    *
    * What it does:
-   * Ensures one `msvc8::vector<float>` can hold at least `requiredCount`
+   * Ensures one `fa::vector<float>` can hold at least `requiredCount`
    * elements before reflected load appends them.
    */
   void EnsureVectorFloatLoadCapacity(VectorFloatType& storage, const std::size_t requiredCount)
@@ -579,9 +579,9 @@ namespace moho
    */
   void RUnitBlueprintDisplayTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    typeInfo->AddField<msvc8::string>("DisplayName", offsetof(RUnitBlueprintDisplay, DisplayName), 3, "Displayed name of unit");
+    typeInfo->AddField<fa::string>("DisplayName", offsetof(RUnitBlueprintDisplay, DisplayName), 3, "Displayed name of unit");
     typeInfo->AddField<moho::RResId>("MeshBlueprint", offsetof(RUnitBlueprintDisplay, MeshBlueprint), 3, "Mesh blueprint we use for display");
-    typeInfo->AddField<msvc8::string>("PlaceholderMeshName", offsetof(RUnitBlueprintDisplay, PlaceholderMeshName), 3, "Name of placeholder mesh to use for the unit when normal mesh isn't available");
+    typeInfo->AddField<fa::string>("PlaceholderMeshName", offsetof(RUnitBlueprintDisplay, PlaceholderMeshName), 3, "Name of placeholder mesh to use for the unit when normal mesh isn't available");
     typeInfo->AddField<moho::RResId>("IconName", offsetof(RUnitBlueprintDisplay, IconName), 3, "Name of icon to use for the unit");
     typeInfo->AddField<float>("UniformScale", offsetof(RUnitBlueprintDisplay, UniformScale), 3, "Uniform scale to be applied to mesh");
     typeInfo->AddField<bool>("SpawnRandomRotation", offsetof(RUnitBlueprintDisplay, SpawnRandomRotation), 3, "Spawn with a small random rotation");
@@ -664,7 +664,7 @@ namespace moho
     GPG_ASSERT(!typeInfo->initFinished_);
     static gpg::RType* cachedVectorFloatType = nullptr;
     if (!cachedVectorFloatType) {
-      cachedVectorFloatType = gpg::LookupRType(typeid(msvc8::vector<float>));
+      cachedVectorFloatType = gpg::LookupRType(typeid(fa::vector<float>));
     }
 
     typeInfo->fields_.push_back(gpg::RField(fieldName, cachedVectorFloatType, offset, 0, nullptr));
@@ -925,11 +925,11 @@ namespace moho
     typeInfo->AddField<float>("GuardReturnRadius", offsetof(RUnitBlueprintAI, GuardReturnRadius), 3, "Maximum range from the guarded unit before initiating return");
     typeInfo->AddField<float>("StagingPlatformScanRadius", offsetof(RUnitBlueprintAI, StagingPlatformScanRadius), 3, "Range for staging platforms to look for planes to repair and refuel when they are on patrol");
     typeInfo->AddField<bool>("ShowAssistRangeOnSelect", offsetof(RUnitBlueprintAI, ShowAssistRangeOnSelect), 3, "Show assist range for the unit if selected");
-    typeInfo->AddField<msvc8::string>("GuardFormationName", offsetof(RUnitBlueprintAI, GuardFormationName), 3, "The formation name used for guarding this unit");
+    typeInfo->AddField<fa::string>("GuardFormationName", offsetof(RUnitBlueprintAI, GuardFormationName), 3, "The formation name used for guarding this unit");
     typeInfo->AddField<bool>("NeedUnpack", offsetof(RUnitBlueprintAI, NeedUnpack), 3, "Unit should unpack before firing weapon");
     typeInfo->AddField<bool>("InitialAutoMode", offsetof(RUnitBlueprintAI, InitialAutoMode), 3, "Initial auto mode behavior for the unit");
-    typeInfo->AddField<msvc8::string>("BeaconName", offsetof(RUnitBlueprintAI, BeaconName), 3, "Thie is the beacon that this unit will create under some circumstances");
-    gpg::RField* const targetBonesField = typeInfo->AddField<msvc8::vector<msvc8::string>>("TargetBones", offsetof(RUnitBlueprintAI, TargetBones));
+    typeInfo->AddField<fa::string>("BeaconName", offsetof(RUnitBlueprintAI, BeaconName), 3, "Thie is the beacon that this unit will create under some circumstances");
+    gpg::RField* const targetBonesField = typeInfo->AddField<fa::vector<fa::string>>("TargetBones", offsetof(RUnitBlueprintAI, TargetBones));
     targetBonesField->mFlags = 3;
     targetBonesField->mDesc = "Some target bones setup for other units to aim at instead of the default center pos";
     typeInfo->AddField<float>("RefuelingMultiplier", offsetof(RUnitBlueprintAI, RefuelingMultiplier), 3, "This multiplier is applied when a staging platform is refueling an air unit");
@@ -991,7 +991,7 @@ namespace moho
     typeInfo->AddField<float>("SurfaceThreatLevel", offsetof(RUnitBlueprintDefense, SurfaceThreatLevel), 3, "Amount of threat this poses to the enemy air units");
     typeInfo->AddField<float>("SubThreatLevel", offsetof(RUnitBlueprintDefense, SubThreatLevel), 3, "Amount of threat this poses to the enemy air units");
     typeInfo->AddField<float>("EconomyThreatLevel", offsetof(RUnitBlueprintDefense, EconomyThreatLevel), 3, "Amount of threat this poses to the enemy air units");
-    typeInfo->AddField<msvc8::string>("ArmorType", offsetof(RUnitBlueprintDefense, ArmorType), 3, "The Armor type name");
+    typeInfo->AddField<fa::string>("ArmorType", offsetof(RUnitBlueprintDefense, ArmorType), 3, "The Armor type name");
     gpg::RField* const shieldField = typeInfo->AddField<moho::RUnitBlueprintDefenseShield>("Shield", offsetof(RUnitBlueprintDefense, Shield));
     shieldField->mFlags = 3;
     shieldField->mDesc = "Shield information";
@@ -1136,12 +1136,12 @@ namespace moho
     typeInfo->AddField<float>("StorageMass", offsetof(RUnitBlueprintEconomy, StorageMass), 3, "Mass storage capacity provided by this unit");
     typeInfo->AddField<bool>("NaturalProducer", offsetof(RUnitBlueprintEconomy, NaturalProducer), 3, "Produces resouce naturally and does not consume anything");
 
-    gpg::RField* const buildableCategoriesField = typeInfo->AddField<msvc8::vector<msvc8::string>>("BuildableCategories", offsetof(RUnitBlueprintEconomy, BuildableCategories));
+    gpg::RField* const buildableCategoriesField = typeInfo->AddField<fa::vector<fa::string>>("BuildableCategories", offsetof(RUnitBlueprintEconomy, BuildableCategories));
     buildableCategoriesField->mFlags = 3;
     buildableCategoriesField->mDesc = "One of the unit categories that can be built by this unit";
     SetLastFieldName(typeInfo, "BuildableCategory");
 
-    gpg::RField* const rebuildBonusIdsField = typeInfo->AddField<msvc8::vector<msvc8::string>>("RebuildBonusIds", offsetof(RUnitBlueprintEconomy, RebuildBonusIds));
+    gpg::RField* const rebuildBonusIdsField = typeInfo->AddField<fa::vector<fa::string>>("RebuildBonusIds", offsetof(RUnitBlueprintEconomy, RebuildBonusIds));
     rebuildBonusIdsField->mFlags = 3;
     rebuildBonusIdsField->mDesc = "You will get bonus if you rebuild this unit over the wreckage of these wreckages";
 
@@ -1196,8 +1196,8 @@ namespace moho
    */
   void RUnitBlueprintWeaponTypeInfo::AddFields(gpg::RType* const typeInfo)
   {
-    typeInfo->AddField<msvc8::string>("Label", offsetof(RUnitBlueprintWeapon, Label), 3, "The label to pass to scripts to id this weapon.");
-    typeInfo->AddField<msvc8::string>("DisplayName", offsetof(RUnitBlueprintWeapon, DisplayName), 3, "The display name of this weapon.");
+    typeInfo->AddField<fa::string>("Label", offsetof(RUnitBlueprintWeapon, Label), 3, "The label to pass to scripts to id this weapon.");
+    typeInfo->AddField<fa::string>("DisplayName", offsetof(RUnitBlueprintWeapon, DisplayName), 3, "The display name of this weapon.");
     gpg::RField* const rangeCategoryField = typeInfo->AddField<moho::UnitWeaponRangeCategory>("RangeCategory", offsetof(RUnitBlueprintWeapon, RangeCategory));
     rangeCategoryField->mFlags = 3;
     rangeCategoryField->mDesc = "The range category this weapon satisfies.";
@@ -1230,14 +1230,14 @@ namespace moho
     typeInfo->AddField<float>("ProjectileLifetimeUsesMultiplier", offsetof(RUnitBlueprintWeapon, ProjectileLifetimeUsesMultiplier), 3, "Lifetime for projectile based on lifetime equation of Multiplier * (MaxRadius/MuzzleVelocity)");
     typeInfo->AddField<float>("Damage", offsetof(RUnitBlueprintWeapon, Damage), 3, "How much damage to cause.");
     typeInfo->AddField<float>("DamageRadius", offsetof(RUnitBlueprintWeapon, DamageRadius), 3, "Radius to inflict damage in.");
-    typeInfo->AddField<msvc8::string>("DamageType", offsetof(RUnitBlueprintWeapon, DamageType), 3, "Type of damage this weapon deals");
+    typeInfo->AddField<fa::string>("DamageType", offsetof(RUnitBlueprintWeapon, DamageType), 3, "Type of damage this weapon deals");
     typeInfo->AddField<float>("RateOfFire", offsetof(RUnitBlueprintWeapon, RateOfFire), 3, "How many shots/second we can fire.");
     typeInfo->AddField<moho::RResId>("ProjectileId", offsetof(RUnitBlueprintWeapon, ProjectileId), 3, "Blueprint Id for projectile, if any.");
     gpg::RField* const ballisticArcField = typeInfo->AddField<moho::ERuleBPUnitWeaponBallisticArc>("BallisticArc", offsetof(RUnitBlueprintWeapon, BallisticArc));
     ballisticArcField->mFlags = 3;
     ballisticArcField->mDesc = "High or low arc for projectiles";
-    typeInfo->AddField<msvc8::string>("TargetRestrictOnlyAllow", offsetof(RUnitBlueprintWeapon, TargetRestrictOnlyAllow), 3, "Comma separated list of Entity Category that are the only valid targets.");
-    typeInfo->AddField<msvc8::string>("TargetRestrictDisallow", offsetof(RUnitBlueprintWeapon, TargetRestrictDisallow), 3, "Comma separated list of Entity Category that are always invalid targets.");
+    typeInfo->AddField<fa::string>("TargetRestrictOnlyAllow", offsetof(RUnitBlueprintWeapon, TargetRestrictOnlyAllow), 3, "Comma separated list of Entity Category that are the only valid targets.");
+    typeInfo->AddField<fa::string>("TargetRestrictDisallow", offsetof(RUnitBlueprintWeapon, TargetRestrictDisallow), 3, "Comma separated list of Entity Category that are always invalid targets.");
     gpg::RField* const targetTypeField = typeInfo->AddField<moho::ERuleBPUnitWeaponTargetType>("TargetType", offsetof(RUnitBlueprintWeapon, TargetType));
     targetTypeField->mFlags = 3;
     targetTypeField->mDesc = "The type of entity this unit can target.";
@@ -1261,8 +1261,8 @@ namespace moho
     typeInfo->AddField<float>("BombDropThreshold", offsetof(RUnitBlueprintWeapon, BombDropThreshold), 3, "Threshold to release point before releasing ordinance?");
     typeInfo->AddField<bool>("ReTargetOnMiss", offsetof(RUnitBlueprintWeapon, ReTargetOnMiss), 3, "This weapon will find new target on miss events");
     typeInfo->AddField<bool>("UseFiringSolutionInsteadOfAimBone", offsetof(RUnitBlueprintWeapon, UseFiringSolutionInsteadOfAimBone), 3, "This weapon uses the recent firing solution to create projectile istead of the aim bone transform");
-    typeInfo->AddField<msvc8::string>("UIMinRangeVisualId", offsetof(RUnitBlueprintWeapon, UIMinRangeVisualId), 3, "Allows the UI to know what kind of minimum range indicator to draw for this weapon.");
-    typeInfo->AddField<msvc8::string>("UIMaxRangeVisualId", offsetof(RUnitBlueprintWeapon, UIMaxRangeVisualId), 3, "Allows the UI to know what kind of maximum range indicator to draw for this weapon.");
+    typeInfo->AddField<fa::string>("UIMinRangeVisualId", offsetof(RUnitBlueprintWeapon, UIMinRangeVisualId), 3, "Allows the UI to know what kind of minimum range indicator to draw for this weapon.");
+    typeInfo->AddField<fa::string>("UIMaxRangeVisualId", offsetof(RUnitBlueprintWeapon, UIMaxRangeVisualId), 3, "Allows the UI to know what kind of maximum range indicator to draw for this weapon.");
     typeInfo->AddField<float>("MaximumBeamLength", offsetof(RUnitBlueprintWeapon, MaximumBeamLength), 3, "Allows the setting of the Maximum Beam length so beams and radius can be different. Default to MaxRadius.");
   }
 

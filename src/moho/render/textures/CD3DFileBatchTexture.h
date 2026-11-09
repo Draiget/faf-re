@@ -25,7 +25,7 @@ namespace moho
      * What it does:
      * Constructs one file-backed raw batch texture and stores the lookup filename.
      */
-    CD3DFileBatchTexture(const DataHandle& data, std::uint32_t border, const msvc8::string& filename);
+    CD3DFileBatchTexture(const DataHandle& data, std::uint32_t border, const fa::string& filename);
 
     /**
      * Address: 0x00448490 (FUN_00448490, Moho::CD3DFileBatchTexture::dtr)
@@ -66,7 +66,7 @@ namespace moho
      * What it does:
      * Returns the stored filename key used by the texture cache.
      */
-    [[nodiscard]] const msvc8::string& GetFilename() const;
+    [[nodiscard]] const fa::string& GetFilename() const;
 
     /**
      * Address: 0x00448500 (FUN_00448500, Moho::CD3DFileBatchTexture::OnClose)
@@ -78,7 +78,7 @@ namespace moho
     static void OnClose(CD3DFileBatchTexture* texture);
 
   public:
-    msvc8::string mFilename; // +0x28
+    fa::string mFilename; // +0x28
     bool mCanDelete = false; // +0x44
   };
 

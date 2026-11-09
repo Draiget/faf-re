@@ -47,7 +47,7 @@ namespace gpg::gal
          * What it does:
          * The variable's name in the effect.
          */
-        virtual msvc8::string* GetName() = 0;
+        virtual fa::string* GetName() = 0;
 
         /**
          * Slot: 2
@@ -143,22 +143,22 @@ namespace gpg::gal
          * Reads the variable's bool annotation `annotationName`; false when it
          * has none.
          */
-        virtual bool GetAnnotationBool(bool* outValue, const msvc8::string& annotationName) = 0;
+        virtual bool GetAnnotationBool(bool* outValue, const fa::string& annotationName) = 0;
 
         /**
          * Slot: 15
          */
-        virtual bool GetAnnotationInt(int* outValue, const msvc8::string& annotationName) = 0;
+        virtual bool GetAnnotationInt(int* outValue, const fa::string& annotationName) = 0;
 
         /**
          * Slot: 16
          */
-        virtual bool GetAnnotationFloat(float* outValue, const msvc8::string& annotationName) = 0;
+        virtual bool GetAnnotationFloat(float* outValue, const fa::string& annotationName) = 0;
 
         /**
          * Slot: 17
          */
-        virtual bool GetAnnotationString(msvc8::string* outValue, const msvc8::string& annotationName) = 0;
+        virtual bool GetAnnotationString(fa::string* outValue, const fa::string& annotationName) = 0;
     };
 
     static_assert(sizeof(EffectVariable) == 0x4, "gpg::gal::EffectVariable size must be 0x4");

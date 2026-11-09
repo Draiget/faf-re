@@ -3,10 +3,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <memory>
 #include <new>
 #include <ostream>
 
 #include "String.h"
+#include "TrackedPointerIndex.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "lua/LuaObject.h"
@@ -26,7 +29,7 @@ struct LegacyValueFloatLane
     throw SerializationError(message ? message : "");
 }
 
-[[noreturn]] void ThrowSerializationError(const msvc8::string& message)
+[[noreturn]] void ThrowSerializationError(const fa::string& message)
 {
     throw SerializationError(message.c_str());
 }
@@ -37,7 +40,7 @@ const char* SafeTypeName(const RType* const type)
 }
 
 constexpr char kArchiveTokenBytes[] = {'}', 'N', '0', '*', '{'};
-using TrackedPointerMap = msvc8::map<RRef, WriteArchive::TrackedPointerRecord, RRefCompare>;
+using TrackedPointerMap = fa::map<RRef, WriteArchive::TrackedPointerRecord, RRefCompare>;
 
 class BinaryWriteArchive;
 
@@ -231,7 +234,7 @@ public:
         int lineColumn = 0;
         for (size_t i = 0; i < byteCount; ++i) {
             const unsigned char value = static_cast<unsigned char>(bytes[i]);
-            const msvc8::string encodedByte = STR_Printf("%02x", static_cast<unsigned int>(value));
+            const fa::string encodedByte = STR_Printf("%02x", static_cast<unsigned int>(value));
             (*mStream) << encodedByte.c_str();
 
             ++lineColumn;
@@ -259,7 +262,7 @@ public:
      * Writes one quoted, escaped text lane (`\\n`, `\\t`, `\\\"`, `\\\\`, octal
      * escapes for non-printable bytes), then terminates the record with newline.
      */
-    void WriteString(msvc8::string* const value) override
+    void WriteString(fa::string* const value) override
     {
         mStream->put('"');
         const char* const data = value->c_str();
@@ -281,7 +284,7 @@ public:
                 break;
             default:
                 if (c < 0x20u || c > 0x7Eu) {
-                    const msvc8::string octalByte = STR_Printf("%03o", static_cast<unsigned int>(c));
+                    const fa::string octalByte = STR_Printf("%03o", static_cast<unsigned int>(c));
                     (*mStream) << "\\" << octalByte.c_str();
                 } else {
                     mStream->put(static_cast<char>(c));
@@ -465,7 +468,7 @@ public:
      * Writes one length-prefixed string lane to the archive stream and throws
      * `SerializationError("nowrite")` when either write fails.
      */
-    void WriteString(msvc8::string* const value) override
+    void WriteString(fa::string* const value) override
     {
         std::FILE* const file = mCachedFile;
         const std::uint32_t byteCount = static_cast<std::uint32_t>(value->size());
@@ -675,6 +678,118 @@ private:
     std::FILE* mCachedFile = nullptr;     // +0x28
 };
 
+/**
+ * Engine addition, see `CreateFastBinaryWriteArchive`. Each value has the width `BinaryWriteArchive` gives it.
+ */
+class FastBinaryWriteArchive final : public gpg::WriteArchive
+{
+public:
+    explicit FastBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file)
+        : mFile(file)
+        , mBuffer(std::make_unique<char[]>(kBufferBytes))
+    {
+        mFastObjRefs = &mIndex;
+    }
+
+    explicit FastBinaryWriteArchive(gpg::WriteArchiveSink& sink)
+        : mSink(&sink)
+        , mBuffer(std::make_unique<char[]>(kBufferBytes))
+    {
+        mFastObjRefs = &mIndex;
+    }
+
+    ~FastBinaryWriteArchive() override
+    {
+        // After a failed write the caller has its exception, and a flush that fails here shows in the file's size.
+        (void)Emit(mBuffer.get(), mUsed);
+    }
+
+    void WriteBytes(char* const bytes, const size_t byteCount) override { Put(bytes, byteCount); }
+
+    void WriteString(fa::string* const value) override
+    {
+        const std::uint32_t byteCount = static_cast<std::uint32_t>(value->size());
+        Scalar<4u>(byteCount);
+        if (byteCount != 0u) {
+            Put(value->raw_data_unsafe(), byteCount);
+        }
+    }
+
+    void WriteFloat(const float value) override { Scalar<4u>(value); }
+    void WriteUInt64(const uint64_t value) override { Scalar<8u>(value); }
+    void WriteInt64(const int64_t value) override { Scalar<8u>(value); }
+    void WriteULong(const unsigned long value) override { Scalar<4u>(value); }
+    void WriteLong(const long value) override { Scalar<4u>(value); }
+    void WriteUInt(const unsigned int value) override { Scalar<4u>(value); }
+    void WriteInt(const int value) override { Scalar<4u>(value); }
+    void WriteUShort(const unsigned short value) override { Scalar<2u>(value); }
+    void WriteShort(const short value) override { Scalar<2u>(value); }
+    void WriteUByte(const unsigned __int8 value) override { Scalar<1u>(value); }
+    void WriteByte(const __int8 value) override { Scalar<1u>(value); }
+    void WriteBool(const bool value) override { Scalar<1u>(value); }
+    void WriteMarker(const int marker) override { Scalar<1u>(kArchiveTokenBytes[marker]); }
+
+    void EndSection(const bool skipOwnershipValidation) override
+    {
+        gpg::WriteArchive::EndSection(skipOwnershipValidation);
+        Flush();
+    }
+
+private:
+    static constexpr std::size_t kBufferBytes = std::size_t{4} * 1024u * 1024u;
+
+    template <std::size_t Width, typename T>
+    void Scalar(const T& value)
+    {
+        static_assert(Width <= sizeof(T));
+        if (kBufferBytes - mUsed < Width) {
+            Flush();
+        }
+        std::memcpy(mBuffer.get() + mUsed, &value, Width);
+        mUsed += Width;
+    }
+
+    void Put(const void* const bytes, const std::size_t byteCount)
+    {
+        if (kBufferBytes - mUsed < byteCount) {
+            Flush();
+            if (byteCount >= kBufferBytes) {
+                if (!Emit(bytes, byteCount)) {
+                    ThrowSerializationError("nowrite");
+                }
+                return;
+            }
+        }
+        if (byteCount != 0u) {
+            std::memcpy(mBuffer.get() + mUsed, bytes, byteCount);
+            mUsed += byteCount;
+        }
+    }
+
+    void Flush()
+    {
+        const std::size_t used = mUsed;
+        mUsed = 0u;
+        if (used != 0u && !Emit(mBuffer.get(), used)) {
+            ThrowSerializationError("nowrite");
+        }
+    }
+
+    [[nodiscard]] bool Emit(const void* const bytes, const std::size_t byteCount)
+    {
+        if (mSink != nullptr) {
+            return mSink->Write(bytes, byteCount);
+        }
+        return byteCount == 0u || std::fwrite(bytes, byteCount, 1u, mFile.get()) == 1u;
+    }
+
+    boost::shared_ptr<std::FILE> mFile;
+    gpg::WriteArchiveSink* mSink = nullptr;
+    std::unique_ptr<char[]> mBuffer;
+    std::size_t mUsed = 0u;
+    TrackedPointerIndex mIndex;
+};
+
 
 void WriteBinaryCompatibilityLane(
     BinaryWriteArchive* const archive,
@@ -692,7 +807,7 @@ void WriteBinaryCompatibilityLane(
  * Runs one deleting-destructor thunk for `BinaryWriteArchive`, forwarding
  * through non-deleting teardown and optional storage release.
  */
-[[nodiscard]] BinaryWriteArchive* DestroyBinaryWriteArchiveDeleting(
+[[maybe_unused]] [[nodiscard]] BinaryWriteArchive* DestroyBinaryWriteArchiveDeleting(
     BinaryWriteArchive* const archive,
     const unsigned char deleteFlag
 )
@@ -861,10 +976,10 @@ WriteArchive* WriteArchive::WriteCFunction(CClosure* const closure, const RRef& 
  */
 void WriteArchive::WriteRefCounts(const RType* const type)
 {
-    const msvc8::map<const RType*, int>::iterator it = mRefCounts.find(type);
+    const fa::map<const RType*, int>::iterator it = mRefCounts.find(type);
     if (it == mRefCounts.end()) {
         WriteInt(-1);
-        msvc8::string typeName(type->GetName());
+        fa::string typeName(type->GetName());
         WriteString(&typeName);
         WriteInt(type->version_);
         (void)mRefCounts.insert({type, static_cast<int>(mRefCounts.size())});
@@ -917,16 +1032,21 @@ WriteArchive& WriteArchive::PreCreatedPtr(const RRef& objectRef)
         ThrowSerializationError("Error while creating archive: NULL pre-created pointers are not allowed.");
     }
 
-    if (mObjRefs.find(objectRef) != mObjRefs.end()) {
+    const bool known = mFastObjRefs != nullptr ? mFastObjRefs->Find(objectRef) != nullptr : mObjRefs.find(objectRef) != mObjRefs.end();
+    if (known) {
         ThrowSerializationError(
             "Error while creating archive: can't register pre-created pointer because it has already been serialized."
         );
     }
 
     WriteArchive::TrackedPointerRecord record{};
-    record.index = static_cast<int>(mObjRefs.size());
+    record.index = static_cast<int>(mFastObjRefs != nullptr ? mFastObjRefs->Size() : mObjRefs.size());
     record.ownership = TrackedPointerState::Owned;
-    (void)mObjRefs.insert({objectRef, record});
+    if (mFastObjRefs != nullptr) {
+        (void)mFastObjRefs->Insert(objectRef, record);
+    } else {
+        (void)mObjRefs.insert({objectRef, record});
+    }
     return *this;
 }
 
@@ -965,6 +1085,20 @@ WriteArchive& WriteArchive::PreCreatedPtr(const RRef& objectRef)
  */
 void WriteArchive::EndSection(const bool skipOwnershipValidation)
 {
+    if (mFastObjRefs != nullptr) {
+        for (std::uint32_t index = 0u; !skipOwnershipValidation && index < mFastObjRefs->Size(); ++index) {
+            const TrackedPointerIndex::Entry& entry = mFastObjRefs->At(index);
+            if (entry.record.ownership == TrackedPointerState::Unowned) {
+                ThrowSerializationError(STR_Printf(
+                    "Error while creating archive: nobody claimed ownership of %s 0x%08llx",
+                    SafeTypeName(entry.key.mType),
+                    static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(entry.key.mObj))
+                ));
+            }
+        }
+        mFastObjRefs->Clear();
+    }
+
     if (!skipOwnershipValidation) {
         for (TrackedPointerMap::const_iterator it = mObjRefs.begin(); it != mObjRefs.end(); ++it) {
             if (it->second.ownership == TrackedPointerState::Unowned) {
@@ -1008,6 +1142,16 @@ void WriteArchive::Close()
 WriteArchive* gpg::CreateBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file)
 {
     return new (std::nothrow) BinaryWriteArchive(file);
+}
+
+WriteArchive* gpg::CreateFastBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file)
+{
+    return new FastBinaryWriteArchive(file);
+}
+
+WriteArchive* gpg::CreateFastBinaryWriteArchive(WriteArchiveSink& sink)
+{
+    return new FastBinaryWriteArchive(sink);
 }
 
 /**

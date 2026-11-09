@@ -56,7 +56,7 @@ namespace moho
      * VFS into mLines, marks its breakpoints and sizes the list. False when
      * the name is empty, the VFS does not find it, or it will not open.
      */
-    bool Load(const msvc8::string& fileName);
+    bool Load(const fa::string& fileName);
 
     /**
      * Address: 0x004C2DA0 (FUN_004C2DA0)
@@ -73,7 +73,7 @@ namespace moho
      * What it does:
      * Selects and shows the first line whose source contains `text`.
      */
-    void FindFirst(const msvc8::string& text);
+    void FindFirst(const fa::string& text);
 
     /**
      * Address: 0x004C2AE0 (FUN_004C2AE0)
@@ -82,7 +82,7 @@ namespace moho
      * The same search, starting after the selected line; nothing without a
      * selection.
      */
-    void FindNext(const msvc8::string& text);
+    void FindNext(const fa::string& text);
 
     /**
      * Address: 0x004C2B90 (FUN_004C2B90)
@@ -90,7 +90,7 @@ namespace moho
      * What it does:
      * The same search backwards, starting before the selected line.
      */
-    void FindPrevious(const msvc8::string& text);
+    void FindPrevious(const fa::string& text);
 
     /**
      * Address: 0x004C2C20 (FUN_004C2C20)
@@ -203,8 +203,8 @@ namespace moho
   public:
     int mCursorLine;                    // +0x150 one-based, 0 when none
     wxImageList* mImageList;            // +0x154
-    msvc8::string mSourcePath;          // +0x158
-    msvc8::vector<ScrFileLine> mLines;  // +0x174
+    fa::string mSourcePath;          // +0x158
+    fa::vector<ScrFileLine> mLines;  // +0x174
 
     DECLARE_EVENT_TABLE()
   };

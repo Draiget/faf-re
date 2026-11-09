@@ -13,33 +13,6 @@
 
 namespace
 {
-  constexpr const char* kSerializationSourcePath =
-    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
-  constexpr int kSerializationLoadLine = 84;
-  constexpr int kSerializationSaveLine = 87;
-  constexpr int kSaveConstructArgsLine = 189;
-  constexpr int kConstructLine = 231;
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedBox3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Box3<float>));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
   moho::Box3fTypeInfo gBox3fTypeInfo;
 
   struct Box3fTypeInfoBootstrap
@@ -62,7 +35,7 @@ namespace Wm3
   template <>
   void Box3<float>::MemberDeserialize(gpg::ReadArchive* archive)
   {
-    gpg::RType* const vector3Type = CachedVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
 
     gpg::RRef ownerRef{};
     archive->Read(vector3Type, &Center, ownerRef);
@@ -87,7 +60,7 @@ namespace Wm3
   template <>
   void Box3<float>::MemberSerialize(gpg::WriteArchive* archive) const
   {
-    gpg::RType* const vector3Type = CachedVector3fType();
+    gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
 
     gpg::RRef ownerRef{};
     archive->Write(vector3Type, &Center, ownerRef);
@@ -175,51 +148,11 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedDColPrimBoxPrimitiveType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CColPrimitive<Wm3::Box3f>));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedDColPrimBoxShapeType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Box3f));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedDColPrimBoxVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCColPrimitiveBaseType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CColPrimitiveBase));
-    }
-    GPG_ASSERT(cached != nullptr);
-    return cached;
-  }
-
   [[nodiscard]] gpg::RRef MakeDColPrimBoxRef(moho::CColPrimitive<Wm3::Box3f>* object)
   {
     gpg::RRef ref{};
     ref.mObj = object;
-    ref.mType = CachedDColPrimBoxPrimitiveType();
+    ref.mType = gpg::RTypeOf<moho::CColPrimitive<Wm3::Box3f>>();
     return ref;
   }
 
@@ -261,13 +194,7 @@ void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
   GPG_ASSERT(typeInfo != nullptr);
   GPG_ASSERT(!typeInfo->initFinished_);
 
-  gpg::RField baseField{};
-  baseField.mName = CachedCColPrimitiveBaseType()->GetName();
-  baseField.mType = CachedCColPrimitiveBaseType();
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, gpg::RTypeOf<moho::CColPrimitiveBase>());
 }
 
 /**
@@ -322,8 +249,8 @@ namespace moho
     Wm3::Vec3f localCenter{};
     const gpg::RRef ownerRef{};
 
-    archive.Read(CachedDColPrimBoxShapeType(), &shape, ownerRef);
-    archive.Read(CachedDColPrimBoxVector3fType(), &localCenter, ownerRef);
+    archive.Read(gpg::RTypeOf<Wm3::Box3f>(), &shape, ownerRef);
+    archive.Read(gpg::RTypeOf<Wm3::Vector3f>(), &localCenter, ownerRef);
 
     auto* object = new CColPrimitive<Wm3::Box3f>(shape);
     if (object != nullptr) {
@@ -342,10 +269,10 @@ namespace moho
   {
     Wm3::Vec3f center{};
     gpg::RRef shapeOwnerRef{};
-    archive.Write(CachedDColPrimBoxShapeType(), GetBox(), shapeOwnerRef);
+    archive.Write(gpg::RTypeOf<Wm3::Box3f>(), GetBox(), shapeOwnerRef);
 
     gpg::RRef centerOwnerRef{};
-    archive.Write(CachedDColPrimBoxVector3fType(), GetCenter(&center), centerOwnerRef);
+    archive.Write(gpg::RTypeOf<Wm3::Vector3f>(), GetCenter(&center), centerOwnerRef);
     result.SetUnowned(0u);
   }
 

@@ -13,14 +13,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return cached;
-  }
 
 } // namespace
 
@@ -33,7 +25,7 @@ namespace moho
   {
     GPG_ASSERT(archive != nullptr);
     const gpg::RRef ownerRef{};
-    archive->Read(ResolveVector3fType(), &position, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &position, ownerRef);
     archive->ReadInt(reinterpret_cast<int*>(&layer));
     (void)archive->ReadPointer(&params, &ownerRef);
     (void)archive->ReadPointer(&sound, &ownerRef);
@@ -46,7 +38,7 @@ namespace moho
   {
     GPG_ASSERT(archive != nullptr);
     const gpg::RRef ownerRef{};
-    archive->Write(ResolveVector3fType(), &position, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &position, ownerRef);
     archive->WriteInt(static_cast<int>(layer));
 
     archive->WritePointer<moho::CSndParams>(params, gpg::TrackedPointerState::Unowned, ownerRef);

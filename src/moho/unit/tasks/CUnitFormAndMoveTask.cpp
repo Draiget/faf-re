@@ -19,55 +19,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitFormAndMoveTaskType()
-  {
-    gpg::RType* type = moho::CUnitFormAndMoveTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitFormAndMoveTask));
-      moho::CUnitFormAndMoveTask::sType = type;
-    }
-    return type;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 
 } // namespace
 
@@ -237,7 +188,7 @@ namespace moho
     }
 
     const gpg::RRef owner{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), owner);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), owner);
 
     IFormationInstance* formationBase = static_cast<IFormationInstance*>(mFormation);
     archive->ReadPointer(&formationBase, &owner);
@@ -262,7 +213,7 @@ namespace moho
     }
 
     const gpg::RRef owner{};
-    archive->Write(CachedCCommandTaskType(), const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this)), owner);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this)), owner);
 
     gpg::RRef formationRef{};
     gpg::RRef_IFormationInstance(&formationRef, mFormation);
@@ -479,12 +430,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitFormAndMoveTask(gpg::RRef* const outRef, moho::CUnitFormAndMoveTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitFormAndMoveTaskType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**

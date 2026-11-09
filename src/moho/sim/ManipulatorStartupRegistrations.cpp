@@ -60,16 +60,6 @@ namespace
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59B34_mFactory = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F59B34_mFactory = nullptr;
 
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindLuaInitFormSetByName(const char* const setName) noexcept
-  {
-    for (moho::CScrLuaInitFormSet* set = moho::CScrLuaInitFormSet::GetFirst(); set != nullptr; set = set->GetNext()) {
-      if (set->mSetName != nullptr && std::strcmp(set->mSetName, setName) == 0) {
-        return set;
-      }
-    }
-    return nullptr;
-  }
-
   template <std::int32_t* TargetIndex>
   int RegisterRecoveredFactoryIndex() noexcept
   {
@@ -81,7 +71,7 @@ namespace
   template <moho::CScrLuaInitForm** PrevLane, moho::CScrLuaInitForm** AnchorLane>
   [[nodiscard]] moho::CScrLuaInitForm* RegisterRecoveredSimInitLinkerLane() noexcept
   {
-    moho::CScrLuaInitFormSet* const simSet = FindLuaInitFormSetByName("Sim");
+    moho::CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
     if (simSet == nullptr) {
       *PrevLane = nullptr;
       return nullptr;
@@ -117,7 +107,7 @@ namespace
     ~RVectorTypeBool() override;
 
     [[nodiscard]] const char* GetName() const override;
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     void Init() override;
     static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
@@ -149,7 +139,7 @@ namespace
     return reinterpret_cast<const TObject*>(objectPtr);
   }
 
-  thread_local msvc8::detail::vector_bool_word_cursor gRecoveredRVectorTypeBoolSubscriptCursorScratch{};
+  thread_local fa::detail::vector_bool_word_cursor gRecoveredRVectorTypeBoolSubscriptCursorScratch{};
 
   /**
    * Address: 0x00BFB080 (FUN_00BFB080, atexit destructor of the RVectorTypeBool object)
@@ -162,7 +152,7 @@ namespace
 
   /**
    * Orphan: no caller anywhere in src and no `Address:` citation of its
-   * own. `CachedVectorBoolElementType()` right below does the same
+   * own. `gpg::RTypeOf<bool>()` right below does the same
    * `LookupRType(typeid(bool))` lookup (minus the `REF_FindTypeNamed`
    * fallback) and is the one with real, evidenced usage: it is called from
    * `RVectorTypeBool::GetName()` (FUN_00641C20, address-cited below). No
@@ -178,15 +168,6 @@ namespace
       if (!cached) {
         cached = gpg::REF_FindTypeNamed("bool");
       }
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVectorBoolElementType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(bool));
     }
     return cached;
   }
@@ -216,7 +197,7 @@ namespace
    */
   const char* RVectorTypeBool::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("vector<%s>", CachedVectorBoolElementType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<bool>()->GetName());
     return sName.c_str();
   }
 
@@ -226,9 +207,9 @@ namespace
    * What it does:
    * Formats inherited lexical text and appends current vector<bool> size.
    */
-  msvc8::string RVectorTypeBool::GetLexical(const gpg::RRef& ref) const
+  fa::string RVectorTypeBool::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -490,7 +471,7 @@ namespace
 
     gRecoveredRVectorTypeBoolSubscriptCursorScratch.word = storage ? storage->mWords : nullptr;
     gRecoveredRVectorTypeBoolSubscriptCursorScratch.bit = 0;
-    (void)msvc8::detail::AdvanceCursorBits(&gRecoveredRVectorTypeBoolSubscriptCursorScratch, ind);
+    (void)fa::detail::AdvanceCursorBits(&gRecoveredRVectorTypeBoolSubscriptCursorScratch, ind);
 
     gpg::RRef out{};
     auto* const reference = reinterpret_cast<std::vector<bool>::reference*>(&gRecoveredRVectorTypeBoolSubscriptCursorScratch);
@@ -519,15 +500,6 @@ namespace
 
 namespace moho
 {
-  [[nodiscard]] static CScrLuaInitFormSet& ClassBinderSimLuaInitSet()
-  {
-    if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
 
   /**
    * Address: 0x00BD1980 (FUN_00BD1980, register_sim_SimInits_mForms_offVariant1)
@@ -541,7 +513,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant1()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.ScriptTask_Methods", &CScrLuaMetatableFactory<CUnitScriptTask>::Instance(), "CUnitScriptTask", ""
+      moho::SCR_SimLuaInitSet(), "moho.ScriptTask_Methods", &CScrLuaMetatableFactory<CUnitScriptTask>::Instance(), "CUnitScriptTask", ""
     );
     return &binder;
   }
@@ -559,7 +531,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant2()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.AimManipulator", &CScrLuaMetatableFactory<CAimManipulator>::Instance(), "CAimManipulator", ""
+      moho::SCR_SimLuaInitSet(), "moho.AimManipulator", &CScrLuaMetatableFactory<CAimManipulator>::Instance(), "CAimManipulator", ""
     );
     return &binder;
   }
@@ -575,7 +547,7 @@ namespace moho
   CScrLuaInitForm* register_CAimManipulatorLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      ClassBinderSimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<CAimManipulator>::Instance(),
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
       "CAimManipulator",
@@ -622,7 +594,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant4()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.BoneEntityManipulator", &CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance(), "CBoneEntityManipulator", ""
+      moho::SCR_SimLuaInitSet(), "moho.BoneEntityManipulator", &CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance(), "CBoneEntityManipulator", ""
     );
     return &binder;
   }
@@ -638,7 +610,7 @@ namespace moho
   CScrLuaInitForm* register_CBoneEntityManipulatorLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      ClassBinderSimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance(),
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
       "CBoneEntityManipulator",
@@ -673,7 +645,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant6()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.BuilderArmManipulator", &CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance(), "CBuilderArmManipulator", ""
+      moho::SCR_SimLuaInitSet(), "moho.BuilderArmManipulator", &CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance(), "CBuilderArmManipulator", ""
     );
     return &binder;
   }
@@ -689,7 +661,7 @@ namespace moho
   CScrLuaInitForm* register_CBuilderArmManipulatorLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      ClassBinderSimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance(),
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
       "CBuilderArmManipulator",
@@ -724,7 +696,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant7()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.CollisionManipulator", &CScrLuaMetatableFactory<CCollisionManipulator>::Instance(), "CCollisionManipulator", ""
+      moho::SCR_SimLuaInitSet(), "moho.CollisionManipulator", &CScrLuaMetatableFactory<CCollisionManipulator>::Instance(), "CCollisionManipulator", ""
     );
     return &binder;
   }
@@ -740,7 +712,7 @@ namespace moho
   CScrLuaInitForm* register_CCollisionManipulatorLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      ClassBinderSimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<CCollisionManipulator>::Instance(),
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
       "CCollisionManipulator",
@@ -775,7 +747,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant8()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.FootPlantManipulator", &CScrLuaMetatableFactory<CFootPlantManipulator>::Instance(), "CFootPlantManipulator", ""
+      moho::SCR_SimLuaInitSet(), "moho.FootPlantManipulator", &CScrLuaMetatableFactory<CFootPlantManipulator>::Instance(), "CFootPlantManipulator", ""
     );
     return &binder;
   }
@@ -791,7 +763,7 @@ namespace moho
   CScrLuaInitForm* register_CFootPlantManipulatorLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      ClassBinderSimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<CFootPlantManipulator>::Instance(),
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
       "CFootPlantManipulator",
@@ -822,7 +794,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant9()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.manipulator_methods", &CScrLuaMetatableFactory<IAniManipulator>::Instance(), "IAniManipulator", ""
+      moho::SCR_SimLuaInitSet(), "moho.manipulator_methods", &CScrLuaMetatableFactory<IAniManipulator>::Instance(), "IAniManipulator", ""
     );
     return &binder;
   }
@@ -866,7 +838,7 @@ namespace moho
   CScrLuaInitForm* register_moho_AnimationManipulator_ClassBinder()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.AnimationManipulator", &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
+      moho::SCR_SimLuaInitSet(), "moho.AnimationManipulator", &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
       "CAnimationManipulator", ""
     );
     return &binder;
@@ -883,7 +855,7 @@ namespace moho
   CScrLuaInitForm* register_CAnimationManipulatorLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      ClassBinderSimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
       "CAnimationManipulator",
@@ -929,7 +901,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant11()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.RotateManipulator", &CScrLuaMetatableFactory<CRotateManipulator>::Instance(), "CRotateManipulator", ""
+      moho::SCR_SimLuaInitSet(), "moho.RotateManipulator", &CScrLuaMetatableFactory<CRotateManipulator>::Instance(), "CRotateManipulator", ""
     );
     return &binder;
   }
@@ -945,7 +917,7 @@ namespace moho
   CScrLuaInitForm* register_CRotateManipulatorLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      ClassBinderSimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
       "CRotateManipulator",
@@ -979,7 +951,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant13()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.SlaveManipulator", &CScrLuaMetatableFactory<CSlaveManipulator>::Instance(), "CSlaveManipulator", ""
+      moho::SCR_SimLuaInitSet(), "moho.SlaveManipulator", &CScrLuaMetatableFactory<CSlaveManipulator>::Instance(), "CSlaveManipulator", ""
     );
     return &binder;
   }
@@ -995,7 +967,7 @@ namespace moho
   CScrLuaInitForm* register_CSlaveManipulatorLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      ClassBinderSimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<CSlaveManipulator>::Instance(),
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
       "CSlaveManipulator",
@@ -1029,7 +1001,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant15()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.SlideManipulator", &CScrLuaMetatableFactory<CSlideManipulator>::Instance(), "CSlideManipulator", ""
+      moho::SCR_SimLuaInitSet(), "moho.SlideManipulator", &CScrLuaMetatableFactory<CSlideManipulator>::Instance(), "CSlideManipulator", ""
     );
     return &binder;
   }
@@ -1045,7 +1017,7 @@ namespace moho
   CScrLuaInitForm* register_CSlideManipulatorLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      ClassBinderSimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<CSlideManipulator>::Instance(),
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
       "CSlideManipulator",
@@ -1082,7 +1054,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant17()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.StorageManipulator", &CScrLuaMetatableFactory<CStorageManipulator>::Instance(), "CStorageManipulator", ""
+      moho::SCR_SimLuaInitSet(), "moho.StorageManipulator", &CScrLuaMetatableFactory<CStorageManipulator>::Instance(), "CStorageManipulator", ""
     );
     return &binder;
   }
@@ -1098,7 +1070,7 @@ namespace moho
   CScrLuaInitForm* register_CStorageManipulatorLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      ClassBinderSimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<CStorageManipulator>::Instance(),
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
       "CStorageManipulator",
@@ -1132,7 +1104,7 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant19()
   {
     static CScrLuaClassBinder binder(
-      ClassBinderSimLuaInitSet(), "moho.ThrustManipulator", &CScrLuaMetatableFactory<CThrustManipulator>::Instance(), "CThrustManipulator", ""
+      moho::SCR_SimLuaInitSet(), "moho.ThrustManipulator", &CScrLuaMetatableFactory<CThrustManipulator>::Instance(), "CThrustManipulator", ""
     );
     return &binder;
   }
@@ -1148,7 +1120,7 @@ namespace moho
   CScrLuaInitForm* register_CThrustManipulatorLuaBaseClass()
   {
     static CScrLuaBaseClassSpec spec(
-      ClassBinderSimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       &CScrLuaMetatableFactory<CThrustManipulator>::Instance(),
       &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
       "CThrustManipulator",

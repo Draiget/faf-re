@@ -116,7 +116,7 @@ namespace moho
    * destructor only needs to clear the category vector and unlink the
    * intrusive unit-set node. The compiler-generated member dtors handle
    * `mUnits.mVec`, `mName`, and `mCats` heap teardown via `~EntitySetTemplate<Unit>`,
-   * `~msvc8::string`, and `~msvc8::vector` respectively.
+   * `~fa::string`, and `~fa::vector` respectively.
    */
   CSquad::~CSquad() = default;
 
@@ -214,7 +214,7 @@ namespace moho
         continue;
       }
 
-      const msvc8::string& bpId = unit->GetBlueprint()->mBlueprintId;
+      const fa::string& bpId = unit->GetBlueprint()->mBlueprintId;
       const char* const bpIdData = (bpId.myRes < 0x10u) ? &bpId.bx.buf[0] : bpId.bx.ptr;
       if (MOHO_STRICMP(bpIdData, blueprintId) == 0) {
         ++count;
@@ -329,7 +329,7 @@ namespace moho
    * Replaces the target-priority categories. Self-assignment is
    * `operator=`'s own first check.
    */
-  void CSquad::SetPrioritizedTargetList(const msvc8::vector<EntityCategorySet>& categories)
+  void CSquad::SetPrioritizedTargetList(const fa::vector<EntityCategorySet>& categories)
   {
     mCats = categories;
   }
@@ -380,7 +380,7 @@ namespace moho
         continue;
       }
 
-      const msvc8::string& bpId = unit->GetBlueprint()->mBlueprintId;
+      const fa::string& bpId = unit->GetBlueprint()->mBlueprintId;
       const char* const bpIdData = (bpId.myRes < 0x10u) ? &bpId.bx.buf[0] : bpId.bx.ptr;
       if (MOHO_STRICMP(bpIdData, blueprintId) != 0) {
         continue;

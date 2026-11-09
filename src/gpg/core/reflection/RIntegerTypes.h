@@ -56,7 +56,7 @@ public:
   void Init() override;
 
   /** Returns string form of `*ref.mObj` cast to `long long`. */
-  [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+  [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
   /** Parses `str` as integer and stores at `*ref.mObj`. */
   bool SetLexical(const gpg::RRef& ref, const char* str) const override;
 };

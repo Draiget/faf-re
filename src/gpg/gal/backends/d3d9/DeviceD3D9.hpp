@@ -72,7 +72,7 @@ namespace gal {
        * What it does:
        * Returns the global D3D9 log-storage lane used by this backend.
        */
-      virtual void* GetLog() override;
+      void* GetLog() override;
       /**
        * Address: 0x008E81E0 (FUN_008E81E0)
        * Slot: 2
@@ -81,7 +81,7 @@ namespace gal {
        * What it does:
        * Dispatches `Func1` pre-hook and returns the embedded device-context lane.
        */
-      virtual DeviceContext* GetDeviceContext() override;
+      DeviceContext* GetDeviceContext() override;
       /**
        * Address: 0x008E81F0 (FUN_008E81F0)
        * Slot: 3
@@ -90,7 +90,7 @@ namespace gal {
        * What it does:
        * Returns the retained current thread-id lane at `this+0x24`.
        */
-      virtual int GetCurThreadId() override;
+      int GetCurThreadId() override;
       /**
        * Address: 0x008E8200 (FUN_008E8200)
        * Slot: 4
@@ -105,7 +105,7 @@ namespace gal {
        * Slot: 5
        * Demangled: gpg::gal::DeviceD3D9::GetModesForAdapter
        */
-      void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
+      void GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
       /**
        * Address: 0x008EAB20 (FUN_008EAB20)
        * Slot: 7
@@ -253,7 +253,7 @@ namespace gal {
        */
       void SaveCubeRenderTarget(
           const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
-          const msvc8::string& filePath
+          const fa::string& filePath
        ) override;
       /**
        * Address: 0x008EC970 (FUN_008EC970)
@@ -265,7 +265,7 @@ namespace gal {
        */
       void SaveRenderTarget(
           const boost::shared_ptr<RenderTarget>& renderTarget,
-          const msvc8::string& filePath,
+          const fa::string& filePath,
           int fileFormat
        ) override;
       /**
@@ -278,7 +278,7 @@ namespace gal {
        */
       void SaveTexture(
           const boost::shared_ptr<Texture>& texture,
-          const msvc8::string& filePath,
+          const fa::string& filePath,
           int fileFormat,
           gpg::MemBuffer<char>* outBuffer
        ) override;
@@ -290,7 +290,7 @@ namespace gal {
        * What it does:
        * Decodes one texture payload from memory and exports block-compressed bytes.
        */
-      virtual void GetTexture2D(
+      void GetTexture2D(
           const void* sourceData,
           std::uint32_t sourceBytes,
           gpg::MemBuffer<char>* outTextureData,
@@ -306,7 +306,7 @@ namespace gal {
        * Dispatches `Func1`, clears caller weak-handle output, and consumes one temporary
        * shared-handle argument by value.
        */
-      virtual boost::weak_ptr<void>* Func7(
+      boost::weak_ptr<void>* Func7(
           boost::weak_ptr<void>* outWeakHandle,
           boost::shared_ptr<void> temporarySharedHandle
        ) override;
@@ -338,7 +338,7 @@ namespace gal {
        * Probes native cooperative-level state and maps D3D9 result values into backend
        * status tokens (`0`, `1`, `2`).
        */
-      virtual int TestCooperativeLevel() override;
+      int TestCooperativeLevel() override;
       /**
        * Address: 0x008ED450 (FUN_008ED450)
        * Slot: 28
@@ -357,7 +357,7 @@ namespace gal {
        * What it does:
        * Ends one native D3D9 scene and throws on failing HRESULT.
        */
-      virtual void EndScene() override;
+      void EndScene() override;
       /**
        * Address: 0x008ED640 (FUN_008ED640)
        * Slot: 30
@@ -366,7 +366,7 @@ namespace gal {
        * What it does:
        * Flushes pending frame-event query data then presents the native swap chain.
        */
-      virtual void Present() override;
+      void Present() override;
       /**
        * Address: 0x008ED750 (FUN_008ED750)
        * Slot: 31
@@ -378,7 +378,7 @@ namespace gal {
        * Resolves one level-0 cursor surface from context texture lanes and binds cursor
        * hotspot/surface properties on the native device.
        */
-      virtual void SetCursor(const CursorContext* context) override;
+      void SetCursor(const CursorContext* context) override;
       /**
        * Address: 0x008E8220 (FUN_008E8220)
        * Slot: 32
@@ -398,7 +398,7 @@ namespace gal {
        * What it does:
        * Dispatches `Func1` pre-hook then forwards to native D3D9 `ShowCursor`.
        */
-      virtual int ShowCursor(bool show) override;
+      int ShowCursor(bool show) override;
       /**
        * Address: 0x008ED910 (FUN_008ED910)
        * Slot: 34
@@ -432,7 +432,7 @@ namespace gal {
        * Applies output target/depth-stencil surface bindings from one output-context
        * payload onto the native D3D9 device.
        */
-      virtual void ClearTarget(const OutputContext* context) override;
+      void ClearTarget(const OutputContext* context) override;
       // Slot 37 is gpg::gal::Device::GetContext (0x008E6810). Both
       // ??_7Device@gal@gpg@@6B@ and ??_7DeviceD3D9@gal@gpg@@6B@ carry that
       // same address there, so the backend inherits it rather than
@@ -448,7 +448,7 @@ namespace gal {
        * Derives native D3D clear-mask bits from caller booleans and dispatches one clear
        * with packed color/depth/stencil payload.
        */
-      virtual void Clear(
+      void Clear(
           bool clearTarget,
           bool clearZbuffer,
           bool clearStencil,
@@ -505,7 +505,7 @@ namespace gal {
        * Validates retained pipeline state and forwards one fog-state payload to
        * the pipeline-state owner.
        */
-      virtual void SetFogState(
+      void SetFogState(
           bool enable,
           const Matrix* projection,
           float fogStart,
@@ -562,7 +562,7 @@ namespace gal {
        * Validates retained pipeline state then forwards begin-technique state
        * setup.
        */
-      virtual void BeginTechnique() override;
+      void BeginTechnique() override;
       /**
        * Address: 0x008EEAC0 (FUN_008EEAC0)
        * Slot: 49
@@ -571,7 +571,7 @@ namespace gal {
        * What it does:
        * Validates retained pipeline state then forwards end-technique cleanup.
        */
-      virtual void EndTechnique() override;
+      void EndTechnique() override;
 
       /**
        * FAF addition, not in the shipped binary (`ren_Info`).
@@ -677,7 +677,7 @@ namespace gal {
 
     public:
       int mCurThreadId = 0;                                    // +0x24 thread that ran Setup
-      msvc8::vector<AdapterD3D9> mAdapters;                    // +0x28
+      fa::vector<AdapterD3D9> mAdapters;                    // +0x28
       DeviceContext mDeviceContext{DeviceApi::Unset};          // +0x38 the context actually in force
       boost::shared_ptr<PipelineStateD3D9> mPipelineState;     // +0x6C
       IDirect3D9* mDirect3D = nullptr;                         // +0x74

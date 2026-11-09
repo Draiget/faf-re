@@ -1,0 +1,36 @@
+name: 1p-uifix-main
+description: >
+  UI fix check, recovered x86 engine: a factory with a tank on its pad must take the cursor
+  rollover (not the tank), and the formation preview must show the tanks' strategic icons (#19).
+  The UI hook logs "UITEST ..." lines that ui-fixes\drive.ps1 answers (cursor moves, a right-drag,
+  window shots). Setup: tools/scenarios/ui-fixes/map copied into the vault as maps/faf_re_uifix,
+  with the faf_re_lockstep scmap and save hard-linked in as faf_re_uifix.scmap /
+  faf_re_uifix_save.lua; copy ui-fixes/init_uifix.lua into C:\ProgramData\FAForever\bin. The exe is
+  a build copied into bin as main_fixcheck.exe. drive.ps1 moves the real cursor.
+timeout: 5m
+
+mode: direct
+lobby: auto
+map: faf_re_uifix
+gameOptions:
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin\main_fixcheck.exe'
+  init: init_uifix.lua
+  nosound: true
+
+players:
+  - { uid: 1, name: UiTest, faction: uef, args: ['/title', 'uifix-main'] }
+
+steps:
+  - start: all
+  - host: 1
+  - waitState: { uids: all, state: Launching, timeout: 3m }
+  - wait: 140s
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: all, pattern: 'UITEST DONE' }

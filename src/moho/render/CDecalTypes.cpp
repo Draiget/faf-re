@@ -17,30 +17,6 @@
 
 namespace
 {
-  /**
-   * Address: 0x0077B940 (FUN_0077B940)
-   *
-   * What it does:
-   * Returns the lazily cached reflection descriptor for `SDecalInfo`.
-   */
-  [[nodiscard]] gpg::RType* CachedSDecalInfoType()
-  {
-    gpg::RType* type = moho::SDecalInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SDecalInfo));
-      moho::SDecalInfo::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3<float>));
-    }
-    return type;
-  }
 
   [[nodiscard]] gpg::ReadArchive* ReadReflectedSDecalInfoPayload(
     gpg::ReadArchive* const archive,
@@ -49,7 +25,7 @@ namespace
   )
   {
     gpg::RRef nullOwner{};
-    archive->Read(CachedSDecalInfoType(), payload, ownerRef ? *ownerRef : nullOwner);
+    archive->Read(gpg::RTypeOf<moho::SDecalInfo>(), payload, ownerRef ? *ownerRef : nullOwner);
     return archive;
   }
 
@@ -60,7 +36,7 @@ namespace
   )
   {
     gpg::RRef nullOwner{};
-    archive->Write(CachedSDecalInfoType(), payload, ownerRef ? *ownerRef : nullOwner);
+    archive->Write(gpg::RTypeOf<moho::SDecalInfo>(), payload, ownerRef ? *ownerRef : nullOwner);
     return archive;
   }
 
@@ -249,13 +225,13 @@ namespace
    * What it does:
    * Assign-copies one `SDecalInfo` forward range and returns one-past the last
    * assigned destination lane. The binary emits an additional specialized
-   * forward-assign lane at `0x0077E8E0` for `msvc8::vector<SDecalInfo>`'s
+   * forward-assign lane at `0x0077E8E0` for `fa::vector<SDecalInfo>`'s
    * operator= reuse path, where the fastcall/register-assignment shape
    * inlines the stride-`sizeof(SDecalInfo)=0x90` loop over a pre-sized
    * destination range; semantically identical to this canonical helper, so
    * this single typed definition services every callsite in the TU.
    */
-  [[nodiscard]] moho::SDecalInfo* CopyAssignSDecalInfoRangeForward(
+  [[maybe_unused]] [[nodiscard]] moho::SDecalInfo* CopyAssignSDecalInfoRangeForward(
     moho::SDecalInfo* destinationBegin,
     const moho::SDecalInfo* sourceBegin,
     const moho::SDecalInfo* sourceEnd
@@ -275,7 +251,7 @@ namespace
   // `src/**` (`DestroySDecalInfoRangeThiscallAdapter` was
   // `[[maybe_unused]]`; `ClearSDecalInfoVectorUsedRange` was defined but
   // never called at all) -- a RULE ONE per-type duplicate of the canonical
-  // `msvc8::vector<Moho::SDecalInfo>::destroy_range`/`clear` template
+  // `fa::vector<Moho::SDecalInfo>::destroy_range`/`clear` template
   // instantiations. Removed in favor of the real citations on those
   // template members in `legacy/containers/Vector.h`, the same fix already
   // applied once in this exact file for the sibling `uninit_copy_n` adapter
@@ -290,7 +266,7 @@ namespace
  *
  * What it does:
  * Constructs the `gpg::RListType<moho::SDecalInfo>` static, which
- * preregisters it for `typeid(msvc8::list<moho::SDecalInfo>)`, and returns
+ * preregisters it for `typeid(fa::list<moho::SDecalInfo>)`, and returns
  * it.
  *
  * `RListType<SDecalInfo>`, vtable 0x00E373A8:
@@ -385,7 +361,7 @@ namespace moho
    *
    * The explicit definition reifies the compiler-synthesized destructor
    * that lives at `0x00742360` in the shipped binary so that the
-   * `msvc8::vector<SDecalInfo>` teardown path (`destroy_range<SDecalInfo>`,
+   * `fa::vector<SDecalInfo>` teardown path (`destroy_range<SDecalInfo>`,
    * `legacy/containers/Vector.h`, address-cited 0x00742090 and siblings)
    * binds to a named, address-annotated symbol rather than an implicit
    * lane.
@@ -426,12 +402,12 @@ namespace moho
     const Wm3::Vec3f& size,
     const Wm3::Vec3f& position,
     const Wm3::Vec3f& rotation,
-    const msvc8::string& textureNamePrimary,
-    const msvc8::string& textureNameSecondary,
+    const fa::string& textureNamePrimary,
+    const fa::string& textureNameSecondary,
     const bool isSplat,
     const float lodParam,
     const std::uint32_t startTick,
-    const msvc8::string& typeName,
+    const fa::string& typeName,
     const std::uint32_t armyIndex,
     const std::uint32_t fidelity
   )
@@ -463,7 +439,7 @@ namespace moho
       return;
     }
 
-    gpg::RType* const vector3fType = CachedVector3fType();
+    gpg::RType* const vector3fType = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
     archive->Read(vector3fType, &mPos, ownerRef);
     archive->Read(vector3fType, &mSize, ownerRef);
@@ -504,18 +480,18 @@ namespace moho
       return;
     }
 
-    gpg::RType* const vector3fType = CachedVector3fType();
+    gpg::RType* const vector3fType = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
     archive->Write(vector3fType, &mPos, ownerRef);
     archive->Write(vector3fType, &mSize, ownerRef);
     archive->Write(vector3fType, &mRot, ownerRef);
 
-    archive->WriteString(const_cast<msvc8::string*>(&mTexName1));
-    archive->WriteString(const_cast<msvc8::string*>(&mTexName2));
+    archive->WriteString(const_cast<fa::string*>(&mTexName1));
+    archive->WriteString(const_cast<fa::string*>(&mTexName2));
     archive->WriteBool(mIsSplat != 0u);
     archive->WriteFloat(mLODParam);
     archive->WriteUInt(mStartTick);
-    archive->WriteString(const_cast<msvc8::string*>(&mType));
+    archive->WriteString(const_cast<fa::string*>(&mType));
     archive->WriteInt(static_cast<int>(mObj));
     archive->WriteInt(static_cast<int>(mArmy));
     archive->WriteInt(static_cast<int>(mFidelity));

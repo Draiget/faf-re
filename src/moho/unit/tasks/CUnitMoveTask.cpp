@@ -29,75 +29,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSNavGoalType()
-  {
-    gpg::RType* type = moho::SNavGoal::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SNavGoal));
-      moho::SNavGoal::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrCUnitCommandType()
-  {
-    gpg::RType* type = moho::WeakPtr<moho::CUnitCommand>::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::WeakPtr<moho::CUnitCommand>));
-      moho::WeakPtr<moho::CUnitCommand>::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitMoveTaskType()
-  {
-    gpg::RType* type = moho::CUnitMoveTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitMoveTask));
-      moho::CUnitMoveTask::sType = type;
-    }
-    return type;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 
   void ReadBoolIntoByteLane(gpg::ReadArchive* const archive, std::uint8_t& laneValue)
   {
@@ -384,16 +315,16 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(CachedCCommandTaskType(), static_cast<CCommandTask*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
 
     gpg::RRef dispatchTaskRef{};
     archive->ReadPointer(&mDispatchTask, &dispatchTaskRef);
 
     const gpg::RRef moveGoalOwnerRef{};
-    archive->Read(CachedSNavGoalType(), &mMoveGoal, moveGoalOwnerRef);
+    archive->Read(gpg::RTypeOf<moho::SNavGoal>(), &mMoveGoal, moveGoalOwnerRef);
 
     const gpg::RRef commandOwnerRef{};
-    archive->Read(CachedWeakPtrCUnitCommandType(), &mCommandRef, commandOwnerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::CUnitCommand>>(), &mCommandRef, commandOwnerRef);
 
     ReadBoolIntoByteLane(archive, mNextCmdIsInstant);
     ReadBoolIntoByteLane(archive, mRequiresTransportCategoryCheck);
@@ -418,14 +349,14 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), static_cast<const CCommandTask*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
 
     gpg::RRef dispatchTaskRef{};
     (void)gpg::RRef_CCommandTask(&dispatchTaskRef, mDispatchTask);
     gpg::WriteRawPointer(archive, dispatchTaskRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedSNavGoalType(), &mMoveGoal, ownerRef);
-    archive->Write(CachedWeakPtrCUnitCommandType(), &mCommandRef, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::SNavGoal>(), &mMoveGoal, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::CUnitCommand>>(), &mCommandRef, ownerRef);
 
     archive->WriteBool(mNextCmdIsInstant != 0u);
     archive->WriteBool(mRequiresTransportCategoryCheck != 0u);
@@ -884,12 +815,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitMoveTask(gpg::RRef* const outRef, moho::CUnitMoveTask* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitMoveTaskType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value);
   }
 
   /**
@@ -1005,7 +931,7 @@ namespace
 
   void CUnitMoveTaskSerializerHelper::Init()
   {
-    gpg::RType* const type = CachedCUnitMoveTaskType();
+    gpg::RType* const type = gpg::RTypeOf<moho::CUnitMoveTask>();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
     type->serLoadFunc_ = mLoadCallback;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);

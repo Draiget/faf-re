@@ -1,6 +1,9 @@
 #include "CHostManager.h"
 
 #include <cstring>
+#if !defined(_WIN32)
+#include <winsock2.h> // platform/posix/win32: the BSD socket and resolver calls
+#endif
 
 #include "Common.h"
 #include "gpg/core/containers/String.h"
@@ -35,7 +38,7 @@ namespace
 /**
  * Address: 0x0047F8A0 (FUN_0047F8A0, struct_Host::struct_Host)
  */
-Host::Host(const msvc8::string& name)
+Host::Host(const fa::string& name)
   : TDatListItem<Host, void>{}
   , mName{}
   , mMapNodeBackLink(nullptr)
@@ -124,15 +127,15 @@ bool moho::NET_GetAddrInfo(const char* str, const u_short defaultPort, const boo
 
   NET_Init();
 
-  msvc8::string nodeName;
-  msvc8::string serviceName;
+  fa::string nodeName;
+  fa::string serviceName;
   const char* const lastColon = std::strrchr(str, ':');
 
   if (lastColon != nullptr) {
     nodeName.assign(str, static_cast<std::size_t>(lastColon - str));
     serviceName.assign(lastColon + 1, std::strlen(lastColon + 1));
   } else {
-    nodeName = msvc8::string{str};
+    nodeName = fa::string{str};
     serviceName = gpg::STR_Printf("%d", defaultPort);
   }
 
@@ -186,10 +189,10 @@ bool moho::NET_GetAddrInfo(const char* str, const u_short defaultPort, const boo
  * Returns cached hostname for host-order IPv4 address and refreshes MRU order.
  * On miss, resolves name, inserts a new cache entry, and evicts LRU entries past cap.
  */
-msvc8::string CHostManager::GetHostName(const std::uint32_t host)
+fa::string CHostManager::GetHostName(const std::uint32_t host)
 {
   {
-    boost::mutex::scoped_lock lock(mLock);
+    std::lock_guard<std::mutex> lock(mLock);
     const auto it = mHosts.find(host);
     if (it != mHosts.end() && it->second != nullptr) {
       Touch(*it->second);
@@ -198,10 +201,10 @@ msvc8::string CHostManager::GetHostName(const std::uint32_t host)
   }
 
   NET_Init();
-  const msvc8::string resolvedName = ResolveHostName(host);
+  const fa::string resolvedName = ResolveHostName(host);
   Host* const pendingHost = new Host(resolvedName);
 
-  boost::mutex::scoped_lock lock(mLock);
+  std::lock_guard<std::mutex> lock(mLock);
   const auto [it, inserted] = mHosts.emplace(host, pendingHost);
 
   if (inserted) {
@@ -218,7 +221,7 @@ msvc8::string CHostManager::GetHostName(const std::uint32_t host)
   return resolvedName;
 }
 
-msvc8::string& CHostManager::GetHostName(const std::uint32_t host, msvc8::string& out)
+fa::string& CHostManager::GetHostName(const std::uint32_t host, fa::string& out)
 {
   out = GetHostName(host);
   return out;
@@ -267,7 +270,7 @@ auto CHostManager::FindByValue(const Host* h) -> CHostManager::HostMap::iterator
   return mHosts.end();
 }
 
-msvc8::string CHostManager::ResolveHostName(const std::uint32_t host)
+fa::string CHostManager::ResolveHostName(const std::uint32_t host)
 {
   sockaddr_in sockAddr{};
   sockAddr.sin_family = AF_INET;
@@ -292,5 +295,5 @@ msvc8::string CHostManager::ResolveHostName(const std::uint32_t host)
     return NET_GetDottedOctetFromUInt32(host);
   }
 
-  return msvc8::string{nodeBuffer};
+  return fa::string{nodeBuffer};
 }

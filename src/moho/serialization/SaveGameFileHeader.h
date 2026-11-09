@@ -31,8 +31,9 @@ namespace moho
     std::uint32_t mGameIdPart3 = 0;                       // +0x001C
     std::uint32_t mGameIdPart4 = 0;                       // +0x0020
     std::uint32_t mGameIdPart2 = 0;                       // +0x0024
-    wchar_t mAppNameUtf16[kSaveGameFileHeaderTextCapacity]{};     // +0x0028
-    wchar_t mSessionNameUtf16[kSaveGameFileHeaderTextCapacity]{}; // +0x0828
+    // UTF-16 text: char16_t, Windows' wchar_t, also where wchar_t is 32 bits (plan WPL.6, C4).
+    char16_t mAppNameUtf16[kSaveGameFileHeaderTextCapacity]{};     // +0x0028
+    char16_t mSessionNameUtf16[kSaveGameFileHeaderTextCapacity]{}; // +0x0828
     std::uint8_t mReservedTail[0x1000]{};                          // +0x1028
   };
 

@@ -1,6 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
 
 #include "legacy/containers/String.h"
@@ -56,8 +59,8 @@ namespace moho
      */
     ~SVFSMountPoint();
 
-    msvc8::string mDir;        // +0x00
-    msvc8::string mMountpoint; // +0x1C
+    fa::string mDir;        // +0x00
+    fa::string mMountpoint; // +0x1C
     SFileWaitHandle* mZipHandle; // +0x38
   };
 
@@ -81,7 +84,7 @@ namespace moho
      * What it does:
      * Initializes VFS mountpoint storage and expands configured mount lanes.
      */
-    CVFSImpl(const msvc8::vector<SVFSMountPoint>& mountpoints, const std::filesystem::path& launchDir);
+    CVFSImpl(const fa::vector<SVFSMountPoint>& mountpoints, const std::filesystem::path& launchDir);
 
     /**
      * Address: 0x004662F0 (FUN_004662F0, Moho::CVFSImpl::dtr)
@@ -100,7 +103,7 @@ namespace moho
      * Resolves one mounted path to an on-disk/zip-backed path and writes the
      * first match to `outPath`.
      */
-    msvc8::string* FindFile(msvc8::string* outPath, gpg::StrArg sourcePath, SDiskFileInfo* outInfo) override;
+    fa::string* FindFile(fa::string* outPath, gpg::StrArg sourcePath, SDiskFileInfo* outInfo) override;
 
     /**
      * Address: 0x00466C60 (FUN_00466C60, Moho::CVFSImpl::ToMountedPath)
@@ -112,7 +115,7 @@ namespace moho
      * Converts one real path under mounted directories into mounted VFS path
      * form.
      */
-    msvc8::string* ToMountedPath(msvc8::string* outPath, gpg::StrArg sourcePath) override;
+    fa::string* ToMountedPath(fa::string* outPath, gpg::StrArg sourcePath) override;
 
     /**
      * Address: 0x00466E50 (FUN_00466E50, Moho::CVFSImpl::GetFileInfo)
@@ -138,7 +141,7 @@ namespace moho
       gpg::StrArg mountPrefix,
       gpg::StrArg queryPath,
       bool allowPrefixWildcard,
-      msvc8::vector<msvc8::string>* outPaths
+      fa::vector<fa::string>* outPaths
     ) override;
 
     /**
@@ -149,7 +152,7 @@ namespace moho
      * Enumerates child mounted directories beneath `mountPrefix`, then sorts
      * and de-duplicates the output list.
      */
-    void EnumerateChildren(gpg::StrArg mountPrefix, msvc8::vector<msvc8::string>* outPaths) override;
+    void EnumerateChildren(gpg::StrArg mountPrefix, fa::vector<fa::string>* outPaths) override;
 
   private:
     /**
@@ -169,10 +172,10 @@ namespace moho
      * mountpoint root, optionally enables disk-watch registration for
      * directory lanes, and mounts zip handles when needed.
      */
-    void AddSearchPath(const SVFSMountPoint& mountPoint, const msvc8::string& resolvedPath, bool isDirectory);
+    void AddSearchPath(const SVFSMountPoint& mountPoint, const fa::string& resolvedPath, bool isDirectory);
 
   public:
-    msvc8::vector<SVFSMountPoint> mMountpoints; // +0x04
+    fa::vector<SVFSMountPoint> mMountpoints; // +0x04
   };
 
   /**
@@ -183,7 +186,7 @@ namespace moho
    * `CVirtualFileSystem` interface.
    */
   [[nodiscard]] CVirtualFileSystem* VFS_Create(
-    const msvc8::vector<SVFSMountPoint>& mountpoints,
+    const fa::vector<SVFSMountPoint>& mountpoints,
     const std::filesystem::path& launchDir
   );
 
@@ -196,4 +199,49 @@ namespace moho
    * sees the disk as it is.
    */
   void DISK_InvalidateFileLookups();
+
+  /** Engine addition: changes whenever mounted file lookups are invalidated (see DISK_InvalidateFileLookups). */
+  [[nodiscard]] std::uint64_t DISK_FileLookupGeneration();
+
+  /**
+   * Engine addition (dedicated-server plan WPR.22, `res_EnumOrderFuzz`): the order-fuzz seed, 0
+   * when off. Resolved from `/enumorderfuzz N` on first use, then the console variable.
+   */
+  [[nodiscard]] std::uint32_t DISK_EnumerationOrderFuzzSeed();
+
+  /**
+   * Engine addition (dedicated-server plan WPR.22): with `res_EnumOrderFuzz` on, puts one
+   * directory listing, as the file system returned it, into a fixed pseudo-random order before
+   * the engine sorts it. By name first, so the result does not depend on the file system, then
+   * shuffled with the seed and a hash of the names, so one folder is shuffled alike in every run
+   * and on every platform. A sim result that changes with the switch relied on the file system's
+   * order (plan risk R10). Off, it does nothing.
+   */
+  template <class Iterator, class NameOf>
+  void DISK_FuzzEnumerationOrder(const Iterator first, const Iterator last, const NameOf nameOf)
+  {
+    const std::uint32_t seed = DISK_EnumerationOrderFuzzSeed();
+    if (seed == 0u || last - first < 2) {
+      return;
+    }
+    std::sort(first, last, [&nameOf](const auto& lhs, const auto& rhs) {
+      return std::strcmp(nameOf(lhs), nameOf(rhs)) < 0;
+    });
+    std::uint64_t state = static_cast<std::uint64_t>(seed) * 0x9E3779B97F4A7C15ull;
+    for (Iterator it = first; it != last; ++it) {
+      for (const char* c = nameOf(*it); *c != '\0'; ++c) {
+        state = (state ^ static_cast<unsigned char>(*c)) * 0x100000001B3ull;
+      }
+    }
+    if (state == 0u) {
+      state = 1u;
+    }
+    for (auto i = last - first - 1; i > 0; --i) {
+      state ^= state << 13;
+      state ^= state >> 7;
+      state ^= state << 17;
+      const auto j = static_cast<decltype(i)>(state % static_cast<std::uint64_t>(i + 1));
+      std::iter_swap(first + i, first + j);
+    }
+  }
 } // namespace moho

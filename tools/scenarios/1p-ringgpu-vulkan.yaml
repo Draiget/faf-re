@@ -1,0 +1,39 @@
+name: 1p-ringgpu-vulkan
+description: >
+  Range-ring A/B on Vulkan (1p-ringgpu-main with /vulkan), recovered x64 engine: 2000 UEF T1 engineers one unit apart and
+  500 UEF artillery two units apart, game paused. The UI hook runs five scenes (engineer pack
+  wide, artillery pack wide, close up, close up with range_Fill, past the pack's edge), each with
+  ren_GpuRanges 0/1 x range_ViewCull 0/1 in three alternating rounds, and logs "RINGGPU SHOT <scene>-<setting>" and
+  "RINGGPU perf <scene>-<setting>". Run mpemu with FAF_GPU_PROFILE=<frames> in its environment
+  for the "pass Ranges" lines, and ring-gpu\capture.ps1 alongside for the screenshots. Setup:
+  tools/scenarios/ring-gpu/map copied into the vault as maps/faf_re_ringgpu, with the
+  faf_re_lockstep scmap and save hard-linked in as faf_re_ringgpu.scmap / faf_re_ringgpu_save.lua;
+  copy ring-gpu/init_ringgpu.lua into C:\ProgramData\FAForever\bin. The exe is a build copied into
+  bin_x64 as main_x64_ringgpu.exe. Do not click into the game window.
+timeout: 14m
+
+mode: direct
+lobby: auto
+map: faf_re_ringgpu
+gameOptions:
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\main_x64_ringgpu.exe'
+  init: init_ringgpu.lua
+  nosound: true
+
+players:
+  - { uid: 1, name: RingGpu, faction: uef, args: ['/vulkan', '/title', 'ringgpu-vulkan'] }
+
+steps:
+  - start: all
+  - host: 1
+  - waitState: { uids: all, state: Launching, timeout: 3m }
+  - wait: 600s
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: all, pattern: 'RINGGPU DONE' }

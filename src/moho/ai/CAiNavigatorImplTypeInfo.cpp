@@ -20,32 +20,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedIAiNavigatorType()
-  {
-    if (!IAiNavigator::sType) {
-      IAiNavigator::sType = gpg::LookupRType(typeid(IAiNavigator));
-    }
-    return IAiNavigator::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CTask));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCScriptObjectType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CScriptObject));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x005A7C20 (FUN_005A7C20)
    *
@@ -55,15 +29,7 @@ namespace
    */
   void AddIAiNavigatorBase(gpg::RType& typeInfo)
   {
-    gpg::RType* const baseType = CachedIAiNavigatorType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo.AddBase(baseField);
+    gpg::AddReflectedBase<IAiNavigator>(&typeInfo);
   }
 
   /**
@@ -74,15 +40,7 @@ namespace
    */
   void AddCTaskBase(gpg::RType& typeInfo)
   {
-    gpg::RType* const baseType = CachedCTaskType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::BaseSubobjectOffset<CAiNavigatorImpl, CTask>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo.AddBase(baseField);
+    gpg::AddReflectedBase<CTask>(&typeInfo, gpg::BaseSubobjectOffset<CAiNavigatorImpl, CTask>());
   }
 
   /**
@@ -94,15 +52,7 @@ namespace
    */
   void AddCScriptObjectBase(gpg::RType& typeInfo)
   {
-    gpg::RType* const baseType = CachedCScriptObjectType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::BaseSubobjectOffset<CAiNavigatorImpl, CScriptObject>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo.AddBase(baseField);
+    gpg::AddReflectedBase<CScriptObject>(&typeInfo, gpg::BaseSubobjectOffset<CAiNavigatorImpl, CScriptObject>());
   }
 
 } // namespace

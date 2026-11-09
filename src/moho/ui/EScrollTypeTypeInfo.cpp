@@ -118,7 +118,7 @@ namespace
    * EScrollType,int>` vtable and the dead, zero-writer `SerSaveLoadHelper<
    * EScrollType>` sibling vtable, same pattern as ESquadClass/EThreatType.
    * The `ArchiveSerialization.cpp` free function wrapped around that address
-   * has zero source-level callers in `src/**` (2026-08-26
+   * has zero source-level callers in `src/ **` (2026-08-26
    * ArchiveSerialization dead-duplicate audit) and is left untouched, out of
    * scope for this pass -- it does not compete with this instantiation, it
    * is simply an orphaned, mis-shaped model of the same underlying `Init()`.

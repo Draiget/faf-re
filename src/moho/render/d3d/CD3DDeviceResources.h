@@ -306,13 +306,13 @@ namespace moho
      * Rebuilds one effect from disk for hot-reload and replaces the previous
      * effect object in the active effect vector.
      */
-    void ReloadEffectFile(const msvc8::string& effectPath);
+    void ReloadEffectFile(const fa::string& effectPath);
 
     /**
      * Address: 0x004424A0 (FUN_004424A0, Moho::CD3DDeviceResources::DevResInitResources)
      *
      * What it does:
-     * Clears existing effects and compiles all `/effects/*.fx` resources.
+     * Clears existing effects and compiles all `/effects/ *.fx` resources.
      */
     void DevResInitResources();
 
@@ -327,8 +327,8 @@ namespace moho
     CD3DDepthStencil mDepthStencil;                           // +0x134
     TDatListItem<RD3DTextureResource, void> mTextureList;     // +0x160
     CD3DDynamicTextureSheet mTextureSheet;                    // +0x168
-    msvc8::vector<CD3DVertexFormat*> mVertexFormats;          // +0x1D8
-    msvc8::vector<CD3DEffect*> mEffects;                      // +0x1E8
+    fa::vector<CD3DVertexFormat*> mVertexFormats;          // +0x1D8
+    fa::vector<CD3DEffect*> mEffects;                      // +0x1E8
   };
 
   static_assert(offsetof(CD3DDeviceResources, mMipSkipLevels) == 0x34, "CD3DDeviceResources::mMipSkipLevels offset must be 0x34");

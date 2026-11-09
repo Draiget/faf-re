@@ -3,16 +3,20 @@
 #include "CMessage.h"
 #include "CMessageStream.h"
 #include "CNetClient.h"
+#include "CNetUDPConnection.h"
 #include "CNullClient.h"
 #include "CReplayClient.h"
 #include "EClientMsg.h"
 #include "ECmdStreamOp.h"
 
 #include <algorithm>
+#include <iterator>
 #include <cstddef>
 #include <cstdint>
+#include <chrono>
 #include <cstring>
 #include <mutex>
+#include <random>
 
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/utils/Global.h"
@@ -159,8 +163,88 @@ CClientManagerImpl::CClientManagerImpl(
       net_CheckOrderStreams > 0 ? std::make_unique<CommandStreamCheck>(clientCount, net_CheckOrderStreams >= 2)
                                 : nullptr
     )
+  , mPeerFeatures(std::make_unique<CPeerFeatures>(clientCount))
 {
   mClients.resize(clientCount, nullptr);
+  // A manager with no clients (`CRemoteClientManager`) stands beside a session's real one.
+  if (clientCount != 0) {
+    NET_ResetReadyDeparture();
+  }
+}
+
+/**
+ * Engine addition (wld_PreciseSharedStart): see the declaration.
+ */
+void CClientManagerImpl::NoteClientReady(const int clientIndex)
+{
+  std::scoped_lock lock(mLock);
+  mPeerFeatures->NoteReady(clientIndex, NET_SteadyClockMicroseconds());
+}
+
+/**
+ * Engine addition (wld_PreciseSharedStart): see the declaration.
+ */
+std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
+{
+  struct SReadyTiming
+  {
+    std::size_t mIndex;
+    std::int64_t mHandledUs;
+    float mPingMs;
+    std::int64_t mLeftUs;
+  };
+
+  std::scoped_lock lock(mLock);
+  fa::vector<SReadyTiming> timings;
+  std::int64_t start = 0;
+  for (std::size_t index = 0; index < mClients.size(); ++index) {
+    CClientBase* const client = mClients[index];
+    if (client == nullptr || !client->NoEjectionPending()) {
+      continue;
+    }
+    const std::int64_t handledUs = mPeerFeatures->ReadyUs(static_cast<int>(index));
+    if (handledUs == 0) {
+      return 0;
+    }
+    // Every ready message is timed as it left its sender. Ours: when our connection sent it
+    // (NET_GetReadyDepartureUs). A peer's: when it was handled here, less the one-way trip, which
+    // is half of what is left of its ping after the peer's wait before it acknowledges
+    // (`PeerAckDelayMs`: what it announced, or as this client does if it announced nothing).
+    // The local client reports a ping of 0.
+    const float pingMs = client->GetStatusMetricA();
+    std::int64_t leftUs = handledUs;
+    if (pingMs > 0.0f) {
+      const float ackDelayMs = static_cast<float>(mPeerFeatures->PeerAckDelayMs(static_cast<int>(index)));
+      const float oneWayMs = std::max(0.0f, (pingMs - ackDelayMs) * 0.5f);
+      leftUs = handledUs - static_cast<std::int64_t>(oneWayMs * 1000.0f);
+    } else if (mLocalClient == client && mClients.size() > 1) {
+      // Not known until our ready message has left; the caller asks again.
+      leftUs = NET_GetReadyDepartureUs();
+      if (leftUs == 0) {
+        return 0;
+      }
+    }
+    timings.push_back(SReadyTiming{index, handledUs, pingMs, leftUs});
+    start = std::max(start, leftUs);
+  }
+
+  if (logDetails) {
+    // Times are relative to the shared start, which is the latest departure; players on one PC
+    // read one steady clock, so the absolute time compares their estimates directly.
+    gpg::Logf("SharedStart: %lld us on the steady clock", static_cast<long long>(start));
+    for (const SReadyTiming& timing : timings) {
+      const float handledMs = static_cast<float>(timing.mHandledUs - start) * 0.001f;
+      const float leftMs = static_cast<float>(timing.mLeftUs - start) * 0.001f;
+      if (static_cast<CClientBase*>(mLocalClient) == mClients[timing.mIndex]) {
+        gpg::Logf("SharedStart: client %d (this one) queued its ready at %+.1f ms, it left at %+.1f ms",
+          static_cast<int>(timing.mIndex), handledMs, leftMs);
+      } else {
+        gpg::Logf("SharedStart: client %d's ready arrived at %+.1f ms, ping %.1f ms, so it left at %+.1f ms",
+          static_cast<int>(timing.mIndex), handledMs, timing.mPingMs, leftMs);
+      }
+    }
+  }
+  return start;
 }
 
 /**
@@ -168,15 +252,15 @@ CClientManagerImpl::CClientManagerImpl(
  */
 void CClientManagerImpl::NoteDivergentOrders()
 {
-  const auto nickname = [this](const int index) -> msvc8::string {
+  const auto nickname = [this](const int index) -> fa::string {
     const bool known = index >= 0 && static_cast<std::size_t>(index) < mClients.size() && mClients[index] != nullptr;
-    return known ? mClients[static_cast<std::size_t>(index)]->GetNickname() : msvc8::string("?");
+    return known ? mClients[static_cast<std::size_t>(index)]->GetNickname() : fa::string("?");
   };
   const bool stopped = mStreamCheck->StopsOnDivergence();
 
   for (const CommandStreamCheck::Divergence& divergence : mStreamCheck->TakeFindings()) {
-    const msvc8::string sender = nickname(divergence.sender);
-    const msvc8::string reporter = nickname(divergence.reporter);
+    const fa::string sender = nickname(divergence.sender);
+    const fa::string reporter = nickname(divergence.reporter);
     const bool selfReport = divergence.sender == divergence.reporter;
 
     if (selfReport) {
@@ -667,6 +751,9 @@ void CMarshaller::WriteCells(CMessageStream& stream, const gpg::core::FastVector
  */
 CClientManagerImpl::~CClientManagerImpl()
 {
+  // It holds client pointers, and deleting a client can still route a message.
+  mRejoinFeed.reset();
+
   for (CClientBase*& client : mClients) {
     delete client;
     client = nullptr;
@@ -825,6 +912,10 @@ void CClientManagerImpl::Cleanup()
     mDispatchedTimer.Reset();
   }
 
+  // Engine addition (issue #285): before this client's ready, so a peer knows
+  // what it supports before the game runs.
+  mPeerFeatures->Announce(*this);
+
   CMessage message{EClientMsg::CLIMSG_Ready};
   ProcessClients(message);
 }
@@ -917,6 +1008,12 @@ void CClientManagerImpl::BroadcastIntParam(const int value)
 void CClientManagerImpl::ProcessClients(CMessage& msg)
 {
   std::scoped_lock lock(mLock);
+
+  // Engine addition (issue #275): null outside a rejoin.
+  if (mRejoinFeed != nullptr && mRejoinFeed->Route(msg)) {
+    return;
+  }
+
   for (CClientBase* const client : mClients) {
     if (client != nullptr) {
       client->Process(msg);
@@ -988,6 +1085,90 @@ bool CClientManagerImpl::EveryoneResponsiveSince(const int beat)
   return true;
 }
 
+namespace
+{
+  // Engine additions (issue #236), both off by default; not members, so the
+  // manager keeps the binary's layout.
+  std::chrono::steady_clock::time_point sLastAvailableAt{};
+  int sLastAvailableBeat = -1;
+  bool sTestBurstSent = false;
+
+  // A type no client registers a receiver for once the lobby is gone (the sim
+  // takes 0-49, the clients 50-57, connection events 200-209): the peer's
+  // connection drops it after logging the first few.
+  constexpr std::uint8_t kTestBurstMessageType = 90;
+
+  // net_LogBeatWaitMs: a beat that became available long after the one before
+  // it waited on some player's data.
+  void NoteAvailableBeat(const int before, const int now)
+  {
+    if (now == before) {
+      return;
+    }
+    const auto at = std::chrono::steady_clock::now();
+    if (now < sLastAvailableBeat) {
+      sLastAvailableBeat = -1; // a new game in this process
+      sTestBurstSent = false;
+    }
+    if (net_LogBeatWaitMs > 0 && sLastAvailableBeat >= 0 && sLastAvailableBeat == before) {
+      const long long waited =
+        std::chrono::duration_cast<std::chrono::milliseconds>(at - sLastAvailableAt).count();
+      if (waited >= net_LogBeatWaitMs) {
+        gpg::Logf("NET: beat %d available %lld ms after beat %d", now, waited, before);
+      }
+    }
+    if (net_LogTraffic > 0 && now / net_LogTraffic != before / net_LogTraffic) {
+      if (gNetLinkTrafficLog != nullptr) {
+        gNetLinkTrafficLog(now);
+      }
+      const std::int64_t samples = gNetTraffic.pingSamples.load(std::memory_order_relaxed);
+      const std::int64_t pingSum = gNetTraffic.pingMicrosSum.load(std::memory_order_relaxed);
+      gpg::Logf(
+        "NET: traffic at beat %d: %lld packets, %lld bytes, %lld resends, %lld acks, mean ping %.1f ms",
+        now,
+        static_cast<long long>(gNetTraffic.packets.load(std::memory_order_relaxed)),
+        static_cast<long long>(gNetTraffic.bytes.load(std::memory_order_relaxed)),
+        static_cast<long long>(gNetTraffic.resends.load(std::memory_order_relaxed)),
+        static_cast<long long>(gNetTraffic.acks.load(std::memory_order_relaxed)),
+        samples > 0 ? static_cast<double>(pingSum) / static_cast<double>(samples) / 1000.0 : 0.0
+      );
+    }
+    sLastAvailableAt = at;
+    sLastAvailableBeat = now;
+  }
+
+  // net_TestBurstBeat / net_TestBurstBytes: filler on the ordered stream to every
+  // peer, incompressible so the deflated size on the wire is the given size.
+  void MaybeSendTestBurst(const fa::vector<CClientBase*>& clients, const int availableBeat)
+  {
+    if (sTestBurstSent || net_TestBurstBeat < 0 || net_TestBurstBytes <= 0 || availableBeat < net_TestBurstBeat) {
+      return;
+    }
+    sTestBurstSent = true;
+    std::minstd_rand random(static_cast<std::uint32_t>(net_TestBurstBytes));
+    int left = net_TestBurstBytes;
+    int messages = 0;
+    while (left > 0) {
+      const int size = left < 60000 ? left : 60000;
+      CMessage message{MessageType(kTestBurstMessageType), static_cast<std::size_t>(size)};
+      for (int i = 0; i < size; ++i) {
+        message.mBuff[3 + i] = static_cast<char>(random() >> 7);
+      }
+      for (CClientBase* const client : clients) {
+        if (auto* const net = dynamic_cast<CNetClient*>(client)) {
+          net->Process(message);
+        }
+      }
+      left -= size;
+      ++messages;
+    }
+    gpg::Logf(
+      "NET: test burst of %d bytes in %d messages sent to every peer at beat %d", net_TestBurstBytes, messages,
+      availableBeat
+    );
+  }
+} // namespace
+
 /**
  * Address: 0x0053EA30 (FUN_0053EA30)
  */
@@ -999,6 +1180,15 @@ void CClientManagerImpl::DoBeat()
 
   if (mConnector != nullptr) {
     mConnector->Pull();
+  }
+
+  // Engine addition (issue #275): null outside a rejoin.
+  if (mRejoinFeed != nullptr) {
+    mRejoinFeed->Pump();
+  }
+  if (mConnector != nullptr && (mRejoinFeed == nullptr || !mRejoinFeed->CatchingUp()) &&
+      mPeerFeatures->EveryoneSupports(*this, EPeerFeature::Rejoin)) {
+    REJOIN_ServeRestartedPeers(*this);
   }
 
   if (mWeAreReady && !mEveryoneIsReady) {
@@ -1031,6 +1221,7 @@ void CClientManagerImpl::DoBeat()
     } while (ClientNeedsFullyQueuedBeatsUntil(mFullyQueuedBeat + 1));
   }
 
+  const int availableBefore = mAvailableBeat;
   if (EveryoneResponsiveSince(mAvailableBeat + 1)) {
     do {
       ++mAvailableBeat;
@@ -1041,6 +1232,9 @@ void CClientManagerImpl::DoBeat()
     stream.Write(mAvailableBeat);
     ProcessClients(message);
   }
+  // Engine additions (issue #236), off by default.
+  NoteAvailableBeat(availableBefore, mAvailableBeat);
+  MaybeSendTestBurst(mClients, mAvailableBeat);
 
   const SClientBottleneckInfo bottleneckInfo = GetBottleneckInfo();
   const float currentUiBottleneckTimeMs = GetBottleneckUiTimestampMs(*this);
@@ -1070,6 +1264,42 @@ void CClientManagerImpl::DoBeat()
   }
 
   mInDoBeat = false;
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+bool CClientManagerImpl::RejoinHoldsIssue(int& nextIssueBeat)
+{
+  if (mRejoinFeed == nullptr) {
+    return false;
+  }
+  std::scoped_lock lock(mLock);
+  return mRejoinFeed->HoldIssue(nextIssueBeat);
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+bool CClientManagerImpl::RejoinCatchingUp()
+{
+  if (mRejoinFeed == nullptr) {
+    return false;
+  }
+  std::scoped_lock lock(mLock);
+  return mRejoinFeed->CatchingUp();
+}
+
+/**
+ * Engine addition, not in the binary: see the declaration.
+ */
+int CClientManagerImpl::RejoinSkippedBeats()
+{
+  if (mRejoinFeed == nullptr) {
+    return 0;
+  }
+  std::scoped_lock lock(mLock);
+  return mRejoinFeed->SkippedBeats();
 }
 
 /**

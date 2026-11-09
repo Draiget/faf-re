@@ -37,7 +37,7 @@ namespace moho
    */
   struct SWldSessionInfo
   {
-    msvc8::string mMapName;                        // 0x00
+    fa::string mMapName;                        // 0x00
     boost::shared_ptr<LaunchInfoBase> mLaunchInfo; // 0x1C
     bool mIsBeingRecorded;                         // 0x24
     bool mIsReplay;                                // 0x25
@@ -242,7 +242,7 @@ namespace moho
   struct SWldScenarioLoadControl
   {
     gpg::core::Mutex mMutex;                   // 0x00
-    msvc8::string mThreadName;                 // 0x08
+    fa::string mThreadName;                 // 0x08
     SWldScenarioLoadCallbackStorage mCallback; // 0x24
     EWldScenarioLoadControlState mState;       // 0x48
     std::uint32_t mProgressToken;              // 0x4C
@@ -365,8 +365,8 @@ namespace moho
    */
   struct SWldScenarioInfo : TDatListItem<SWldScenarioInfo, void>
   {
-    msvc8::string mMapName;  // 0x08
-    msvc8::string mGameMods; // 0x24
+    fa::string mMapName;  // 0x08
+    fa::string mGameMods; // 0x24
     union
     {
       bool mUnloadRequested; // 0x40
@@ -385,7 +385,7 @@ namespace moho
      * What it does:
      * Initializes list links, lower-cases map name, copies game-mods, and clears runtime owners.
      */
-    SWldScenarioInfo(const char* mapName, const msvc8::string& gameMods);
+    SWldScenarioInfo(const char* mapName, const fa::string& gameMods);
 
     /**
      * Address: 0x008857A0 (FUN_008857A0, sub_8857A0)

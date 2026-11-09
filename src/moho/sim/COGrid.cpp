@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -14,8 +15,13 @@
 #include <typeinfo>
 #include <vector>
 
+#include "legacy/math/X87Math.h"
 #include "moho/containers/SCoordsVec2.h"
+#include "gpg/core/containers/ReadArchive.h"
+#include "gpg/core/containers/WriteArchive.h"
+#include "gpg/core/reflection/SerializationError.h"
 #include "moho/entity/Entity.h"
+#include "moho/entity/EntityDb.h"
 #include "moho/collision/CColPrimitiveBase.h"
 #include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -36,23 +42,6 @@ namespace
   using moho::GridTraversalLine;
   using moho::InitGridTraversalLine;
   using moho::IsGridTraversalBeyondEnd;
-
-  // The binary's inlined floor (0x0040D908, 0x004FCBFD): `frndint; fcompi;
-  // cmovb eax,-1; fistp; add`. For every non-NaN input that equals the
-  // truncated floor below; a NaN compares unordered (cmovb takes -1) and fistp
-  // stores the integer indefinite 0x80000000, so the sum is 0x7FFFFFFF.
-  [[nodiscard]] std::int32_t FloorToInt(const float value) noexcept
-  {
-    if (std::isnan(value)) {
-      return 0x7FFFFFFF;
-    }
-    return static_cast<std::int32_t>(std::floor(value));
-  }
-
-  [[nodiscard]] std::int32_t CeilToInt(const float value) noexcept
-  {
-    return static_cast<std::int32_t>(std::ceil(value));
-  }
 
   // One collision cell spans 4 world units, so world -> cell is a shift by 2.
   inline constexpr int kWorldToCollisionCellShift = 2;
@@ -113,8 +102,9 @@ void moho::InitGridTraversalLine(
     line.zMask = zMask;
 
     const std::int32_t alignMask = -step;
-    line.xEdge = FloorToInt(line.x0) & alignMask;
-    line.zEdge = FloorToInt(line.z0) & alignMask;
+    // 0x0040D908, 0x0040D93A: the binary's inlined floor.
+    line.xEdge = fa::FloorToIntX87(line.x0) & alignMask;
+    line.zEdge = fa::FloorToIntX87(line.z0) & alignMask;
   }
 }
 
@@ -467,9 +457,12 @@ namespace moho
     const std::size_t bucketCount = static_cast<std::size_t>(mLastIndex + 1);
     const std::size_t bucketBytes = bucketCount * sizeof(void*);
 
-    mUnitBuckets = static_cast<EntityCollisionCellNode**>(::operator new(bucketBytes));
-    mPropBuckets = static_cast<EntityCollisionCellNode**>(::operator new(bucketBytes));
-    mEntityBuckets = static_cast<EntityCollisionCellNode**>(::operator new(bucketBytes));
+    // 0x004FCD60 / 0x004FCD82 / 0x004FCDA4: `call 0x00A82130` (operator new[],
+    // a tail-jump to the scalar form), paired with operator delete[] in the
+    // destructor.
+    mUnitBuckets = static_cast<EntityCollisionCellNode**>(::operator new[](bucketBytes));
+    mPropBuckets = static_cast<EntityCollisionCellNode**>(::operator new[](bucketBytes));
+    mEntityBuckets = static_cast<EntityCollisionCellNode**>(::operator new[](bucketBytes));
 
     std::memset(mUnitBuckets, 0, bucketBytes);
     std::memset(mPropBuckets, 0, bucketBytes);
@@ -519,15 +512,16 @@ namespace moho
    */
   EntityOccupationManager::~EntityOccupationManager()
   {
-    operator delete[](mUnitBuckets);
-    operator delete[](mPropBuckets);
-    operator delete[](mEntityBuckets);
+    // 0x004FCE15 / 0x004FCE1E / 0x004FCE27: `call 0x00A82542` (operator delete[]).
+    ::operator delete[](mUnitBuckets);
+    ::operator delete[](mPropBuckets);
+    ::operator delete[](mEntityBuckets);
 
-    // 0x004FCE2C..0x004FCE59; the vector's own storage is released by
-    // ~vector (the `_Tidy` at 0x004FCE5C).
+    // 0x004FCE2C..0x004FCE59 (`call 0x00A82542` at 0x004FCE4C); the vector's
+    // own storage is released by ~vector (the `_Tidy` at 0x004FCE5C).
     const int blockCount = static_cast<int>(mAllBlocks.size());
     for (int index = 0; index < blockCount; ++index) {
-      operator delete[](mAllBlocks[index]);
+      ::operator delete[](mAllBlocks[index]);
     }
   }
 
@@ -541,8 +535,9 @@ namespace moho
   void EntityOccupationManager::EnsureSize(const int requiredFreeNodes)
   {
     while (mFreeNodeCount < requiredFreeNodes) {
-      // 0x2000 nodes: 0x10000 bytes on x86.
-      auto* chunk = static_cast<EntityCollisionCellNode*>(::operator new(0x2000u * sizeof(EntityCollisionCellNode)));
+      // 0x2000 nodes: 0x10000 bytes on x86. 0x004FCEA5: `call 0x00A82130`
+      // (operator new[]); the destructor frees each block with delete[].
+      auto* chunk = static_cast<EntityCollisionCellNode*>(::operator new[](0x2000u * sizeof(EntityCollisionCellNode)));
       for (int i = 0; i < 0x1FFF; ++i) {
         chunk[i].next = &chunk[i + 1];
       }
@@ -595,6 +590,111 @@ namespace moho
     bucketHeads[bucketIndex] = node;
 
     --mFreeNodeCount;
+  }
+
+  void EntityOccupationManager::SaveBucketOrder(gpg::WriteArchive* const archive, const EntityDB& entities) const
+  {
+    int entityCount = 0;
+    for (const auto& [id, entity] : entities.mAllUnits) {
+      entityCount += entity != nullptr ? 1 : 0;
+    }
+    archive->WriteInt(entityCount);
+    for (const auto& [id, entity] : entities.mAllUnits) {
+      if (entity != nullptr) {
+        CollisionDBRect rect = *static_cast<const CollisionShape<Entity>*>(entity);
+        archive->WriteUInt(id);
+        archive->WriteBytes(reinterpret_cast<char*>(&rect), sizeof(rect));
+      }
+    }
+
+    EntityCollisionCellNode* const* const families[] = {mUnitBuckets, mPropBuckets, mEntityBuckets};
+    for (EntityCollisionCellNode* const* const buckets : families) {
+      for (int bucket = 0; bucket <= mLastIndex; ++bucket) {
+        if (buckets[bucket] == nullptr) {
+          continue;
+        }
+
+        archive->WriteInt(bucket);
+        int count = 0;
+        for (const EntityCollisionCellNode* node = buckets[bucket]; node != nullptr; node = node->next) {
+          ++count;
+        }
+        archive->WriteInt(count);
+        for (const EntityCollisionCellNode* node = buckets[bucket]; node != nullptr; node = node->next) {
+          const Entity* const entity = static_cast<const Entity*>(static_cast<const CollisionShape<Entity>*>(node->owner));
+          archive->WriteUInt(static_cast<unsigned int>(entity->id_));
+        }
+      }
+      archive->WriteInt(-1);
+    }
+  }
+
+  void EntityOccupationManager::LoadBucketOrder(gpg::ReadArchive* const archive, const EntityDB& entities)
+  {
+    EntityCollisionCellNode** const families[] = {mUnitBuckets, mPropBuckets, mEntityBuckets};
+    for (EntityCollisionCellNode** const buckets : families) {
+      for (int bucket = 0; bucket <= mLastIndex; ++bucket) {
+        for (EntityCollisionCellNode* node = buckets[bucket]; node != nullptr;) {
+          EntityCollisionCellNode* const next = node->next;
+          node->owner = nullptr;
+          node->next = mFreeNodeHead;
+          mFreeNodeHead = node;
+          ++mFreeNodeCount;
+          node = next;
+        }
+        buckets[bucket] = nullptr;
+      }
+    }
+
+    int entityCount = 0;
+    archive->ReadInt(&entityCount);
+    for (int index = 0; index < entityCount; ++index) {
+      unsigned int id = 0u;
+      archive->ReadUInt(&id);
+      CollisionDBRect rect{};
+      archive->ReadBytes(reinterpret_cast<char*>(&rect), sizeof(rect));
+
+      const auto found = entities.mAllUnits.find(id);
+      if (found == entities.mAllUnits.end() || found->second == nullptr) {
+        throw gpg::SerializationError("Keyframe: an entity with a saved grid rect was not loaded");
+      }
+      static_cast<CollisionDBRect&>(*static_cast<CollisionShape<Entity>*>(found->second)) = rect;
+    }
+
+    for (EntityCollisionCellNode** const buckets : families) {
+      for (;;) {
+        int bucket = -1;
+        archive->ReadInt(&bucket);
+        if (bucket < 0) {
+          break;
+        }
+        if (bucket > mLastIndex) {
+          throw gpg::SerializationError("Keyframe: a saved grid bucket is out of range");
+        }
+
+        int count = 0;
+        archive->ReadInt(&count);
+        EnsureSize(count);
+        EntityCollisionCellNode** link = &buckets[bucket];
+        for (int index = 0; index < count; ++index) {
+          unsigned int id = 0u;
+          archive->ReadUInt(&id);
+
+          const auto found = entities.mAllUnits.find(id);
+          if (found == entities.mAllUnits.end() || found->second == nullptr) {
+            throw gpg::SerializationError("Keyframe: an entity in a saved grid bucket was not loaded");
+          }
+
+          EntityCollisionCellNode* const node = mFreeNodeHead;
+          mFreeNodeHead = node->next;
+          --mFreeNodeCount;
+          node->owner = static_cast<CollisionShape<Entity>*>(found->second);
+          node->next = nullptr;
+          *link = node;
+          link = &node->next;
+        }
+      }
+    }
   }
 
   /**
@@ -734,6 +834,15 @@ namespace moho
     RelinkTo(rect);
   }
 
+  /// Engine addition: the occupation gather loads the next list node and the next cell's first node
+  /// while it handles the current one (same results, same order).
+  bool sim_GatherPrefetch = true;
+  TConVar<bool> gTConVar_sim_GatherPrefetch(
+    "sim_GatherPrefetch",
+    "Occupation-grid gathers load the next cell's nodes ahead of time (same results, same order).",
+    &sim_GatherPrefetch
+  );
+
   /**
    * Address: 0x004FD000 (FUN_004FD000, Moho::EntityOccupationManager::GatherUnmarkedUnitsInRect)
    */
@@ -779,11 +888,18 @@ namespace moho
           const bool includeProps = (flagBits & ENTITYTYPE_Prop) != 0u;
           const bool includeDynamic = (flagBits & (ENTITYTYPE_Projectile | ENTITYTYPE_Entity)) != 0u;
 
+          const bool prefetch = sim_GatherPrefetch;
           do {
             const int bucketIndex = position & mLastIndex;
 
             if (includeUnits && unitBuckets) {
+              if (prefetch && remainingX > 1) {
+                __builtin_prefetch(unitBuckets[(position + 1) & mLastIndex]);
+              }
               for (EntityCollisionCellNode* node = unitBuckets[bucketIndex]; node; node = node->next) {
+                if (prefetch && node->next != nullptr) {
+                  __builtin_prefetch(node->next);
+                }
                 CollisionShapeBase* const shape = node->owner;
                 if (ClaimGatherShape(shape, useSharedMarks)) {
                   outSpans.PushBack(shape);
@@ -1017,6 +1133,13 @@ namespace moho
     &sim_GatherLargeBuffers
   );
 
+  bool sim_SweptProbeEarlyOut = true;
+  TConVar<bool> gTConVar_sim_SweptProbeEarlyOut(
+    "sim_SweptProbeEarlyOut",
+    "Swept path probes test units before the box overlap and stop at the first blocker (same results).",
+    &sim_SweptProbeEarlyOut
+  );
+
   bool sim_GatherReserve = true;
   TConVar<bool> gTConVar_sim_GatherReserve(
     "sim_GatherReserve",
@@ -1033,6 +1156,8 @@ namespace moho
     // decides where the elements live), so a larger window changes nothing
     // but the malloc/free pair. These locals are not part of any struct layout.
     constexpr std::size_t kGatherInlineCapacity = 256u;
+    // The binary's inline window of those gather buffers, used with `sim_GatherLargeBuffers` off.
+    constexpr std::size_t kGatherBinaryCapacity = 20u;
     // `UnitIsBlocked`'s `CollisionResult` buffer (binary: 10 inline slots).
     constexpr std::size_t kUnitBlockedInlineCapacity = 32u;
 
@@ -1068,6 +1193,29 @@ namespace moho
    * and `comiss entity.Min, boundsMax; ja` reject. Written as `!(a > b)`, not `a <= b`, so that a
    * NaN bound compares unordered and passes, as the `ja` lets it.
    */
+  /// Engine addition: a collect loop loads ahead what it reads per candidate: the bounds four
+  /// candidates on, the collision primitive two on (same results, same order).
+  bool sim_CollectPrefetch = true;
+  TConVar<bool> gTConVar_sim_CollectPrefetch(
+    "sim_CollectPrefetch",
+    "Entity collision collects load each candidate's bounds and primitive ahead of time (same results).",
+    &sim_CollectPrefetch
+  );
+
+  static void PrefetchCollectCandidates(Entity* const* const candidates, const int index, const int count) noexcept
+  {
+    if (index + 4 < count) {
+      if (const Entity* const ahead = candidates[index + 4]; ahead != nullptr) {
+        __builtin_prefetch(&ahead->mAABox);
+      }
+    }
+    if (index + 2 < count) {
+      if (const Entity* const closer = candidates[index + 2]; closer != nullptr) {
+        __builtin_prefetch(closer->CollisionExtents);
+      }
+    }
+  }
+
   [[nodiscard]] static bool AxisAlignedBoundsOverlapEntityBounds(
     const Wm3::AxisAlignedBox3f& bounds,
     const Entity& entity
@@ -1124,7 +1272,7 @@ namespace moho
     CollisionDBRect queryRect{};
     (void)func_AABoxToRect(&queryRect, source->mAABox);
 
-    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const int gatheredCount =
       mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, queryRect, flags);
@@ -1134,7 +1282,11 @@ namespace moho
     CollisionResult collisionResult{};
     collisionResult.sourceEntity = source;
 
+    const bool prefetch = sim_CollectPrefetch;
     for (int index = 0; index < gatheredCount; ++index) {
+      if (prefetch) {
+        PrefetchCollectCandidates(gatheredEntities.start_, index, gatheredCount);
+      }
       Entity* const candidate = gatheredEntities.start_[index];
       if (candidate == nullptr || candidate == source) {
         continue;
@@ -1183,7 +1335,7 @@ namespace moho
   {
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromOrientedBox(box);
 
-    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const int gatheredCount = GatherUnmarkedEntities(queryBounds, flags, gatheredEntities);
 
@@ -1192,7 +1344,11 @@ namespace moho
     // The original initializes this result once before traversing candidates.
     // A primitive that leaves a lane unwritten retains the preceding value.
     CollisionResult collisionResult{};
+    const bool prefetch = sim_CollectPrefetch;
     for (int index = 0; index < gatheredCount; ++index) {
+      if (prefetch) {
+        PrefetchCollectCandidates(gatheredEntities.start_, index, gatheredCount);
+      }
       Entity* const candidate = gatheredEntities.start_[index];
       if (candidate == nullptr || !AxisAlignedBoundsOverlapEntityBounds(queryBounds, *candidate)) {
         continue;
@@ -1232,7 +1388,7 @@ namespace moho
     gpg::core::FastVectorInline<CollisionResult>& into
   )
   {
-    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const int gatheredCount = grid.GatherUnmarkedEntities(box, ENTITYTYPE_Unit, gatheredEntities);
 
@@ -1381,6 +1537,7 @@ namespace moho
   [[nodiscard]] bool SweptPathBlockedByUnit(
     COGrid& grid, Unit* const unit, const Wm3::Vector3f& fromCenter, const Wm3::Vector3f& toCenter, const int mode)
   {
+    assert(unit != nullptr && "SweptPathBlockedByUnit: the moving unit is required");
     if (fromCenter == toCenter) {
       // Endpoints coincide — nothing to sweep.
       return false;
@@ -1412,6 +1569,40 @@ namespace moho
       static_cast<float>(blueprint->mSizeX) * 0.55555558f,
       1000.0f,
       halfLength);
+
+    // Engine change (sim_SweptProbeEarlyOut): the answer is "some candidate passes every test",
+    // and every test below only reads state, so the cheap unit tests run before the box overlap
+    // and the first blocker ends the scan. Same candidates, same tests, same answer as collecting
+    // every hit through CollectEntitiesInBox first.
+    if (sim_SweptProbeEarlyOut) {
+      const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromOrientedBox(sweptBox);
+      GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
+      gpg::core::FastVectorInline<Entity*>& gathered = gatherScratch.Get();
+      const int gatheredCount = grid.GatherUnmarkedEntities(queryBounds, ENTITYTYPE_Unit, gathered);
+      CollisionResult collisionResult{};
+      for (int index = 0; index < gatheredCount; ++index) {
+        Entity* const source = gathered.start_[index];
+        if (source == nullptr || !AxisAlignedBoundsOverlapEntityBounds(queryBounds, *source)) {
+          continue;
+        }
+        CColPrimitiveBase* const collisionPrimitive = source->CollisionExtents;
+        Unit* const candidate = source->IsUnit();
+        if (collisionPrimitive == nullptr || candidate == nullptr) {
+          continue;
+        }
+        const ELayer candidateLayer = candidate->mVarDat.mLayerMask;
+        if (candidateLayer == LAYER_Air || candidateLayer == LAYER_Sub) {
+          continue;
+        }
+        if (unit->IsSameFormationLayerWith(candidate) || func_IsSourceUnit(mode, *unit, candidate)) {
+          continue;
+        }
+        if (collisionPrimitive->CollideBox(&sweptBox, &collisionResult)) {
+          return true;
+        }
+      }
+      return false;
+    }
 
     gpg::core::FastVectorN<CollisionResult, 10> hits{};
     grid.CollectEntitiesInBox(hits, ENTITYTYPE_Unit, sweptBox);
@@ -1481,7 +1672,7 @@ namespace moho
   {
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromSphere(sphere);
 
-    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const int gatheredCount = GatherUnmarkedEntities(queryBounds, flags, gatheredEntities);
 
@@ -1552,7 +1743,7 @@ namespace moho
     const Wm3::Vec3f& lineEnd
   )
   {
-    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     const std::int32_t gatheredCount =
       GatherUnmarkedEntitiesInLine(mEntityOccupationManager, gatheredEntities, lineStart, lineEnd);
@@ -1681,10 +1872,10 @@ namespace moho
    */
   CollisionDBRect* func_AABoxToRect(CollisionDBRect* const out, const Wm3::AxisAlignedBox3f& box)
   {
-    const int minCellX = FloorToInt(box.Min.x) >> kWorldToCollisionCellShift;
-    const int minCellZ = FloorToInt(box.Min.z) >> kWorldToCollisionCellShift;
-    const int maxCellX = (CeilToInt(box.Max.x) + 3) >> kWorldToCollisionCellShift;
-    const int maxCellZ = (CeilToInt(box.Max.z) + 3) >> kWorldToCollisionCellShift;
+    const int minCellX = fa::FloorToIntX87(box.Min.x) >> kWorldToCollisionCellShift;
+    const int minCellZ = fa::FloorToIntX87(box.Min.z) >> kWorldToCollisionCellShift;
+    const int maxCellX = (fa::CeilToIntX87(box.Max.x) + 3) >> kWorldToCollisionCellShift;
+    const int maxCellZ = (fa::CeilToIntX87(box.Max.z) + 3) >> kWorldToCollisionCellShift;
 
     out->mStartX = ClampCollisionCellStartToU16(minCellX);
     out->mStartZ = ClampCollisionCellStartToU16(minCellZ);
@@ -1713,7 +1904,7 @@ namespace moho
     CollisionDBRect cellRect{};
     (void)func_Rect2fToInt16(&cellRect, rect);
 
-    GatherScratch<CollisionShapeBase*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<CollisionShapeBase*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<CollisionShapeBase*>& gatheredSpans = gatherScratch.Get();
     (void)grid.mEntityOccupationManager.GatherUnmarkedUnitsInRect(gatheredSpans, cellRect, ENTITYTYPE_Unit);
 
@@ -1789,7 +1980,7 @@ namespace moho
     CollisionDBRect gatherRect{};
     (void)func_AABoxToRect(&gatherRect, queryBounds);
 
-    GatherScratch<Entity*, kGatherInlineCapacity, 20> gatherScratch{};
+    GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
     grid.mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, gatherRect, type);
 

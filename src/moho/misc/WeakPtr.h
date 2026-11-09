@@ -231,7 +231,7 @@ namespace moho
      * detaches first -- the destination storage is fresh, so it holds no
      * prior chain membership. This is the construct-into-fresh-storage
      * counterpart to `operator=` below. Every relinking copy an
-     * `msvc8::vector` of weak pointers (or of a struct holding one) emits --
+     * `fa::vector` of weak pointers (or of a struct holding one) emits --
      * `uninit_fill_n`, `uninit_copy_n` -- is this constructor in a loop.
      *
      * Address: 0x00686D50 (FUN_00686D50 -- this constructor emitted out of line,
@@ -554,7 +554,7 @@ namespace moho
   static_assert(offsetof(WeakPtr<WeakObject>, ownerLinkSlot) == 0x00, "WeakPtr<T>::ownerLinkSlot offset must be 0x00");
   static_assert(offsetof(WeakPtr<WeakObject>, nextInOwner) == 0x04, "WeakPtr<T>::nextInOwner offset must be 0x04");
 
-  // The same layout in pointer units, checked on x64 too: X64LayoutAsserts.h turns `static_assert`
+  // The same layout in pointer units, checked on x64 too: LayoutAsserts.h turns `static_assert`
   // off there for the x86-only numbers, and these hold on both.
 #pragma push_macro("static_assert")
 #undef static_assert

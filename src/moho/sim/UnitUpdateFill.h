@@ -22,6 +22,7 @@ namespace moho
   /// only act while `sim_ParallelSync` defers unit records. The packet only goes to the client:
   /// the allocations land on worker threads (the engine allocator is thread-safe) and in a
   /// different order, and every byte the client reads is the serial one.
+  extern bool sim_SyncInPlace;
   extern bool sim_ParallelSyncHeap;
   extern bool sim_ParallelEntitySync;
 
@@ -102,6 +103,14 @@ namespace moho
   [[nodiscard]] SEntityVariableUpdateEntry* QueueEntityVariableUpdateDeferred(
     SSyncData* syncData, EntId entityId, const SSTIEntityVariableData& variableData
   );
+
+  /**
+   * Captures scroll endpoints into the newest queued entity record. When that
+   * record is deferred, preserves these captured values across its later copy.
+   * Caller must establish current visibility before passing live creator data.
+   * Does not retain source pointers or modify any simulation entity payload.
+   */
+  void OverrideEntityUpdateScroll(SSyncData* syncData, const SSTIEntityVariableData& source);
 
   /**
    * Engine addition (`sim_ParallelEntitySync`): when the newest entity-update record of

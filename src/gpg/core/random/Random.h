@@ -185,7 +185,7 @@ namespace gpg
 		 * @param state 
 		 * @return 
 		 */
-		static uint32_t __fastcall mt_next_u32_game_exact(void* owner, Mt19937State& state) {
+		[[maybe_unused]] static uint32_t __fastcall mt_next_u32_game_exact(void* owner, Mt19937State& state) {
             using namespace gpg::core;
             const auto ref = Mt19937Ref::FromState(state);
             uint32_t i = *ref.idx;
@@ -204,14 +204,5 @@ namespace gpg
             return v ^ (v >> 18);
         }
 
-        /**
-         * Convert to [0,1).
-         * Use exact 2^-32; IDA's 1.862645e-10
-         * @param u
-         * @return
-         */
-        static float mt_unitf_from_u32(uint32_t u) {
-            return static_cast<float>(static_cast<double>(u) * (1.0 / 4294967296.0)); // [0,1)
-        }
 	}
 }

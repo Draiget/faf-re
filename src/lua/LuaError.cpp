@@ -7,12 +7,12 @@
  * Mangled: ??0lua_Error@lua@@Z_0
  *
  * What it does:
- * Constructs a `lua_Error` by forwarding `err` to `msvc8::runtime_error`, then
+ * Constructs a `lua_Error` by forwarding `err` to `fa::runtime_error`, then
  * stores `lua_state` in `L` and `errcode` in `code`.  The vtable is set by
  * the usual C++ construction sequence.
  */
 lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode, const char* const err)
-  : msvc8::runtime_error(err), L(lua_state), code(errcode)
+  : fa::runtime_error(err), L(lua_state), code(errcode)
 {
   // Crash-report ring (deviation, documented): record the error so a later
   // crash report shows the failing script history. Log-only, bounded.
@@ -29,7 +29,7 @@ lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode, const c
  * by a _TRACEBACK handler - is already sitting there.
  */
 lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode)
-  : msvc8::runtime_error(luaL_checklstring(lua_state, -1, nullptr)), L(lua_state), code(errcode)
+  : fa::runtime_error(luaL_checklstring(lua_state, -1, nullptr)), L(lua_state), code(errcode)
 {
   // See the (state, errcode, err) overload for the diagnostics ring.
   RecordLuaError(lua_state, what());
@@ -44,14 +44,14 @@ lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode)
  * `code` and `L` fields.
  */
 lua::lua_Error::lua_Error(const lua::lua_Error& error)
-  : msvc8::runtime_error(error), L(error.L), code(error.code)
+  : fa::runtime_error(error), L(error.L), code(error.code)
 {
 }
 
 /**
  * What it does:
  * Implements base Lua error destruction by delegating to normal
- * `msvc8::runtime_error` teardown.
+ * `fa::runtime_error` teardown.
  */
 lua::lua_Error::~lua_Error() = default;
 

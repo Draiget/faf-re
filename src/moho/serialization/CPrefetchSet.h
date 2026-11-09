@@ -48,7 +48,7 @@ namespace moho
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
   public:
-    msvc8::vector<PrefetchHandleBase> mHandles; // +0x00
+    fa::vector<PrefetchHandleBase> mHandles; // +0x00
   };
 
   static_assert(offsetof(CPrefetchSet, mHandles) == 0x00, "CPrefetchSet::mHandles offset must be 0x00");

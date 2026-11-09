@@ -16,7 +16,7 @@ namespace moho
   struct RMeshBlueprint;
 
   struct ClutterRegion;
-  struct ClutterRegionKey;
+  class ClutterRegionKey;
 
 
 
@@ -48,7 +48,7 @@ namespace moho
 
     /**
      * Address: 0x007D7E00 (FUN_007D7E00, inlined into the tail-destroy loop
-     * of `msvc8::vector<ClutterSurfaceElement>::erase(first,last)` --
+     * of `fa::vector<ClutterSurfaceElement>::erase(first,last)` --
      * `legacy/containers/Vector.h`)
      * Address: 0x007D7EB0 (FUN_007D7EB0, ??1Surface@Clutter@Moho@@QAE@@Z,
      * inlined into `Surface::~Surface`'s own `mSeeds` teardown sweep, below)
@@ -76,7 +76,7 @@ namespace moho
      * emitting a standalone symbol, so there is no separate address to cite
      * here beyond the ones already on `DestroyInPlace()`. Declaring this as
      * a real (non-trivial) destructor, instead of leaving the type
-     * implicitly trivial, is what makes `msvc8::vector<ClutterSurfaceElement>`'s
+     * implicitly trivial, is what makes `fa::vector<ClutterSurfaceElement>`'s
      * existing, unmodified `destroy_range`/`erase`/`clear`/`tidy` machinery
      * (`Vector.h`) emit the per-element call `FUN_007D7E00` and
      * `FUN_007D7EB0` both show -- previously the struct was (wrongly)
@@ -88,7 +88,7 @@ namespace moho
 
     /**
      * Address: 0x007D94B0 (FUN_007D94B0, inlined into the tail-shift step of
-     * `msvc8::vector<ClutterSurfaceElement>::erase(first,last)` --
+     * `fa::vector<ClutterSurfaceElement>::erase(first,last)` --
      * `legacy/containers/Vector.h`)
      *
      * What it does:
@@ -125,7 +125,7 @@ namespace moho
   /**
    * `Moho::Clutter::Surface`. The trailing seed storage (`myProxy_`/
    * `first_`/`last_`/`end_` inside `mSeeds`, entry offsets +0x08/+0x0C/
-   * +0x10/+0x14) is byte-identical to `msvc8::vector<ClutterSurfaceElement>`
+   * +0x10/+0x14) is byte-identical to `fa::vector<ClutterSurfaceElement>`
    * -- confirmed via `Clutter::Clutter`'s real body (`FUN_007D60D0`), which
    * constructs the 256-entry `mSurfaces` array through the compiler-emitted
    * `` `eh vector constructor iterator' `` helper calling `Surface::Surface`
@@ -159,7 +159,7 @@ namespace moho
 
     void* vtable; // +0x00
     std::int32_t density; // +0x04
-    msvc8::vector<ClutterSurfaceElement> mSeeds; // +0x08 (16 bytes: myProxy_/first_/last_/end_)
+    fa::vector<ClutterSurfaceElement> mSeeds; // +0x08 (16 bytes: myProxy_/first_/last_/end_)
   };
   static_assert(sizeof(ClutterSurfaceEntry) == 0x18, "ClutterSurfaceEntry size must be 0x18");
   static_assert(offsetof(ClutterSurfaceEntry, density) == 0x04, "ClutterSurfaceEntry::density offset must be 0x04");
@@ -172,8 +172,8 @@ namespace moho
   // at 0x0C with a `{next, prev, value}` node at 0x0C. `mList1` holds the
   // 128-region pool blocks, `mList2` the recycle list, and each region's
   // `mMap` the payloads that region owns.
-  using ClutterRegionList = msvc8::list<ClutterRegion*>;
-  using ClutterPayloadList = msvc8::list<void*>;
+  using ClutterRegionList = fa::list<ClutterRegion*>;
+  using ClutterPayloadList = fa::list<void*>;
 
 
 
@@ -221,7 +221,7 @@ namespace moho
     }
   };
 
-  using ClutterRegionKeySet = msvc8::set<ClutterRegionKey, ClutterRegionKeyLess>;
+  using ClutterRegionKeySet = fa::set<ClutterRegionKey, ClutterRegionKeyLess>;
   static_assert(sizeof(ClutterRegionKeySet) == 0x0C, "ClutterRegionKeySet size must be 0x0C");
 
 

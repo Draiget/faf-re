@@ -1,4 +1,7 @@
 #include "moho/misc/CEconomyEvent.h"
+#include "moho/misc/EconomyRequestRelease.h"
+#include "moho/lua/CScrLuaInitForm.h"
+#include "gpg/core/reflection/Reflection.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -37,20 +40,6 @@ namespace
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    // Every file that wants this set must resolve the one that already
-    // exists. Declaring a fresh static here creates a second set with the
-    // same name, and SCR_FindLuaInitFormSet returns only the first - so
-    // half the binders never get run.
-    if (moho::CScrLuaInitFormSet* const existing = moho::SCR_FindLuaInitFormSet("Sim"); existing != nullptr) {
-      return *existing;
-    }
-
-    static moho::CScrLuaInitFormSet sSet("Sim");
-    return sSet;
-  }
-
   /**
    * Address: 0x00775630 (FUN_00775630, context unwrap)
    * Address: 0x00775910 (FUN_00775910, context unwrap)
@@ -64,28 +53,6 @@ namespace
     return luaContext ? luaContext->stateUserData : nullptr;
   }
 
-  /**
-   * Address: 0x006ADF70 (FUN_006ADF70)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `CEconomyEvent` lane.
-   */
-  [[nodiscard]] gpg::RType* CachedCEconomyEventType()
-  {
-    if (!moho::CEconomyEvent::sType) {
-      moho::CEconomyEvent::sType = gpg::LookupRType(typeid(moho::CEconomyEvent));
-    }
-    return moho::CEconomyEvent::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCScriptEventType()
-  {
-    if (!moho::CScriptEvent::sType) {
-      moho::CScriptEvent::sType = gpg::LookupRType(typeid(moho::CScriptEvent));
-    }
-    return moho::CScriptEvent::sType;
-  }
-
   [[nodiscard]] gpg::RType* CachedCScriptObjectPointerType()
   {
     static gpg::RType* cached = nullptr;
@@ -93,14 +60,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::CScriptObject*));
     }
     return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSEconValueType()
-  {
-    if (!moho::SEconValue::sType) {
-      moho::SEconValue::sType = gpg::LookupRType(typeid(moho::SEconValue));
-    }
-    return moho::SEconValue::sType;
   }
 
   struct TypeInfoRTypePair
@@ -114,8 +73,6 @@ namespace
     bool initialized;
     TypeInfoRTypePair entries[3];
   };
-
-  thread_local TypeInfoCache3 gCEconRequestRRefCache{false, {}};
 
   template <typename TObject>
   [[nodiscard]] gpg::RRef* BuildTypedRefWithCache(
@@ -196,43 +153,6 @@ namespace
     return outRef;
   }
 
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
-  }
-
-  void IntrusiveUnlink(moho::TDatListItem<void, void>& node)
-  {
-    node.ListUnlink();
-  }
-
   void IntrusiveLinkBefore(moho::TDatListItem<void, void>& node, moho::TDatListItem<void, void>& listHead)
   {
     node.ListLinkBefore(&listHead);
@@ -247,7 +167,7 @@ namespace
    */
   void AddCScriptEventBaseToCEconomyEventType(gpg::RType* typeInfo)
   {
-    gpg::RType* const baseType = CachedCScriptEventType();
+    gpg::RType* const baseType = gpg::RTypeOf<moho::CScriptEvent>();
     gpg::RField baseField(baseType->GetName(), baseType, 0, 0, nullptr);
     typeInfo->AddBase(baseField);
   }
@@ -299,6 +219,7 @@ namespace
       activeState = state->GetCState();
     }
     luaL_error(activeState, "%s", text ? text : "<lua error>");
+    std::abort();
   }
 
   template <typename TObject>
@@ -402,33 +323,6 @@ namespace
   {
     unit->mUnitVarDat.mMaintainenceCost.ENERGY = 0.0f;
     unit->mUnitVarDat.mMaintainenceCost.MASS = 0.0f;
-  }
-
-  /**
-   * Address: 0x00773740 (FUN_00773740, sub_773740)
-   */
-  [[nodiscard]] moho::SEconValue TakeGrantedResourcesAndReset(moho::CEconRequest* request)
-  {
-    moho::SEconValue out{};
-    out.energy = request->mGranted.energy;
-    out.mass = request->mGranted.mass;
-    request->mGranted.energy = 0.0f;
-    request->mGranted.mass = 0.0f;
-    return out;
-  }
-
-  /**
-   * Address: 0x005CFA20 (sub_5CFA20)
-   */
-  void DestroyEconomyRequestPointer(moho::CEconRequest*& request)
-  {
-    if (!request) {
-      return;
-    }
-
-    IntrusiveUnlink(request->mNode);
-    delete request;
-    request = nullptr;
   }
 
 } // namespace
@@ -561,7 +455,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    gpg::RType* const econValueType = CachedSEconValueType();
+    gpg::RType* const econValueType = gpg::RTypeOf<moho::SEconValue>();
     GPG_ASSERT(econValueType != nullptr);
 
     archive->Read(econValueType, &mRequested, nullOwner);
@@ -581,7 +475,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    gpg::RType* const econValueType = CachedSEconValueType();
+    gpg::RType* const econValueType = gpg::RTypeOf<moho::SEconValue>();
     GPG_ASSERT(econValueType != nullptr);
 
     archive->Write(econValueType, &mRequested, nullOwner);
@@ -691,7 +585,7 @@ moho::CEconomyEvent::~CEconomyEvent()
  */
 gpg::RType* moho::CEconomyEvent::GetClass() const
 {
-  return CachedCEconomyEventType();
+  return gpg::CachedLookup<moho::CEconomyEvent>(moho::CEconomyEvent::sType);
 }
 
 /**
@@ -699,7 +593,7 @@ gpg::RType* moho::CEconomyEvent::GetClass() const
  */
 gpg::RRef moho::CEconomyEvent::GetDerivedObjectRef()
 {
-  return MakeTypedRef(this, CachedCEconomyEventType());
+  return gpg::MakeTypedRef(this, gpg::CachedLookup<moho::CEconomyEvent>(moho::CEconomyEvent::sType));
 }
 
 /**
@@ -726,7 +620,7 @@ void moho::CEconomyEvent::ProcessTick()
         try {
           const float progress = 1.0f - static_cast<float>(mRemainingTicks) / static_cast<float>(mTotalTicks);
           progressCallback.Call_ObjectNum(mUnit->GetLuaObject(), progress);
-        } catch (const msvc8::runtime_error& error) {
+        } catch (const fa::runtime_error& error) {
           gpg::Warnf("Error executing progress function: %s", error.what());
         }
       }
@@ -814,7 +708,7 @@ int moho::cfunc_CreateEconomyEvent(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CreateEconomyEvent_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     "CreateEconomyEvent",
     &moho::cfunc_CreateEconomyEvent,
     nullptr,
@@ -869,7 +763,7 @@ int moho::cfunc_RemoveEconomyEvent(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_RemoveEconomyEvent_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     "RemoveEconomyEvent",
     &moho::cfunc_RemoveEconomyEvent,
     nullptr,
@@ -913,7 +807,7 @@ int moho::cfunc_EconomyEventIsDone(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_EconomyEventIsDone_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     "EconomyEventIsDone",
     &moho::cfunc_EconomyEventIsDone,
     nullptr,
@@ -944,7 +838,7 @@ int moho::cfunc_EconomyEventIsDoneL(LuaPlus::LuaState* const state)
  */
 moho::CEconomyEvent* moho::func_GetCEconomyEvent(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
 {
-  return ResolveTypedGameObject<CEconomyEvent>(object, state, CachedCEconomyEventType());
+  return ResolveTypedGameObject<CEconomyEvent>(object, state, gpg::CachedLookup<moho::CEconomyEvent>(moho::CEconomyEvent::sType));
 }
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
@@ -982,7 +876,7 @@ namespace
   const CEconomyEventLuaFuncDefBootstrap gCEconomyEventLuaFuncDefBootstrap{};
 
   moho::CScrLuaClassBinder gEconomyEventClassBinder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     "moho.EconomyEvent",
     &moho::CScrLuaMetatableFactory<moho::CEconomyEvent>::Instance(),
     "CEconomyEvent",

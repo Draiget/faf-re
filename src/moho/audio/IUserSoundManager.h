@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <type_traits>
 
 #include "gpg/core/containers/FastVector.h"
@@ -50,7 +51,7 @@ namespace moho
      * Address: 0x00A82547 (_purecall)
      * Slot: 3
      */
-    virtual void Play(const msvc8::string& bankName, const msvc8::string& cueName) = 0;
+    virtual void Play(const fa::string& bankName, const fa::string& cueName) = 0;
 
     /**
      * Address: 0x00A82547 (_purecall)
@@ -90,6 +91,23 @@ namespace moho
    * Returns the process-global user sound manager, creating/replacing it on first use.
    */
   [[nodiscard]] IUserSoundManager* USER_GetSound();
+
+  /**
+   * Engine addition (snd_CreateEarly): builds the user sound manager (USER_GetSound's) on a helper
+   * thread, so the audio engine comes up while the main thread goes on to create the window and the
+   * graphics device. USER_GetSound waits for it.
+   */
+  void USER_StartSoundEarly();
+
+  /** Waits for the build USER_StartSoundEarly started, if any. */
+  void USER_FinishSoundEarly();
+
+  /**
+   * Runs `work` with the user sound manager: on the thread building it while that build runs (after
+   * the build, in the order given), here otherwise. For work whose caller needs nothing back, such
+   * as AudioSetLanguage.
+   */
+  void USER_WithSound(std::function<void(IUserSoundManager*)> work);
 
   static_assert(sizeof(IUserSoundManager) == 0x4, "IUserSoundManager size must be 0x4");
   static_assert(std::is_polymorphic<IUserSoundManager>::value, "IUserSoundManager must remain polymorphic");

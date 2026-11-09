@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/Layout.h"
 #include "moho/containers/TDatList.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/sim/SOCellPos.h"
@@ -51,7 +52,9 @@ namespace moho
    */
   struct SNavPath
   {
+#if FAF_RETAIL_LAYOUT
     std::uint32_t reserved0;
+#endif
     SOCellPos* start;
     SOCellPos* finish;
     SOCellPos* capacity;

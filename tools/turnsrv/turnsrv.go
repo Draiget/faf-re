@@ -18,6 +18,7 @@ import (
 	"github.com/pion/turn/v5"
 
 	"faf-main/tools/journal"
+	"faf-main/tools/relay"
 )
 
 // Config selects where the server listens and which address it relays from.
@@ -47,6 +48,7 @@ type Server struct {
 	cfg    Config
 	server *turn.Server
 	ip     net.IP
+	shaped *impairment
 }
 
 // user is the REST username's user part: "<game>.<uid>".
@@ -100,10 +102,12 @@ func Start(cfg Config, j *journal.Journal) (*Server, error) {
 		ip = firstPrivateIPv4()
 	}
 
-	conn, err := net.ListenPacket("udp4", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))
+	raw, err := net.ListenPacket("udp4", fmt.Sprintf("%s:%d", cfg.ListenIP, cfg.Port))
 	if err != nil {
 		return nil, fmt.Errorf("turn listen: %w", err)
 	}
+	shaped := newImpairment()
+	conn := &impairedConn{PacketConn: raw, shared: shaped}
 
 	loggers := logging.NewDefaultLoggerFactory()
 	loggers.DefaultLogLevel = logging.LogLevelWarn
@@ -113,6 +117,8 @@ func Start(cfg Config, j *journal.Journal) (*Server, error) {
 		relays = &turn.RelayAddressGeneratorPortRange{RelayAddress: ip, Address: cfg.ListenIP,
 			MinPort: uint16(cfg.RelayMinPort), MaxPort: uint16(cfg.RelayMaxPort)}
 	}
+
+	relays = &impairedRelays{RelayAddressGenerator: relays, shared: shaped}
 
 	rec := func(kind, userID string, data map[string]any) {
 		game, uid := parseUser(userID)
@@ -152,8 +158,13 @@ func Start(cfg Config, j *journal.Journal) (*Server, error) {
 		_ = conn.Close()
 		return nil, fmt.Errorf("turn server: %w", err)
 	}
-	return &Server{cfg: cfg, server: server, ip: ip}, nil
+	return &Server{cfg: cfg, server: server, ip: ip, shaped: shaped}, nil
 }
+
+// SetImpairment shapes every datagram the server sends to its clients from now
+// on (issue #242): with relayed candidates only, the one-way impairment of
+// every player-to-player path. The zero value passes everything.
+func (s *Server) SetImpairment(imp relay.Impairment) { s.shaped.set(imp) }
 
 // URLs are the ICE server URLs to hand to clients.
 func (s *Server) URLs() []string {

@@ -59,10 +59,7 @@ namespace moho
    */
   gpg::RRef CUIWorldMesh::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -146,7 +143,7 @@ namespace moho
     }
 
     if (const LuaPlus::LuaObject colorObject = meshDescriptor["Color"]; !colorObject.IsNil()) {
-      msvc8::string encodedColor(LuaStringOrEmpty(colorObject));
+      fa::string encodedColor(LuaStringOrEmpty(colorObject));
       color = static_cast<int>(SCR_DecodeColor(encodedColor));
     }
 
@@ -165,9 +162,9 @@ namespace moho
 
       // 0x0086B616: the shared `GetModel` lane, same as every other model consumer.
       const boost::shared_ptr<RScmResource> modelResource = GetModel(LuaStringOrEmpty(meshNameObject), nullptr);
-      const msvc8::string textureName(LuaStringOrEmpty(textureNameObject));
-      const msvc8::string shaderName(LuaStringOrEmpty(shaderNameObject));
-      const msvc8::string emptyTextureName{};
+      const fa::string textureName(LuaStringOrEmpty(textureNameObject));
+      const fa::string shaderName(LuaStringOrEmpty(shaderNameObject));
+      const fa::string emptyTextureName{};
       const boost::shared_ptr<MeshMaterial> material =
         MeshMaterial::Create(shaderName, textureName, emptyTextureName, emptyTextureName, emptyTextureName, emptyTextureName, nullptr);
 
@@ -189,7 +186,7 @@ namespace moho
       float blueprintUniformScale = uniformScale;
       int gameTick = 0;
       if (worldSession != nullptr && worldSession->mRules != nullptr) {
-        msvc8::string blueprintId(LuaStringOrEmpty(blueprintIdObject));
+        fa::string blueprintId(LuaStringOrEmpty(blueprintIdObject));
         RResId normalizedBlueprintId{};
         gpg::STR_CopyFilename(&normalizedBlueprintId.name, &blueprintId);
 

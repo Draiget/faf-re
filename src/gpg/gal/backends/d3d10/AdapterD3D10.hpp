@@ -14,7 +14,7 @@ namespace gpg::gal
         std::uint32_t format_ = 0U;              // +0x00 (DXGI_FORMAT)
         IDXGIOutput* output_ = nullptr;          // +0x04
         DXGI_OUTPUT_DESC outputDesc_{};          // +0x08 (0x5C bytes)
-        msvc8::vector<DXGI_MODE_DESC> modes_{};  // +0x64
+        fa::vector<DXGI_MODE_DESC> modes_{};  // +0x64
     };
 
     static_assert(offsetof(AdapterModeD3D10, format_) == 0x00, "AdapterModeD3D10::format_ offset must be 0x00");
@@ -94,7 +94,7 @@ namespace gpg::gal
     public:
         IDXGIAdapter* dxgiAdapter_ = nullptr;        // +0x04
         DXGI_ADAPTER_DESC description_{};            // +0x08
-        msvc8::vector<AdapterModeD3D10> modes_{};    // +0x12C
+        fa::vector<AdapterModeD3D10> modes_{};    // +0x12C
     };
 
     static_assert(offsetof(AdapterD3D10, dxgiAdapter_) == 0x04, "AdapterD3D10::dxgiAdapter_ offset must be 0x04");

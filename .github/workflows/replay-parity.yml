@@ -1,0 +1,326 @@
+name: Replay parity
+
+# Plays FAF vault replays of one game version on the Linux headless build and checks every
+# checksum the live players recorded, as tools/replay-parity does on Windows: same verdicts, and a
+# desync one live client had alone is not ours. Plays from the caches the Parity prewarm workflow
+# fills; it fetches from FAF only what they lack. tools/parity-data/README.md.
+#
+# Run it from master (its caches are the ones every run can read) with the commit to test.
+# Every night at 20:00 UTC (00:00 UTC+4) it plays master's head on the nightly set: every replay
+# that desynced before and others picked once, the same ones each night, as many as 40 jobs of 150
+# minutes play (20 at once, so two rounds, about 5 h 30 min). New failures don't fail the run: the
+# report lists them, and the Nightly release publishes only when it lists none.
+on:
+  schedule:
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit, branch or tag to build and test
+        required: true
+        default: master
+      set:
+        description: Replays to play
+        type: choice
+        options: [core, extended, sample, nightly, all]
+        default: core
+      sample:
+        description: Replays for set=sample or nightly
+        default: "1000"
+      seed:
+        description: Random order of the sample (and of what set=all leaves out past 256 jobs)
+        default: "1"
+      game_version:
+        description: FAF game version of the replays
+        default: "3835"
+      after_run:
+        description: An earlier run's id; play only what it did not (no time left, not got ready) or what crashed, and report both
+        default: ""
+      resume:
+        description: With after_run, play only what that run scheduled (resumes a cancelled run; set and batch are then that run's, give set=all and batch 1/1)
+        type: boolean
+        default: false
+      oracle_check:
+        description: Also check the server's visibility oracles every beat (unfocused, every army; slower), verdict oracle on a difference
+        type: boolean
+        default: false
+      batch:
+        description: K/N plays the K-th of N equal id ranges of the set (GitHub cancels jobs that wait 24 h for a runner; set=all needs 3 or more)
+        default: "1/1"
+      job_minutes:
+        description: Minutes each job plays (fewer = more, shorter jobs; at most 300)
+        default: "300"
+
+permissions:
+  contents: read
+  actions: read  # an earlier run's results (after_run)
+
+concurrency:
+  group: replay-parity
+  cancel-in-progress: false
+
+env:
+  GAME_VERSION: ${{ inputs.game_version || '3835' }}
+  PYTHON_VERSION: "3.14"
+  # Jobs play for this long; plan.py packs shards to it, shard.py starts nothing that would not
+  # end by then. A job may run 360 minutes in all.
+  PLAY_MINUTES: ${{ inputs.job_minutes || '150' }}
+  # Part of the headless build's cache key: a new value rebuilds everything once.
+  BUILD_CACHE: "v1"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      # The full commit of `ref`: checkout takes a short commit id for a branch or tag name.
+      - id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF: ${{ inputs.ref || github.sha }}
+        run: |
+          sha=$(gh api "repos/${{ github.repository }}/commits/$REF" --jq .sha)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.commit.outputs.sha }}
+      # The headless binary is cached by what it is built from: the git trees of the paths the
+      # build reads (the pinned toolchain makes the same sources the same binary). Commits that
+      # change only tools/, docs/ or .github/ reuse it. Bump BUILD_CACHE when the build steps change.
+      - id: sources
+        run: |
+          tree=$(git ls-tree HEAD CMakeLists.txt CMakePresets.json cmake data dependencies src tests | sha256sum | cut -c1-20)
+          echo "key=headless-$BUILD_CACHE-$tree" >> "$GITHUB_OUTPUT"
+      - id: built
+        uses: actions/cache/restore@v6
+        with:
+          path: build/linux-clang-x64-release/headless
+          key: ${{ steps.sources.outputs.key }}
+      # The pinned toolchain (cmake/toolchains/linux-clang-pins.cmake): configure refuses another.
+      - if: steps.built.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          v=1:18.1.3-1ubuntu1
+          sudo apt-get install -y --no-install-recommends ninja-build \
+            clang-18=$v lld-18=$v llvm-18=$v libc++-18-dev=$v libc++abi-18-dev=$v libunwind-18-dev=$v
+      - if: steps.built.outputs.cache-hit != 'true'
+        uses: actions/cache@v6
+        with:
+          path: dependencies/.downloads
+          key: deps-${{ hashFiles('cmake/FafDependencies.cmake') }}
+      - if: steps.built.outputs.cache-hit != 'true'
+        run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;boost_1_34_1" -P cmake/FafDependencies.cmake
+      - if: steps.built.outputs.cache-hit != 'true'
+        run: cmake --preset linux-clang-x64-release
+      - if: steps.built.outputs.cache-hit != 'true'
+        run: cmake --build --preset linux-clang-x64-release --target headless
+      - if: steps.built.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: build/linux-clang-x64-release/headless
+          key: ${{ steps.sources.outputs.key }}
+      - run: |
+          what=$([ "${{ steps.built.outputs.cache-hit }}" = true ] && echo "Reused the build" || echo "Built")
+          echo "$what ${{ steps.sources.outputs.key }} for ${{ steps.commit.outputs.sha }}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: headless
+          path: build/linux-clang-x64-release/headless
+          retention-days: 7
+
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      # What the prewarm learnt about each replay (ready, or why not). Without it every corpus
+      # replay is scheduled and the jobs check them.
+      - uses: actions/cache/restore@v6
+        with:
+          path: cache/index
+          key: index-${{ env.GAME_VERSION }}-latest
+          restore-keys: index-${{ env.GAME_VERSION }}-
+      # The earlier run's results: what it played to a verdict is left out of this plan.
+      - if: inputs.after_run != ''
+        uses: actions/download-artifact@v8
+        with:
+          pattern: results-*
+          path: after
+          run-id: ${{ inputs.after_run }}
+          github-token: ${{ github.token }}
+      # The earlier run's plan, for resume: its replays, with its own after_run and batch applied.
+      - if: inputs.after_run != '' && inputs.resume
+        uses: actions/download-artifact@v8
+        with:
+          name: plan
+          path: resumed
+          run-id: ${{ inputs.after_run }}
+          github-token: ${{ github.token }}
+      - id: plan
+        run: >
+          mkdir -p cache/index &&
+          python tools/parity-data/plan.py --corpus tools/parity-data/corpus/$GAME_VERSION.tsv.gz --index cache/index
+          --set ${{ inputs.set || 'nightly' }} --sample ${{ inputs.sample || '5000' }} --seed ${{ inputs.seed || '1' }} --slots 4
+          --desynced tools/parity-data/desynced/$GAME_VERSION.txt ${{ (inputs.set || 'nightly') == 'nightly' && '--max-shards 40' || '' }}
+          --batch "${{ inputs.batch || '1/1' }}" --budget-minutes "$PLAY_MINUTES" ${{ inputs.after_run != '' && '--after after' || '' }}
+          ${{ inputs.after_run != '' && inputs.resume && '--replays-of resumed/plan.json' || '' }}
+          --out plan.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: plan
+          path: plan.json
+          retention-days: 30
+
+  run:
+    needs: [build, plan]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    # PARITY_RETAIL_KEY is this environment's secret, given to master only. No deployment: the
+    # secret comes without one, and one per shard filled the environment's deployment history.
+    environment:
+      name: parity
+      deployment: false
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    name: run (shard ${{ matrix.shard }})
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: headless
+          path: bin
+      - uses: actions/download-artifact@v8
+        with:
+          name: plan
+      - uses: actions/cache/restore@v6
+        with:
+          path: game
+          key: game-${{ env.GAME_VERSION }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: retail.enc
+          key: retail-${{ vars.PARITY_RETAIL_ID }}
+          fail-on-cache-miss: true
+      # The pack: FAF's game files with the retail archives in fa/gamedata.
+      - env:
+          KEY: ${{ secrets.PARITY_RETAIL_KEY }}
+        run: |
+          KEY="$(printf '%s' "$KEY" | tr -d '[:space:]')"; export KEY
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:KEY -in retail.enc | tar -xJf - -C game
+          rm retail.enc
+          chmod +x bin/headless
+      # A cache entry matches only a restore with the same path lines: these are the prewarm's.
+      - uses: actions/cache/restore@v6
+        with:
+          path: |
+            cache/maps
+            !cache/maps/.partial-*
+          key: maps-${{ env.GAME_VERSION }}-latest
+          restore-keys: maps-${{ env.GAME_VERSION }}-
+      - uses: actions/cache/restore@v6
+        with:
+          path: |
+            cache/m28
+            !cache/m28/.partial-*
+          key: m28-${{ env.GAME_VERSION }}-latest
+          restore-keys: m28-${{ env.GAME_VERSION }}-
+      - if: matrix.bucket >= 0
+        uses: actions/cache/restore@v6
+        with:
+          path: cache/replays
+          key: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-latest
+          restore-keys: replays-${{ env.GAME_VERSION }}-b${{ matrix.bucket }}-
+      - run: >
+          mkdir -p cache/replays cache/maps cache/m28 &&
+          python tools/parity-data/shard.py --plan plan.json --shard ${{ matrix.shard }} --headless bin/headless
+          --pack game --replays cache/replays --maps cache/maps --m28 cache/m28 --work work
+          --out results --minutes "$PLAY_MINUTES" --game-version "$GAME_VERSION"
+          ${{ inputs.oracle_check && '--oracle-check' || '' }}
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: results-${{ matrix.shard }}
+          path: results
+          retention-days: 30
+
+  report:
+    needs: [plan, run]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: plan
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: results-*
+          path: results
+      - if: inputs.after_run != ''
+        uses: actions/download-artifact@v8
+        with:
+          pattern: results-*
+          path: after
+          run-id: ${{ inputs.after_run }}
+          github-token: ${{ github.token }}
+      - run: >
+          python tools/parity-data/report.py --plan plan.json --results results
+          ${{ inputs.after_run != '' && '--after after' || '' }}
+          --expected tools/parity-data/expected/$GAME_VERSION.json --out report --no-fail
+          --title "Replay parity: ${{ inputs.ref || 'master' }}, set ${{ inputs.set || 'nightly' }}${{ inputs.batch && inputs.batch != '1/1' && format(' batch {0}', inputs.batch) || '' }}, game version $GAME_VERSION${{ inputs.after_run != '' && format(', after run {0}', inputs.after_run) || '' }}"
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: report
+          path: report
+          retention-days: 90
+
+  # A desync never fails the run (report --no-fail), so a failed job in the nightly is CI's: a lost
+  # runner, a timeout, a cache or network error. Nightly retry re-runs the failed jobs once this run
+  # has ended, twice at most. tools/release/README.md.
+  retry:
+    needs: [build, plan, run, report]
+    if: failure() && github.event_name == 'schedule' && github.run_attempt < 3
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write  # starts Nightly retry
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run nightly-retry.yml -R "$GITHUB_REPOSITORY" --ref master -f run_id=${{ github.run_id }}
+
+  # A re-run started by Nightly retry ends without starting Nightly release (GitHub starts no
+  # workflow from what the workflow token did), so this run starts it, when the report is clean.
+  release:
+    needs: [run, report]
+    if: github.event_name == 'schedule' && github.run_attempt > 1 && github.triggering_actor == 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write  # starts Nightly release
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: report
+          path: report
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          new=$(jq -r '.regressions | length' report/report.json)
+          if [ "$new" != "0" ]; then
+            echo "$new new failures: no nightly release." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh workflow run nightly-release.yml -R "$GITHUB_REPOSITORY" --ref master -f ref=${{ github.sha }} \
+            -f publish=true -f parity_run=${{ github.run_id }} \
+            -f note="Replay parity passed on attempt ${{ github.run_attempt }}, after Nightly retry re-ran its failed jobs."

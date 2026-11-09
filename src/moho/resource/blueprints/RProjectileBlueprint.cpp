@@ -44,21 +44,6 @@ namespace moho
       return randomStream->FRand(-range, range);
     }
 
-    /**
-     * Address: 0x0051CC40 (FUN_0051CC40)
-     *
-     * What it does:
-     * Lazily resolves and caches RTTI metadata for `RProjectileBlueprint`.
-     */
-    [[nodiscard]] gpg::RType* ResolveRProjectileBlueprintType()
-    {
-      gpg::RType* type = RProjectileBlueprint::sType;
-      if (!type) {
-        type = gpg::LookupRType(typeid(RProjectileBlueprint));
-        RProjectileBlueprint::sType = type;
-      }
-      return type;
-    }
   } // namespace
 
   gpg::RType* RProjectileBlueprint::sType = nullptr;
@@ -155,7 +140,7 @@ namespace moho
    */
   gpg::RType* RProjectileBlueprint::GetClass() const
   {
-    return ResolveRProjectileBlueprintType();
+    return gpg::RTypeOf<RProjectileBlueprint>();
   }
 
   /**
@@ -167,10 +152,7 @@ namespace moho
    */
   gpg::RRef RProjectileBlueprint::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -185,7 +167,7 @@ namespace moho
   {
     REntityBlueprint::OnInitBlueprint();
 
-    msvc8::string completedMeshPath = RES_CompletePath(Display.MeshBlueprint.name.c_str(), mSource.c_str());
+    fa::string completedMeshPath = RES_CompletePath(Display.MeshBlueprint.name.c_str(), mSource.c_str());
     gpg::STR_NormalizeFilenameLowerSlash(completedMeshPath);
     Display.MeshBlueprint.name.assign_owned(completedMeshPath.view());
   }
@@ -313,7 +295,7 @@ namespace moho
     RRuleGameRules* rules = nullptr;
     const gpg::RRef owner{};
     archive.ReadPointer(&rules, &owner);
-    msvc8::string id;
+    fa::string id;
     archive.ReadString(&id);
     RResId resId{};
     gpg::STR_CopyFilename(&resId.name, &id);

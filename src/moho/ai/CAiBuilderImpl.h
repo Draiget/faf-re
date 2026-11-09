@@ -27,11 +27,11 @@ namespace moho
    * The rebuild queue: encoded cell position (`x * 10000 + z`) -> the blueprint
    * to rebuild there.
    *
-   * IDA types the emissions `msvc8::map<uint, RUnitBlueprint*>`; the node is
+   * IDA types the emissions `fa::map<uint, RUnitBlueprint*>`; the node is
    * 0x18 with the key at `node+0x0C`, the blueprint at `node+0x10` and
    * colour/nil at `+0x14`/`+0x15`.
    */
-  using SBuilderRebuildMap = msvc8::map<std::uint32_t, const RUnitBlueprint*>;
+  using SBuilderRebuildMap = fa::map<std::uint32_t, const RUnitBlueprint*>;
 
   /**
    * VFTABLE: 0x00E1B73C
@@ -143,7 +143,7 @@ namespace moho
      * VFTable SLOT: 8
      */
     [[nodiscard]]
-    msvc8::vector<WeakPtr<CUnitCommand>>& BuilderGetFactoryCommandQueue() override;
+    fa::vector<WeakPtr<CUnitCommand>>& BuilderGetFactoryCommandQueue() override;
 
     /**
      * Address: 0x0059F480 (FUN_0059F480)
@@ -259,7 +259,7 @@ namespace moho
     std::uint8_t mPad0B;                                    // +0x0B
     Wm3::Vector3f mAimTarget;                               // +0x0C
     SBuilderRebuildMap mRebuildStructures;                  // +0x18
-    msvc8::vector<WeakPtr<CUnitCommand>> mFactoryCommands;  // +0x24
+    fa::vector<WeakPtr<CUnitCommand>> mFactoryCommands;  // +0x24
   };
 
 

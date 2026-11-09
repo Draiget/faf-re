@@ -34,7 +34,7 @@ namespace
    */
   wxBitmap LoadMarkerBitmap(const char* const mountedPath)
   {
-    msvc8::string diskPath;
+    fa::string diskPath;
     (void)moho::DISK_GetVFS()->FindFile(&diskPath, mountedPath, nullptr);
     return wxBitmap(gpg::STR_Utf8ToWide(diskPath.c_str()).c_str(), wxBITMAP_TYPE_BMP);
   }
@@ -90,14 +90,14 @@ moho::ScrFileCtrl::~ScrFileCtrl() = default;
  * the loop keeps appending empty lines. A last line with no newline is
  * dropped. Both as shipped.
  */
-bool moho::ScrFileCtrl::Load(const msvc8::string& fileName)
+bool moho::ScrFileCtrl::Load(const fa::string& fileName)
 {
   Clear();
   if (fileName.empty()) {
     return false;
   }
 
-  msvc8::string diskPath;
+  fa::string diskPath;
   (void)DISK_GetVFS()->FindFile(&diskPath, fileName.c_str(), nullptr);
   if (diskPath.empty()) {
     return false;
@@ -135,12 +135,12 @@ void moho::ScrFileCtrl::Clear()
 /**
  * Address: 0x004C2A40 (FUN_004C2A40)
  */
-void moho::ScrFileCtrl::FindFirst(const msvc8::string& text)
+void moho::ScrFileCtrl::FindFirst(const fa::string& text)
 {
   const int lineCount = static_cast<int>(mLines.size());
   bool found = false;
   for (int index = 0; !found && index < lineCount; ++index) {
-    found = mLines[index].mSourceText.find(text.c_str(), 0, text.size()) != msvc8::string::npos;
+    found = mLines[index].mSourceText.find(text.c_str(), 0, text.size()) != fa::string::npos;
     if (found) {
       SetItemState(index, kFoundLineState, kFoundLineState);
       EnsureVisible(index);
@@ -151,7 +151,7 @@ void moho::ScrFileCtrl::FindFirst(const msvc8::string& text)
 /**
  * Address: 0x004C2AE0 (FUN_004C2AE0)
  */
-void moho::ScrFileCtrl::FindNext(const msvc8::string& text)
+void moho::ScrFileCtrl::FindNext(const fa::string& text)
 {
   const long selected = GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
   if (selected < 0) {
@@ -161,7 +161,7 @@ void moho::ScrFileCtrl::FindNext(const msvc8::string& text)
   const int lineCount = static_cast<int>(mLines.size());
   bool found = false;
   for (int index = selected + 1; !found && index < lineCount; ++index) {
-    found = mLines[index].mSourceText.find(text.c_str(), 0, text.size()) != msvc8::string::npos;
+    found = mLines[index].mSourceText.find(text.c_str(), 0, text.size()) != fa::string::npos;
     if (found) {
       SetItemState(index, kFoundLineState, kFoundLineState);
       EnsureVisible(index);
@@ -172,7 +172,7 @@ void moho::ScrFileCtrl::FindNext(const msvc8::string& text)
 /**
  * Address: 0x004C2B90 (FUN_004C2B90)
  */
-void moho::ScrFileCtrl::FindPrevious(const msvc8::string& text)
+void moho::ScrFileCtrl::FindPrevious(const fa::string& text)
 {
   const long selected = GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
   if (selected < 0) {
@@ -181,7 +181,7 @@ void moho::ScrFileCtrl::FindPrevious(const msvc8::string& text)
 
   bool found = false;
   for (int index = selected - 1; !found && index > -1; --index) {
-    found = mLines[index].mSourceText.find(text.c_str(), 0, text.size()) != msvc8::string::npos;
+    found = mLines[index].mSourceText.find(text.c_str(), 0, text.size()) != fa::string::npos;
     if (found) {
       SetItemState(index, kFoundLineState, kFoundLineState);
       EnsureVisible(index);
@@ -398,7 +398,7 @@ void moho::ScrFileCtrl::OnSize(wxSizeEvent& event)
  */
 void moho::ScrFileCtrl::LoadBreakpoints()
 {
-  msvc8::vector<ScrBreakpoint> breakpoints;
+  fa::vector<ScrBreakpoint> breakpoints;
   SCR_EnumerateBreakpoints(mSourcePath, breakpoints);
   for (const ScrBreakpoint& breakpoint : breakpoints) {
     const int index = breakpoint.line - 1;

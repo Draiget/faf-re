@@ -69,6 +69,10 @@ namespace moho
     );
 
     boost::shared_ptr<RScmResource> resource;
-    return *ConstructSharedRScmResourceFromRaw(&resource, new RScmResource(path, scmFile));
+    (void)ConstructSharedRScmResourceFromRaw(&resource, new RScmResource(path, scmFile));
+    if (!RScmResource::KeepGeometry()) {
+      resource->DropGeometry();
+    }
+    return resource;
   }
 } // namespace moho

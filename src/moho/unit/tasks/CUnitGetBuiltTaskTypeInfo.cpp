@@ -19,24 +19,6 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitGetBuiltTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitGetBuiltTask));
-    }
-    return cached;
-  }
 } // namespace
 
 namespace moho
@@ -96,15 +78,7 @@ namespace moho
    */
   void __stdcall CUnitGetBuiltTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedCCommandTaskType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
 
   /**
@@ -117,7 +91,7 @@ namespace moho
   gpg::RRef CUnitGetBuiltTaskTypeInfo::NewRef()
   {
     auto* const task = new (std::nothrow) CUnitGetBuiltTask();
-    return gpg::RRef{task, CachedCUnitGetBuiltTaskType()};
+    return gpg::RRef{task, gpg::RTypeOf<moho::CUnitGetBuiltTask>()};
   }
 
   /**
@@ -129,11 +103,8 @@ namespace moho
    */
   gpg::RRef CUnitGetBuiltTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitGetBuiltTask*>(objectStorage);
-    if (task) {
-      new (task) CUnitGetBuiltTask();
-    }
-    return gpg::RRef{task, CachedCUnitGetBuiltTaskType()};
+    auto* const task = gpg::ConstructInStorage<CUnitGetBuiltTask>(objectStorage);
+    return gpg::RRef{task, gpg::RTypeOf<moho::CUnitGetBuiltTask>()};
   }
 
   /**

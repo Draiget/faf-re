@@ -165,39 +165,8 @@ namespace
   // Address: 0x010B43D0 -- process-global `EntityConstruct` singleton.
   moho::EntityConstruct gEntityConstruct;
 
-  gpg::RType* gWeakPtrEntityType = nullptr;
-  gpg::RType* gVTransformType = nullptr;
   gpg::RType* gCScriptObjectType = nullptr;
   gpg::RType* gCTaskType = nullptr;
-
-  template <typename TObject>
-  [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSEntAttachInfoType()
-  {
-    return ResolveCachedType<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolvePositionHistoryType()
-  {
-    return ResolveCachedType<moho::PositionHistory>(moho::PositionHistory::sType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveWeakPtrEntityType()
-  {
-    return ResolveCachedType<moho::WeakPtr<moho::Entity>>(gWeakPtrEntityType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVTransformType()
-  {
-    return ResolveCachedType<moho::VTransform>(gVTransformType);
-  }
 
   struct ScaledDirectionLane
   {
@@ -324,7 +293,7 @@ namespace
    * list, or an index past its end.
    *
    * The owner (`esi`) is the Sim: the body reads a 4-byte-element vector whose
-   * `_Myfirst`/`_Mylast` sit at +0x910/+0x914, i.e. `msvc8::vector<CArmyImpl*>
+   * `_Myfirst`/`_Mylast` sit at +0x910/+0x914, i.e. `fa::vector<CArmyImpl*>
    * mArmiesList` at +0x90C behind its proxy word, and it decodes the index the
    * same way as `CInfluenceMap::ResolveSourceArmy`
    * (`sim->mArmiesList[(id >> 20) & 0xFF]`).
@@ -345,7 +314,7 @@ namespace
       return nullptr;
     }
 
-    const msvc8::vector<moho::CArmyImpl*>& armies = sim->mArmiesList;
+    const fa::vector<moho::CArmyImpl*>& armies = sim->mArmiesList;
     if (armies.begin() == nullptr) {
       return nullptr;
     }
@@ -389,7 +358,7 @@ namespace
     GPG_ASSERT(!owner->initFinished_);
     gpg::RField field{};
     field.mName = "PendingCoords";
-    field.mType = ResolveVTransformType();
+    field.mType = gpg::RTypeOf<moho::VTransform>();
     field.mOffset = offsetof(moho::Entity, mPendingTransform);
     owner->fields_.push_back(field);
     return &owner->fields_.back();
@@ -549,12 +518,12 @@ namespace moho
 
     const gpg::RRef nullOwner{};
 
-    archive->Read(ResolveWeakPtrEntityType(), &mAttachTargetWeak, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mAttachTargetWeak, nullOwner);
     archive->ReadInt(&mParentBoneIndex);
     archive->ReadInt(&mChildBoneIndex);
 
     // Binary stores this 0x1C region through `VTransform` RTTI lanes.
-    archive->Read(ResolveVTransformType(), &mRelativeTransform, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::VTransform>(), &mRelativeTransform, nullOwner);
   }
 
   /**
@@ -569,12 +538,12 @@ namespace moho
 
     const gpg::RRef nullOwner{};
 
-    archive->Write(ResolveWeakPtrEntityType(), &mAttachTargetWeak, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mAttachTargetWeak, nullOwner);
     archive->WriteInt(mParentBoneIndex);
     archive->WriteInt(mChildBoneIndex);
 
     // Binary stores this 0x1C region through `VTransform` RTTI lanes.
-    archive->Write(ResolveVTransformType(), &mRelativeTransform, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::VTransform>(), &mRelativeTransform, nullOwner);
   }
 
   /**
@@ -588,7 +557,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    gpg::RType* const transformType = ResolveVTransformType();
+    gpg::RType* const transformType = gpg::RTypeOf<moho::VTransform>();
 
     for (VTransform& sample : samples) {
       archive->Read(transformType, &sample, nullOwner);
@@ -607,7 +576,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    gpg::RType* const transformType = ResolveVTransformType();
+    gpg::RType* const transformType = gpg::RTypeOf<moho::VTransform>();
 
     for (const VTransform& sample : samples) {
       archive->Write(transformType, &sample, nullOwner);
@@ -669,12 +638,7 @@ namespace moho
    */
   void DestroyPositionHistoryTypeInfoBody(PositionHistoryTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**
@@ -740,7 +704,7 @@ namespace moho
    */
   void EntityTypeInfo::AddBase_CScriptObjectVariant1(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = ResolveCachedType<CScriptObject>(gCScriptObjectType);
+    gpg::RType* const baseType = gpg::CachedLookup<CScriptObject>(gCScriptObjectType);
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(baseType != nullptr);
     if (!typeInfo || !baseType) {
@@ -755,7 +719,7 @@ namespace moho
    */
   void EntityTypeInfo::AddBase_CTaskVariant1(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = ResolveCachedType<CTask>(gCTaskType);
+    gpg::RType* const baseType = gpg::CachedLookup<CTask>(gCTaskType);
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(baseType != nullptr);
     if (!typeInfo || !baseType) {

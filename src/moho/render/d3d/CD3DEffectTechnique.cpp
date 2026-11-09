@@ -3,11 +3,16 @@
 #include <cstring>
 #include <cstdlib>
 #include <exception>
+#include <mutex>
 #include <new>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <type_traits>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
@@ -26,7 +31,7 @@
 
 namespace moho
 {
-  msvc8::string GetEngineVersion();
+  fa::string GetEngineVersion();
 
   namespace
   {
@@ -47,6 +52,59 @@ namespace moho
     [[nodiscard]] CD3DEffect::Technique& MutableTechnique(const TechniqueSet::iterator it) noexcept
     {
       return const_cast<CD3DEffect::Technique&>(*it);
+    }
+
+    /**
+     * FAF addition, not in the shipped binary (issue #307).
+     *
+     * The technique MSDF text draws with, appended to `primbatcher.fx`, which is FAF's game data. It
+     * uses that file's vertex shader, sampler and variables. The distance range in screen pixels comes
+     * as a constant rather than from `fwidth`, so it stays within `ps_2_0` for Direct3D 9.
+     */
+    constexpr const char kMsdfTechniqueSource[] = R"fx(
+
+float MsdfPixelRange = 1.0;
+
+float4 MsdfTextPS(
+    float4 Pos : POSITION,
+    float4 Diff : COLOR0,
+    float2 Tex1 : TEXCOORD0) : COLOR
+{
+    float3 field = tex2D(LinearSampler, Tex1).rgb;
+    float median = max(min(field.r, field.g), min(max(field.r, field.g), field.b));
+    float4 color = Diff;
+    color.a *= saturate(MsdfPixelRange * (median - 0.5) + 0.5) * AlphaMultiplier;
+    return color;
+}
+
+technique TMsdfText
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_SrcAlpha_InvSrcAlpha_Write_RGB )
+        DepthState( Depth_Disable )
+        RasterizerState( Rasterizer_Cull_None )
+
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0;
+        AlphaFunc = Greater;
+#endif
+
+        VertexShader = compile vs_1_1 PrimBatcherVS();
+        PixelShader = compile ps_2_0 MsdfTextPS();
+    }
+}
+)fx";
+
+    [[nodiscard]] gpg::MemBuffer<char> AppendMsdfTechnique(const gpg::MemBuffer<char>& source)
+    {
+      const std::size_t sourceBytes = source.Size();
+      const std::size_t tailBytes = sizeof(kMsdfTechniqueSource) - 1u;
+      gpg::MemBuffer<char> merged = gpg::AllocMemBuffer(sourceBytes + tailBytes);
+      std::memcpy(merged.data(), source.data(), sourceBytes);
+      std::memcpy(merged.data() + sourceBytes, kMsdfTechniqueSource, tailBytes);
+      return merged;
     }
 
     /**
@@ -91,7 +149,7 @@ namespace moho
      * (FUN_0042BB80) - so capacity cannot distinguish a defined lane from an
      * untouched one. Length can, and length is what the binary reads.
      *
-     * The word is lane+0x18. mName sits at lane+0x04 and msvc8::string keeps
+     * The word is lane+0x18. mName sits at lane+0x04 and fa::string keeps
      * its allocator cookie at +0x00, so the layout is bx at lane+0x08,
      * mySize at lane+0x18, myRes at lane+0x1C - which is exactly what the
      * Implementation constructor stores (`mov [esi+1Ch], 0Fh` for the
@@ -150,6 +208,59 @@ namespace moho
       return graphics_Fidelity;
     }
 
+    /**
+     * Engine addition (ren_TechniqueMemo): the techniques each effect's `SetTechnique` resolved. A lookup
+     * built a whole `Technique` (three lanes, each with a string and two maps) as its search key, then had
+     * the gal effect search its techniques by name and allocate a new technique object, for every batch of
+     * every pass. An effect's entry holds its gal effect and the fidelity it was resolved at, and is dropped
+     * when either changes, when the effect loads a file and when it is destroyed - before its gal effect is
+     * released, so no technique outlives the effect it came from. Only successful resolutions are kept, so
+     * an invalid fidelity definition still logs at each call.
+     */
+    bool ren_TechniqueMemo = true;
+    TConVar<bool> gTConVar_ren_TechniqueMemo(
+      "ren_TechniqueMemo",
+      "An effect finds a technique it selected before in a small table (1, the default), or looks it up by name each "
+      "time (0). Read at each selection.",
+      &ren_TechniqueMemo
+    );
+
+    struct EffectTechniqueMemo
+    {
+      static constexpr std::size_t kTechniques = 24U;
+      const gpg::gal::Effect* galEffect = nullptr;
+      std::int32_t fidelity = 0;
+      std::vector<std::pair<std::string, boost::shared_ptr<gpg::gal::EffectTechnique>>> techniques;
+    };
+
+    struct TechniqueMemoTable
+    {
+      std::mutex mutex;
+      std::unordered_map<const CD3DEffect*, EffectTechniqueMemo> effects;
+    };
+
+    [[nodiscard]] TechniqueMemoTable& GetTechniqueMemoTable()
+    {
+      // Never destroyed: an effect still alive at exit would otherwise have its techniques released after
+      // the device is gone.
+      static TechniqueMemoTable* const table = new TechniqueMemoTable();
+      return *table;
+    }
+
+    void ForgetEffectTechniques(const CD3DEffect* const effect)
+    {
+      TechniqueMemoTable& table = GetTechniqueMemoTable();
+      EffectTechniqueMemo dropped;
+      {
+        const std::lock_guard<std::mutex> lock(table.mutex);
+        const auto found = table.effects.find(effect);
+        if (found == table.effects.end()) {
+          return;
+        }
+        dropped = std::move(found->second);
+        table.effects.erase(found);
+      }
+    }
   } // namespace
 
   /**
@@ -168,9 +279,9 @@ namespace moho
    * What it does:
    * Initializes one implementation lane and copies one lane-name string.
    */
-  CD3DEffect::Technique::Implementation::Implementation(const msvc8::string& implementationName)
+  CD3DEffect::Technique::Implementation::Implementation(const fa::string& implementationName)
   {
-    mName.assign(implementationName, 0U, msvc8::string::npos);
+    mName.assign(implementationName, 0U, fa::string::npos);
   }
 
   /**
@@ -197,7 +308,7 @@ namespace moho
     const Implementation& other
   )
   {
-    mName.assign(other.mName, 0U, msvc8::string::npos);
+    mName.assign(other.mName, 0U, fa::string::npos);
     mIntegerAnnotations = other.mIntegerAnnotations;
     mStringAnnotations = other.mStringAnnotations;
     return *this;
@@ -210,7 +321,7 @@ namespace moho
    * Looks up one integer annotation by key and writes the found value.
    */
   bool CD3DEffect::Technique::Implementation::TryGetIntegerAnnotation(
-    const msvc8::string& annotationName,
+    const fa::string& annotationName,
     std::int32_t* const outValue
   ) const
   {
@@ -230,8 +341,8 @@ namespace moho
    * Looks up one string annotation by key and copies the stored value.
    */
   bool CD3DEffect::Technique::Implementation::TryGetStringAnnotation(
-    const msvc8::string& annotationName,
-    msvc8::string* const outValue
+    const fa::string& annotationName,
+    fa::string* const outValue
   ) const
   {
     const auto node = mStringAnnotations.find(annotationName);
@@ -239,7 +350,7 @@ namespace moho
       return false;
     }
 
-    outValue->assign(node->second, 0U, msvc8::string::npos);
+    outValue->assign(node->second, 0U, fa::string::npos);
     return true;
   }
 
@@ -254,9 +365,9 @@ namespace moho
    * What it does:
    * Initializes one technique with name text and three implementation lanes.
    */
-  CD3DEffect::Technique::Technique(const msvc8::string& techniqueName)
+  CD3DEffect::Technique::Technique(const fa::string& techniqueName)
   {
-    mName.assign(techniqueName, 0U, msvc8::string::npos);
+    mName.assign(techniqueName, 0U, fa::string::npos);
 
     Implementation* const lanes = GetImplementationLanes();
     std::uint32_t constructedCount = 0;
@@ -267,7 +378,7 @@ namespace moho
     } catch (...) {
       while (constructedCount > 0U) {
         --constructedCount;
-        lanes[constructedCount].~Implementation();
+        lanes[constructedCount].Implementation::~Implementation();
       }
       throw;
     }
@@ -284,7 +395,7 @@ namespace moho
   {
     Implementation* const lanes = GetImplementationLanes();
     for (std::int32_t index = 2; index >= 0; --index) {
-      lanes[index].~Implementation();
+      lanes[index].Implementation::~Implementation();
     }
 
     mName.tidy(true, 0U);
@@ -376,6 +487,7 @@ namespace moho
     // member with a destructor of its own (`WeakObject`). Until that head is
     // modelled, the walk stays in this body and the handles are dropped here
     // to keep them ahead of it.
+    ForgetEffectTechniques(this); // engine addition (ren_TechniqueMemo): before the gal effect goes
     mCurrentTechnique.reset();
     mEffect.reset();
 
@@ -398,13 +510,13 @@ namespace moho
    * What it does:
    * Parses one sample-count argument and forwards it to the active D3D device.
    */
-  void CD3DEffect::CON_d3d_AntiAliasingSamples(const msvc8::vector<msvc8::string>& args)
+  void CD3DEffect::CON_d3d_AntiAliasingSamples(const fa::vector<fa::string>& args)
   {
     if (args.size() != 2U) {
       return;
     }
 
-    const msvc8::string* const sampleCountText = ConCommandArg(args, 1U);
+    const fa::string* const sampleCountText = ConCommandArg(args, 1U);
     if (sampleCountText == nullptr) {
       return;
     }
@@ -427,7 +539,8 @@ namespace moho
    */
   bool CD3DEffect::InitEffectFromFile(const char* const effectFilePath)
   {
-    const msvc8::string engineVersion = GetEngineVersion();
+    const fa::string engineVersion = GetEngineVersion();
+    ForgetEffectTechniques(this); // engine addition (ren_TechniqueMemo): the techniques belong to the old effect
     mEffect.reset();
 
     try {
@@ -444,13 +557,13 @@ namespace moho
         return false;
       }
 
-      msvc8::string compatPath{};
+      fa::string compatPath{};
       (void)waitHandleSet->mHandle->FindFile(&compatPath, compatResourcePath, nullptr);
       const gpg::MemBuffer<const char> compatStateBuffer = DISK_MemoryMapFile(compatPath.c_str());
-      const msvc8::string cacheDirectory = USER_GetAppCacheDir();
-      const msvc8::string effectBaseName = FILE_Base(effectFilePath, true);
+      const fa::string cacheDirectory = USER_GetAppCacheDir();
+      const fa::string effectBaseName = FILE_Base(effectFilePath, true);
 
-      mName.assign(effectBaseName, 0U, msvc8::string::npos);
+      mName.assign(effectBaseName, 0U, fa::string::npos);
       mFile.assign(effectFilePath, std::char_traits<char>::length(effectFilePath));
 
       SDiskFileInfo sourceInfo{};
@@ -472,22 +585,23 @@ namespace moho
       // Builds the effect, from its compiled copy in the cache when that is at
       // least as new as the source. FAF: `boneTexture` compiles the variant
       // with FAF_BONE_TEXTURE defined (see WantsBoneTextureVariant); it turns
-      // into different shaders, so it is cached under a name of its own.
-      const auto createEffect = [&](const bool boneTexture) {
-        const msvc8::string cachePath =
-          cacheDirectory + "/" + mName + (boneTexture ? ".bonetex." : ".") + engineVersion;
+      // into different shaders, so it is cached under a name of its own. So
+      // does `msdfText`, the source with the MSDF technique appended.
+      const auto createEffect = [&](const bool boneTexture, const bool msdfText = false) {
+        const char* const variant = boneTexture ? ".bonetex." : (msdfText ? ".msdf." : ".");
+        const fa::string cachePath = cacheDirectory + "/" + mName + variant + engineVersion;
         SDiskFileInfo cacheInfo{};
         bool useCachePayload = false;
         if (waitHandleSet->GetFileInfo(cachePath.c_str(), &cacheInfo, false)) {
           useCachePayload = IsDiskFileInfoNotOlder(cacheInfo, sourceInfo);
         }
 
-        msvc8::vector<gpg::gal::EffectMacro> effectMacros{};
+        fa::vector<gpg::gal::EffectMacro> effectMacros{};
         if (boneTexture) {
           effectMacros.push_back(gpg::gal::EffectMacro("FAF_BONE_TEXTURE", "1"));
         }
         const gpg::gal::EffectContext context(
-          useCachePayload, mFile.c_str(), cachePath.c_str(), mergedBuffer, effectMacros
+          useCachePayload, mFile.c_str(), cachePath.c_str(), msdfText ? AppendMsdfTechnique(mergedBuffer) : mergedBuffer, effectMacros
         );
         mEffect = gpg::gal::Effect::Create(context);
       };
@@ -502,19 +616,30 @@ namespace moho
           mEffect.reset();
         }
       }
+      // The MSDF technique goes on the end of primbatcher.fx, which is FAF's
+      // game data and which every renderer compiles from this same buffer. If
+      // it doesn't compile against that file, text stays on the old path.
+      if (!mEffect && std::strcmp(mName.c_str(), "primbatcher") == 0) {
+        try {
+          createEffect(false, true);
+        } catch (const std::exception& exception) {
+          gpg::Warnf("%s: %s; building it without MSDF text", effectFilePath, exception.what());
+          mEffect.reset();
+        }
+      }
       if (!mEffect) {
         createEffect(false);
       }
 
       mTechniques.clear();
 
-      msvc8::vector<msvc8::string> techniqueImplementationNames{};
+      fa::vector<fa::string> techniqueImplementationNames{};
       EnumerateValidTechniques(techniqueImplementationNames);
-      for (const msvc8::string& implementationName : techniqueImplementationNames) {
-        msvc8::string abstractTechniqueName{};
-        const msvc8::string abstractTechniqueToken("abstractTechnique", 17U);
+      for (const fa::string& implementationName : techniqueImplementationNames) {
+        fa::string abstractTechniqueName{};
+        const fa::string abstractTechniqueToken("abstractTechnique", 17U);
         if (!GetImplAnnotation(&abstractTechniqueName, implementationName, abstractTechniqueToken)) {
-          abstractTechniqueName.assign(implementationName, 0U, msvc8::string::npos);
+          abstractTechniqueName.assign(implementationName, 0U, fa::string::npos);
         }
 
         const TechniqueSet::iterator definition = mTechniques.emplace(abstractTechniqueName).first;
@@ -537,7 +662,7 @@ namespace moho
         }
 
         std::int32_t fidelityIndex = -1;
-        const msvc8::string fidelityToken("fidelity", 8U);
+        const fa::string fidelityToken("fidelity", 8U);
         (void)GetImplAnnotation(&fidelityIndex, implementationName, fidelityToken);
         if (fidelityIndex < 0 || fidelityIndex > 2) {
           gpg::Warnf(
@@ -590,9 +715,9 @@ namespace moho
    * What it does:
    * Queries the current effect for valid techniques and appends their names.
    */
-  void CD3DEffect::EnumerateValidTechniques(msvc8::vector<msvc8::string>& outTechniqueNames)
+  void CD3DEffect::EnumerateValidTechniques(fa::vector<fa::string>& outTechniqueNames)
   {
-    msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>> techniques{};
+    fa::vector<boost::shared_ptr<gpg::gal::EffectTechnique>> techniques{};
     mEffect->GetTechniques(techniques);
 
     for (const boost::shared_ptr<gpg::gal::EffectTechnique>& technique : techniques) {
@@ -609,7 +734,24 @@ namespace moho
    */
   void CD3DEffect::SetTechnique(const char* const techniqueName)
   {
-    const msvc8::string lookupName(techniqueName, std::char_traits<char>::length(techniqueName));
+    // Engine change (ren_TechniqueMemo): a technique this effect selected before is found without building the
+    // search key or a new gal technique.
+    const std::int32_t memoFidelity = ResolveGraphicsFidelityIndex();
+    if (ren_TechniqueMemo && mEffect != nullptr) {
+      TechniqueMemoTable& table = GetTechniqueMemoTable();
+      const std::lock_guard<std::mutex> lock(table.mutex);
+      const auto found = table.effects.find(this);
+      if (found != table.effects.end() && found->second.galEffect == mEffect.get() && found->second.fidelity == memoFidelity) {
+        for (const auto& [name, technique] : found->second.techniques) {
+          if (name == techniqueName) {
+            mCurrentTechnique = technique;
+            return;
+          }
+        }
+      }
+    }
+
+    const fa::string lookupName(techniqueName, std::char_traits<char>::length(techniqueName));
     const Technique lookupTechnique(lookupName);
     const TechniqueSet::iterator definition = GetFidelityDefinitions(lookupTechnique);
 
@@ -636,6 +778,22 @@ namespace moho
     }
 
     mCurrentTechnique = mEffect->GetTechnique(selectedLane.mName.c_str());
+
+    if (ren_TechniqueMemo && mEffect != nullptr && mCurrentTechnique != nullptr) {
+      TechniqueMemoTable& table = GetTechniqueMemoTable();
+      EffectTechniqueMemo stale;
+      const std::lock_guard<std::mutex> lock(table.mutex);
+      EffectTechniqueMemo& memo = table.effects[this];
+      if (memo.galEffect != mEffect.get() || memo.fidelity != memoFidelity) {
+        stale = std::move(memo);
+        memo = EffectTechniqueMemo{};
+        memo.galEffect = mEffect.get();
+        memo.fidelity = memoFidelity;
+      }
+      if (memo.techniques.size() < EffectTechniqueMemo::kTechniques) {
+        memo.techniques.emplace_back(techniqueName, mCurrentTechnique);
+      }
+    }
   }
 
   /**
@@ -647,8 +805,8 @@ namespace moho
    */
   bool CD3DEffect::GetImplAnnotation(
     std::int32_t* const outValue,
-    const msvc8::string& implementationName,
-    const msvc8::string& annotationName
+    const fa::string& implementationName,
+    const fa::string& annotationName
   )
   {
     const boost::shared_ptr<gpg::gal::EffectTechnique> technique = mEffect->GetTechnique(implementationName.c_str());
@@ -667,8 +825,8 @@ namespace moho
    * resolving from implementation annotation when cache is missing.
    */
   std::int32_t CD3DEffect::GetIntegerAnnotation(
-    const msvc8::string& techniqueName,
-    const msvc8::string& annotationName,
+    const fa::string& techniqueName,
+    const fa::string& annotationName,
     const std::int32_t defaultValue
   )
   {
@@ -705,9 +863,9 @@ namespace moho
    * Reads one string annotation from one implementation technique lane.
    */
   bool CD3DEffect::GetImplAnnotation(
-    msvc8::string* const outValue,
-    const msvc8::string& implementationName,
-    const msvc8::string& annotationName
+    fa::string* const outValue,
+    const fa::string& implementationName,
+    const fa::string& annotationName
   )
   {
     const boost::shared_ptr<gpg::gal::EffectTechnique> technique = mEffect->GetTechnique(implementationName.c_str());
@@ -725,14 +883,14 @@ namespace moho
    * Returns one string annotation for the selected technique/fidelity lane,
    * resolving from implementation annotation when cache is missing.
    */
-  msvc8::string CD3DEffect::GetStringAnnotation(
-    const msvc8::string& techniqueName,
-    const msvc8::string& annotationName,
-    const msvc8::string& defaultValue
+  fa::string CD3DEffect::GetStringAnnotation(
+    const fa::string& techniqueName,
+    const fa::string& annotationName,
+    const fa::string& defaultValue
   )
   {
-    msvc8::string resolvedValue{};
-    resolvedValue.assign(defaultValue, 0U, msvc8::string::npos);
+    fa::string resolvedValue{};
+    resolvedValue.assign(defaultValue, 0U, fa::string::npos);
 
     if (!mEffect) {
       gpg::Warnf("attempt to retrieve annotation from invalid effect");

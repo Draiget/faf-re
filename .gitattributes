@@ -2,3 +2,11 @@
 # target files have, while headers and LF targets do not. core.autocrlf would
 # normalise that away and the patches would only apply inside this work tree.
 dependencies/patches/*.patch -text
+
+# The Linux build's stored profile, and the script that records it on Linux.
+cmake/pgo/*.profdata binary
+tools/pgo/*.sh text eol=lf
+
+# Stored call hashes (tests/replay_sets): binary, and the list keeps its LF.
+tests/replay_sets/*.sets binary
+tests/replay_sets/*.tsv text eol=lf

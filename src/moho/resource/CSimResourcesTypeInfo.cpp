@@ -29,12 +29,7 @@ namespace
    */
   [[maybe_unused]] void cleanup_CSimResourcesTypeInfoRTypeBase(moho::CSimResourcesTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = msvc8::vector<gpg::RField>{};
-    typeInfo->bases_ = msvc8::vector<gpg::RField>{};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**
@@ -80,15 +75,6 @@ namespace
     return out;
   }
 
-  [[nodiscard]] gpg::RType* ResolveResourceDepositVectorType()
-  {
-    static gpg::RType* sResourceDepositVectorType = nullptr;
-    if (sResourceDepositVectorType == nullptr) {
-      sResourceDepositVectorType = gpg::LookupRType(typeid(msvc8::vector<moho::ResourceDeposit>));
-    }
-    return sResourceDepositVectorType;
-  }
-
   /**
    * Address: 0x00548840 (FUN_00548840)
    *
@@ -101,7 +87,7 @@ namespace
     moho::CSimResources* const object
   )
   {
-    gpg::RType* const vectorType = ResolveResourceDepositVectorType();
+    gpg::RType* const vectorType = gpg::RTypeOf<fa::vector<moho::ResourceDeposit>>();
     gpg::RRef ownerRef{};
     archive->Read(vectorType, &object->deposits_, ownerRef);
   }
@@ -118,7 +104,7 @@ namespace
     moho::CSimResources* const object
   )
   {
-    gpg::RType* const vectorType = ResolveResourceDepositVectorType();
+    gpg::RType* const vectorType = gpg::RTypeOf<fa::vector<moho::ResourceDeposit>>();
     gpg::RRef ownerRef{};
     archive->Write(vectorType, &object->deposits_, ownerRef);
   }

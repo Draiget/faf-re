@@ -26,45 +26,16 @@ namespace
    * Constructs and preregisters static RTTI descriptor storage for
    * `moho::CUnitReclaimTask`.
    */
-  [[nodiscard]] gpg::RType* construct_CUnitReclaimTaskTypeInfo()
+  [[maybe_unused]] [[nodiscard]] gpg::RType* construct_CUnitReclaimTaskTypeInfo()
   {
     return AcquireCUnitReclaimTaskTypeInfo();
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitReclaimTaskType()
-  {
-    gpg::RType* type = moho::CUnitReclaimTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitReclaimTask));
-      moho::CUnitReclaimTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedListenerECommandEventType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Listener<moho::ECommandEvent>));
-    }
-    return cached;
   }
 
   [[nodiscard]] gpg::RRef MakeCUnitReclaimTaskRef(moho::CUnitReclaimTask* const object)
   {
     gpg::RRef out{};
     out.mObj = object;
-    out.mType = CachedCUnitReclaimTaskType();
+    out.mType = gpg::RTypeOf<moho::CUnitReclaimTask>();
     gpg::RRef_CUnitReclaimTask(&out, object);
     return out;
   }
@@ -141,15 +112,7 @@ namespace moho
    */
   void __stdcall CUnitReclaimTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedCCommandTaskType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
 
   /**
@@ -157,15 +120,7 @@ namespace moho
    */
   void __stdcall CUnitReclaimTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedListenerECommandEventType();
-
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::BaseSubobjectOffset<CUnitReclaimTask, Listener<ECommandEvent>>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(typeInfo, gpg::BaseSubobjectOffset<CUnitReclaimTask, Listener<ECommandEvent>>());
   }
 
   /**
@@ -182,10 +137,7 @@ namespace moho
    */
   gpg::RRef CUnitReclaimTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<moho::CUnitReclaimTask*>(objectStorage);
-    if (object) {
-      new (object) moho::CUnitReclaimTask();
-    }
+    auto* const object = gpg::ConstructInStorage<moho::CUnitReclaimTask>(objectStorage);
 
     return MakeCUnitReclaimTaskRef(reinterpret_cast<CUnitReclaimTask*>(object));
   }

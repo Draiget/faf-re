@@ -1,4 +1,5 @@
 #include "CAnimationManipulator.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 #include <algorithm>
 #include <cmath>
@@ -13,9 +14,11 @@
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "legacy/math/X87Math.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/animation/CAnimTexture.h"
+#include "moho/animation/PoseJobs.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/WeakPtr.h"
@@ -33,7 +36,6 @@
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedRangeWarning = "%s\n  expected between %d and %d args, but got %d";
   constexpr const char* kCreateAnimatorName = "CreateAnimator";
   constexpr const char* kCreateAnimatorClassName = "<global>";
@@ -69,16 +71,6 @@ namespace
   constexpr const char* kSetDisableOnSignalHelpText = "AnimationManipulator:SetDisableOnSignal(bool)";
   constexpr const char* kSetDirectionalAnimHelpText = "AnimationManipulator:SetDirectionalAnim(bool)";
   constexpr const char* kPlayAnimHelpText = "AnimManipulator:PlayAnim(entity, animName, looping=false)";
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
 
   // The SCA file header record, read in place from the loaded file bytes
   // (pointer-free on-disk data, so the same layout on every architecture).
@@ -171,6 +163,7 @@ namespace
     lua_pushstring(rawState, message);
     (void)lua_gettop(rawState);
     lua_error(rawState);
+    std::abort();
   }
 
   /**
@@ -198,7 +191,7 @@ namespace
       const boost::shared_ptr<const moho::CAniSkel> skeleton = ownerActor ? ownerActor->GetSkeleton() : boost::shared_ptr<const moho::CAniSkel>{};
       const int boneIndex = skeleton ? skeleton->FindBoneIndex(boneName) : -1;
       if (boneIndex < 0) {
-        const msvc8::string msg = gpg::STR_Printf("Unknown bone %s", boneName);
+        const fa::string msg = gpg::STR_Printf("Unknown bone %s", boneName);
         RaiseLuaErrorWithMessage(rawState, msg.c_str());
       }
       return boneIndex;
@@ -215,19 +208,11 @@ namespace
     const moho::SAniSkelBone* const bone =
       (skeleton != nullptr && boneIndex >= 0) ? skeleton->GetBone(static_cast<std::uint32_t>(boneIndex)) : nullptr;
     if (bone == nullptr) {
-      const msvc8::string msg = gpg::STR_Printf("Unknown bone %i", boneIndex);
+      const fa::string msg = gpg::STR_Printf("Unknown bone %i", boneIndex);
       RaiseLuaErrorWithMessage(rawState, msg.c_str());
     }
 
     return boneIndex;
-  }
-
-  gpg::RType* CachedCAnimationManipulatorType()
-  {
-    if (!moho::CAnimationManipulator::sType) {
-      moho::CAnimationManipulator::sType = gpg::LookupRType(typeid(moho::CAnimationManipulator));
-    }
-    return moho::CAnimationManipulator::sType;
   }
 
   /**
@@ -242,7 +227,7 @@ namespace
       return nullptr;
     }
 
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCAnimationManipulatorType());
+    const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, gpg::CachedLookup<moho::CAnimationManipulator>(moho::CAnimationManipulator::sType));
     return upcast.mObj;
   }
 
@@ -253,47 +238,15 @@ namespace
    * Copies one packed vector<bool>-cursor lane, advances it by `bitDelta`,
    * then stores the advanced `{word,bit}` pair in caller output storage.
    */
-  [[maybe_unused]] msvc8::detail::vector_bool_word_cursor* AdvanceVectorBoolCursorPackedLane(
-    const msvc8::detail::vector_bool_word_cursor* const sourceCursor,
-    msvc8::detail::vector_bool_word_cursor* const destinationCursor,
+  [[maybe_unused]] fa::detail::vector_bool_word_cursor* AdvanceVectorBoolCursorPackedLane(
+    const fa::detail::vector_bool_word_cursor* const sourceCursor,
+    fa::detail::vector_bool_word_cursor* const destinationCursor,
     const int bitDelta
   )
   {
     *destinationCursor = *sourceCursor;
-    (void)msvc8::detail::AdvanceCursorBits(destinationCursor, bitDelta);
+    (void)fa::detail::AdvanceCursorBits(destinationCursor, bitDelta);
     return destinationCursor;
-  }
-
-  template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeTypedRef(TObject* object, gpg::RType* staticType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = staticType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = staticType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = staticType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived = dynamicType->IsDerivedFrom(staticType, &baseOffset);
-    GPG_ASSERT(derived);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj =
-      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
-    out.mType = dynamicType;
-    return out;
   }
 
   /**
@@ -312,24 +265,11 @@ namespace
    */
   void AddIAniManipulatorBase(gpg::RType* const typeInfo)
   {
-    if (moho::IAniManipulator::sType == nullptr) {
-      moho::IAniManipulator::sType = gpg::LookupRType(typeid(moho::IAniManipulator));
-    }
-
-    gpg::RType* const baseType = moho::IAniManipulator::sType;
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseViaSlot<moho::IAniManipulator>(typeInfo);
   }
 
   using TypeInfo = moho::CAnimationManipulatorTypeInfo;
 
-  gpg::RType* gWeakPtrUnitType = nullptr;
-  gpg::RType* gVectorBoolType = nullptr;
 
   /**
    * Address: 0x00BFAF90 (FUN_00BFAF90, atexit destructor of the CAnimationManipulatorTypeInfo object)
@@ -338,30 +278,6 @@ namespace
   {
     static TypeInfo sInstance;
     return sInstance;
-  }
-
-  [[nodiscard]] gpg::RType* CachedIAniManipulatorTypeForSerializer()
-  {
-    if (!moho::IAniManipulator::sType) {
-      moho::IAniManipulator::sType = gpg::LookupRType(typeid(moho::IAniManipulator));
-    }
-    return moho::IAniManipulator::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakPtrUnitType()
-  {
-    if (!gWeakPtrUnitType) {
-      gWeakPtrUnitType = gpg::LookupRType(typeid(moho::WeakPtr<moho::Unit>));
-    }
-    return gWeakPtrUnitType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVectorBoolType()
-  {
-    if (!gVectorBoolType) {
-      gVectorBoolType = gpg::LookupRType(typeid(std::vector<bool>));
-    }
-    return gVectorBoolType;
   }
 
 } // namespace
@@ -432,7 +348,7 @@ namespace moho
   CScrLuaInitForm* func_CreateAnimator_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kCreateAnimatorName,
       &moho::cfunc_CreateAnimator,
       nullptr,
@@ -535,7 +451,7 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorPlayAnim_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kPlayAnimName,
       &moho::cfunc_CAnimationManipulatorPlayAnim,
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
@@ -566,7 +482,7 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorSetRate_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kSetRateName,
       &moho::cfunc_CAnimationManipulatorSetRate,
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
@@ -585,10 +501,7 @@ namespace moho
   int cfunc_CAnimationManipulatorSetRateL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetRateHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetRateHelpText);
 
     const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
     CAnimationManipulator* const manipulator = SCR_FromLua_CAnimationManipulator(manipObject, state);
@@ -625,7 +538,7 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorGetRate_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kGetRateName,
       &moho::cfunc_CAnimationManipulatorGetRate,
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
@@ -645,10 +558,7 @@ namespace moho
   int cfunc_CAnimationManipulatorGetRateL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetRateHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetRateHelpText);
 
     const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
     CAnimationManipulator* const manipulator = SCR_FromLua_CAnimationManipulator(manipObject, state);
@@ -677,7 +587,7 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorGetAnimationFraction_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kGetAnimationFractionName,
       &moho::cfunc_CAnimationManipulatorGetAnimationFraction,
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
@@ -697,10 +607,7 @@ namespace moho
   int cfunc_CAnimationManipulatorGetAnimationFractionL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetAnimationFractionHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetAnimationFractionHelpText);
 
     const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
     CAnimationManipulator* const manipulator = SCR_FromLua_CAnimationManipulator(manipObject, state);
@@ -730,7 +637,7 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorSetAnimationFraction_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kSetAnimationFractionName,
       &moho::cfunc_CAnimationManipulatorSetAnimationFraction,
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
@@ -750,10 +657,7 @@ namespace moho
   int cfunc_CAnimationManipulatorSetAnimationFractionL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetAnimationFractionHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetAnimationFractionHelpText);
 
     const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
     CAnimationManipulator* const manipulator = SCR_FromLua_CAnimationManipulator(manipObject, state);
@@ -792,7 +696,7 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorGetAnimationTime_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kGetAnimationTimeName,
       &moho::cfunc_CAnimationManipulatorGetAnimationTime,
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
@@ -812,10 +716,7 @@ namespace moho
   int cfunc_CAnimationManipulatorGetAnimationTimeL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetAnimationTimeHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetAnimationTimeHelpText);
 
     const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
     CAnimationManipulator* const manipulator = SCR_FromLua_CAnimationManipulator(manipObject, state);
@@ -845,7 +746,7 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorSetAnimationTime_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kSetAnimationTimeName,
       &moho::cfunc_CAnimationManipulatorSetAnimationTime,
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
@@ -865,10 +766,7 @@ namespace moho
   int cfunc_CAnimationManipulatorSetAnimationTimeL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetAnimationTimeHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetAnimationTimeHelpText);
 
     const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
     CAnimationManipulator* const manipulator = SCR_FromLua_CAnimationManipulator(manipObject, state);
@@ -904,7 +802,7 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorGetAnimationDuration_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kGetAnimationDurationName,
       &moho::cfunc_CAnimationManipulatorGetAnimationDuration,
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
@@ -924,10 +822,7 @@ namespace moho
   int cfunc_CAnimationManipulatorGetAnimationDurationL(LuaPlus::LuaState* const state)
   {
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 1) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetAnimationDurationHelpText, 1, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 1, kGetAnimationDurationHelpText);
 
     const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
     CAnimationManipulator* const manipulator = SCR_FromLua_CAnimationManipulator(manipObject, state);
@@ -958,7 +853,7 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorSetBoneEnabled_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kSetBoneEnabledName,
       &moho::cfunc_CAnimationManipulatorSetBoneEnabled,
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
@@ -1031,7 +926,7 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorSetOverwriteMode_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kSetOverwriteModeName,
       &moho::cfunc_CAnimationManipulatorSetOverwriteMode,
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
@@ -1050,11 +945,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorSetOverwriteModeL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetOverwriteModeHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetOverwriteModeHelpText);
 
     const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
     CAnimationManipulator* const manipulator = SCR_FromLua_CAnimationManipulator(manipObject, state);
@@ -1085,7 +976,7 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorSetDisableOnSignal_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kSetDisableOnSignalName,
       &moho::cfunc_CAnimationManipulatorSetDisableOnSignal,
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
@@ -1104,11 +995,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorSetDisableOnSignalL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetDisableOnSignalHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetDisableOnSignalHelpText);
 
     const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
     CAnimationManipulator* const manipulator = SCR_FromLua_CAnimationManipulator(manipObject, state);
@@ -1139,7 +1026,7 @@ namespace moho
   CScrLuaInitForm* func_CAnimationManipulatorSetDirectionalAnim_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
+      moho::SCR_SimLuaInitSet(),
       kSetDirectionalAnimName,
       &moho::cfunc_CAnimationManipulatorSetDirectionalAnim,
       &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
@@ -1158,11 +1045,7 @@ namespace moho
    */
   int cfunc_CAnimationManipulatorSetDirectionalAnimL(LuaPlus::LuaState* const state)
   {
-    lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetDirectionalAnimHelpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, kSetDirectionalAnimHelpText);
 
     const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
     CAnimationManipulator* const manipulator = SCR_FromLua_CAnimationManipulator(manipObject, state);
@@ -1270,7 +1153,7 @@ namespace moho
    */
   gpg::RType* CAnimationManipulator::GetClass() const
   {
-    return CachedCAnimationManipulatorType();
+    return gpg::CachedLookup<moho::CAnimationManipulator>(moho::CAnimationManipulator::sType);
   }
 
   /**
@@ -1278,7 +1161,7 @@ namespace moho
    */
   gpg::RRef CAnimationManipulator::GetDerivedObjectRef()
   {
-    return MakeTypedRef(this, CachedCAnimationManipulatorType());
+    return gpg::MakeTypedRef(this, gpg::CachedLookup<moho::CAnimationManipulator>(moho::CAnimationManipulator::sType));
   }
 
   /**
@@ -1300,8 +1183,10 @@ namespace moho
     float rate = mRate;
     if (mDirectionalAnim) {
       Unit* const unit = mGoal.GetObjectPtr();
-      const Wm3::Quatf& q = unit->GetTransform().orient_;
-      const Wm3::Vec3f velocity = unit->GetVelocity();
+      // Engine addition (sim_ParallelPose): inside a queued pose job, the inputs copied at queue time.
+      const SPoseJobInputs* const jobInputs = POSE_JobInputsFor(unit);
+      const Wm3::Quatf& q = jobInputs != nullptr ? jobInputs->mTransformOrient : unit->GetTransform().orient_;
+      const Wm3::Vec3f velocity = jobInputs != nullptr ? jobInputs->mVelocity : unit->GetVelocity();
       const float forwardX = 2.0f * (q.x * q.z + q.w * q.y);
       const float forwardY = 2.0f * (q.y * q.z - q.w * q.x);
       const float forwardZ = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
@@ -1319,11 +1204,14 @@ namespace moho
       if (unit == nullptr) {
         mAnimationTime += rate * 0.1f;
       } else {
-        const Wm3::Vec3f velocity = unit->GetVelocity();
+        // Engine addition (sim_ParallelPose): inside a queued pose job, the inputs copied at queue time.
+        const SPoseJobInputs* const jobInputs = POSE_JobInputsFor(unit);
+        const Wm3::Vec3f velocity = jobInputs != nullptr ? jobInputs->mVelocity : unit->GetVelocity();
         const float speed = std::sqrt(velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z);
         const float speedFraction = speed / unit->GetBlueprint()->Physics.MaxSpeed;
-        const Wm3::Quatf& orientation = unit->mVarDat.mCurTransform.orient_;
-        const Wm3::Quatf& prevOrientation = unit->mVarDat.mLastTransform.orient_;
+        const Wm3::Quatf& orientation = jobInputs != nullptr ? jobInputs->mCurOrient : unit->mVarDat.mCurTransform.orient_;
+        const Wm3::Quatf& prevOrientation =
+          jobInputs != nullptr ? jobInputs->mLastOrient : unit->mVarDat.mLastTransform.orient_;
         // 0x0063FFDE: `0x004F0B40` is a 16-byte memcmp, so this is bitwise
         // inequality (a -0/+0 lane flip counts as turning), which is exactly
         // Wm3 `Quaternion::operator==`.
@@ -1407,15 +1295,15 @@ namespace moho
           keyTransform.orient_ = blended;
         } else {
           // Raw SCA key floats (on-disk float arrays) loaded into the math types.
-          std::memcpy(&keyTransform.pos_, key1.position, sizeof(keyTransform.pos_));
+          std::memcpy(static_cast<void*>(&keyTransform.pos_), key1.position, sizeof(keyTransform.pos_));
           // Raw SCA key floats (on-disk float arrays) loaded into the math types.
-          std::memcpy(&keyTransform.orient_, key1.rotation, sizeof(keyTransform.orient_));
+          std::memcpy(static_cast<void*>(&keyTransform.orient_), key1.rotation, sizeof(keyTransform.orient_));
         }
       } else {
         // Raw SCA key floats (on-disk float arrays) loaded into the math types.
-        std::memcpy(&keyTransform.pos_, key0.position, sizeof(keyTransform.pos_));
+        std::memcpy(static_cast<void*>(&keyTransform.pos_), key0.position, sizeof(keyTransform.pos_));
         // Raw SCA key floats (on-disk float arrays) loaded into the math types.
-        std::memcpy(&keyTransform.orient_, key0.rotation, sizeof(keyTransform.orient_));
+        std::memcpy(static_cast<void*>(&keyTransform.orient_), key0.rotation, sizeof(keyTransform.orient_));
       }
 
       CAniPoseBone& bone = poseBones[boneIndex];
@@ -1573,7 +1461,7 @@ namespace moho
       return;
     }
 
-    msvc8::vector<std::int32_t> childBoneIndices;
+    fa::vector<std::int32_t> childBoneIndices;
     skeleton->CollectChildBoneIndices(boneIndex, childBoneIndices);
 
     const std::int32_t* const childBegin = childBoneIndices.begin();
@@ -1805,9 +1693,9 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedIAniManipulatorTypeForSerializer(), static_cast<moho::IAniManipulator*>(this), nullOwner);
-    archive->Read(CachedWeakPtrUnitType(), &mGoal, nullOwner);
-    archive->Read(CachedVectorBoolType(), &mBoneMask, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::IAniManipulator>(), static_cast<moho::IAniManipulator*>(this), nullOwner);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &mGoal, nullOwner);
+    archive->Read(gpg::RTypeOf<std::vector<bool>>(), &mBoneMask, nullOwner);
     archive->ReadPointerShared(&mAnimationRef, &nullOwner);
     archive->ReadFloat(&mRate);
     archive->ReadFloat(&mAnimationTime);
@@ -1834,9 +1722,9 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Write(CachedIAniManipulatorTypeForSerializer(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(this)), nullOwner);
-    archive->Write(CachedWeakPtrUnitType(), &const_cast<moho::CAnimationManipulator*>(this)->mGoal, nullOwner);
-    archive->Write(CachedVectorBoolType(), const_cast<moho::SAniManipBitStorage*>(&mBoneMask), nullOwner);
+    archive->Write(gpg::RTypeOf<moho::IAniManipulator>(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(this)), nullOwner);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Unit>>(), &const_cast<moho::CAnimationManipulator*>(this)->mGoal, nullOwner);
+    archive->Write(gpg::RTypeOf<std::vector<bool>>(), const_cast<moho::SAniManipBitStorage*>(&mBoneMask), nullOwner);
     archive->WritePointer(mAnimationRef.get(), gpg::TrackedPointerState::Shared, nullOwner);
     archive->WriteFloat(mRate);
     archive->WriteFloat(mAnimationTime);
@@ -1874,3 +1762,29 @@ namespace
   // Address: 0x010B291C -- process-global `CAnimationManipulatorSerializer` singleton.
   moho::CAnimationManipulatorSerializer gCAnimationManipulatorSerializer;
 } // namespace
+
+namespace moho
+{
+  /**
+   * Address: 0x00422940 (FUN_00422940)
+   *
+   * What it does:
+   * Computes `value mod range` with the same positive-wrap behavior used by
+   * animation frame sampling paths.
+   *
+   * 0x00422949..0x0042294F: `fld value; fld range; call _CIfmod` -- the MSVC8
+   * CRT, which returns +0 for a zero dividend. 0x00422958..0x00422987 shifts by
+   * `range` when `0 > r` and `0 > range` disagree (both ordered compares). No
+   * zero-range guard: the callers test the range first (0x0063FAB7, 0x0064005D,
+   * and a non-empty frame list in GetFrameAt).
+   */
+  float WrapPositiveModulo(const float value, const float range) noexcept
+  {
+    float wrapped = static_cast<float>(fa::fmod(value, range));
+    if ((0.0f > wrapped) != (0.0f > range)) {
+      wrapped += range;
+    }
+    return wrapped;
+  }
+
+} // namespace moho

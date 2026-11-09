@@ -31,7 +31,7 @@ namespace moho
       : SFootprint{}
     {}
 
-    msvc8::string mName;     // +0x10
+    fa::string mName;     // +0x10
     std::int32_t mIndex = -1; // +0x2C
   };
 

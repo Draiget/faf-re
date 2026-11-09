@@ -1,4 +1,5 @@
 #include "moho/net/CDiscoveryService.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 #include <cstddef>
 #include <new>
@@ -24,7 +25,6 @@
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kCDiscoveryServiceGetGameCountHelp = "CDiscoveryService.GetCount(self)";
   constexpr const char* kCDiscoveryServiceResetHelp = "CDiscoveryService.Reset(self)";
   constexpr const char* kCDiscoveryServiceDestroyHelp = "CDiscoveryService.Destory(self)";
@@ -37,30 +37,6 @@ namespace
 
   // Distinct games tracked at once; far more than any LAN advertises.
   constexpr std::size_t kMaxDiscoveredGames = 256;
-
-  [[nodiscard]] gpg::RType* CachedCDiscoveryServiceTypeBridge()
-  {
-    static gpg::RType* cached = nullptr;
-    if (cached == nullptr) {
-      cached = gpg::LookupRType(typeid(moho::CDiscoveryService));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
-  {
-    return moho::SCR_FindLuaInitFormSet("User");
-  }
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = FindUserLuaInitSet(); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("User");
-    return fallbackSet;
-  }
 
   [[nodiscard]] moho::CDiscoveryService* OwnerFromPullTaskSubobject(
     moho::CTask* const pullTask
@@ -145,7 +121,7 @@ namespace
         continue;
       }
 
-      const msvc8::string hostName = moho::NET_GetHostName(record->mHostAddress);
+      const fa::string hostName = moho::NET_GetHostName(record->mHostAddress);
       gpg::Logf("LOBBY: Discovery reply from %s:%d timed out.", hostName.c_str(), record->mHostPort);
 
       record = games.erase(record);
@@ -355,7 +331,7 @@ moho::CDiscoveryService::~CDiscoveryService()
  */
 gpg::RType* moho::CDiscoveryService::GetClass() const
 {
-  return CachedCDiscoveryServiceTypeBridge();
+  return gpg::RTypeOf<moho::CDiscoveryService>();
 }
 
 /**
@@ -366,10 +342,7 @@ gpg::RType* moho::CDiscoveryService::GetClass() const
  */
 gpg::RRef moho::CDiscoveryService::GetDerivedObjectRef()
 {
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
+  return gpg::MakeSelfRef(this);
 }
 
 /**
@@ -387,7 +360,7 @@ gpg::RRef moho::CDiscoveryService::GetDerivedObjectRef()
  * (`this=mGames`-shaped field group, `pos=mGamesEnd`, `val=&newRecord`) --
  * the generic `_Insert_n` growth-and-insert core (~1.5x growth, floor
  * `count+1`, `uninit_copy_n` head-range relocation via `sub_7CBF90`/
- * `sub_7CED40`). That is exactly `msvc8::vector<T>::push_back`'s own
+ * `sub_7CED40`). That is exactly `fa::vector<T>::push_back`'s own
  * two-branch shape (see its class doc / `Address:` catalog in Vector.h),
  * so the faithful recovery is the one-line call below, not a duplicate of
  * the growth arithmetic.
@@ -559,10 +532,7 @@ int moho::cfunc_CDiscoveryServiceGetGameCount(lua_State* const luaContext)
  */
 int moho::cfunc_CDiscoveryServiceGetGameCountL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCDiscoveryServiceGetGameCountHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCDiscoveryServiceGetGameCountHelp);
 
   const LuaPlus::LuaObject serviceObject(LuaPlus::LuaStackObject(state, 1));
   CDiscoveryService* const discoveryService = SCR_FromLua_CDiscoveryService(serviceObject, state);
@@ -582,7 +552,7 @@ int moho::cfunc_CDiscoveryServiceGetGameCountL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CDiscoveryServiceGetGameCount_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "GetGameCount",
     &moho::cfunc_CDiscoveryServiceGetGameCount,
     &CScrLuaMetatableFactory<CDiscoveryService>::Instance(),
@@ -612,10 +582,7 @@ int moho::cfunc_CDiscoveryServiceReset(lua_State* const luaContext)
  */
 int moho::cfunc_CDiscoveryServiceResetL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCDiscoveryServiceResetHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCDiscoveryServiceResetHelp);
 
   const LuaPlus::LuaObject serviceObject(LuaPlus::LuaStackObject(state, 1));
   CDiscoveryService* const discoveryService = SCR_FromLua_CDiscoveryService(serviceObject, state);
@@ -632,7 +599,7 @@ int moho::cfunc_CDiscoveryServiceResetL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CDiscoveryServiceReset_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "Reset",
     &moho::cfunc_CDiscoveryServiceReset,
     &CScrLuaMetatableFactory<CDiscoveryService>::Instance(),
@@ -663,10 +630,7 @@ int moho::cfunc_CDiscoveryServiceDestroy(lua_State* const luaContext)
  */
 int moho::cfunc_CDiscoveryServiceDestroyL(LuaPlus::LuaState* const state)
 {
-  const int argumentCount = lua_gettop(state->m_state);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kCDiscoveryServiceDestroyHelp, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kCDiscoveryServiceDestroyHelp);
 
   const LuaPlus::LuaObject serviceObject(LuaPlus::LuaStackObject(state, 1));
   CDiscoveryService* const discoveryService = SCR_FromLua_CDiscoveryServiceOpt(serviceObject, state);
@@ -685,7 +649,7 @@ int moho::cfunc_CDiscoveryServiceDestroyL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CDiscoveryServiceDestroy_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
+    moho::SCR_UserLuaInitSet(),
     "Destroy",
     &moho::cfunc_CDiscoveryServiceDestroy,
     &CScrLuaMetatableFactory<CDiscoveryService>::Instance(),
@@ -743,7 +707,7 @@ namespace
   moho::CScrLuaInitForm* register_moho_discovery_service_methods()
   {
     static moho::CScrLuaClassBinder binder(
-      UserLuaInitSet(), "moho.discovery_service_methods", &moho::CScrLuaMetatableFactory<moho::CDiscoveryService>::Instance(), "CDiscoveryService", ""
+      moho::SCR_UserLuaInitSet(), "moho.discovery_service_methods", &moho::CScrLuaMetatableFactory<moho::CDiscoveryService>::Instance(), "CDiscoveryService", ""
     );
     return &binder;
   }

@@ -51,4 +51,12 @@ namespace gpg::gal::d3d11
   [[nodiscard]] TranslatedEffectSource TranslateEffectSource(
     std::string_view preprocessed, bool shaderModel41, std::string_view original
   );
+
+  /**
+   * Engine addition: `ren_EffectFastScan`. Scan effect text with EffectScan.h (true, the default) or
+   * with the std::regex patterns it replaced, which took about half of the time from process start
+   * to the lobby. `/fxregex` turns it off before the first effect loads. With the environment
+   * variable FAF_FX_SCAN_VERIFY=1 each effect is translated both ways and any difference logged.
+   */
+  extern bool gEffectFastScan;
 } // namespace gpg::gal::d3d11

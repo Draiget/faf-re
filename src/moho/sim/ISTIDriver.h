@@ -13,7 +13,7 @@ namespace moho
   class CClientManagerImpl;
   class Sim;
   class CD3DPrimBatcher;
-  class CSaveGameRequestImpl;
+  class ISaveRequest;
   struct SSyncData;
 
   /**
@@ -86,7 +86,7 @@ namespace moho
 
     // Slot 13. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073B270 (FUN_0073B270)
     // Replaces camera list used when preparing sync snapshots.
-    virtual void SetGeomCams(const msvc8::vector<GeomCamera3>& geoCams) = 0;
+    virtual void SetGeomCams(const fa::vector<GeomCamera3>& geoCams) = 0;
 
     // Slot 14. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073B3F0 (FUN_0073B3F0)
     // Retail binary performs compare-only logic for mask block A (no state mutation in this build).
@@ -198,7 +198,7 @@ namespace moho
 
     // Slot 38. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073DF60 (FUN_0073DF60)
     // Enqueues a save-game request to be executed on Dispatch().
-    virtual void RequestSaveGame(CSaveGameRequestImpl* request) = 0;
+    virtual void RequestSaveGame(ISaveRequest* request) = 0;
 
     // Slot 39. Base: 0x00A82547 (_purecall); CSimDriver override: 0x0073DFE0 (FUN_0073DFE0)
     // Renders network/sync diagnostics overlay.

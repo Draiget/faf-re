@@ -135,7 +135,7 @@ namespace gpg::gal
         std::int32_t mPixelShaderProfile = 0;  // +0x18
         std::uint32_t mMaxPrimitiveCount = 0;  // +0x1C
         std::uint32_t mMaxVertexCount = 0;     // +0x20
-        msvc8::vector<Head> mHeads{};        // +0x24
+        fa::vector<Head> mHeads{};        // +0x24
     };
 
     static_assert(offsetof(DeviceContext, mDeviceType) == 0x04, "DeviceContext::mDeviceType offset must be 0x04");

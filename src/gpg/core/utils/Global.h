@@ -6,6 +6,17 @@
     if (! (x)) { GPG_ERROR(#x); }\
 } while (false)
 
+// `delete p` or `p->~T()` on a class that has virtual functions and no virtual
+// destructor. The binary's vtable fixes that layout, so the class can't gain one,
+// and these calls always see the object's own type. In a template the `T` can also
+// be a class with a virtual destructor, which then still dispatches: don't qualify
+// the call there. Outside templates, `p->T::~T()` says the same thing without this.
+#define GPG_NONVIRTUAL_DESTROY(...) \
+    _Pragma("clang diagnostic push") \
+    _Pragma("clang diagnostic ignored \"-Wdelete-non-abstract-non-virtual-dtor\"") \
+    __VA_ARGS__; \
+    _Pragma("clang diagnostic pop")
+
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -85,7 +96,7 @@ namespace gpg
 	/// binary's binary search; console variable `mem_SmallBlockIndexTable`.
 	extern bool mem_SmallBlockIndexTable;
 
-#if defined(_M_X64)
+#if defined(_M_X64) || defined(__x86_64__)
 	/**
 	 * x64 port (not in the binary): logs the image base (and whether it is below
 	 * 4 GB), then what `FAF_HIGHMEM=1` reserved below 4 GB before the CRT

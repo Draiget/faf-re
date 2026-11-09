@@ -17,6 +17,7 @@
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/RResId.h"
+#include "moho/sim/DesyncRecorder.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SOCellPos.h"
 
@@ -35,7 +36,7 @@ namespace
      * What it does:
      * Constructs one decoder-message exception from one prebuilt message string.
      */
-    explicit XDecoderMessageError(const msvc8::string& message);
+    explicit XDecoderMessageError(const fa::string& message);
 
     /**
      * Address: 0x006E43E0 (FUN_006E43E0, Moho::XDecoderMessageError copy ctor)
@@ -78,13 +79,13 @@ namespace
    * What it does:
    * Constructs one decoder-message exception from one prebuilt message string.
    */
-  XDecoderMessageError::XDecoderMessageError(const msvc8::string& message)
+  XDecoderMessageError::XDecoderMessageError(const fa::string& message)
     : std::runtime_error(message.c_str())
   {}
 
   constexpr std::uint32_t kNoTargetEntityId = 0xF0000000u;
 
-  [[noreturn]] void ThrowDecoderError(const msvc8::string& message)
+  [[noreturn]] void ThrowDecoderError(const fa::string& message)
   {
     throw XDecoderMessageError(message);
   }
@@ -116,7 +117,7 @@ namespace moho
    */
   CDecoder::CDecoder(
     ICommandSink* const sink,
-    msvc8::auto_ptr<gpg::Stream>& stream,
+    fa::auto_ptr<gpg::Stream>& stream,
     RRuleGameRules* const rules,
     LuaPlus::LuaState* const luaState
   )
@@ -137,6 +138,20 @@ namespace moho
    */
   CDecoder::~CDecoder() = default;
 
+#if FAF_SERVER_MODE
+  namespace
+  {
+    CDecoder::MessageObserver sMessageObserver = nullptr;
+    void* sMessageObserverContext = nullptr;
+  } // namespace
+
+  void CDecoder::SetMessageObserver(const MessageObserver observer, void* const context) noexcept
+  {
+    sMessageObserverContext = context;
+    sMessageObserver = observer;
+  }
+#endif
+
   /**
    * Address: 0x006E40F0 (FUN_006E40F0)
    * Mangled: ?ProcessMessage@CDecoder@Moho@@UAEXABVCMessage@2@PAVCMessageDispatcher@2@@Z
@@ -153,6 +168,11 @@ namespace moho
     if (mStream.get() != nullptr) {
       mStream->Write(message->mBuff.start_, message->mBuff.Size());
     }
+#if FAF_SERVER_MODE
+    if (sMessageObserver != nullptr) {
+      sMessageObserver(*message, sMessageObserverContext);
+    }
+#endif
 
     DecodeMessage(*message);
   }
@@ -182,6 +202,12 @@ namespace moho
     gpg::BinaryReader reader(&stream);
 
     const auto opcode = static_cast<ECmdStreamOp>(static_cast<std::uint8_t>(message.mBuff[0]));
+
+    // Engine addition (issue #216): the desync recorder counts each beat's player commands.
+    if (opcode != ECmdStreamOp::CMDST_Advance && opcode != ECmdStreamOp::CMDST_SetCommandSource
+        && opcode != ECmdStreamOp::CMDST_VerifyChecksum) {
+      CDesyncRecorder::NoteCommandFor(mSink);
+    }
 
     try {
       DecodeOpcode(opcode, reader);
@@ -376,7 +402,7 @@ namespace moho
   void CDecoder::DecodeCreateUnit(gpg::BinaryReader& reader)
   {
     std::uint8_t armyIndex = 0;
-    msvc8::string blueprintId;
+    fa::string blueprintId;
     float heading = 0.0f;
 
     reader.ReadExact(armyIndex);
@@ -396,7 +422,7 @@ namespace moho
    */
   void CDecoder::DecodeCreateProp(gpg::BinaryReader& reader)
   {
-    msvc8::string blueprintPath;
+    fa::string blueprintPath;
     Wm3::Vec3f location{};
     reader.ReadString(&blueprintPath);
     reader.ReadExact(location);
@@ -431,8 +457,8 @@ namespace moho
   void CDecoder::DecodeProcessInfoPair(gpg::BinaryReader& reader)
   {
     EntId entityId = 0;
-    msvc8::string key;
-    msvc8::string value;
+    fa::string key;
+    fa::string value;
 
     reader.ReadExact(entityId);
     reader.ReadString(&key);
@@ -566,7 +592,7 @@ namespace moho
    */
   void CDecoder::DecodeExecuteLuaInSim(gpg::BinaryReader& reader)
   {
-    msvc8::string functionName;
+    fa::string functionName;
     LuaPlus::LuaObject args;
     reader.ReadString(&functionName);
     DecodeLuaObject(reader, args);
@@ -578,7 +604,7 @@ namespace moho
    */
   void CDecoder::DecodeLuaSimCallback(gpg::BinaryReader& reader)
   {
-    msvc8::string callbackName;
+    fa::string callbackName;
     LuaPlus::LuaObject args;
     reader.ReadString(&callbackName);
     DecodeLuaObject(reader, args);
@@ -591,7 +617,7 @@ namespace moho
    */
   void CDecoder::DecodeDebugCommand(gpg::BinaryReader& reader)
   {
-    msvc8::string command;
+    fa::string command;
     Wm3::Vec3f worldPos{};
     std::uint8_t focusArmy = 0;
 
@@ -707,7 +733,7 @@ namespace moho
 
     reader.ReadExact(commandData.mIndex);
 
-    const msvc8::string targetContext = msvc8::string(decodeContext ? decodeContext : "") + "/DecodeCommandData()";
+    const fa::string targetContext = fa::string(decodeContext ? decodeContext : "") + "/DecodeCommandData()";
     commandData.mTarget = DecodeTarget(reader, targetContext.c_str());
     commandData.mTarget2 = DecodeTarget(reader, targetContext.c_str());
 
@@ -717,7 +743,7 @@ namespace moho
       reader.ReadExact(commandData.unk4C);
     }
 
-    msvc8::string blueprintId;
+    fa::string blueprintId;
     reader.ReadString(&blueprintId);
     if (!blueprintId.empty()) {
       RResId lookupId{};
@@ -810,7 +836,7 @@ namespace moho
    * What it does:
    * Lowercases and slash-normalizes blueprint/resource identifiers.
    */
-  void CDecoder::NormalizeFilenameLowerSlash(msvc8::string& inOut)
+  void CDecoder::NormalizeFilenameLowerSlash(fa::string& inOut)
   {
     gpg::STR_NormalizeFilenameLowerSlash(inOut);
   }

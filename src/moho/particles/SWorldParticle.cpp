@@ -8,35 +8,15 @@
 
 namespace
 {
-  template <typename TType>
-  [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cached)
-  {
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(TType));
-    }
-
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    return ResolveCachedType<Wm3::Vector3<float>>(cached);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveParticleTextureCountedPtrType()
-  {
-    return ResolveCachedType<moho::CountedPtr_CParticleTexture>(moho::CountedPtr_CParticleTexture::sType);
-  }
 
   [[nodiscard]] gpg::RType* ResolveSWorldParticleBlendModeType()
   {
-    return ResolveCachedType<moho::SWorldParticle::BlendMode>(moho::SWorldParticle::sBlendModeType);
+    return gpg::CachedLookup<moho::SWorldParticle::BlendMode>(moho::SWorldParticle::sBlendModeType);
   }
 
   [[nodiscard]] gpg::RType* ResolveSWorldParticleZModeType()
   {
-    return ResolveCachedType<moho::SWorldParticle::ZMode>(moho::SWorldParticle::sZModeType);
+    return gpg::CachedLookup<moho::SWorldParticle::ZMode>(moho::SWorldParticle::sZModeType);
   }
 } // namespace
 
@@ -88,9 +68,9 @@ namespace moho
     const gpg::RRef nullOwner{};
     archive->ReadBool(&mDragEnabled);
     archive->ReadFloat(&mResistance);
-    archive->Read(ResolveVector3fType(), &mPos, nullOwner);
-    archive->Read(ResolveVector3fType(), &mDir, nullOwner);
-    archive->Read(ResolveVector3fType(), &mAccel, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3<float>>(), &mPos, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3<float>>(), &mDir, nullOwner);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3<float>>(), &mAccel, nullOwner);
     archive->ReadFloat(&mInterop);
     archive->ReadFloat(&mLifetime);
     archive->ReadFloat(&mFramerate);
@@ -103,8 +83,8 @@ namespace moho
     archive->ReadFloat(&mAngle);
     archive->ReadFloat(&mRotationCurve);
     archive->ReadFloat(&mReserved54);
-    archive->Read(ResolveParticleTextureCountedPtrType(), &mTexture, nullOwner);
-    archive->Read(ResolveParticleTextureCountedPtrType(), &mRampTexture, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mTexture, nullOwner);
+    archive->Read(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mRampTexture, nullOwner);
     archive->ReadString(&mTypeTag);
     archive->ReadInt(&mArmyIndex);
     archive->Read(ResolveSWorldParticleBlendModeType(), &mBlendMode, nullOwner);
@@ -123,9 +103,9 @@ namespace moho
     const gpg::RRef nullOwner{};
     archive->WriteBool(mDragEnabled);
     archive->WriteFloat(mResistance);
-    archive->Write(ResolveVector3fType(), &mPos, nullOwner);
-    archive->Write(ResolveVector3fType(), &mDir, nullOwner);
-    archive->Write(ResolveVector3fType(), &mAccel, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3<float>>(), &mPos, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3<float>>(), &mDir, nullOwner);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3<float>>(), &mAccel, nullOwner);
     archive->WriteFloat(mInterop);
     archive->WriteFloat(mLifetime);
     archive->WriteFloat(mFramerate);
@@ -138,9 +118,9 @@ namespace moho
     archive->WriteFloat(mAngle);
     archive->WriteFloat(mRotationCurve);
     archive->WriteFloat(mReserved54);
-    archive->Write(ResolveParticleTextureCountedPtrType(), &mTexture, nullOwner);
-    archive->Write(ResolveParticleTextureCountedPtrType(), &mRampTexture, nullOwner);
-    archive->WriteString(const_cast<msvc8::string*>(&mTypeTag));
+    archive->Write(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mTexture, nullOwner);
+    archive->Write(gpg::RTypeOf<moho::CountedPtr_CParticleTexture>(), &mRampTexture, nullOwner);
+    archive->WriteString(const_cast<fa::string*>(&mTypeTag));
     archive->WriteInt(mArmyIndex);
     archive->Write(ResolveSWorldParticleBlendModeType(), &mBlendMode, nullOwner);
     archive->Write(ResolveSWorldParticleZModeType(), &mZMode, nullOwner);

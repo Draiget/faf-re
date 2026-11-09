@@ -1,0 +1,44 @@
+// Engine addition (issue #314): the exe's version resource.
+//
+// FAF's client tells this exe from the original ForgedAlliance.exe by ProductName "faf-re":
+// in FAF both are named ForgedAlliance.exe, and the x86 build is 32-bit like the original,
+// so neither the name nor the machine type tells them apart. FileVersion and ProductVersion
+// are the build's name as the label players see shows it (FAF_BUILD_SHOWN): the release or
+// nightly tag, or the commit for any other build, whose numbers are then 0.0.0.0.
+// docs/LAUNCHER_NATIVE_NETWORK.md says what a launcher reads.
+//
+// faf/BuildInfoGenerated.h is written on every build (cmake/FafBuildInfo.cmake);
+// faf/ExeName.h when the build is configured (src/CMakeLists.txt).
+
+#include <winver.h>
+
+#include "faf/BuildInfoGenerated.h"
+#include "faf/ExeName.h"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION FAF_BUILD_VERSION_NUMBERS
+PRODUCTVERSION FAF_BUILD_VERSION_NUMBERS
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+FILEFLAGS 0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904b0"
+    BEGIN
+      VALUE "CompanyName", "Draiget & contributors"
+      VALUE "FileDescription", "faf-re, the Forged Alliance engine"
+      VALUE "FileVersion", FAF_BUILD_SHOWN
+      VALUE "InternalName", "faf-re"
+      VALUE "OriginalFilename", FAF_EXE_NAME
+      VALUE "ProductName", "faf-re"
+      VALUE "ProductVersion", FAF_BUILD_SHOWN
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

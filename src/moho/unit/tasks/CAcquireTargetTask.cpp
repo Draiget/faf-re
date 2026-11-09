@@ -10,6 +10,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
+#include "legacy/math/X87Math.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -31,45 +32,13 @@ using namespace moho;
 
 namespace
 {
-  template <class T>
-  [[nodiscard]] gpg::RType* CachedRType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(T));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCTaskType()
-  {
-    if (!CTask::sType) {
-      CTask::sType = gpg::LookupRType(typeid(CTask));
-    }
-    return CTask::sType;
-  }
-
-  [[nodiscard]] gpg::RType* CachedUnitWeaponType()
-  {
-    return CachedRType<UnitWeapon>();
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAiAttackerImplType()
-  {
-    return CachedRType<CAiAttackerImpl>();
-  }
-
-  [[nodiscard]] gpg::RType* CachedUnitType()
-  {
-    return CachedRType<Unit>();
-  }
 
   template <class T>
   [[nodiscard]] gpg::RRef MakeTrackedRef(T* object)
   {
     gpg::RRef out{};
     out.mObj = nullptr;
-    out.mType = CachedRType<T>();
+    out.mType = gpg::RTypeOf<T>();
     if (!object) {
       return out;
     }
@@ -108,7 +77,7 @@ namespace
     source.mObj = tracked.object;
     source.mType = tracked.type;
 
-    const gpg::RType* const expectedType = CachedRType<T>();
+    const gpg::RType* const expectedType = gpg::RTypeOf<T>();
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, expectedType);
     if (upcast.mObj) {
       return static_cast<T*>(upcast.mObj);
@@ -116,7 +85,7 @@ namespace
 
     const char* const expectedName = expectedType ? expectedType->GetName() : "null";
     const char* const actualName = source.GetTypeName();
-    const msvc8::string errorMessage = gpg::STR_Printf(
+    const fa::string errorMessage = gpg::STR_Printf(
       "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
       expectedName ? expectedName : "null",
       actualName ? actualName : "null"
@@ -134,20 +103,6 @@ namespace
   {
     const gpg::RRef pointerRef = MakeTrackedRef(pointer);
     gpg::WriteRawPointer(archive, pointerRef, state, ownerRef);
-  }
-
-  void AddBase(gpg::RType* const ownerType, gpg::RType* const baseType, const std::int32_t offset)
-  {
-    GPG_ASSERT(ownerType != nullptr);
-    GPG_ASSERT(baseType != nullptr);
-
-    gpg::RField field{};
-    field.mName = baseType->GetName();
-    field.mType = baseType;
-    field.mOffset = offset;
-    field.mFlags = 0;
-    field.mDesc = nullptr;
-    ownerType->AddBase(field);
   }
 
   constexpr std::int32_t kAcquireTargetRetargetCooldownTicks = 30;
@@ -364,7 +319,7 @@ namespace moho
     // Reschedule interval: ceil(TargetCheckInterval * 10) clamped to at least 1,
     // then +1 (the ">= 2 => wait N-1 beats" band). This is the default return.
     const float intervalTicksFloat = weaponBlueprint->TargetCheckInterval * 10.0f;
-    int intervalTicks = static_cast<int>(std::ceil(intervalTicksFloat));
+    int intervalTicks = fa::CeilToIntX87(intervalTicksFloat); // 0x005D8D5B..0x005D8D6E
     if (intervalTicks < 1) {
       intervalTicks = 1;
     }
@@ -812,7 +767,7 @@ namespace moho
     }
 
 
-    gpg::RType* const baseTaskType = CachedCTaskType();
+    gpg::RType* const baseTaskType = gpg::CachedLookup<CTask>(CTask::sType);
     archive->Read(baseTaskType, this, ownerRef);
 
     mWeapon = ReadTrackedPointer<UnitWeapon>(archive, ownerRef);
@@ -836,7 +791,7 @@ namespace moho
     }
 
 
-    gpg::RType* const baseTaskType = CachedCTaskType();
+    gpg::RType* const baseTaskType = gpg::CachedLookup<CTask>(CTask::sType);
     archive->Write(baseTaskType, this, ownerRef);
 
     WriteTrackedPointer(archive, mWeapon, gpg::TrackedPointerState::Unowned, ownerRef);

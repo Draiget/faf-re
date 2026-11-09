@@ -13,12 +13,12 @@ namespace
 {
   struct LuaDocEntry
   {
-    msvc8::string mGroupName;
-    msvc8::string mDocString;
-    msvc8::string mName;
+    fa::string mGroupName;
+    fa::string mDocString;
+    fa::string mName;
   };
 
-  [[nodiscard]] bool LessText(const msvc8::string& lhs, const msvc8::string& rhs)
+  [[nodiscard]] bool LessText(const fa::string& lhs, const fa::string& rhs)
   {
     return std::string_view(lhs.c_str()) < std::string_view(rhs.c_str());
   }
@@ -160,7 +160,7 @@ namespace moho
    */
   void CScrLuaInitFormSet::DumpDocs()
   {
-    msvc8::vector<LuaDocEntry> entries;
+    fa::vector<LuaDocEntry> entries;
 
     for (CScrLuaInitForm* form = mForms; form; form = form->mNextInSet) {
       if (!form->GetName() || !form->GetGroupName() || !form->GetDocString()) {
@@ -169,9 +169,9 @@ namespace moho
 
       entries.push_back(
         LuaDocEntry{
-          msvc8::string(form->GetGroupName()),
-          msvc8::string(form->GetDocString()),
-          msvc8::string(form->GetName()),
+          fa::string(form->GetGroupName()),
+          fa::string(form->GetDocString()),
+          fa::string(form->GetName()),
         }
       );
     }
@@ -183,8 +183,8 @@ namespace moho
 
     std::size_t index = 0;
     while (index < entries.size()) {
-      const msvc8::string groupName = entries[index].mGroupName;
-      const msvc8::string groupScopeName = gpg::STR_Printf("%s.%s", setName, groupName.c_str());
+      const fa::string groupName = entries[index].mGroupName;
+      const fa::string groupScopeName = gpg::STR_Printf("%s.%s", setName, groupName.c_str());
       gpg::ScopedLogContext groupScope(groupScopeName);
 
       while (index < entries.size() && entries[index].mGroupName == groupName) {
@@ -259,3 +259,33 @@ namespace moho
     return mDocString;
   }
 } // namespace moho
+
+moho::CScrLuaInitFormSet& moho::SCR_SimLuaInitSet()
+{
+  if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
+    return *set;
+  }
+
+  static CScrLuaInitFormSet fallbackSet("Sim");
+  return fallbackSet;
+}
+
+moho::CScrLuaInitFormSet& moho::SCR_CoreLuaInitSet()
+{
+  if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("Core"); set != nullptr) {
+    return *set;
+  }
+
+  static CScrLuaInitFormSet fallbackSet("Core");
+  return fallbackSet;
+}
+
+moho::CScrLuaInitFormSet& moho::SCR_UserLuaInitSet()
+{
+  if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet("User"); set != nullptr) {
+    return *set;
+  }
+
+  static CScrLuaInitFormSet fallbackSet("User");
+  return fallbackSet;
+}

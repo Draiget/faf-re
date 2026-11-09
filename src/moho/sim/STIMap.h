@@ -3,6 +3,7 @@
 #include <cstddef>
 #include "gpg/core/containers/FastVector.h"
 #include <cstdint>
+#include <memory>
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/Rect2.h"
@@ -14,6 +15,7 @@
 #include "moho/sim/SMinMax.h"
 #include "Wm3AxisAlignedBox3.h"
 #include "Wm3Vector2.h"
+#include "moho/sim/WaterBodies.h"
 
 namespace moho
 {
@@ -42,7 +44,7 @@ namespace moho
    * One mip level of the height field. Both grids are owned, so the tier has
    * the copy/assign/destroy trio a 2007 engine would have written by hand --
    * and that trio is what made `mGrids.resize(n, CHeightFieldTier{})` emit the
-   * whole `msvc8::vector<CHeightFieldTier>` family the recovery used to carry
+   * whole `fa::vector<CHeightFieldTier>` family the recovery used to carry
    * as free functions (all cited on the template members now).
    * Address: 0x004785D0 (FUN_004785D0 -- `CHeightFieldTier::CHeightFieldTier()` -- both owned grids null, both extents zero; zero callers, unreachable; formerly `ZeroHeightFieldTier` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
    * Address: 0x00479580 (FUN_00479580 -- `CHeightFieldTier::~CHeightFieldTier()` -- `delete[]` both owned grids; callers 0x00479380, 0x004796D0; formerly `DestroyHeightFieldTierEntry` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
@@ -531,7 +533,7 @@ namespace moho
     std::uint16_t* data;                    // +0x00
     std::int32_t width;                     // +0x04
     std::int32_t height;                    // +0x08
-    msvc8::vector<CHeightFieldTier> mGrids; // +0x0C
+    fa::vector<CHeightFieldTier> mGrids; // +0x0C
   };
 
   static_assert(sizeof(CHeightField) == 0x1C, "CHeightField size must be 0x1C");
@@ -846,6 +848,42 @@ namespace moho
     [[nodiscard]] float GetElevation(std::int32_t x, std::int32_t z) const;
     [[nodiscard]] bool IsWaterEnabled() const noexcept;
     [[nodiscard]] float GetWaterElevation() const noexcept;
+
+    /**
+     * Engine addition (.plans/water-levels/PLAN.md): the water level at world
+     * `(x, z)`: a water body's where one is, else the sea's, else
+     * `kWaterBodyNoWater`. Without bodies it is exactly what every reader of
+     * the single level computed, `mWaterEnabled ? mWaterElevation : -10000`.
+     */
+    [[nodiscard]] float GetWaterElevationAt(float x, float z) const noexcept
+    {
+      const float sea = mWaterEnabled != 0u ? mWaterElevation : kWaterBodyNoWater;
+      return mWaterBodies ? mWaterBodies->LevelAt(x, z, sea) : sea;
+    }
+
+    /// The same at height-field vertex `(x, z)`, for the occupancy checks.
+    [[nodiscard]] float GetWaterElevationAtVertex(std::int32_t x, std::int32_t z) const noexcept
+    {
+      const float sea = mWaterEnabled != 0u ? mWaterElevation : kWaterBodyNoWater;
+      return mWaterBodies ? mWaterBodies->LevelOfVertex(x, z, sea) : sea;
+    }
+
+    /// Engine addition: whether the map has water bodies in this session.
+    [[nodiscard]] bool HasWaterBodies() const noexcept { return mWaterBodies != nullptr; }
+
+    /**
+     * Engine addition: fills the water bodies `scenarioInfo.WaterBodies`
+     * describes over this map's height field, when the session has
+     * `EFafSimFix::WaterBodies` on; otherwise, or when the map describes none,
+     * leaves the map with its sea only. Logs what it built or skipped.
+     */
+    void InstallWaterBodies(const LuaPlus::LuaObject& scenarioInfo);
+
+  private:
+    /// Engine addition: `SurfaceIntersection` with water bodies (STIMap.cpp).
+    [[nodiscard]] Wm3::Vec3f SurfaceIntersectionWithWaterBodies(const GeomLine3& line, CColHitResult* res) const;
+
+  public:
     /**
      * Address: 0x0089E5C0 (FUN_0089E5C0)
      *
@@ -905,14 +943,19 @@ namespace moho
      * (`LuaPlus::LuaObject` is 0x14, so it is not 8-aligned either), and a
      * 4-aligned type is not rounded up from 0x1544 to 0x1548. Named by the
      * offset convention because the layout is proven and the purpose is not.
+     *
+     * Engine addition: that unused slot holds the map's water bodies
+     * (`CWaterBodies`, .plans/water-levels/PLAN.md), null unless the session
+     * has them on and the map describes some. Same size on x86.
      */
-    std::uint32_t field_0x1544 = 0;               // +0x1544
+    std::unique_ptr<CWaterBodies> mWaterBodies;   // +0x1544
   };
 
   static_assert(offsetof(STIMap, mTerrainType) == 0x1428, "STIMap::mTerrainType offset must be 0x1428");
   static_assert(offsetof(STIMap, mBlocking) == 0x1434, "STIMap::mBlocking offset must be 0x1434");
   static_assert(offsetof(STIMap, mWaterEnabled) == 0x1534, "STIMap::mWaterEnabled offset must be 0x1534");
   static_assert(offsetof(STIMap, mWaterElevationAbyss) == 0x1540, "STIMap::mWaterElevationAbyss offset must be 0x1540");
+  static_assert(offsetof(STIMap, mWaterBodies) == 0x1544, "STIMap::mWaterBodies takes the unused slot at 0x1544");
   static_assert(sizeof(STIMap) == 0x1548, "STIMap size must be 0x1548");
 
   /**

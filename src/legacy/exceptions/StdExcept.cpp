@@ -1,6 +1,6 @@
 #include "legacy/exceptions/StdExcept.h"
 
-namespace msvc8
+namespace fa
 {
   exception::~exception() = default;
-} // namespace msvc8
+} // namespace fa

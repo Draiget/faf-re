@@ -34,7 +34,7 @@ namespace moho
   {
   public:
     [[nodiscard]] const char* GetName() const override;
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
     [[nodiscard]] const gpg::RIndexed* IsPointer() const override;
     void Init() override;
@@ -83,7 +83,7 @@ namespace gpg
     /**
      * Address: 0x006E9C50 (FUN_006E9C50, gpg::RVectorType_WeakPtr_CUnitCommand::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x006E9CE0 (FUN_006E9CE0, gpg::RVectorType_WeakPtr_CUnitCommand::IsIndexed)

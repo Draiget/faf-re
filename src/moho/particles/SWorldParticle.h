@@ -51,18 +51,18 @@ namespace moho
      * Address: 0x0049BC00 (FUN_0049BC00, `??0SWorldParticle@Moho@@QAE@@Z_0` -- the
      * compiler-generated copy constructor: the scalar fields, both counted
      * texture handles (retained by `CountedPtr`'s copy) and `mTypeTag`; emitted
-     * out of line for `msvc8::vector<SWorldParticle>`'s copy steps. Formerly
+     * out of line for `fa::vector<SWorldParticle>`'s copy steps. Formerly
      * transcribed as `CopyWorldParticleForVectorMove` in
      * ParticleRenderBuckets.cpp, removed 2026-09-10.)
      * Address: 0x0049BD30 (FUN_0049BD30, `??1SParticle@Moho@@QAE@@Z` -- the implicit
      * destructor: `mTypeTag` then both counted handles. Formerly
      * `DestroyWorldParticleForVectorTail`, removed.)
-     * Address: 0x0049FAB0 (FUN_0049FAB0 -- the compiler-generated copy assignment of `SWorldParticle` as emitted for its `msvc8::vector` instantiation; callers 0x0049DE20, 0x0049E400, 0x0049E430; formerly `CopyAssignWorldParticleAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0049FF50 (FUN_0049FF50 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SWorldParticle` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopyConstructWorldParticleIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0049FFA0 (FUN_0049FFA0 -- the implicit destructor of `SWorldParticle` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlace` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A05C0 (FUN_004A05C0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SWorldParticle` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopyConstructWorldParticleIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A0610 (FUN_004A0610 -- the implicit destructor of `SWorldParticle` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlaceDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A0710 (FUN_004A0710 -- the implicit destructor of `SWorldParticle` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlaceAndReturnSelf` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0049FAB0 (FUN_0049FAB0 -- the compiler-generated copy assignment of `SWorldParticle` as emitted for its `fa::vector` instantiation; callers 0x0049DE20, 0x0049E400, 0x0049E430; formerly `CopyAssignWorldParticleAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0049FF50 (FUN_0049FF50 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SWorldParticle` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopyConstructWorldParticleIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0049FFA0 (FUN_0049FFA0 -- the implicit destructor of `SWorldParticle` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlace` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004A05C0 (FUN_004A05C0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SWorldParticle` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopyConstructWorldParticleIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004A0610 (FUN_004A0610 -- the implicit destructor of `SWorldParticle` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlaceDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004A0710 (FUN_004A0710 -- the implicit destructor of `SWorldParticle` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlaceAndReturnSelf` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
      */
     /**
      * Air drag, from `REmitterBlueprint::ParticleResistance`. Not an "is this
@@ -91,7 +91,7 @@ namespace moho
     float mReserved54 = 0.0f;                         // +0x58
     CountedPtr_CParticleTexture mTexture;             // +0x5C
     CountedPtr_CParticleTexture mRampTexture;         // +0x60
-    msvc8::string mTypeTag;                           // +0x64
+    fa::string mTypeTag;                           // +0x64
     std::int32_t mArmyIndex = 0;                      // +0x80
     BlendMode mBlendMode = BlendMode::Mode0;          // +0x84
     ZMode mZMode = ZMode::Mode0;                      // +0x88

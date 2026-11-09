@@ -28,7 +28,7 @@ namespace moho
    * What it does:
    * Stores beam render-bucket state on `CWorldParticles` at the recovered
    * `+0xCC` lane.
-   * Address: 0x004914B0 (FUN_004914B0 -- the aggregate's implicit default constructor: null the vertex sheet, then `rb_tree()` buys the header sentinel and self-links it for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x004925E0, 0x004928A0, 0x00493090; formerly `InitializeBeamBucketMapStorage` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004914B0 (FUN_004914B0 -- the aggregate's implicit default constructor: null the vertex sheet, then `rb_tree()` buys the header sentinel and self-links it for `fa::map<SBeamBucketKey, fa::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x004925E0, 0x004928A0, 0x00493090; formerly `InitializeBeamBucketMapStorage` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
    */
   struct SBeamBucketContainer
   {
@@ -84,7 +84,7 @@ namespace moho
   };
 
   /** The render-bucket map: 0x0C of `{proxy, head, size}`, nodes at 0x50. */
-  using ParticleBucketMap = msvc8::map<SParticleBucketKey, SParticleRenderBucket*, ParticleBucketKeyLess>;
+  using ParticleBucketMap = fa::map<SParticleBucketKey, SParticleRenderBucket*, ParticleBucketKeyLess>;
 
   static_assert(sizeof(ParticleBucketMap) == 0x0C, "ParticleBucketMap size must be 0x0C");
 
@@ -102,7 +102,7 @@ namespace moho
     }
   };
 
-  using TrailBucketMap = msvc8::map<STrailBucketKey, STrailRenderBucket*, TrailBucketKeyLess>;
+  using TrailBucketMap = fa::map<STrailBucketKey, STrailRenderBucket*, TrailBucketKeyLess>;
 
   static_assert(sizeof(TrailBucketMap) == 0x0C, "TrailBucketMap size must be 0x0C");
 
@@ -301,7 +301,7 @@ namespace moho
      * render work item. The D3D device's reset path walks this to drop every
      * buffer's GPU handles (inlined there, at 0x0042E252).
      */
-    [[nodiscard]] const msvc8::list<ParticleBuffer*>& PooledBuffers() const noexcept
+    [[nodiscard]] const fa::list<ParticleBuffer*>& PooledBuffers() const noexcept
     {
       return mParticleBuffers;
     }
@@ -316,10 +316,10 @@ namespace moho
      * constructors (`_Buy_head`, 0x00497D00) before the constructor body runs;
      * `~CWorldParticles` tears them down through `_Tidy` (0x00495F30).
      */
-    msvc8::list<ParticleBuffer*> mParticleBuffers;            // +0x04
-    msvc8::list<ParticleBuffer*> mAvailableParticleBuffers;   // +0x10
+    fa::list<ParticleBuffer*> mParticleBuffers;            // +0x04
+    fa::list<ParticleBuffer*> mAvailableParticleBuffers;   // +0x10
     /** Pooled trail-segment vertex buffers (head bought through 0x0049C620). */
-    msvc8::set<STrailSegmentBuffer*> mTrailSegmentPool;      // +0x1C
+    fa::set<STrailSegmentBuffer*> mTrailSegmentPool;      // +0x1C
 
     /**
      * The three render-bucket maps, and beside each the scratch key the lookup
@@ -343,7 +343,7 @@ namespace moho
 
     std::int32_t mBeatsSincePause = 0;                       // +0xC4
     bool mInstantiated = false;                              // +0xC8
-    std::uint8_t mPaddingC9_CB[0x03]{};                      // +0xC9
+    [[maybe_unused]] std::uint8_t mPaddingC9_CB[0x03]{};                      // +0xC9
     SBeamBucketContainer mBeams;                             // +0xCC
   };
 

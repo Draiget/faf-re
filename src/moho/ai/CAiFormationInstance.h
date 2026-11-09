@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <new>
 
 #include "gpg/core/containers/FastVector.h"
 #include "legacy/containers/Map.h"
@@ -133,13 +134,13 @@ namespace moho
    * `mUnitOffsets` is the `std::map<EntId,SUnitOffsetInfo>` the binary's own
    * reflection names (`preregister_RMapType_EntId_SUnitOffsetInfo`,
    * 0x00571A70); its node is 0x44 bytes with the colour/nil pair at +0x40/+0x41,
-   * exactly `msvc8::detail::rb_node<std::pair<const EntId, SUnitOffsetInfo>>`.
+   * exactly `fa::detail::rb_node<std::pair<const EntId, SUnitOffsetInfo>>`.
    *
    * The compiler-generated special members are all real binary functions and
    * fall straight out of the member types:
    *   - Address: 0x0056CAA0 (FUN_0056CAA0) copy constructor -- stands a fresh
    *     map head up and clones the source tree (`0x0056CC50`, the
-   *     `_Tree(const _Tree&)` emission cited on `msvc8::detail::rb_tree`),
+   *     `_Tree(const _Tree&)` emission cited on `fa::detail::rb_tree`),
    *     copies the scalar fields, then splices `mLeader` into the source
    *     leader's weak chain;
    *   - Address: 0x00573270 (FUN_00573270) copy assignment -- the map's
@@ -205,7 +206,7 @@ namespace moho
     [[nodiscard]] Unit* GetLeader();
 
     /// The placed units of this group, keyed by entity id.
-    msvc8::map<EntId, SUnitOffsetInfo> mUnitOffsets; // +0x00
+    fa::map<EntId, SUnitOffsetInfo> mUnitOffsets; // +0x00
     /// Zeroed by the constructor and copied by the special members; nothing
     /// else in the binary writes it.
     Wm3::Vec3f mPos;                                 // +0x0C
@@ -343,8 +344,8 @@ namespace moho
   static_assert(sizeof(gpg::fastvector_n<WeakPtr<IUnit>, 4>) == 0x30, "fastvector_n<WeakPtr<IUnit>,4> size must be 0x30");
   static_assert(sizeof(gpg::fastvector_n<SOffsetInfo, 2>) == 0xA8, "fastvector_n<SOffsetInfo,2> size must be 0xA8");
   static_assert(sizeof(gpg::fastvector_n<SAssignedLocInfo, 16>) == 0x110, "fastvector_n<SAssignedLocInfo,16> size must be 0x110");
-  static_assert(sizeof(msvc8::map<EntId, SUnitOffsetInfo>) == 0x0C, "map<EntId,SUnitOffsetInfo> size must be 0x0C");
-  static_assert(sizeof(msvc8::map<EntId, SCoordsVec2>) == 0x0C, "map<EntId,SCoordsVec2> size must be 0x0C");
+  static_assert(sizeof(fa::map<EntId, SUnitOffsetInfo>) == 0x0C, "map<EntId,SUnitOffsetInfo> size must be 0x0C");
+  static_assert(sizeof(fa::map<EntId, SCoordsVec2>) == 0x0C, "map<EntId,SCoordsVec2> size must be 0x0C");
 
   /**
    * Address: 0x0056DEC0 (FUN_0056DEC0, gpg::RFastVectorType_SOffsetInfo::SerLoad)
@@ -552,17 +553,17 @@ namespace moho
     gpg::fastvector_n<SAssignedLocInfo, 16> mSlots;           // +0x1A0
     /// `GetFormationPosition` results by entity id, valid until the centre
     /// moves or the plan is rebuilt.
-    msvc8::map<EntId, SCoordsVec2> mFormationPosCache;        // +0x2B0
+    fa::map<EntId, SCoordsVec2> mFormationPosCache;        // +0x2B0
     /// `GetOffsetPosition` results by entity id, same lifetime as
     /// `mFormationPosCache`.
-    msvc8::map<EntId, SCoordsVec2> mOffsetPosCache;           // +0x2BC
+    fa::map<EntId, SCoordsVec2> mOffsetPosCache;           // +0x2BC
     Wm3::Vec3f mForwardVector;                                // +0x2C8
     Wm3::Quatf mOrientation;                                  // +0x2D4
     /// Rotation from the units' mean heading to the formation heading
     /// (`UpdateFormation`); `RunScript` pre-rotates each unit's relative
     /// position by it before matching slots.
     Wm3::Quatf mOrientationChange;                            // +0x2E4
-    msvc8::string mScriptName;                                // +0x2F4
+    fa::string mScriptName;                                // +0x2F4
     /// The formation centre (`GetCoords`/`SetCoords`).
     SCoordsVec2 mCoords;                                      // +0x310
     /// Multiplies every script offset (`ComputeRunScriptOffset`); `SetScale`.
@@ -1099,6 +1100,30 @@ namespace moho
      * True when no assigned slot of `layer` overlaps `position` by `size`.
      */
     virtual bool PosIsFree(const SCoordsVec2& position, std::int32_t size, std::int32_t layer) const;
+
+    /**
+     * Engine addition: formations get their memory from a free list of their own, last freed
+     * first reused, instead of the general allocator.
+     *
+     * The binary compares units' cached formation pointers (`SInfoCache::mFormationLayer`, refreshed
+     * only by each unit's own `UpdateInfoCache`): `IsSameFormationLayerWith` (0x006A8D40),
+     * `IsHigherPriorityThan` (0x006A8D80), `COGrid::UnitIsBlocked` (0x00721340) and the steering
+     * braking test. A cache can still hold a formation that was freed, so whether it equals a newer
+     * formation depends on where that one was allocated. In the binary, `new` (0x00A825B9 ->
+     * malloc 0x00958B20) serves the sim thread from its own per-size lane, last freed first reused,
+     * so a new formation lands on the formation freed last, the same way on every machine. The x64
+     * allocator's size classes and shared lists differ, and other threads change what it hands out:
+     * replay 26883293 desynced at beat 3697 in some runs (a stale pointer matched a formation placed
+     * on an older freed block) and not in others. With this list the new formation takes the block
+     * the last formation freed, as in the binary, in every run: on that replay the stale pointer
+     * matches at beat 4019 and does not at beat 3697, as the live players' checksums require.
+     */
+    [[nodiscard]] static void* operator new(std::size_t size);
+    [[nodiscard]] static void* operator new(std::size_t size, const std::nothrow_t&) noexcept;
+    [[nodiscard]] static void* operator new(std::size_t, void* const place) noexcept { return place; }
+    static void operator delete(void* block, std::size_t size) noexcept;
+    static void operator delete(void* block, const std::nothrow_t&) noexcept;
+    static void operator delete(void*, void*) noexcept {}
 
   public:
     Sim* mSim;                                    // +0x328

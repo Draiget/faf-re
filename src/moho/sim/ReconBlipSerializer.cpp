@@ -11,30 +11,8 @@
 
 namespace
 {
-  gpg::RType* gEntityType = nullptr;
   gpg::RType* gReconBlipType = nullptr;
   gpg::RType* gWeakPtrUnitType = nullptr;
-  gpg::RType* gVector3fType = nullptr;
-  gpg::RType* gUnitConstDataType = nullptr;
-  gpg::RType* gUnitVarDataType = nullptr;
-  gpg::RType* gPerArmyReconInfoVectorType = nullptr;
-
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntityType()
-  {
-    if (!gEntityType) {
-      gEntityType = gpg::LookupRType(typeid(moho::Entity));
-    }
-    return gEntityType;
-  }
 
   /**
    * Address: 0x005C90A0 (FUN_005C90A0)
@@ -49,7 +27,7 @@ namespace
     }
 
     outRef->mObj = object;
-    outRef->mType = object ? CachedType<moho::ReconBlip>(gReconBlipType) : nullptr;
+    outRef->mType = object ? gpg::CachedLookup<moho::ReconBlip>(gReconBlipType) : nullptr;
     return outRef;
   }
 
@@ -62,34 +40,6 @@ namespace
       }
     }
     return gWeakPtrUnitType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVector3fType()
-  {
-    return CachedType<Wm3::Vector3f>(gVector3fType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveUnitConstDataType()
-  {
-    return CachedType<moho::SSTIUnitConstantData>(gUnitConstDataType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolveUnitVarDataType()
-  {
-    return CachedType<moho::SSTIUnitVariableData>(gUnitVarDataType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolvePerArmyReconInfoVectorType()
-  {
-    return CachedType<msvc8::vector<moho::SPerArmyReconInfo>>(gPerArmyReconInfoVectorType);
-  }
-
-  [[nodiscard]] gpg::RType* ResolvePerArmyReconInfoType()
-  {
-    if (!moho::SPerArmyReconInfo::sType) {
-      moho::SPerArmyReconInfo::sType = gpg::LookupRType(typeid(moho::SPerArmyReconInfo));
-    }
-    return moho::SPerArmyReconInfo::sType;
   }
 
   // Addresses 0x005C90D0/0x005CAF90 (deserialize "ThunkA"/"ThunkB" pair) and
@@ -121,13 +71,13 @@ namespace moho
   {
     const gpg::RRef ownerRef{};
 
-    archive->Read(ResolveEntityType(), static_cast<moho::Entity*>(this), ownerRef);
+    archive->Read(gpg::RTypeOf<moho::Entity>(), static_cast<moho::Entity*>(this), ownerRef);
     archive->Read(ResolveWeakPtrUnitType(), &mCreator, ownerRef);
     archive->ReadBool(reinterpret_cast<bool*>(&mDeleteWhenStale));
-    archive->Read(ResolveVector3fType(), &mJamOffset, ownerRef);
-    archive->Read(ResolveUnitConstDataType(), &mUnitConstDat, ownerRef);
-    archive->Read(ResolveUnitVarDataType(), &mUnitVarDat, ownerRef);
-    archive->Read(ResolvePerArmyReconInfoVectorType(), &mReconDat, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mJamOffset, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::SSTIUnitConstantData>(), &mUnitConstDat, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::SSTIUnitVariableData>(), &mUnitVarDat, ownerRef);
+    archive->Read(gpg::RTypeOf<fa::vector<moho::SPerArmyReconInfo>>(), &mReconDat, ownerRef);
   }
 
   /**
@@ -140,13 +90,13 @@ namespace moho
   {
     const gpg::RRef ownerRef{};
 
-    archive->Write(ResolveEntityType(), static_cast<const moho::Entity*>(this), ownerRef);
+    archive->Write(gpg::RTypeOf<moho::Entity>(), static_cast<const moho::Entity*>(this), ownerRef);
     archive->Write(ResolveWeakPtrUnitType(), &mCreator, ownerRef);
     archive->WriteBool(mDeleteWhenStale != 0u);
-    archive->Write(ResolveVector3fType(), &mJamOffset, ownerRef);
-    archive->Write(ResolveUnitConstDataType(), &mUnitConstDat, ownerRef);
-    archive->Write(ResolveUnitVarDataType(), &mUnitVarDat, ownerRef);
-    archive->Write(ResolvePerArmyReconInfoVectorType(), &mReconDat, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mJamOffset, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::SSTIUnitConstantData>(), &mUnitConstDat, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::SSTIUnitVariableData>(), &mUnitVarDat, ownerRef);
+    archive->Write(gpg::RTypeOf<fa::vector<moho::SPerArmyReconInfo>>(), &mReconDat, ownerRef);
   }
 } // namespace moho
 

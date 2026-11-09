@@ -71,7 +71,7 @@ namespace moho
    * What it does:
    * Returns one player-color token string from the game color table.
    */
-  msvc8::string GetPlayerColorName(int idx);
+  fa::string GetPlayerColorName(int idx);
 
   /**
    * Address: 0x00506B20 (FUN_00506B20, ?GetPlayerColorCount@Moho@@YAIXZ)

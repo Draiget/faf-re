@@ -36,6 +36,8 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
+#include "gpg/gal/backends/common/PipelineMemo.h"
+#include "gpg/gal/backends/common/UsedTextureTable.h"
 #include "gpg/gal/backends/common/WindowsCursor.h"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/effects/SpirvReflect.h"
@@ -62,7 +64,7 @@ namespace gpg::gal
     DeviceContext* GetDeviceContext() override;
     int GetCurThreadId() override;
     void Func1() const override;
-    void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
+    void GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
     OutputContext* GetHeadOutputContext(unsigned int headIndex) override;
     const OutputContext* GetHeadOutputContext(unsigned int headIndex) const override;
     boost::shared_ptr<PipelineState> GetPipelineState() override;
@@ -87,10 +89,10 @@ namespace gpg::gal
       const RECT* sourceRect,
       const RECT* destinationRect
     ) override;
-    void SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath) override;
-    void SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, int fileFormat) override;
+    void SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
+    void SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, int fileFormat) override;
     void SaveTexture(
-      const boost::shared_ptr<Texture>& texture, const msvc8::string& filePath, int fileFormat, gpg::MemBuffer<char>* outBuffer
+      const boost::shared_ptr<Texture>& texture, const fa::string& filePath, int fileFormat, gpg::MemBuffer<char>* outBuffer
     ) override;
     void GetTexture2D(
       const void* sourceData, std::uint32_t sourceBytes, gpg::MemBuffer<char>* outTextureData, std::uint32_t* outWidth, int* outHeight
@@ -135,6 +137,10 @@ namespace gpg::gal
     void BeginProfileRegion(std::uint32_t region) override;
     void EndProfileRegion(std::uint32_t region) override;
     bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
+    void ReleaseBufferCopy(VertexBuffer& buffer) override;
+    void ReleaseBufferCopy(IndexBuffer& buffer) override;
+    void CopyLockedRangeOnly(VertexBuffer& buffer) override;
+    void CopyLockedRangeOnly(IndexBuffer& buffer) override;
     bool CopyVertexBufferRegion(
       VertexBuffer& destination, std::uint32_t destinationOffset, VertexBuffer& source, std::uint32_t sourceOffset, std::uint32_t byteCount
     ) override;
@@ -188,7 +194,7 @@ namespace gpg::gal
       const std::uint8_t* constantsCpu = nullptr; // the same snapshot, CPU side (upload memory)
       std::uint32_t constantsBytes = 0;
       std::uint64_t constantsSerial = 0;          // the submission whose upload memory holds it
-      std::shared_ptr<const std::vector<effects::TextureBinding>> sampled;
+      const std::vector<effects::TextureBinding>* sampled = nullptr; // in the effect's state
     };
 
     struct ProgramState;
@@ -205,6 +211,14 @@ namespace gpg::gal
       std::uint32_t acquired = 0;
       bool hasImage = false;
       bool acquireWaitPending = false; // the next submission waits for the acquire
+      // Engine addition (`ren_VulkanScaledPresent`): the head draws into an image of its own at the size the
+      // engine made it, and Present copies that into the acquired image, scaled to the window. The swap chain
+      // can then follow the window's size while the engine's targets keep theirs, as on Direct3D 12.
+      bool scaled = false;
+      std::uint32_t headWidth = 0; // the size the engine draws the head at
+      std::uint32_t headHeight = 0;
+      // Out of date or suboptimal for the window: made again at the window's size before the next acquire.
+      bool stale = false;
       void* window = nullptr;
     };
 
@@ -239,6 +253,12 @@ namespace gpg::gal
     void CreateSwapChains(const DeviceContext& context);
     void CreateSwapChain(SwapChain& swapChain, std::uint32_t width, std::uint32_t height);
     void DestroySwapChain(SwapChain& swapChain, bool keepSurface) noexcept;
+    /** A stale scaled swap chain made again at the window's current size; false while the window has no area. */
+    bool RecreateStaleSwapChain(SwapChain& swapChain);
+    /** Copies a scaled head's image into its acquired swap-chain image and leaves that ready to present. */
+    void CopyHeadToSwapChain(vulkan::TrackedImage& head, SwapChain& swapChain);
+    /** A device-local colour image with a view, usable as a target, a texture and a copy source or destination. */
+    RenderTargetVulkan::Buffer CreateColorTargetImage(VkFormat format, std::uint32_t width, std::uint32_t height);
     void CreateRenderTargets();
     void ReleaseRenderTargets() noexcept;
     void CheckAvailableFormats(DeviceContext* context);
@@ -278,6 +298,7 @@ namespace gpg::gal
     [[nodiscard]] VkImageView TargetView(VkFormat& format, vulkan::TrackedImage*& image, std::uint32_t& width, std::uint32_t& height);
     void Trace(const char* format, ...);
     void DumpBackBufferIfDue();
+    void LogMemoryIfDue();
     // ---- GPU-driven programs (GpuDrivenVulkan.cpp) ------------------------------
     void CreateGpuDrivenObjects();
     void ReleaseGpuDrivenObjects() noexcept;
@@ -294,7 +315,7 @@ namespace gpg::gal
 
     // ---- core objects --------------------------------------------------------
     int mCurThreadId = 0;
-    msvc8::vector<msvc8::string> mLog{};
+    fa::vector<fa::string> mLog{};
     DeviceContext mDeviceContext{DeviceApi::Unset};
     std::recursive_mutex mMutex;
     VkInstance mInstance = VK_NULL_HANDLE;
@@ -334,6 +355,22 @@ namespace gpg::gal
     std::map<std::pair<std::uint64_t, std::uint64_t>, VkShaderModule> mLinkedModules;
     std::unordered_map<std::uint64_t, effects::SpirvInterface> mInterfaces;
     std::unordered_map<std::string, VkPipeline> mPipelines;
+    /** Everything mPipelines' string key is built from; see PipelineMemo. */
+    struct PipelineInputs
+    {
+      std::uint64_t vertexKey;
+      std::uint64_t pixelKey;
+      std::uint32_t format;
+      std::uint32_t sampleMask;
+      std::uint32_t strides[16];
+      effects::BlendDesc blend;
+      effects::DepthStencilDesc depth;
+      effects::RasterizerDesc rasterizer;
+      VkFormat colorFormat;
+      VkFormat depthFormat;
+      VkPrimitiveTopology topology;
+    };
+    PipelineMemo<PipelineInputs, VkPipeline> mPipelineMemo;
 
     // ---- heads ---------------------------------------------------------------
     std::vector<SwapChain> mSwapChains;

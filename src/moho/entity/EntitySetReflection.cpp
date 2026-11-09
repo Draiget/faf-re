@@ -46,54 +46,6 @@ namespace
   }
 
   /**
-   * Address: 0x00689740 (FUN_00689740)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `EntitySetBase` lane.
-   */
-  [[nodiscard]] gpg::RType* ResolveEntitySetBaseType()
-  {
-    gpg::RType* type = moho::EntitySetBase::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntitySetBase));
-      moho::EntitySetBase::sType = type;
-    }
-
-    GPG_ASSERT(type != nullptr);
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntitySetType()
-  {
-    gpg::RType* type = EntitySet::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(EntitySet));
-      EntitySet::sType = type;
-    }
-
-    GPG_ASSERT(type != nullptr);
-    return type;
-  }
-
-  /**
-   * Address: 0x006940F0 (FUN_006940F0)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `WeakEntitySetTemplate<Entity>` lane.
-   */
-  [[nodiscard]] gpg::RType* ResolveWeakEntitySetType()
-  {
-    gpg::RType* type = WeakEntitySet::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(WeakEntitySet));
-      WeakEntitySet::sType = type;
-    }
-
-    GPG_ASSERT(type != nullptr);
-    return type;
-  }
-
-  /**
    * Address: 0x006947C0 (FUN_006947C0)
    *
    * What it does:
@@ -125,7 +77,7 @@ namespace
   {
     gpg::RRef ref{};
     ref.mObj = object;
-    ref.mType = ResolveEntitySetBaseType();
+    ref.mType = gpg::CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType);
     return ref;
   }
 
@@ -136,13 +88,13 @@ namespace
    * Deserializes one `EntitySetBase` object lane through archive owner context
    * and returns the archive instance.
    */
-  gpg::ReadArchive* ReadEntitySetBaseArchiveAdapter(
+  [[maybe_unused]] gpg::ReadArchive* ReadEntitySetBaseArchiveAdapter(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
   )
   {
-    archive->Read(ResolveEntitySetBaseType(), object, *ownerRef);
+    archive->Read(gpg::CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType), object, *ownerRef);
     return archive;
   }
 
@@ -153,13 +105,13 @@ namespace
    * Serializes one `EntitySetBase` object lane through archive owner context
    * and returns the archive instance.
    */
-  gpg::WriteArchive* WriteEntitySetBaseArchiveAdapter(
+  [[maybe_unused]] gpg::WriteArchive* WriteEntitySetBaseArchiveAdapter(
     gpg::WriteArchive* const archive,
     void** const objectSlot,
     const gpg::RRef* const ownerRef
   )
   {
-    archive->Write(ResolveEntitySetBaseType(), objectSlot, *ownerRef);
+    archive->Write(gpg::CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType), objectSlot, *ownerRef);
     return archive;
   }
 
@@ -169,13 +121,13 @@ namespace
    * What it does:
    * Deserializes one `EntitySetBase` object lane through archive owner context.
    */
-  void ReadEntitySetBaseArchiveObjectLane1(
+  [[maybe_unused]] void ReadEntitySetBaseArchiveObjectLane1(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
   )
   {
-    archive->Read(ResolveEntitySetBaseType(), object, *ownerRef);
+    archive->Read(gpg::CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType), object, *ownerRef);
   }
 
   /**
@@ -184,13 +136,13 @@ namespace
    * What it does:
    * Serializes one `EntitySetBase` object lane through archive owner context.
    */
-  void WriteEntitySetBaseArchiveObjectLane1(
+  [[maybe_unused]] void WriteEntitySetBaseArchiveObjectLane1(
     gpg::WriteArchive* const archive,
     void** const objectSlot,
     const gpg::RRef* const ownerRef
   )
   {
-    archive->Write(ResolveEntitySetBaseType(), objectSlot, *ownerRef);
+    archive->Write(gpg::CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType), objectSlot, *ownerRef);
   }
 
   /**
@@ -200,7 +152,7 @@ namespace
    * Deserializes one `fastvector<Entity*>` object lane through archive owner
    * context and returns the archive instance.
    */
-  gpg::ReadArchive* ReadFastVectorEntityPointerArchiveAdapter(
+  [[maybe_unused]] gpg::ReadArchive* ReadFastVectorEntityPointerArchiveAdapter(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
@@ -217,7 +169,7 @@ namespace
    * Serializes one `fastvector<Entity*>` object lane through archive owner
    * context and returns the archive instance.
    */
-  gpg::WriteArchive* WriteFastVectorEntityPointerArchiveAdapter(
+  [[maybe_unused]] gpg::WriteArchive* WriteFastVectorEntityPointerArchiveAdapter(
     gpg::WriteArchive* const archive,
     void** const objectSlot,
     const gpg::RRef* const ownerRef
@@ -234,7 +186,7 @@ namespace
    * Deserializes one `fastvector<Entity*>` object lane through archive owner
    * context.
    */
-  void ReadFastVectorEntityPointerArchiveObjectLane1(
+  [[maybe_unused]] void ReadFastVectorEntityPointerArchiveObjectLane1(
     gpg::ReadArchive* const archive,
     void* const object,
     gpg::RRef* const ownerRef
@@ -250,7 +202,7 @@ namespace
    * Serializes one `fastvector<Entity*>` object lane through archive owner
    * context.
    */
-  void WriteFastVectorEntityPointerArchiveObjectLane1(
+  [[maybe_unused]] void WriteFastVectorEntityPointerArchiveObjectLane1(
     gpg::WriteArchive* const archive,
     void** const objectSlot,
     const gpg::RRef* const ownerRef
@@ -415,7 +367,7 @@ namespace moho
     gpg::RType* const typeInfo
   )
   {
-    gpg::RType* const baseType = ResolveEntitySetBaseType();
+    gpg::RType* const baseType = gpg::CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType);
 
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(baseType != nullptr);
@@ -423,13 +375,7 @@ namespace moho
       return;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType);
   }
 
   /**
@@ -488,7 +434,7 @@ namespace moho
     gpg::RType* const typeInfo
   )
   {
-    gpg::RType* const baseType = ResolveEntitySetType();
+    gpg::RType* const baseType = gpg::CachedLookup<EntitySet>(EntitySet::sType);
 
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(baseType != nullptr);
@@ -496,13 +442,7 @@ namespace moho
       return;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType);
   }
 
   /**

@@ -1,4 +1,5 @@
 #include "legacy/containers/Vector.h"
+#include "platform/Interlocked.h"
 #include "EntityDb.h"
 
 #include <cstdlib>
@@ -149,7 +150,6 @@ namespace
   constexpr std::uint32_t kAllUnitsShieldFamilyBoundaryKey = 0x40000000u;
   constexpr std::uint32_t kAllUnitsOtherFamilyBoundaryKey = 0x50000000u;
   constexpr std::uint32_t kAllUnitsLateFamilyBoundaryKey = 0x60000000u;
-  constexpr std::uint32_t kEntityIdFamilyNibbleMask = 0xF0000000u;
 
   gpg::RType* gLegacyEntityDbIdPoolMapType = nullptr;
   gpg::RType* gLegacyEntityDbEntityListType = nullptr;
@@ -180,7 +180,7 @@ namespace
   {
     gpg::RType* type = gLegacyEntityDbEntityListType;
     if (!type) {
-      type = gpg::LookupRType(typeid(msvc8::list<moho::Entity*>));
+      type = gpg::LookupRType(typeid(fa::list<moho::Entity*>));
       gLegacyEntityDbEntityListType = type;
     }
     return type;
@@ -223,7 +223,7 @@ namespace
     }
 
 #if defined(_WIN32)
-    ::InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), static_cast<long>(delta));
+    statItem->AddPrimaryBits(delta);
 #else
     statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
 #endif
@@ -305,7 +305,7 @@ namespace
   [[nodiscard]] moho::CEntityDbAllUnitsNode*
   TreeLowerBound(moho::CEntityDbAllUnitsNode* const head, const std::uint32_t lowerBoundKey) noexcept
   {
-    return msvc8::lower_bound_node<moho::CEntityDbAllUnitsNode, &moho::CEntityDbAllUnitsNode::isNil>(
+    return fa::lower_bound_node<moho::CEntityDbAllUnitsNode, &moho::CEntityDbAllUnitsNode::isNil>(
       head, lowerBoundKey, [](const auto& node, const std::uint32_t key) {
       return node.key < key;
     }
@@ -319,7 +319,7 @@ namespace
    * Stores the first all-units node at/after one source upper-bound key
    * `((sourceIndex + 1) << 20)` into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreAllUnitsSourceUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAllUnitsSourceUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t sourceIndex,
     const moho::EntityDB* const entityDb
@@ -340,7 +340,7 @@ namespace
    * What it does:
    * Stores the left-most all-units tree node (minimum key) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreAllUnitsLeftmostNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAllUnitsLeftmostNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -389,7 +389,7 @@ namespace
    * Returns the exact all-units payload pointer for one `entityId`, or `nullptr`
    * when lookup resolves to the map head/sentinel lane.
    */
-  moho::Entity* FindEntityPayloadByIdNode(
+  [[maybe_unused]] moho::Entity* FindEntityPayloadByIdNode(
     moho::EntityDB* const entityDb,
     const std::uint32_t entityId
   ) noexcept
@@ -413,7 +413,7 @@ namespace
    * Stores the first all-units node at/after the high-family boundary key
    * (`0x20000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreHighFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreHighFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -433,7 +433,7 @@ namespace
    * Stores the first all-units node at/after the mid-family boundary key
    * (`0x30000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreMidFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreMidFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -453,7 +453,7 @@ namespace
    * Stores the first all-units node at/after the shield-family boundary key
    * (`0x40000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreShieldFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreShieldFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -474,7 +474,7 @@ namespace
    * Stores the first all-units node at/after the other-family boundary key
    * (`0x50000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreOtherFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreOtherFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -494,7 +494,7 @@ namespace
    * Stores the first all-units node at/after the late-family boundary key
    * (`0x60000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreLateFamilyBoundaryLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreLateFamilyBoundaryLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -536,7 +536,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` prop-family
    * purge lower-bound query.
    */
-  moho::CEntityDbAllUnitsNode** StorePurgePropFamilyUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgePropFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::EntityDB* const entityDb
@@ -574,7 +574,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` projectile-family
    * purge lower-bound query.
    */
-  moho::CEntityDbAllUnitsNode** StorePurgeProjectileFamilyUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeProjectileFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::EntityDB* const entityDb
@@ -612,7 +612,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` shield-family
    * purge lower-bound query.
    */
-  moho::CEntityDbAllUnitsNode** StorePurgeShieldFamilyUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeShieldFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::EntityDB* const entityDb
@@ -650,7 +650,7 @@ namespace
    * Register-shape adapter that forwards one `(armyIndex + 1)` other-family
    * purge lower-bound query.
    */
-  moho::CEntityDbAllUnitsNode** StorePurgeOtherFamilyUpperBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StorePurgeOtherFamilyUpperBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const std::uint32_t armyIndex,
     const moho::EntityDB* const entityDb
@@ -666,7 +666,7 @@ namespace
    * Stores the first all-units node at/after the non-unit family boundary
    * (`0x10000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreFirstNonUnitFamilyLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreFirstNonUnitFamilyLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -686,7 +686,7 @@ namespace
    * Stores the first all-units node at/after the high-family boundary
    * (`0x20000000`) into `outNode`.
    */
-  moho::CEntityDbAllUnitsNode** StoreFirstHighFamilyLowerBoundNode(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreFirstHighFamilyLowerBoundNode(
     moho::CEntityDbAllUnitsNode** const outNode,
     const moho::EntityDB* const entityDb
   ) noexcept
@@ -736,7 +736,7 @@ namespace
     moho::CEntityDbAllUnitsNode* const last
   )
   {
-    using Map = msvc8::map<std::uint32_t, moho::Entity*>;
+    using Map = fa::map<std::uint32_t, moho::Entity*>;
     const Map::const_iterator firstIt(reinterpret_cast<Map::const_iterator::node_type*>(first));
     const Map::const_iterator lastIt(reinterpret_cast<Map::const_iterator::node_type*>(last));
     const Map::iterator next = entityDb->mAllUnits.erase(firstIt, lastIt);
@@ -769,7 +769,7 @@ namespace
    * Register-shape adapter that advances one all-armies iterator object and
    * returns the same iterator pointer.
    */
-  moho::CUnitIterAllArmies* AdvanceAllArmiesIteratorLane(
+  [[maybe_unused]] moho::CUnitIterAllArmies* AdvanceAllArmiesIteratorLane(
     moho::CUnitIterAllArmies* const iterator
   ) noexcept
   {
@@ -786,7 +786,7 @@ namespace
    * Stores the current all-armies iterator node lane into `outIterator`, then
    * advances the iterator with `Next()` and returns `outIterator`.
    */
-  moho::CEntityDbAllUnitsNode** StoreAndAdvanceAllArmiesIteratorPostIncrement(
+  [[maybe_unused]] moho::CEntityDbAllUnitsNode** StoreAndAdvanceAllArmiesIteratorPostIncrement(
     moho::CUnitIterAllArmies* const iterator,
     moho::CEntityDbAllUnitsNode** const outIterator
   ) noexcept
@@ -893,12 +893,7 @@ namespace
    */
   void DestroyEntityDbTypeInfoBody(EntityDbTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   EntityDbTypeInfo::~EntityDbTypeInfo()
@@ -966,20 +961,6 @@ namespace
     static_cast<moho::EntityDB*>(objectStorage)->~EntityDB();
   }
 
-  /**
-   * Shared `IdPool` RTTI cache lookup, used by `EntityDbIdPoolMapTypeInfo::
-   * GetName`/`SerLoad`/`SerSave` (all three resolve the same element type).
-   */
-  [[nodiscard]] gpg::RType* CachedIdPoolElementType()
-  {
-    gpg::RType* type = moho::IdPool::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::IdPool));
-      moho::IdPool::sType = type;
-    }
-    return type;
-  }
-
   class EntityDbIdPoolMapTypeInfo final : public gpg::RType
   {
   public:
@@ -998,8 +979,8 @@ namespace
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName = gpg::STR_Printf(
-        "map<%s,%s>", gpg::LookupRType(typeid(unsigned int))->GetName(), CachedIdPoolElementType()->GetName()
+      static const fa::string sName = gpg::STR_Printf(
+        "map<%s,%s>", gpg::LookupRType(typeid(unsigned int))->GetName(), gpg::RTypeOf<moho::IdPool>()->GetName()
       );
       return sName.c_str();
     }
@@ -1010,10 +991,10 @@ namespace
      * What it does:
      * Formats inherited lexical text and appends current map element count.
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override
     {
-      const msvc8::string base = gpg::RType::GetLexical(ref);
-      const auto* const map = static_cast<const msvc8::map<std::uint32_t, moho::IdPool>*>(ref.mObj);
+      const fa::string base = gpg::RType::GetLexical(ref);
+      const auto* const map = static_cast<const fa::map<std::uint32_t, moho::IdPool>*>(ref.mObj);
       const int size = map ? static_cast<int>(map->size()) : 0;
       return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
     }
@@ -1024,7 +1005,7 @@ namespace
      * What it does:
      * Sets the reflected object size to the real `map<uint,IdPool>` ABI
      * footprint (12 bytes: `{proxy, head, size}`, matching
-     * `msvc8::map<std::uint32_t, IdPool>` exactly -- not the unrelated size a
+     * `fa::map<std::uint32_t, IdPool>` exactly -- not the unrelated size a
      * modern `std::map<>` local variable would report) and installs the
      * map's load/save reflection callbacks. The binary writes these two
      * function pointers directly at `this+0x1C`/`this+0x14`; this override
@@ -1032,7 +1013,7 @@ namespace
      */
     void Init() override
     {
-      size_ = sizeof(msvc8::map<std::uint32_t, moho::IdPool>);
+      size_ = sizeof(fa::map<std::uint32_t, moho::IdPool>);
       version_ = 1;
       serLoadFunc_ = &EntityDbIdPoolMapTypeInfo::SerLoad;
       serSaveFunc_ = &EntityDbIdPoolMapTypeInfo::SerSave;
@@ -1044,13 +1025,13 @@ namespace
      * What it does:
      * Clears the destination map, reads the element count, then reads and
      * inserts `count` `(key, IdPool)` pairs in archive order. Clearing is
-     * `msvc8::map::clear()` (binary: `FUN_00688030` destroys the subtree from
+     * `fa::map::clear()` (binary: `FUN_00688030` destroys the subtree from
      * the real root, then self-links the header -- see the
      * `rb_tree::destroy_subtree`/`clear()` citations in RbTree.h); each
-     * insert is `msvc8::map::insert()`, i.e. `rb_tree::insert_unique()`
+     * insert is `fa::map::insert()`, i.e. `rb_tree::insert_unique()`
      * (`FUN_006870D0`) linking through `insert_at`/`buy_node`/the rotate pair
      * (`FUN_00687280`/`FUN_006881C0`/`FUN_006880A0`/`FUN_00688120`, all cited
-     * on their RbTree.h members) exactly as every other `msvc8::map`
+     * on their RbTree.h members) exactly as every other `fa::map`
      * instantiation in this codebase does -- no per-map reimplementation.
      */
     static void SerLoad(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
@@ -1060,7 +1041,7 @@ namespace
      *
      * What it does:
      * Writes the element count, then walks the map in ascending key order
-     * writing each `(key, IdPool)` pair. The walk is `msvc8::map`'s
+     * writing each `(key, IdPool)` pair. The walk is `fa::map`'s
      * `begin()`/`operator++` (`FUN_006878C0`/its register-shape adapters
      * `FUN_00685FA0`/`FUN_00686CE0`, cited on `rb_increment` in RbTree.h) --
      * no separate iteration mechanic is introduced here.
@@ -1078,12 +1059,7 @@ namespace
    */
   void DestroyEntityDbIdPoolMapTypeInfoBody(EntityDbIdPoolMapTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   EntityDbIdPoolMapTypeInfo::~EntityDbIdPoolMapTypeInfo()
@@ -1106,7 +1082,7 @@ namespace
   )
   {
     auto* const map =
-      reinterpret_cast<msvc8::map<std::uint32_t, moho::IdPool>*>(objectPtr);
+      reinterpret_cast<fa::map<std::uint32_t, moho::IdPool>*>(objectPtr);
     if (archive == nullptr || map == nullptr) {
       return;
     }
@@ -1115,7 +1091,7 @@ namespace
     archive->ReadUInt(&count);
     map->clear();
 
-    gpg::RType* const idPoolType = CachedIdPoolElementType();
+    gpg::RType* const idPoolType = gpg::RTypeOf<moho::IdPool>();
     gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
 
     for (unsigned int i = 0; i < count; ++i) {
@@ -1125,7 +1101,7 @@ namespace
       moho::IdPool pool{};
       archive->Read(idPoolType, &pool, owner);
 
-      (void)map->insert(msvc8::map<std::uint32_t, moho::IdPool>::value_type(key, std::move(pool)));
+      (void)map->insert(fa::map<std::uint32_t, moho::IdPool>::value_type(key, std::move(pool)));
     }
   }
 
@@ -1144,14 +1120,14 @@ namespace
   )
   {
     const auto* const map =
-      reinterpret_cast<const msvc8::map<std::uint32_t, moho::IdPool>*>(objectPtr);
+      reinterpret_cast<const fa::map<std::uint32_t, moho::IdPool>*>(objectPtr);
     if (archive == nullptr || map == nullptr) {
       return;
     }
 
     archive->WriteUInt(static_cast<unsigned int>(map->size()));
 
-    gpg::RType* const idPoolType = CachedIdPoolElementType();
+    gpg::RType* const idPoolType = gpg::RTypeOf<moho::IdPool>();
     gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
 
     for (const auto& [key, pool] : *map) {
@@ -1187,7 +1163,7 @@ namespace moho
    * `mIdPoolTree`'s sentinel-head allocate/self-link/isNil=1 sequence, inlined
    * here in the binary via the raw node allocator (`FUN_00688180`, cited on
    * `rb_tree::alloc_raw` in RbTree.h) rather than a named `buy_head` symbol,
-   * is now `msvc8::map<std::uint32_t, IdPool>`'s own default constructor --
+   * is now `fa::map<std::uint32_t, IdPool>`'s own default constructor --
    * see the `buy_head()` citation on that member in RbTree.h. No source-level
    * call is needed here; member default-initialization runs it automatically.
    */
@@ -1203,7 +1179,7 @@ namespace moho
    *
    * `mIdPoolTree`'s teardown -- recursive subtree destroy from the tree's
    * root (`FUN_00688030`, cited on `rb_tree::destroy_subtree` in RbTree.h),
-   * then release the sentinel head -- is now `msvc8::map<std::uint32_t,
+   * then release the sentinel head -- is now `fa::map<std::uint32_t,
    * IdPool>`'s own destructor (see the `~rb_tree()` citation on that member),
    * run automatically by member destruction right after this body returns.
    * (A prior hand-rolled version of this teardown recursed from
@@ -1216,19 +1192,14 @@ namespace moho
    * `AllUnitsHead()`'s teardown is the shipped body's direct call `sub_686EF0(
    * this, &outIter, AllUnitsHead()->_Myhead->_Left, AllUnitsHead()->_Myhead)` --
    * `EraseAllUnitsRange(leftmost(), header())`, cited on that member above
-   * (0x00686EF0) -- not an inlined recursive destroy. DB-integrity fix:
-   * this body previously called `DestroyAllUnitsSubtreeRecursive(AllUnitsHead()
-   * ->left)` directly, i.e. from the *leftmost* node instead of the real
-   * root (`AllUnitsHead()->parent`) -- the exact same wrong-root bug already
-   * documented and fixed for `mIdPoolTree` above, independently reintroduced
-   * here for `AllUnitsHead()`. Since leftmost() has no left child by definition,
-   * that call would destroy at most leftmost's own right subtree and then
-   * stop, leaking essentially the entire all-units tree (every tracked
-   * `Unit`) on every `EntityDB` teardown. Routing through the already-
-   * recovered `EraseAllUnitsRange` (which internally calls
+   * (0x00686EF0) -- not an inlined recursive destroy. Since leftmost() has no
+   * left child by definition, that call would destroy at most leftmost's own
+   * right subtree and then stop, leaking essentially the entire all-units tree
+   * (every tracked `Unit`) on every `EntityDB` teardown. Routing through the
+   * already- recovered `EraseAllUnitsRange` (which internally calls
    * `DestroyAllUnitsSubtreeRecursive(head->parent)`, the correct root, via
-   * `EraseAllUnitsTreeRange`'s whole-tree fast path) fixes the leak and
-   * matches the real call target.
+   * `EraseAllUnitsTreeRange`'s whole-tree fast path) fixes the leak and matches
+   * the real call target.
    */
   EntityDB::~EntityDB()
   {
@@ -1511,7 +1482,7 @@ namespace moho
    * Exchanges two heap slots and keeps everything that refers to them
    * correct. `.asm`-confirmed: the entry array sits at `[queue+4]` and the
    * position map at `[queue+0x14]` (`mov eax,[eax+4]` / `mov edx,[eax+14h]`
-   * -- the `_Myfirst` of two `msvc8::vector`s at `+0x00`/`+0x10`). Each
+   * -- the `_Myfirst` of two `fa::vector`s at `+0x00`/`+0x10`). Each
    * 0x14-byte slot is one `CEntityDbBoundedPropQueueNode`, and `std::swap`
    * on two of them is a copy into a temporary and two assignments through
    * the node's `operator=` (0x00687A70), which relinks each `mOwnerLink`
@@ -1546,7 +1517,7 @@ namespace moho
    * Acquires one handle slot from the free-list lane (`lastHandle`) when
    * available; otherwise appends one new handle slot and returns its index.
    * `.c`-confirmed two-way split matches this method exactly. The
-   * capacity-exhausted append path reaches `msvc8::vector<std::int32_t>::
+   * capacity-exhausted append path reaches `fa::vector<std::int32_t>::
    * push_back`/`insert` (0x00686E80/0x00687B40, ICF-shared with
    * `ClusterSearchOpenHeapRuntime::mHandleToHeapIndex`, cited on
    * `legacy/containers/Vector.h`) through `handleSlots.push_back(payload)`.
@@ -1616,7 +1587,7 @@ namespace moho
    * `moho/sim/SimRecoveryRuntime.cpp` under the same private
    * `PriorityQueue20Runtime` type as `Swap`/`AcquireHandle`/`SiftUp` above
    * -- that copy carried this same address but had no real caller
-   * anywhere in `src/**`; removed rather than left as a citation
+   * anywhere in `src/ **`; removed rather than left as a citation
    * duplicate.
    */
   void CEntityDbBoundedPropQueue::SiftDown(std::int32_t index, const std::int32_t count) noexcept
@@ -1977,7 +1948,7 @@ namespace moho
    *
    * What it does:
    * Constructs the `gpg::RListType<moho::Entity*>` static, which preregisters
-   * it for `typeid(msvc8::list<moho::Entity*>)` (`EntityDB::mEntList`), and
+   * it for `typeid(fa::list<moho::Entity*>)` (`EntityDB::mEntList`), and
    * returns it.
    *
    * `RListType<Entity*>`:

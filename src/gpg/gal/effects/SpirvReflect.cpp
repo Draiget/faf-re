@@ -254,3 +254,80 @@ namespace gpg::gal::effects
     return stripped;
   }
 } // namespace gpg::gal::effects
+
+namespace gpg::gal::effects
+{
+  std::uint64_t ReflectSpirvTextureSlots(const std::vector<std::uint8_t>& code)
+  {
+    constexpr std::uint64_t kAll = ~std::uint64_t{0};
+    constexpr std::uint16_t kOpTypeImage = 25;
+    constexpr std::uint16_t kOpTypeRuntimeArray = 29;
+    constexpr std::uint32_t kDecorationBinding = 33;
+    constexpr std::uint32_t kDecorationDescriptorSet = 34;
+    constexpr std::uint32_t kStorageUniformConstant = 0;
+
+    const std::vector<std::uint32_t> words = Words(code);
+    if (words.size() < 5U || words[0] != kMagic) {
+      return kAll;
+    }
+    std::map<std::uint32_t, std::uint32_t> bindings;
+    std::map<std::uint32_t, std::uint32_t> sets;
+    std::map<std::uint32_t, std::uint16_t> typeOps;     // type id -> opcode
+    std::map<std::uint32_t, std::uint32_t> elementTypes; // array / pointer type id -> element / pointee type id
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> variables; // (variable id, pointer type id), UniformConstant
+    for (std::size_t at = 5U; at < words.size();) {
+      const std::uint16_t opcode = static_cast<std::uint16_t>(words[at] & 0xFFFFU);
+      const std::uint32_t count = words[at] >> 16U;
+      if (count == 0U || at + count > words.size()) {
+        return kAll;
+      }
+      if (opcode == kOpDecorate && count >= 4U) {
+        if (words[at + 2U] == kDecorationBinding) {
+          bindings[words[at + 1U]] = words[at + 3U];
+        } else if (words[at + 2U] == kDecorationDescriptorSet) {
+          sets[words[at + 1U]] = words[at + 3U];
+        }
+      } else if (opcode == kOpTypeImage && count >= 2U) {
+        typeOps[words[at + 1U]] = opcode;
+      } else if ((opcode == kOpTypeArray || opcode == kOpTypeRuntimeArray) && count >= 3U) {
+        typeOps[words[at + 1U]] = opcode;
+        elementTypes[words[at + 1U]] = words[at + 2U];
+      } else if (opcode == kOpTypePointer && count >= 4U) {
+        typeOps[words[at + 1U]] = opcode;
+        elementTypes[words[at + 1U]] = words[at + 3U];
+      } else if (opcode == kOpVariable && count >= 4U && words[at + 3U] == kStorageUniformConstant) {
+        variables.emplace_back(words[at + 2U], words[at + 1U]);
+      }
+      at += count;
+    }
+
+    std::uint64_t slots = 0U;
+    for (const auto& [variable, pointerType] : variables) {
+      // Follow the pointer and any arrays down to the element type; only images are texture registers.
+      std::uint32_t type = pointerType;
+      for (int depth = 0; depth < 4; ++depth) {
+        const auto element = elementTypes.find(type);
+        if (element == elementTypes.end()) {
+          break;
+        }
+        type = element->second;
+      }
+      const auto op = typeOps.find(type);
+      if (op == typeOps.end() || op->second != kOpTypeImage) {
+        continue;
+      }
+      const auto set = sets.find(variable);
+      const auto binding = bindings.find(variable);
+      if (binding == bindings.end()) {
+        return kAll; // an image without a binding: can't say which register it reads
+      }
+      if (set != sets.end() && set->second != 0U) {
+        continue; // not the effect's texture set
+      }
+      if (binding->second < 64U) {
+        slots |= std::uint64_t{1} << binding->second;
+      }
+    }
+    return slots;
+  }
+} // namespace gpg::gal::effects

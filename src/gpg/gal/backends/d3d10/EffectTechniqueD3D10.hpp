@@ -47,7 +47,7 @@ namespace gpg::gal
          * What it does:
          * Returns the technique name.
          */
-        msvc8::string* GetName() override;
+        fa::string* GetName() override;
 
         /**
          * Address: 0x00901110 (FUN_00901110)
@@ -92,7 +92,7 @@ namespace gpg::gal
          * What it does:
          * Reads the technique's bool annotation `annotationName`.
          */
-        bool GetAnnotationBool(bool* outValue, const msvc8::string& annotationName) override;
+        bool GetAnnotationBool(bool* outValue, const fa::string& annotationName) override;
 
         /**
          * Address: 0x00901710 (FUN_00901710)
@@ -101,7 +101,7 @@ namespace gpg::gal
          * What it does:
          * Reads the technique's int annotation `annotationName`.
          */
-        bool GetAnnotationInt(int* outValue, const msvc8::string& annotationName) override;
+        bool GetAnnotationInt(int* outValue, const fa::string& annotationName) override;
 
         /**
          * Address: 0x00901880 (FUN_00901880)
@@ -110,7 +110,7 @@ namespace gpg::gal
          * What it does:
          * Reads the technique's float annotation `annotationName`.
          */
-        bool GetAnnotationFloat(float* outValue, const msvc8::string& annotationName) override;
+        bool GetAnnotationFloat(float* outValue, const fa::string& annotationName) override;
 
         /**
          * Address: 0x009019F0 (FUN_009019F0)
@@ -119,10 +119,10 @@ namespace gpg::gal
          * What it does:
          * Reads the technique's string annotation `annotationName`.
          */
-        bool GetAnnotationString(msvc8::string* outValue, const msvc8::string& annotationName) override;
+        bool GetAnnotationString(fa::string* outValue, const fa::string& annotationName) override;
 
     public:
-        msvc8::string name_{};              // +0x04
+        fa::string name_{};              // +0x04
         ID3D10Effect* dxEffect_ = nullptr;                   // +0x20 held (AddRef) while the wrapper lives
         ID3D10EffectTechnique* techniqueHandle_ = nullptr;   // +0x24 owned by the effect
         bool beginEndActive_ = false;       // +0x28

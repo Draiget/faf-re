@@ -1,4 +1,5 @@
 #include "moho/projectile/Projectile.h"
+#include "moho/sim/SimArchiveMode.h"
 
 #include <cmath>
 #include <cstddef>
@@ -12,13 +13,14 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "legacy/exceptions/StdExcept.h"
+#include "legacy/math/X87Math.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityId.h"
 #include "moho/math/GridPos.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
 #include "moho/math/Wm3Segment3FafExtras.h"
-#include "Wm3DistVector3Segment3.h"
+#include "moho/math/Wm3Queries.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -45,6 +47,8 @@
 #include "moho/unit/core/Unit.h"
 #include "Wm3Segment3.h"
 #include "moho/misc/DiagnosticBudget.h"
+#include "moho/sim/SimBlockLane.h"
+#include "moho/sim/SimKeyframe.h"
 
 namespace moho
 {
@@ -59,52 +63,6 @@ namespace
   constexpr std::uint32_t kProjectileCollisionBucketFlags = 0x400u;
   constexpr float kProjectileUnsetValue = -1.0f;
   constexpr float kProjectileBounceVelocityDampingDefault = 0.5f;
-
-  template <class T>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(T));
-    }
-    return slot;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEntityType()
-  {
-    static gpg::RType* cached = nullptr;
-    return CachedType<moho::Entity>(cached);
-  }
-
-  [[nodiscard]] gpg::RType* CachedImpactBroadcasterType()
-  {
-    return CachedType<moho::ManyToOneBroadcaster_EProjectileImpactEvent>(moho::ManyToOneBroadcaster_EProjectileImpactEvent::sType);
-  }
-
-  [[nodiscard]] gpg::RType* CachedWeakEntityType()
-  {
-    return CachedType<moho::WeakPtr<moho::Entity>>(moho::WeakPtr<moho::Entity>::sType);
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* cached = nullptr;
-    return CachedType<Wm3::Vector3f>(cached);
-  }
-
-  [[nodiscard]] gpg::RType* CachedAiTargetType()
-  {
-    return CachedType<moho::CAiTarget>(moho::CAiTarget::sType);
-  }
-
-  [[nodiscard]] gpg::RType* CachedProjectileAttributesType()
-  {
-    return CachedType<moho::CProjectileAttributes>(moho::CProjectileAttributes::sType);
-  }
-
-  [[nodiscard]] gpg::RType* CachedProjectileType()
-  {
-    return CachedType<moho::Projectile>(moho::Projectile::sType);
-  }
 
   [[nodiscard]] gpg::RRef MakeProjectileRef(moho::Projectile* const object)
   {
@@ -253,7 +211,7 @@ namespace
     try {
       LuaPlus::LuaFunction<bool> callback(script);
       return callback(collidedEntity->mLuaObj, projectile);
-    } catch (const msvc8::runtime_error& error) {
+    } catch (const fa::runtime_error& error) {
       moho::CScriptObject::LogScriptWarning(
         weakGuard.GetObjectPtr(), "OnCollisionCheck", error.what()
       );
@@ -363,7 +321,7 @@ namespace moho
     const VTransform& launchTransform,
     const float damage,
     const float damageRadius,
-    const msvc8::string& damageTypeName,
+    const fa::string& damageTypeName,
     const CAiTarget& target,
     const bool isChildProjectile
   )
@@ -623,7 +581,8 @@ namespace moho
       // Initial layer selection from map water level vs launch height (pos.y).
       const float currentHeight = launchTransform.pos_.y;
       STIMap* const mapData = SimulationRef->mMapData;
-      const float waterElevation = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
+      // Engine addition (water bodies): the level at the launch point.
+      const float waterElevation = mapData->GetWaterElevationAt(launchTransform.pos_.x, launchTransform.pos_.z);
       const ELayer previousLayer = mVarDat.mLayerMask;
 
       // 0x0069BC49: `comiss water, posY; jbe` -> Air, so an unordered (NaN)
@@ -687,7 +646,7 @@ namespace moho
       // Previously modeled via the RULE ONE offset-magic helper
       // `AppendProjectileLaneFromOwnerOffsetRuntime` (SimRecoveryRuntime.cpp,
       // reach-in through `ownerBase + 0x9B8`) -- collapsed onto
-      // `msvc8::vector<SCamFollowParams>::push_back` (Vector.h) instead; see
+      // `fa::vector<SCamFollowParams>::push_back` (Vector.h) instead; see
       // that citation for the full fast/slow-path evidence chain.
       if (blueprint->Display.CameraFollowsProjectile != 0) {
         SimulationRef->mSyncSerializeGroup0.push_back(SCamFollowParams{
@@ -698,6 +657,33 @@ namespace moho
       }
     }
   }
+
+#if defined(_M_X64) || defined(__x86_64__)
+  static_assert(sizeof(Projectile) <= SimBlockLane::kBlockBytes);
+
+  void* Projectile::operator new(const std::size_t size)
+  {
+    if (size == sizeof(Projectile)) {
+      if (void* const block = SimBlockLane::Allocate()) {
+        return block;
+      }
+      throw std::bad_alloc();
+    }
+    return ::operator new(size);
+  }
+
+  void Projectile::operator delete(void* const block, const std::size_t size) noexcept
+  {
+    if (block == nullptr) {
+      return;
+    }
+    if (size == sizeof(Projectile)) {
+      SimBlockLane::Free(block);
+      return;
+    }
+    ::operator delete(block);
+  }
+#endif
 
   /**
    * Address: 0x0069AED0 (FUN_0069AED0, Moho::Projectile::~Projectile)
@@ -769,11 +755,14 @@ namespace moho
    *
    * What it does:
    * Sets the projectile expiration tick to `mCurTick + round(seconds * 10.0f)`;
-   * 0x0069DEA1 converts with `fistp` (round-to-nearest), not truncation.
+   * 0x0069DEA1 converts with `fistp` (round-to-nearest), not truncation. A NaN
+   * lifetime -- a tactical missile's glide time after its speed dropped to 0 --
+   * stores the integer indefinite 0x80000000, so the projectile expires about
+   * 2^31 ticks later instead of on the next tick.
    */
   void Projectile::SetLifetime(const float lifetimeSeconds)
   {
-    const std::uint32_t lifetimeTicks = static_cast<std::uint32_t>(std::lrintf(lifetimeSeconds * 10.0f));
+    const std::uint32_t lifetimeTicks = static_cast<std::uint32_t>(fa::RoundToInt(lifetimeSeconds * 10.0f));
     mLifetimeEnd = SimulationRef->mCurTick + lifetimeTicks;
   }
 
@@ -800,8 +789,10 @@ namespace moho
     // FAF FA-Binary-Patches #154 (Fix projectiles falling below zero): a
     // projectile whose current position is below height 0 -- off the map, where
     // there is no terrain to hit -- impacts now. `comiss y, 0.0; jb` at the
-    // 0x0069BDDA hook: a NaN height impacts too.
-    if (FAF_IsSimFixActive(EFafSimFix::ProjectileImpactBelowZero) && !(mVarDat.mCurTransform.pos_.y >= 0.0f)) {
+    // 0x0069BDDA hook: a NaN height impacts too. #180 removes this hook and
+    // replaces it with the map-edge terrain check in CheckCollision.
+    if (FAF_IsSimFixActive(EFafSimFix::ProjectileImpactBelowZero) &&
+        !FAF_IsSimFixActive(EFafSimFix::ProjectileMapEdgeCollision) && !(mVarDat.mCurTransform.pos_.y >= 0.0f)) {
       this->Impact();
       return 1;
     }
@@ -950,7 +941,7 @@ namespace moho
     // Underwater clamp: keep the projectile just below the surface.
     if (mStayUnderwater && mBelowWater) {
       STIMap* const mapData = SimulationRef->mMapData;
-      const float waterElevation = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
+      const float waterElevation = mapData->GetWaterElevationAt(tran.pos_.x, tran.pos_.z); // engine addition
       const float clampY = waterElevation - 0.0099999998f;
       // 0x0069C4E2: `comiss clampY, posY; ja skip` -- an unordered (NaN)
       // compare also clamps.
@@ -1119,7 +1110,7 @@ namespace moho
         CArmyImpl* const launcherArmy = launcherEntity->ArmyRef;
         if (launcherArmy != nullptr) {
           CArmyStats* const stats = launcherArmy->GetArmyStats();
-          msvc8::string statPath = msvc8::string("RealTimeStats_") + launcherEntity->GetUniqueName();
+          fa::string statPath = fa::string("RealTimeStats_") + launcherEntity->GetUniqueName();
           const bool didHit = mTargetPosData.ImpactDidHitEntity(collidedEntity, mImpactType);
           statPath = statPath + (didHit ? "_Shots_Hit" : "_Shots_Missed");
           const std::int32_t delta = 1;
@@ -1228,7 +1219,7 @@ namespace moho
 
     // Underwater aim clamp: keep the aim point just below the surface.
     if (mStayUnderwater) {
-      const float waterElevation = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
+      const float waterElevation = mapData->GetWaterElevationAt(aim.x, aim.z); // engine addition
       const float clampY = waterElevation - 0.25f;
       // 0x0069CB7B: `comiss clampY, aim.y; ja skip` -- NaN also clamps.
       if (!(clampY > aim.y)) {
@@ -1316,7 +1307,7 @@ namespace moho
           jitteredY = groundClampedBase;
         }
         if (!mStayUnderwater) {
-          const float waterLine = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
+          const float waterLine = mapData->GetWaterElevationAt(jitteredX, jitteredZ); // engine addition
           const float waterLimit = waterLine + 0.5f;
           const float waterClampedBase = (baseY > waterLimit) ? waterLimit : baseY;
           if (jitteredY < waterClampedBase) {
@@ -1350,7 +1341,7 @@ namespace moho
 
       // Only flatten while pointing upward (asm 0x0069CFFB-0x0069D01D: forward.y > 0).
       if (forwardY > 0.0f) {
-        const float waterLine = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
+        const float waterLine = mapData->GetWaterElevationAt(trn.pos_.x, trn.pos_.z); // engine addition
         const float t = (waterLine - trn.pos_.y) / forwardY;
         // Only when the surface is reached within one forward unit (asm 0x0069D047: t < 1.0).
         if (t < 1.0f) {
@@ -1448,8 +1439,9 @@ namespace moho
       // misses, and is what a terrain hit must beat to cancel the layer change.
       float waterCrossingDistance = 0.0f;
 
-      if (mapData->mWaterEnabled) {
-        waterElevation = mapData->mWaterElevation;
+      // Engine addition (water bodies): the level where the step ends.
+      if (mapData->mWaterEnabled || mapData->HasWaterBodies()) {
+        waterElevation = mapData->GetWaterElevationAt(nextPos.x, nextPos.z);
         if (mBelowWater) {
           if (nextPos.y > waterElevation) {
             crossing = EWaterCrossing::Exit;
@@ -1517,6 +1509,40 @@ namespace moho
           // (`comiss terrain, water; jbe` -- an unordered compare also counts).
           terrainBeforeWater = !(terrainHit.distance > waterCrossingDistance);
         }
+      } else if (FAF_IsSimFixActive(EFafSimFix::ProjectileMapEdgeCollision)) {
+        // FAF FA-Binary-Patches #180 (section/Fixes/ProjectileMapEdgeCollision.cpp,
+        // entered from FixCollisions' terrain miss): Intersection finds no
+        // terrain outside the map, so the terrain counts as extending outwards
+        // from the map edge. GetElevation clamps its samples to the grid, so
+        // outside the map it returns the height of the nearest edge point.
+        // A NaN x or z counts as outside (`comiss; jb`).
+        const float maxX = static_cast<float>(heightField->width - 1);
+        const float maxZ = static_cast<float>(heightField->height - 1);
+        if (!(nextPos.x >= 0.0f) || !(nextPos.z >= 0.0f) || nextPos.x > maxX || nextPos.z > maxZ) {
+          const float edgeElevation = heightField->GetElevation(nextPos.x, nextPos.z);
+          if (edgeElevation > nextPos.y) {
+            // Fraction of the segment where it crosses the edge height; 0 when
+            // it started at or below it.
+            float fraction = 0.0f;
+            if (curPos.y > edgeElevation) {
+              fraction = (curPos.y - edgeElevation) / (curPos.y - nextPos.y);
+            }
+            // Only replaces a queued impact that comes later along the segment
+            // (a NaN interpolation is kept).
+            if (mImpactInterpolation < 0.0f || mImpactInterpolation > fraction) {
+              mImpactInterpolation = fraction;
+              mImpactPosition = Wm3::Vector3f{
+                (nextPos.x - curPos.x) * fraction + curPos.x,
+                edgeElevation,
+                (nextPos.z - curPos.z) * fraction + curPos.z,
+              };
+              // Joins the terrain hit at SPLICE (0x0069DB46): IMPACT_Terrain,
+              // then the hit distance against the water crossing.
+              mImpactType = IMPACT_Terrain;
+              terrainBeforeWater = !((fraction * distMoved) > waterCrossingDistance);
+            }
+          }
+        }
       }
 
       // 0x0069DB59..0x0069DBA2: the layer change runs last, and not at all when
@@ -1545,8 +1571,9 @@ namespace moho
         // Squared distance from the target's world position to the swept segment:
         // Wild Magic's DistVector3Segment3f on the stack (ctor 0x00A48030 at
         // 0x0069D67F, GetSquared 0x00A484F0 at 0x0069D692).
-        Wm3::DistVector3Segment3f targetDistance(target->mVarDat.mCurTransform.pos_, segment);
-        const float distSq = targetDistance.GetSquared();
+        Wm3::Vector3f closestOnSegment;
+        const float distSq =
+          Wm3::SquaredDistanceVector3Segment3(target->mVarDat.mCurTransform.pos_, segment, closestOnSegment);
 
         // Hit radius squared = |target velocity|^2 + 0.5 (asm 0x0069D69B: target
         // GetVelocity() via vtable slot 15 (+0x3C); 0x0069D6D4: + flt_E4F724 == 0.5).
@@ -1559,7 +1586,6 @@ namespace moho
         if (distSq <= hitRadiusSq && RunProjectileOnCollisionCheckScript(target, this)) {
           // The query's closest point on the segment (GetClosestPoint1,
           // 0x00A39230 at 0x0069D706), read once the script agrees.
-          const Wm3::Vector3f& closestOnSegment = targetDistance.GetClosestPoint1();
           // Fraction of the segment consumed at the closest point
           // (asm 0x0069D719-0x0069D7F1): |closest - curPos| / |nextPos - curPos|,
           // clamped to [0, 1].
@@ -1816,12 +1842,12 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    archive->Read(CachedEntityType(), this, ownerRef);
-    archive->Read(CachedImpactBroadcasterType(), &mImpactEventBroadcaster, ownerRef);
-    archive->Read(CachedWeakEntityType(), &mLauncherWeak, ownerRef);
-    archive->Read(CachedVector3fType(), &mVelocity, ownerRef);
-    archive->Read(CachedVector3fType(), &mLocalAngularVelocity, ownerRef);
-    archive->Read(CachedVector3fType(), &mScaleVelocity, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::Entity>(), this, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::ManyToOneBroadcaster_EProjectileImpactEvent>(), &mImpactEventBroadcaster, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mLauncherWeak, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mVelocity, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mLocalAngularVelocity, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mScaleVelocity, ownerRef);
 
     archive->ReadFloat(&mImpactInterpolation);
     archive->ReadBool(&mCollideSurface);
@@ -1836,29 +1862,42 @@ namespace moho
     archive->ReadFloat(&mTurnRateDegrees);
     archive->ReadFloat(&mMaxSpeed);
     archive->ReadFloat(&mAcceleration);
-    archive->Read(CachedVector3fType(), &mBallisticAcceleration, ownerRef);
-    archive->Read(CachedVector3fType(), &mCachedAimPoint, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mBallisticAcceleration, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mCachedAimPoint, ownerRef);
     archive->ReadBool(&mKeepLastAimLatch);
 
     archive->ReadFloat(&mDamage);
     archive->ReadFloat(&mDamageRadius);
     archive->ReadString(&mDamageTypeName);
 
-    archive->Read(CachedAiTargetType(), &mTargetPosData, ownerRef);
-    archive->Read(CachedVector3fType(), &mImpactPosition, ownerRef);
-    archive->Read(CachedWeakEntityType(), &mCollidedEntityWeak, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CAiTarget>(), &mTargetPosData, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mImpactPosition, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mCollidedEntityWeak, ownerRef);
 
     archive->ReadUInt(&mLifetimeEnd);
     archive->ReadBool(&mBelowWater);
     archive->ReadInt(&mBounceLimit);
     archive->ReadInt(&mGroundTick);
     archive->ReadBool(&mDirectAwayFromGround);
-    archive->Read(CachedVector3fType(), &mGroundDirection, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mGroundDirection, ownerRef);
     archive->ReadFloat(&mBounceVelocityDamping);
     archive->ReadInt(&mZigZagNextTick);
-    archive->Read(CachedVector3fType(), &mZigZagRandomOffset, ownerRef);
-    archive->Read(CachedProjectileAttributesType(), &mAttributes, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mZigZagRandomOffset, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CProjectileAttributes>(), &mAttributes, ownerRef);
     archive->ReadBool(&mIsChildProjectile);
+
+    // Engine addition (replay keyframes): not in a saved game, whose projectile that was about to
+    // impact (mImpactInterpolation) tells OnImpact the default type instead of what it hit.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      int impactType = 0;
+      archive->ReadInt(&impactType);
+      mImpactType = static_cast<EImpactType>(impactType);
+
+      // See SIM_NoteKeyframeBlock.
+      std::uint64_t saved = 0;
+      archive->ReadUInt64(&saved);
+      SIM_NoteKeyframeBlock(saved, this);
+    }
   }
 
   /**
@@ -1877,12 +1916,12 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    archive->Write(CachedEntityType(), this, ownerRef);
-    archive->Write(CachedImpactBroadcasterType(), &mImpactEventBroadcaster, ownerRef);
-    archive->Write(CachedWeakEntityType(), &mLauncherWeak, ownerRef);
-    archive->Write(CachedVector3fType(), &mVelocity, ownerRef);
-    archive->Write(CachedVector3fType(), &mLocalAngularVelocity, ownerRef);
-    archive->Write(CachedVector3fType(), &mScaleVelocity, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::Entity>(), this, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::ManyToOneBroadcaster_EProjectileImpactEvent>(), &mImpactEventBroadcaster, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mLauncherWeak, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mVelocity, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mLocalAngularVelocity, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mScaleVelocity, ownerRef);
 
     archive->WriteFloat(mImpactInterpolation);
     archive->WriteBool(mCollideSurface);
@@ -1897,29 +1936,35 @@ namespace moho
     archive->WriteFloat(mTurnRateDegrees);
     archive->WriteFloat(mMaxSpeed);
     archive->WriteFloat(mAcceleration);
-    archive->Write(CachedVector3fType(), &mBallisticAcceleration, ownerRef);
-    archive->Write(CachedVector3fType(), &mCachedAimPoint, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mBallisticAcceleration, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mCachedAimPoint, ownerRef);
     archive->WriteBool(mKeepLastAimLatch);
 
     archive->WriteFloat(mDamage);
     archive->WriteFloat(mDamageRadius);
-    archive->WriteString(const_cast<msvc8::string*>(&mDamageTypeName));
+    archive->WriteString(const_cast<fa::string*>(&mDamageTypeName));
 
-    archive->Write(CachedAiTargetType(), &mTargetPosData, ownerRef);
-    archive->Write(CachedVector3fType(), &mImpactPosition, ownerRef);
-    archive->Write(CachedWeakEntityType(), &mCollidedEntityWeak, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CAiTarget>(), &mTargetPosData, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mImpactPosition, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::WeakPtr<moho::Entity>>(), &mCollidedEntityWeak, ownerRef);
 
     archive->WriteUInt(mLifetimeEnd);
     archive->WriteBool(mBelowWater);
     archive->WriteInt(mBounceLimit);
     archive->WriteInt(mGroundTick);
     archive->WriteBool(mDirectAwayFromGround);
-    archive->Write(CachedVector3fType(), &mGroundDirection, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mGroundDirection, ownerRef);
     archive->WriteFloat(mBounceVelocityDamping);
     archive->WriteInt(mZigZagNextTick);
-    archive->Write(CachedVector3fType(), &mZigZagRandomOffset, ownerRef);
-    archive->Write(CachedProjectileAttributesType(), &mAttributes, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mZigZagRandomOffset, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CProjectileAttributes>(), &mAttributes, ownerRef);
     archive->WriteBool(mIsChildProjectile);
+
+    // Engine addition (replay keyframes): see MemberDeserialize.
+    if (gSimExactArchive.load(std::memory_order_relaxed)) {
+      archive->WriteInt(static_cast<int>(mImpactType));
+      archive->WriteUInt64(reinterpret_cast<std::uintptr_t>(this)); // see SIM_NoteKeyframeBlock
+    }
   }
 
   // Addresses 0x0069F8F0/0x006A0060 (the "ThunkA"/"ThunkB" serialization

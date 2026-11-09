@@ -25,26 +25,6 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedIAiAttackerType()
-  {
-    gpg::RType* type = IAiAttacker::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(IAiAttacker));
-      IAiAttacker::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCScriptObjectType()
-  {
-    gpg::RType* type = CScriptObject::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(CScriptObject));
-      CScriptObject::sType = type;
-    }
-    return type;
-  }
-
   struct AiAttackerRecoveryBootstrap
   {
     AiAttackerRecoveryBootstrap()
@@ -87,7 +67,7 @@ const char* CAiAttackerImplTypeInfo::GetName() const
  */
 void CAiAttackerImplTypeInfo::AddBase_IAiAttacker(gpg::RType* const typeInfo)
 {
-  gpg::AddBaseIfPresent(typeInfo, CachedIAiAttackerType(), 0x00);
+  gpg::AddBaseIfPresent(typeInfo, gpg::RTypeOf<IAiAttacker>(), 0x00);
 }
 
 /**
@@ -97,7 +77,7 @@ void CAiAttackerImplTypeInfo::AddBase_IAiAttacker(gpg::RType* const typeInfo)
  */
 void CAiAttackerImplTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
 {
-  gpg::AddBaseIfPresent(typeInfo, CachedCScriptObjectType(), gpg::BaseSubobjectOffset<CAiAttackerImpl, CScriptObject>());
+  gpg::AddBaseIfPresent(typeInfo, gpg::RTypeOf<CScriptObject>(), gpg::BaseSubobjectOffset<CAiAttackerImpl, CScriptObject>());
 }
 
 /**

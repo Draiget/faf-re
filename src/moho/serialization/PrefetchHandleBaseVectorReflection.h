@@ -14,7 +14,7 @@ namespace gpg
    * COL: 0x00E61DE8
    *
    * What it is:
-   * Reflection/indexing adapter for `msvc8::vector<moho::PrefetchHandleBase>`.
+   * Reflection/indexing adapter for `fa::vector<moho::PrefetchHandleBase>`.
    */
   template <>
   class RVectorType<moho::PrefetchHandleBase> final : public gpg::RType, public gpg::RIndexed
@@ -33,7 +33,7 @@ namespace gpg
     /**
      * Address: 0x004A5DD0 (FUN_004A5DD0)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x004A5E60 (FUN_004A5E60)

@@ -786,7 +786,8 @@ moho::WEmitterWx::WEmitterWx(UserEntity* const attachEntity, const Wm3::Vector3f
   // destructor's ReleaseInterlockRef (slot 37) gives it back.
   mSim = WLD_GetDriver()->ProcessEvents();
 
-  if (attachEntity != nullptr) {
+  // Engine addition, server mode: a server session's client has no sim (`ProcessEvents` gives none).
+  if (attachEntity != nullptr && mSim != nullptr) {
     Entity* const entity = mSim->mEntityDB->FindEntityById(attachEntity->mParams.mEntityId);
     mAttachedUnit.Set(entity != nullptr ? entity->IsUnit() : nullptr);
   } else {
@@ -984,7 +985,7 @@ moho::WEmitterWx::~WEmitterWx()
     delete panel;
   }
 
-  if (mPreviewEffect.GetObjectPtr() != nullptr) {
+  if (mPreviewEffect.GetObjectPtr() != nullptr && mSim != nullptr) {
     mSim->mEffectManager->DestroyEffect(mPreviewEffect.GetObjectPtr());
   }
   WLD_GetDriver()->ReleaseInterlockRef();
@@ -1091,7 +1092,7 @@ void moho::WEmitterWx::RefreshPreviewEmitter()
   }
 
   // Slot 4 takes the texture paths: 0 the particle texture, 1 the ramp.
-  msvc8::string path = gpg::STR_WideToUtf8(mTexturePath.c_str());
+  fa::string path = gpg::STR_WideToUtf8(mTexturePath.c_str());
   mPreviewEffect.GetObjectPtr()->OnInit(0, path.c_str());
   path = gpg::STR_WideToUtf8(mRampTexturePath.c_str());
   mPreviewEffect.GetObjectPtr()->OnInit(1, path.c_str());
@@ -1217,7 +1218,7 @@ void moho::WEmitterWx::OnTimeSliderUpdateUI(wxUpdateUIEvent&)
     return;
   }
 
-  int tick = static_cast<int>(msvc8::fmod(mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TICKCOUNT), mCachedRepeatTime));
+  int tick = static_cast<int>(fa::fmod(mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TICKCOUNT), mCachedRepeatTime));
   if (mCachedRepeatTime >= mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TICKCOUNT)) {
     tick = static_cast<int>(mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TICKCOUNT));
   }
@@ -1242,7 +1243,7 @@ void moho::WEmitterWx::WriteBlueprintScript(const wxString& path, const wxString
     return;
   }
 
-  msvc8::auto_ptr<gpg::Stream> file = DISK_OpenFileWrite(gpg::STR_WideToUtf8(path.c_str()).c_str());
+  fa::auto_ptr<gpg::Stream> file = DISK_OpenFileWrite(gpg::STR_WideToUtf8(path.c_str()).c_str());
   if (file.get() == nullptr) {
     return;
   }
@@ -1318,7 +1319,7 @@ void moho::WEmitterWx::OnMenuCommand(wxCommandEvent& event)
 {
   switch (event.GetId()) {
     case ID_EMITTER_OPEN: {
-      msvc8::string emittersRoot;
+      fa::string emittersRoot;
       (void)DISK_GetVFS()->FindFile(&emittersRoot, "/effects/Emitters", nullptr);
       mBlueprintDirectory = gpg::STR_Utf8ToWide(emittersRoot.c_str()).c_str();
 
@@ -1348,7 +1349,7 @@ void moho::WEmitterWx::OnMenuCommand(wxCommandEvent& event)
       mPreviewEffect.Set(nullptr);
 
       {
-        msvc8::string mountedPath;
+        fa::string mountedPath;
         (void)DISK_GetVFS()->ToMountedPath(&mountedPath, gpg::STR_WideToUtf8(mBlueprintPath.c_str()).c_str());
         mBlueprintName = mountedPath;
       }
@@ -1411,7 +1412,7 @@ void moho::WEmitterWx::OnMenuCommand(wxCommandEvent& event)
 
     case ID_EMITTER_SAVE: {
       if (mBlueprintFileName.IsEmpty()) {
-        msvc8::string emittersRoot;
+        fa::string emittersRoot;
         (void)DISK_GetVFS()->FindFile(&emittersRoot, "/effects/Emitters", nullptr);
         mBlueprintDirectory = gpg::STR_Utf8ToWide(emittersRoot.c_str()).c_str();
 
@@ -1442,7 +1443,7 @@ void moho::WEmitterWx::OnMenuCommand(wxCommandEvent& event)
     }
 
     case ID_EMITTER_OPEN_TEXTURE: {
-      msvc8::string texturesRoot;
+      fa::string texturesRoot;
       (void)DISK_GetVFS()->FindFile(&texturesRoot, "/textures/particles", nullptr);
       mTextureDirectory = gpg::STR_Utf8ToWide(texturesRoot.c_str()).c_str();
 
@@ -1456,7 +1457,7 @@ void moho::WEmitterWx::OnMenuCommand(wxCommandEvent& event)
       mTextureDirectory = dialog->GetDirectory();
       mTexturePath = dialog->GetPath();
 
-      msvc8::string mountedPath;
+      fa::string mountedPath;
       (void)DISK_GetVFS()->ToMountedPath(&mountedPath, gpg::STR_WideToUtf8(mTexturePath.c_str()).c_str());
       mTexturePath = gpg::STR_Utf8ToWide(mountedPath.c_str()).c_str();
       mTextureNameControl->SetLabel(mTexturePath);
@@ -1465,7 +1466,7 @@ void moho::WEmitterWx::OnMenuCommand(wxCommandEvent& event)
     }
 
     case ID_EMITTER_OPEN_RAMP: {
-      msvc8::string texturesRoot;
+      fa::string texturesRoot;
       (void)DISK_GetVFS()->FindFile(&texturesRoot, "/textures/particles", nullptr);
       mTextureDirectory = gpg::STR_Utf8ToWide(texturesRoot.c_str()).c_str();
 
@@ -1479,7 +1480,7 @@ void moho::WEmitterWx::OnMenuCommand(wxCommandEvent& event)
       mTextureDirectory = dialog->GetDirectory();
       mRampTexturePath = dialog->GetPath();
 
-      msvc8::string mountedPath;
+      fa::string mountedPath;
       (void)DISK_GetVFS()->ToMountedPath(&mountedPath, gpg::STR_WideToUtf8(mRampTexturePath.c_str()).c_str());
       mRampTexturePath = gpg::STR_Utf8ToWide(mountedPath.c_str()).c_str();
       mRampNameControl->SetLabel(mRampTexturePath);

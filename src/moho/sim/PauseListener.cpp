@@ -62,7 +62,7 @@ namespace moho
         SCR_Import(luaState, "/lua/ui/game/gamemain.lua")["OnUserPause"]
       );
       onUserPauseFn.Call_Bool(event.mPaused);
-    } catch (const msvc8::runtime_error& error) {
+    } catch (const fa::runtime_error& error) {
       gpg::Warnf("Error running '/lua/ui/game/gamemain.lua:OnUserPause': %s", error.what());
     }
   }

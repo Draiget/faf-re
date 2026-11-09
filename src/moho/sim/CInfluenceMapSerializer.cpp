@@ -9,14 +9,6 @@
 
 namespace
 {
-  template <class TObject>
-  [[nodiscard]] gpg::RType* CachedType(gpg::RType*& slot)
-  {
-    if (!slot) {
-      slot = gpg::LookupRType(typeid(TObject));
-    }
-    return slot;
-  }
 
   gpg::RType* gCArmyImplType = nullptr;
   gpg::RType* gBlipCellMapType = nullptr;
@@ -38,7 +30,7 @@ namespace moho
    * Address: 0x0071F330 (FUN_0071F330, sub_71F330)
    * Address: 0x0071E2F0 (FUN_0071E2F0)
    */
-  void CInfluenceMap::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+  void CInfluenceMap::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& /*ownerRef*/)
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -53,7 +45,7 @@ namespace moho
       gpg::RRef source{};
       source.mObj = tracked.object;
       source.mType = tracked.type;
-      const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedType<moho::CArmyImpl>(gCArmyImplType));
+      const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::CachedLookup<moho::CArmyImpl>(gCArmyImplType));
       mArmy = static_cast<moho::CArmyImpl*>(upcast.mObj);
     }
 
@@ -62,18 +54,18 @@ namespace moho
     archive->ReadInt(&mHeight);
     archive->ReadInt(&mGridSize);
     archive->Read(
-      CachedType<msvc8::map<std::uint32_t, std::int32_t>>(gBlipCellMapType),
+      gpg::CachedLookup<fa::map<std::uint32_t, std::int32_t>>(gBlipCellMapType),
       &mBlipCells,
       owner
     );
-    archive->Read(CachedType<msvc8::vector<moho::InfluenceGrid>>(gInfluenceGridVectorType), &mMapEntries, owner);
+    archive->Read(gpg::CachedLookup<fa::vector<moho::InfluenceGrid>>(gInfluenceGridVectorType), &mMapEntries, owner);
   }
 
   /**
    * Address: 0x0071F400 (FUN_0071F400, sub_71F400)
    * Address: 0x0071E300 (FUN_0071E300)
    */
-  void CInfluenceMap::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef)
+  void CInfluenceMap::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& /*ownerRef*/)
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -83,7 +75,7 @@ namespace moho
     const gpg::RRef owner{};
     gpg::RRef armyRef{};
     armyRef.mObj = mArmy;
-    armyRef.mType = mArmy ? CachedType<moho::CArmyImpl>(gCArmyImplType) : nullptr;
+    armyRef.mType = mArmy ? gpg::CachedLookup<moho::CArmyImpl>(gCArmyImplType) : nullptr;
     gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, owner);
 
     archive->WriteInt(mTotal);
@@ -91,11 +83,11 @@ namespace moho
     archive->WriteInt(mHeight);
     archive->WriteInt(mGridSize);
     archive->Write(
-      CachedType<msvc8::map<std::uint32_t, std::int32_t>>(gBlipCellMapType),
+      gpg::CachedLookup<fa::map<std::uint32_t, std::int32_t>>(gBlipCellMapType),
       &mBlipCells,
       owner
     );
-    archive->Write(CachedType<msvc8::vector<moho::InfluenceGrid>>(gInfluenceGridVectorType), &mMapEntries, owner);
+    archive->Write(gpg::CachedLookup<fa::vector<moho::InfluenceGrid>>(gInfluenceGridVectorType), &mMapEntries, owner);
   }
 } // namespace moho
 

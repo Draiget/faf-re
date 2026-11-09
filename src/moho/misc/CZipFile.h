@@ -1,5 +1,6 @@
 #pragma once
 
+#include "legacy/containers/Layout.h"
 #include <Windows.h>
 
 #include <cstddef>
@@ -23,7 +24,7 @@ namespace moho
     std::uint16_t mDosTime = 0;             // +0x06
     std::uint32_t mCompressedSize = 0;      // +0x08
     std::uint32_t mUncompressedSize = 0;    // +0x0C
-    msvc8::string mName{};                  // +0x10
+    fa::string mName{};                  // +0x10
     std::uint32_t mLocalHeaderOffset = 0;   // +0x2C
     std::int32_t mCachedDataOffset = -1;    // +0x30
   };
@@ -49,7 +50,7 @@ namespace moho
    */
   struct ZipEntryNameLess
   {
-    [[nodiscard]] bool operator()(const msvc8::string& lhs, const msvc8::string& rhs) const
+    [[nodiscard]] bool operator()(const fa::string& lhs, const fa::string& rhs) const
     {
       return gpg::STR_CompareNoCase(lhs.c_str(), rhs.c_str()) < 0;
     }
@@ -61,10 +62,10 @@ namespace moho
    * IDA types the emissions `std::map_string_uint`. The node is 0x30 (its
    * allocator, 0x0046F170, computes `lea edx,[ecx+ecx*2]; shl edx,4`) with the
    * key at `node+0x0C` -- `find` reads `_Bx` at `node+0x10` and `_Myres` at
-   * `node+0x24`, the plain 0x1C `msvc8::string` -- the index at `node+0x28`,
+   * `node+0x24`, the plain 0x1C `fa::string` -- the index at `node+0x28`,
    * and colour/nil at `+0x2C`/`+0x2D`.
    */
-  using SZipFileNameIndexMap = msvc8::map<msvc8::string, std::uint32_t, ZipEntryNameLess>;
+  using SZipFileNameIndexMap = fa::map<fa::string, std::uint32_t, ZipEntryNameLess>;
 
   static_assert(sizeof(SZipFileNameIndexMap) == 0x0C, "SZipFileNameIndexMap size must be 0x0C");
   static_assert(
@@ -92,9 +93,34 @@ namespace moho
   static_assert(offsetof(SZipLocalFileHeader, mExtraFieldLength) == 0x1C, "SZipLocalFileHeader::mExtraFieldLength offset must be 0x1C");
   static_assert(sizeof(SZipLocalFileHeader) == 0x1E, "SZipLocalFileHeader size must be 0x1E");
 
+  /**
+   * Engine addition (`res_ZipKeepOpen`): while one of these lives on a thread, that thread's
+   * `CZipFile::ReadEntry` calls keep each archive open instead of opening it for every file. All of
+   * them close when it ends, as an open archive can't be replaced. Reads return the same bytes.
+   * `/nozipkeepopen` turns it off at startup.
+   */
+  class CZipFileReadScope
+  {
+  public:
+    CZipFileReadScope();
+    ~CZipFileReadScope();
+    CZipFileReadScope(const CZipFileReadScope&) = delete;
+    CZipFileReadScope& operator=(const CZipFileReadScope&) = delete;
+
+  private:
+    bool mOwnsArchives = false;
+  };
+
   class CZipFile
   {
   public:
+    /**
+     * Engine addition (plan WPR.35): whether `ReadEntry` keeps every file it decompressed for the
+     * next read, as the binary does. A program with no UI, whose loaded data lives elsewhere, turns
+     * this off before it reads anything: a second read decompresses the file again.
+     */
+    static void SetKeepEntryData(bool keep) noexcept;
+
     static constexpr std::uint32_t kInvalidEntryIndex = 0xFFFFFFFFu;
 
     /**
@@ -122,7 +148,7 @@ namespace moho
      * What it does:
      * Resolves one canonical zip entry name to entry index, or returns `0xFFFFFFFF`.
      */
-    [[nodiscard]] std::uint32_t FindFile(const msvc8::string& canonicalPath) const;
+    [[nodiscard]] std::uint32_t FindFile(const fa::string& canonicalPath) const;
 
     /**
      * Address: 0x0046D380 (FUN_0046D380, Moho::CZipFile::OpenFile)
@@ -130,7 +156,7 @@ namespace moho
      * What it does:
      * Opens one zip entry by canonical path as a memory-backed read stream.
      */
-    [[nodiscard]] msvc8::auto_ptr<gpg::Stream> OpenFile(const msvc8::string& canonicalPath) const;
+    [[nodiscard]] fa::auto_ptr<gpg::Stream> OpenFile(const fa::string& canonicalPath) const;
 
     /**
      * Address: 0x0046D420 (FUN_0046D420, Moho::CZipFile::ReadFile)
@@ -138,7 +164,7 @@ namespace moho
      * What it does:
      * Reads one zip entry by canonical path into immutable shared-memory bytes.
      */
-    [[nodiscard]] gpg::MemBuffer<const char> ReadFile(const msvc8::string& canonicalPath) const;
+    [[nodiscard]] gpg::MemBuffer<const char> ReadFile(const fa::string& canonicalPath) const;
 
     /**
      * Address: 0x0046D460 (FUN_0046D460, Moho::CZipFile::CopyFile)
@@ -146,7 +172,7 @@ namespace moho
      * What it does:
      * Reads one zip entry by canonical path and returns a mutable byte copy.
      */
-    [[nodiscard]] gpg::MemBuffer<char> CopyFile(const msvc8::string& canonicalPath) const;
+    [[nodiscard]] gpg::MemBuffer<char> CopyFile(const fa::string& canonicalPath) const;
 
     /**
      * Address: 0x0046C770 (FUN_0046C770, Moho::CZipFile::GetEntryName)
@@ -154,7 +180,7 @@ namespace moho
      * What it does:
      * Returns the canonical zip-entry name for one validated entry index.
      */
-    [[nodiscard]] const msvc8::string& GetEntryName(std::uint32_t entryIndex) const;
+    [[nodiscard]] const fa::string& GetEntryName(std::uint32_t entryIndex) const;
 
     /**
      * Address: 0x0046C810 (FUN_0046C810, Moho::CZipFile::GetEntrySize)
@@ -178,7 +204,7 @@ namespace moho
      * What it does:
      * Opens one zip entry by index as a memory-backed read stream.
      */
-    [[nodiscard]] msvc8::auto_ptr<gpg::Stream> OpenEntry(std::uint32_t entryIndex) const;
+    [[nodiscard]] fa::auto_ptr<gpg::Stream> OpenEntry(std::uint32_t entryIndex) const;
 
     /**
      * Address: 0x0046CB80 (FUN_0046CB80, Moho::CZipFile::ReadEntry)
@@ -200,14 +226,24 @@ namespace moho
   private:
     [[nodiscard]] SZipFileCachedEntry& GetCachedEntryOrThrow(std::uint32_t entryIndex, const char* message) const;
     [[nodiscard]] const CZipFileEntry& GetEntryOrThrow(std::uint32_t entryIndex, const char* message) const;
+#if !FAF_RETAIL_LAYOUT
+    void BuildEntryIndex(const char* archivePath);
+#endif
 
   public:
-    msvc8::string mPath{};                           // +0x00
-    msvc8::vector<SZipFileCachedEntry> mEntries{};  // +0x1C
+    fa::string mPath{};                           // +0x00
+    fa::vector<SZipFileCachedEntry> mEntries{};  // +0x1C
+#if FAF_RETAIL_LAYOUT
     SZipFileNameIndexMap mEntryByCanonicalPath{};   // +0x2C
+#else
+    // Engine change: entry indices sorted by name, in place of the binary's map. The map keeps a
+    // second copy of every name and a node per entry, for lookups only this file makes.
+    fa::vector<std::uint32_t> mEntryByCanonicalPath{};
+#endif
   };
 
   static_assert(offsetof(CZipFile, mEntries) == 0x1C, "CZipFile::mEntries offset must be 0x1C");
   static_assert(offsetof(CZipFile, mEntryByCanonicalPath) == 0x2C, "CZipFile::mEntryByCanonicalPath offset must be 0x2C");
   static_assert(sizeof(CZipFile) == 0x38, "CZipFile size must be 0x38");
+
 } // namespace moho

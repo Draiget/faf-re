@@ -9,8 +9,12 @@ Development tools for the engine. The main one is **mpemu**, a Go multiplayer te
 | `cmd/mpemu` | Runs multiplayer sessions against an emulated FAF client + lobby server and checks them. `mpemu agent` serves one test PC's players |
 | `cmd/mpemu-server` | The hub: icebreaker signalling API, STUN/TURN, the director–agent control channel and a latching game relay. Deployment: [deploy/README.md](deploy/README.md) |
 | `cmd/fakegame` | Stand-in for the game process: speaks GPGNet, pings every peer over UDP and reports what it measured (`/loadtime` delays `Idle` as the game's loading does) |
+| `cmd/fafclient` | Emulates the mainline FAF client's side of the ICE adapter contract and the lobby server's pairing, so any adapter (FAF's `faf-ice-adapter.jar`, ours) runs unchanged; see [docs/LAUNCHER_ADAPTER_CONTRACT.md](../docs/LAUNCHER_ADAPTER_CONTRACT.md) |
+| `cmd/desync-diff` | Compares players' desync dumps from one game and prints the first value that differs (`compare`), rebuilds a missing side from the replay (`rebuild`), and is the desync server's dump receiver (`serve`). See [cmd/desync-diff/README.md](cmd/desync-diff/README.md) |
+| `cmd/turnsrv` | `turnsrv` on its own (prints its URLs and one set of credentials), for testing ICE agents such as `faf_juice_gather` |
 | `scenarios/` | YAML scenarios for mpemu |
-| `difffuzz/` | Differential fuzzing of pure leaf functions, retail against recovered; see [difffuzz/README.md](difffuzz/README.md) |
+| `fontfuzz/` | `faf_fontfuzz`: fuzzes what a mod's font goes through, the structure check, the cook and the atlas that comes back. Build it with `-DFAF_FONTFUZZ_SANITIZE=ON` in its own build folder |
+| `difffuzz/` | Differential fuzzing of pure leaf functions, retail against recovered, and `faf_math_dump`, the same functions compared across Windows and Linux; see [difffuzz/README.md](difffuzz/README.md) |
 | `sfd-inspect/` | Independent SFD diagnostics and parser tests; see [sfd-inspect/README.md](sfd-inspect/README.md) |
 
 The rest of this page covers mpemu. It is one Go module (`faf-main/tools`): shared packages at the top level, each program in `cmd/<app>`.
@@ -30,6 +34,7 @@ The rest of this page covers mpemu. It is one Go module (`faf-main/tools`): shar
 | `scenario` | YAML scenarios, step runner, assertions, interactive console |
 | `procs` | Child processes in a kill-on-close job object: nothing survives mpemu |
 | `fakegame` | Library behind `cmd/fakegame` |
+| `fafclient` | Library behind `cmd/fafclient`: the client's JSON-RPC (JJsonRpc framing), adapter launch, lobby-server pairing and `IceMsg` relay |
 
 ## Build
 

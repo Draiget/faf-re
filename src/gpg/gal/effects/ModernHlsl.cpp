@@ -12,13 +12,129 @@
 #include <utility>
 
 #include "EffectText.h"
+#include "ShadowCascades.h"
 
 namespace gpg::gal::effects
 {
   using namespace text;
 
+  ShadowCascadeConstants gShadowCascades{};
+  std::atomic<bool> gShadowCascadesBlocked{false};
+
+  bool IsShadowLookupSampler(const SamplerDesc& sampler)
+  {
+    return Lower(sampler.texture) == "shadowtexture" && Lower(sampler.name).find("blur") == std::string::npos;
+  }
+
+  std::string_view ShadowCascadeDeclaration() noexcept
+  {
+    return "float4 faf_ShadowCascades[9]; // engine addition (ren_ShadowCascades), filled by the backend\n";
+  }
+
   namespace
   {
+    static_assert(kShadowCascadeVectors == 9U, "ShadowCascadeDeclaration's array length");
+
+    // Engine addition (ren_ShadowCascades): the lighting shadow samplers' own type; see ShadowCascades.h.
+    // The shadow targets have one mip, so every lookup reads level 0 and needs no derivatives: a pixel's
+    // neighbours may sit in another tile.
+    constexpr const char* kShadowCascadeHelpers = R"hlsl(
+// ---- engine addition (ren_ShadowCascades): shadow lookups through the cascade atlas ----
+// HLSL converts between structs whose members match one for one, which would make every tex2D on this
+// type ambiguous with faf_sampler's. The sampler comes first here and the texture first there, so
+// neither converts to the other.
+struct faf_shadow_sampler
+{
+    SamplerState s;
+    Texture2D t2;
+};
+faf_shadow_sampler faf_make_shadow_sampler(Texture2D t2, TextureCube tc, Texture3D t3, SamplerState s)
+{
+    faf_shadow_sampler r;
+    r.s = s;
+    r.t2 = t2;
+    return r;
+}
+float2 faf_shadow_uv(float2 uv)
+{
+    const int count = (int)faf_ShadowCascades[0].x;
+    if (count <= 0) return uv;
+    [unroll] for (int k = 0; k < 4; ++k) {
+        if (k < count) {
+            const float4 box = faf_ShadowCascades[1 + 2 * k];
+            if (all(uv >= box.xy) && all(uv <= box.zw)) {
+                const float4 map = faf_ShadowCascades[2 + 2 * k];
+                return uv * map.xy + map.zw;
+            }
+        }
+    }
+    return faf_ShadowCascades[0].zw;
+}
+float4 faf_shadow_read(faf_shadow_sampler s, float2 uv) { return s.t2.SampleLevel(s.s, faf_shadow_uv(uv), 0); }
+float4 tex2D(faf_shadow_sampler s, float2 uv) { return faf_shadow_read(s, uv); }
+float4 tex2D(faf_shadow_sampler s, float2 uv, float2 dx, float2 dy) { return faf_shadow_read(s, uv); }
+float4 tex2Dbias(faf_shadow_sampler s, float4 uv) { return faf_shadow_read(s, uv.xy); }
+float4 tex2Dproj(faf_shadow_sampler s, float4 uv) { return faf_shadow_read(s, uv.xy / uv.w); }
+float4 tex2Dlod(faf_shadow_sampler s, float4 uv) { return faf_shadow_read(s, uv.xy); }
+float4 tex2Dgrad(faf_shadow_sampler s, float2 uv, float2 dx, float2 dy) { return faf_shadow_read(s, uv); }
+// ---- end of the cascade lookups ----
+)hlsl";
+
+    /**
+     * Engine addition (ren_ShadowCascades): true when every use of `sampler` in `source`, past its own
+     * declaration and outside comments, is the first argument of a tex2D-family call. Those are the
+     * calls faf_shadow_sampler answers; anything else (passing it to a function) needs a faf_sampler.
+     */
+    [[nodiscard]] bool ShadowSamplerOnlyLookedUp(const std::string_view source, const SamplerDesc& sampler)
+    {
+      static constexpr std::string_view kCalls[] = {"tex2D", "tex2Dbias", "tex2Dproj", "tex2Dlod", "tex2Dgrad"};
+      const std::string_view name = sampler.name;
+      std::size_t index = 0U;
+      while (index < source.size()) {
+        if (source.compare(index, 2U, "//") == 0) {
+          const std::size_t end = source.find('\n', index);
+          index = (end == std::string_view::npos) ? source.size() : end;
+          continue;
+        }
+        if (source.compare(index, 2U, "/*") == 0) {
+          const std::size_t end = source.find("*/", index + 2U);
+          index = (end == std::string_view::npos) ? source.size() : end + 2U;
+          continue;
+        }
+        if (index >= sampler.begin && index < sampler.end) {
+          index = sampler.end;
+          continue;
+        }
+        const bool whole = (index == 0U || !IsIdentifierChar(source[index - 1U])) && source.compare(index, name.size(), name) == 0 &&
+          (index + name.size() >= source.size() || !IsIdentifierChar(source[index + name.size()]));
+        if (!whole) {
+          ++index;
+          continue;
+        }
+        std::size_t before = index;
+        const auto skipSpace = [&] {
+          while (before > 0U && std::isspace(static_cast<unsigned char>(source[before - 1U])) != 0) {
+            --before;
+          }
+        };
+        skipSpace();
+        if (before == 0U || source[before - 1U] != '(') {
+          return false;
+        }
+        --before;
+        skipSpace();
+        std::size_t start = before;
+        while (start > 0U && IsIdentifierChar(source[start - 1U])) {
+          --start;
+        }
+        const std::string_view call = source.substr(start, before - start);
+        if (std::find(std::begin(kCalls), std::end(kCalls), call) == std::end(kCalls)) {
+          return false;
+        }
+        index += name.size();
+      }
+      return true;
+    }
     // Register numbers of the placeholder views a faf_sampler carries for the
     // dimensions its texture is never sampled in. The compiler removes them
     // with the dead fields; ModernEffect consumers can check none survive.
@@ -566,46 +682,163 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     return layout;
   }
 
+  namespace
+  {
+    /// What GenerateModernHlsl's body needs from the texture views.
+    struct TextureViews
+    {
+      std::vector<std::vector<TextureDimension>> samplerDimensions;
+    };
+
+    /// Texture views and sampler registers.
+    TextureViews BuildTextureViews(const std::string_view source, EffectDescription& description, ModernEffect& modern)
+    {
+      TextureViews views;
+      std::map<std::string, std::vector<TextureDimension>> textureDimensions;
+      std::vector<std::vector<TextureDimension>>& samplerDimensions = views.samplerDimensions;
+      for (const SamplerDesc& sampler : description.samplers) {
+        samplerDimensions.push_back(SamplerDimensions(sampler, source));
+        if (sampler.texture.empty()) {
+          continue;
+        }
+        std::vector<TextureDimension>& dimensions = textureDimensions[sampler.texture];
+        for (const TextureDimension dimension : samplerDimensions.back()) {
+          if (std::find(dimensions.begin(), dimensions.end(), dimension) == dimensions.end()) {
+            dimensions.push_back(dimension);
+          }
+        }
+      }
+      for (const Parameter& parameter : description.parameters) {
+        if (parameter.parameterClass != ParameterClass::Texture) {
+          continue;
+        }
+        const auto found = textureDimensions.find(parameter.name);
+        if (found == textureDimensions.end()) {
+          continue; // never sampled
+        }
+        for (const TextureDimension dimension : found->second) {
+          const std::uint32_t slot = static_cast<std::uint32_t>(modern.textures.size());
+          modern.textures.push_back(TextureSlot{parameter.name, dimension, slot});
+        }
+      }
+      if (modern.textures.size() > kMaxTextureSlots) {
+        modern.notes.push_back("more texture views than the register budget");
+      }
+      if (description.samplers.size() > kMaxSamplerSlots) {
+        modern.notes.push_back("more samplers than the register budget");
+      }
+      return views;
+    }
+
+    /// The functions in the source, by name; the first definition of a name wins.
+    std::map<std::string, Function> CollectFunctions(const std::vector<Item>& items)
+    {
+      std::map<std::string, Function> functions;
+      for (const Item& item : items) {
+        Function function;
+        if (item.braced && item.head.find('(') != std::string::npos && !HasTopLevelAssignment(item.head) &&
+            ParseFunctionHead(item.head, function) && functions.find(function.name) == functions.end()) {
+          functions[function.name] = function;
+        }
+      }
+      return functions;
+    }
+
+    /// The role each struct plays in a stage's signature.
+    std::map<std::string, SemanticRole> AssignStructRoles(
+      EffectDescription& description, const std::map<std::string, Function>& functions, ModernEffect& modern
+    )
+    {
+      std::map<std::string, SemanticRole> structRoles;
+      std::set<std::string> vertexInputStructs;
+      const auto isStruct = [&](const std::string& name) { return description.FindStruct(name) != nullptr; };
+      // Roles belong to the struct definition, typedef'd names included.
+      const auto baseStruct = [&](const std::string& name) {
+        const StructType* const found = description.FindStruct(name);
+        return (found != nullptr && !found->aliasOf.empty()) ? found->aliasOf : name;
+      };
+      for (const Technique& technique : description.techniques) {
+        for (const Pass& pass : technique.passes) {
+          for (const auto& [reference, stage] :
+               {std::pair{&pass.vertexShader, ShaderStage::Vertex}, std::pair{&pass.pixelShader, ShaderStage::Pixel}}) {
+            const auto found = functions.find(reference->function);
+            if (found == functions.end()) {
+              continue;
+            }
+            const Function& function = found->second;
+            if (stage == ShaderStage::Vertex) {
+              if (isStruct(function.returnType)) {
+                structRoles.emplace(baseStruct(function.returnType), SemanticRole::VertexOutput);
+              }
+              for (const std::string& parameter : function.parameters) {
+                const ParameterParts parts = SplitParameter(parameter);
+                if (!isStruct(parts.type)) {
+                  continue;
+                }
+                if (parts.isOut) {
+                  structRoles.emplace(baseStruct(parts.type), SemanticRole::VertexOutput);
+                } else if (!parts.isUniform) {
+                  vertexInputStructs.insert(baseStruct(parts.type));
+                }
+              }
+            } else {
+              if (isStruct(function.returnType)) {
+                structRoles[baseStruct(function.returnType)] = SemanticRole::PixelOutput;
+              }
+              for (const std::string& parameter : function.parameters) {
+                const ParameterParts parts = SplitParameter(parameter);
+                if (!isStruct(parts.type)) {
+                  continue;
+                }
+                if (parts.isOut) {
+                  structRoles[baseStruct(parts.type)] = SemanticRole::PixelOutput;
+                } else if (!parts.isUniform) {
+                  structRoles.emplace(baseStruct(parts.type), SemanticRole::PixelInput);
+                }
+              }
+            }
+          }
+        }
+      }
+      for (const std::string& name : vertexInputStructs) {
+        const auto found = structRoles.find(name);
+        if (found != structRoles.end() && found->second != SemanticRole::PixelOutput) {
+          modern.notes.push_back("struct " + name + " is both a vertex input and a stage output; semantics left as written");
+          structRoles.erase(found);
+        }
+      }
+      return structRoles;
+    }
+  } // namespace
+
   ModernEffect GenerateModernHlsl(const std::string_view source, EffectDescription& description)
   {
     ModernEffect modern;
     const std::vector<Item> items = SplitItems(source);
 
-    // ---- texture views and sampler registers ----------------------------------
-    std::map<std::string, std::vector<TextureDimension>> textureDimensions;
-    std::vector<std::vector<TextureDimension>> samplerDimensions;
-    for (const SamplerDesc& sampler : description.samplers) {
-      samplerDimensions.push_back(SamplerDimensions(sampler, source));
-      if (sampler.texture.empty()) {
-        continue;
-      }
-      std::vector<TextureDimension>& dimensions = textureDimensions[sampler.texture];
-      for (const TextureDimension dimension : samplerDimensions.back()) {
-        if (std::find(dimensions.begin(), dimensions.end(), dimension) == dimensions.end()) {
-          dimensions.push_back(dimension);
+    TextureViews textureViews = BuildTextureViews(source, description, modern);
+    std::vector<std::vector<TextureDimension>>& samplerDimensions = textureViews.samplerDimensions;
+
+    // Engine addition (ren_ShadowCascades): the lighting shadow samplers read through the atlas when the
+    // effect carries the cascade parameter (EffectProgram adds it) and only ever looks them up.
+    bool shadowCascades = false;
+    {
+      const bool declared = std::any_of(description.parameters.begin(), description.parameters.end(), [](const Parameter& parameter) {
+        return parameter.name == kShadowCascadeParameter && parameter.elements == kShadowCascadeVectors;
+      });
+      bool lookups = true;
+      bool any = false;
+      for (const SamplerDesc& sampler : description.samplers) {
+        if (IsShadowLookupSampler(sampler)) {
+          any = true;
+          lookups = lookups && ShadowSamplerOnlyLookedUp(source, sampler);
         }
       }
-    }
-    std::map<std::pair<std::string, TextureDimension>, std::uint32_t> viewSlots;
-    for (const Parameter& parameter : description.parameters) {
-      if (parameter.parameterClass != ParameterClass::Texture) {
-        continue;
+      shadowCascades = declared && any && lookups;
+      if (declared && any && !lookups) {
+        gShadowCascadesBlocked.store(true);
+        modern.notes.push_back("a shadow sampler is used other than in a tex2D lookup; shadow cascades are off");
       }
-      const auto found = textureDimensions.find(parameter.name);
-      if (found == textureDimensions.end()) {
-        continue; // never sampled
-      }
-      for (const TextureDimension dimension : found->second) {
-        const std::uint32_t slot = static_cast<std::uint32_t>(modern.textures.size());
-        modern.textures.push_back(TextureSlot{parameter.name, dimension, slot});
-        viewSlots[{parameter.name, dimension}] = slot;
-      }
-    }
-    if (modern.textures.size() > kMaxTextureSlots) {
-      modern.notes.push_back("more texture views than the register budget");
-    }
-    if (description.samplers.size() > kMaxSamplerSlots) {
-      modern.notes.push_back("more samplers than the register budget");
     }
 
     // ---- parameters a function writes -------------------------------------------
@@ -617,74 +850,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       }
     }
 
-    // ---- functions and the roles of their structs --------------------------------
-    std::map<std::string, Function> functions;
-    for (const Item& item : items) {
-      Function function;
-      if (item.braced && item.head.find('(') != std::string::npos && !HasTopLevelAssignment(item.head) &&
-          ParseFunctionHead(item.head, function) && functions.find(function.name) == functions.end()) {
-        functions[function.name] = function;
-      }
-    }
-
-    std::map<std::string, SemanticRole> structRoles;
-    std::set<std::string> vertexInputStructs;
-    const auto isStruct = [&](const std::string& name) { return description.FindStruct(name) != nullptr; };
-    // Roles belong to the struct definition, typedef'd names included.
-    const auto baseStruct = [&](const std::string& name) {
-      const StructType* const found = description.FindStruct(name);
-      return (found != nullptr && !found->aliasOf.empty()) ? found->aliasOf : name;
-    };
-    for (const Technique& technique : description.techniques) {
-      for (const Pass& pass : technique.passes) {
-        for (const auto& [reference, stage] :
-             {std::pair{&pass.vertexShader, ShaderStage::Vertex}, std::pair{&pass.pixelShader, ShaderStage::Pixel}}) {
-          const auto found = functions.find(reference->function);
-          if (found == functions.end()) {
-            continue;
-          }
-          const Function& function = found->second;
-          if (stage == ShaderStage::Vertex) {
-            if (isStruct(function.returnType)) {
-              structRoles.emplace(baseStruct(function.returnType), SemanticRole::VertexOutput);
-            }
-            for (const std::string& parameter : function.parameters) {
-              const ParameterParts parts = SplitParameter(parameter);
-              if (!isStruct(parts.type)) {
-                continue;
-              }
-              if (parts.isOut) {
-                structRoles.emplace(baseStruct(parts.type), SemanticRole::VertexOutput);
-              } else if (!parts.isUniform) {
-                vertexInputStructs.insert(baseStruct(parts.type));
-              }
-            }
-          } else {
-            if (isStruct(function.returnType)) {
-              structRoles[baseStruct(function.returnType)] = SemanticRole::PixelOutput;
-            }
-            for (const std::string& parameter : function.parameters) {
-              const ParameterParts parts = SplitParameter(parameter);
-              if (!isStruct(parts.type)) {
-                continue;
-              }
-              if (parts.isOut) {
-                structRoles[baseStruct(parts.type)] = SemanticRole::PixelOutput;
-              } else if (!parts.isUniform) {
-                structRoles.emplace(baseStruct(parts.type), SemanticRole::PixelInput);
-              }
-            }
-          }
-        }
-      }
-    }
-    for (const std::string& name : vertexInputStructs) {
-      const auto found = structRoles.find(name);
-      if (found != structRoles.end() && found->second != SemanticRole::PixelOutput) {
-        modern.notes.push_back("struct " + name + " is both a vertex input and a stage output; semantics left as written");
-        structRoles.erase(found);
-      }
-    }
+    const std::map<std::string, Function> functions = CollectFunctions(items);
+    std::map<std::string, SemanticRole> structRoles = AssignStructRoles(description, functions, modern);
 
     // ---- the body ---------------------------------------------------------------
     std::string body;
@@ -740,7 +907,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         std::snprintf(declaration, sizeof(declaration), "SamplerState faf_smp_%s : register(s%u);\n", sampler->name.c_str(),
                       static_cast<unsigned>(index));
         body += declaration;
-        body += "#define " + sampler->name + " faf_make_sampler(" + view(TextureDimension::Texture2D, "faf_null2D") + ", " +
+        const char* const maker = (shadowCascades && IsShadowLookupSampler(*sampler)) ? "faf_make_shadow_sampler(" : "faf_make_sampler(";
+        body += "#define " + sampler->name + " " + maker + view(TextureDimension::Texture2D, "faf_null2D") + ", " +
           view(TextureDimension::TextureCube, "faf_nullCube") + ", " + view(TextureDimension::Texture3D, "faf_null3D") +
           ", faf_smp_" + sampler->name + ")\n";
         continue;
@@ -762,6 +930,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           }
         } else if (numericParameters.count(parameter->name) != 0U || parameter->parameterClass == ParameterClass::Struct) {
           body += GlobalDeclaration(*parameter) + "\n";
+          if (shadowCascades && parameter->name == kShadowCascadeParameter) {
+            body += kShadowCascadeHelpers;
+          }
         }
         // Anything else (strings, sampler parameters without state) has no shader-side form.
         continue;

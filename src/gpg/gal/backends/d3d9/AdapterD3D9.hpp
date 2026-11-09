@@ -37,9 +37,9 @@ namespace gpg::gal
     AdapterD3D9(
       std::uint32_t vendorId,
       std::uint32_t deviceId,
-      const msvc8::string& driver,
-      const msvc8::string& device,
-      const msvc8::string& desc
+      const fa::string& driver,
+      const fa::string& device,
+      const fa::string& desc
     );
 
     /**
@@ -70,10 +70,10 @@ namespace gpg::gal
   public:
     std::uint32_t vendorId = 0;             // +0x04
     std::uint32_t deviceId = 0;             // +0x08
-    msvc8::string driver{};                 // +0x0C
-    msvc8::string deviceName{};             // +0x28
-    msvc8::string description{};            // +0x44
-    msvc8::vector<AdapterModeD3D9> modes{}; // +0x60
+    fa::string driver{};                 // +0x0C
+    fa::string deviceName{};             // +0x28
+    fa::string description{};            // +0x44
+    fa::vector<AdapterModeD3D9> modes{}; // +0x60
   };
 
   static_assert(offsetof(AdapterD3D9, vendorId) == 0x04, "AdapterD3D9::vendorId offset must be 0x04");

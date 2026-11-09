@@ -1,0 +1,32 @@
+---
+# Report-only allow-list for the engine. Never add a check here without reading what its fix does to
+# the sim: a tidy-looking rewrite can change a checksum. Left out on purpose, with the reason:
+#   readability-simplify-boolean-expr       !(a > b) is not a <= b when a value is NaN (docs/RETAIL_REPLAY_PARITY.md, "NaN in a compare")
+#   modernize-min-max-use-initializer-list  argument order decides ties and NaN
+#   modernize-use-std-numbers, readability-math-missing-parentheses   float expressions stay as the binary computes them
+#   modernize-use-integer-sign-comparison   "Signed versus unsigned cells" in the same document
+#   performance-unnecessary-copy-initialization, performance-move-const-arg,
+#   performance-unnecessary-value-param, performance-for-range-copy   when a handle is freed is sim state ("Reused addresses")
+#   modernize-loop-convert                  caches end() while a unit dying can change the list
+#   modernize-use-default-member-init, modernize-use-equals-default,
+#   performance-enum-size, cppcoreguidelines-virtual-class-destructor   layouts and triviality of recovered types stay
+#   bugprone-suspicious-memory-comparison   bit-exact float tests are deliberate (-0.0 is not zero)
+Checks: >
+  -*,
+  modernize-use-override,
+  modernize-use-using,
+  modernize-use-nullptr,
+  modernize-deprecated-headers,
+  modernize-use-bool-literals,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-reserved-identifier,
+  -bugprone-suspicious-memory-comparison,
+  -bugprone-narrowing-conversions,
+  -bugprone-branch-clone,
+  -bugprone-throwing-static-initialization,
+  -bugprone-crtp-constructor-accessibility,
+  -bugprone-derived-method-shadowing-base-method
+HeaderFilterRegex: '.*[/\\]src[/\\](moho|gpg|legacy|lua|remote|platform|headless)[/\\].*'
+FormatStyle: none
+...

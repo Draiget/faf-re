@@ -26,44 +26,6 @@ namespace
 {
   constexpr std::uint64_t kUnitStateMaskCarrierLaunch = 0x0000000000000200ull;
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitCarrierLaunchType()
-  {
-    gpg::RType* type = moho::CUnitCarrierLaunch::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitCarrierLaunch));
-      moho::CUnitCarrierLaunch::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedSNavGoalType()
-  {
-    gpg::RType* type = moho::SNavGoal::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SNavGoal));
-      moho::SNavGoal::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedEntitySetTemplateUnitType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntitySetTemplate<moho::Unit>));
-    }
-    return type;
-  }
 } // namespace
 
 namespace moho
@@ -347,14 +309,14 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Read(CachedCCommandTaskType(), this, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), this, ownerRef);
 
     const gpg::RRef launchGoalOwnerRef{};
-    archive->Read(CachedSNavGoalType(), &mLaunchGoal, launchGoalOwnerRef);
+    archive->Read(gpg::RTypeOf<moho::SNavGoal>(), &mLaunchGoal, launchGoalOwnerRef);
     archive->ReadBool(&mHasCarrierTransportedUnit);
 
     const gpg::RRef carriedUnitsOwnerRef{};
-    archive->Read(CachedEntitySetTemplateUnitType(), &mCarriedUnits, carriedUnitsOwnerRef);
+    archive->Read(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), &mCarriedUnits, carriedUnitsOwnerRef);
   }
 
   /**
@@ -371,14 +333,14 @@ namespace moho
     }
 
     const gpg::RRef ownerRef{};
-    archive->Write(CachedCCommandTaskType(), this, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), this, ownerRef);
 
     const gpg::RRef launchGoalOwnerRef{};
-    archive->Write(CachedSNavGoalType(), &mLaunchGoal, launchGoalOwnerRef);
+    archive->Write(gpg::RTypeOf<moho::SNavGoal>(), &mLaunchGoal, launchGoalOwnerRef);
     archive->WriteBool(mHasCarrierTransportedUnit);
 
     const gpg::RRef carriedUnitsOwnerRef{};
-    archive->Write(CachedEntitySetTemplateUnitType(), &mCarriedUnits, carriedUnitsOwnerRef);
+    archive->Write(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), &mCarriedUnits, carriedUnitsOwnerRef);
   }
 
   /**
@@ -532,7 +494,7 @@ namespace
 
   void CUnitCarrierLaunchSerializerHelperNode::Init()
   {
-    gpg::RType* const type = CachedCUnitCarrierLaunchType();
+    gpg::RType* const type = gpg::RTypeOf<moho::CUnitCarrierLaunch>();
     GPG_ASSERT(type->serLoadFunc_ == nullptr);
     type->serLoadFunc_ = mSerLoadFunc;
     GPG_ASSERT(type->serSaveFunc_ == nullptr);

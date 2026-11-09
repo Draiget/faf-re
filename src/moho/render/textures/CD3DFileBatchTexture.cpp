@@ -19,12 +19,12 @@ namespace moho
   {
     struct TextureLookup
     {
-      msvc8::string mFileName;
+      fa::string mFileName;
       std::uint32_t mBorder = 0;
 
       TextureLookup() = default;
 
-      TextureLookup(const msvc8::string& fileName, const std::uint32_t border)
+      TextureLookup(const fa::string& fileName, const std::uint32_t border)
         : mFileName()
         , mBorder(border)
       {
@@ -116,7 +116,7 @@ namespace moho
     using FileTextureHandle = boost::shared_ptr<CD3DFileBatchTexture>;
     using FileTextureWeakHandle = boost::weak_ptr<CD3DFileBatchTexture>;
     using TextureLookupMap = std::map<TextureLookup, FileTextureWeakHandle, TextureLookupLess>;
-    using FileTextureRetainQueue = msvc8::vector<FileTextureHandle>;
+    using FileTextureRetainQueue = fa::vector<FileTextureHandle>;
     constexpr std::size_t kRetainQueueLimit = 30u;
 
     TextureLookupMap sTextureMap;
@@ -260,7 +260,7 @@ namespace moho
   CD3DFileBatchTexture::CD3DFileBatchTexture(
     const DataHandle& data,
     const std::uint32_t border,
-    const msvc8::string& filename
+    const fa::string& filename
   )
     : CD3DRawBatchTexture(data, border)
     , mFilename()
@@ -305,7 +305,7 @@ namespace moho
   /**
    * Address: 0x00448480 (FUN_00448480)
    */
-  const msvc8::string& CD3DFileBatchTexture::GetFilename() const
+  const fa::string& CD3DFileBatchTexture::GetFilename() const
   {
     return mFilename;
   }
@@ -319,7 +319,7 @@ namespace moho
       return;
     }
 
-    boost::mutex::scoped_lock scopedLock(sResourceLock);
+    std::lock_guard<std::recursive_mutex> scopedLock(sResourceLock);
 
     const TextureLookup lookup(texture->GetFilename(), texture->GetBorder());
     TextureLookupMap::iterator mapIt = FindTextureLookupEntry(lookup);
@@ -358,7 +358,7 @@ namespace moho
     boost::shared_ptr<CD3DBatchTexture> outTexture;
     const char* const normalizedPath = filename != nullptr ? filename : "";
 
-    boost::mutex::scoped_lock scopedLock(sResourceLock);
+    std::lock_guard<std::recursive_mutex> scopedLock(sResourceLock);
 
     const TextureLookup lookup(normalizedPath, border);
     const TextureLookupMap::iterator cachedIt = FindTextureLookupEntry(lookup);

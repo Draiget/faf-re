@@ -47,7 +47,7 @@ namespace gpg
     /**
      * Address: 0x00626C60 (FUN_00626C60, gpg::RVectorType_SPickUpInfo::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const RRef& ref) const override;
 
     /**
      * Address: 0x00626CF0 (FUN_00626CF0, gpg::RVectorType_SPickUpInfo::IsIndexed)

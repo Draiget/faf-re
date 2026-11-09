@@ -57,7 +57,7 @@ namespace moho
      * Opens `fileName` in the source notebook and, the first time, adds it
      * to the saved file list.
      */
-    bool OpenFile(const msvc8::string& fileName);
+    bool OpenFile(const fa::string& fileName);
 
     /**
      * Address: 0x004BECF0 (FUN_004BECF0)
@@ -255,9 +255,9 @@ namespace moho
     wxListCtrl* mCallStack;                    // +0x188
     ScrWatchCtrl* mLocals;                     // +0x18C
     ScrWatchCtrl* mGlobals;                    // +0x190
-    msvc8::string mFindString;                 // +0x194
+    fa::string mFindString;                 // +0x194
     wxTextCtrl* mFindText;                     // +0x1B0
-    msvc8::list<msvc8::string> mRecentFiles;   // +0x1B4 Options.Debug.Files
+    fa::list<fa::string> mRecentFiles;   // +0x1B4 Options.Debug.Files
 
     DECLARE_EVENT_TABLE()
   };

@@ -24,67 +24,14 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedListenerEAiNavigatorEventType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Listener<moho::EAiNavigatorEvent>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedListenerEFormationdStatusType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Listener<moho::EFormationdStatus>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedListenerECommandEventType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::Listener<moho::ECommandEvent>));
-    }
-    return cached;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCUnitFormAndMoveTaskType()
-  {
-    gpg::RType* type = moho::CUnitFormAndMoveTask::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CUnitFormAndMoveTask));
-      moho::CUnitFormAndMoveTask::sType = type;
-    }
-    return type;
-  }
-
   void AddBaseField(gpg::RType* const typeInfo, gpg::RType* const baseType, const std::int32_t offset)
   {
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = offset;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType, offset);
   }
 
   [[nodiscard]] gpg::RRef MakeFormAndMoveTaskRef(moho::CUnitFormAndMoveTask* const task)
   {
-    return gpg::RRef{task, CachedCUnitFormAndMoveTaskType()};
+    return gpg::RRef{task, gpg::RTypeOf<moho::CUnitFormAndMoveTask>()};
   }
 
   /**
@@ -185,7 +132,7 @@ namespace moho
    */
   void CUnitFormAndMoveTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
   {
-    AddBaseField(typeInfo, CachedCCommandTaskType(), 0x00);
+    AddBaseField(typeInfo, gpg::RTypeOf<moho::CCommandTask>(), 0x00);
   }
 
   /**
@@ -197,7 +144,7 @@ namespace moho
    */
   void CUnitFormAndMoveTaskTypeInfo::AddBase_Listener_EAiNavigatorEvent(gpg::RType* const typeInfo)
   {
-    AddBaseField(typeInfo, CachedListenerEAiNavigatorEventType(), gpg::BaseSubobjectOffset<CUnitFormAndMoveTask, Listener<EAiNavigatorEvent>>());
+    AddBaseField(typeInfo, gpg::RTypeOf<moho::Listener<moho::EAiNavigatorEvent>>(), gpg::BaseSubobjectOffset<CUnitFormAndMoveTask, Listener<EAiNavigatorEvent>>());
   }
 
   /**
@@ -209,7 +156,7 @@ namespace moho
    */
   void CUnitFormAndMoveTaskTypeInfo::AddBase_Listener_EFormationdStatus(gpg::RType* const typeInfo)
   {
-    AddBaseField(typeInfo, CachedListenerEFormationdStatusType(), gpg::BaseSubobjectOffset<CUnitFormAndMoveTask, Listener<EFormationdStatus>>());
+    AddBaseField(typeInfo, gpg::RTypeOf<moho::Listener<moho::EFormationdStatus>>(), gpg::BaseSubobjectOffset<CUnitFormAndMoveTask, Listener<EFormationdStatus>>());
   }
 
   /**
@@ -221,7 +168,7 @@ namespace moho
    */
   void CUnitFormAndMoveTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
   {
-    AddBaseField(typeInfo, CachedListenerECommandEventType(), gpg::BaseSubobjectOffset<CUnitFormAndMoveTask, Listener<ECommandEvent>>());
+    AddBaseField(typeInfo, gpg::RTypeOf<moho::Listener<moho::ECommandEvent>>(), gpg::BaseSubobjectOffset<CUnitFormAndMoveTask, Listener<ECommandEvent>>());
   }
 
   /**
@@ -245,10 +192,7 @@ namespace moho
    */
   gpg::RRef CUnitFormAndMoveTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitFormAndMoveTask*>(objectStorage);
-    if (task) {
-      new (task) CUnitFormAndMoveTask();
-    }
+    auto* const task = gpg::ConstructInStorage<CUnitFormAndMoveTask>(objectStorage);
     return MakeFormAndMoveTaskRef(task);
   }
 

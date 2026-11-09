@@ -28,8 +28,9 @@ namespace
     float elevation = heightField->GetElevation(x, z);
     const bool seabedOnly =
       (static_cast<std::uint8_t>(footprint.mOccupancyCaps) & static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_SEABED)) != 0u;
-    if (!seabedOnly && map.mWaterEnabled != 0u && map.mWaterElevation > elevation) {
-      elevation = map.mWaterElevation;
+    const float waterElevation = map.GetWaterElevationAt(x, z); // engine addition: per position
+    if (!seabedOnly && waterElevation > elevation) {
+      elevation = waterElevation;
     }
     return elevation;
   }
@@ -121,10 +122,7 @@ namespace moho
    */
   gpg::RRef RDebugNavPath::GetDerivedObjectRef()
   {
-    gpg::RRef out{};
-    out.mObj = this;
-    out.mType = GetClass();
-    return out;
+    return gpg::MakeSelfRef(this);
   }
 
   /**

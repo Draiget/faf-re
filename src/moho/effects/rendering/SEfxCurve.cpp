@@ -32,7 +32,7 @@ namespace gpg
     /**
      * Address: 0x0065EF80 (FUN_0065EF80, gpg::RFastVectorType_SEfxCurve::GetLexical)
      */
-    [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x0065F010 (FUN_0065F010, gpg::RFastVectorType_SEfxCurve::IsIndexed)
@@ -111,13 +111,13 @@ namespace gpg
     gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int /*version*/, gpg::RRef* const ownerRef
   )
   {
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SEfxCurve>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SEfxCurve>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
 
     const moho::SEfxCurve fill{};
-    vec.Resize(count, fill);
+    vec.resize(count, fill);
 
     for (unsigned int i = 0; i < count; ++i) {
       gpg::RType* elementType = CachedSEfxCurveType();
@@ -135,7 +135,7 @@ namespace gpg
     gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int /*version*/, gpg::RRef* const ownerRef
   )
   {
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SEfxCurve>*>(objectPtr);
+    auto& vec = *reinterpret_cast<gpg::core::FastVectorInline<moho::SEfxCurve>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(vec.size());
     archive->WriteUInt(count);
 
@@ -154,7 +154,7 @@ namespace gpg
    */
   const char* RFastVectorType<moho::SEfxCurve>::GetName() const
   {
-    static const msvc8::string sName = gpg::STR_Printf("fastvector<%s>", CachedSEfxCurveType()->GetName());
+    static const fa::string sName = gpg::STR_Printf("fastvector<%s>", CachedSEfxCurveType()->GetName());
     return sName.c_str();
   }
 
@@ -164,9 +164,9 @@ namespace gpg
    * What it does:
    * Appends `size=<count>` to the base reflection lexical dump string.
    */
-  msvc8::string RFastVectorType<moho::SEfxCurve>::GetLexical(const gpg::RRef& ref) const
+  fa::string RFastVectorType<moho::SEfxCurve>::GetLexical(const gpg::RRef& ref) const
   {
-    const msvc8::string base = gpg::RType::GetLexical(ref);
+    const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
@@ -205,7 +205,7 @@ namespace gpg
   gpg::RRef RFastVectorType<moho::SEfxCurve>::SubscriptIndex(void* obj, const int ind) const
   {
     gpg::RRef out{};
-    auto& vec = *static_cast<gpg::fastvector<moho::SEfxCurve>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SEfxCurve>*>(obj);
     out = gpg::MakeRRef<moho::SEfxCurve>(vec.Data() + ind);
     return out;
   }
@@ -229,9 +229,9 @@ namespace gpg
    */
   void RFastVectorType<moho::SEfxCurve>::SetCount(void* obj, const int count) const
   {
-    auto& vec = *static_cast<gpg::fastvector<moho::SEfxCurve>*>(obj);
+    auto& vec = *static_cast<gpg::core::FastVectorInline<moho::SEfxCurve>*>(obj);
     const moho::SEfxCurve fill{};
-    vec.Resize(static_cast<std::size_t>(count), fill);
+    vec.resize(static_cast<std::size_t>(count), fill);
   }
 
   /**

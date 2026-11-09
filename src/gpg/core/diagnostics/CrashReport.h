@@ -62,6 +62,15 @@ namespace gpg::diag
   bool WriteCrashReport(const CrashReportContext& context);
 
   /**
+   * Engine addition (issue #216): the report's build, process and system sections (commit, exe
+   * stamp, command line, OS, CPU model and flags, RAM) on their own, for the desync dump.
+   */
+  void WriteEnvironmentReport(std::FILE* sink);
+
+  /** Engine addition (issue #216): the report's loaded-module list on its own. */
+  void WriteModuleList(std::FILE* sink);
+
+  /**
    * One fatal path end-to-end: write the report, write the minidump, show
    * the crash-report dialog. The dialog appears only on the call that
    * actually wrote the report - nested fatals (abort after terminate) stay
@@ -90,15 +99,29 @@ namespace gpg::diag
    */
   void NoteSimLuaError(const char* message);
 
-  /** Copies the report text to the clipboard (CF_UNICODETEXT, no CRT heap). */
+  /**
+   * Copies the report text to the clipboard (CF_UNICODETEXT, no CRT heap).
+   * Client only (CrashReportDialog.cpp).
+   */
   void CopyCrashReportToClipboard();
 
   /**
    * Modal crash dialog built from an in-memory template (no resource
    * dependency): read-only report text + Copy / Open folder / Close.
-   * Falls back to a message box when even that fails.
+   * Falls back to a message box when even that fails. Client only
+   * (CrashReportDialog.cpp).
    */
   void ShowCrashReportDialog(const char* reportPath);
+
+  /**
+   * Engine addition (dedicated-server plan WPR.12): the dialog the fatal path
+   * shows after writing the report and the minidump. CrashReportDialog.cpp sets
+   * it to ShowCrashReportDialog during static initialisation; a program without
+   * the client (headless, the game server) leaves it null and ends without a
+   * dialog.
+   */
+  using CrashReportDialogHook = void (*)(const char* reportPath);
+  extern CrashReportDialogHook sCrashReportDialog;
 
 } // namespace gpg::diag
 

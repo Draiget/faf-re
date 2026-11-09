@@ -1,0 +1,37 @@
+# Engine addition (dedicated-server plan WPL.13): the faf_sim functions that may call a host libm
+# transcendental (tests/linux/LibmGate.py). One "symbol demangled-function" per line; the reason
+# above each group. A new call fails the Linux build until it is reviewed here.
+
+# legacy/math/X87Math: the CRT-dispatch lanes. In the domain the engine's x87 bodies run
+# (X87Math64.S); the host CRT is reached only with the CRT's SSE2 mode on (never in the sim) or
+# for pow's zero, infinite and NaN operands (IEEE-defined results). asinf, expf and logf use the
+# engine's legacy/math/Libm.cpp (plan WPL.11) and are not listed: a host call there fails.
+acos fa::acos(double)
+asin fa::asin(double)
+pow fa::pow(double, double)
+# powf: the sim driver's wall-clock pacing only (SimDriver.cpp, the beat rate from the sim rate).
+pow fa::powf(float, float)
+# powf: the skew clock's tick length and display factor (SimDriver.cpp), wall-clock pacing and a log
+# line; nothing it computes reaches the sim.
+powf (anonymous namespace)::ApplySharedStart((anonymous namespace)::SkewClock&, int, int, moho::CClientManagerImpl&)
+powf moho::CSimDriver::GetSyncData(moho::SSyncData*&)
+
+# Camera projection (effect culling against the sync filter's cameras, the render-side view):
+# visual only.
+tanf moho::GeomCamera3::ViewInitPerspective(float, float, float, float)
+tanf moho::VEC_D3DProjectionMatrixFOV(float, float, float, float, float)
+
+# Effects and decals: visual state, not in the sim checksum.
+atan2f moho::CEfxEmitter::Tick(int)
+atan2f (anonymous namespace)::CreateDecalFromTransform(moho::VTransform const&, Wm3::Vector3<float> const&, moho::Sim*, float, fa::string const&, fa::string const&, float, bool, fa::string const&, unsigned int, unsigned int)
+
+# remote/wire: the server-authoritative wire format (the server quantises, clients decode); not
+# sim state.
+atan2 faf::remote::wire::QuantizeYaw(std::__1::array<float, 4ul> const&)
+sin faf::remote::wire::YawToQuaternion(unsigned int)
+cos faf::remote::wire::YawToQuaternion(unsigned int)
+cos faf::remote::wire::ApplyOrientationReckoning(faf::remote::wire::SEntityRecord&, faf::remote::wire::SEntityRecord const&, std::__1::span<unsigned int const, 18446744073709551615ul>, unsigned int, faf::remote::wire::SReckoningScheme const&, faf::remote::wire::SFrameCodec const&)
+# remote/client: the client rebuilding sync packets from the wire (runs on the client, not the sim).
+acos faf::remote::client::CSyncRebuilder::ApplyFrame(faf::remote::wire::SViewFrame, unsigned long, moho::SSyncData&, std::__1::chrono::time_point<std::__1::chrono::steady_clock, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> > >)
+# The client's beat clock: the beat rate the server's sim rate implies, for pacing and skew stats.
+pow faf::remote::client::CBeatClock::ExpectedBeatsPerSecond() const

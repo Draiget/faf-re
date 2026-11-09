@@ -241,15 +241,6 @@ namespace moho
    *  - Serialize(): 0x0060AA20 (same shape, tail-calls
    *    `CUnitTeleportTask::MemberSerialize` at 0x0060D350)
    *
-   * The pre-existing free functions this instantiation supersedes
-   * (`CUnitTeleportTaskSerializerLoad`/`CUnitTeleportTaskSerializerSave` and
-   * their `g...Callback` volatile-pointer anchors, previously in
-   * CUnitCallTeleport.cpp) mis-attributed addresses 0x0060AA10/0x0060AA20 to
-   * a hand-written 2-argument shape; the real compiled signature there is the
-   * template's 4-argument `RType::load_func_t`/`save_func_t`, confirmed by
-   * the real ctor (0x00BD0650) storing those two addresses directly into
-   * `mLoadCallback`/`mSaveCallback`.
-   *
    * Address: 0x0060C580 (FUN_0060C580 -- an unreferenced copy of `Serialize`, `jmp` into
    * `MemberSerialize` 0x0060D350.)
    */

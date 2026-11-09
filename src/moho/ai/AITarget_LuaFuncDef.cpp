@@ -1,4 +1,5 @@
 #include "moho/ai/AITarget_LuaFuncDef.h"
+#include "moho/lua/LuaVector3.h"
 
 #include "moho/ai/CAiTarget.h"
 #include "moho/lua/CScrLuaBinder.h"
@@ -10,31 +11,6 @@ namespace
   constexpr const char* kAITargetLuaHelpText = "Create a target object";
   constexpr const char* kLuaExpectedBetweenArgsWarning = "%s\n  expected between %d and %d args, but got %d";
 
-  [[nodiscard]] moho::CScrLuaInitFormSet& CoreLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Core"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Core");
-    return fallbackSet;
-  }
-
-  [[nodiscard]] Wm3::Vec3f ReadVector3FromLuaObject(const LuaPlus::LuaObject& object) noexcept
-  {
-    Wm3::Vec3f out = Wm3::Vec3f::Zero();
-    if (!object.IsTable()) {
-      return out;
-    }
-
-    const LuaPlus::LuaObject xObject = object[1];
-    const LuaPlus::LuaObject yObject = object[2];
-    const LuaPlus::LuaObject zObject = object[3];
-    out.x = static_cast<float>(xObject.GetNumber());
-    out.y = static_cast<float>(yObject.GetNumber());
-    out.z = static_cast<float>(zObject.GetNumber());
-    return out;
-  }
 } // namespace
 
 namespace moho
@@ -113,7 +89,7 @@ namespace moho
   void func_AITarget_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      CoreLuaInitSet(),
+      moho::SCR_CoreLuaInitSet(),
       "AITarget",
       &cfunc_AITarget,
       nullptr,

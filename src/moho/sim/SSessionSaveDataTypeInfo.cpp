@@ -105,10 +105,7 @@ gpg::RRef SSessionSaveDataTypeInfo::NewRef()
  */
 gpg::RRef SSessionSaveDataTypeInfo::CtrRef(void* const objectStorage)
 {
-  auto* const object = static_cast<SSessionSaveData*>(objectStorage);
-  if (object != nullptr) {
-    new (object) SSessionSaveData();
-  }
+  auto* const object = gpg::ConstructInStorage<SSessionSaveData>(objectStorage);
   return MakeSSessionSaveDataRef(object);
 }
 

@@ -905,6 +905,21 @@ namespace moho
   CD3DDevice* D3D_GetDevice();
 
   /**
+   * Engine addition: `ren_DirectPaint`. CD3DDevice::Refresh invalidates the window and the frame draws
+   * in the WM_PAINT that follows: wx's event tables, BeginPaint, EndPaint and a window DC, 6 % of an
+   * uncapped frame and none of it used by a device that draws through a swap chain. With this on,
+   * Refresh only marks the frame and the main loop draws it where the message would have come. Paint
+   * messages from Windows (a window uncovered, a capture tool) still go through OnPaint.
+   */
+  extern bool ren_DirectPaint;
+
+  /** A frame is waiting for D3D_RunDirectPaint, so the main loop must not wait for messages. */
+  [[nodiscard]] bool D3D_IsDirectPaintPending() noexcept;
+
+  /** Draws the frame Refresh marked, if any. Returns whether it did. */
+  bool D3D_RunDirectPaint();
+
+  /**
    * Address: 0x004305F0 (FUN_004305F0, ?REN_Init@Moho@@YAXXZ)
    *
    * What it does:

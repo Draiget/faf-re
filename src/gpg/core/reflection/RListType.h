@@ -12,12 +12,12 @@
 namespace gpg
 {
   /**
-   * Reflection for `msvc8::list<T>`: the class template behind every
+   * Reflection for `fa::list<T>`: the class template behind every
    * `gpg::RListType<T>` in the binary (`.?AU?$RListType@...@gpg@@`, a struct
    * over `RType`/`RObject` whose 11-slot vtable overrides the destructor,
    * `GetName`, `GetLexical` and `Init`).
    *
-   * Constructing one preregisters it for `typeid(msvc8::list<T>)`; the startup
+   * Constructing one preregisters it for `typeid(fa::list<T>)`; the startup
    * function that builds each instance is this constructor inlined
    * (`preregister_SNamedFootprintListTypeInfo` 0x005149D0: `RType::RType`
    * 0x008DD950, the vptr store, `PreRegisterRType` 0x008DF850).
@@ -37,7 +37,7 @@ namespace gpg
   template <class T>
   struct RListType : RType
   {
-    using list_type = msvc8::list<T>;
+    using list_type = fa::list<T>;
 
     RListType()
     {
@@ -50,7 +50,7 @@ namespace gpg
      */
     [[nodiscard]] const char* GetName() const override
     {
-      static const msvc8::string sName = STR_Printf("list<%s>", RTypeOf<T>()->GetName());
+      static const fa::string sName = STR_Printf("list<%s>", RTypeOf<T>()->GetName());
       return sName.c_str();
     }
 
@@ -59,9 +59,9 @@ namespace gpg
      * The inherited lexical text followed by the list's size. The binary reads
      * `_Mysize` straight off `ref.mObj` with no null test.
      */
-    [[nodiscard]] msvc8::string GetLexical(const RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(const RRef& ref) const override
     {
-      const msvc8::string base = RType::GetLexical(ref);
+      const fa::string base = RType::GetLexical(ref);
       return STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(static_cast<const list_type*>(ref.mObj)->size()));
     }
 

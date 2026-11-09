@@ -132,23 +132,6 @@ namespace
     transform.pos_.z = 0.0f;
   }
 
-  /**
-   * Address: 0x00658EC0 (FUN_00658EC0)
-   *
-   * What it does:
-   * Returns cached reflected type metadata for `SEntAttachInfo`, resolving it
-   * through RTTI lookup on first use.
-   */
-  [[nodiscard]] gpg::RType* CachedSEntAttachInfoType()
-  {
-    gpg::RType* type = moho::SEntAttachInfo::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::SEntAttachInfo));
-      moho::SEntAttachInfo::sType = type;
-    }
-
-    return type;
-  }
 } // namespace
 
 namespace moho
@@ -204,7 +187,7 @@ namespace moho
     gpg::ReadArchive* const archive, void* const object, const gpg::RRef& owner
   )
   {
-    archive->Read(CachedSEntAttachInfoType(), object, owner);
+    archive->Read(gpg::CachedLookup<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType), object, owner);
   }
 
   /**
@@ -218,7 +201,7 @@ namespace moho
     gpg::WriteArchive* const archive, const void* const object, const gpg::RRef& owner
   )
   {
-    archive->Write(CachedSEntAttachInfoType(), object, owner);
+    archive->Write(gpg::CachedLookup<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType), object, owner);
   }
 
   /**
@@ -303,7 +286,7 @@ namespace moho
     mParams.resize(BEAM_LASTPARAM, 0.0f);
     mParticleTextures.resize(2, nullptr);
     {
-      const msvc8::string emptyString;
+      const fa::string emptyString;
       mStrings.resize(2, emptyString);
     }
 
@@ -362,7 +345,7 @@ namespace moho
     mParams.resize(BEAM_LASTPARAM, 0.0f);
     mParticleTextures.resize(2, nullptr);
     {
-      const msvc8::string emptyString;
+      const fa::string emptyString;
       mStrings.resize(2, emptyString);
     }
 
@@ -754,7 +737,7 @@ namespace moho
     }
 
     Sim* const sim = mManager->GetSim();
-    const msvc8::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
+    const fa::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
     for (std::size_t cameraIndex = 0; cameraIndex < cameras.size(); ++cameraIndex) {
       if (CanSeeCam(&cameras[cameraIndex])) {
         sim->GetParticleBuffer()->mBeams.push_back(mBeam);

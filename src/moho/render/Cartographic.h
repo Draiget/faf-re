@@ -31,6 +31,7 @@ namespace moho
   class IRenderWorldView;
   class IWldTerrainRes;
   class RangeRenderer;
+  class STIMap;
   class VisionRenderer;
   struct GeomCamera3;
 
@@ -210,8 +211,8 @@ namespace moho
     void UploadDecalVerticesIfDirty();
 
   public:
-    msvc8::string mTechniqueName;                                         // +0x04
-    msvc8::string mTexturePath;                                           // +0x20
+    fa::string mTechniqueName;                                         // +0x04
+    fa::string mTexturePath;                                           // +0x20
     boost::shared_ptr<gpg::gal::Texture> mDecalTexture;               // +0x3C
     boost::shared_ptr<gpg::gal::VertexFormat> mVertexFormat;          // +0x44
     boost::shared_ptr<gpg::gal::VertexBuffer> mQuadVertexBuffer;      // +0x4C
@@ -643,4 +644,8 @@ namespace moho
    * increments the owning batch count with VC8 list-overflow protection.
    */
   std::int32_t InsertCartographicDecalBatchCopy(const CartographicDecalBatch& sourceBatch, Cartographic& owner);
+
+  /// Engine addition (water bodies): whether the cartographic textures were built for other water
+  /// bodies than `map` has now, so the view initializes them again.
+  [[nodiscard]] bool CartographicWaterBodiesStale(const STIMap& map) noexcept;
 } // namespace moho

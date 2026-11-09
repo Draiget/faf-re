@@ -60,6 +60,12 @@ namespace moho
     CUnitFerryTask(CCommandTask* parentTask, Unit* targetUnit);
 
     /**
+     * Builds an empty task for the serializer to fill (what `CUnitFerryTaskTypeInfo::NewRef`,
+     * 0x006101B0, constructs).
+     */
+    CUnitFerryTask();
+
+    /**
      * Address: 0x0060F790 (FUN_0060F790, Moho::CUnitFerryTask::operator new)
      *
      * What it does:
@@ -138,7 +144,7 @@ namespace moho
      * queue of an army TRANSPORTATION unit currently ferrying to the same
      * beacon. An empty route source leaves the own-queue copy in place.
      */
-    void GetUnitCommands(msvc8::vector<WeakPtr<CUnitCommand>>& outCommands);
+    void GetUnitCommands(fa::vector<WeakPtr<CUnitCommand>>& outCommands);
 
     /**
      * Address: 0x0060F400 (FUN_0060F400, Moho::CUnitFerryTask::TaskTick)

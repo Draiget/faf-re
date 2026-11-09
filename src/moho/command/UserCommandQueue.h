@@ -97,7 +97,7 @@ namespace moho
     UserUnit* ownerUnit;                                                  // +0x00
     std::uint32_t mUnknown04;                                             // +0x04
     gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2> primaryLinks;  // +0x08
-    msvc8::deque<UserManagerHelperEntry> issueQueue;                      // +0x28
+    fa::deque<UserManagerHelperEntry> issueQueue;                      // +0x28
     std::uint32_t mUnknown3C;                                             // +0x3C
     gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2> resolvedLinks; // +0x40
     std::uint8_t resolvedLinksDirty;                                      // +0x60

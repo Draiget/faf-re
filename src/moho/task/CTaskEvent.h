@@ -202,7 +202,7 @@ namespace moho
      * Returns `"NULL"` for empty weak pointers, otherwise wraps pointee lexical with brackets.
      */
     [[nodiscard]]
-    msvc8::string GetLexical(const gpg::RRef& ref) const override;
+    fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
      * Address: 0x00407500 (FUN_00407500, Moho::RWeakPtrType_STaskEventLinkage::IsIndexed)

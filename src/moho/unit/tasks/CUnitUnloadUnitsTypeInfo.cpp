@@ -10,14 +10,6 @@
 
 namespace
 {
-  [[nodiscard]] gpg::RType* CachedCUnitUnloadUnitsType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::CUnitUnloadUnits));
-    }
-    return cached;
-  }
 
   /**
    * Address: 0x00627DC0 (FUN_00627DC0, Moho::CUnitUnloadUnitsTypeInfo::Delete)
@@ -38,10 +30,7 @@ namespace
    */
   void DestroyCUnitUnloadUnitsInPlace(void* const objectStorage)
   {
-    auto* const task = static_cast<moho::CUnitUnloadUnits*>(objectStorage);
-    if (task != nullptr) {
-      task->~CUnitUnloadUnits();
-    }
+    gpg::DestructInStorage<moho::CUnitUnloadUnits>(objectStorage);
   }
 } // namespace
 

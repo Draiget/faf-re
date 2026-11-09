@@ -1,4 +1,7 @@
+#include "moho/animation/AniPoseBones.h"
 #include "moho/animation/CRotateManipulator.h"
+#include "gpg/core/reflection/Reflection.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "legacy/math/X87Math.h"
 
 #include <cmath>
@@ -39,7 +42,6 @@ namespace
   constexpr const char* kCreateRotatorClassName = "<global>";
   constexpr const char* kCreateRotatorHelpText =
     "manip = CreateRotator(unit, bone, axis, [goal], [speed], [accel], [goalspeed])";
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedBetweenArgsWarning = "%s\n  expected between %d and %d args, but got %d";
 
   constexpr const char* kInvalidAxisError =
@@ -67,37 +69,6 @@ namespace
   constexpr const char* kSetFollowBoneHelpText = "RotateManipulator:SetFollowBone(bone)";
   constexpr const char* kGetCurrentAngleHelpText = "RotateManipulator:GetCurrentAngle()";
   constexpr const char* kSetCurrentAngleHelpText = "RotateManipulator:SetCurrentAngle(angle)";
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
-
-  [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const actor, const int boneIndex) noexcept
-  {
-    if (actor == nullptr || actor->mPose.get() == nullptr || boneIndex < 0) {
-      return nullptr;
-    }
-
-    moho::CAniPose* const pose = actor->mPose.get();
-    moho::CAniPoseBone* const bonesBegin = pose->mBones.begin();
-    moho::CAniPoseBone* const bonesEnd = pose->mBones.end();
-    if (bonesBegin == nullptr || bonesEnd == nullptr || bonesBegin >= bonesEnd) {
-      return nullptr;
-    }
-
-    const std::ptrdiff_t boneCount = bonesEnd - bonesBegin;
-    if (boneIndex >= boneCount) {
-      return nullptr;
-    }
-
-    return &bonesBegin[boneIndex];
-  }
 
   [[nodiscard]] bool ParseAxisText(const char* axisText, Wm3::Vector3f* const outAxis) noexcept
   {
@@ -211,25 +182,6 @@ namespace
     return upcast.mObj;
   }
 
-  [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
-  {
-    gpg::RType* type = moho::IAniManipulator::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::IAniManipulator));
-      moho::IAniManipulator::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
-
   // Address: 0x00BD3010 (FUN_00BD3010, register_CRotateManipulatorSerializer)
   // -- MSVC's own compiler-generated dynamic initializer for this global runs
   // the real `gpg::SerSaveLoadHelper<CRotateManipulator>` ctor (self-links
@@ -264,36 +216,6 @@ namespace
   };
 
   [[maybe_unused]] CRotateManipulatorSerializerStartupBootstrap gCRotateManipulatorSerializerStartupBootstrap;
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 
   [[nodiscard]] moho::CRotateManipulator*
   GetCRotateManipulatorOptional(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
@@ -357,7 +279,7 @@ void moho::CRotateManipulator::MemberDeserialize(gpg::ReadArchive* const archive
   }
 
   const gpg::RRef owner{};
-  archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(this), owner);
+  archive->Read(gpg::RTypeOf<moho::IAniManipulator>(), static_cast<moho::IAniManipulator*>(this), owner);
 
   bool hasGoal = mHasGoal != 0;
   archive->ReadBool(&hasGoal);
@@ -367,7 +289,7 @@ void moho::CRotateManipulator::MemberDeserialize(gpg::ReadArchive* const archive
   archive->ReadBool(&spinDown);
   mSpinDown = static_cast<std::uint8_t>(spinDown ? 1 : 0);
 
-  archive->Read(CachedVector3fType(), &mAxis, owner);
+  archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mAxis, owner);
   archive->ReadFloat(&mCurrentAngle);
   archive->ReadFloat(&mGoalAngle);
   archive->ReadFloat(&mSpeed);
@@ -390,10 +312,10 @@ void moho::CRotateManipulator::MemberSerialize(gpg::WriteArchive* const archive)
   }
 
   const gpg::RRef owner{};
-  archive->Write(CachedIAniManipulatorType(), this, owner);
+  archive->Write(gpg::RTypeOf<moho::IAniManipulator>(), this, owner);
   archive->WriteBool(mHasGoal != 0);
   archive->WriteBool(mSpinDown != 0);
-  archive->Write(CachedVector3fType(), &mAxis, owner);
+  archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mAxis, owner);
   archive->WriteFloat(mCurrentAngle);
   archive->WriteFloat(mGoalAngle);
   archive->WriteFloat(mSpeed);
@@ -472,7 +394,7 @@ bool moho::CRotateManipulator::SetCurrentAngle(const float angleRadians)
   }
 
   const std::int32_t watchedBoneIndex = mWatchBones.begin()->mBoneIndex;
-  moho::CAniPoseBone* const watchedBone = ResolvePoseBone(mOwnerActor, watchedBoneIndex);
+  moho::CAniPoseBone* const watchedBone = moho::ResolvePoseBone(mOwnerActor, watchedBoneIndex);
   if (watchedBone == nullptr) {
     return false;
   }
@@ -523,7 +445,7 @@ bool moho::CRotateManipulator::ManipulatorUpdate()
   }
 
   if (mFollowBone >= 0) {
-    if (CAniPoseBone* const followBone = ResolvePoseBone(mOwnerActor, mFollowBone)) {
+    if (CAniPoseBone* const followBone = moho::ResolvePoseBone(mOwnerActor, mFollowBone)) {
       const VTransform& composite = followBone->GetCompositeTransform();
       const float x =
         ((composite.orient_.x * composite.orient_.z) + (composite.orient_.w * composite.orient_.y)) * 2.0f;
@@ -533,7 +455,7 @@ bool moho::CRotateManipulator::ManipulatorUpdate()
       // second argument.
       const float y =
         1.0f - (((composite.orient_.x * composite.orient_.x) + (composite.orient_.y * composite.orient_.y)) * 2.0f);
-      mGoalAngle = msvc8::atan2(x, y);
+      mGoalAngle = fa::atan2(x, y);
     }
   }
 
@@ -584,7 +506,7 @@ bool moho::CRotateManipulator::ManipulatorUpdate()
     mCurrentAngle = moho::NormalizeAngleSignedRadians(mCurrentAngle + mSpeed);
   }
 
-  if (CAniPoseBone* const watchedBone = ResolvePoseBone(mOwnerActor, watchedBinding->mBoneIndex)) {
+  if (CAniPoseBone* const watchedBone = moho::ResolvePoseBone(mOwnerActor, watchedBinding->mBoneIndex)) {
     Wm3::Quaternionf rotation{};
     moho::EulerRollToQuat(&mAxis, &rotation, mCurrentAngle);
     watchedBone->Rotate(rotation);
@@ -613,7 +535,7 @@ int moho::cfunc_CreateRotator(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CreateRotator_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kCreateRotatorMethodName,
     &moho::cfunc_CreateRotator,
     nullptr,
@@ -711,10 +633,7 @@ int moho::cfunc_CRotateManipulatorSetSpinDown(lua_State* const luaContext)
 int moho::cfunc_CRotateManipulatorSetSpinDownL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetSpinDownHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetSpinDownHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CRotateManipulator* const manipulator = RequireRotateManipulator(manipObject, state, kInvalidSpinDownError);
@@ -746,10 +665,7 @@ int moho::cfunc_CRotateManipulatorSetGoal(lua_State* const luaContext)
 int moho::cfunc_CRotateManipulatorSetGoalL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetGoalHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetGoalHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CRotateManipulator* const manipulator = RequireRotateManipulator(manipObject, state, kInvalidGoalError);
@@ -790,10 +706,7 @@ int moho::cfunc_CRotateManipulatorSetSpeed(lua_State* const luaContext)
 int moho::cfunc_CRotateManipulatorSetSpeedL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetSpeedHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetSpeedHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CRotateManipulator* const manipulator = RequireRotateManipulator(manipObject, state, kInvalidSpeedError);
@@ -823,10 +736,7 @@ int moho::cfunc_CRotateManipulatorSetTargetSpeed(lua_State* const luaContext)
 int moho::cfunc_CRotateManipulatorSetTargetSpeedL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetTargetSpeedHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetTargetSpeedHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CRotateManipulator* const manipulator = RequireRotateManipulator(manipObject, state, kInvalidTargetSpeedError);
@@ -866,10 +776,7 @@ int moho::cfunc_CRotateManipulatorSetAccel(lua_State* const luaContext)
 int moho::cfunc_CRotateManipulatorSetAccelL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetAccelHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetAccelHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CRotateManipulator* const manipulator = RequireRotateManipulator(manipObject, state, kInvalidAccelError);
@@ -906,10 +813,7 @@ int moho::cfunc_CRotateManipulatorClearFollowBone(lua_State* const luaContext)
 int moho::cfunc_CRotateManipulatorClearFollowBoneL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kClearFollowBoneHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kClearFollowBoneHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CRotateManipulator* const manipulator = RequireRotateManipulator(manipObject, state, kInvalidClearFollowBoneError);
@@ -941,10 +845,7 @@ int moho::cfunc_CRotateManipulatorSetFollowBone(lua_State* const luaContext)
 int moho::cfunc_CRotateManipulatorSetFollowBoneL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetFollowBoneHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetFollowBoneHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CRotateManipulator* const manipulator = RequireRotateManipulator(manipObject, state, kInvalidSetFollowBoneError);
@@ -982,10 +883,7 @@ int moho::cfunc_CRotateManipulatorGetCurrentAngle(lua_State* const luaContext)
 int moho::cfunc_CRotateManipulatorGetCurrentAngleL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetCurrentAngleHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kGetCurrentAngleHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CRotateManipulator* const manipulator = RequireRotateManipulator(manipObject, state, kInvalidGetCurrentAngleError);
@@ -1010,10 +908,7 @@ int moho::cfunc_CRotateManipulatorSetCurrentAngle(lua_State* const luaContext)
 int moho::cfunc_CRotateManipulatorSetCurrentAngleL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetCurrentAngleHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetCurrentAngleHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CRotateManipulator* const manipulator = RequireRotateManipulator(manipObject, state, kInvalidGetCurrentAngleError);
@@ -1154,19 +1049,7 @@ void moho::CRotateManipulatorTypeInfo::Destruct(void* const objectStorage)
 
 void moho::CRotateManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const typeInfo)
 {
-  gpg::RType* baseType = moho::IAniManipulator::sType;
-  if (!baseType) {
-    baseType = gpg::LookupRType(typeid(moho::IAniManipulator));
-    moho::IAniManipulator::sType = baseType;
-  }
-
-  gpg::RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseViaSlot<moho::IAniManipulator>(typeInfo);
 }
 
 /**
@@ -1178,7 +1061,7 @@ void moho::CRotateManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const
  */
 gpg::RRef* gpg::RRef_CRotateManipulator(gpg::RRef* const outRef, moho::CRotateManipulator* const value)
 {
-  const gpg::RRef typed = MakeDerivedRef(value, CachedCRotateManipulatorType());
+  const gpg::RRef typed = gpg::MakeDerivedRef(value, CachedCRotateManipulatorType());
   outRef->mObj = typed.mObj;
   outRef->mType = typed.mType;
   return outRef;

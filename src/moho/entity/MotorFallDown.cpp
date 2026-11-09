@@ -28,8 +28,8 @@
 
 namespace
 {
-  constexpr float kPi = 3.1415927f;
-  constexpr float kHalfPi = 1.5707964f;
+  [[maybe_unused]] constexpr float kPi = 3.1415927f;
+  [[maybe_unused]] constexpr float kHalfPi = 1.5707964f;
   constexpr float kQuarterPi = 0.78539819f;
   constexpr float kFourOverPi = 1.2732395f;
   constexpr float kQuatUpdateThreshold = 0.0001f;
@@ -126,7 +126,7 @@ namespace
   /**
    * Address: 0x00695F00 (FUN_00695F00, gpg::RRef_MotorFallDown)
    */
-  [[nodiscard]] gpg::RRef MakeMotorFallDownRef(moho::MotorFallDown* const object)
+  [[maybe_unused]] [[nodiscard]] gpg::RRef MakeMotorFallDownRef(moho::MotorFallDown* const object)
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -231,10 +231,7 @@ namespace moho
    */
   gpg::RRef MotorFallDown::GetDerivedObjectRef()
   {
-    gpg::RRef ref{};
-    ref.mObj = this;
-    ref.mType = GetClass();
-    return ref;
+    return gpg::MakeSelfRef(this);
   }
 
   /**
@@ -284,9 +281,9 @@ namespace moho
     // fsin/fcos results; only -sin(elevation) is stored straight.
     const float elevationAngle = mFallAngleRadians - kHalfPi;
     const Wm3::Vec3f targetAxis{
-      msvc8::SinTimesCos(mFallDirectionRadians, elevationAngle),
-      -msvc8::sin(elevationAngle),
-      msvc8::CosTimesCos(mFallDirectionRadians, elevationAngle),
+      fa::SinTimesCos(mFallDirectionRadians, elevationAngle),
+      -fa::sin(elevationAngle),
+      fa::CosTimesCos(mFallDirectionRadians, elevationAngle),
     };
 
     VTransform pendingTransform = entity->mVarDat.mCurTransform;
@@ -338,12 +335,7 @@ namespace moho
    */
   void DestroyMotorFallDownTypeInfoBody(MotorFallDownTypeInfo* const typeInfo) noexcept
   {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
+    gpg::ClearTypeLists(typeInfo);
   }
 
   /**
@@ -368,13 +360,7 @@ namespace moho
   void MotorFallDownTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedCScriptObjectType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = gpg::RType::BaseSubobjectOffset<MotorFallDown, CScriptObject>();
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::RType::BaseSubobjectOffset<MotorFallDown, CScriptObject>());
   }
 
   /**
@@ -384,13 +370,7 @@ namespace moho
   void MotorFallDownTypeInfo::AddBase_Motor(gpg::RType* const typeInfo)
   {
     gpg::RType* const baseType = CachedMotorType();
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBaseType(typeInfo, baseType);
   }
 
   /**
@@ -464,7 +444,7 @@ namespace moho
     )
     {
       if (!motor->mBreakOnWhack) {
-        motor->mFallDirectionRadians = msvc8::atan2(normalXYZ[0], normalXYZ[2]);
+        motor->mFallDirectionRadians = fa::atan2(normalXYZ[0], normalXYZ[2]);
         motor->mBreakOnWhack = doBreak;
       }
 
@@ -505,12 +485,7 @@ namespace moho
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 6) {
-      LuaPlus::LuaState::Error(
-        state, "%s\n  expected %d args, but got %d", kMotorFallDownWhackHelpText, 6, argumentCount
-      );
-    }
+    moho::SCR_ExpectExactArgs(state, 6, kMotorFallDownWhackHelpText);
 
     const LuaPlus::LuaObject selfObject(LuaPlus::LuaStackObject(state, 1));
     MotorFallDown* const motor = SCR_FromLua_MotorFallDown(selfObject, state);

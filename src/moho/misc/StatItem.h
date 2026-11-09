@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 
@@ -8,6 +9,7 @@
 #include "legacy/containers/String.h"
 #include "moho/containers/TDatTreeItem.h"
 #include "moho/misc/Stats.h"
+#include "platform/Interlocked.h"
 
 namespace LuaPlus
 {
@@ -127,6 +129,30 @@ namespace moho
   {
   public:
     /**
+     * Engine addition: atomic add on the primary lane, returning the value before it.
+     */
+    std::int32_t AddPrimaryBits(const std::int32_t delta) noexcept
+    {
+      return platform::AtomicAdd(&mPrimaryValueBits, delta);
+    }
+
+    /**
+     * Engine addition: atomic exchange on the primary lane, returning the value before it.
+     */
+    std::int32_t ExchangePrimaryBits(const std::int32_t value) noexcept
+    {
+      return platform::AtomicExchange(&mPrimaryValueBits, value);
+    }
+
+    /**
+     * Engine addition: atomic store on the primary lane.
+     */
+    void StorePrimaryBits(const std::int32_t value) noexcept
+    {
+      platform::AtomicField(&mPrimaryValueBits).store(value);
+    }
+
+    /**
      * Address: 0x00408730 (FUN_00408730, Moho::StatItem::StatItem)
      */
     explicit StatItem(const char* name);
@@ -149,7 +175,7 @@ namespace moho
     /**
      * Address: 0x00418750 (FUN_00418750, Moho::StatItem::GetString)
      */
-    msvc8::string* GetString(bool useRealtimeValue, msvc8::string* outValue);
+    fa::string* GetString(bool useRealtimeValue, fa::string* outValue);
 
     /**
      * Address: 0x00418890 (FUN_00418890, Moho::StatItem::GetInt)
@@ -182,12 +208,12 @@ namespace moho
     /**
      * Address: 0x00417FE0 (FUN_00417FE0, Moho::StatItem::SetValue_0)
      */
-    void SetValueCopy(msvc8::string* outValue);
+    void SetValueCopy(fa::string* outValue);
 
     /**
      * Address: 0x00415220 (FUN_00415220, Moho::StatItem::SetValue)
      */
-    void SetValue(const msvc8::string& value);
+    void SetValue(const fa::string& value);
 
     /**
      * Address: 0x004151E0 (FUN_004151E0, Moho::StatItem::Release)
@@ -274,7 +300,7 @@ namespace moho
 
     // Shared intrusive-tree helpers used by stat-path recovery code.
     void AttachChild(StatItem* child);
-    [[nodiscard]] StatItem* FindDirectChildByName(const msvc8::string& token);
+    [[nodiscard]] StatItem* FindDirectChildByName(const fa::string& token);
 
     static gpg::RType* sType;
 
@@ -289,17 +315,17 @@ namespace moho
     volatile std::int32_t mPrimaryValueBits; // +0x24
 
     // String value storage for `EStatType::kString`.
-    msvc8::string mValue; // +0x28
+    fa::string mValue; // +0x28
 
     // Numeric slot used when `useRealtimeValue == true`.
     volatile std::int32_t mRealtimeValueBits; // +0x44
 
-    msvc8::string mScratchValue; // +0x48
+    fa::string mScratchValue; // +0x48
 
     std::uint32_t mSampleTag{0};      // +0x64
     StatSampleBuffer mSampleHistory;  // +0x68..+0x73
 
-    msvc8::string mName; // +0x74
+    fa::string mName; // +0x74
 
     EStatType mType{EStatType::kNone};         // +0x90
     volatile std::int32_t mUseRealtimeSlot{0}; // +0x94

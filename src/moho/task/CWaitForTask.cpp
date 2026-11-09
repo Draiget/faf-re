@@ -34,24 +34,6 @@ namespace
     return &sInstance;
   }
 
-  gpg::RType* CachedCWaitForTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CWaitForTask));
-    }
-    return cached;
-  }
-
-  gpg::RType* CachedCTaskType()
-  {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(CTask));
-    }
-    return cached;
-  }
-
   /**
    * Address: 0x004CB920 (FUN_004CB920, CWaitForTaskTypeInfo::AddBase_CTask)
    *
@@ -60,14 +42,7 @@ namespace
    */
   void AddCTaskBaseToTypeInfo(gpg::RType* const typeInfo)
   {
-    gpg::RType* const taskType = CachedCTaskType();
-    gpg::RField baseField{};
-    baseField.mName = taskType->GetName();
-    baseField.mType = taskType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    typeInfo->AddBase(baseField);
+    gpg::AddReflectedBase<CTask>(typeInfo);
   }
 
 } // namespace

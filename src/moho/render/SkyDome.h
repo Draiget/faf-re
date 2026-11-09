@@ -48,7 +48,7 @@ namespace moho
    * append checks is 107374182 -- `0xFFFFFFFF / 0x28`, this list's own
    * `max_size`.
    */
-  using SkyDomeDecalUploadList = msvc8::list<SkyDomeDecalVertices>;
+  using SkyDomeDecalUploadList = fa::list<SkyDomeDecalVertices>;
 
   static_assert(sizeof(SkyDomeDecalVertices) == 0x28, "SkyDomeDecalVertices size must be 0x28");
   static_assert(sizeof(SkyDomeDecalUploadList) == 0x0C, "SkyDomeDecalUploadList size must be 0x0C");
@@ -145,7 +145,7 @@ namespace moho
      * Restores cirrus scalar/vector context lanes, releases the previous
      * cirrus texture handle, and stores the new texture path.
      */
-    void SetCirrusContext(float speed, const Wm3::Vector3f& direction, const msvc8::string& texturePath);
+    void SetCirrusContext(float speed, const Wm3::Vector3f& direction, const fa::string& texturePath);
 
     /**
      * Address: 0x00815230 (FUN_00815230, ?SetupHorizonAndCirrus@SkyDome@Moho@@...)
@@ -300,7 +300,7 @@ namespace moho
       const Wm3::Vector3f& skyColor,
       float horizonSize,
       const Wm3::Vector3f& horizonColor,
-      const msvc8::string& horizonLookupPath
+      const fa::string& horizonLookupPath
     ) noexcept;
 
     /**
@@ -335,7 +335,7 @@ namespace moho
       int head,
       float deltaFrame,
       const GeomCamera3& cam,
-      const msvc8::vector<CumulusVertex>& cumulusVertices
+      const fa::vector<CumulusVertex>& cumulusVertices
     );
 
     /**
@@ -379,19 +379,19 @@ namespace moho
     float mHorizonSize = 44.0f;                                   // +0x40
     Wm3::Vector3f mHorizonColor{0.5608f, 0.6706f, 0.8857f};     // +0x44
     Wm3::Vector3f mSkyColor{0.1804f, 0.4039f, 0.7245f};         // +0x50
-    msvc8::string mHorizonLookupPath;                              // +0x5C
+    fa::string mHorizonLookupPath;                              // +0x5C
     float mHorizonBlend = 0.1f;                                   // +0x78
-    msvc8::string mAtmosphereTexPath;                              // +0x7C
-    msvc8::string mAtmosphereTexPath2;                             // +0x98
+    fa::string mAtmosphereTexPath;                              // +0x7C
+    fa::string mAtmosphereTexPath2;                             // +0x98
     SkyDomeDecalUploadList mDecalUploads;                          // +0xB4
-    msvc8::string mDecalTexPath1;                                  // +0xC0
-    msvc8::string mDecalTexPath2;                                  // +0xDC
-    msvc8::string mDecalTexPath3;                                  // +0xF8
+    fa::string mDecalTexPath1;                                  // +0xC0
+    fa::string mDecalTexPath2;                                  // +0xDC
+    fa::string mDecalTexPath3;                                  // +0xF8
     float mCirrusMultiplier = 1.8f;                                // +0x114
     float mCirrusColor_R = 1.0f;                                  // +0x118
     float mCirrusColor_G = 1.0f;                                  // +0x11C
     float mCirrusColor_B = 1.0f;                                  // +0x120
-    msvc8::string mCirrusTexPath;                                  // +0x124
+    fa::string mCirrusTexPath;                                  // +0x124
     std::uint8_t mCirrusData[0x50];                                // +0x140 (copied from static)
     std::int32_t mDomeVertexCount = 0;                             // +0x190
     std::int32_t mDomeIndexCount = 0;                              // +0x194

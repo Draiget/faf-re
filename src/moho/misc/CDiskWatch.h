@@ -17,7 +17,7 @@ namespace moho
 
   struct SDiskWatchEvent
   {
-    msvc8::string mPath;          // +0x00
+    fa::string mPath;          // +0x00
     std::int32_t mActionCode;     // +0x1C
     std::uint32_t mTimestampLow;  // +0x20
     std::uint32_t mTimestampHigh; // +0x24
@@ -75,10 +75,10 @@ namespace moho
 
   public:
     CDiskWatch* mOwner;                // +0x00
-    msvc8::vector<SDiskWatchEvent> mPendingEvents; // +0x04
-    msvc8::string mDirectoryPath;      // +0x14
+    fa::vector<SDiskWatchEvent> mPendingEvents; // +0x04
+    fa::string mDirectoryPath;      // +0x14
     void* mDirectoryHandle;            // +0x30
-    msvc8::vector<std::uint8_t> mReadBuffer;       // +0x34
+    fa::vector<std::uint8_t> mReadBuffer;       // +0x34
     SDiskWatchOverlapped mReadOverlapped;   // +0x44
   };
 
@@ -156,12 +156,12 @@ namespace moho
      * Address: 0x00461E00 (FUN_00461E00,
      * ?CopyAndClearPendingChanges@CDiskWatchListener@Moho@@QAE?AV?$vector@USDiskWatchEvent@Moho@@V?$allocator@USDiskWatchEvent@Moho@@@std@@@std@@XZ)
      */
-    void CopyAndClearPendingChanges(msvc8::vector<SDiskWatchEvent>& outEvents);
+    void CopyAndClearPendingChanges(fa::vector<SDiskWatchEvent>& outEvents);
 
   public:
     CDiskWatch* mWatch;                           // +0x0C
-    msvc8::vector<SDiskWatchEvent> mEvents;       // +0x10
-    msvc8::vector<msvc8::string> mPatterns;       // +0x20
+    fa::vector<SDiskWatchEvent> mEvents;       // +0x10
+    fa::vector<fa::string> mPatterns;       // +0x20
   };
 
   class CDiskWatch
@@ -177,7 +177,7 @@ namespace moho
      * compares against `0x7FFFFFE` = `0xFFFFFFFF / 0x20 - 1`, so the pair is
      * 0x20 and nothing here is padded.
      */
-    using DiskWatchMap = msvc8::map<msvc8::string, CDiskDirWatch*>;
+    using DiskWatchMap = fa::map<fa::string, CDiskDirWatch*>;
 
     /**
      * Address: 0x004627C0 (FUN_004627C0, ??0CDiskWatch@Moho@@QAE@XZ)
@@ -238,7 +238,7 @@ namespace moho
      * Opens the current process token and enables/disables one named privilege.
      */
     [[nodiscard]]
-    bool EnablePrivilege(const msvc8::string& privilegeName, bool enable = true) const;
+    bool EnablePrivilege(const fa::string& privilegeName, bool enable = true) const;
 
   public:
     /**

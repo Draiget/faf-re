@@ -80,7 +80,7 @@ namespace moho
    */
   void SimArmy::MemberDeserialize(gpg::ReadArchive* const archive)
   {
-    IArmy* const base = this ? static_cast<IArmy*>(this) : nullptr;
+    IArmy* const base = static_cast<IArmy*>(this);
     gpg::RType* type = IArmy::sType;
     if (!type) {
       type = gpg::LookupRType(typeid(IArmy));
@@ -96,7 +96,7 @@ namespace moho
    */
   void SimArmy::MemberSerialize(gpg::WriteArchive* const archive) const
   {
-    const IArmy* const base = this ? static_cast<const IArmy*>(this) : nullptr;
+    const IArmy* const base = static_cast<const IArmy*>(this);
     gpg::RType* type = IArmy::sType;
     if (!type) {
       type = gpg::LookupRType(typeid(IArmy));

@@ -1,3 +1,4 @@
+#include "gpg/core/reflection/Reflection.h"
 #include "moho/audio/AudioReflectionHelpers.h"
 
 #include <typeinfo>
@@ -26,30 +27,23 @@ namespace
     return sType;
   }
 
-  [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cachedType, const std::type_info& typeInfo)
-  {
-    if (!cachedType) {
-      cachedType = gpg::LookupRType(typeInfo);
-    }
-    return cachedType;
-  }
 } // namespace
 
 namespace moho::audio_reflection
 {
   gpg::RType* ResolveISoundManagerType()
   {
-    return ResolveCachedType(CachedISoundManagerType(), typeid(moho::ISoundManager));
+    return gpg::CachedLookup(CachedISoundManagerType(), typeid(moho::ISoundManager));
   }
 
   gpg::RType* ResolveCSimSoundManagerType()
   {
-    return ResolveCachedType(CachedCSimSoundManagerType(), typeid(moho::CSimSoundManager));
+    return gpg::CachedLookup(CachedCSimSoundManagerType(), typeid(moho::CSimSoundManager));
   }
 
   gpg::RType* ResolveCScriptEventType()
   {
-    return ResolveCachedType(CachedCScriptEventType(), typeid(moho::CScriptEvent));
+    return gpg::CachedLookup(CachedCScriptEventType(), typeid(moho::CScriptEvent));
   }
 
   void AddBase(gpg::RType* const ownerType, gpg::RType* const baseType)
@@ -58,13 +52,7 @@ namespace moho::audio_reflection
       return;
     }
 
-    gpg::RField baseField{};
-    baseField.mName = baseType->GetName();
-    baseField.mType = baseType;
-    baseField.mOffset = 0;
-    baseField.mFlags = 0;
-    baseField.mDesc = nullptr;
-    ownerType->AddBase(baseField);
+    gpg::AddReflectedBaseType(ownerType, baseType);
   }
 
   void RegisterSerializeCallbacks(

@@ -1,12 +1,32 @@
 #include "legacy/math/X87Math.h"
+#include "legacy/math/Libm.h"
 
 #include <bit>
 #include <cmath>
 #include <xmmintrin.h>
 
-extern "C" int global_mode_sse2;
+// Moved here unchanged from moho/math/MathReflection.cpp (dedicated-server plan
+// WPL.23): the lane state belongs with the helpers that read it, and the
+// simulation's math tests link this file without the reflection code.
+extern "C" int global_mode_sse2 = 1;
+extern "C" int global_compat_flag = 1;
 
-#if defined(_M_X64)
+/**
+ * Address: 0x00A8ECD3 (FUN_00A8ECD3, func_SetSSE2)
+ *
+ * What it does:
+ * Enables/disables the SSE2 runtime lane by masking with the startup
+ * compatibility flag, then publishes and returns the resulting mode value.
+ */
+extern "C" int __cdecl SetSse2Mode(const int enableSse2)
+{
+  const int mode = (enableSse2 != 0) ? global_compat_flag : 0;
+  global_mode_sse2 = mode;
+  return mode;
+}
+
+// x64 (Windows x64 and System V): legacy/math/X87Math64.asm / X87Math64.S.
+#if defined(_M_X64) || defined(__x86_64__)
 // legacy/math/X87Math64.asm: the same instruction sequences for 64-bit code,
 // which has no inline assembly.
 extern "C" float __cdecl msvc8_x87_sinf(float x);
@@ -20,7 +40,8 @@ extern "C" unsigned int __cdecl msvc8_x87_control_word();
 extern "C" float __cdecl msvc8_x87_atan2_difference(float firstY, float firstX, float secondY, float secondX);
 extern "C" float __cdecl msvc8_x87_atan2_plus(float y, float x, float addend);
 extern "C" float __cdecl msvc8_x87_sin_times_cos(float sinArg, float cosArg);
-extern "C" float __cdecl msvc8_x87_sin_times(float sinArg, float factor);
+extern "C" float __cdecl msvc8_x87_sin_of_product_times(float a, float b, float factor);
+extern "C" float __cdecl msvc8_x87_twister_word_in_range(float lower, float upper, std::uint32_t word);
 extern "C" void __cdecl msvc8_x87_slerp_spherical_blend(
   float* outLanes, const float* q1Lanes, const float* rhsLanes, float angle, float oneMinusT, float t
 );
@@ -31,6 +52,9 @@ extern "C" float __cdecl msvc8_x87_intrinsic_ln_quotient(float x, double base);
 extern "C" float __cdecl msvc8_x87_scaled_ln_quotient(float numerator, float denominator, float scale);
 extern "C" float __cdecl msvc8_x87_cos_times_cos(float firstArg, float secondArg);
 extern "C" float __cdecl msvc8_x87_bilinear_height(float h00, float h01, float h10, float h11, float fracX, float fracZ);
+extern "C" float __cdecl msvc8_x87_subtract_bilinear_height(
+  float top, float h00, float h01, float h10, float h11, float fracX, float fracZ
+);
 extern "C" std::int32_t __cdecl msvc8_x87_round_to_int(float value);
 extern "C" void __cdecl msvc8_x87_scale_vector_max_length(float* x, float* y, float* z, float maxLength, float lengthSq);
 extern "C" void __cdecl msvc8_x87_scale_vector_to_length(
@@ -44,7 +68,7 @@ extern "C" void __cdecl msvc8_x87_scale_vector_to_length_of(
 extern "C" float __cdecl msvc8_x87_vector_length_zyx(const float* lanes);
 #endif
 
-namespace msvc8
+namespace fa
 {
   namespace
   {
@@ -69,6 +93,17 @@ namespace msvc8
     [[nodiscard]] bool TakesSse2Lane(const unsigned int controlWord) noexcept
     {
       return global_mode_sse2 != 0 && (_mm_getcsr() & 0x1F80u) == 0x1F80u && (controlWord & 0x7Fu) == 0x7Fu;
+    }
+
+    /**
+     * Engine addition (dedicated-server plan WPL.11): the NaN a domain error gives, the x87
+     * indefinite (negative quiet NaN) the Windows CRT returns for acos/asin of |x| > 1 and pow
+     * of a negative base with a fractional exponent. Spelled here so every platform gives it:
+     * glibc returns the positive quiet NaN.
+     */
+    [[nodiscard]] double DomainErrorNaN() noexcept
+    {
+      return std::bit_cast<double>(0xFFF8000000000000ull);
     }
 
     /**
@@ -126,6 +161,22 @@ namespace msvc8
 #else
     return msvc8_x87_round_to_int(value);
 #endif
+  }
+
+  std::int32_t FloorToIntX87(const float value) noexcept
+  {
+    const float nearest = std::nearbyint(value);
+    const auto whole = static_cast<std::uint32_t>(RoundToInt(nearest));
+    const std::uint32_t borrow = (value < nearest || std::isunordered(value, nearest)) ? 1u : 0u;
+    return static_cast<std::int32_t>(whole - borrow);
+  }
+
+  std::int32_t CeilToIntX87(const float value) noexcept
+  {
+    const float nearest = std::nearbyint(value);
+    const auto whole = static_cast<std::uint32_t>(RoundToInt(nearest));
+    const std::uint32_t carry = value > nearest ? 1u : 0u;
+    return static_cast<std::int32_t>(whole + carry);
   }
 
   void ScaleVectorByMaxLengthX87(float& x, float& y, float& z, const float maxLength) noexcept
@@ -275,6 +326,21 @@ namespace msvc8
     if (x == 0.0 && y != 0.0 && std::isfinite(y)) {
       return 0.0;
     }
+    // Engine addition (plan WPL.11): the domain errors as the Windows x64 CRT answers them
+    // (probed: an infinite dividend gives the quiet NaN with its sign, a zero divisor the
+    // positive one); glibc gives the negative NaN for both. NaN operands stay with the CRT,
+    // which passes them through alike on both platforms. x86 keeps its CRT's answer (the
+    // negative indefinite for both, tests/sim_math/known_windows-x86.txt).
+#if !defined(_M_IX86)
+    if (!std::isnan(x) && !std::isnan(y)) {
+      if (std::isinf(x)) {
+        return std::bit_cast<double>(std::signbit(x) ? 0xFFF8000000000000ull : 0x7FF8000000000000ull);
+      }
+      if (y == 0.0) {
+        return std::bit_cast<double>(0x7FF8000000000000ull);
+      }
+    }
+#endif
     return std::fmod(x, y);
   }
 
@@ -393,11 +459,78 @@ namespace msvc8
 #endif
   }
 
+  float SubtractBilinearHeight(
+    const float top, const float h00, const float h01, const float h10, const float h11, const float fracX,
+    const float fracZ
+  ) noexcept
+  {
+#if defined(_M_IX86)
+    float result;
+    __asm {
+      fld h01
+      fld h00
+      fsub st(1), st(0)
+      fld fracZ
+      fmul st(2), st(0)
+      fxch st(2)
+      faddp st(1), st(0)
+      fld h11
+      fld h10
+      fsub st(1), st(0)
+      fxch st(1)
+      fmulp st(3), st(0)
+      faddp st(2), st(0)
+      fsub st(1), st(0)
+      fxch st(1)
+      fmul fracX
+      faddp st(1), st(0)
+      fsubr top
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_subtract_bilinear_height(top, h00, h01, h10, h11, fracX, fracZ);
+#endif
+  }
+
   float MulTwisterWord(const float factor, const std::uint32_t word) noexcept
   {
     const double wordValue =
       word < 0x80000000u ? static_cast<double>(word) : static_cast<double>(static_cast<float>(word));
     return RoundExactProductToFloat(static_cast<double>(factor), wordValue);
+  }
+
+  float TwisterWordInRange(const float lower, const float upper, const std::uint32_t twisterWord) noexcept
+  {
+#if defined(_M_IX86)
+    // 0x0051B5C6..0x0051B5EA: `fild` the word as signed and add 2^32 back
+    // when it loaded negative, then range, product, 2^-32 and the sum on the
+    // stack (constants 0x00E4F710 and 0x00E4F7B0).
+    constexpr float kTwoTo32 = 4294967296.0f;
+    constexpr float kInvTwoTo32 = 2.3283064365386962890625e-10f;
+    const float twoTo32 = kTwoTo32;
+    const float invTwoTo32 = kInvTwoTo32;
+    float result;
+    __asm {
+      fild twisterWord
+      mov eax, twisterWord
+      test eax, eax
+      jge loaded
+      fadd twoTo32
+    loaded:
+      fld upper
+      fld lower
+      fsub st(1), st
+      fxch st(2)
+      fmulp st(1), st
+      fmul invTwoTo32
+      faddp st(1), st
+      fstp result
+    }
+    return result;
+#else
+    return msvc8_x87_twister_word_in_range(lower, upper, twisterWord);
+#endif
   }
 
   /**
@@ -533,19 +666,20 @@ namespace msvc8
 #endif
   }
 
-  float SinTimes(const float sinArg, const float factor) noexcept
+  float SinOfProductTimes(const float a, const float b, const float factor) noexcept
   {
 #if defined(_M_IX86)
     float result;
     __asm {
-      fld sinArg
+      fld a
+      fmul b
       fsin
       fmul factor
       fstp result
     }
     return result;
 #else
-    return msvc8_x87_sin_times(sinArg, factor);
+    return msvc8_x87_sin_of_product_times(a, b, factor);
 #endif
   }
 
@@ -724,7 +858,13 @@ namespace msvc8
 
   float asinf(const float x) noexcept
   {
-    return static_cast<float>(std::asin(static_cast<double>(x)));
+    // Engine addition (plan WPL.11): the domain errors' NaN as on Windows x64 (DomainErrorNaN);
+    // in the domain a double asin, as the binary's asinf called the CRT's: the engine's
+    // (fa::libm, equal to the Windows x64 UCRT's for every float), not the host's.
+    if (!std::isnan(x) && !(x >= -1.0f && x <= 1.0f)) {
+      return static_cast<float>(DomainErrorNaN());
+    }
+    return static_cast<float>(libm::asin(static_cast<double>(x)));
   }
 
   float acosf(const float x) noexcept
@@ -734,6 +874,10 @@ namespace msvc8
 
   double acos(const double x) noexcept
   {
+    // Engine addition (plan WPL.11): |x| > 1 and the infinities are a domain error.
+    if (!std::isnan(x) && !(x >= -1.0 && x <= 1.0)) {
+      return DomainErrorNaN();
+    }
     if (TakesSse2Lane(CurrentControlWord()) || !(x >= -1.0 && x <= 1.0)) {
       return std::acos(x);
     }
@@ -766,8 +910,11 @@ namespace msvc8
   double asin(const double x) noexcept
   {
     const unsigned int controlWord = CurrentControlWord();
-    // NaN, infinities and |x| > 1 take the CRT's errno lane; the host CRT
-    // returns the same NaN.
+    // NaN, infinities and |x| > 1 take the CRT's errno lane. Engine addition (plan WPL.11):
+    // the domain errors' NaN is spelled out (DomainErrorNaN); a NaN passes through the CRT.
+    if (!std::isnan(x) && !(x >= -1.0 && x <= 1.0)) {
+      return DomainErrorNaN();
+    }
     if (TakesSse2Lane(controlWord) || !(x >= -1.0 && x <= 1.0)) {
       return std::asin(x);
     }
@@ -819,7 +966,7 @@ namespace msvc8
       // 0x00A8E2DD: classify the exponent (0x00A8E302: integer, then whether
       // y * 0.5 is too), run the positive lane on -x and negate for odd y.
       if (y != std::floor(y)) {
-        return std::pow(x, y);
+        return DomainErrorNaN(); // engine addition (plan WPL.11), the CRT's domain error
       }
       const bool oddExponent = (y * 0.5) != std::floor(y * 0.5);
       const double magnitude = PowPositiveBase(controlWord, -x, y);
@@ -828,7 +975,7 @@ namespace msvc8
     return PowPositiveBase(controlWord, x, y);
   }
 
-  static double PowPositiveBase(const unsigned int controlWord, const double x, const double y) noexcept
+  static double PowPositiveBase([[maybe_unused]] const unsigned int controlWord, const double x, const double y) noexcept
   {
 #if defined(_M_IX86)
     double result;
@@ -859,14 +1006,16 @@ namespace msvc8
 #endif
   }
 
+  // expf and logf: a double exp/log rounded once, as the x86 CRT's float overloads do; the
+  // engine's (fa::libm, plan WPL.11), equal to the Windows x64 UCRT's for every float.
   float expf(const float x) noexcept
   {
-    return static_cast<float>(std::exp(static_cast<double>(x)));
+    return static_cast<float>(libm::exp(static_cast<double>(x)));
   }
 
   float logf(const float x) noexcept
   {
-    return static_cast<float>(std::log(static_cast<double>(x)));
+    return static_cast<float>(libm::log(static_cast<double>(x)));
   }
 
   float powf(const float x, const float y) noexcept
@@ -898,4 +1047,4 @@ namespace msvc8
     return msvc8_x87_vector_length_zyx(lanes);
 #endif
   }
-} // namespace msvc8
+} // namespace fa

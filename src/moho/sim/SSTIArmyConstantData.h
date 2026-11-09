@@ -78,8 +78,8 @@ namespace moho
     void MemberDeserialize(gpg::ReadArchive* archive);
 
     std::int32_t mArmyIndex;                          // +0x00
-    msvc8::string mArmyName;                          // +0x04
-    msvc8::string mPlayerName;                        // +0x20
+    fa::string mArmyName;                          // +0x04
+    fa::string mPlayerName;                        // +0x20
     std::uint8_t mIsCivilian;                         // +0x3C
     std::uint8_t mPad3D[3];                           // +0x3D
     boost::shared_ptr<CIntelGrid> mVisionReconGrid;  // +0x40

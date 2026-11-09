@@ -122,9 +122,9 @@ namespace moho
     mReady = false;
     mType = 2;
 
-    std::memset(&mStart, 0, sizeof(mStart));
-    std::memset(&mFinish, 0, sizeof(mFinish));
-    std::memset(&mMousePos, 0, sizeof(mMousePos));
+    std::memset(static_cast<void*>(&mStart), 0, sizeof(mStart));
+    std::memset(static_cast<void*>(&mFinish), 0, sizeof(mFinish));
+    std::memset(static_cast<void*>(&mMousePos), 0, sizeof(mMousePos));
 
     mNumFormationScripts = 0;
     mDirection = Wm3::Quaternionf(/*w*/ 0.0f, /*x*/ 0.0f, /*y*/ 0.0f, /*z*/ 1.0f);
@@ -262,7 +262,8 @@ namespace moho
       const float dx = mFinish.x - mStart.x;
       const float dy = mFinish.y - mStart.y;
       const float dz = mFinish.z - mStart.z;
-      const float dragDistance = std::sqrt(dx * dx + dy * dy + dz * dz);
+      // 0x0083877F: (dz*dz + dy*dy) + dx*dx.
+      const float dragDistance = std::sqrt((dz * dz + dy * dy) + dx * dx);
 
       if (dragDistance > 200.0f) {
         mTravelFormation = FORMATION_PickTravelFormation(state, formationType, dragDistance);

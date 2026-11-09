@@ -1,10 +1,12 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
 
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 #include "moho/serialization/SSavedGameHeader.h"
 
 struct lua_State;
@@ -23,6 +25,7 @@ namespace LuaPlus
 
 namespace moho
 {
+  class LaunchInfoBase;
   class CScrLuaInitForm;
   struct SWldSessionInfo;
 
@@ -59,15 +62,30 @@ namespace moho
      * What it does:
      * Builds one single-player `SWldSessionInfo` from loaded save payload.
      */
-    [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> CreateSinglePlayerSessionInfo();
+    [[nodiscard]] fa::auto_ptr<SWldSessionInfo> CreateSinglePlayerSessionInfo();
 
   private:
-    msvc8::string mFilename;      // +0x00
+    fa::string mFilename;      // +0x00
     gpg::ReadArchive* mReader;    // +0x1C
     SSavedGameHeader mHeader;     // +0x20
   };
 
   static_assert(sizeof(CSavedGame) == 0x78, "CSavedGame size must be 0x78");
+
+  enum class EGpgNetOpenMode : int
+  {
+    Read = 1,
+    Write = 2,
+  };
+
+  /**
+   * Engine addition: `OpenGPGNetURI` (ReplaySessionSetup.cpp) for the client's session startup,
+   * which writes the replay it records through the same function.
+   */
+  /** Engine addition: the header of a replay, for what records one (`VCR_CreateReplay`, the dedicated server). */
+  void VCR_WriteReplayHeader(gpg::Stream& stream, const SWldSessionInfo& sessionInfo);
+
+  [[nodiscard]] std::unique_ptr<gpg::Stream> VCR_OpenGPGNetURI(gpg::StrArg uri, EGpgNetOpenMode mode);
 
   /**
    * Address: 0x00875B60 (FUN_00875B60)
@@ -80,7 +98,7 @@ namespace moho
    * owner when the session carries no `LaunchInfoNew` or the sink cannot be
    * opened; `WLD_DoLoading` treats that as "this session is not recorded".
    */
-  [[nodiscard]] msvc8::auto_ptr<gpg::Stream> VCR_CreateReplay(const SWldSessionInfo* sessionInfo, gpg::StrArg name);
+  [[nodiscard]] fa::auto_ptr<gpg::Stream> VCR_CreateReplay(const SWldSessionInfo* sessionInfo, gpg::StrArg name);
 
   /**
    * Address: 0x008765E0 (FUN_008765E0)
@@ -93,9 +111,65 @@ namespace moho
    *
    * Engine addition: when the replay is refused, `failureReason` (if given)
    * receives a sentence saying why, for the player.
+   *
+   * Engine addition (issue #275): with `commandStream`, the session gets no
+   * client manager; the stream, positioned on the first recorded command, goes
+   * to the caller, who builds one.
    */
-  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo>
-  VCR_SetupReplaySession(gpg::StrArg filename, msvc8::string* failureReason = nullptr);
+  [[nodiscard]] fa::auto_ptr<SWldSessionInfo> VCR_SetupReplaySession(
+    gpg::StrArg filename,
+    fa::string* failureReason = nullptr,
+    std::unique_ptr<gpg::Stream>* commandStream = nullptr,
+    int skipBeats = 0
+  );
+
+  /**
+   * Engine addition (issue #275): the same from a stream already open.
+   * `filename` only names it in messages.
+   */
+  [[nodiscard]] fa::auto_ptr<SWldSessionInfo> VCR_SetupReplaySessionFromStream(
+    std::unique_ptr<gpg::Stream> replayStream,
+    gpg::StrArg filename,
+    fa::string* failureReason,
+    std::unique_ptr<gpg::Stream>* commandStream,
+    int skipBeats = 0
+  );
+
+  /** Engine addition (replay timeline): set, `VCR_SetupReplaySession` also reads the replay's length into `gVcrReplayBeats`. */
+  extern bool gVcrScanReplayLength;
+  extern std::int32_t gVcrReplayBeats;
+  /** Engine addition (replay timeline): sums the stream's beats from here to its end, and comes back here. */
+  [[nodiscard]] std::int32_t VCR_ScanReplayBeats(gpg::Stream& stream);
+
+  /**
+   * Engine addition (dedicated-server plan WPL.4): the name of the local client
+   * VCR_SetupReplaySession creates, `Loc(USER_GetLuaState(), "<LOC
+   * Engine0031>Local")` in the binary. The user Lua state is user-side code, so
+   * SessionStartup.cpp (user side) sets this during static initialisation;
+   * without a user side the name is the key's text, "Local".
+   */
+  using ReplayLocalClientNameHook = fa::string (*)();
+  extern ReplayLocalClientNameHook sReplayLocalClientName;
+
+  /**
+   * Engine addition, not in the binary: whether the serialized Lua values a
+   * replay or saved game carries (game mods, scenario, army setups) decode
+   * (moho/misc/ReplaySessionSetup.cpp). Replay and saved-game loading refuse a
+   * file whose values do not, while their reader can still say why.
+   */
+  [[nodiscard]] bool LaunchInfoStringsDecode(
+    const LaunchInfoBase& launchInfo, const fa::vector<fa::string>& armySetups
+  );
+
+  /**
+   * Address: 0x0088BBB0 (FUN_0088BBB0, sub_88BBB0)
+   *
+   * What it does:
+   * Gives a single-player session info its one local command source and
+   * client: appends the source to the launch info, gives every army that
+   * source, and binds a one-client local client manager.
+   */
+  void SetupSinglePlayerCommandSourceLane(SWldSessionInfo& sessionInfo, const char* playerName);
 
   /**
    * Address: 0x0088CBC0 (FUN_0088CBC0)
@@ -105,7 +179,15 @@ namespace moho
    * What it does:
    * Builds one single-player `SWldSessionInfo` from Lua launch payload.
    */
-  [[nodiscard]] msvc8::auto_ptr<SWldSessionInfo> WLD_SetupSessionInfo(const LuaPlus::LuaObject& launchData);
+  [[nodiscard]] fa::auto_ptr<SWldSessionInfo> WLD_SetupSessionInfo(const LuaPlus::LuaObject& launchData);
+
+  /**
+   * Engine addition (the map editor, src/editor): when set, `WLD_SetupSessionInfo` turns cheats on for the
+   * single-player session it builds, as the `debug.enable_debug_facilities` preference does, without
+   * writing that preference (the editor shares Game.prefs with the game). The editor's view of the whole
+   * map during play needs it (`CWldSession::ValidateFocusArmyRequest`). False in the game.
+   */
+  extern bool gSessionCheats;
 
   /**
    * Address: 0x00876DD0 (FUN_00876DD0, cfunc_LaunchReplaySession)

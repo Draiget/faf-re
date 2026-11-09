@@ -12,24 +12,6 @@ namespace
 {
   bool gCTaskThreadTypeInfoPreregistered = false;
 
-  [[nodiscard]] gpg::RType* CachedCTaskThreadType()
-  {
-    gpg::RType* type = moho::CTaskThread::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CTaskThread));
-      moho::CTaskThread::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RRef MakeTaskThreadRef(moho::CTaskThread* const thread)
-  {
-    gpg::RRef out{};
-    out.mObj = thread;
-    out.mType = CachedCTaskThreadType();
-    return out;
-  }
-
   /**
    * Address: 0x00409420 (FUN_00409420, sub_409420)
    *

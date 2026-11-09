@@ -9,13 +9,13 @@
 
 #pragma pack(push, 4)
 
-namespace msvc8
+namespace fa
 {
     /**
      * \brief Owning MSVC8-layout `std::map`.
      *
      * All red-black mechanics live in `detail::rb_tree` (RbTree.h), which this
-     * container shares with `msvc8::set`; the only difference between the two is
+     * container shares with `fa::set`; the only difference between the two is
      * the traits' key extractor - `set` extracts the value itself, `map` extracts
      * `value_type::first`.
      *
@@ -30,7 +30,7 @@ namespace msvc8
      * Note: this container used to be a non-owning inspection facade with an
      * `adopt(header, size)` factory. Adopting foreign tree memory is unsound now
      * that the container frees what it holds, so `adopt` and the raw-header
-     * constructor are gone; nothing in `src/**` referenced them.
+     * constructor are gone; nothing in `src/ **` referenced them.
      */
     template<class Key, class T, class Less = std::less<Key>>
     class map
@@ -59,13 +59,13 @@ namespace msvc8
 
         /**
          * MSVC8 `_Tree::_Tree(const _Myt&)`: a fresh empty tree plus a `_Copy`
-         * walk of the source, shared with `msvc8::set` through `rb_tree`.
+         * walk of the source, shared with `fa::set` through `rb_tree`.
          */
         map(const map& o) : tree_(o.tree_) {}
         /**
-         * Address: 0x0042C2C0 (FUN_0042C2C0 -- `operator=` -- clear, then clone the source tree node by node for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `AssignIntegerAnnotationTree` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x00432690 (FUN_00432690 -- `operator=` -- clear, then clone the source tree node by node for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); callers 0x0042C1D0, 0x0042C2C0, 0x004318B0; formerly `AssignIntegerAnnotationTree` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0042C2F0 (FUN_0042C2F0 -- the string map's `operator=` for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `AssignStringAnnotationTree` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0042C2C0 (FUN_0042C2C0 -- `operator=` -- clear, then clone the source tree node by node for the technique-implementation annotation maps -- `fa::map<fa::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `fa::map<fa::string, fa::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `AssignIntegerAnnotationTree` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00432690 (FUN_00432690 -- `operator=` -- clear, then clone the source tree node by node for the technique-implementation annotation maps -- `fa::map<fa::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `fa::map<fa::string, fa::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); callers 0x0042C1D0, 0x0042C2C0, 0x004318B0; formerly `AssignIntegerAnnotationTree` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0042C2F0 (FUN_0042C2F0 -- the string map's `operator=` for the technique-implementation annotation maps -- `fa::map<fa::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `fa::map<fa::string, fa::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `AssignStringAnnotationTree` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
          */
         map& operator=(const map& o)
         {
@@ -84,13 +84,13 @@ namespace msvc8
         [[nodiscard]] key_compare key_comp() const { return tree_.key_comp(); }
 
         /**
-         * Address: 0x007F1880 (FUN_007F1880 -- `size()` for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `GetBlueprintExtractorRegistrySizeLane` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0059FF90 (FUN_0059FF90 -- `size()` written through a caller slot for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyBuilderLane08ToOutAdapter` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x004242A0 (FUN_004242A0 -- `size()` for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `AnimTextureCacheSize` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x007F1880 (FUN_007F1880 -- `size()` for `fa::map<fa::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `GetBlueprintExtractorRegistrySizeLane` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0059FF90 (FUN_0059FF90 -- `size()` written through a caller slot for `fa::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyBuilderLane08ToOutAdapter` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x004242A0 (FUN_004242A0 -- `size()` for `fa::map<fa::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `AnimTextureCacheSize` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
          */
         [[nodiscard]] size_type size() const noexcept { return tree_.size(); }
         /**
-         * Address: 0x006E15A0 (FUN_006E15A0, `msvc8::map<Moho::CmdId,
+         * Address: 0x006E15A0 (FUN_006E15A0, `fa::map<Moho::CmdId,
          * Moho::CUnitCommand*>::empty` -- `Moho::CCommandDB::commands` in
          * `CCommandDb.h`. `return map->size == 0u;`, matching `tree_.empty()`
          * exactly. Re-homed here from a bespoke free function in
@@ -130,7 +130,7 @@ namespace msvc8
          * binary open-codes this once per table where the constructor now does it.
          */
         /**
-         * Address: 0x006E1580 (FUN_006E1580, `msvc8::map<Moho::CmdId,
+         * Address: 0x006E1580 (FUN_006E1580, `fa::map<Moho::CmdId,
          * Moho::CUnitCommand*>::begin` -- `Moho::CCommandDB::commands` in
          * `CCommandDb.h`. `*outNode = map->head->left; return outNode;` --
          * the store-into-hidden-return-pointer form MSVC8 uses for a
@@ -142,25 +142,25 @@ namespace msvc8
          * this sweep) beyond this member's own generic API surface, which
          * every range-for loop over `commands` in `CCommandDb.cpp` now
          * uses.)
-         * Address: 0x00495AC0 (FUN_00495AC0 -- `begin()` -- the header's left link for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetBeamBucketMapBeginIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x004AD1F0 (FUN_004AD1F0 -- `begin()` written through a caller-supplied iterator slot for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); zero callers, unreachable; formerly `CopyTreeHeadLeftmostNodeVariant1` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x004AD5D0 (FUN_004AD5D0 -- the second emission of that same `begin()` export for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); zero callers, unreachable; formerly `CopyTreeHeadLeftmostNodeVariant2` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x00432430 (FUN_00432430 -- `begin()` -- the header's left link for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `GetIntAnnotationTreeBegin` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005A00E0 (FUN_005A00E0 -- `begin()` -- the header's left link, written through a caller slot for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyDereferencedBuilderLane04ToOutAdapterA` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x005A0E80 (FUN_005A0E80 -- a second emission of that `begin()` store for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyDereferencedBuilderLane04ToOutAdapterB` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x00424290 (FUN_00424290 -- `begin()` -- the header's left link for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `AnimTextureCacheBegin` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00495AC0 (FUN_00495AC0 -- `begin()` -- the header's left link for `fa::map<SBeamBucketKey, fa::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetBeamBucketMapBeginIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AD1F0 (FUN_004AD1F0 -- `begin()` written through a caller-supplied iterator slot for `fa::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); zero callers, unreachable; formerly `CopyTreeHeadLeftmostNodeVariant1` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AD5D0 (FUN_004AD5D0 -- the second emission of that same `begin()` export for `fa::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); zero callers, unreachable; formerly `CopyTreeHeadLeftmostNodeVariant2` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00432430 (FUN_00432430 -- `begin()` -- the header's left link for the technique-implementation annotation maps -- `fa::map<fa::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `fa::map<fa::string, fa::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `GetIntAnnotationTreeBegin` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005A00E0 (FUN_005A00E0 -- `begin()` -- the header's left link, written through a caller slot for `fa::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyDereferencedBuilderLane04ToOutAdapterA` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x005A0E80 (FUN_005A0E80 -- a second emission of that `begin()` store for `fa::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyDereferencedBuilderLane04ToOutAdapterB` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00424290 (FUN_00424290 -- `begin()` -- the header's left link for `fa::map<fa::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `AnimTextureCacheBegin` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
          */
         [[nodiscard]] iterator begin() noexcept { return iterator(tree_.leftmost()); }
         [[nodiscard]] const_iterator begin() const noexcept { return const_iterator(tree_.leftmost()); }
         [[nodiscard]] const_iterator cbegin() const noexcept { return begin(); }
 
         /**
-         * Address: 0x00495AD0 (FUN_00495AD0 -- `end()` -- the header sentinel itself for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetBeamBucketMapEndIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x00432440 (FUN_00432440 -- `end()` -- the header sentinel itself for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `GetIntAnnotationTreeHead` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0059FF80 (FUN_0059FF80 -- `end()` written through a caller-supplied iterator slot for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyBuilderLane04ToOutAdapterA` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x005A00F0 (FUN_005A00F0 -- a second emission of that `end()` store for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyBuilderLane04ToOutAdapterB` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x005A0E90 (FUN_005A0E90 -- a third emission of that `end()` store for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyBuilderLane04ToOutAdapterC` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x00423C50 (FUN_00423C50 -- `end()` -- the header sentinel for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `AnimTextureCacheHead` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00495AD0 (FUN_00495AD0 -- `end()` -- the header sentinel itself for `fa::map<SBeamBucketKey, fa::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetBeamBucketMapEndIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00432440 (FUN_00432440 -- `end()` -- the header sentinel itself for the technique-implementation annotation maps -- `fa::map<fa::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `fa::map<fa::string, fa::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `GetIntAnnotationTreeHead` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0059FF80 (FUN_0059FF80 -- `end()` written through a caller-supplied iterator slot for `fa::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyBuilderLane04ToOutAdapterA` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x005A00F0 (FUN_005A00F0 -- a second emission of that `end()` store for `fa::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyBuilderLane04ToOutAdapterB` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x005A0E90 (FUN_005A0E90 -- a third emission of that `end()` store for `fa::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyBuilderLane04ToOutAdapterC` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00423C50 (FUN_00423C50 -- `end()` -- the header sentinel for `fa::map<fa::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `AnimTextureCacheHead` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
          */
         [[nodiscard]] iterator end() noexcept { return iterator(tree_.header()); }
         [[nodiscard]] const_iterator end() const noexcept { return const_iterator(tree_.header()); }
@@ -170,7 +170,7 @@ namespace msvc8
 
         /**
          * Address: 0x0083A950 (FUN_0083A950, sub_83A950) --
-         * `UiKeyActionMap`/`msvc8::map<UiKeyMask, msvc8::string>::find` --
+         * `UiKeyActionMap`/`fa::map<UiKeyMask, fa::string>::find` --
          * `gUiKeyActionMap` (`moho/ui/UiRuntimeTypes.cpp:1394`), isNil@+0x2D
          * (see the sibling instantiation's `lower_bound_node` citation in
          * `RbTree.h` for the full node-layout derivation). `find_node`'s
@@ -189,11 +189,11 @@ namespace msvc8
         /**
          * Address: 0x006ADD30 (FUN_006ADD30, func_hasArmorType -- IDA's own
          * inferred name; not a real "has type" predicate, see below) --
-         * `msvc8::map<msvc8::string, float>::find` -- `Unit::
+         * `fa::map<fa::string, float>::find` -- `Unit::
          * ArmorMultipliers` in `moho/unit/core/Unit.h`, isNil@+0x2D. Same
          * fused shape as `FUN_0083A950` above: `find_node`'s nil-or-key-
          * greater verify step is inlined into this emission (via
-         * `std::operator<<char>`, the `msvc8::string` less-than compare)
+         * `std::operator<<char>`, the `fa::string` less-than compare)
          * rather than called out separately, while the lower-bound descent
          * itself remains out-of-line as `lower_bound_node`'s emission for
          * this instantiation (`FUN_006AFBF0`, cited in `RbTree.h`). Three
@@ -201,25 +201,19 @@ namespace msvc8
          * ProcessArmorOnDamage` (0x006A9D60, `ArmorMultipliers.find(...)` in
          * the recovered combat-math body), `Unit::GetArmorMult` (0x006A9E10,
          * same pattern), and `cfunc_UnitGetArmorMultL` (0x006C4200) via
-         * `Unit::GetArmorMult`. Previously `recovered` with an address
-         * annotation attached to `IsArmorMapSentinel` -- a trivial
-         * null-or-isNil predicate that does not implement this function's
-         * documented lower-bound-then-verify behavior at all (a
-         * mis-attribution, not a real recovery of this address); that
-         * helper is deleted and this member's real call sites (`.find()`)
-         * are the recovery now (DB-integrity fix).
-         * Address: 0x004E1950 (FUN_004E1950 -- `find` -- lower_bound plus the equivalence check, returning the header on a miss for `msvc8::map<moho::CSndParams*, moho::HSndEntityLoop*>` (`gSharedAmbientLoopsByParams` in moho/audio/CSndParams.cpp, node 0x18, mapped handle at node+0x10); callers 0x004DF2B0; formerly `FindSndLoopNodeByParams` in moho/audio/CSndParams.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x007F01D0 (FUN_007F01D0 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007EDA40, 0x007EEE50, 0x007EF0B0; formerly `FindBlueprintExtractorRegistryEntry` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x00432680 (FUN_00432680 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss -- for `msvc8::map<msvc8::string, std::int32_t>` (`CD3DEffect::Technique::Implementation::mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `FindIntAnnotationNodeBridge` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x004237C0 (FUN_004237C0 -- `find` -- lower bound, then reject a non-equivalent key for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00422D90, 0x00422E50; formerly `FindAnimTextureCacheEntry` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x004AC7D0 (FUN_004AC7D0 -- `find` -- lower bound on the unsigned key, then the `key < candidate` check, returning the header on a miss -- for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories` at +0x4C; node 0x18, key at node+0x0C, factory at node+0x10, colour/nil at +0x14/+0x15); callers `DetachFactory` 0x004A9FC0, `FindFactory` 0x004AB600 and its inlined copy in `LoadRecord` 0x004AA690.)
+         * `Unit::GetArmorMult`.
+         * Address: 0x004E1950 (FUN_004E1950 -- `find` -- lower_bound plus the equivalence check, returning the header on a miss for `fa::map<moho::CSndParams*, moho::HSndEntityLoop*>` (`gSharedAmbientLoopsByParams` in moho/audio/CSndParams.cpp, node 0x18, mapped handle at node+0x10); callers 0x004DF2B0; formerly `FindSndLoopNodeByParams` in moho/audio/CSndParams.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007F01D0 (FUN_007F01D0 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss for `fa::map<fa::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007EDA40, 0x007EEE50, 0x007EF0B0; formerly `FindBlueprintExtractorRegistryEntry` in moho/misc/RangeExtractor.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00432680 (FUN_00432680 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss -- for `fa::map<fa::string, std::int32_t>` (`CD3DEffect::Technique::Implementation::mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D); zero callers, unreachable; formerly `FindIntAnnotationNodeBridge` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004237C0 (FUN_004237C0 -- `find` -- lower bound, then reject a non-equivalent key for `fa::map<fa::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00422D90, 0x00422E50; formerly `FindAnimTextureCacheEntry` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x004AC7D0 (FUN_004AC7D0 -- `find` -- lower bound on the unsigned key, then the `key < candidate` check, returning the header on a miss -- for `fa::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories` at +0x4C; node 0x18, key at node+0x0C, factory at node+0x10, colour/nil at +0x14/+0x15); callers `DetachFactory` 0x004A9FC0, `FindFactory` 0x004AB600 and its inlined copy in `LoadRecord` 0x004AA690.)
          */
         [[nodiscard]] iterator find(const key_type& k) { return iterator(tree_.find_node(k)); }
         [[nodiscard]] const_iterator find(const key_type& k) const { return const_iterator(tree_.find_node(k)); }
 
         /**
          * `rb_tree::count` (RbTree.h) carries this method's real address
-         * (0x004DB770, a `msvc8::set<msvc8::string>` instantiation -- the
+         * (0x004DB770, a `fa::set<fa::string>` instantiation -- the
          * same shared `_Tree::count` member `map` and `set` both compile
          * down to) -- see that citation for the full evidence trail,
          * including why the general equal-range-based shape (not a
@@ -228,8 +222,8 @@ namespace msvc8
         [[nodiscard]] size_type count(const key_type& k) const { return tree_.count(k); }
 
         /**
-         * Address: 0x00423A00 (FUN_00423A00 -- the key comparison every descent makes, `msvc8::string::operator<` on the probe and the node key for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00423AD0, 0x00432450, 0x004327A0; formerly `IsAnimTextureCacheKeyLess` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x00424670 (FUN_00424670 -- `lower_bound` for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004233D0, 0x004237C0, 0x00423C40; formerly `LowerBoundAnimTextureCacheEntry` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00423A00 (FUN_00423A00 -- the key comparison every descent makes, `fa::string::operator<` on the probe and the node key for `fa::map<fa::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00423AD0, 0x00432450, 0x004327A0; formerly `IsAnimTextureCacheKeyLess` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00424670 (FUN_00424670 -- `lower_bound` for `fa::map<fa::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004233D0, 0x004237C0, 0x00423C40; formerly `LowerBoundAnimTextureCacheEntry` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
          */
         [[nodiscard]] iterator lower_bound(const key_type& k) { return iterator(tree_.lower_bound_node(k)); }
         [[nodiscard]] const_iterator lower_bound(const key_type& k) const
@@ -245,11 +239,11 @@ namespace msvc8
 
         /**
          * `rb_tree::equal_range` (RbTree.h) carries this method's real
-         * addresses (0x00A59E20/0x00A59E80, a `msvc8::set<std::uint32_t>`
+         * addresses (0x00A59E20/0x00A59E80, a `fa::set<std::uint32_t>`
          * instantiation -- the same shared `_Tree::equal_range` member `map`
          * and `set` both compile down to) -- see that citation for the full
          * evidence trail.
-         * Address: 0x007358A0 (FUN_007358A0 -- `equal_range` -- both descents, written into the caller's pair for `msvc8::map<msvc8::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `BuildSimConEqualRange` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x007358A0 (FUN_007358A0 -- `equal_range` -- both descents, written into the caller's pair for `fa::map<fa::string, moho::CSimConCommand*, SimConCommandNameLess>` (`Moho::sSimConList` at 0x010C7884; pair 0x20, node 0x30, key at node+0x0C, command pointer at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `STR_CompareNoCase`); zero callers, unreachable; formerly `BuildSimConEqualRange` in moho/sim/CSimConCommand.cpp (RULE ONE), removed 2026-09-11.)
          */
         [[nodiscard]] std::pair<iterator, iterator> equal_range(const key_type& k)
         {
@@ -266,13 +260,13 @@ namespace msvc8
         [[nodiscard]] mapped_type& at(const key_type& k)
         {
             node_type* const n = tree_.find_node(k);
-            assert(!detail::rb_is_nil(n) && "msvc8::map::at: key not found");
+            assert(!detail::rb_is_nil(n) && "fa::map::at: key not found");
             return n->value.second;
         }
         [[nodiscard]] const mapped_type& at(const key_type& k) const
         {
             const node_type* const n = tree_.find_node(k);
-            assert(!detail::rb_is_nil(n) && "msvc8::map::at: key not found");
+            assert(!detail::rb_is_nil(n) && "fa::map::at: key not found");
             return n->value.second;
         }
 
@@ -292,7 +286,7 @@ namespace msvc8
 
         /** Destroys every node and restores the empty header links. */
         /**
-         * Address: 0x004247A0 (FUN_004247A0 -- `clear()` -- destroy the subtree, then self-link the header and zero the size for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004243B0; formerly `ResetAnimTextureCacheStorage` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x004247A0 (FUN_004247A0 -- `clear()` -- destroy the subtree, then self-link the header and zero the size for `fa::map<fa::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004243B0; formerly `ResetAnimTextureCacheStorage` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
          */
         void clear() noexcept { tree_.clear(); }
 
@@ -305,14 +299,14 @@ namespace msvc8
          * What it does:
          * Links a copy of `v` into the tree when its key is absent and reports
          * `true`; otherwise returns a cursor on the colliding node and `false`.
-         * Address: 0x004E1890 (FUN_004E1890 -- `insert(value)` -- the lookup-or-insert that follows the miss for `msvc8::map<moho::CSndParams*, moho::HSndEntityLoop*>` (`gSharedAmbientLoopsByParams` in moho/audio/CSndParams.cpp, node 0x18, mapped handle at node+0x10); callers 0x004DF2B0; formerly `EnsureSharedAmbientLoopMapEntry` in moho/audio/CSndParams.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x005A14E0 (FUN_005A14E0 -- `insert`'s `std::pair<iterator, bool>` return, built in the caller's slot for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `BuildRebuildInsertResultLane` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x005A14C0 (FUN_005A14C0 -- that same `pair<iterator, bool>` zeroed before the insert runs for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `ClearRebuildInsertResultNodeLane` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x0077B830 (FUN_0077B830 -- `insert`'s `std::pair<iterator, bool>` return, built in the caller's slot for `msvc8::map<std::uint32_t, moho::CDecalBucketSet>` (`CDecalBuffer::mStartTickBuckets` at +0x0CC0; the start-tick map's node is 0x20 with the key at node+0x0C and the 0x0C bucket-set head at node+0x10, and the bucket set's own node is 0x14 with the handle at node+0x0C, colour/nil at +0x10/+0x11); zero callers, unreachable; formerly `WriteDwordByteLanePair` in moho/render/CDecalBuffer.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x004E1890 (FUN_004E1890 -- `insert(value)` -- the lookup-or-insert that follows the miss for `fa::map<moho::CSndParams*, moho::HSndEntityLoop*>` (`gSharedAmbientLoopsByParams` in moho/audio/CSndParams.cpp, node 0x18, mapped handle at node+0x10); callers 0x004DF2B0; formerly `EnsureSharedAmbientLoopMapEntry` in moho/audio/CSndParams.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x005A14E0 (FUN_005A14E0 -- `insert`'s `std::pair<iterator, bool>` return, built in the caller's slot for `fa::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `BuildRebuildInsertResultLane` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x005A14C0 (FUN_005A14C0 -- that same `pair<iterator, bool>` zeroed before the insert runs for `fa::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `ClearRebuildInsertResultNodeLane` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x0077B830 (FUN_0077B830 -- `insert`'s `std::pair<iterator, bool>` return, built in the caller's slot for `fa::map<std::uint32_t, moho::CDecalBucketSet>` (`CDecalBuffer::mStartTickBuckets` at +0x0CC0; the start-tick map's node is 0x20 with the key at node+0x0C and the 0x0C bucket-set head at node+0x10, and the bucket set's own node is 0x14 with the handle at node+0x0C, colour/nil at +0x10/+0x11); zero callers, unreachable; formerly `WriteDwordByteLanePair` in moho/render/CDecalBuffer.cpp (RULE ONE), removed 2026-09-11.)
          */
         /**
          * Address: 0x0049EE50 (FUN_0049EE50 -- the `value_type` copy constructor
-         * MSVC emits for this insert, for `msvc8::map<moho::SParticleBucketKey,
+         * MSVC emits for this insert, for `fa::map<moho::SParticleBucketKey,
          * moho::SParticleRenderBucket*>` (`CWorldParticles::mParticleBuckets` and
          * `mRefractingParticleBuckets`; pair 0x40, key 0x3C, bucket pointer at
          * pair+0x3C). Formerly `CopyConstructParticleBucketKeyValueFromKeyAndBucketSlot`
@@ -322,14 +316,14 @@ namespace msvc8
          * zero callers, unreachable. Formerly
          * `CopyConstructParticleBucketKeyValueAndReleaseSource`, removed 2026-09-22.)
          * Address: 0x0049EE80 (FUN_0049EE80 -- the same `value_type` copy for
-         * `msvc8::map<moho::STrailBucketKey, moho::STrailRenderBucket*>`
+         * `fa::map<moho::STrailBucketKey, moho::STrailRenderBucket*>`
          * (`CWorldParticles::mTrailBuckets`; pair 0x38, key 0x34, bucket pointer at
          * pair+0x34). Formerly `CopyConstructTrailBucketKeyValueFromKeyAndBucketSlot`,
          * removed 2026-09-22.)
          * Address: 0x0049E1F0 (FUN_0049E1F0 -- its release-source emission; zero
          * callers, unreachable. Formerly
          * `CopyConstructTrailBucketKeyValueAndReleaseSource`, removed 2026-09-22.)
-         * Address: 0x004AC460 (FUN_004AC460 -- `insert(value)` -- lower_bound, then insert-at-hint only when the key is not already there, so a second factory for one type is ignored, for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`, node 0x18); callers `AttachFactory` 0x004A9F30, `ActivatePendingFactories` 0x004AA090; formerly cited on `operator[]` and `FindOrInsertFactoryRegistrationKey` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AC460 (FUN_004AC460 -- `insert(value)` -- lower_bound, then insert-at-hint only when the key is not already there, so a second factory for one type is ignored, for `fa::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`, node 0x18); callers `AttachFactory` 0x004A9F30, `ActivatePendingFactories` 0x004AA090; formerly cited on `operator[]` and `FindOrInsertFactoryRegistrationKey` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          */
         std::pair<iterator, bool> insert(const value_type& v)
         {
@@ -339,7 +333,7 @@ namespace msvc8
 
         /** Hinted unique insert; a useless hint costs one extra comparison. */
         /**
-         * Address: 0x004242B0 (FUN_004242B0 -- `insert(hint, value)` -- descend from the hint and link the new node for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00423AD0; formerly `InsertAnimTextureCacheEntryUnique` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x004242B0 (FUN_004242B0 -- `insert(hint, value)` -- descend from the hint and link the new node for `fa::map<fa::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00423AD0; formerly `InsertAnimTextureCacheEntryUnique` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
          */
         iterator insert(const_iterator hint, const value_type& v) { return iterator(tree_.insert_hint(hint, v)); }
 
@@ -352,20 +346,20 @@ namespace msvc8
 
         /**
          * Address: 0x007E2C60 (FUN_007E2C60, std::map<MeshBatchKey, vector<MeshInstance*>>::operator[])
-         * Address: 0x00949B30 (FUN_00949B30, msvc8::map<_D3DRENDERSTATETYPE, unsigned int>::operator[])
-         * Address: 0x00949BA0 (FUN_00949BA0, msvc8::map<_D3DSAMPLERSTATETYPE, unsigned int>::operator[])
-         * Address: 0x00949C10 (FUN_00949C10, msvc8::map<_D3DTEXTURESTAGESTATETYPE, unsigned int>::operator[]
+         * Address: 0x00949B30 (FUN_00949B30, fa::map<_D3DRENDERSTATETYPE, unsigned int>::operator[])
+         * Address: 0x00949BA0 (FUN_00949BA0, fa::map<_D3DSAMPLERSTATETYPE, unsigned int>::operator[])
+         * Address: 0x00949C10 (FUN_00949C10, fa::map<_D3DTEXTURESTAGESTATETYPE, unsigned int>::operator[]
          * -- the three the `gpg::gal::StateCache::Update` miss path reaches,
          * `tree_[state] = value` in gpg/gal/StateCache.h)
          * Address: 0x005A0040 (FUN_005A0040, std::map<uint, Moho::RUnitBlueprint*>::operator[])
          * Address: 0x00718360 (FUN_00718360, std::map<uint32, cellIndex>::operator[])
-         * Address: 0x0083A9D0 (FUN_0083A9D0, msvc8::map<UiKeyMask,bool>::operator[] --
+         * Address: 0x0083A9D0 (FUN_0083A9D0, fa::map<UiKeyMask,bool>::operator[] --
          * verified via the returned offset (`v1+16`): node header 12 + key
          * uint32 4 = 16, matching the pair<UiKeyMask,bool>'s mapped_type
          * offset exactly. Emitted via gUiKeyRepeatMap[keyMask] = true in
          * AddUiKeyMapEntries, UiRuntimeTypes.cpp)
          * Address: 0x00685750 (FUN_00685750, `std::map_uint_IdPool::find2` --
-         * `msvc8::map<std::uint32_t, moho::IdPool>::operator[]`,
+         * `fa::map<std::uint32_t, moho::IdPool>::operator[]`,
          * `EntityDB::mIdPoolTree` in `EntityDb.h`. Matches this member
          * exactly: calls `find` (this instantiation's `lower_bound_node`
          * emission), and on a miss (`result == head || key < result->key`)
@@ -380,8 +374,8 @@ namespace msvc8
          * through a separate `gRuntimePools` runtime cache rather than this
          * member directly, a known follow-up documented in the EntityDb.cpp
          * `MemberSerialize`/`MemberDeserialize` citations.)
-         * Address: 0x007B27D0 (FUN_007B27D0, `msvc8::map<std::uint32_t,
-         * msvc8::set<std::uint32_t>>::operator[]` -- confirmed via raw
+         * Address: 0x007B27D0 (FUN_007B27D0, `fa::map<std::uint32_t,
+         * fa::set<std::uint32_t>>::operator[]` -- confirmed via raw
          * `.asm`: real `this`=ecx (thiscall), descend loop testing isNil at
          * `[node+0x1D]` (29 decimal, this instantiation's outer 32-byte
          * node) updating the candidate only on left turns (`lower_bound`'s
@@ -390,7 +384,7 @@ namespace msvc8
          * `mapped_type()` sub-expression first (`sub_7B4A50`, already-cited
          * `alloc_raw()`, RbTree.h, plus an inlined self-link/`isNil=1`/
          * `size_=0` at byte offset 0x11 -- the *inner*
-         * `msvc8::set<std::uint32_t>`'s isNil offset -- exactly
+         * `fa::set<std::uint32_t>`'s isNil offset -- exactly
          * `buy_head()` inlined, not a separate call), then `sub_7B3500`
          * (this same instantiation's *copy* constructor, RbTree.h -- not a
          * default ctor: it copy-constructs the pair's `.second` from the
@@ -400,7 +394,7 @@ namespace msvc8
          * matched by its empty/leftmost/rightmost/predecessor-successor
          * branch structure and its isNil check at the *outer* offset)
          * inserts it, and `sub_7B3E00` (already-cited `erase_range` for
-         * `msvc8::set<std::uint32_t>`) tears down the scratch temporaries in
+         * `fa::set<std::uint32_t>`) tears down the scratch temporaries in
          * reverse construction order -- `FUN_007B2940`/`FUN_007B2970`/
          * `FUN_007B36A0` are this teardown's three real-binary addresses
          * (two SEH-unwind funclets for the two temporaries, one the copy
@@ -421,7 +415,7 @@ namespace msvc8
          * Returns a reference to the mapped value either way.
          */
         /**
-         * Address: 0x006ADBF0 (FUN_006ADBF0) -- `msvc8::map<msvc8::string,
+         * Address: 0x006ADBF0 (FUN_006ADBF0) -- `fa::map<fa::string,
          * float>::operator[]` -- `Unit::ArmorMultipliers` in `moho/unit/
          * core/Unit.h`, isNil@+0x2D. IDA's own inferred listing name for
          * this address is `std::map_string_float::find` -- WRONG: `find()`
@@ -435,25 +429,18 @@ namespace msvc8
          * reference shape, not `find()`'s read-only shape. Three confirmed
          * real callers, all in `Unit.cpp`: `Unit::InitializeArmor`
          * (0x006A7B90, `ArmorMultipliers[damageTypeName] = armorMultiplier`
-         * seeding entries from blueprint armor definitions), an
-         * owner=<none> inlined chunk at 0x006A9DF6 (inside one of the two
-         * recovered callers above), and `cfunc_UnitAlterArmorL` (0x006C4000,
-         * the Lua `Unit:AlterArmor(damageTypeName, multiplier)` setter,
+         * seeding entries from blueprint armor definitions), an owner=<none>
+         * inlined chunk at 0x006A9DF6 (inside one of the two recovered
+         * callers above), and `cfunc_UnitAlterArmorL` (0x006C4000, the Lua
+         * `Unit:AlterArmor(damageTypeName, multiplier)` setter,
          * `unit->ArmorMultipliers[armorTypeName] = armorMultiplier`).
-         * Previously marked `external_dependency` with a generic bulk-tag
-         * note ("STL template instantiation / codec helper - external") --
-         * wrong on two counts: this is a real engine-instantiated map
-         * (`Unit`'s own armor data, not a generic/third-party codec), and
-         * per RULE ONE its recovery is this member's own call sites in
-         * `Unit.cpp`, not a hand-rolled free function or an external tag
-         * (DB-integrity fix).
          *
-         * Address: 0x008A7C80 (FUN_008A7C80, sub_8A7C80) -- `msvc8::map<
-         * msvc8::string, moho::TerrainEnvironmentLookupEntry>::operator[]`
+         * Address: 0x008A7C80 (FUN_008A7C80, sub_8A7C80) -- `fa::map<
+         * fa::string, moho::TerrainEnvironmentLookupEntry>::operator[]`
          * -- `Moho::CWldTerrainRes::mEnvLookup` (`Terrain`/
          * a deleted overlay in `moho/sim/CWldMap.cpp`),
          * isNil@+0x4D (0x50-byte node: 12-byte link triplet + 28-byte
-         * `msvc8::string` key + 0x24-byte `TerrainEnvironmentLookupEntry`
+         * `fa::string` key + 0x24-byte `TerrainEnvironmentLookupEntry`
          * value + color/isNil). IDA's own inferred listing name for this
          * address is `std::map_string_shared_ptr_RD3DTextureResource::
          * find` -- WRONG on two counts, the same misnomer already
@@ -464,7 +451,7 @@ namespace msvc8
          * `FUN_008A8590`, cited in `RbTree.h`); and the mapped type IDA's
          * heuristic inferred (`shared_ptr<RD3DTextureResource>`) is only
          * one field of the real 0x24-byte `TerrainEnvironmentLookupEntry`
-         * value (`{msvc8::string mEnvironmentName; boost::shared_ptr<
+         * value (`{fa::string mEnvironmentName; boost::shared_ptr<
          * RD3DTextureResource> mTexture;}`), confirmed by this emission's
          * own default-value construction (`v8.mName` empty-SSO-init,
          * `v8.mTex.obj`/`.count.pi_` zeroed) and by its caller overwriting
@@ -498,7 +485,7 @@ namespace msvc8
          * anywhere in `src`. This entry, and `mEnvLookup`'s migration
          * onto this template, is that recovery.
          *
-         * Address: 0x00879120 (FUN_00879120, sub_879120) -- `msvc8::map<
+         * Address: 0x00879120 (FUN_00879120, sub_879120) -- `fa::map<
          * std::uint32_t, Moho::CWldTerrainDecal*>::operator[]` --
          * `Moho::CDecalManager::mDecalGroupLookupByDecalIndex`
          * (`moho/terrain/splat/CWldSplat.h`), isNil@+0x15 (same
@@ -525,24 +512,24 @@ namespace msvc8
          * write through by hand -- all now replaced by this member's own
          * `operator[]`.
          * Address: 0x00879450 (FUN_00879450, sub_879450) -- the sibling
-         * `msvc8::map<std::uint32_t, Moho::CDecalGroup*>::operator[]`
+         * `fa::map<std::uint32_t, Moho::CDecalGroup*>::operator[]`
          * emission for `Moho::CDecalManager::mDecalGroupLookupBySplatIndex`,
          * same shape, calling that tree's own `insert_hint`
          * (`FUN_00879F60`, `RbTree.h`). Sole real caller is
          * `CDecalManager::LoadDecalGroup`'s
          * `mDecalGroupLookupBySplatIndex[*group->GetIndex()] = group;`
          * (`CWldSplat.cpp`).
-         * Address: 0x0056B6C0 (FUN_0056B6C0, sub_56B6C0 -- `operator[]` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19): the cache stores in `CFormationInstance::GetFormationPosition`/`GetOffsetPosition`.)
-         * Address: 0x0056AAF0 (FUN_0056AAF0, sub_56AAF0 -- `operator[]` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `group.mUnitOffsets[entityId] = info` in `CFormationInstance::RunScript` (0x00567E06 / 0x00567F9A).)
-         * Address: 0x00495AE0 (FUN_00495AE0 -- `operator[]` -- lower_bound, then insert-at-hint when the key is not equivalent for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `FindOrInsertBeamBucketEntryByKey` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x007F00A0 (FUN_007F00A0 -- `operator[]` -- the find half for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007ED4B0; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
-         * Address: 0x007F0960 (FUN_007F0960 -- `operator[]`'s insert-on-miss half for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F00A0; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
-         * Address: 0x00684510 (FUN_00684510 -- the mapped-value store `operator[]` performs -- `Entity::StandardInit` writing the entity into the reserved id's slot for `msvc8::map<std::uint32_t, moho::Entity*>` (`EntityDB::mAllUnits` at +0x00); zero callers, unreachable; formerly `AssignEntityPayloadAtIdNode` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x0045AFE0 (FUN_0045AFE0 -- `operator[]` -- lower bound, then insert a default-constructed record on a miss for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x00458D30; formerly `FileInfoMapGetOrCreate` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x007EFD00 (FUN_007EFD00 -- `operator[]` -- lower bound, then insert a default-constructed profile on a miss for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007EE5A0; formerly `FindOrInsertRangeProfileByExtractorName` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x00431910 (FUN_00431910 -- `operator[]` -- lower bound, then insert a default-constructed mapped string on a miss; `AssignRemap` assigns into what it returns for `msvc8::map<msvc8::string, msvc8::string>` (`ShaderDictionary::mRemaps` at +0x10; pair 0x38, node 0x48, key at node+0x0C, mapped name at node+0x28, colour/nil at +0x44/+0x45); callers 0x0042BDA4, 0x0042D840, 0x007DBE90; formerly `ShaderDictionary::AssignRemap`'s hand-written body in moho/mesh/ShaderDictionary.cpp (RULE ONE), rewritten 2026-09-11.)
-         * Address: 0x00423AD0 (FUN_00423AD0 -- `operator[]`'s lower-bound-then-insert core for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004233D0; formerly `ResolveAnimTextureCacheIndexSlot` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
-         * Address: 0x004233D0 (FUN_004233D0 -- `operator[]` itself, returning the mapped slot; `CAnimTexture::FindOrCreate` assigns the new texture into it for `msvc8::map<msvc8::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00422E50; formerly `EnsureAnimTextureCacheSlot` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x0056B6C0 (FUN_0056B6C0, sub_56B6C0 -- `operator[]` for `fa::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19): the cache stores in `CFormationInstance::GetFormationPosition`/`GetOffsetPosition`.)
+         * Address: 0x0056AAF0 (FUN_0056AAF0, sub_56AAF0 -- `operator[]` for `fa::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `group.mUnitOffsets[entityId] = info` in `CFormationInstance::RunScript` (0x00567E06 / 0x00567F9A).)
+         * Address: 0x00495AE0 (FUN_00495AE0 -- `operator[]` -- lower_bound, then insert-at-hint when the key is not equivalent for `fa::map<SBeamBucketKey, fa::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `FindOrInsertBeamBucketEntryByKey` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007F00A0 (FUN_007F00A0 -- `operator[]` -- the find half for `fa::map<fa::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007ED4B0; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
+         * Address: 0x007F0960 (FUN_007F0960 -- `operator[]`'s insert-on-miss half for `fa::map<fa::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F00A0; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
+         * Address: 0x00684510 (FUN_00684510 -- the mapped-value store `operator[]` performs -- `Entity::StandardInit` writing the entity into the reserved id's slot for `fa::map<std::uint32_t, moho::Entity*>` (`EntityDB::mAllUnits` at +0x00); zero callers, unreachable; formerly `AssignEntityPayloadAtIdNode` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0045AFE0 (FUN_0045AFE0 -- `operator[]` -- lower bound, then insert a default-constructed record on a miss for `fa::map<fa::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x00458D30; formerly `FileInfoMapGetOrCreate` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x007EFD00 (FUN_007EFD00 -- `operator[]` -- lower bound, then insert a default-constructed profile on a miss for `fa::map<fa::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007EE5A0; formerly `FindOrInsertRangeProfileByExtractorName` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00431910 (FUN_00431910 -- `operator[]` -- lower bound, then insert a default-constructed mapped string on a miss; `AssignRemap` assigns into what it returns for `fa::map<fa::string, fa::string>` (`ShaderDictionary::mRemaps` at +0x10; pair 0x38, node 0x48, key at node+0x0C, mapped name at node+0x28, colour/nil at +0x44/+0x45); callers 0x0042BDA4, 0x0042D840, 0x007DBE90; formerly `ShaderDictionary::AssignRemap`'s hand-written body in moho/mesh/ShaderDictionary.cpp (RULE ONE), rewritten 2026-09-11.)
+         * Address: 0x00423AD0 (FUN_00423AD0 -- `operator[]`'s lower-bound-then-insert core for `fa::map<fa::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x004233D0; formerly `ResolveAnimTextureCacheIndexSlot` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x004233D0 (FUN_004233D0 -- `operator[]` itself, returning the mapped slot; `CAnimTexture::FindOrCreate` assigns the new texture into it for `fa::map<fa::string, moho::CAnimTexture*>` (`Moho::sAnimTextureMap` at 0x010A77F8; node 0x30, key at node+0x0C, texture pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00422E50; formerly `EnsureAnimTextureCacheSlot` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
          */
         mapped_type& operator[](const key_type& k)
         {
@@ -558,7 +545,7 @@ namespace msvc8
          * following element.
          *
          * Address: 0x0057DA50 (FUN_0057DA50, sub_57DA50) --
-         * `SBuildStructurePositionMap`/`msvc8::map<Wm3::Vector2i,
+         * `SBuildStructurePositionMap`/`fa::map<Wm3::Vector2i,
          * SBuildReserveInfo>::erase(const_iterator)`
          * (`moho::CAiBrain::mBuildStructureMap`, `CAiBrain.h:68/266`).
          * Reached from `EraseBuildReservation` (`CAiBrain.cpp:1417`,
@@ -570,14 +557,14 @@ namespace msvc8
          * `_SECURE_SCL` checked-iterator guard is on a REACHED code path;
          * it just never trips, since `position` is always a live, valid
          * cursor from the enclosing walk.
-         * Address: 0x004AC520 (FUN_004AC520 -- `erase(const_iterator)` with the invalid-iterator throw for `msvc8::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`, node 0x18); callers 0x004A9FC0, 0x004AE0D0; formerly `EraseFactoryRegistrationAtIterator` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x00685410 (FUN_00685410 -- `erase(const_iterator)` for `msvc8::map<std::uint32_t, moho::Entity*>` (`EntityDB::mAllUnits` at +0x00); callers 0x00684690, 0x00686EF0; formerly `EraseAllUnitsTreeNode` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004AC520 (FUN_004AC520 -- `erase(const_iterator)` with the invalid-iterator throw for `fa::map<const gpg::RType*, moho::ResourceFactoryBase*>` (`ResourceManager::mFactories`, node 0x18); callers 0x004A9FC0, 0x004AE0D0; formerly `EraseFactoryRegistrationAtIterator` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00685410 (FUN_00685410 -- `erase(const_iterator)` for `fa::map<std::uint32_t, moho::Entity*>` (`EntityDB::mAllUnits` at +0x00); callers 0x00684690, 0x00686EF0; formerly `EraseAllUnitsTreeNode` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(const_iterator pos) { return iterator(tree_.erase_node(pos.node())); }
 
         /**
          * Address: 0x0083AA70 (FUN_0083AA70, sub_83AA70) -- CORRECTED: was
-         * mislabeled `UiKeyActionMap`/`msvc8::map<UiKeyMask, msvc8::string>`
+         * mislabeled `UiKeyActionMap`/`fa::map<UiKeyMask, fa::string>`
          * here despite already noting `isNil@+0x15` -- that offset belongs
          * to `UiKeyRepeatMap`, not `UiKeyActionMap` (which is isNil@+0x2D;
          * see `FUN_0083A640` cited on `erase(const_iterator)` above). This
@@ -600,7 +587,7 @@ namespace msvc8
          * key_type&)` is shared machinery between `map`/`set`/`multimap`/
          * `multiset` and can't assume uniqueness, so it is always the
          * general `equal_range`+count+`erase_range` shape -- confirmed
-         * directly against the decompiled body of a `msvc8::set<
+         * directly against the decompiled body of a `fa::set<
          * std::uint32_t>` instantiation (0x00A65B60/0x00A65C10, cited on
          * `rb_tree::erase(const key_type&)` in `RbTree.h`). `map`/`set`
          * both delegate to that one shared member now instead of each
@@ -725,7 +712,7 @@ namespace msvc8
         size_type erase(const key_type& k) { return tree_.erase(k); }
 
         /**
-         * Address: 0x008AF890 (FUN_008AF890 -- `clear()` -- free every node from `_Myhead->_Next`, then self-link the header and zero the size for `msvc8::set<moho::IXACTCue*>` (`CUserSoundManager::mPendingDestroyCues`); callers 0x008AA800, 0x008AAA10, 0x008AF3C3; formerly `ClearPendingDestroyCueSet` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x008AF890 (FUN_008AF890 -- `clear()` -- free every node from `_Myhead->_Next`, then self-link the header and zero the size for `fa::set<moho::IXACTCue*>` (`CUserSoundManager::mPendingDestroyCues`); callers 0x008AA800, 0x008AAA10, 0x008AF3C3; formerly `ClearPendingDestroyCueSet` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-11.)
          */
         void clear() noexcept { tree_.clear(); }
         void swap(multimap& other) noexcept { tree_.swap(other.tree_); }
@@ -735,9 +722,9 @@ namespace msvc8
     };
 
     // --------- Convenience: ensure 32-bit pointer size assumed ----------
-    static_assert(sizeof(map<void*, void*>) == 0x0C, "msvc8::map size should be 0x0C");
-    static_assert(sizeof(multimap<void*, void*>) == 0x0C, "msvc8::multimap size should be 0x0C");
+    static_assert(sizeof(map<void*, void*>) == 0x0C, "fa::map size should be 0x0C");
+    static_assert(sizeof(multimap<void*, void*>) == 0x0C, "fa::multimap size should be 0x0C");
 
-} // namespace msvc8
+} // namespace fa
 
 #pragma pack(pop)

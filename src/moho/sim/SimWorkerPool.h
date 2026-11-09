@@ -49,15 +49,21 @@ namespace moho
    *   Checking exactly that is the determinism test for any parallel phase.
    *
    * Worker count: the `sim_Workers` console variable, seeded from `/simworkers N` on the command
-   * line. 0, the default, runs every job inline on the caller, which is the original serial path.
+   * line, otherwise `gSimDefaultWorkers`. 0 runs every job inline on the caller, the original serial path.
    * A changed value takes effect at the next dispatch. Threads are created on first use.
    */
   /**
    * Engine addition: `sim_Workers`, a user-side (process-local) console variable. It is never sent
    * to the sim, so clients may differ; parallel phases produce the serial result either way.
-   * -1 until first use, then the `/simworkers` value (0 when absent).
+   * -1 until first use, then the `/simworkers` value (`gSimDefaultWorkers` when absent).
    */
   extern int sim_Workers;
+
+  /**
+   * Engine addition: the worker count without `/simworkers`. 0 unless the exe sets it before the first sim:
+   * the game runs with workers, while headless and the server stay serial, as a full machine runs slower with them.
+   */
+  extern int gSimDefaultWorkers;
 
   /**
    * Engine addition: per-phase switches, user-side like `sim_Workers`, so any parallel phase can
@@ -66,6 +72,16 @@ namespace moho
   extern bool sim_ParallelRecon;
   extern bool sim_ParallelSync;
   extern bool sim_ParallelCoords; // Sim.cpp: the coordinate pass on workers
+  extern bool sim_ParallelUnitSyncRefresh; // Sim.cpp: units' own sync blocks refreshed on workers
+
+  /**
+   * Engine addition, debug only: microseconds a worker thread waits before each chunk it takes
+   * (0, the default, waits nothing). The dispatching thread takes the first chunks itself and the
+   * workers come in late, so chunks overlap in other combinations than they do without it: a chunk
+   * that touches state another chunk owns shows up as a checksum mismatch instead of passing by
+   * luck. Results must not change with any value.
+   */
+  extern int sim_WorkerJobDelayUs;
 
   class CSimWorkerPool
   {
@@ -95,6 +111,19 @@ namespace moho
      * - Concurrent dispatchers are serialized.
      */
     void Run(std::size_t count, std::size_t grain, RangeFunction fn, void* context);
+
+    /**
+     * Starts `fn(context, begin, end)` over [0, count) on the workers and returns at once. The
+     * calling thread takes no chunk until `FinishAsync`, where it helps with the chunks left and
+     * waits for the rest; it must call `FinishAsync` before it returns from the phase. Meanwhile
+     * it must not touch what the chunks read or write, and a `Run` on this thread runs serially.
+     * With no workers, or a single chunk, the chunks run here before this returns and `FinishAsync`
+     * has nothing left to do. Returns true when chunks are still running.
+     */
+    bool StartAsync(std::size_t count, std::size_t grain, RangeFunction fn, void* context);
+
+    /// Ends the dispatch `StartAsync` began (nothing when none is pending); rethrows a chunk's error.
+    void FinishAsync();
 
     /// `Run` over a callable taking `(std::size_t begin, std::size_t end)`.
     template <class Body>

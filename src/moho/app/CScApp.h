@@ -2,15 +2,37 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 #include "gpg/core/time/Timer.h"
+#include "gpg/gal/DeviceContext.hpp"
 #include "moho/app/IWinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
 
-namespace gpg::gal
+namespace moho
 {
-  class DeviceContext;
-} // namespace gpg::gal
+  /**
+   * Engine addition (the map editor, src/editor): when not empty, the renderers `CScApp::CreateDevice`
+   * tries, in this order, in place of the `graphics_api` option and the command-line switches, with
+   * no Direct3D 9 or 10 fallback after them. Empty in the game, which keeps its own order.
+   */
+  extern std::vector<gpg::gal::DeviceApi> gAppRenderers;
+
+  /**
+   * Engine addition (the map editor): when set, `CScApp::CreateDevice` makes one maximized, movable,
+   * resizable window whatever the display options say (`primary_adapter` full screen, a second
+   * adapter, `/windowed`, `/fullscreen`). False in the game.
+   */
+  extern bool gAppWindowed;
+
+  /**
+   * Engine addition (the map editor): called by `CScApp::CreateAppFrame` just before the device is created,
+   * with the context and the top-level frame's window. The editor adds a head there for its own panels (a
+   * child window of the frame); the game's viewport was made for the heads before it, so it draws only those.
+   * Null in the game.
+   */
+  extern void (*gAppBeforeDeviceCreate)(gpg::gal::DeviceContext& context, void* frameWindow);
+} // namespace moho
 
 class CScApp final : public moho::IWinApp
 {
@@ -120,7 +142,7 @@ public:
    * bootstrap handoff for the startup render path.
    */
   bool CreateAppFrame(
-    const msvc8::string& title,
+    const fa::string& title,
     bool maximized,
     const wxPoint& position,
     gpg::gal::DeviceContext& context

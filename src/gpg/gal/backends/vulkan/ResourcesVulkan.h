@@ -95,18 +95,23 @@ namespace gpg::gal
   class DepthStencilTargetVulkan final : public DepthStencilTarget
   {
   public:
-    DepthStencilTargetVulkan(const DepthStencilTargetContext& context, vulkan::TrackedImage image, VkImageView view);
+    DepthStencilTargetVulkan(
+      const DepthStencilTargetContext& context, vulkan::TrackedImage image, VkImageView view, VkImageView sampledView = VK_NULL_HANDLE
+    );
     ~DepthStencilTargetVulkan() override;
 
     DepthStencilTargetContext* GetContext() override;
 
     [[nodiscard]] vulkan::TrackedImage& Image() noexcept { return mImage; }
     [[nodiscard]] VkImageView View() const noexcept { return mView; }
+    /** The depth aspect for shaders, when the target was created readable and the format can be sampled. */
+    [[nodiscard]] VkImageView SampledView() const noexcept { return mSampledView; }
 
   private:
     DepthStencilTargetContext mContext;
     vulkan::TrackedImage mImage;
     VkImageView mView = VK_NULL_HANDLE;
+    VkImageView mSampledView = VK_NULL_HANDLE;
   };
 
   /** Cube targets stay empty, as on D3D10, D3D11 and D3D12. */
@@ -134,6 +139,10 @@ namespace gpg::gal
 
     [[nodiscard]] std::uint8_t* Lock(std::uint32_t offset, std::uint32_t size, MohoD3DLockFlags flags);
     void Unlock();
+    /** Device::ReleaseBufferCopy: frees the CPU copy of a static buffer, once it's on the GPU. */
+    void ReleaseCopy() noexcept;
+    /** Device::CopyLockedRangeOnly. */
+    void CopyLockedRangeOnly() noexcept { mLockedRangeOnly = true; }
 
     /** The buffer and offset draws read from. */
     void PrepareForDraw(DeviceVulkan& device, VkBuffer& outBuffer, VkDeviceSize& outOffset);
@@ -146,6 +155,7 @@ namespace gpg::gal
     const char* mKind = nullptr;
     bool mDynamic = false;
     backend::LockShadow mShadow;
+    bool mLockedRangeOnly = false;
     vulkan::TrackedBuffer mBuffer; // static buffers
     VkBuffer mChunkBuffer = VK_NULL_HANDLE;
     VkDeviceSize mChunkOffset = 0;

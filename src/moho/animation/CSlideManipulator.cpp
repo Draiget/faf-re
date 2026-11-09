@@ -1,4 +1,7 @@
+#include "moho/animation/AniPoseBones.h"
 #include "moho/animation/CSlideManipulator.h"
+#include "gpg/core/reflection/Reflection.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 
 #include "moho/math/Vector3f.h"
 
@@ -32,7 +35,6 @@ namespace moho
 
 namespace
 {
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kExpectedGameObjectError = "Expected a game object. (Did you call with '.' instead of ':'?)";
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
@@ -57,25 +59,6 @@ namespace
   constexpr const char* kSetGoalHelpText = "CSlideManipulator:SetGoal(goal_x, goal_y, goal_z)";
   constexpr const char* kBeenDestroyedName = "BeenDestroyed";
   constexpr const char* kBeenDestroyedHelpText = "CSlideManipulator:BeenDestroyed()";
-
-  [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
-  {
-    gpg::RType* type = moho::IAniManipulator::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::IAniManipulator));
-      moho::IAniManipulator::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fSerializationType()
-  {
-    static gpg::RType* type = nullptr;
-    if (!type) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
 
   // Address: 0x00BD34C0 (FUN_00BD34C0, register_CSlideManipulatorSerializer)
   // -- MSVC's own compiler-generated dynamic initializer for this global runs
@@ -111,37 +94,6 @@ namespace
   };
 
   [[maybe_unused]] CSlideManipulatorSerializerStartupBootstrap gCSlideManipulatorSerializerStartupBootstrap;
-
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
-
-  [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const actor, const int boneIndex) noexcept
-  {
-    if (actor == nullptr || actor->mPose.get() == nullptr || boneIndex < 0) {
-      return nullptr;
-    }
-
-    moho::CAniPose* const pose = actor->mPose.get();
-    moho::CAniPoseBone* const bonesBegin = pose->mBones.begin();
-    moho::CAniPoseBone* const bonesEnd = pose->mBones.end();
-    if (bonesBegin == nullptr || bonesEnd == nullptr || bonesBegin >= bonesEnd) {
-      return nullptr;
-    }
-
-    const std::ptrdiff_t boneCount = bonesEnd - bonesBegin;
-    if (boneIndex >= boneCount) {
-      return nullptr;
-    }
-
-    return &bonesBegin[boneIndex];
-  }
 
   /**
    * Address: 0x00647250 (FUN_00647250)
@@ -253,36 +205,6 @@ namespace
 
     const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, CachedCSlideManipulatorType());
     return upcast.mObj;
-  }
-
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!isDerived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
   }
 
   /**
@@ -404,9 +326,9 @@ void moho::CSlideManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
   }
 
   const gpg::RRef owner{};
-  archive->Read(CachedIAniManipulatorType(), static_cast<moho::IAniManipulator*>(this), owner);
+  archive->Read(gpg::RTypeOf<moho::IAniManipulator>(), static_cast<moho::IAniManipulator*>(this), owner);
 
-  gpg::RType* const vectorType = CachedVector3fSerializationType();
+  gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3f>();
   archive->Read(vectorType, &mCurrentPosition, owner);
   archive->Read(vectorType, &mGoal, owner);
 
@@ -435,10 +357,10 @@ void moho::CSlideManipulator::MemberSerialize(gpg::WriteArchive* const archive) 
 
   const gpg::RRef owner{};
   archive->Write(
-    CachedIAniManipulatorType(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(this)), owner
+    gpg::RTypeOf<moho::IAniManipulator>(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(this)), owner
   );
 
-  gpg::RType* const vectorType = CachedVector3fSerializationType();
+  gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3f>();
   archive->Write(vectorType, &mCurrentPosition, owner);
   archive->Write(vectorType, &mGoal, owner);
 
@@ -578,7 +500,7 @@ bool moho::CSlideManipulator::ManipulatorUpdate()
     EventSetSignaled(true);
   }
 
-  CAniPoseBone* const watchedBone = ResolvePoseBone(mOwnerActor, watchedBinding->mBoneIndex);
+  CAniPoseBone* const watchedBone = moho::ResolvePoseBone(mOwnerActor, watchedBinding->mBoneIndex);
   if (watchedBone == nullptr) {
     return true;
   }
@@ -730,7 +652,7 @@ int moho::cfunc_CreateSliderL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_CreateSlider_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kCreateSliderName,
     &moho::cfunc_CreateSlider,
     nullptr,
@@ -761,7 +683,7 @@ int moho::cfunc_CSlideManipulatorSetWorldUnits(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetWorldUnits_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kSetWorldUnitsName,
     &moho::cfunc_CSlideManipulatorSetWorldUnits,
     &CScrLuaMetatableFactory<CSlideManipulator>::Instance(),
@@ -780,10 +702,7 @@ moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetWorldUnits_LuaFuncDef()
 int moho::cfunc_CSlideManipulatorSetWorldUnitsL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetWorldUnitsHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetWorldUnitsHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CSlideManipulator* const manipulator = SCR_FromLua_CSlideManipulator(manipObject, state);
@@ -813,7 +732,7 @@ int moho::cfunc_CSlideManipulatorSetSpeed(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetSpeed_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kSetSpeedName,
     &moho::cfunc_CSlideManipulatorSetSpeed,
     &CScrLuaMetatableFactory<CSlideManipulator>::Instance(),
@@ -832,10 +751,7 @@ moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetSpeed_LuaFuncDef()
 int moho::cfunc_CSlideManipulatorSetSpeedL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetSpeedHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetSpeedHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CSlideManipulator* const manipulator = GetCSlideManipulatorOptional(manipObject, state);
@@ -877,7 +793,7 @@ int moho::cfunc_CSlideManipulatorSetAcceleration(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetAcceleration_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kSetAccelerationName,
     &moho::cfunc_CSlideManipulatorSetAcceleration,
     &CScrLuaMetatableFactory<CSlideManipulator>::Instance(),
@@ -896,10 +812,7 @@ moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetAcceleration_LuaFuncDef()
 int moho::cfunc_CSlideManipulatorSetAccelerationL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetAccelerationHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetAccelerationHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CSlideManipulator* const manipulator = SCR_FromLua_CSlideManipulator(manipObject, state);
@@ -937,7 +850,7 @@ int moho::cfunc_CSlideManipulatorSetDeceleration(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetDeceleration_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kSetDecelerationName,
     &moho::cfunc_CSlideManipulatorSetDeceleration,
     &CScrLuaMetatableFactory<CSlideManipulator>::Instance(),
@@ -956,10 +869,7 @@ moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetDeceleration_LuaFuncDef()
 int moho::cfunc_CSlideManipulatorSetDecelerationL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 2) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetDecelerationHelpText, 2, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 2, kSetDecelerationHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CSlideManipulator* const manipulator = SCR_FromLua_CSlideManipulator(manipObject, state);
@@ -996,7 +906,7 @@ int moho::cfunc_CSlideManipulatorSetGoal(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetGoal_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kSetGoalName,
     &moho::cfunc_CSlideManipulatorSetGoal,
     &CScrLuaMetatableFactory<CSlideManipulator>::Instance(),
@@ -1016,10 +926,7 @@ moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetGoal_LuaFuncDef()
 int moho::cfunc_CSlideManipulatorSetGoalL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 4) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSetGoalHelpText, 4, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 4, kSetGoalHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CSlideManipulator* const manipulator = SCR_FromLua_CSlideManipulator(manipObject, state);
@@ -1070,7 +977,7 @@ int moho::cfunc_CSlideManipulatorBeenDestroyed(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_CSlideManipulatorBeenDestroyed_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kBeenDestroyedName,
     &moho::cfunc_CSlideManipulatorBeenDestroyed,
     &CScrLuaMetatableFactory<CSlideManipulator>::Instance(),
@@ -1089,10 +996,7 @@ moho::CScrLuaInitForm* moho::func_CSlideManipulatorBeenDestroyed_LuaFuncDef()
 int moho::cfunc_CSlideManipulatorBeenDestroyedL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kBeenDestroyedHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kBeenDestroyedHelpText);
 
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CSlideManipulator* const manipulator = GetCSlideManipulatorOptional(manipObject, state);
@@ -1188,13 +1092,7 @@ void moho::CSlideManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const 
     return;
   }
 
-  gpg::RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.mFlags = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
+  gpg::AddReflectedBaseType(typeInfo, baseType);
 }
 
 /**
@@ -1277,12 +1175,7 @@ namespace gpg
    */
   gpg::RRef* RRef_CSlideManipulator(gpg::RRef* const outRef, moho::CSlideManipulator* const value)
   {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCSlideManipulatorType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value, &CachedCSlideManipulatorType);
   }
 } // namespace gpg
 

@@ -27,31 +27,31 @@ moho::ScrActivation::ScrActivation(const ScrActivation& other)
     name(),
     line(0)
 {
-  file.assign(other.file, 0U, msvc8::string::npos);
-  name.assign(other.name, 0U, msvc8::string::npos);
+  file.assign(other.file, 0U, fa::string::npos);
+  name.assign(other.name, 0U, fa::string::npos);
   line = other.line;
 }
 
 /**
  * Address: 0x004AFF80 (FUN_004AFF80, Moho::ScrActivation::ScrActivation)
  *
- * msvc8::string const &,msvc8::string const &,int
+ * fa::string const &,fa::string const &,int
  *
  * What it does:
  * Initializes one script activation entry from file/name string lanes and
  * stores the associated source line.
  */
 moho::ScrActivation::ScrActivation(
-  const msvc8::string& filePath,
-  const msvc8::string& activationName,
+  const fa::string& filePath,
+  const fa::string& activationName,
   const int lineNumber
 )
   : file(),
     name(),
     line(0)
 {
-  file.assign(filePath, 0U, msvc8::string::npos);
-  name.assign(activationName, 0U, msvc8::string::npos);
+  file.assign(filePath, 0U, fa::string::npos);
+  name.assign(activationName, 0U, fa::string::npos);
   line = lineNumber;
 }
 

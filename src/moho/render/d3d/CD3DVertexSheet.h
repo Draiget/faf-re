@@ -199,7 +199,7 @@ namespace moho
     CD3DVertexFormat* mVertexFormat;             // +0x10
     int mStreamFrequencyToken;                   // +0x14
     std::uint32_t mStreamUsageToken;             // +0x18
-    msvc8::vector<CD3DVertexStream*> mStreams;   // +0x1C
+    fa::vector<CD3DVertexStream*> mStreams;   // +0x1C
     SBitStorage32 mOwnedStreamMask;              // +0x2C
   };
 

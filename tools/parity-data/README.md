@@ -1,0 +1,151 @@
+# Replay parity in CI
+
+The [Replay parity workflow](../../.github/workflows/replay-parity.yml) plays FAF vault replays of one game version (3835 now) on the Linux `headless` build and checks every checksum the live players recorded, as [tools/replay-parity](../replay-parity/README.md) does on Windows, with the same verdicts and the same rule for a desync that happened in the live game (the sim matches at least as many of the recorded clients as the checksum that differs, so the live game had already split). The [Parity prewarm workflow](../../.github/workflows/parity-prewarm.yml) fills the caches it plays from. The tools here fetch the game files, replays and maps from FAF, strip them, split a run into jobs packed to their time limit, play each job's replays and merge the results.
+
+## The workflows
+
+**Parity prewarm** (by hand, with a game version, and weekly):
+
+| Job | What it does |
+|---|---|
+| `game` | Once per version: downloads FAF's packages and init file for the version from FAF's updater (`<package>.<version>.nx2`, `init_faf_<version>.lua`, no sign-in needed) and strips them |
+| `retail` | Once: downloads the encrypted retail archives from `PARITY_RETAIL_URL` and checks they open with `PARITY_RETAIL_KEY` |
+| `replays` | One job per bucket of 10,000 replay ids, `parallel` jobs at a time (default 4, each one request a second): downloads the corpus replays the bucket's cache lacks, checks each as the parity runner does (featured mod, engine version, sim mods, map) and records the result in the bucket's `index.jsonl`; keeps the ready ones |
+| `assets` | Downloads the corpus' top and retail maps (stripped) and every M28AI version a ready replay needs, and saves every bucket's index in one file for the planner |
+
+**Replay parity** (by hand, with the commit to test):
+
+| Job | What it does |
+|---|---|
+| `build` | Builds `headless` from the commit given, with the pinned toolchain |
+| `plan` | Picks the replays (`core`, `extended`, a seeded `sample`, `nightly` or `all`) and packs them into jobs |
+| `run` | One job per shard: puts the pack together (FAF's game files and the retail archives), plays its replays four at a time, and uploads `results.jsonl` and the logs of every replay that did not pass. It starts a replay only if its estimate, scaled by how much longer than estimated the job's finished replays took, ends before the job's 300 minutes; a replay that does not fit, or is still playing then, is `not-run` |
+| `report` | Merges the results, writes the job summary and `report.json` (passing replays with replay time, wall time and speedup), and lists under `regressions` any new desync, crash, early stop, timeout or error (a replay that could not be got ready, or a shard that died). These don't fail the run: the report is its result, with a warning on the run |
+
+**The nightly run** starts at 20:00 UTC (00:00 UTC+4) on master's head; by hand it is `set=nightly`, `sample=5000`, `seed=1`, `job_minutes=150`. It plays the `nightly` set: the core and extended sets, every replay in [desynced/3835.txt](desynced/3835.txt), and others picked once by a fixed seed. They are the same replays every night, so a failure that is new means a change since the night before, and passing starts the [Nightly release](../release/README.md). It keeps as many as 40 jobs of 150 minutes hold. GitHub runs 20 jobs at once on Free, so that is two rounds, about 5 h 30 min with a fresh build; a job holds one replay bucket, so 40 short jobs fill the runners where 25 buckets in full-length jobs could not end in time. While it runs, pull request checks wait for a free runner and another parity run queues behind it. Add a replay to `desynced/` when it desyncs; a failure the report calls new turns the night red until it is fixed or listed in `expected/` with its reason.
+
+A run whose jobs ran out of time leaves replays `not-run`. Start another with `after_run` set to its run id: it plays only those (and any `error`, `timeout` or `crash`), and its report covers both runs.
+
+A cancelled run is resumed with `after_run` set to it, `resume` ticked, `set=all` and `batch=1/1`: the new run plays only the replays the cancelled one scheduled (its own `after_run` and `batch` already applied) and did not play to a verdict. Give `ref` the commit the cancelled run built (its `build` job's summary line), not a branch that has moved since.
+
+**Replay check** (the `replay check` label on a pull request, or by hand; [replay-check.yml](../../.github/workflows/replay-check.yml)): the core set, one replay per job, on Linux x64, Windows x64 and Windows x86, once for each engine flag set (default `/simworkers 1` and `/simworkers 8`), for a pull request's check rather than a parity survey.
+
+| Job | What it does |
+|---|---|
+| `plan` | The commit (the pull request's head, or `ref`), the core set one replay a shard (`plan.py --slots 1`), and the matrix of builds, flag sets and shards |
+| `data` | Restores the caches and gathers the core set's replays, maps and M28AI versions with the game files and the encrypted retail file into one artifact (`stage.py`): a cache saved on a Linux runner does not restore on a Windows one |
+| `build-linux`, `build-windows` | Build `headless` from the commit: Linux with the pinned clang 18, Windows with clang-cl from LLVM 22.1.7 (the version maintainers build with). They only restore caches; `windows-downloads`, which runs the workflow's own commit, saves the Windows dependency downloads and the LLVM installer |
+| `play` | One job per build, flag set and replay: decrypts the retail file and plays with `shard.py` (`--simworkers`, `--engine-args`) |
+| `report` | One per build and flag set, failing on any new desync, crash, early stop or error |
+
+The play jobs run the pull request's build next to the decrypted retail archives, so the check starts only when someone with write access adds the label after reading the diff; a new push does not start it again (remove and add the label). It saves no cache, so a pull request's code never writes one that other runs read.
+
+`oracle_check` (dedicated-server plan WPR.54) plays every replay unfocused with headless `--oracle-check`: each beat, for every army, the server's visibility oracle against what the sim publishes, and the spatial oracle against the brute-force one. A replay with any difference, or without the oracle's summary, gets the verdict `oracle`, which fails the run. The check makes replays slower than the plan's estimates, so a large set leaves more `not-run` for an `after_run`.
+
+Run both from master: caches saved on master are the ones every run reads. Anyone with write access to the repository can start them. The weekly prewarm fetches what is still missing and keeps the caches from expiring (GitHub drops a cache unused for 7 days).
+
+**FAF's servers.** Only the prewarm asks FAF for anything, each job one request a second (the replay buckets `parallel` jobs at a time), and only for what the cache lacks: once the caches are full, a parity run sends FAF nothing. A `run` job downloads a replay, map or M28AI version only when the caches lack it (a map outside the top maps, a replay the prewarm has not reached yet); the core and extended sets are played from shared jobs that fetch their 8 or 18 replays.
+
+**Caches** (10 GB per repository; most keys carry an entry count, so a run saves a new one only when something was added):
+
+| Key | Contents |
+|---|---|
+| `game-<version>` | FAF's packages and init file, stripped (34 MB for 3835) |
+| `retail-<PARITY_RETAIL_ID>` | the retail archives, encrypted as downloaded (73 MB) |
+| `replays-<version>-b<bucket>-n<count>` | one bucket's ready `.fafreplay` files and `index.jsonl` (about 80 KB a replay) |
+| `maps-<version>-s<count>` | the top and retail maps, stripped (count: folders holding their scenario file) |
+| `m28-<version>-n<count>` | M28AI versions |
+| `index-<version>-r<run>` | every bucket's index, for the planner |
+
+A pull request's workflow can read master's caches too, a fork's included, which is why the retail archives stay encrypted there.
+
+**Settings.** The secrets belong to an environment named `parity` (repository Settings, Environments) whose deployment branches are `master` only: the jobs that use them (`retail` in the prewarm, `run`) name that environment, and a workflow on any other branch gets nothing.
+
+| Name | Where | |
+|---|---|---|
+| `PARITY_RETAIL_URL` | `parity` environment secret or variable | where the encrypted retail file is downloaded from: a direct link, or a Google Drive share link (`drive.google.com/file/d/<id>/...`, shared with anyone who has the link); it need not be secret, as the file is useless without the key |
+| `PARITY_RETAIL_KEY` | `parity` environment secret | the file's passphrase |
+| `PARITY_RETAIL_ID` | `parity` environment variable | names the retail file, for example `v1`; change it when the file changes (only the jobs in the environment use it) |
+
+**Charts.** After a full run, update the run, the commit and the causes in `parity_chart.json`, then redraw the charts in `docs/images/` (the README and `docs/RETAIL_REPLAY_PARITY.md` show them). The script refuses a causes list that doesn't add up to the report's desyncs:
+
+```
+gh run download <run id> -R Draiget/faf-re -n report -D tmp/parity-ci/run-<run id>/report
+python tools/parity-data/chart.py --report tmp/parity-ci/run-<run id>/report/report.json
+```
+
+## The corpus
+
+[corpus/3835.tsv.gz](corpus/3835.tsv.gz) lists the replays CI may play: every 3835 game in the vault with 2 or more players, at least 5 minutes of game, a replay, and a map that can be had (generated maps cannot), plus the core and extended sets of [PR_REPLAY_CHECK.md](../../docs/PR_REPLAY_CHECK.md). One line per replay: id, ticks, players, map folder, and where its map comes from: `retail` (a map the game ships, cached from FAF's map vault), `cached` (one of the 500 most played vault maps) or `download` (fetched by the job that plays it). On 29/10/2026: 43,091 replays, 9,194 on retail maps, 28,989 on the top 500 maps, 4,908 on others. About 30% of them need a sim mod and are left out when the prewarm reads them.
+
+It is made from the FAF API, which needs a signed-in user:
+
+```
+python corpus.py login                                  # prints a link and a code; tokens go to tmp/claude/
+python corpus.py export --first 26825749 --last 27067140 --out tmp/claude/export3835
+python corpus.py build --export tmp/claude/export3835 --retail-maps <pack>/fa/maps --top-maps 500 \
+  --out tools/parity-data/corpus/3835.tsv.gz
+```
+
+26,825,749 to 27,067,140 are the vault ids of game version 3835: the first replay whose engine version (inside the replay, `Supreme Commander v1.50.3835`) is 3835, and the last whose header names 3835. Headers name 3835 from 26,825,350 on, but the replays up to 26,825,721 were recorded by the 3834 engine. The export asks for one page of 100 games a second, about 1,000 requests. The login is the FAF client's (its client id and the device-code sign-in of `api/TokenRetriever.java`), as FAF has no client registered for this project.
+
+Failures that are not bugs of this engine are in [expected/3835.json](expected/3835.json), each with why: retail fails there too, the map reads the real-time clock, or the replay cannot be got. The report gives them the verdict `expected-desync` (or `expected-crash`, `expected-error`), leaves them out of the desync count and does not fail on them. A bug of ours does not belong in this file: fix it. A live game split needs no entry: when the players recorded different checksums and the sim equals the larger side, or one side of a tie, the replay passes and the report lists the split.
+
+## The pack
+
+The game data a headless replay parity run needs, cut down from the full game: every file headless reads keeps its bytes, every other file stays as an empty file of the same name, at the same path, with the same timestamp. On 3835 the game archives go from about 3.7 GB to 111 MB: FAF's packages to 34 MB, the retail archives to 76 MB.
+
+### Why empty files, not no files
+
+Headless never reads a texture, a sound or a movie, but it does ask whether some textures exist. The session checksum is seeded with every blueprint's reflected value (`RRuleGameRulesImpl::UpdateChecksum`, 0x0052B2B0), and a mesh blueprint's LOD texture names are filled in only when `<mesh>_albedo.dds`, `_normalsTS.dds`, `_SpecTeam.dds` or `_lookup.dds` exists next to the mesh (`RMeshBlueprintLOD::Init`, 0x00518870). Removing the textures, or skipping that lookup in headless, changes the checksum at beat 0 (26902315: every recorded checksum mismatched from beat 0 on, 29/10/2026). An empty file answers the lookup as the real one does, and a read of one returns no bytes.
+
+### Layout
+
+| Folder | From |
+|---|---|
+| `bin/init_ci.lua` | FAF's `init_faf_<version>.lua` with the vault set to the pack's (`custom_vault_path`, right before `if custom_vault_path then`) |
+| `fa_path.lua` | written for the pack: `fa_path` relative to `InitFileDir`, the game version |
+| `gamedata/*.nx2` | FAF's packages for the version, from FAF's updater |
+| `fa/gamedata/*.scd` | the retail archives: the one part FAF does not publish. Kept private: encrypted, behind a secret |
+| `fa/maps/X1CA_*/*_strings.lua` | the campaign maps' dialogue, in the retail file too: survival maps import it (`survival_horde_ee`, `xxx_survival`, `sh1r3_mycelium2_survival` and others), FAF's map vault does not serve the campaign maps, and without it the import errors in the sim and the replay desyncs (26830435 at beat 200). `init_ci.lua` mounts `fa/maps` at `/maps` |
+| `vault/` | empty; `shard.py` gives each replay a vault of its own with its map and M28AI version |
+| `manifest.json` | game version, kept types, SHA-256 of every source file |
+
+The retail maps come from FAF's map vault like any other map: their `.scmap` and Lua files are the game's (x1mp_005 and scmp_009 compared file for file; FAF adds previews and leaves out the editor's `.raw` files), and 26902315 matches every checksum on FAF's x1mp_005. The retail archives FAF's init never mounts (`schook`, `moholua`, `mohodata`, `lua`, `editor`, `ambience`) are left out.
+
+### Making the retail file
+
+For a new copy of the retail archives and campaign strings (they do not change between FAF versions; a file made before 31/10/2026 has no campaign strings and needs remaking):
+
+```
+python make_pack.py retail --fa <game install> --out <dir>
+tar -C <dir> -cf - . | xz -9 | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:KEY -out faf-parity-retail-v1.tar.xz.enc
+```
+
+Put it where `PARITY_RETAIL_URL` points, the passphrase in `PARITY_RETAIL_KEY`, and a new `PARITY_RETAIL_ID`.
+
+### Checking the stripping rule
+
+When headless or the game data changes, check that the pack still holds every file headless reads:
+
+1. Trace a set of replays with headless `--disk-trace` ([SWITCHES.md](../../docs/SWITCHES.md#headless)) and check which file types it reads:
+
+   ```
+   python make_pack.py types runs/*.disk
+   ```
+
+   `content types:` lists them; `NOT IN CONTENT_TYPES:` means headless read a type the pack would empty, so add it to `CONTENT_TYPES` first.
+
+2. Build a whole pack from local data (with `--vault` and `--m28` also the vault maps and M28AI versions, to play from locally):
+
+   ```
+   python make_pack.py build --fa <game install> --faf <FAF data folder> --init <FAF data folder>/bin/init_faf.lua --out <pack>
+   ```
+
+3. Check that every file the traces read is in the pack with its bytes:
+
+   ```
+   python make_pack.py verify --pack <pack> --root <game install>/maps=fa/maps --root <vault>/maps=vault/maps runs/*.disk
+   ```
+
+4. Play the replays on the pack (`/init <pack>/bin/init_ci.lua`) and compare their `--digests` files with the runs on the full data: they must be identical. On 29/10/2026 the core set's nine traced runs matched, digest file for digest file.

@@ -1,5 +1,7 @@
 #include "moho/lua/CScrLuaBinder.h"
 
+#include "gpg/core/profiling/ProfileNames.h"
+
 namespace moho
 {
   /**
@@ -19,7 +21,12 @@ namespace moho
     : CScrLuaInitForm(set, name, groupName, docString)
     , mFunction(function)
     , mOwnerFactory(ownerFactory)
-  {}
+  {
+#if defined(TRACY_ENABLE)
+    // Profile builds: the Lua call path names its zone after the bound function.
+    gpg::profiling::NameLuaCFunction(reinterpret_cast<const void*>(function), groupName, name);
+#endif
+  }
 
   /**
    * Address: 0x100159C0 (FUN_100159C0)

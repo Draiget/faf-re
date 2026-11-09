@@ -1,0 +1,42 @@
+name: 2p-lobby-features
+description: >
+  Two of our x64 clients in the normal lobby, the host holding a style key and the
+  other not. Each must see that the other runs our engine, and the one without a key
+  must see the host's style proven. Both stay in the lobby for the screenshot of the
+  name colour; nothing launches. Needs peer_style.key in bin_x64 and
+  init_mpemu_localvault.lua in the FAF bin folder. Do not click into the game windows.
+timeout: 5m
+
+mode: direct
+lobby: normal
+map: faf_re_lockstep
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\peerstyle_test.exe'
+  init: init_mpemu_localvault.lua
+  window: { width: 1280, height: 800 }
+  nosound: true
+  tile: true
+
+players:
+  - { uid: 1, name: KeyHost, faction: uef }
+  - { uid: 2, name: NoKey, faction: cybran, args: ['/peerstylekey', 'no-such-file.key'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - wait: 90s
+
+expect:
+  noCrash: true
+  logsContain:
+    - { uids: [1], pattern: 'PEERS: lobby player \d+:NoKey runs our engine, features 0+,' }
+    - { uids: [2], pattern: 'PEERS: lobby player \d+:KeyHost runs our engine, features 0+8,' }
+    - { uids: [2], pattern: 'PEERS: lobby player \d+:KeyHost has style [0-9a-f]{6}' }
+  logsAbsent:
+    - { uids: [1, 2], pattern: 'Hooked /lua/ui/lobby/lobby.lua' }
+    - { uids: [1, 2], pattern: 'could not show a style' }
+    - { uids: [1], pattern: 'has style' }
+    - { uids: [1, 2], pattern: 'does not check' }
+    - { uids: [1, 2], pattern: 'style key' }

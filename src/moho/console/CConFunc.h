@@ -18,7 +18,7 @@ namespace moho
   class CConFunc final : public CConCommand
   {
   public:
-    using Callback = void(__cdecl*)(const msvc8::vector<msvc8::string>& args);
+    using Callback = void(__cdecl*)(const fa::vector<fa::string>& args);
 
     /**
      * Address: 0x0041E5C0 (FUN_0041E5C0, ??0CConFunc@Moho@@QAE@PBD0@Z)
@@ -37,7 +37,7 @@ namespace moho
      * What it does:
      * Forwards command args to the stored handler.
      */
-    void Handle(const msvc8::vector<msvc8::string>& args) override;
+    void Handle(const fa::vector<fa::string>& args) override;
 
     Callback mFunc; // 0x0C
   };

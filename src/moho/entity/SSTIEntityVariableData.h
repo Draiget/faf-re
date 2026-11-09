@@ -116,7 +116,7 @@ namespace moho
      * `mAuxValueVector` has one inline element, so copying only its pointer
      * lanes would make the copy alias the source's storage: its heap buffer when
      * dynamic, or pointing into the source object itself when inline. That is
-     * live in `msvc8::vector<SEntityVariableUpdateEntry>::insert`, whose
+     * live in `fa::vector<SEntityVariableUpdateEntry>::insert`, whose
      * `uninit_move_n` copy-constructs each element into the newly grown buffer
      * and then runs `destroy_range` over the old one -- so the old element's
      * destructor freed the buffer the new, live element had just aliased.

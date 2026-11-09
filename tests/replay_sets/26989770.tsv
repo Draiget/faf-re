@@ -1,0 +1,885 @@
+va	name	params	hashed	result	calls	file	line
+0x00405050	`anonymous namespace'::MaxInt	I I -> I	0 1	1	1163	src/moho/ai/CAiTransportImpl.cpp	312
+0x0040D960	`anonymous namespace'::UpdateGridTraversalStep	P I -> V	1	0	34056	src/moho/sim/STIMap.cpp	943
+0x0041B520	LuaPlus::LuaStackObject::GetInteger	P -> I		1	1455124	src/lua/LuaObject.cpp	20881
+0x00457BA0	LuaPlus::LuaTableIterator::Next	P -> B		5	226717	src/lua/LuaTableIterator.cpp	80
+0x00466E50	moho::CVFSImpl::GetFileInfo	P P P -> B		5	39734	src/moho/sim/CVFSImpl.cpp	975
+0x00474830	`anonymous namespace'::ComputeBoxBoxContactManifold	P P P -> B		5	17006999	src/moho/collision/CColPrimitiveBase.cpp	119
+0x00477030	moho::CHeightField::DoIntersection	P P P F F P -> B	3 4	5	505054	src/moho/sim/STIMap.cpp	2178
+0x004776E0	moho::CHeightField::ClipSegmentToWorld	P P P P P -> B		5	505054	src/moho/sim/STIMap.cpp	1977
+0x004778F0	moho::CHeightField::DoIntersectionLL	P P P P P I I F P -> B	5 6 7	5	41018	src/moho/sim/STIMap.cpp	2063
+0x00477B80	moho::CHeightField::DoIntersectionUR	P P P P P I I F P -> B	5 6 7	5	41715	src/moho/sim/STIMap.cpp	2125
+0x004C7580	moho::CScriptObject::RunScriptMultiRet	P P P S5 S5 S5 S5 S5 -> B		5	3892	src/moho/script/CScriptObject.cpp	885
+0x004C7A90	moho::cfunc_IsDestroyed	P -> I		1	327243	src/moho/script/CScriptObject.cpp	967
+0x004C7B10	moho::cfunc_IsDestroyedL	P -> I		1	327243	src/moho/script/CScriptObject.cpp	997
+0x004CCB00	LuaPlus::LuaStackObject::ToNumber	P -> D		3	7692	src/lua/LuaObject.cpp	20899
+0x004CD9A0	moho::cfunc_LOG	P -> I		1	5	src/moho/script/CScriptObject.cpp	1116
+0x004CDB00	moho::cfunc_SPEW	P -> I		1	5	src/moho/script/CScriptObject.cpp	1164
+0x004CEAF0	moho::cfunc_doscript	P -> I		1	286	src/moho/script/CScriptObject.cpp	1188
+0x004CEB70	moho::cfunc_doscriptL	P -> I		1	286	src/moho/script/CScriptObject.cpp	1212
+0x004D2C80	LuaPlus::LuaObject::ToByteStream	P P -> B		5	471371	src/lua/LuaObject.cpp	23463
+0x004EB740	moho::RotateQuatByAngle	P F -> B	1	5	136263	src/moho/math/QuaternionMath.cpp	568
+0x004EDED0	moho::QuatsNearEqual	P P -> B		5	9435120	src/moho/math/QuaternionMath.cpp	211
+0x004FCF20	moho::EntityOccupationManager::AddColShapeAt	P P I -> V	2	0	800395	src/moho/sim/COGrid.cpp	569
+0x004FD000	moho::EntityOccupationManager::GatherUnmarkedUnitsInRect	P P P I -> I	3	1	18519659	src/moho/sim/COGrid.cpp	728
+0x004FD200	`anonymous namespace'::MarchLineAndGatherCollisionSpans	P P P P -> I		1	72164	src/moho/sim/COGrid.cpp	284
+0x004FE7A0	moho::CColPrimitive<Wm3::Sphere3<float> >::CollideSphere	P P P -> B		5	182288	src/moho/collision/CColPrimitiveBase.cpp	636
+0x004FE860	moho::CColPrimitive<Wm3::Sphere3<float> >::CollideBox	P P P -> B		5	78068	src/moho/collision/CColPrimitiveBase.cpp	609
+0x004FE9D0	moho::CColPrimitive<Wm3::Sphere3<float> >::CollideLine	P P P P -> B		5	49679	src/moho/collision/CColPrimitiveBase.cpp	577
+0x004FF150	moho::CColPrimitive<Wm3::Box3<float> >::CollideSphere	P P P -> B		5	1330243	src/moho/collision/CColPrimitiveBase.cpp	430
+0x004FF260	moho::CColPrimitive<Wm3::Box3<float> >::CollideBox	P P P -> B		5	17006999	src/moho/collision/CColPrimitiveBase.cpp	409
+0x004FF2D0	moho::CColPrimitive<Wm3::Box3<float> >::CollideLine	P P P P -> B		5	120759	src/moho/collision/CColPrimitiveBase.cpp	384
+0x00506E20	moho::GridPos::GridPos	P P I -> V	2	0	37982464	src/moho/math/GridPos.cpp	30
+0x00507540	moho::CIntelGrid::Raster	P P I B -> V	2	0	644109	src/moho/sim/CIntelGrid.cpp	465
+0x005077B0	moho::CIntelGrid::Tick	P I -> V	1	0	157648	src/moho/sim/CIntelGrid.cpp	420
+0x0050AD80	moho::Entity::LayerToString	I -> P	0	0	90636	src/moho/entity/Entity.cpp	8239
+0x0050B260	moho::COORDS_GridSnap	P P P P I -> S3	4	0	102740	src/moho/entity/Entity.cpp	8214
+0x0050B300	moho::COORDS_Orient	P F F -> S4	1 2	0	1138	src/moho/entity/Entity.cpp	7852
+0x0050B710	moho::COORDS_Pitch	P -> F		2	3469431	src/moho/entity/Entity.cpp	7940
+0x0052B1A0	moho::RRuleGameRulesImpl::GetBlueprintFromOrdinal	P I -> P	1	0	1071108	src/moho/sim/RRuleGameRules.cpp	1214
+0x005382E0	moho::VEC_LargestAxis	P -> I		1	619	src/moho/math/Vector3f.cpp	123
+0x00541540	moho::IUnit::CalcSpawnElevation	P I S7 P -> F		2	14500	src/moho/unit/core/IUnit.cpp	123
+0x005459F0	LuaPlus::LuaStackObject::GetNumber	P -> D		3	15983	src/lua/LuaObject.h	1028
+0x005556B0	moho::cfunc_EntityCategory__add	P -> I		1	3357	src/moho/entity/EntityCategoryReflection.cpp	390
+0x00555730	moho::cfunc_EntityCategory__addL	P -> I		1	3357	src/moho/entity/EntityCategoryReflection.cpp	398
+0x00555840	moho::cfunc_EntityCategory__sub	P -> I		1	111723	src/moho/entity/EntityCategoryReflection.cpp	447
+0x005558C0	moho::cfunc_EntityCategory__subL	P -> I		1	111723	src/moho/entity/EntityCategoryReflection.cpp	455
+0x005559D0	moho::cfunc_EntityCategory__mul	P -> I		1	18572	src/moho/entity/EntityCategoryReflection.cpp	504
+0x00555A50	moho::cfunc_EntityCategory__mulL	P -> I		1	18572	src/moho/entity/EntityCategoryReflection.cpp	512
+0x00564AB0	moho::OCCUPY_MobileCheck	P P P -> I		5	27326010	src/moho/sim/STIMap.cpp	3161
+0x00564DF0	moho::STIMap::OccupancyCapsOfFootprintAt	P P P -> I		5	141163271	src/moho/sim/STIMap.cpp	2677
+0x00564F80	moho::OCCUPY_CheckEdgeFlatness	P P P P P -> B		5	15139	src/moho/sim/STIMap.cpp	3588
+0x005651F0	moho::OCCUPY_CheckAreaFlatness	P P P P P -> B		5	486064	src/moho/sim/STIMap.cpp	3536
+0x005652E0	moho::OCCUPY_Check	P P P P P -> B		5	648734	src/moho/sim/STIMap.cpp	3661
+0x005657F0	moho::IsValidVector3f	P -> B		5	4744250	src/moho/math/Vector3f.cpp	20
+0x00566B10	moho::CFormationInstance::PreRunScript	P P P I -> V	3	0	1938	src/moho/ai/CAiFormationInstance.cpp	2854
+0x00567300	moho::CFormationInstance::RunScript	P P I -> V	2	0	969	src/moho/ai/CAiFormationInstance.cpp	2921
+0x00568820	moho::CFormationInstance::Setup	P P I -> V	2	0	1938	src/moho/ai/CAiFormationInstance.cpp	2878
+0x00569BD0	moho::CFormationInstance::GetLayer	P P -> I		1	703037	src/moho/ai/CAiFormationInstance.cpp	2782
+0x00569BF0	moho::CFormationInstance::CommandIsForm	P -> B		5	637568	src/moho/ai/CAiFormationInstance.cpp	3547
+0x00569C20	moho::CFormationInstance::IsInFormation	P P -> B		5	72396	src/moho/ai/CAiFormationInstance.cpp	3522
+0x0056A210	moho::CFormationInstance::UnitCount	P -> I		1	158540	src/moho/ai/CAiFormationInstance.cpp	2767
+0x0056A440	moho::CFormationInstance::Contains	P P B -> B		5	464848	src/moho/ai/CAiFormationInstance.cpp	3447
+0x0056A9D0	moho::EntityCategory::HasBlueprint	P P -> B		5	2798352	src/moho/entity/EntityCategoryReflection.cpp	356
+0x00570750	moho::EulerRollToQuat	P P F -> P	2	0	1733023	src/moho/math/Vector3f.cpp	317
+0x00575BD0	moho::FORMATION_GetScriptName	P I I -> P	1 2	0	596	src/moho/ai/CAiFormationDBImpl.cpp	252
+0x00575DB0	moho::FORMATION_GetScriptIndex	P P I -> I	2	1	1153	src/moho/ai/CAiFormationDBImpl.cpp	290
+0x00577F20	moho::STIMap::IsBlockingTerrain	P I I -> B	1 2	5	140546615	src/moho/sim/STIMap.cpp	2658
+0x00579430	moho::IArmy::GetAllianceWith	P P -> I		1	3341114	src/moho/sim/IArmySerializer.cpp	120
+0x0057A6D0	moho::CAiBrain::CanBuildUnit	P P P -> B		5	349	src/moho/ai/CAiBrain.cpp	2297
+0x0057A790	moho::func_OrderBuildStructure	P P P P P F -> P	5	0	750	src/moho/ai/CAiBrain.cpp	132
+0x0057B0C0	`anonymous namespace'::IssueBuildFactoryCommands	P I P P -> B		5	512	src/moho/ai/CAiBrain.cpp	780
+0x0057B1E0	moho::CAiBrain::BuildUnit	P P P I -> B	3	5	512	src/moho/ai/CAiBrain.cpp	2314
+0x0057B290	moho::CollectUnitsAroundPointFiltered	P P P P F I -> P	4 5	0	67447	src/moho/ai/CAiBrain.cpp	1531
+0x0057B480	moho::CountUnitsAroundPointFiltered	P P P F I -> I	3 4	1	8388	src/moho/ai/CAiBrain.cpp	1593
+0x0057CBB0	moho::CAiBrain::CanBuildStructureAt	P P P I I I -> B		5	116340	src/moho/ai/CAiBrain.cpp	6259
+0x00585920	moho::SEconTotals::MaxStorageOf	P I -> D		3	874274	src/moho/sim/CEconomy.cpp	762
+0x00586070	moho::cfunc_CAiBrainGetArmyIndex	P -> I		1	106562	src/moho/ai/CAiBrain.cpp	2733
+0x005861C0	moho::cfunc_CAiBrainGetFactionIndex	P -> I		1	2366	src/moho/ai/CAiBrain.cpp	2785
+0x005864A0	moho::cfunc_CAiBrainGetPersonality	P -> I		1	3	src/moho/ai/CAiBrain.cpp	2893
+0x005865F0	moho::cfunc_CAiBrainSetCurrentEnemy	P -> I		1	2	src/moho/ai/CAiBrain.cpp	2950
+0x00586770	moho::cfunc_CAiBrainGetCurrentEnemy	P -> I		1	3507	src/moho/ai/CAiBrain.cpp	3008
+0x005868D0	moho::cfunc_CAiBrainGetUnitBlueprint	P -> I		1	170	src/moho/ai/CAiBrain.cpp	3071
+0x00586AD0	moho::cfunc_CAiBrainGetArmyStat	P -> I		1	94608	src/moho/ai/CAiBrain.cpp	3146
+0x00587520	moho::cfunc_CAiBrainGetBlueprintStat	P -> I		1	35496	src/moho/ai/CAiBrain.cpp	3469
+0x005876E0	moho::cfunc_CAiBrainGetCurrentUnits	P -> I		1	24271	src/moho/ai/CAiBrain.cpp	3541
+0x00587870	moho::cfunc_CAiBrainGetListOfUnits	P -> I		1	27858	src/moho/ai/CAiBrain.cpp	3785
+0x00587B80	moho::cfunc_CAiBrainSetArmyStatsTrigger	P -> I		1	16	src/moho/ai/CAiBrain.cpp	3609
+0x00587FA0	moho::cfunc_CAiBrainRemoveArmyStatsTrigger	P -> I		1	16	src/moho/ai/CAiBrain.cpp	3714
+0x005881F0	moho::cfunc_CAiBrainGiveResource	P -> I		1	4	src/moho/ai/CAiBrain.cpp	5134
+0x00588850	moho::cfunc_CAiBrainSetResourceSharing	P -> I		1	18	src/moho/ai/CAiBrain.cpp	3891
+0x00588C10	moho::cfunc_CAiBrainFindUpgradeBP	P -> I		1	50	src/moho/ai/CAiBrain.cpp	5465
+0x00589380	moho::cfunc_CAiBrainDecideWhatToBuild	P -> I		1	349	src/moho/ai/CAiBrain.cpp	5637
+0x00589400	moho::cfunc_CAiBrainDecideWhatToBuildL	P -> I		1	349	src/moho/ai/CAiBrain.cpp	5649
+0x00589720	moho::cfunc_CAiBrainGetArmyStartPos	P -> I		1	8464	src/moho/ai/CAiBrain.cpp	3943
+0x0058A440	moho::cfunc_CAiBrainFindPlaceToBuild	P -> I		1	341	src/moho/ai/CAiBrain.cpp	4631
+0x0058B3A0	moho::cfunc_CAiBrainCanBuildStructureAt	P -> I		1	99343	src/moho/ai/CAiBrain.cpp	6407
+0x0058B420	moho::cfunc_CAiBrainCanBuildStructureAtL	P -> I		1	99343	src/moho/ai/CAiBrain.cpp	6443
+0x0058B610	moho::cfunc_CAiBrainBuildStructure	P -> I		1	750	src/moho/ai/CAiBrain.cpp	5746
+0x0058BF80	moho::cfunc_CAiBrainCanBuildPlatoon	P -> I		1	136682	src/moho/ai/CAiBrain.cpp	8565
+0x0058C490	moho::cfunc_CAiBrainBuildPlatoon	P -> I		1	512	src/moho/ai/CAiBrain.cpp	8231
+0x0058CFC0	moho::cfunc_CAiBrainPlatoonExists	P -> I		1	11961	src/moho/ai/CAiBrain.cpp	7264
+0x0058D140	moho::cfunc_CAiBrainGetPlatoonsList	P -> I		1	242	src/moho/ai/CAiBrain.cpp	7318
+0x0058D360	moho::cfunc_CAiBrainDisbandPlatoon	P -> I		1	1218	src/moho/ai/CAiBrain.cpp	7395
+0x0058D650	moho::cfunc_CAiBrainMakePlatoon	P -> I		1	1286	src/moho/ai/CAiBrain.cpp	8428
+0x0058DC60	moho::cfunc_CAiBrainAssignUnitsToPlatoon	P -> I		1	2988	src/moho/ai/CAiBrain.cpp	8328
+0x0058DFA0	moho::cfunc_CAiBrainGetPlatoonUniquelyNamed	P -> I		1	48259	src/moho/ai/CAiBrain.cpp	7511
+0x0058E140	moho::cfunc_CAiBrainGetNumUnitsAroundPoint	P -> I		1	8388	src/moho/ai/CAiBrain.cpp	7987
+0x0058E1C0	moho::cfunc_CAiBrainGetNumUnitsAroundPointL	P -> I		1	8388	src/moho/ai/CAiBrain.cpp	8023
+0x0058E3D0	moho::cfunc_CAiBrainGetUnitsAroundPoint	P -> I		1	64720	src/moho/ai/CAiBrain.cpp	7956
+0x0058E450	moho::cfunc_CAiBrainGetUnitsAroundPointL	P -> I		1	64720	src/moho/ai/CAiBrain.cpp	7885
+0x0058F370	moho::cfunc_CAiBrainGetEconomyStored	P -> I		1	185790	src/moho/ai/CAiBrain.cpp	4749
+0x0058F530	moho::cfunc_CAiBrainGetEconomyStoredRatio	P -> I		1	73063	src/moho/ai/CAiBrain.cpp	5060
+0x0058F730	moho::cfunc_CAiBrainGetEconomyIncome	P -> I		1	71989	src/moho/ai/CAiBrain.cpp	4804
+0x0058F8F0	moho::cfunc_CAiBrainGetEconomyUsage	P -> I		1	19706	src/moho/ai/CAiBrain.cpp	4859
+0x0058FAB0	moho::cfunc_CAiBrainGetEconomyRequested	P -> I		1	71989	src/moho/ai/CAiBrain.cpp	4914
+0x0058FC70	moho::cfunc_CAiBrainGetEconomyTrend	P -> I		1	24086	src/moho/ai/CAiBrain.cpp	4969
+0x0058FE30	moho::cfunc_CAiBrainGetMapWaterRatio	P -> I		1	5420	src/moho/ai/CAiBrain.cpp	5004
+0x005902E0	moho::cfunc_CAiBrainGetThreatAtPositionL	P -> I		1	247582	src/moho/ai/CAiBrain.cpp	5870
+0x00590C00	moho::cfunc_CAiBrainGetThreatsAroundPosition	P -> I		1	696	src/moho/ai/CAiBrain.cpp	6078
+0x00590C80	moho::cfunc_CAiBrainGetThreatsAroundPositionL	P -> I		1	696	src/moho/ai/CAiBrain.cpp	6119
+0x00591020	moho::cfunc_CAiBrainCheckBlockingTerrain	P -> I		1	960	src/moho/ai/CAiBrain.cpp	8075
+0x005917F0	moho::cfunc_CAiBrainGetNoRushTicks	P -> I		1	66	src/moho/ai/CAiBrain.cpp	7572
+0x00593260	moho::CArmyStats::UpdateUnitStat	P P P -> I		1	2494	src/moho/sim/CArmyStats.cpp	1057
+0x00593290	`anonymous namespace'::AddArmyStatFloatByName	P P P -> I		1	2494	src/moho/unit/core/Unit.cpp	1600
+0x00596930	`anonymous namespace'::UnitsWillCollide	P P P P P P B -> B		5	3443812	src/moho/ai/CAiSteeringImpl.cpp	251
+0x00596E00	`anonymous namespace'::IsCollisionApproachThreat	P P P P P P -> B		5	59700	src/moho/ai/CAiSteeringImpl.cpp	353
+0x00598B90	moho::CUnitCommandQueue::Finished	P -> B		5	5051122	src/moho/unit/CUnitCommandQueue.cpp	292
+0x00598E80	moho::IAiCommandDispatchImpl::Execute	P -> I		1	5120768	src/moho/ai/IAiCommandDispatchImpl.cpp	971
+0x00599030	moho::IAiCommandDispatchImpl::OnEvent	P I -> V	1	0	45927	src/moho/ai/IAiCommandDispatchImpl.cpp	870
+0x0059A570	moho::CAiFormationInstance::PosIsFree	P P I I -> B	2 3	5	36054	src/moho/ai/CAiFormationInstance.cpp	4115
+0x0059A620	moho::CAiFormationInstance::CalcFormationSpeed	P P P P -> F		2	72316	src/moho/ai/CAiFormationInstance.cpp	3689
+0x0059A790	moho::CAiFormationInstance::GetDistFromLeader	P P P -> F		2	72316	src/moho/ai/CAiFormationInstance.cpp	3629
+0x0059A7D0	moho::CAiFormationInstance::GetPriority	P P P -> I		1	75644	src/moho/ai/CAiFormationInstance.cpp	3647
+0x0059A970	`anonymous namespace'::GetOffsetInfoLeader	I P P -> P	0	0	154723	src/moho/ai/CAiFormationInstance.cpp	1480
+0x0059C0F0	moho::CAiFormationDBImpl::GetScriptIndex	P P P -> I		1	1153	src/moho/ai/CAiFormationDBImpl.cpp	703
+0x0059F480	moho::CAiBuilderImpl::BuilderIsBusy	P -> B		5	131984	src/moho/ai/CAiBuilderImpl.cpp	483
+0x0059F4D0	moho::CAiBuilderImpl::BuilderAddFactoryCommand	P P I -> V	2	0	163	src/moho/ai/CAiBuilderImpl.cpp	513
+0x0059F540	moho::CAiBuilderImpl::BuilderGetFactoryCommand	P I -> P	1	0	1354	src/moho/ai/CAiBuilderImpl.cpp	543
+0x005A3E00	moho::CAiNavigatorLand::NavigatorMakeIdle	P -> B		5	26640	src/moho/ai/CAiNavigatorLand.cpp	532
+0x005A3EC0	moho::CAiNavigatorLand::FollowingLeader	P -> B		5	65691	src/moho/ai/CAiNavigatorLand.cpp	434
+0x005A4280	moho::CAiNavigatorLand::Execute	P -> I		1	3248482	src/moho/ai/CAiNavigatorLand.cpp	561
+0x005A4E50	moho::CAiNavigatorAir::HasGoodPath	P -> B		5	3838	src/moho/ai/CAiNavigatorAir.cpp	342
+0x005A4E60	moho::CAiNavigatorAir::FollowingLeader	P -> B		5	4979	src/moho/ai/CAiNavigatorAir.cpp	350
+0x005A50D0	moho::CAiNavigatorAir::Execute	P -> I		1	572673	src/moho/ai/CAiNavigatorAir.cpp	417
+0x005A5BF0	moho::cfunc_CAiNavigatorImplAbortMove	P -> I		1	1355	src/moho/ai/CAiNavigatorImpl.cpp	411
+0x005A5F90	moho::cfunc_CAiNavigatorImplGetCurrentTargetPos	P -> I		1	19	src/moho/ai/CAiNavigatorImpl.cpp	576
+0x005AA590	moho::CAiPathFinder::GetHeuristicCost	P P -> F		2	4207251	src/moho/ai/CAiPathFinder.cpp	997
+0x005AA680	moho::CAiPathFinder::IsInBounds	P P P P -> B		5	39583007	src/moho/ai/CAiPathFinder.cpp	946
+0x005AA710	moho::CAiPathFinder::CanTraverseCell	P P -> B		5	17543661	src/moho/ai/CAiPathFinder.cpp	902
+0x005AA860	moho::CAiPathFinder::ShouldSearchRect	P P -> B		5	24253692	src/moho/ai/CAiPathFinder.cpp	1054
+0x005AA960	moho::CAiPathFinder::IsGoalCandidateCell	P P -> B		5	3257419	src/moho/ai/CAiPathFinder.cpp	1026
+0x005AD370	moho::CellDistance	S1 S1 -> F		2	895252	src/moho/ai/NavigatorCellMath.h	40
+0x005AD800	moho::CAiPathNavigator::IsCellInGoal	P P -> B		5	41910	src/moho/ai/CAiPathNavigator.cpp	1863
+0x005AD830	`anonymous namespace'::ConsumePathPrefix	P I -> I	1	1	74098	src/moho/ai/CAiPathNavigator.cpp	435
+0x005AEC70	moho::CAiPathNavigator::RequestContinuationPath	P I -> V	1	0	10267	src/moho/ai/CAiPathNavigator.cpp	1335
+0x005AF360	`anonymous namespace'::ComputeDirectPrefixSpan	P -> I		1	50502	src/moho/ai/CAiPathNavigator.cpp	853
+0x005AF4E0	`anonymous namespace'::CanOccupyTargetCell	P S1 S1 -> B		5	330532	src/moho/ai/CAiPathNavigator.cpp	627
+0x005AF5B0	`anonymous namespace'::CanReachCellFromCurrent	P S1 -> B		5	231009	src/moho/ai/CAiPathNavigator.cpp	694
+0x005AF670	`anonymous namespace'::CanPathCellTransition	P S1 S1 -> B		5	288247	src/moho/ai/CAiPathNavigator.cpp	670
+0x005AF6D0	moho::CAiPathNavigator::SetTargetPoint	P I -> V	1	0	48321	src/moho/ai/CAiPathNavigator.cpp	1428
+0x005AF7E0	moho::CAiPathNavigator::TryAdvanceTargetPoint	P -> B		5	57249	src/moho/ai/CAiPathNavigator.cpp	1461
+0x005B0210	`anonymous namespace'::InitializePathStorageExact	P I -> B	1	5	1389	src/moho/ai/IAiNavigator.cpp	478
+0x005B0880	`anonymous namespace'::HeadingDeltaMismatch	P P -> B		5	41787	src/moho/ai/CAiPathNavigator.cpp	281
+0x005B1C90	moho::VecSetLength	P F -> B	1	5	806838	src/moho/math/Vector3f.cpp	157
+0x005B26C0	moho::CAiPathSpline::Update	P P I -> I	2	1	20532	src/moho/ai/CAiPathSpline.cpp	1008
+0x005B2FF0	moho::CAiPathSpline::Generate	P P P I B -> V	3	0	89406	src/moho/ai/CAiPathSpline.cpp	1275
+0x005BA970	moho::cfunc_CAiPersonalityAdjustDelay	P -> I		1	385	src/moho/ai/CAiPersonality.cpp	377
+0x005BD470	moho::EntityAttributes::SetIntelRadius	P I I -> V	1 2	0	2121	src/moho/entity/Entity.cpp	1430
+0x005BDB60	moho::Entity::IsBeingBuilt	P -> B		5	26613	src/moho/entity/Entity.cpp	2538
+0x005BE080	`anonymous namespace'::RectToGridCellBounds	P P I -> S4	2	0	2431124	src/moho/sim/CIntelGrid.cpp	105
+0x005BE210	moho::CIntelGrid::IsVisible	P P B -> B		5	2406312	src/moho/sim/CIntelGrid.cpp	348
+0x005BF5F0	moho::ReconBlip::GetTargetPoint	P P I -> S3	2	0	26095	src/moho/sim/ReconBlip.cpp	915
+0x005C07E0	moho::CAiReconDBImpl::CheckEvent	P P I I -> V	2 3	0	18518	src/moho/ai/CAiReconDBImpl.cpp	891
+0x005C0890	moho::CAiReconDBImpl::CheckIntelEvents	P P I I -> V	2 3	0	597160	src/moho/ai/CAiReconDBImpl.cpp	921
+0x005C0910	moho::CAiReconDBImpl::ReconGetFogOfWar	P -> B		5	706019	src/moho/ai/CAiReconDBImpl.cpp	2016
+0x005C18A0	moho::CAiReconDBImpl::ReconCanDetect	P P F I -> I		1	1196953	src/moho/ai/CAiReconDBImpl.cpp	1737
+0x005C18F0	moho::CAiReconDBImpl::ReconCanDetect	P P P I -> I	3	1	5966642	src/moho/ai/CAiReconDBImpl.cpp	1786
+0x005C1CF0	moho::CAiReconDBImpl::UpdateBlip	P P P I -> V	3	0	596723	src/moho/ai/CAiReconDBImpl.cpp	1241
+0x005C9600	moho::CAiReconDBImpl::GetReconFlags	P P P I B -> I	3	1	5965829	src/moho/ai/CAiReconDBImpl.cpp	1572
+0x005C9720	moho::CAiReconDBImpl::GetReconFlagsForRect	P P I B -> I		1	1196953	src/moho/ai/CAiReconDBImpl.cpp	1624
+0x005CB360	moho::CAiReconDBImpl::GetNewReconFor	P P I B -> I		1	11931658	src/moho/ai/CAiReconDBImpl.cpp	1472
+0x005CB460	moho::CAiReconDBImpl::ApplyReconCounters	P P I -> I		1	210630	src/moho/ai/CAiReconDBImpl.cpp	1519
+0x005CB520	moho::CAiReconDBImpl::GetDetection	P P I B -> I		1	2393906	src/moho/ai/CAiReconDBImpl.cpp	1673
+0x005CB600	moho::CAiReconDBImpl::DoCounterDetection	P P I -> I	2	1	12406	src/moho/ai/CAiReconDBImpl.cpp	1716
+0x005CEF50	moho::CAiSiloBuildImpl::SiloGetBuildCount	P I -> I	1	1	157	src/moho/ai/CAiSiloBuildImpl.cpp	494
+0x005CEF80	moho::CAiSiloBuildImpl::SiloGetStorageCount	P I -> I	1	1	269	src/moho/ai/CAiSiloBuildImpl.cpp	508
+0x005CEF90	moho::CAiSiloBuildImpl::SiloGetMaxStorageCount	P I -> I	1	1	156	src/moho/ai/CAiSiloBuildImpl.cpp	516
+0x005CEFC0	moho::CAiSiloBuildImpl::SiloAddBuild	P I -> B	1	5	39413	src/moho/ai/CAiSiloBuildImpl.cpp	535
+0x005D1E70	moho::VecLimitLengthTo	P F -> B	1	5	3384600	src/moho/math/Vector3f.cpp	58
+0x005D2440	moho::CAiSteeringImpl::GetVal	P -> I		1	85100	src/moho/ai/CAiSteeringImpl.cpp	1290
+0x005D2480	moho::CAiSteeringImpl::TrySnapPosToWaypoint	P P I P F -> S3	2 4	0	41841	src/moho/ai/CAiSteeringImpl.cpp	1303
+0x005D2790	moho::CAiSteeringImpl::CAiSteeringImpl	P P P I -> V	3	0	751	src/moho/ai/CAiSteeringImpl.cpp	968
+0x005D3000	moho::CAiSteeringImpl::DriveToNextWaypoint	P -> B		5	3248482	src/moho/ai/CAiSteeringImpl.cpp	1552
+0x005D3140	moho::CAiSteeringImpl::FlyToNextWaypoint	P -> B		5	572673	src/moho/ai/CAiSteeringImpl.cpp	1598
+0x005D32B0	moho::CAiSteeringImpl::Execute	P -> I		1	3821155	src/moho/ai/CAiSteeringImpl.cpp	1628
+0x005D3680	moho::CAiSteeringImpl::UpdatePath	P I P B -> V	1	0	106561	src/moho/ai/CAiSteeringImpl.cpp	1364
+0x005D3B40	moho::CAiSteeringImpl::SetCol	P I P -> V	1	0	85196	src/moho/ai/CAiSteeringImpl.cpp	1247
+0x005D3C30	moho::AI_CreateSteering	P P I -> P	2	0	751	src/moho/ai/CAiSteeringImpl.cpp	1662
+0x005D5D90	moho::CAiAttackerImpl::GetWeaponCount	P -> I		1	8850	src/moho/ai/CAiAttackerImpl.cpp	591
+0x005D5FB0	moho::LAiAttackerImpl::Execute	P -> I		1	2810216	src/moho/ai/LAiAttackerImpl.cpp	32
+0x005D6310	`anonymous namespace'::CalculateFiringPitch	P P P P F P -> B	4	5	38319	src/moho/ai/CAimManipulator.cpp	516
+0x005D6440	`anonymous namespace'::CalculateFiringDirection	P P P F -> P	3	0	38314	src/moho/ai/CAimManipulator.cpp	567
+0x005D6490	moho::AI_TestForTerrainBlockage	P P I -> B	2	5	108003	src/moho/ai/CAiAttackerImpl.cpp	747
+0x005D6E80	moho::CAiAttackerImpl::GetMaxWeaponRange	P -> F		2	560916	src/moho/ai/CAiAttackerImpl.cpp	1068
+0x005D6F40	moho::CAiAttackerImpl::PickTarget	P P -> B		5	347911	src/moho/ai/CAiAttackerImpl.cpp	713
+0x005D6FA0	moho::CAiAttackerImpl::CanAttackTarget	P P -> B		5	7923	src/moho/ai/CAiAttackerImpl.cpp	690
+0x005D7090	moho::CAiAttackerImpl::TargetIsWithinWeaponAttackRange	P P P -> B		5	7201	src/moho/ai/CAiAttackerImpl.cpp	1171
+0x005D70E0	moho::CAiAttackerImpl::VectorIsWithinAttackRange	P P -> B		5	2159	src/moho/ai/CAiAttackerImpl.cpp	1135
+0x005D7210	moho::CAiAttackerImpl::IsTooClose	P P -> B		5	6693	src/moho/ai/CAiAttackerImpl.cpp	1227
+0x005D7340	moho::CAiAttackerImpl::IsTargetExempt	P P -> B		5	267965	src/moho/ai/CAiAttackerImpl.cpp	1302
+0x005D77D0	moho::CAiAttackerImpl::GetWeapon	P I -> P	1	0	13647	src/moho/ai/CAiAttackerImpl.cpp	603
+0x005D7A10	moho::CAiAttackerImpl::FindBestEnemy	P P P F B -> P	3	0	792583	src/moho/ai/CAiAttackerImpl.cpp	812
+0x005D8AD0	`anonymous namespace'::CheckTargetGuardExempt	P P -> B		5	25894	src/moho/unit/tasks/CAcquireTargetTask.cpp	233
+0x005D8C40	moho::CAcquireTargetTask::CheckAutoInitiate	P -> B		5	20342	src/moho/unit/tasks/CAcquireTargetTask.cpp	860
+0x005D8D10	moho::CAcquireTargetTask::Execute	P -> I		1	864474	src/moho/unit/tasks/CAcquireTargetTask.cpp	362
+0x005E2A10	moho::CAiTarget::HasTarget	P -> B		5	10002023	src/moho/ai/CAiTarget.cpp	304
+0x005E2D40	moho::CAiTarget::HasSameTargetEntity	P P -> B		5	508	src/moho/ai/CAiTarget.cpp	341
+0x005E2DB0	moho::CAiTarget::NoTarget	P -> B		5	806349	src/moho/ai/CAiTarget.cpp	375
+0x005E44F0	moho::STransportPickUpInfo::HasUnit	P P -> B		5	403	src/moho/ai/CAiTransportImpl.cpp	74
+0x005E4F00	moho::CAiTransportImpl::IsBoneReserved	P S4 -> B		5	4394	src/moho/ai/CAiTransportImpl.cpp	1293
+0x005E50A0	moho::CAiTransportImpl::GetBestAttachPoint	P P -> I		1	240	src/moho/ai/CAiTransportImpl.cpp	1079
+0x005E65A0	moho::CAiTransportImpl::TransportGetPickupUnitCount	P -> I		1	3926	src/moho/ai/CAiTransportImpl.cpp	791
+0x005E6690	moho::CAiTransportImpl::TransportIsUnitAssignedForPickup	P P -> B		5	163	src/moho/ai/CAiTransportImpl.cpp	821
+0x005E6870	moho::CAiTransportImpl::TransportCanCarryUnit	P P -> B		5	160	src/moho/ai/CAiTransportImpl.cpp	856
+0x005E6AC0	moho::CAiTransportImpl::TransportValidateType	P P -> B		5	1163	src/moho/ai/CAiTransportImpl.cpp	1114
+0x005E6B30	moho::CAiTransportImpl::TransportFindAttachList	P I P P P -> V	1	0	1163	src/moho/ai/CAiTransportImpl.cpp	1178
+0x005E6C70	moho::CAiTransportImpl::TransportHasSpaceFor	P P -> B		5	923	src/moho/ai/CAiTransportImpl.cpp	1338
+0x005E6E30	moho::CAiTransportImpl::TransportAssignSlot	P P I -> B	2	5	240	src/moho/ai/CAiTransportImpl.cpp	1366
+0x005E7100	moho::CAiTransportImpl::TransportAttachUnit	P P -> B		5	159	src/moho/ai/CAiTransportImpl.cpp	1444
+0x005E7170	moho::CAiTransportImpl::TransportDetachUnit	P P -> B		5	159	src/moho/ai/CAiTransportImpl.cpp	1473
+0x005E77C0	moho::CAiTransportImpl::TransportIsReadyForUnit	P P -> B		5	287	src/moho/ai/CAiTransportImpl.cpp	1628
+0x005E7930	moho::CAiTransportImpl::TransportGetAttachBone	P P -> I		1	128	src/moho/ai/CAiTransportImpl.cpp	1636
+0x005E8050	moho::CAiTransportImpl::TransportIsStoredUnit	P P -> B		5	145	src/moho/ai/CAiTransportImpl.cpp	1809
+0x005F24E0	moho::CUnitCommand::IsCoordinating	P -> B		5	16258	src/moho/unit/CUnitCommand.cpp	1254
+0x005F2F00	moho::CUnitAttackTargetTask::IsWithinHorizontalDistance	P F -> B		5	6813	src/moho/unit/tasks/CUnitAttackTargetTask.cpp	588
+0x005F2FB0	moho::CUnitAttackTargetTask::HasFormationLeadDesiredTarget	P -> B		5	1128	src/moho/unit/tasks/CUnitAttackTargetTask.cpp	614
+0x005F3450	moho::CUnitAttackTargetTask::UpdateAttacker	P P -> B		5	508	src/moho/unit/tasks/CUnitAttackTargetTask.cpp	990
+0x005F34C0	moho::CUnitAttackTargetTask::TaskTick	P -> I		1	12583	src/moho/unit/tasks/CUnitAttackTargetTask.cpp	1120
+0x005F5630	moho::CBuildTaskHelper::IsGood	P -> B		5	439336	src/moho/unit/tasks/CBuildTaskHelper.cpp	451
+0x005F5670	moho::CheckBuildRestriction	P P P -> B		5	8934	src/moho/unit/tasks/CBuildTaskHelper.cpp	103
+0x005F5BF0	moho::CBuildTaskHelper::UpdateWorkProgress	P -> B		5	1074487	src/moho/unit/tasks/CBuildTaskHelper.cpp	245
+0x005F7440	moho::CUnitMobileBuildTask::Execute	P -> I		1	290407	src/moho/unit/tasks/CUnitMobileBuildTask.cpp	457
+0x005F8890	moho::CUnitUpgradeTask::TaskTick	P -> I		1	108038	src/moho/unit/tasks/CUnitUpgradeTask.cpp	223
+0x005F9230	moho::CUnitRepairTask::CanRepair	P -> B		5	189	src/moho/unit/tasks/CUnitRepairTask.cpp	344
+0x005FA790	moho::CFactoryBuildTask::Execute	P -> I		1	162587	src/moho/unit/tasks/CFactoryBuildTask.cpp	381
+0x005FFC70	moho::CUnitCallTransport::Execute	P -> I		1	2156	src/moho/unit/tasks/CUnitCallTransport.cpp	182
+0x00603F10	moho::Unit::DecrementCapturers	P -> I		1	1	src/moho/unit/core/Unit.cpp	13974
+0x006043E0	moho::CUnitCaptureTask::TaskTick	P -> I		1	931	src/moho/unit/tasks/CUnitCaptureTask.cpp	289
+0x0060A490	moho::IAiCommandDispatchImpl::Stop	P -> I		1	313	src/moho/ai/IAiCommandDispatchImpl.cpp	898
+0x0060A4D0	moho::CUnitGetBuiltTask::Execute	P -> I		1	396557	src/moho/unit/tasks/CUnitGetBuiltTask.cpp	30
+0x00612560	moho::CUnitGuardTask::IsOwnerCellInsideGoalBounds	P P -> B		5	1007	src/moho/unit/tasks/CUnitGuardTask.cpp	984
+0x00612600	moho::CUnitGuardTask::ShouldAbortGuardForBuilderContext	P -> B		5	62315	src/moho/unit/tasks/CUnitGuardTask.cpp	1126
+0x006141A0	moho::CUnitGuardTask::Execute	P -> I		1	68291	src/moho/unit/tasks/CUnitGuardTask.cpp	1697
+0x006189C0	moho::CommandIsInstant	I -> B	0	5	10	src/moho/unit/tasks/CUnitMoveTask.cpp	204
+0x00618A00	moho::CUnitMoveTask::ShouldUseCurrentCommandTargetPosition	P -> B		5	8446	src/moho/unit/tasks/CUnitMoveTask.cpp	478
+0x00618A70	moho::CUnitMoveTask::Execute	P -> I		1	4494	src/moho/unit/tasks/CUnitMoveTask.cpp	747
+0x0061B610	moho::`anonymous namespace'::PatrolGoalCoversUnitOrigin	P -> B		5	48643	src/moho/unit/tasks/CUnitPatrolTask.cpp	432
+0x0061C130	moho::CUnitPatrolTask::Execute	P -> I		1	56874	src/moho/unit/tasks/CUnitPatrolTask.cpp	829
+0x0061F000	moho::CUnitReclaimTask::TaskTick	P -> I		1	26780	src/moho/unit/tasks/CUnitReclaimTask.cpp	451
+0x00621490	moho::CUnitRefuel::Execute	P -> I		1	267	src/moho/unit/tasks/CUnitRefuel.cpp	365
+0x00625950	moho::CUnitLoadUnits::Execute	P -> I		1	4051	src/moho/unit/tasks/CUnitLoadUnits.cpp	515
+0x00626390	moho::CUnitUnloadUnits::Execute	P -> I		1	94	src/moho/unit/tasks/CUnitUnloadUnits.cpp	243
+0x0062A900	moho::CAiTarget::ImpactDidHitEntity	P P I -> B	2	5	8582	src/moho/ai/CAiTarget.cpp	501
+0x0062AA90	moho::UnitWontFitAt	P P -> B		5	4179271	src/moho/unit/core/Unit.cpp	358
+0x0062ABA0	moho::UnitIsBlockedAt	P P I -> B	2	5	2173	src/moho/unit/core/Unit.cpp	278
+0x0062AD30	moho::Entity::GetStartingLayer	P P I -> I	2	1	36081	src/moho/entity/Entity.cpp	2313
+0x0062AF70	moho::Unit::DistanceToOccupiedRect	P P -> F		2	28788	src/moho/unit/core/Unit.cpp	17033
+0x0062B160	moho::`anonymous namespace'::SampleSnapElevation	P P P B -> F		2	3409856	src/moho/unit/CUnitMotion.cpp	498
+0x0062B200	moho::TryBuildStructureAt	P P P I B B B -> B	3	5	15724	src/moho/unit/tasks/CUnitCallTeleport.cpp	93
+0x0062B780	moho::Unit::PrepareMove	P I P P B -> B		5	4674	src/moho/unit/core/Unit.cpp	15555
+0x0062CA60	moho::STIMap::IsWithin	P P F B -> B	2	5	13771255	src/moho/sim/STIMap.cpp	2581
+0x0062CB60	moho::Entity::IsInBounds	P B F -> B		5	784	src/moho/entity/Entity.cpp	2496
+0x0062CC40	moho::Unit::IsAtPosition	P P -> B		5	1523402	src/moho/unit/core/Unit.cpp	13546
+0x0062CD40	moho::Unit::PredictAheadBomb	P P F -> P	2	0	6417	src/moho/unit/core/Unit.cpp	14358
+0x0062D2B0	moho::Unit::OverlapsWith	P P -> B		5	7573	src/moho/unit/core/Unit.cpp	15248
+0x0062D620	moho::STIMap::LookAheadForMaxTerrain	P P B F -> F		2	538198	src/moho/sim/STIMap.cpp	3101
+0x0062EE40	`anonymous namespace'::ResolveFormationBucketTypeFromUnitSet	P -> I		1	1749	src/moho/ai/CAiFormationDBImpl.cpp	181
+0x0062FB50	moho::NormalizeAngleSignedRadians	F -> F		2	9274566	src/moho/math/QuaternionMath.cpp	123
+0x00630220	moho::CAimManipulator::CAimManipulator	P P P P I I I -> V	4 5 6	0	550	src/moho/ai/CAimManipulator.cpp	648
+0x00630760	moho::CAimManipulator::Track	P P B -> B		5	2593286	src/moho/ai/CAimManipulator.cpp	1465
+0x006309F0	moho::CAimManipulator::CheckTracking	P P P F F F F B -> B		5	5186572	src/moho/ai/CAimManipulator.cpp	1299
+0x006312B0	`anonymous namespace'::PredictInterceptPointConstantSpeed	P P P F P -> P	3	0	25134	src/moho/ai/CAimManipulator.cpp	383
+0x00631F20	moho::cfunc_CreateAimController	P -> I		1	550	src/moho/sim/ManipulatorLuaFunctionThunks.cpp	1033
+0x00632140	moho::cfunc_CAimManipulatorSetFiringArc	P -> I		1	550	src/moho/ai/CAimManipulator.cpp	1176
+0x00632340	moho::cfunc_CAimManipulatorSetResetPoseTime	P -> I		1	134	src/moho/ai/CAimManipulator.cpp	1558
+0x006325F0	moho::cfunc_CAimManipulatorSetEnabled	P -> I		1	1081	src/moho/ai/CAimManipulator.cpp	1678
+0x00632730	moho::cfunc_CAimManipulatorGetHeadingPitch	P -> I		1	100	src/moho/ai/CAimManipulator.cpp	1732
+0x00632890	moho::cfunc_CAimManipulatorSetHeadingPitch	P -> I		1	103	src/moho/ai/CAimManipulator.cpp	1787
+0x00635CA0	moho::CBuilderArmManipulator::CBuilderArmManipulator	P P P I I I -> V	3 4 5	0	144	src/moho/ai/CBuilderArmManipulator.cpp	223
+0x00635FE0	moho::CBuilderArmManipulator::TrackAimDirection	P P B B -> B		5	876145	src/moho/ai/CBuilderArmManipulator.cpp	511
+0x00636220	moho::CBuilderArmManipulator::UpdateTrackingAxis	P P P F F F B -> B		5	1752290	src/moho/ai/CBuilderArmManipulator.cpp	409
+0x00636490	moho::CBuilderArmManipulator::SetAimingArc	P F F F F F F -> V	1 2 3 4 5 6	0	144	src/moho/ai/CBuilderArmManipulator.cpp	328
+0x00636800	moho::cfunc_CreateBuilderArmController	P -> I		1	144	src/moho/sim/ManipulatorLuaFunctionThunks.cpp	1113
+0x00636BD0	moho::cfunc_CBuilderArmManipulatorGetHeadingPitch	P -> I		1	83	src/moho/sim/ManipulatorLuaFunctionThunks.cpp	582
+0x00636D30	moho::cfunc_CBuilderArmManipulatorSetHeadingPitch	P -> I		1	80	src/moho/sim/ManipulatorLuaFunctionThunks.cpp	617
+0x00637FA0	moho::cfunc_CreateCollisionDetector	P -> I		1	4	src/moho/collision/CCollisionManipulator.cpp	508
+0x00638250	moho::cfunc_CCollisionManipulatorEnable	P -> I		1	112	src/moho/collision/CCollisionManipulator.cpp	621
+0x00638380	moho::cfunc_CCollisionManipulatorDisable	P -> I		1	34	src/moho/collision/CCollisionManipulator.cpp	664
+0x006384C0	moho::cfunc_CCollisionManipulatorWatchBone	P -> I		1	8	src/moho/collision/CCollisionManipulator.cpp	707
+0x00677F40	moho::Entity::Entity	P P P I -> V	3	0	2170	src/moho/entity/Entity.cpp	2188
+0x00678370	moho::Entity::StandardInit	P P I -> V	2	0	43375	src/moho/entity/Entity.cpp	2243
+0x00678930	moho::Entity::SetVizToFocusPlayer	P I -> V	1	0	177	src/moho/entity/Entity.cpp	4272
+0x00678980	moho::Entity::SetVizToEnemies	P I -> V	1	0	1044	src/moho/entity/Entity.cpp	4288
+0x006789D0	moho::Entity::SetVizToAllies	P I -> V	1	0	179	src/moho/entity/Entity.cpp	4304
+0x00678A20	moho::Entity::SetVizToNeutrals	P I -> V	1	0	1120	src/moho/entity/Entity.cpp	4320
+0x00678B90	moho::Entity::GetArmyIndex	P -> I		1	262775	src/moho/entity/Entity.cpp	2507
+0x00678BB0	moho::Entity::GetBoneCount	P -> I		1	211216	src/moho/entity/Entity.cpp	2438
+0x00678C30	moho::Entity::GetBoneName	P I -> P	1	0	24655	src/moho/entity/Entity.cpp	2461
+0x00678CC0	moho::Entity::ResolveBoneIndex	P P -> I		1	356007	src/moho/entity/Entity.cpp	2519
+0x00679550	moho::Entity::AttachTo	P P -> B		5	1352	src/moho/entity/Entity.cpp	3279
+0x006796F0	moho::Entity::DetachFrom	P P B -> B		5	1226	src/moho/entity/Entity.cpp	3339
+0x00679C40	moho::Entity::TaskTick	P -> I		1	13819464	src/moho/entity/Entity.cpp	2765
+0x00679CE0	moho::Entity::GetBoneWorldTransform	P P I -> S7	2	0	41616	src/moho/entity/Entity.cpp	2808
+0x00679F70	moho::Entity::MotionTick	P -> I		1	4256881	src/moho/entity/Entity.cpp	3129
+0x0067A9D0	moho::Entity::Intersects	P P P -> B		5	10622	src/moho/entity/Entity.cpp	3693
+0x0067AFF0	moho::Entity::SetCurrentLayer	P I -> V	1	0	5019796	src/moho/entity/Entity.cpp	3958
+0x0067B050	moho::Entity::IsInCategory	P P -> B		5	24759079	src/moho/entity/Entity.cpp	3979
+0x0067B240	moho::ENT_GetImpactType	P P P -> I		1	7009	src/moho/sim/EImpactTypeTypeInfo.cpp	80
+0x0067B320	moho::ENT_GetImpactTypeString	I -> P	0	0	15285	src/moho/sim/EImpactTypeTypeInfo.cpp	135
+0x00684030	`anonymous namespace'::UpdateEntityCountStats	I I -> V	0 1	0	76443	src/moho/entity/EntityDb.cpp	240
+0x0068A670	moho::cfunc_EntityCreateProjectileAtBone	P -> I		1	169	src/moho/entity/Entity.cpp	4475
+0x0068AAF0	moho::cfunc_EntityShakeCamera	P -> I		1	448	src/moho/entity/Entity.cpp	4587
+0x0068AD60	moho::cfunc_EntityGetAIBrain	P -> I		1	89627	src/moho/entity/Entity.cpp	4852
+0x0068AF30	moho::cfunc_EntityGetBlueprint	P -> I		1	98698	src/moho/entity/Entity.cpp	4923
+0x0068AFB0	moho::cfunc_EntityGetBlueprintL	P -> I		1	98698	src/moho/entity/Entity.cpp	4934
+0x0068B210	moho::cfunc_EntityGetArmy	P -> I		1	20796	src/moho/entity/Entity.cpp	4978
+0x0068B570	moho::cfunc_EntityIsValidBone	P -> I		1	3118	src/moho/entity/Entity.cpp	5103
+0x0068B7F0	moho::cfunc_EntityGetBoneCount	P -> I		1	2528	src/moho/entity/Entity.cpp	5182
+0x0068B940	moho::cfunc_EntityGetBoneName	P -> I		1	24655	src/moho/entity/Entity.cpp	5232
+0x0068BAE0	moho::cfunc_EntityRequestRefreshUI	P -> I		1	2514	src/moho/entity/Entity.cpp	5295
+0x0068BC10	moho::cfunc_EntityGetEntityId	P -> I		1	23527	src/moho/entity/Entity.cpp	6219
+0x0068BD90	moho::cfunc_EntityAttachTo	P -> I		1	355	src/moho/sim/Sim.cpp	14110
+0x0068C010	moho::cfunc_EntityAttachBoneTo	P -> I		1	838	src/moho/entity/Entity.cpp	5345
+0x0068C2B0	moho::cfunc_EntitySetParentOffset	P -> I		1	14	src/moho/entity/Entity.cpp	5375
+0x0068C4A0	moho::cfunc_EntityDetachFrom	P -> I		1	711	src/moho/entity/Entity.cpp	5434
+0x0068C650	moho::cfunc_EntityDetachAll	P -> I		1	798	src/moho/entity/Entity.cpp	6270
+0x0068C8B0	moho::cfunc_EntityGetParent	P -> I		1	6	src/moho/entity/Entity.cpp	5500
+0x0068CC30	moho::cfunc_EntityPlaySound	P -> I		1	61479	src/moho/entity/Entity.cpp	5586
+0x0068CDC0	moho::cfunc_EntitySetAmbientSound	P -> I		1	51657	src/moho/entity/Entity.cpp	5645
+0x0068CF60	moho::cfunc_EntityGetFractionComplete	P -> I		1	479496	src/moho/entity/Entity.cpp	5710
+0x0068D0A0	moho::cfunc_EntityAdjustHealth	P -> I		1	23839	src/moho/entity/Entity.cpp	5760
+0x0068D2B0	moho::cfunc_EntityGetHealth	P -> I		1	41945	src/moho/entity/Entity.cpp	5825
+0x0068D3F0	moho::cfunc_EntityGetMaxHealth	P -> I		1	52308	src/moho/entity/Entity.cpp	5875
+0x0068D530	moho::cfunc_EntitySetHealth	P -> I		1	21796	src/moho/entity/Entity.cpp	5925
+0x0068D710	moho::cfunc_EntitySetMaxHealth	P -> I		1	21783	src/moho/entity/Entity.cpp	5988
+0x0068D880	moho::cfunc_EntitySetVizToFocusPlayer	P -> I		1	177	src/moho/entity/Entity.cpp	6044
+0x0068DA00	moho::cfunc_EntitySetVizToEnemies	P -> I		1	1044	src/moho/entity/Entity.cpp	6089
+0x0068DB80	moho::cfunc_EntitySetVizToAllies	P -> I		1	179	src/moho/entity/Entity.cpp	6132
+0x0068DD00	moho::cfunc_EntitySetVizToNeutrals	P -> I		1	1120	src/moho/entity/Entity.cpp	6176
+0x0068E050	moho::cfunc_EntityEnableIntel	P -> I		1	2970	src/moho/sim/Sim.cpp	14605
+0x0068E2F0	moho::cfunc_EntityDisableIntel	P -> I		1	2047	src/moho/sim/Sim.cpp	14688
+0x0068E590	moho::cfunc_EntitySetIntelRadius	P -> I		1	2114	src/moho/sim/Sim.cpp	14771
+0x0068E9A0	moho::cfunc_EntityInitIntel	P -> I		1	7	src/moho/sim/Sim.cpp	14934
+0x0068F180	moho::cfunc_EntitySetCollisionShape	P -> I		1	1612	src/moho/entity/Entity.cpp	6363
+0x0068F500	moho::cfunc_EntityGetOrientation	P -> I		1	1646	src/moho/entity/Entity.cpp	6507
+0x0068F660	moho::cfunc_EntitySetOrientation	P -> I		1	2676	src/moho/sim/Sim.cpp	14188
+0x0068F860	moho::cfunc_EntityGetHeading	P -> I		1	54286	src/moho/entity/Entity.cpp	6561
+0x0068FC10	moho::cfunc_EntityGetPosition	P -> I		1	253600	src/moho/sim/Sim.cpp	14329
+0x0068FC90	moho::cfunc_EntityGetPositionL	P -> I		1	253600	src/moho/sim/Sim.cpp	14341
+0x0068FEE0	moho::cfunc_EntityGetPositionXYZ	P -> I		1	73153	src/moho/sim/Sim.cpp	14419
+0x00690790	moho::cfunc_EntitySetMesh	P -> I		1	3914	src/moho/entity/Entity.cpp	6814
+0x006909F0	moho::cfunc_EntitySetDrawScale	P -> I		1	14	src/moho/entity/Entity.cpp	7431
+0x00690D20	moho::cfunc_EntitySetScale	P -> I		1	42028	src/moho/entity/Entity.cpp	6891
+0x00691260	moho::cfunc_EntityAddThreadScroller	P -> I		1	10713	src/moho/entity/Entity.cpp	7040
+0x00691480	moho::cfunc_EntityAddPingPongScroller	P -> I		1	19	src/moho/entity/Entity.cpp	7096
+0x00691840	moho::cfunc_EntityRemoveScroller	P -> I		1	12806	src/moho/entity/Entity.cpp	7157
+0x00691A00	moho::cfunc_EntityDestroy	P -> I		1	33214	src/moho/entity/Entity.cpp	7207
+0x00691B40	moho::cfunc_EntityBeenDestroyed	P -> I		1	450561	src/moho/entity/Entity.cpp	7266
+0x00691C90	moho::cfunc_EntityKill	P -> I		1	466	src/moho/entity/Entity.cpp	7299
+0x006922B0	moho::cfunc__c_CreateEntity	P -> I		1	2170	src/moho/entity/Entity.cpp	4767
+0x00692330	moho::cfunc__c_CreateEntityL	P -> I		1	2170	src/moho/entity/Entity.cpp	4708
+0x00692580	moho::ENTSCR_ResolveBoneIndex	P P B -> I		1	495072	src/moho/entity/Entity.cpp	7747
+0x00695580	moho::cfunc_EntityFallDown	P -> I		1	9229	src/moho/entity/Entity.cpp	7475
+0x00695720	moho::cfunc_MotorFallDownWhack	P -> I		1	9229	src/moho/entity/MotorFallDown.cpp	484
+0x006969E0	moho::cfunc_EntitySinkAway	P -> I		1	8761	src/moho/entity/Entity.cpp	7535
+0x00697B00	moho::SPhysBody::IntegrateFreefallStep	P P F P -> V	2	0	2149	src/moho/sim/SPhysBody.cpp	481
+0x006992C0	moho::RotateDirectionTowardTargetLimited	P F F F F F -> P	1 2 3 4 5	0	1798228	src/moho/ai/CAiPathSpline.cpp	336
+0x00699760	ComputeSteeringSpeedCapFromParams	P F -> F		2	1239866	src/moho/ai/CAiPathSpline.cpp	278
+0x0069AA50	moho::QuatFromVecRot	P P F -> V	2	0	69883	src/moho/math/QuaternionMath.cpp	635
+0x0069BDD0	moho::Projectile::MotionTick	P -> I		1	1689832	src/moho/projectile/Projectile.cpp	803
+0x006A13B0	moho::cfunc_ProjectileGetLauncher	P -> I		1	9181	src/moho/projectile/ProjectileStartupRegistrations.cpp	661
+0x006A1680	moho::cfunc_ProjectileGetCurrentTargetPosition	P -> I		1	26	src/moho/projectile/ProjectileStartupRegistrations.cpp	794
+0x006A1B90	moho::cfunc_ProjectileSetLifetime	P -> I		1	54	src/moho/projectile/ProjectileStartupRegistrations.cpp	1179
+0x006A2090	moho::cfunc_ProjectileSetAcceleration	P -> I		1	8	src/moho/projectile/ProjectileStartupRegistrations.cpp	1388
+0x006A2210	moho::cfunc_ProjectileSetBallisticAcceleration	P -> I		1	77	src/moho/projectile/ProjectileStartupRegistrations.cpp	1481
+0x006A2A10	moho::cfunc_ProjectileSetVelocity	P -> I		1	104450	src/moho/projectile/ProjectileStartupRegistrations.cpp	1823
+0x006A3170	moho::cfunc_ProjectileSetCollision	P -> I		1	91	src/moho/projectile/ProjectileStartupRegistrations.cpp	2044
+0x006A36D0	moho::cfunc_ProjectileTrackTarget	P -> I		1	158	src/moho/projectile/ProjectileStartupRegistrations.cpp	2279
+0x006A3820	moho::cfunc_ProjectileSetStayUpright	P -> I		1	165	src/moho/projectile/ProjectileStartupRegistrations.cpp	2336
+0x006A41E0	moho::cfunc_ProjectileChangeDetonateAboveHeight	P -> I		1	3	src/moho/projectile/ProjectileStartupRegistrations.cpp	2747
+0x006A4A30	moho::Unit::IsAutoMode	P -> B		5	19707	src/moho/unit/core/Unit.cpp	16116
+0x006A4BD0	moho::Unit::GetUniformScale	P -> F		2	1321	src/moho/unit/core/Unit.cpp	14136
+0x006A75C0	moho::Unit::GetMaxFootprintSize	P -> I		1	282171	src/moho/unit/core/Unit.cpp	14044
+0x006A7D10	moho::Unit::IsBusy	P -> B		5	131984	src/moho/unit/core/Unit.cpp	14597
+0x006A8D40	moho::Unit::IsSameFormationLayerWith	P P -> B		5	683276	src/moho/unit/core/Unit.cpp	15428
+0x006A8D80	moho::Unit::IsHigherPriorityThan	P P -> B		5	2919572	src/moho/unit/core/Unit.cpp	15444
+0x006A97C0	moho::Unit::SetFireState	P I -> V	1	0	749	src/moho/unit/core/Unit.cpp	17172
+0x006A9D60	moho::Unit::ProcessArmorOnDamage	P F S7 -> F		2	7428	src/moho/unit/core/Unit.cpp	14466
+0x006A9E50	moho::Unit::CanBuild	P P -> B		5	92871	src/moho/unit/core/Unit.cpp	13917
+0x006A9F40	moho::Unit::Materialize	P F -> F		2	1082017	src/moho/unit/core/Unit.cpp	14505
+0x006AA5C0	moho::Unit::GetBoneWorldTransform	P P I -> S7	2	0	989551	src/moho/unit/core/Unit.cpp	13770
+0x006AAF50	moho::Unit::PickTargetPoint	P P -> B		5	11301	src/moho/unit/core/Unit.cpp	13632
+0x006AAFB0	moho::Unit::PickTargetPointAboveWater	P P -> B		5	2673	src/moho/unit/core/Unit.cpp	13655
+0x006AB340	moho::Unit::GetTargetPoint	P P I -> S3	2	0	163953	src/moho/unit/core/Unit.cpp	13733
+0x006AB410	moho::Unit::AttachTo	P P -> B		5	983	src/moho/unit/core/Unit.cpp	14304
+0x006AB480	moho::Unit::DetachFrom	P P B -> B		5	892	src/moho/unit/core/Unit.cpp	14327
+0x006AB810	moho::Unit::CanReserveOgridRect	P P -> B		5	61854	src/moho/unit/core/Unit.cpp	16031
+0x006AD060	moho::Unit::GetBlipsInRange	P I -> P	1	0	748308	src/moho/unit/core/Unit.cpp	14930
+0x006B85E0	moho::CUnitMotion::SetTarget	P P P I -> V	3	0	47744	src/moho/unit/CUnitMotion.cpp	1190
+0x006B8F30	moho::CUnitMotion::SetMotionHorzEvent	P I -> V	1	0	1188174	src/moho/unit/CUnitMotion.cpp	1516
+0x006B8F70	moho::CUnitMotion::SetMotionVertEvent	P I -> V	1	0	500683	src/moho/unit/CUnitMotion.cpp	1541
+0x006B8FF0	moho::CUnitMotion::SetMotionState	P I -> V	1	0	73	src/moho/unit/CUnitMotion.cpp	1593
+0x006B9730	moho::CUnitMotion::AtTarget	P -> B		5	203976	src/moho/unit/CUnitMotion.cpp	1697
+0x006B9840	moho::CUnitMotion::IsMoving	P -> B		5	22213	src/moho/unit/CUnitMotion.cpp	1749
+0x006B98C0	moho::CUnitMotion::IsOnValidLayer	P -> B		5	3057668	src/moho/unit/CUnitMotion.cpp	1787
+0x006B9D10	moho::CUnitMotion::MotionTick	P -> I		1	3842332	src/moho/unit/CUnitMotion.cpp	4332
+0x006BC400	moho::STIMap::GetElevation	P I I -> F	1 2	2	6495	src/moho/sim/STIMap.cpp	3400
+0x006BC820	moho::CUnitMotion::ShouldHoverInsteadOfLand	P -> B		5	610747	src/moho/unit/CUnitMotion.cpp	1867
+0x006BC8E0	moho::CUnitMotion::GetElevation	P -> F		2	232123	src/moho/unit/CUnitMotion.cpp	1814
+0x006BC950	moho::CUnitMotion::CalcWingedLift	P F F -> F	1 2	2	173060	src/moho/unit/CUnitMotion.cpp	1842
+0x006BCA10	moho::CUnitMotion::CalcAirMovementDampingFactor	P P -> F		2	262855	src/moho/unit/CUnitMotion.cpp	2930
+0x006BCB90	moho::CUnitMotion::CalcDesiredTargetElevation	P P P -> F		2	6495	src/moho/unit/CUnitMotion.cpp	2974
+0x006C1E20	moho::CUnitMotion::CalcMoveCommon	P P P -> B		5	3057668	src/moho/unit/CUnitMotion.cpp	2703
+0x006C3220	moho::CUnitMotion::HandleDivingAndSurfacing	P -> B		5	382024	src/moho/unit/CUnitMotion.cpp	2503
+0x006C3AB0	moho::cfunc_UnitGetUnitId	P -> I		1	1321	src/moho/unit/core/Unit.cpp	2384
+0x006C3D80	moho::cfunc_UnitGetCargo	P -> I		1	1071	src/moho/unit/core/Unit.cpp	2550
+0x006C3E00	moho::cfunc_UnitGetCargoL	P -> I		1	1071	src/moho/unit/core/Unit.cpp	2513
+0x006C44E0	moho::cfunc_UnitSetFocusEntity	P -> I		1	3711	src/moho/unit/core/Unit.cpp	2765
+0x006C4670	moho::cfunc_UnitGetFocusUnit	P -> I		1	8971	src/moho/unit/core/Unit.cpp	2826
+0x006C4800	moho::cfunc_UnitGetWeapon	P -> I		1	1375	src/moho/unit/core/Unit.cpp	2887
+0x006C49F0	moho::cfunc_UnitGetWeaponCount	P -> I		1	3775	src/moho/unit/core/Unit.cpp	2963
+0x006C4B40	moho::cfunc_UnitGetTargetEntity	P -> I		1	2	src/moho/unit/core/Unit.cpp	3018
+0x006C4CA0	moho::cfunc_UnitGetHealth	P -> I		1	81417	src/moho/unit/core/Unit.cpp	3080
+0x006C5900	moho::cfunc_UnitIsUnitState	P -> I		1	602712	src/moho/unit/core/Unit.cpp	5296
+0x006C5AA0	moho::cfunc_UnitIsIdleState	P -> I		1	15727	src/moho/unit/core/Unit.cpp	5349
+0x006C5D60	moho::cfunc_UnitIsBeingBuilt	P -> I		1	106295	src/moho/unit/core/Unit.cpp	5453
+0x006C5EB0	moho::cfunc_UnitIsPaused	P -> I		1	89199	src/moho/unit/core/Unit.cpp	5504
+0x006C6140	moho::cfunc_UnitSetConsumptionActive	P -> I		1	10432	src/moho/unit/core/Unit.cpp	5612
+0x006C6290	moho::cfunc_UnitSetProductionActive	P -> I		1	1351	src/moho/unit/core/Unit.cpp	7035
+0x006C63F0	moho::cfunc_UnitSetBusy	P -> I		1	21296	src/moho/unit/core/Unit.cpp	7095
+0x006C6570	moho::cfunc_UnitSetBlockCommandQueue	P -> I		1	2862	src/moho/unit/core/Unit.cpp	7156
+0x006C66F0	moho::cfunc_UnitSetImmobile	P -> I		1	5270	src/moho/unit/core/Unit.cpp	7216
+0x006C6860	moho::cfunc_UnitSetStunned	P -> I		1	2	src/moho/unit/core/Unit.cpp	7722
+0x006C69D0	moho::cfunc_UnitSetUnSelectable	P -> I		1	4	src/moho/unit/core/Unit.cpp	7277
+0x006C6CB0	moho::cfunc_UnitSetUnitState	P -> I		1	10044	src/moho/unit/core/Unit.cpp	7795
+0x006C7230	moho::cfunc_UnitGetNumBuildOrders	P -> I		1	47	src/moho/unit/core/Unit.cpp	7583
+0x006C7D10	moho::cfunc_UnitSetFireState	P -> I		1	1140	src/moho/unit/core/Unit.cpp	8118
+0x006C8290	moho::cfunc_UnitRemoveBuildRestriction	P -> I		1	10	src/moho/unit/core/Unit.cpp	8309
+0x006C8560	moho::cfunc_UnitAddCommandCap	P -> I		1	55	src/moho/unit/core/Unit.cpp	8451
+0x006C8700	moho::cfunc_UnitRemoveCommandCap	P -> I		1	22	src/moho/unit/core/Unit.cpp	8514
+0x006C89E0	moho::cfunc_UnitTestCommandCaps	P -> I		1	25	src/moho/unit/core/Unit.cpp	8815
+0x006C8B80	moho::cfunc_UnitAddToggleCap	P -> I		1	50	src/moho/unit/core/Unit.cpp	8629
+0x006C8D20	moho::cfunc_UnitRemoveToggleCap	P -> I		1	324	src/moho/unit/core/Unit.cpp	8691
+0x006C9000	moho::cfunc_UnitTestToggleCaps	P -> I		1	467	src/moho/unit/core/Unit.cpp	8880
+0x006C91A0	moho::cfunc_UnitSetRegenRate	P -> I		1	61	src/moho/unit/core/Unit.cpp	5778
+0x006C9460	moho::cfunc_UnitSetReclaimable	P -> I		1	453	src/moho/unit/core/Unit.cpp	8910
+0x006C95B0	moho::cfunc_UnitSetCapturable	P -> I		1	4	src/moho/unit/core/Unit.cpp	8962
+0x006C9700	moho::cfunc_UnitIsCapturable	P -> I		1	205	src/moho/unit/core/Unit.cpp	9014
+0x006C9980	moho::cfunc_UnitIsOverchargePaused	P -> I		1	10	src/moho/unit/core/Unit.cpp	9120
+0x006C9C50	moho::cfunc_UnitGetBuildRate	P -> I		1	12845	src/moho/unit/core/Unit.cpp	5954
+0x006C9DA0	moho::cfunc_UnitSetConsumptionPerSecondEnergy	P -> I		1	12063	src/moho/unit/core/Unit.cpp	5680
+0x006C9F40	moho::cfunc_UnitSetConsumptionPerSecondMass	P -> I		1	90368	src/moho/unit/core/Unit.cpp	5748
+0x006CA0E0	moho::cfunc_UnitSetProductionPerSecondEnergy	P -> I		1	1666	src/moho/unit/core/Unit.cpp	6006
+0x006CA270	moho::cfunc_UnitSetProductionPerSecondMass	P -> I		1	79971	src/moho/unit/core/Unit.cpp	6069
+0x006CA400	moho::cfunc_UnitGetConsumptionPerSecondEnergy	P -> I		1	25230	src/moho/unit/core/Unit.cpp	6132
+0x006CA550	moho::cfunc_UnitGetConsumptionPerSecondMass	P -> I		1	53128	src/moho/unit/core/Unit.cpp	6184
+0x006CAD20	moho::cfunc_UnitSetSpeedMult	P -> I		1	521	src/moho/unit/core/Unit.cpp	6499
+0x006CAE90	moho::cfunc_UnitSetAccMult	P -> I		1	1	src/moho/unit/core/Unit.cpp	6555
+0x006CB000	moho::cfunc_UnitSetTurnMult	P -> I		1	1	src/moho/unit/core/Unit.cpp	6611
+0x006CB450	moho::cfunc_UnitRevertCollisionShape	P -> I		1	608	src/moho/unit/core/Unit.cpp	9173
+0x006CB790	moho::cfunc_UnitGetCurrentLayer	P -> I		1	2	src/moho/unit/core/Unit.cpp	10099
+0x006CC180	moho::cfunc_UnitIsMoving	P -> I		1	8725	src/moho/unit/core/Unit.cpp	10373
+0x006CC2D0	moho::cfunc_UnitGetNavigator	P -> I		1	1357	src/moho/unit/core/Unit.cpp	10427
+0x006CC420	moho::cfunc_UnitGetVelocity	P -> I		1	721	src/moho/unit/core/Unit.cpp	10484
+0x006CC5A0	moho::cfunc_UnitGetStat	P -> I		1	3401	src/moho/unit/core/Unit.cpp	10541
+0x006CC8E0	moho::cfunc_UnitSetStat	P -> I		1	18240	src/moho/unit/core/Unit.cpp	6781
+0x006CCB40	moho::cfunc_UnitSetWorkProgress	P -> I		1	1256	src/moho/unit/core/Unit.cpp	6902
+0x006CCCB0	moho::cfunc_UnitGetWorkProgress	P -> I		1	830	src/moho/unit/core/Unit.cpp	6958
+0x006CCDF0	moho::cfunc_NotifyUpgrade	P -> I		1	68	src/moho/unit/core/Unit.cpp	11264
+0x006CD300	moho::cfunc_UnitGetGuardedUnit	P -> I		1	1133	src/moho/unit/core/Unit.cpp	4042
+0x006CD460	moho::cfunc_UnitGetGuards	P -> I		1	5613	src/moho/unit/core/Unit.cpp	4111
+0x006CD4E0	moho::cfunc_UnitGetGuardsL	P -> I		1	5613	src/moho/unit/core/Unit.cpp	4073
+0x006CDB00	moho::cfunc_UnitSetCustomName	P -> I		1	151	src/moho/unit/core/Unit.cpp	10642
+0x006CE200	moho::cfunc_UnitGetCommandQueue	P -> I		1	3618	src/moho/unit/core/Unit.cpp	4607
+0x006CE280	moho::cfunc_UnitGetCommandQueueL	P -> I		1	3618	src/moho/unit/core/Unit.cpp	4562
+0x006CEF60	moho::cfunc_UnitGetNukeSiloAmmoCount	P -> I		1	5	src/moho/unit/core/Unit.cpp	4967
+0x006CF370	moho::cfunc_UnitGetTacticalSiloAmmoCount	P -> I		1	5	src/moho/unit/core/Unit.cpp	5145
+0x006D03E0	moho::cfunc_UnitCanBuild	P -> I		1	2378	src/moho/unit/core/Unit.cpp	9223
+0x006D05D0	moho::cfunc_UnitGetRallyPoint	P -> I		1	1334	src/moho/unit/core/Unit.cpp	9296
+0x006D0A50	moho::cfunc_UnitGetFuelRatio	P -> I		1	20895	src/moho/unit/core/Unit.cpp	9413
+0x006D0D30	moho::cfunc_UnitSetShieldRatio	P -> I		1	24	src/moho/unit/core/Unit.cpp	10700
+0x006D0FE0	moho::cfunc_UnitGetBlip	P -> I		1	106	src/moho/unit/core/Unit.cpp	9640
+0x006D1170	moho::cfunc_UnitTransportHasSpaceFor	P -> I		1	138	src/moho/unit/core/Unit.cpp	9703
+0x006D1470	moho::cfunc_UnitShowBone	P -> I		1	1184	src/moho/unit/core/Unit.cpp	9889
+0x006D1610	moho::cfunc_UnitHideBone	P -> I		1	1361	src/moho/unit/core/Unit.cpp	9957
+0x006D31D0	moho::`anonymous namespace'::AiTargetsAreSame	P P -> B		5	803106	src/moho/unit/core/UnitWeapon.cpp	3559
+0x006D3DC0	moho::CFireWeaponTask::Execute	P -> I		1	4223740	src/moho/unit/tasks/CFireWeaponTask.cpp	218
+0x006D4310	moho::UnitWeapon::UnitWeapon	P P P I -> V	3	0	743	src/moho/unit/core/UnitWeapon.cpp	2877
+0x006D4C80	moho::UnitWeapon::CanFire	P P -> B		5	26705	src/moho/unit/core/UnitWeapon.cpp	3084
+0x006D5500	moho::UnitWeapon::CheckSilo	P -> B		5	32809	src/moho/unit/core/UnitWeapon.cpp	3269
+0x006D5590	`anonymous namespace'::CanWeaponAttackEntityTarget	P P -> B		5	1039085	src/moho/unit/core/UnitWeapon.cpp	419
+0x006D5720	moho::UnitWeapon::CanAttackTarget	P P -> B		5	2017927	src/moho/unit/core/UnitWeapon.cpp	3289
+0x006D5B40	moho::UnitWeapon::TargetSolutionStatusGun	P P P -> I		1	1452270	src/moho/unit/core/UnitWeapon.cpp	3342
+0x006D5D40	moho::UnitWeapon::GetSolutionStatus	P P -> I		1	186	src/moho/unit/core/UnitWeapon.cpp	3429
+0x006D5D80	moho::UnitWeapon::TargetIsTooClose	P P -> I		1	1341567	src/moho/unit/core/UnitWeapon.cpp	3449
+0x006D78C0	moho::UnitWeapon::IsEntityBlacklisted	P P -> B		5	238920	src/moho/unit/core/UnitWeapon.cpp	3247
+0x006D7BD0	moho::cfunc_UnitWeaponPlaySound	P -> I		1	9294	src/moho/unit/core/UnitWeapon.cpp	702
+0x006D7D70	moho::cfunc_UnitWeaponSetEnabled	P -> I		1	1581	src/moho/unit/core/UnitWeapon.cpp	763
+0x006D8320	moho::cfunc_UnitWeaponResetTarget	P -> I		1	258	src/moho/unit/core/UnitWeapon.cpp	972
+0x006D8490	moho::cfunc_UnitWeaponCreateProjectile	P -> I		1	9038	src/moho/unit/core/UnitWeapon.cpp	1013
+0x006D8A60	moho::cfunc_UnitWeaponGetBlueprint	P -> I		1	743	src/moho/unit/core/UnitWeapon.cpp	2059
+0x006D8D70	moho::cfunc_UnitWeaponHasTarget	P -> I		1	1	src/moho/unit/core/UnitWeapon.cpp	1665
+0x006D9310	moho::cfunc_UnitWeaponGetCurrentTarget	P -> I		1	9242	src/moho/unit/core/UnitWeapon.cpp	1703
+0x006D9490	moho::cfunc_UnitWeaponGetCurrentTargetPos	P -> I		1	3	src/moho/unit/core/UnitWeapon.cpp	1743
+0x006DA350	moho::cfunc_UnitWeaponSetFireTargetLayerCaps	P -> I		1	3284	src/moho/unit/core/UnitWeapon.cpp	2703
+0x006DA4E0	moho::cfunc_UnitWeaponSetTargetingPriorities	P -> I		1	678	src/moho/unit/core/UnitWeapon.cpp	1838
+0x006DA7F0	moho::cfunc_UnitWeaponSetFiringRandomness	P -> I		1	1171	src/moho/unit/core/UnitWeapon.cpp	2641
+0x006DADF0	moho::cfunc_UnitWeaponBeenDestroyed	P -> I		1	6962	src/moho/unit/core/UnitWeapon.cpp	2021
+0x006E0EC0	moho::CCommandDB::RemoveCmd	P I -> V	1	0	8367	src/moho/command/CCommandDb.cpp	227
+0x006EDCB0	moho::CUnitCommandQueue::InsertCommandToQueue	P P I -> V	2	0	17327	src/moho/unit/CUnitCommandQueue.cpp	304
+0x006EDD30	moho::CUnitCommandQueue::FindCommandIndex	P I -> I	1	1	30	src/moho/unit/CUnitCommandQueue.cpp	213
+0x006EDEF0	moho::CUnitCommandQueue::RemoveCommandFromQueue	P I -> B	1	5	26	src/moho/unit/CUnitCommandQueue.cpp	439
+0x006EDF80	moho::CUnitCommandQueue::RemoveCommandFromQueue	P P -> B		5	26	src/moho/unit/CUnitCommandQueue.cpp	417
+0x006EE260	moho::CUnitCommandQueue::NeedsUIRefresh	P -> B		5	21116	src/moho/unit/CUnitCommandQueue.cpp	406
+0x006EEC40	moho::EntitySetTemplate<moho::Unit>::Same	P P -> B		5	173	src/moho/entity/Entity.h	516
+0x006EECF0	`anonymous namespace'::ValidateIssueCommandUnits	P P I -> B	2	5	3283	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	405
+0x006EEDB0	`anonymous namespace'::FilterFactoryUnitsByCommandCap	P P I -> B		5	68	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	372
+0x006EF9E0	`anonymous namespace'::ProcessIssuedUnitCommand	P P P B P -> B		5	16593	src/moho/sim/Sim.cpp	1782
+0x006F16A0	moho::CUnitCommand::DecreaseCount	P I -> V	1	0	26	src/moho/unit/CUnitCommand.cpp	1445
+0x006F18E0	moho::cfunc_IssueClearCommands	P -> I		1	3352	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	1320
+0x006F1A40	moho::cfunc_IssueStop	P -> I		1	2180	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	1370
+0x006F1D80	moho::cfunc_IssueOverCharge	P -> I		1	10	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	3503
+0x006F2250	moho::cfunc_IssueFactoryRallyPoint	P -> I		1	68	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	2952
+0x006F2510	moho::cfunc_IssueClearFactoryCommands	P -> I		1	68	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	2208
+0x006F2660	moho::cfunc_IssueMove	P -> I		1	967	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	2669
+0x006F26D0	moho::cfunc_IssueMoveL	P -> I		1	967	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	2682
+0x006F2960	moho::cfunc_IssueMoveOffFactory	P -> I		1	585	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	2253
+0x006F29D0	moho::cfunc_IssueMoveOffFactoryL	P -> I		1	585	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	2265
+0x006F2C70	moho::cfunc_IssueFormMove	P -> I		1	48	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	2335
+0x006F2CE0	moho::cfunc_IssueFormMoveL	P -> I		1	48	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	2348
+0x006F30D0	moho::cfunc_IssueGuard	P -> I		1	232	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	3017
+0x006F50B0	moho::cfunc_IssueAggressiveMove	P -> I		1	607	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	4171
+0x006F5120	moho::cfunc_IssueAggressiveMoveL	P -> I		1	607	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	4183
+0x006F53C0	moho::cfunc_IssueFormAggressiveMove	P -> I		1	257	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	4249
+0x006F5430	moho::cfunc_IssueFormAggressiveMoveL	P -> I		1	257	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	4262
+0x006F6060	moho::cfunc_IssueRepair	P -> I		1	68	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	3570
+0x006F6600	moho::cfunc_IssueUpgrade	P -> I		1	50	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	4035
+0x006F6960	moho::cfunc_IssueReclaim	P -> I		1	289	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	3702
+0x006F6C20	moho::cfunc_IssueCapture	P -> I		1	200	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	3783
+0x006F71E0	moho::cfunc_IssueTransportLoad	P -> I		1	37	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	4279
+0x006F7530	moho::cfunc_IssueTransportUnload	P -> I		1	20	src/moho/sim/CCommandLuaFunctionRegistrations.cpp	2842
+0x006FA180	moho::Prop::Materialize	P F -> F	1	2	5775	src/moho/entity/Prop.cpp	801
+0x006FC3B0	moho::cfunc_CreateProp	P -> I		1	378	src/moho/sim/Sim.cpp	15172
+0x006FC430	moho::cfunc_CreatePropL	P -> I		1	378	src/moho/sim/Sim.cpp	15184
+0x006FC590	moho::cfunc_EntityCreatePropAtBone	P -> I		1	20501	src/moho/sim/Sim.cpp	15244
+0x006FC610	moho::cfunc_EntityCreatePropAtBoneL	P -> I		1	20501	src/moho/sim/Sim.cpp	15257
+0x006FDD00	moho::CArmyImpl::GetUnitCap	P -> F		2	81502	src/moho/sim/CArmyImpl.cpp	2376
+0x006FDD30	moho::CArmyImpl::IgnoreUnitCap	P -> B		5	1240	src/moho/sim/CArmyImpl.cpp	2392
+0x006FDD60	moho::CArmyImpl::GetArmyUnitCostTotal	P -> F		2	81502	src/moho/sim/CArmyImpl.cpp	2018
+0x006FDED0	moho::CArmyImpl::UseWholeMap	P -> B		5	13869306	src/moho/sim/CArmyImpl.cpp	2416
+0x006FE2F0	moho::CArmyImpl::GetPathcapLand	P -> I		1	4196	src/moho/sim/CArmyImpl.cpp	2485
+0x006FE300	moho::CArmyImpl::GetPathcapSea	P -> I		1	2075	src/moho/sim/CArmyImpl.cpp	2493
+0x006FE310	moho::CArmyImpl::GetPathcapBoth	P -> I		1	13769	src/moho/sim/CArmyImpl.cpp	2501
+0x00707F40	moho::ARMY_IndexFromLuaState	P P -> I		1	431429	src/moho/sim/Sim.cpp	15963
+0x007081A0	moho::cfunc_ListArmies	P -> I		1	1	src/moho/sim/Sim.cpp	16055
+0x00708220	moho::cfunc_ListArmiesL	P -> I		1	1	src/moho/sim/Sim.cpp	16085
+0x00708310	moho::cfunc_GetArmyBrain	P -> I		1	2	src/moho/sim/Sim.cpp	16114
+0x00708390	moho::cfunc_GetArmyBrainL	P -> I		1	2	src/moho/sim/Sim.cpp	16144
+0x00708D60	moho::cfunc_GetArmyUnitCostTotal	P -> I		1	1438	src/moho/sim/Sim.cpp	17235
+0x00708DE0	moho::cfunc_GetArmyUnitCostTotalL	P -> I		1	1438	src/moho/sim/Sim.cpp	17266
+0x00708E60	moho::cfunc_GetArmyUnitCap	P -> I		1	1438	src/moho/sim/Sim.cpp	17285
+0x00708EE0	moho::cfunc_GetArmyUnitCapL	P -> I		1	1438	src/moho/sim/Sim.cpp	17316
+0x007099C0	moho::cfunc_IsAllySim	P -> I		1	18077	src/moho/sim/Sim.cpp	16438
+0x00709A40	moho::cfunc_IsAllySimL	P -> I		1	18077	src/moho/sim/Sim.cpp	16468
+0x00709AF0	moho::cfunc_IsEnemySim	P -> I		1	7240	src/moho/sim/Sim.cpp	16497
+0x00709B70	moho::cfunc_IsEnemySimL	P -> I		1	7240	src/moho/sim/Sim.cpp	16527
+0x00709D50	moho::cfunc_ArmyIsCivilian	P -> I		1	31815	src/moho/sim/Sim.cpp	16615
+0x00709DD0	moho::cfunc_ArmyIsCivilianL	P -> I		1	31815	src/moho/sim/Sim.cpp	16645
+0x0070A6E0	moho::cfunc_AddBuildRestriction	P -> I		1	34	src/moho/sim/CArmyLuaFunctionRegistrations.cpp	432
+0x0070A760	moho::cfunc_AddBuildRestrictionL	P -> I		1	34	src/moho/sim/CArmyLuaFunctionRegistrations.cpp	545
+0x0070A800	moho::cfunc_RemoveBuildRestriction	P -> I		1	26	src/moho/sim/CArmyLuaFunctionRegistrations.cpp	444
+0x0070A880	moho::cfunc_RemoveBuildRestrictionL	P -> I		1	26	src/moho/sim/CArmyLuaFunctionRegistrations.cpp	573
+0x0070A920	moho::cfunc_OkayToMessWithArmy	P -> I		1	36	src/moho/sim/Sim.cpp	16731
+0x0070A9A0	moho::cfunc_OkayToMessWithArmyL	P -> I		1	36	src/moho/sim/Sim.cpp	16762
+0x0070AA60	moho::cfunc_ArmyIsOutOfGame	P -> I		1	2367	src/moho/sim/Sim.cpp	16800
+0x0070AAE0	moho::cfunc_ArmyIsOutOfGameL	P -> I		1	2367	src/moho/sim/Sim.cpp	16830
+0x0070B820	moho::CArmyStats::AddBlueprintStatDelta	P P P F -> P	3	0	18667	src/moho/sim/CArmyStats.cpp	1046
+0x00715750	moho::InfluenceGrid::GetThreat	P I I -> F	1 2	2	5453023	src/moho/sim/CInfluenceMap.cpp	1819
+0x00715C60	moho::CInfluenceMap::VectorToCoords	P P -> I		1	854893	src/moho/sim/CInfluenceMap.cpp	1972
+0x00715D10	moho::CInfluenceMap::InsertEntry	P I P P -> V	1	0	10946	src/moho/sim/CInfluenceMap.cpp	2447
+0x00715FF0	moho::CInfluenceMap::GetThreatRect	P I I I B I I -> F	1 2 3 5 6	2	257833	src/moho/sim/CInfluenceMap.cpp	2034
+0x00716FC0	moho::CInfluenceMap::GetHighestThreatPosition	P P P I B I I -> P	3 5 6	0	34	src/moho/sim/CInfluenceMap.cpp	2616
+0x00720770	moho::COGrid_RectHasBlockingUnit	P P -> B		5	110301	src/moho/sim/COGrid.cpp	1697
+0x00720AA0	moho::SFootprint::FitsAt	P P P -> I		5	8425	src/moho/sim/STIMap.cpp	3263
+0x00720B50	`anonymous namespace'::IsFootprintClearAlongCellLine	P P S1 S1 F F -> B		5	487475	src/moho/ai/CAiPathNavigator.cpp	525
+0x00720C90	`anonymous namespace'::IsCellStepClearForUnit	P P S1 S1 -> B		5	290279	src/moho/ai/CAiPathNavigator.cpp	589
+0x00720D90	moho::func_LocationIsFree	P P P P -> B		5	538433	src/moho/sim/STIMap.cpp	3777
+0x00720F70	moho::COORDS_CanMoveAt	P P P B P -> B		5	90064	src/moho/unit/core/Unit.cpp	132
+0x007212B0	`anonymous namespace'::UnitCanMoveAt	P P P -> B		5	36915	src/moho/ai/CAiFormationInstance.cpp	1520
+0x00721340	moho::COGrid::UnitIsBlocked	P P P I -> B	3	5	16195699	src/moho/sim/COGrid.cpp	1250
+0x007216D0	moho::SweptPathBlockedByUnit	P P P P I -> B	4	5	343557	src/moho/sim/COGrid.cpp	1368
+0x00721990	moho::PathTransitionBlocked	P P P P I -> B	4	5	288247	src/moho/sim/COGrid.cpp	1436
+0x00721DC0	moho::COGrid::CollectEntitiesInBox	P P I P -> V	2	0	1281859	src/moho/sim/COGrid.cpp	1168
+0x00721FB0	moho::COGrid::ForAllEntitiesIterator	P P I P -> V	2	0	160515	src/moho/sim/COGrid.cpp	1466
+0x00722DF0	moho::EntityOccupationManager::GatherUnmarkedEntities	P P P I -> I	3	1	18397768	src/moho/sim/COGrid.cpp	823
+0x00722E30	`anonymous namespace'::GatherUnmarkedEntitiesInLine	P P P P -> I		1	72164	src/moho/sim/COGrid.cpp	360
+0x00724350	moho::CSquad::AppendUnitsWithBP	P P I P -> V	2	0	2649	src/moho/sim/CSquad.cpp	375
+0x00724400	moho::CSquad::AppendUnitsInCategory	P P I P -> V	2	0	41622	src/moho/sim/CSquad.cpp	414
+0x007244E0	moho::CSquad::CanAttackTarget	P P -> B		5	110704	src/moho/sim/CSquad.cpp	262
+0x007251D0	moho::CPlatoon::IsInPlatoon	P P -> B		5	148587	src/moho/sim/CPlatoon.cpp	999
+0x00725220	moho::CPlatoon::GetSquadClass	P P -> I		1	19619	src/moho/sim/CPlatoon.cpp	1012
+0x007252D0	moho::CPlatoon::AppendUnitToSquad	P I P -> V	1	0	68	src/moho/sim/CPlatoon.cpp	1045
+0x00725580	moho::CSquad::AllocateOnPlatoon	P I P -> P	1	0	1558	src/moho/sim/CSquad.cpp	142
+0x00725630	moho::CPlatoon::GetSquad	P I -> P	1	0	2988	src/moho/sim/CPlatoon.cpp	903
+0x007256E0	moho::CPlatoon::GetUnassignedUnitsInCategory	P P I P -> V	2	0	41622	src/moho/sim/CPlatoon.cpp	951
+0x00725730	moho::CPlatoon::GetUnassignedUnitsWithBP	P P I P -> V	2	0	2649	src/moho/sim/CPlatoon.cpp	963
+0x00725CF0	moho::CPlatoon::FindClosestUnitToPos	P P I I I B P -> P	2 3 4	0	8746	src/moho/sim/CPlatoon.cpp	3218
+0x00726120	moho::CPlatoon::FindClosestUnit	P P I I I B -> P	2 3 4	0	8746	src/moho/sim/CPlatoon.cpp	3348
+0x007261B0	moho::CPlatoon::Stop	P I -> V	1	0	1842	src/moho/sim/CPlatoon.cpp	1090
+0x007268E0	moho::CPlatoon::AggressiveMoveToLocation	P P P I -> S4	3	0	151	src/moho/sim/CPlatoon.cpp	4520
+0x00726DE0	moho::CPlatoon::MoveToLocation	P P P B I -> S4	4	0	689	src/moho/sim/CPlatoon.cpp	4303
+0x00727F50	moho::CPlatoon::AttackTarget	P P P I -> S4	3	0	8	src/moho/sim/CPlatoon.cpp	3911
+0x0072BAD0	moho::cfunc_CPlatoonGetBrain	P -> I		1	6214	src/moho/sim/CPlatoon.cpp	1470
+0x0072BD60	moho::cfunc_CPlatoonUniquelyNamePlatoon	P -> I		1	1	src/moho/sim/CPlatoon.cpp	1573
+0x0072C300	moho::cfunc_CPlatoonGetPlatoonPosition	P -> I		1	12040	src/moho/sim/CPlatoon.cpp	1795
+0x0072C9B0	moho::cfunc_CPlatoonGetPlatoonUnits	P -> I		1	33866	src/moho/sim/CPlatoon.cpp	2477
+0x0072CE70	moho::cfunc_CPlatoonCanFormPlatoon	P -> I		1	41794	src/moho/sim/CPlatoon.cpp	2860
+0x0072D870	moho::cfunc_CPlatoonFormPlatoon	P -> I		1	270	src/moho/sim/CPlatoon.cpp	2890
+0x0072E8C0	moho::cfunc_CPlatoonSetPrioritizedTargetList	P -> I		1	11	src/moho/sim/CPlatoon.cpp	2976
+0x0072EB30	moho::cfunc_CPlatoonFindPrioritizedUnit	P -> I		1	9	src/moho/sim/CPlatoon.cpp	3006
+0x0072EBB0	moho::cfunc_CPlatoonFindPrioritizedUnitL	P -> I		1	9	src/moho/sim/CPlatoon.cpp	3144
+0x0072EDE0	moho::cfunc_CPlatoonFindClosestUnit	P -> I		1	8746	src/moho/sim/CPlatoon.cpp	3593
+0x0072EE60	moho::cfunc_CPlatoonFindClosestUnitL	P -> I		1	8746	src/moho/sim/CPlatoon.cpp	3376
+0x0072F710	moho::cfunc_CPlatoonCanAttackTarget	P -> I		1	13	src/moho/sim/CPlatoon.cpp	3759
+0x0072F940	moho::cfunc_CPlatoonStop	P -> I		1	1842	src/moho/sim/CPlatoon.cpp	3789
+0x0072F9C0	moho::cfunc_CPlatoonStopL	P -> I		1	1842	src/moho/sim/CPlatoon.cpp	3801
+0x0072FAE0	moho::cfunc_CPlatoonAttackTarget	P -> I		1	8	src/moho/sim/CPlatoon.cpp	4006
+0x007300A0	moho::cfunc_CPlatoonMoveToLocation	P -> I		1	689	src/moho/sim/CPlatoon.cpp	4447
+0x00730120	moho::cfunc_CPlatoonMoveToLocationL	P -> I		1	689	src/moho/sim/CPlatoon.cpp	4383
+0x007303A0	moho::cfunc_CPlatoonAggressiveMoveToLocation	P -> I		1	151	src/moho/sim/CPlatoon.cpp	4621
+0x00730420	moho::cfunc_CPlatoonAggressiveMoveToLocationL	P -> I		1	151	src/moho/sim/CPlatoon.cpp	4563
+0x00731F00	moho::cfunc_CPlatoonIsCommandsActive	P -> I		1	210	src/moho/sim/CPlatoon.cpp	2152
+0x007320C0	moho::cfunc_CPlatoonSetPlatoonFormationOverride	P -> I		1	243	src/moho/sim/CPlatoon.cpp	5933
+0x007324A0	moho::cfunc_CPlatoonCalculatePlatoonThreat	P -> I		1	876	src/moho/sim/CPlatoon.cpp	6026
+0x00732520	moho::cfunc_CPlatoonCalculatePlatoonThreatL	P -> I		1	876	src/moho/sim/CPlatoon.cpp	6038
+0x007328E0	moho::cfunc_CPlatoonCalculatePlatoonThreatAroundPosition	P -> I		1	4015	src/moho/sim/CPlatoon.cpp	6109
+0x00732E40	moho::cfunc_CPlatoonPlatoonCategoryCountAroundPosition	P -> I		1	1202	src/moho/sim/CPlatoon.cpp	6209
+0x007331C0	moho::cfunc_CPlatoonPlatoonCategoryCount	P -> I		1	89	src/moho/sim/CPlatoon.cpp	6298
+0x00733240	moho::cfunc_CPlatoonPlatoonCategoryCountL	P -> I		1	89	src/moho/sim/CPlatoon.cpp	6310
+0x00736E40	moho::ComputeShieldedDamageForEntity	P P F -> F		2	1828	src/moho/sim/CDamage.cpp	704
+0x00738BD0	moho::cfunc_Damage	P -> I		1	6049	src/moho/sim/CDamageLuaFunctionRegistrations.cpp	132
+0x00738F40	moho::cfunc_DamageArea	P -> I		1	1737	src/moho/sim/CDamageLuaFunctionRegistrations.cpp	238
+0x007392C0	moho::cfunc_DamageRing	P -> I		1	42	src/moho/sim/CDamageLuaFunctionRegistrations.cpp	355
+0x00748650	moho::Sim::SetCommandSource	P I -> V	1	0	1	src/moho/sim/Sim.cpp	6575
+0x007487C0	moho::Sim::VerifyChecksum	P P I -> V	2	0	394	src/moho/sim/Sim.cpp	6634
+0x007491C0	moho::Sim::ValidateNewCommandId	P I P -> B		5	1434	src/moho/sim/Sim.cpp	6770
+0x007496E0	moho::Sim::DecreaseCommandCount	P I I -> V	1 2	0	46	src/moho/sim/Sim.cpp	7384
+0x00749F40	moho::Sim::AdvanceBeat	P I -> V	1	0	19706	src/moho/sim/Sim.cpp	9271
+0x0074B120	moho::Sim::FlattenMapRect	P P F -> V	2	0	9962	src/moho/sim/Sim.cpp	15838
+0x0074B900	moho::cfunc_IsGameOver	P -> I		1	24633	src/moho/sim/Sim.cpp	12377
+0x0074B980	moho::cfunc_IsGameOverL	P -> I		1	24633	src/moho/sim/Sim.cpp	12353
+0x0074B9F0	moho::cfunc_GetEntityById	P -> I		1	62	src/moho/sim/Sim.cpp	17725
+0x0074BA70	moho::cfunc_GetEntityByIdL	P -> I		1	62	src/moho/sim/Sim.cpp	17756
+0x0074BB40	moho::cfunc_GetUnitByIdSim	P -> I		1	4	src/moho/sim/Sim.cpp	17794
+0x0074BBC0	moho::cfunc_GetUnitByIdSimL	P -> I		1	4	src/moho/sim/Sim.cpp	17825
+0x00758E10	moho::STIMap::GetTerrainType	P P I I -> S5	2 3	0	53502	src/moho/sim/STIMap.cpp	2801
+0x00758E90	moho::STIMap::GetTerrainTypeOffset	P F F -> F	1 2	2	161	src/moho/sim/STIMap.cpp	2847
+0x00758F90	moho::cfunc_RandomSim	P -> I		1	391290	src/moho/sim/Sim.cpp	10889
+0x00759010	moho::cfunc_RandomSimL	P -> I		1	391290	src/moho/sim/Sim.cpp	10920
+0x00759190	moho::cfunc_FlattenMapRect	P -> I		1	9962	src/moho/sim/Sim.cpp	11179
+0x00759810	moho::cfunc_ParseEntityCategorySim	P -> I		1	16539	src/moho/sim/Sim.cpp	11263
+0x00759890	moho::cfunc_ParseEntityCategorySimL	P -> I		1	16539	src/moho/sim/Sim.cpp	11294
+0x00759990	moho::cfunc_EntityCategoryContainsSim	P -> I		1	600581	src/moho/sim/Sim.cpp	11367
+0x00759A10	moho::cfunc_EntityCategoryContainsSimL	P -> I		1	600581	src/moho/sim/Sim.cpp	11334
+0x00759BD0	moho::cfunc_EntityCategoryFilterDownSim	P -> I		1	20257	src/moho/sim/Sim.cpp	11397
+0x00759EF0	moho::cfunc_EntityCategoryCount	P -> I		1	26310	src/moho/sim/Sim.cpp	11515
+0x0075A770	moho::cfunc_GetGameTimeSecondsSim	P -> I		1	334241	src/moho/sim/Sim.cpp	12468
+0x0075A7F0	moho::cfunc_GetGameTimeSecondsSimL	P -> I		1	334241	src/moho/sim/Sim.cpp	12498
+0x0075A860	moho::cfunc_GetGameTick	P -> I		1	34916	src/moho/sim/Sim.cpp	12517
+0x0075A8E0	moho::cfunc_GetGameTickL	P -> I		1	34916	src/moho/sim/Sim.cpp	12541
+0x0075A950	moho::cfunc_GetSystemTimeSecondsOnlyForProfileUse	P -> I		1	1576	src/moho/sim/Sim.cpp	12561
+0x0075A9D0	moho::cfunc_GetSystemTimeSecondsOnlyForProfileUseL	P -> I		1	1576	src/moho/sim/Sim.cpp	12592
+0x0075AE00	moho::cfunc_GetUnitsInRect	P -> I		1	7886	src/moho/sim/Sim.cpp	12742
+0x0075AE80	moho::cfunc_GetUnitsInRectL	P -> I		1	7886	src/moho/sim/Sim.cpp	12773
+0x0075B200	moho::cfunc_GetReclaimablesInRect	P -> I		1	3704	src/moho/sim/Sim.cpp	12870
+0x0075B280	moho::cfunc_GetReclaimablesInRectL	P -> I		1	3704	src/moho/sim/Sim.cpp	12901
+0x0075BBE0	moho::cfunc_GetMapSize	P -> I		1	6751	src/moho/sim/Sim.cpp	13000
+0x0075BC60	moho::cfunc_GetMapSizeL	P -> I		1	6751	src/moho/sim/Sim.cpp	13025
+0x0075BCF0	moho::cfunc_GetTerrainHeight	P -> I		1	51336	src/moho/sim/Sim.cpp	13067
+0x0075BD70	moho::cfunc_GetTerrainHeightL	P -> I		1	51336	src/moho/sim/Sim.cpp	13078
+0x0075BE70	moho::cfunc_GetSurfaceHeight	P -> I		1	118681	src/moho/sim/Sim.cpp	13135
+0x0075BEF0	moho::cfunc_GetSurfaceHeightL	P -> I		1	118681	src/moho/sim/Sim.cpp	13147
+0x0075C030	moho::cfunc_GetTerrainTypeOffset	P -> I		1	161	src/moho/sim/Sim.cpp	13209
+0x0075C0B0	moho::cfunc_GetTerrainTypeOffsetL	P -> I		1	161	src/moho/sim/Sim.cpp	13220
+0x0075C1B0	moho::cfunc_GetTerrainType	P -> I		1	53341	src/moho/sim/Sim.cpp	13276
+0x0075CDD0	moho::cfunc_GetFocusArmySim	P -> I		1	23311	src/moho/sim/Sim.cpp	17883
+0x0075CE50	moho::cfunc_GetFocusArmySimL	P -> I		1	23311	src/moho/sim/Sim.cpp	17914
+0x0075D060	moho::cfunc_TryCopyPose	P -> I		1	373	src/moho/sim/Sim.cpp	11088
+0x0075E2A0	moho::cfunc_DebugGetSelection	P -> I		1	21896	src/moho/sim/Sim.cpp	11823
+0x0075E4E0	moho::cfunc_IsEntity	P -> I		1	121	src/moho/sim/Sim.cpp	11898
+0x0075E560	moho::cfunc_IsEntityL	P -> I		1	121	src/moho/sim/Sim.cpp	11928
+0x0075E620	moho::cfunc_IsUnit	P -> I		1	444	src/moho/sim/Sim.cpp	11953
+0x0075E780	moho::cfunc_IsProp	P -> I		1	59095	src/moho/sim/Sim.cpp	11996
+0x007661C0	moho::PathQueue::ImplBase::ExpandNode	P P P -> I		1	3257690	src/moho/path/PathTables.cpp	539
+0x00766280	moho::PathQueue::ImplBase::CollectNeighbours	P P P -> B		5	3238473	src/moho/path/PathTables.cpp	492
+0x00766350	moho::PathQueue::ImplBase::AddNeighbours	P P I P -> B	2	5	3784850	src/moho/path/PathTables.cpp	471
+0x0076D810	moho::CIntelPosHandle::CIntelPosHandle	P I P -> V	1	0	2862	src/moho/entity/intel/CIntelPosHandle.cpp	153
+0x0076D980	moho::CIntelPosHandle::ChangeRadius	P I -> V	1	0	2114	src/moho/entity/intel/CIntelPosHandle.cpp	245
+0x0076E490	moho::CIntel::ForceUpdate	P P I -> V	2	0	7905522	src/moho/entity/intel/CIntel.cpp	180
+0x0076E4C0	moho::CIntel::Update	P P I -> V	2	0	21417	src/moho/entity/intel/CIntel.cpp	201
+0x0076F1E0	moho::CIntelPosHandle::UpdatePos	P I P -> I	1	0	16165746	src/moho/entity/intel/CIntelPosHandle.cpp	197
+0x007732C0	moho::CEconStorage::Chng	P I -> V	1	0	5408880	src/moho/sim/CEconStorage.cpp	85
+0x00776490	moho::Shield::Shield	P P P I -> V	3	0	6	src/moho/entity/Shield.cpp	149
+0x00776A20	moho::cfunc__c_CreateShield	P -> I		1	6	src/moho/entity/Shield.cpp	260
+0x00907310	LuaPlus::LuaObject::IsTable	P -> B		5	11063529	src/lua/LuaObject.h	829
+0x00907320	LuaPlus::LuaObject::IsUserData	P -> B		5	8351927	src/lua/LuaObject.cpp	21295
+0x00907350	LuaPlus::LuaObject::IsNumber	P -> B		5	519515	src/lua/LuaObject.cpp	21249
+0x00907370	LuaPlus::LuaObject::IsString	P -> B		5	980489	src/lua/LuaObject.cpp	21271
+0x009073B0	LuaPlus::LuaObject::ToNumber	P -> D		3	11174	src/lua/LuaObject.cpp	23227
+0x00907810	LuaPlus::LuaObject::IsFunction	P -> B		5	468561	src/lua/LuaObject.cpp	21349
+0x009078D0	LuaPlus::LuaObject::IsBoolean	P -> B		5	462660	src/lua/LuaObject.cpp	21237
+0x00907910	LuaPlus::LuaObject::GetInteger	P -> I		1	564298	src/lua/LuaObject.cpp	23421
+0x00907970	LuaPlus::LuaObject::GetNumber	P -> D		3	147353	src/lua/LuaObject.cpp	23264
+0x00907C90	LuaPlus::LuaObject::GetBoolean	P -> B		5	6462	src/lua/LuaObject.cpp	23146
+0x00907F50	LuaPlus::LuaObject::GetCount	P -> I		1	1159506	src/lua/LuaObject.cpp	22878
+0x009081F0	LuaPlus::LuaObject::SetInteger	P P I -> V	2	0	23482	src/lua/LuaObject.cpp	22028
+0x00908320	LuaPlus::LuaObject::SetNumber	P P F -> V	2	0	118175	src/lua/LuaObject.cpp	21946
+0x00908370	LuaPlus::LuaObject::SetNumber	P I F -> V	1 2	0	921384	src/lua/LuaObject.cpp	21962
+0x009084E0	LuaPlus::LuaObject::SetString	P I P -> V	1	0	416	src/lua/LuaObject.cpp	21751
+0x009087A0	LuaPlus::LuaObject::SetObject	P I P -> V	1	0	358404	src/lua/LuaObject.cpp	22162
+0x009091E0	LuaPlus::LuaObject::operator[]	P P I -> S5	2	0	3939169	src/lua/LuaObject.cpp	22740
+0x00909650	LuaPlus::LuaObject::AssignInteger	P P I -> V	2	0	8406	src/lua/LuaObject.cpp	21602
+0x00909CE0	LuaPlus::LuaObject::Insert	P I P -> V	1	0	54519	src/lua/LuaObject.cpp	22445
+0x0090A6B0	LuaPlusH_next	P P P P -> I		5	363521	src/lua/LuaObject.cpp	3155
+0x0090C460	lua_checkstack	P I -> I	1	1	410009	src/lua/LuaObject.cpp	1627
+0x0090C5A0	lua_settop	P I -> V	1	0	54361615	src/lua/LuaObject.cpp	933
+0x0090C640	lua_insert	P I -> V	1	0	21288	src/lua/LuaObject.cpp	837
+0x0090C6E0	lua_pushvalue	P I -> V	1	0	76849113	src/lua/LuaObject.cpp	802
+0x0090C7A0	lua_isnumber	P I -> I	1	1	4480180	src/lua/LuaObject.cpp	1473
+0x0090C9F0	lua_tonumber	P I -> F	1	2	14245366	src/lua/LuaObject.cpp	1448
+0x0090CA40	lua_toboolean	P I -> I	1	1	25040990	src/lua/LuaObject.cpp	1536
+0x0090CA90	lua_tostring	P I -> P	1	0	4197033	src/lua/LuaObject.cpp	15678
+0x0090CC50	lua_tothread	P I -> P	1	0	60899	src/lua/LuaObject.cpp	1590
+0x0090CF80	lua_pushboolean	P I -> V	1	0	2705879	src/lua/LuaObject.cpp	995
+0x0090D050	lua_rawget	P I -> V	1	0	6143527	src/lua/LuaObject.cpp	18586
+0x0090D0A0	lua_rawgeti	P I I -> V	1 2	0	37697004	src/lua/LuaObject.cpp	1772
+0x0090D180	lua_getmetatable	P I -> I	1	1	638645	src/lua/LuaObject.cpp	1401
+0x0090D2A0	lua_rawset	P I -> V	1	0	1143538	src/lua/LuaObject.cpp	18603
+0x0090D2F0	lua_rawseti	P I I -> V	1 2	0	21147430	src/lua/LuaObject.cpp	18621
+0x0090D340	lua_setmetatable	P I -> I	1	1	610702	src/lua/LuaObject.cpp	18641
+0x0090D3B0	lua_setfenv	P I -> I	1	1	286	src/lua/LuaObject.cpp	1820
+0x0090D430	LuaCallProtected	P I I -> I	1 2	1	572429	src/lua/LuaObject.cpp	17868
+0x0090D5C0	lua_load	P P P P -> I		1	19992	src/lua/LuaObject.cpp	15721
+0x0090D670	lua_setgcthreshold	P I -> V	1	0	281	src/lua/LuaObject.cpp	1119
+0x0090D6D0	lua_next	P I -> I	1	1	9297010	src/lua/LuaObject.cpp	1752
+0x0090DD10	luaL_checkstack	P I P -> V	1	0	410009	src/lua/LuaObject.cpp	15989
+0x0090DD40	luaL_getmetafield	P I P -> I	1	1	625059	src/lua/LuaObject.cpp	3440
+0x0090DDA0	luaL_callmeta	P I P -> I	1	1	771	src/lua/LuaObject.cpp	15334
+0x0090DFB0	luaL_setn	P I I -> V	1 2	0	1143538	src/lua/LuaObject.cpp	16143
+0x0090E090	luaL_getn	P I -> I	1	1	2200654	src/lua/LuaObject.cpp	16183
+0x0090E760	luaL_loadbuffer	P P I P -> I	2	1	19706	src/lua/LuaObject.cpp	15934
+0x0090EA20	luaL_checktype	P I I -> V	1 2	0	12115720	src/lua/LuaObject.cpp	1668
+0x0090EA70	luaL_checkany	P I -> V	1	0	1027011	src/lua/LuaObject.cpp	1655
+0x0090EAA0	luaL_checklstring	P I P -> P	1	0	1662495	src/lua/LuaObject.cpp	1682
+0x0090EBF0	luaL_optnumber	P I F -> F	1 2	2	908837	src/lua/LuaObject.cpp	3508
+0x0090ECF0	luaB_tonumber	P -> I		1	3140	src/lua/LuaObject.cpp	14757
+0x0090EEA0	`anonymous namespace'::luaB_getmetatable	P -> I		1	13586	src/lua/LuaObject.cpp	11380
+0x0090EEF0	`anonymous namespace'::luaB_setmetatable	P -> I		1	610702	src/lua/LuaObject.cpp	12187
+0x0090F190	`anonymous namespace'::luaB_rawget	P -> I		1	742	src/lua/LuaObject.cpp	11455
+0x0090F270	`anonymous namespace'::luaB_type	P -> I		1	987484	src/lua/LuaObject.cpp	11512
+0x0090F2B0	`anonymous namespace'::luaB_next	P -> I		1	9297010	src/lua/LuaObject.cpp	11531
+0x0090F2F0	`anonymous namespace'::luaB_pairs	P -> I		1	7208	src/lua/LuaObject.cpp	11550
+0x0090F560	`anonymous namespace'::luaB_unpack	P -> I		1	393080	src/lua/LuaObject.cpp	11712
+0x0090F5B0	`anonymous namespace'::luaB_pcall	P -> I		1	21288	src/lua/LuaObject.cpp	11730
+0x0090FC10	`anonymous namespace'::luaB_yield	P -> I		1	1371922	src/lua/LuaObject.cpp	11789
+0x0090FDE0	luaB_tostring	P -> I		1	771	src/lua/LuaObject.cpp	14875
+0x00910010	luaK_fixjump	I I P -> V	0 1	0	503	src/lua/LuaObject.cpp	3219
+0x00910060	luaK_getlabel	P -> I		1	258	src/lua/LuaParser.cpp	2015
+0x009100D0	need_value	P I I -> I	1 2	1	274	src/lua/LuaParser.cpp	1729
+0x009102F0	luaK_concat	P P I -> V	2	0	9317	src/lua/LuaObject.cpp	3238
+0x00910340	luaK_checkstack	P I -> V	1	0	163	src/lua/LuaParser.cpp	2080
+0x00910380	luaK_reserveregs	P I -> V	1	0	1371	src/lua/LuaParser.cpp	2099
+0x00910400	addk	P P P -> I		1	186701	src/lua/LuaObject.cpp	3275
+0x00910490	luaK_stringK	P P -> I		1	33943	src/lua/LuaParser.cpp	2112
+0x009104C0	luaK_numberK	P F -> I		1	152696	src/lua/LuaParser.cpp	2127
+0x00910500	nil_constant	P -> I		1	62	src/lua/LuaObject.cpp	3305
+0x00910540	luaK_setcallreturns	P P I -> V	2	0	28092	src/lua/LuaParser.cpp	2170
+0x009105E0	luaK_fixline	P I -> V	1	0	24232	src/lua/LuaParser.cpp	2003
+0x00910600	luaK_code	P I I -> I		1	284418	src/lua/LuaParser.cpp	1953
+0x009106B0	luaK_codeABC	P I I I I -> I		1	96185	src/lua/LuaParser.cpp	1977
+0x009106E0	luaK_codeABx	P I I I -> I	1 2 3	1	40376	src/lua/LuaParser.cpp	1991
+0x00910710	luaK_nil	P I I -> V	1 2	0	254	src/lua/LuaParser.cpp	2142
+0x009107A0	luaK_jump	P -> I		1	439	src/lua/LuaParser.cpp	2028
+0x009107E0	luaK_condjump	I P I I I -> I	0 2 3 4	1	1409	src/lua/LuaParser.cpp	1599
+0x00910840	luaK_patchtohere	P I -> V	1	0	4162	src/lua/LuaParser.cpp	2051
+0x00910AD0	`anonymous namespace'::exp2reg	P P I -> V	2	0	229473	src/lua/LuaParser.cpp	2238
+0x00910CF0	luaK_exp2RK	P P -> I		1	15254	src/lua/LuaParser.cpp	2329
+0x00910F40	jumponcond	P I P -> I	1	1	924	src/lua/LuaParser.cpp	1705
+0x009115E0	luaK_patchlist	P I I -> V	1 2	0	233	src/lua/LuaParser.cpp	2064
+0x009125C0	lua_gethookmask	P -> I		1	115867	src/lua/LuaObject.cpp	19379
+0x009138D0	luaD_reallocstack	P I -> V	1	0	1539	src/lua/LuaObject.cpp	16060
+0x00913920	luaD_reallocCI	P I -> V	1	0	13844	src/lua/LuaObject.cpp	16086
+0x00913990	luaD_growstack	P I -> V	1	0	37120	src/lua/LuaObject.cpp	5002
+0x00913D40	luaD_poscall	P I P -> V	1	0	59150806	src/lua/LuaObject.cpp	17947
+0x00913E40	lua_yield	P I -> I	1	1	1387028	src/lua/LuaObject.cpp	11986
+0x00913F90	luaD_protectedparser	P P I -> I	2	1	19992	src/lua/LuaParser.cpp	2611
+0x00914EF0	luaF_newLclosure	P I P -> P	1	0	25204	src/lua/LuaObject.cpp	16022
+0x00915290	luaC_separateudata	P -> I		1	281	src/lua/LuaObject.cpp	18174
+0x00915A50	`anonymous namespace'::sweepstrings	P I -> V	1	0	281	src/lua/LuaObject.cpp	7878
+0x00915CC0	mark	P -> I		1	281	src/lua/LuaObject.cpp	18266
+0x00918440	read_numeral	P I P -> I	1	1	115217	src/lua/LuaParser.cpp	681
+0x009188F0	luaX_checklimit	P I I P -> V	1 2	0	162707	src/lua/LuaParser.cpp	592
+0x00918C40	read_string	P I P -> V	1	0	4137	src/lua/LuaParser.cpp	864
+0x00919100	luaX_lex	P P -> I		1	492228	src/lua/LuaParser.cpp	983
+0x00919A50	`anonymous namespace'::math_abs	P -> I		1	407	src/lua/LuaObject.cpp	10780
+0x00919A80	`anonymous namespace'::math_sin	P -> I		1	56156	src/lua/LuaObject.cpp	10823
+0x00919AB0	`anonymous namespace'::math_cos	P -> I		1	56156	src/lua/LuaObject.cpp	10837
+0x00919B40	`anonymous namespace'::math_acos	P -> I		1	305	src/lua/LuaObject.cpp	10865
+0x00919BA0	`anonymous namespace'::math_atan2	P -> I		1	1237	src/lua/LuaObject.cpp	10893
+0x00919BE0	`anonymous namespace'::math_ceil	P -> I		1	79253	src/lua/LuaObject.cpp	10908
+0x00919C10	`anonymous namespace'::math_floor	P -> I		1	846405	src/lua/LuaObject.cpp	10922
+0x00919C40	`anonymous namespace'::math_mod	P -> I		1	3283	src/lua/LuaObject.cpp	10936
+0x00919C80	`anonymous namespace'::math_sqrt	P -> I		1	50471	src/lua/LuaObject.cpp	10956
+0x00919CB0	`anonymous namespace'::math_pow	P -> I		1	33	src/lua/LuaObject.cpp	10970
+0x00919D20	`anonymous namespace'::math_log10	P -> I		1	18	src/lua/LuaObject.cpp	11001
+0x00919E90	`anonymous namespace'::math_min	P -> I		1	158774	src/lua/LuaObject.cpp	11088
+0x00919F10	`anonymous namespace'::math_max	P -> I		1	54998	src/lua/LuaObject.cpp	11110
+0x0091A4E0	luaO_int2fb	I -> I	0	1	38281	src/lua/LuaObject.cpp	17740
+0x0091A570	luaO_rawequalObj	P P -> I		1	8795922	src/lua/LuaObject.cpp	2031
+0x0091A5D0	luaO_str2d	P P -> I		1	121497	src/lua/LuaObject.cpp	17709
+0x0091AAE0	testnext	P I -> I	1	1	1913	src/lua/LuaParser.cpp	1243
+0x0091ACF0	luaI_registerlocalvar	P P -> I		1	636	src/lua/LuaParser.cpp	3542
+0x0091AD80	`anonymous namespace'::adjustlocalvars	P I -> V	1	0	2793	src/lua/LuaParser.cpp	1268
+0x0091ADC0	removevars	P I -> V	1	0	22361	src/lua/LuaParser.cpp	1288
+0x0091AE00	new_localvarstr	P P I -> V	2	0	420	src/lua/LuaParser.cpp	3574
+0x0091AE90	indexupvalue	P P P -> I		1	1057	src/lua/LuaObject.cpp	4047
+0x0091AFB0	`anonymous namespace'::singlevaraux	P P P I -> V	3	0	58666	src/lua/LuaParser.cpp	1474
+0x0091B0C0	`anonymous namespace'::adjust_assign	P I P I -> V	1 3	0	2073	src/lua/LuaParser.cpp	1531
+0x0091B140	code_params	P I I -> V	1 2	0	682	src/lua/LuaParser.cpp	3591
+0x0091BC70	body	P P I I -> V	2 3	0	673	src/lua/LuaParser.cpp	3643
+0x0091BD30	`anonymous namespace'::explist1	P P -> I		1	7121	src/lua/LuaParser.cpp	3185
+0x0091C4B0	`anonymous namespace'::GetBinaryOperatorFromToken	I -> I	0	0	207993	src/lua/LuaParser.cpp	1171
+0x0091C680	subexpr	P P I -> I	2	0	207993	src/lua/LuaParser.cpp	3113
+0x0091C910	assignment	P P I -> V	2	0	1554	src/lua/LuaParser.cpp	4139
+0x0091CA90	whilestat	P I -> V	1	0	25	src/lua/LuaParser.cpp	3701
+0x0091CD40	repeatstat	P I -> V	1	0	1	src/lua/LuaParser.cpp	3761
+0x0091CEA0	forbody	P I I I I -> V	1 2 3 4	0	207	src/lua/LuaParser.cpp	3791
+0x0091CFC0	fornum	P P I -> V	2	0	44	src/lua/LuaParser.cpp	3821
+0x0091D300	forstat	P I -> V	1	0	207	src/lua/LuaParser.cpp	3889
+0x0091D490	`anonymous namespace'::ifstat	P I -> V	1	0	868	src/lua/LuaParser.cpp	3216
+0x0091D850	funcname	P P -> I		1	124	src/lua/LuaParser.cpp	1451
+0x0091D8B0	`anonymous namespace'::funcstat	P I -> V	1	0	124	src/lua/LuaParser.cpp	3334
+0x0091DD60	`anonymous namespace'::statement	P -> I		1	26388	src/lua/LuaParser.cpp	4186
+0x009247C0	luaS_resize	P I -> V	1	0	1	src/lua/LuaObject.cpp	2112
+0x00924C30	`anonymous namespace'::str_sub	P -> I		1	151239	src/lua/LuaObject.cpp	9146
+0x00924CE0	`anonymous namespace'::str_lower	P -> I		1	3460	src/lua/LuaObject.cpp	9120
+0x00925230	matchbracketclass	P I P -> I	1	1	702278	src/lua/LuaObject.cpp	2468
+0x00925920	lmemfind	I P I P -> P	0 2	0	727820	src/lua/LuaObject.cpp	2280
+0x00925B30	`anonymous namespace'::str_find	P -> I		1	727820	src/lua/LuaObject.cpp	9277
+0x00925FA0	`anonymous namespace'::str_gsub	P -> I		1	21481	src/lua/LuaObject.cpp	9478
+0x00926690	`anonymous namespace'::str_format_helper	P P I -> I	2	1	4854	src/lua/LuaObject.cpp	9773
+0x00926EB0	`anonymous namespace'::str_format	P -> I		1	4854	src/lua/LuaObject.cpp	9943
+0x00927240	setarrayvector	I P P -> I	0	1	2866511	src/lua/LuaObject.cpp	3635
+0x00927290	setnodevector	P P I -> P	2	0	3522636	src/lua/LuaObject.cpp	3658
+0x00927320	luaH_new	P I I -> P	1 2	0	2044307	src/lua/LuaObject.cpp	3723
+0x009276A0	luaH_next	P P P -> I		1	9297010	src/lua/LuaObject.cpp	3100
+0x00927780	resize	P I P I -> I	1 3	1	1478329	src/lua/LuaObject.cpp	3771
+0x00927C20	`anonymous namespace'::LuaTableGetN	P -> I		1	646511	src/lua/LuaObject.cpp	10159
+0x00927C90	`anonymous namespace'::LuaTableInsert	P -> I		1	1138381	src/lua/LuaObject.cpp	10191
+0x00927D30	`anonymous namespace'::LuaTableRemove	P -> I		1	5157	src/lua/LuaObject.cpp	10231
+0x00927F60	`anonymous namespace'::LuaTableAuxSort	P I I -> V	1 2	0	891234	src/lua/LuaObject.cpp	10334
+0x00928360	`anonymous namespace'::LuaTableSort	P -> I		1	16929	src/lua/LuaObject.cpp	10435
+0x00928420	luaT_gettm	P I P -> P	1	0	29403209	src/lua/LuaObject.cpp	2994
+0x00928450	luaT_gettmbyobj	P P I -> P	2	0	599504	src/lua/LuaObject.cpp	3019
+0x009291A0	luaV_tostring	P P -> I		1	4293	src/lua/LuaObject.cpp	16699
+0x009293E0	luaV_gettable	P P P I -> P	3	0	14733783	src/lua/LuaObject.cpp	18459
+0x009295A0	`anonymous namespace'::get_compTM	P I P P -> P	1	0	2566997	src/lua/LuaObject.cpp	5059
+0x00929680	luaV_strcmp	P P -> I		1	90	src/lua/LuaObject.cpp	16260
+0x009296F0	luaV_lessthan	P P P -> I		1	28571125	src/lua/LuaObject.cpp	16325
+0x00929770	luaV_lessequal	P P P -> I		1	2257530	src/lua/LuaObject.cpp	16362
+0x00929810	luaV_equalval	P P P -> I		1	10377693	src/lua/LuaObject.cpp	16407
+0x00929910	CoerceToStringInPlace	P P -> B		5	79770	src/lua/LuaObject.cpp	16739
+0x00929BF0	luaV_index	P P P I -> P	3	0	16537239	src/lua/LuaObject.cpp	18495
+0x0092B970	luaZ_fill	P -> I		1	20083	src/lua/LuaObject.cpp	15597
+0x0092B9B0	luaZ_lookahead	P -> I		1	19992	src/lua/LuaObject.cpp	15624

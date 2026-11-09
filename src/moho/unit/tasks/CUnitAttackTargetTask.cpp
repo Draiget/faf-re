@@ -1,4 +1,5 @@
 #include "moho/unit/tasks/CUnitAttackTargetTask.h"
+#include "moho/unit/tasks/TaskThreadWake.h"
 
 #include <cmath>
 #include <cstddef>
@@ -49,35 +50,6 @@ namespace moho
 namespace
 {
 
-
-  [[nodiscard]] gpg::RType* CachedCCommandTaskType()
-  {
-    gpg::RType* type = moho::CCommandTask::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CCommandTask));
-      moho::CCommandTask::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedCAiTargetType()
-  {
-    gpg::RType* type = moho::CAiTarget::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CAiTarget));
-      moho::CAiTarget::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* CachedVector3fType()
-  {
-    static gpg::RType* type = nullptr;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(Wm3::Vector3f));
-    }
-    return type;
-  }
 
   /**
    * Address: 0x005F45F0 (FUN_005F45F0)
@@ -148,53 +120,10 @@ namespace
 
   [[maybe_unused]] CUnitAttackTargetTaskSerializerStartupBootstrap gCUnitAttackTargetTaskSerializerStartupBootstrap;
 
-  template <class TObject>
-  [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
-  {
-    gpg::RRef out{};
-    out.mObj = nullptr;
-    out.mType = baseType;
-    if (!object) {
-      return out;
-    }
-
-    gpg::RType* dynamicType = baseType;
-    try {
-      dynamicType = gpg::LookupRType(typeid(*object));
-    } catch (...) {
-      dynamicType = baseType;
-    }
-
-    std::int32_t baseOffset = 0;
-    const bool derived =
-      dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
-    if (!derived) {
-      out.mObj = object;
-      out.mType = dynamicType;
-      return out;
-    }
-
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<char*>(object) - baseOffset);
-    out.mType = dynamicType;
-    return out;
-  }
 
   [[nodiscard]] int RoundToCellCoord(const float value) noexcept
   {
     return static_cast<int>(std::lrintf(value));
-  }
-
-  void WakeOwnerThreadForImmediateTick(moho::CCommandTask* const commandTask)
-  {
-    if (commandTask == nullptr || commandTask->mOwnerThread == nullptr) {
-      return;
-    }
-
-    moho::CTaskThread* const ownerThread = commandTask->mOwnerThread;
-    ownerThread->mPendingFrames = 0;
-    if (ownerThread->mStaged) {
-      ownerThread->Unstage();
-    }
   }
 
 
@@ -1029,7 +958,7 @@ namespace moho
     CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     const gpg::RRef ownerRef{};
 
-    archive->Read(CachedCCommandTaskType(), commandTask, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CCommandTask>(), commandTask, ownerRef);
     archive->ReadPointer(&mDispatchTask, &ownerRef);
     archive->ReadPointer(&mCommand, &ownerRef);
 
@@ -1038,8 +967,8 @@ namespace moho
     mFormation = static_cast<CAiFormationInstance*>(formationBase);
 
     archive->ReadPointer(&mWeapon, &ownerRef);
-    archive->Read(CachedCAiTargetType(), &mTarget, ownerRef);
-    archive->Read(CachedVector3fType(), &mTargetPosition, ownerRef);
+    archive->Read(gpg::RTypeOf<moho::CAiTarget>(), &mTarget, ownerRef);
+    archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), &mTargetPosition, ownerRef);
 
     bool hasMobileTarget = (mHasMobileTarget != 0u);
     archive->ReadBool(&hasMobileTarget);
@@ -1075,7 +1004,7 @@ namespace moho
     CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     const gpg::RRef ownerRef{};
 
-    archive->Write(CachedCCommandTaskType(), commandTask, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CCommandTask>(), commandTask, ownerRef);
 
     gpg::RRef pointerRef{};
     (void)gpg::RRef_CCommandTask(&pointerRef, mDispatchTask);
@@ -1090,8 +1019,8 @@ namespace moho
     pointerRef = gpg::MakeRRef<moho::UnitWeapon>(mWeapon);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedCAiTargetType(), &mTarget, ownerRef);
-    archive->Write(CachedVector3fType(), &mTargetPosition, ownerRef);
+    archive->Write(gpg::RTypeOf<moho::CAiTarget>(), &mTarget, ownerRef);
+    archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), &mTargetPosition, ownerRef);
     archive->WriteBool(mHasMobileTarget != 0u);
     archive->WriteBool(mIgnoreFormationUpdates != 0u);
     archive->WriteBool(mIsGrounded != 0u);
@@ -1342,11 +1271,14 @@ namespace moho
           const float forwardZ =
             1.0f - (((transform.orient_.y * transform.orient_.y) + (transform.orient_.x * transform.orient_.x)) * 2.0f);
 
-          Wm3::Vector3f toTarget = mTarget.GetTargetPosGun(false) - unit->GetPosition();
-          (void)Wm3::Vector3f::Normalize(&toTarget);
+          // 0x005F3CD4: `NormalizeVectorInto` (0x0044F7E0) -- zero only when the
+          // length is not positive, where `Vector3f::Normalize` zeroes at 1e-6.
+          Wm3::Vector3f toTarget{};
+          (void)NormalizeVectorInto(&toTarget, mTarget.GetTargetPosGun(false) - unit->GetPosition());
 
           float rollRadians = blueprint->AI.AttackAngle * 0.017453292f;
-          if (((toTarget.z * forwardX) - (forwardZ * toTarget.x)) <= 0.0f) {
+          // 0x005F3CFD `comiss` + `jbe`: NaN takes the negative roll.
+          if (!(((toTarget.z * forwardX) - (forwardZ * toTarget.x)) > 0.0f)) {
             rollRadians = -rollRadians;
           }
 
@@ -1410,11 +1342,6 @@ namespace gpg
     moho::CUnitAttackTargetTask* const value
   )
   {
-    if (outRef == nullptr) {
-      return nullptr;
-    }
-
-    *outRef = MakeDerivedRef(value, CachedCUnitAttackTargetTaskType());
-    return outRef;
+    return gpg::WriteDerivedRef(outRef, value, &CachedCUnitAttackTargetTaskType);
   }
 } // namespace gpg

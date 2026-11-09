@@ -174,7 +174,7 @@ namespace
    * Reads one position lane `{x,*,z}` and samples elevation from one indirect
    * `CHeightField*` owner lane.
    */
-  float SampleHeightFieldElevationFromPositionXZ(
+  [[maybe_unused]] float SampleHeightFieldElevationFromPositionXZ(
     const Wm3::Vec3f* const position,
     moho::CHeightField* const* const heightField
   )
@@ -272,7 +272,7 @@ namespace
    * What it does:
    * Returns pointer to one min/max entry at `(x,z)` without clamping.
    */
-  [[nodiscard]] moho::SMinMax<std::uint16_t>*
+  [[maybe_unused]] [[nodiscard]] moho::SMinMax<std::uint16_t>*
   MinMaxGridCellPtr(moho::CHeightFieldMinMaxGrid& grid, const std::int32_t x, const std::int32_t z) noexcept
   {
     return &grid.data[x + z * grid.width];
@@ -359,7 +359,7 @@ namespace
    * What it does:
    * Duplicate lane returning raw 16-bit height-word data pointer.
    */
-  [[nodiscard]] std::uint16_t* GetHeightWordDataVariant2(moho::CHeightField& field) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint16_t* GetHeightWordDataVariant2(moho::CHeightField& field) noexcept
   {
     return field.data;
   }
@@ -370,13 +370,13 @@ namespace
    * What it does:
    * Returns backing height-word byte count (`2 * width * height`).
    */
-  [[nodiscard]] std::int32_t GetHeightWordDataByteCount(const moho::CHeightField& field) noexcept
+  [[maybe_unused]] [[nodiscard]] std::int32_t GetHeightWordDataByteCount(const moho::CHeightField& field) noexcept
   {
     return 2 * field.width * field.height;
   }
 
 
-  using HeightFieldTierVector = msvc8::vector<moho::CHeightFieldTier>;
+  using HeightFieldTierVector = fa::vector<moho::CHeightFieldTier>;
 
   [[nodiscard]] std::size_t MinMaxGridSampleCount(const moho::CHeightFieldMinMaxGrid& grid) noexcept
   {
@@ -495,7 +495,7 @@ namespace
    * What it does:
    * Assigns one min/max tier grid, reallocating destination storage as needed.
    */
-  moho::CHeightFieldMinMaxGrid*
+  [[maybe_unused]] moho::CHeightFieldMinMaxGrid*
   AssignMinMaxGrid(moho::CHeightFieldMinMaxGrid& dst, const moho::CHeightFieldMinMaxGrid& src)
   {
     if (&dst == &src) {
@@ -514,7 +514,7 @@ namespace
    * Assigns one error-word tier grid, reallocating destination storage as
    * needed.
    */
-  moho::CHeightFieldI16Grid*
+  [[maybe_unused]] moho::CHeightFieldI16Grid*
   AssignHeightWordGrid(moho::CHeightFieldI16Grid& dst, const moho::CHeightFieldI16Grid& src)
   {
     if (&dst == &src) {
@@ -532,7 +532,7 @@ namespace
    * What it does:
    * Returns high byte of an integer lane.
    */
-  std::uint8_t HighByteVariant1(const std::uint32_t value) noexcept
+  [[maybe_unused]] std::uint8_t HighByteVariant1(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
   }
@@ -543,7 +543,7 @@ namespace
    * What it does:
    * Duplicate lane returning high byte of an integer.
    */
-  std::uint8_t HighByteVariant2(const std::uint32_t value) noexcept
+  [[maybe_unused]] std::uint8_t HighByteVariant2(const std::uint32_t value) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
   }
@@ -569,7 +569,7 @@ namespace
    * What it does:
    * Duplicate lane copying one tier from pointer source.
    */
-  moho::CHeightFieldTier*
+  [[maybe_unused]] moho::CHeightFieldTier*
   CopyHeightFieldTierFromPointerVariant2(moho::CHeightFieldTier& dst, const moho::CHeightFieldTier* source)
   {
     return CopyHeightFieldTierFromPointerVariant1(dst, source);
@@ -618,7 +618,7 @@ namespace
    * Intersects parametric segment line against plane `{normal,dist}` and
    * returns NaN vector when outside segment range.
    */
-  [[nodiscard]] Wm3::Vec3f
+  [[maybe_unused]] [[nodiscard]] Wm3::Vec3f
   PlaneIntersection(const moho::GeomLine3& line, const moho::VecDist& plane, moho::CGeomHitResult* outHit)
   {
     // 0x00577540-0x0057756C: the denominator sums `(y + z) + x`; the
@@ -668,6 +668,50 @@ namespace
     return static_cast<std::uint8_t>(mask & static_cast<std::uint8_t>(~bitsToClear));
   }
 
+  /// Engine addition (water bodies): the shallowest and deepest water over a block of vertices.
+  struct WaterDepthRange
+  {
+    float minDepth;
+    float maxDepth;
+  };
+
+  /**
+   * Engine addition (water bodies): water level minus terrain over vertices
+   * `[x0, x0 + sizeX] x [z0, z0 + sizeZ]`, each vertex under its own level.
+   * With one level everywhere it gives the single-level checks' `level -
+   * maxHeight` and `level - minHeight`.
+   */
+  [[nodiscard]] WaterDepthRange WaterDepthUnder(
+    const moho::STIMap& map, const std::int32_t x0, const std::int32_t z0, const std::int32_t sizeX, const std::int32_t sizeZ
+  ) noexcept
+  {
+    const moho::CHeightField* const field = map.mHeightField.get();
+    WaterDepthRange range{std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest()};
+    for (std::int32_t z = z0; z <= z0 + sizeZ; ++z) {
+      const std::size_t row = static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width);
+      for (std::int32_t x = x0; x <= x0 + sizeX; ++x) {
+        const float terrain = static_cast<float>(field->data[row + static_cast<std::size_t>(x)]) * kHeightWordScale;
+        const float depth = map.GetWaterElevationAtVertex(x, z) - terrain;
+        range.minDepth = std::min(range.minDepth, depth);
+        range.maxDepth = std::max(range.maxDepth, depth);
+      }
+    }
+    return range;
+  }
+
+  [[nodiscard]] std::uint8_t ApplyWaterDepthRange(
+    std::uint8_t capsMask, const moho::SFootprint& footprint, const WaterDepthRange& depth
+  ) noexcept
+  {
+    if (footprint.mMinWaterDepth > depth.minDepth) {
+      capsMask = RemoveCaps(capsMask, kOccWaterSubSeabed);
+    }
+    if (depth.maxDepth > footprint.mMaxWaterDepth) {
+      capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+    }
+    return capsMask;
+  }
+
   [[nodiscard]] std::uint16_t ClampWordFromFloat(float value) noexcept
   {
     if (value >= 65535.0f) {
@@ -684,15 +728,6 @@ namespace
     const std::int32_t sampleX = ClampIndex(x, field.width - 1);
     const std::int32_t sampleZ = ClampIndex(z, field.height - 1);
     return static_cast<std::uint16_t>(field.data[sampleX + sampleZ * field.width]);
-  }
-
-  [[nodiscard]] Wm3::Vec3f Cross3(const Wm3::Vec3f& a, const Wm3::Vec3f& b) noexcept
-  {
-    return {
-      a.y * b.z - a.z * b.y,
-      a.z * b.x - a.x * b.z,
-      a.x * b.y - a.y * b.x,
-    };
   }
 
   /**
@@ -889,7 +924,7 @@ namespace
    * What it does:
    * Routes one z-row update through the tier-error kernel without progress ticks.
    */
-  void
+  [[maybe_unused]] void
   UpdateErrorSingleRowNoProgress(moho::CHeightField& field, const std::int32_t z, const std::int32_t x0, const std::int32_t x1)
   {
     UpdateErrorKernel(field, nullptr, x0, z, x1, z);
@@ -900,16 +935,6 @@ namespace
   using moho::GridTraversalLine;
   using moho::InitGridTraversalLine;
   using moho::IsGridTraversalBeyondEnd;
-
-  [[nodiscard]] std::int32_t FloorToInt(const float value) noexcept
-  {
-    return static_cast<std::int32_t>(std::floor(value));
-  }
-
-  [[nodiscard]] std::int32_t CeilToInt(const float value) noexcept
-  {
-    return static_cast<std::int32_t>(std::ceil(value));
-  }
 
   [[nodiscard]] std::int32_t HighestBitIndex(std::int32_t value) noexcept
   {
@@ -985,8 +1010,9 @@ namespace
         line.zMask = (line.zMask == 0) ? 0 : -newStep;
 
         const std::int32_t alignMask = -newStep;
-        line.xEdge = FloorToInt(line.x0) & alignMask;
-        line.zEdge = FloorToInt(line.z0) & alignMask;
+        // 0x0040D9DA, 0x0040DA0C: the binary's inlined floor.
+        line.xEdge = fa::FloorToIntX87(line.x0) & alignMask;
+        line.zEdge = fa::FloorToIntX87(line.z0) & alignMask;
       }
       return;
     }
@@ -1338,35 +1364,58 @@ namespace moho
    * What it does:
    * Bilinearly samples scaled terrain elevation at world coordinates.
    */
+  namespace
+  {
+    /// The four samples and the fractions FUN_0044FB90 interpolates.
+    struct ElevationSample
+    {
+      float h00;
+      float h01;
+      float h10;
+      float h11;
+      float fracX;
+      float fracZ;
+    };
+
+    [[nodiscard]] ElevationSample SampleElevation(const CHeightField& field, const float x, const float z) noexcept
+    {
+      // 0x0044FB9D..0x0044FBD0: frndint, the -1 borrow and fistp. Outside the
+      // int range (and for NaN) that is not std::floor, and the fraction below
+      // is `x + 2^31`, not 0 (difffuzz, plan WPR.21).
+      const int fx = fa::FloorToIntX87(x);
+      const int fz = fa::FloorToIntX87(z);
+
+      const int wMax = field.width - 1;
+      const int hMax = field.height - 1;
+
+      // `lea ecx, [esi+1]` wraps: a NaN's 0x7FFFFFFF + 1 is INT_MIN.
+      const int fxNext = static_cast<int>(static_cast<std::uint32_t>(fx) + 1u);
+      const int fzNext = static_cast<int>(static_cast<std::uint32_t>(fz) + 1u);
+      const int x0 = ClampIndex(fx, wMax);
+      const int x1 = ClampIndex(fxNext, wMax);
+      const int z0 = ClampIndex(fz, hMax);
+      const int z1 = ClampIndex(fzNext, hMax);
+
+      // Sample scaling by 1/128 is exact in every precision, so the float
+      // products match the binary's mixed SSE/x87 scaling bit for bit.
+      ElevationSample sample{};
+      sample.h00 = static_cast<float>(field.data[x0 + z0 * field.width]) * 0.0078125f;
+      sample.h01 = static_cast<float>(field.data[x0 + z1 * field.width]) * 0.0078125f;
+      sample.h10 = static_cast<float>(field.data[x1 + z0 * field.width]) * 0.0078125f;
+      sample.h11 = static_cast<float>(field.data[x1 + z1 * field.width]) * 0.0078125f;
+      sample.fracX = x - static_cast<float>(fx);
+      sample.fracZ = z - static_cast<float>(fz);
+      return sample;
+    }
+  } // namespace
+
   float CHeightField::GetElevation(const float x, const float z) const
   {
-    // 0x0044FB90 floor: x87 frndint (round-half-even) with a -1 adjust when
-    // the value rounded up -- arithmetically std::floor for every input.
-    const int fx = static_cast<int>(std::floor(static_cast<double>(x)));
-    const int fz = static_cast<int>(std::floor(static_cast<double>(z)));
-
-    const float fracX = x - static_cast<float>(fx);
-    const float fracZ = z - static_cast<float>(fz);
-
-    const int wMax = width - 1;
-    const int hMax = height - 1;
-
-    const int x0 = ClampIndex(fx, wMax);
-    const int x1 = ClampIndex(fx + 1, wMax);
-    const int z0 = ClampIndex(fz, hMax);
-    const int z1 = ClampIndex(fz + 1, hMax);
-
-    // Sample scaling by 1/128 is exact in every precision, so the float
-    // products match the binary's mixed SSE/x87 scaling bit for bit.
-    const float h00 = static_cast<float>(data[x0 + z0 * width]) * 0.0078125f;
-    const float h01 = static_cast<float>(data[x0 + z1 * width]) * 0.0078125f;
-    const float h10 = static_cast<float>(data[x1 + z0 * width]) * 0.0078125f;
-    const float h11 = static_cast<float>(data[x1 + z1 * width]) * 0.0078125f;
-
     // 0x0044FCFB..0x0044FD3D keeps both interpolated rows on the x87 stack.
     // The simulation sets PC24: double intermediates ignore that control and
     // produce different heights. Preserve the original arithmetic explicitly.
-    return msvc8::BilinearHeight(h00, h01, h10, h11, fracX, fracZ);
+    const ElevationSample s = SampleElevation(*this, x, z);
+    return fa::BilinearHeight(s.h00, s.h01, s.h10, s.h11, s.fracX, s.fracZ);
   }
 
   /**
@@ -1377,18 +1426,26 @@ namespace moho
    * What it does:
    * Samples four neighboring elevations around `(x,z)`, builds one terrain
    * gradient normal, and normalizes the output vector.
+   *
+   * The first three heights are stored as floats (`fstp dword`); the fourth
+   * stays in st0, where GetElevation returns it, and `fsubr [top]`
+   * (0x0069A6DA) subtracts it there. A height in the float denormal range
+   * therefore enters the z difference unrounded: `top - bottom` can be a
+   * negative value too small for a float, stored as -0.
    */
   Wm3::Vec3f CHeightField::GetNormal(const float x, const float z) const
   {
     const float top = GetElevation(x, z - 0.5f);
     const float left = GetElevation(x - 0.5f, z);
     const float right = GetElevation(x + 0.5f, z);
-    const float bottom = GetElevation(x, z + 0.5f);
+    const ElevationSample bottom = SampleElevation(*this, x, z + 0.5f);
 
     Wm3::Vec3f out{};
     out.x = left - right;
     out.y = 1.0f;
-    out.z = top - bottom;
+    out.z = fa::SubtractBilinearHeight(
+      top, bottom.h00, bottom.h01, bottom.h10, bottom.h11, bottom.fracX, bottom.fracZ
+    );
     (void)out.Normalize();
     return out;
   }
@@ -1810,7 +1867,18 @@ namespace moho
       return;
     }
 
-    const std::uint16_t heightWord = ClampWordFromFloat((*sourceHeights) * 128.0f);
+    // 0x00477E9C..0x00477EBF: `comiss 65535, h; ja` keeps h only below 65535,
+    // so a NaN height (FAF's FlattenGradientMapRect divides by a zero-width
+    // skirt for structures off the map) becomes 65535, not the 0 that a NaN
+    // cvttss2si leaves in the low word.
+    float scaledHeight = (*sourceHeights) * 128.0f;
+    if (!(scaledHeight < 65535.0f)) {
+      scaledHeight = 65535.0f;
+    }
+    if (scaledHeight < 0.0f) {
+      scaledHeight = 0.0f;
+    }
+    const std::uint16_t heightWord = static_cast<std::uint16_t>(scaledHeight);
     for (std::int32_t z = z0; z < z1; ++z) {
       for (std::int32_t x = x0; x < x1; ++x) {
         data[x + z * width] = heightWord;
@@ -1946,6 +2014,10 @@ namespace moho
    *
    * What it does:
    * Clips `[min,max]` segment parameter range to map XY bounds and top-height ceiling.
+   *
+   * The far limit is taken unless it is greater than max (`comiss far, max; ja skip` at 0x00477747, 0x004777DB,
+   * 0x004778B1), so a NaN limit replaces max and the final `comiss max, min; jb` (0x004778B9) rejects the segment.
+   * A NaN dir.y takes the far-limit side (`comiss 0, dir.y; jbe` at 0x00477890).
    */
   bool CHeightField::ClipSegmentToWorld(const Wm3::Vec3f& pos, const Wm3::Vec3f& dir, float& min, float& max) const
   {
@@ -1959,13 +2031,14 @@ namespace moho
     } else {
       const float t0 = (-1.0f / dir.x) * pos.x;
       const float t1 = (static_cast<float>(width - 1) - pos.x) / dir.x;
-      const float nearT = (t1 <= t0) ? t1 : t0;
-      const float farT = (t1 <= t0) ? t0 : t1;
+      const bool swapped = !(t1 > t0); // 0x0047773A comiss t1, t0; jbe
+      const float nearT = swapped ? t1 : t0;
+      const float farT = swapped ? t0 : t1;
 
       if (nearT > newMin) {
         newMin = nearT;
       }
-      if (farT <= newMax) {
+      if (!(farT > newMax)) {
         newMax = farT;
       }
     }
@@ -1977,13 +2050,14 @@ namespace moho
     } else {
       const float t0 = (-1.0f / dir.z) * pos.z;
       const float t1 = (static_cast<float>(height - 1) - pos.z) / dir.z;
-      const float nearT = (t1 <= t0) ? t1 : t0;
-      const float farT = (t1 <= t0) ? t0 : t1;
+      const bool swapped = !(t1 > t0); // 0x004777CE comiss t1, t0; jbe
+      const float nearT = swapped ? t1 : t0;
+      const float farT = swapped ? t0 : t1;
 
       if (nearT > newMin) {
         newMin = nearT;
       }
-      if (farT <= newMax) {
+      if (!(farT > newMax)) {
         newMax = farT;
       }
     }
@@ -1994,8 +2068,8 @@ namespace moho
       const float maxTerrainY = static_cast<float>(topBounds.max) * 0.0078125f;
       const float t = (maxTerrainY - pos.y) / dir.y;
 
-      if (dir.y >= 0.0f) {
-        if (t <= newMax) {
+      if (!(0.0f > dir.y)) {
+        if (!(t > newMax)) {
           newMax = t;
         }
       } else if (t > newMin) {
@@ -2056,8 +2130,12 @@ namespace moho
       return true;
     }
 
+    // `comiss 0, sideP2; jbe` (0x00477AFE): only an ordered `sideP2 < 0` is a
+    // crossing. A NaN end point -- the diagonal split of a line running
+    // exactly along x == z divides by zero -- is a miss, not a hit on the
+    // unbounded line far past the segment.
     const float sideP2 = PlaneSide(p2, normal, planeDistance);
-    if (sideP2 >= 0.0f) {
+    if (!(sideP2 < 0.0f)) {
       return false;
     }
 
@@ -2114,8 +2192,10 @@ namespace moho
       return true;
     }
 
+    // `comiss 0, sideP2; jbe` (0x00477D90): a NaN end point is a miss, as in
+    // DoIntersectionLL.
     const float sideP2 = PlaneSide(p2, normal, planeDistance);
-    if (sideP2 >= 0.0f) {
+    if (!(sideP2 < 0.0f)) {
       return false;
     }
 
@@ -2168,7 +2248,7 @@ namespace moho
 
     std::int32_t tier = tierCount;
     const float scaledSpan = (end - start) * dirMax * 2.0f;
-    const std::int32_t walkSpanCeil = CeilToInt(scaledSpan);
+    const std::int32_t walkSpanCeil = fa::CeilToIntX87(scaledSpan); // 0x0047718A..0x0047719D
     const std::int32_t spanBit = HighestBitIndex(walkSpanCeil);
     if (spanBit < tier) {
       tier = spanBit;
@@ -2443,6 +2523,10 @@ namespace moho
       mWaterElevation = src->mWaterElevation;
       mWaterElevationDeep = src->mWaterElevationDeep;
       mWaterElevationAbyss = src->mWaterElevationAbyss;
+      // Engine addition: a clone keeps the source's water bodies.
+      if (src->mWaterBodies) {
+        mWaterBodies = std::make_unique<CWaterBodies>(*src->mWaterBodies);
+      }
     }
 
     CHeightField* const copiedField = new CHeightField(sourceWidth - 1, sourceHeight - 1);
@@ -2663,11 +2747,17 @@ namespace moho
     const std::uint16_t maxHeight = std::max(std::max(h00, h10), std::max(h01, h11));
 
     std::uint8_t capsMask = OccupancyMask(footprint.mOccupancyCaps);
-    if (footprint.mMinWaterDepth > (waterElevation - static_cast<float>(maxHeight) * kHeightWordScale)) {
-      capsMask = RemoveCaps(capsMask, kOccWaterSubSeabed);
-    }
-    if ((waterElevation - static_cast<float>(minHeight) * kHeightWordScale) > footprint.mMaxWaterDepth) {
-      capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+    if (mWaterBodies) {
+      // Engine addition: each corner under its own water level.
+      const WaterDepthRange depth = WaterDepthUnder(*this, static_cast<std::int32_t>(x), static_cast<std::int32_t>(z), 1, 1);
+      capsMask = ApplyWaterDepthRange(capsMask, footprint, depth);
+    } else {
+      if (footprint.mMinWaterDepth > (waterElevation - static_cast<float>(maxHeight) * kHeightWordScale)) {
+        capsMask = RemoveCaps(capsMask, kOccWaterSubSeabed);
+      }
+      if ((waterElevation - static_cast<float>(minHeight) * kHeightWordScale) > footprint.mMaxWaterDepth) {
+        capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+      }
     }
 
     if ((capsMask & kOccLandSeabed) != 0u && footprint.mMaxSlope != 0.0f) {
@@ -2719,7 +2809,7 @@ namespace moho
       return;
     }
 
-    msvc8::vector<LuaPlus::LuaObject> parsedEntries{};
+    fa::vector<LuaPlus::LuaObject> parsedEntries{};
     for (LuaPlus::LuaTableIterator iter(&terrainTypesTable, 1); !iter.m_isDone; iter.Next()) {
       LuaPlus::LuaObject entry = iter.GetValue();
       if (!entry || !entry.IsTable()) {
@@ -2866,6 +2956,10 @@ namespace moho
     if (mWaterEnabled != 0u && mWaterElevation > out.Max.y) {
       out.Max.y = mWaterElevation;
     }
+    // Engine addition: water bodies above the terrain's top.
+    if (mWaterBodies && mWaterBodies->HighestLevel() > out.Max.y) {
+      out.Max.y = mWaterBodies->HighestLevel();
+    }
     return out;
   }
 
@@ -2886,6 +2980,10 @@ namespace moho
     CHeightField* const field = mHeightField.get();
     if (!field) {
       return Wm3::Vec3f::NaN();
+    }
+
+    if (mWaterBodies) {
+      return SurfaceIntersectionWithWaterBodies(line, res);
     }
 
     if (mWaterEnabled == 0u) {
@@ -2942,6 +3040,90 @@ namespace moho
   }
 
   /**
+   * Engine addition (water bodies): `SurfaceIntersection` when water lies at
+   * more than one level. The line hits the first water surface it enters
+   * before the terrain: the sea's or a body's plane, where that plane is the
+   * water level of the place it crosses. A start already under water, a
+   * terrain hit, and the fallback plane below the terrain work as with one level.
+   */
+  Wm3::Vec3f STIMap::SurfaceIntersectionWithWaterBodies(const GeomLine3& line, CColHitResult* const res) const
+  {
+    CHeightField& field = *mHeightField;
+    if (line.closest > -std::numeric_limits<float>::max()) {
+      const Wm3::Vec3f closestPoint = PointOnLine(line, line.closest);
+      if (GetWaterElevationAt(closestPoint.x, closestPoint.z) > closestPoint.y) {
+        if (res) {
+          res->distance = line.closest;
+        }
+        return closestPoint;
+      }
+    }
+
+    CColHitResult terrainResult{};
+    const Wm3::Vec3f terrainHit = IntersectHeightFieldAndMarkTerrainHit(field, line, &terrainResult);
+    const bool terrainFound = Wm3::Vec3f::IsntNaN(terrainHit);
+
+    bool waterFound = false;
+    Wm3::Vec3f waterHit{};
+    CGeomHitResult waterResult{};
+    const auto tryLevel = [&](const float level) {
+      if (!(level > kWaterBodyNoWater)) {
+        return;
+      }
+      VecDist plane{};
+      plane.dir.x = 0.0f;
+      plane.dir.y = 1.0f;
+      plane.dir.z = 0.0f;
+      plane.dist = level;
+      CGeomHitResult hit{};
+      const Wm3::Vec3f point = PlaneIntersection(line, plane, &hit);
+      if (!Wm3::Vec3f::IsntNaN(point) || GetWaterElevationAt(point.x, point.z) != level) {
+        return;
+      }
+      if (terrainFound && !(hit.distance < terrainResult.distance)) {
+        return;
+      }
+      if (!waterFound || hit.distance < waterResult.distance) {
+        waterFound = true;
+        waterHit = point;
+        waterResult = hit;
+      }
+    };
+    tryLevel(mWaterEnabled != 0u ? mWaterElevation : kWaterBodyNoWater);
+    for (std::size_t number = 1; number <= mWaterBodies->BodyCount(); ++number) {
+      tryLevel(mWaterBodies->Body(static_cast<std::uint8_t>(number)).elevation);
+    }
+
+    if (waterFound) {
+      if (res) {
+        res->distance = waterResult.distance;
+        res->hitKind = 3;
+      }
+      return waterHit;
+    }
+    if (terrainFound) {
+      if (res) {
+        *res = terrainResult;
+        res->hitKind = 1;
+      }
+      return terrainHit;
+    }
+
+    // Nothing hit: the plane under the lowest terrain, as the single-level code without water.
+    const std::int32_t tierCount =
+      field.mGrids.begin() ? static_cast<std::int32_t>(field.mGrids.end() - field.mGrids.begin()) : 0;
+    VecDist plane{};
+    plane.dir.x = 0.0f;
+    plane.dir.y = 1.0f;
+    plane.dir.z = 0.0f;
+    plane.dist = field.GetTierBox(0, 0, tierCount).Min.y;
+    if (res) {
+      res->hitKind = 3;
+    }
+    return PlaneIntersection(line, plane, reinterpret_cast<CGeomHitResult*>(res));
+  }
+
+  /**
    * Address: 0x005ADC20 (FUN_005ADC20)
    *
    * Wm3::Vector3<float> const &
@@ -2956,7 +3138,7 @@ namespace moho
   bool STIMap::AboveWater(const Wm3::Vec3f& position) const
   {
     const float terrainElevation = mHeightField->GetElevation(position.x, position.z);
-    const float waterElevation = (mWaterEnabled != 0u) ? mWaterElevation : kNoWaterElevation;
+    const float waterElevation = GetWaterElevationAt(position.x, position.z); // engine addition: per position
     return terrainElevation > waterElevation;
   }
 
@@ -3032,11 +3214,9 @@ namespace moho
   float STIMap::GetSurface(const float x, const float z) const
   {
     const float terrainElevation = mHeightField->GetElevation(x, z);
-    if (mWaterEnabled == 0u) {
-      return terrainElevation;
-    }
-
-    return mWaterElevation > terrainElevation ? mWaterElevation : terrainElevation;
+    // Engine addition: the water level at (x, z); -10000 without water, which no terrain is under.
+    const float waterElevation = GetWaterElevationAt(x, z);
+    return waterElevation > terrainElevation ? waterElevation : terrainElevation;
   }
 
   /**
@@ -3072,11 +3252,9 @@ namespace moho
         return terrainElevation;
       }
 
-      if (mWaterEnabled == 0u) {
-        return terrainElevation;
-      }
-
-      return (mWaterElevation > terrainElevation) ? mWaterElevation : terrainElevation;
+      // Engine addition: the water level at the position; -10000 without water.
+      const float waterElevation = GetWaterElevationAt(position.x, position.z);
+      return (waterElevation > terrainElevation) ? waterElevation : terrainElevation;
     }
 
     // 0x0062D68D..0x0062D6DB: the smaller extent is picked with an unsigned
@@ -3107,7 +3285,7 @@ namespace moho
       return terrainTierMax;
     }
 
-    const float waterElevation = (mWaterEnabled != 0u) ? mWaterElevation : kNoWaterElevation;
+    const float waterElevation = GetWaterElevationAt(position.x, position.z); // engine addition: per position
     return (waterElevation > terrainTierMax) ? waterElevation : terrainTierMax;
   }
 
@@ -3161,11 +3339,17 @@ namespace moho
     }
 
     std::uint8_t capsMask = OccupancyMask(footprint.mOccupancyCaps);
-    if (footprint.mMinWaterDepth > (waterElevation - static_cast<float>(maxHeight) * kHeightWordScale)) {
-      capsMask = RemoveCaps(capsMask, kOccWaterSubSeabed);
-    }
-    if ((waterElevation - static_cast<float>(minHeight) * kHeightWordScale) > footprint.mMaxWaterDepth) {
-      capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+    if (map.mWaterBodies) {
+      // Engine addition: each vertex under its own water level.
+      const WaterDepthRange depth = WaterDepthUnder(map, x0, z0, x1 - x0, z1 - z0);
+      capsMask = ApplyWaterDepthRange(capsMask, footprint, depth);
+    } else {
+      if (footprint.mMinWaterDepth > (waterElevation - static_cast<float>(maxHeight) * kHeightWordScale)) {
+        capsMask = RemoveCaps(capsMask, kOccWaterSubSeabed);
+      }
+      if ((waterElevation - static_cast<float>(minHeight) * kHeightWordScale) > footprint.mMaxWaterDepth) {
+        capsMask = RemoveCaps(capsMask, kOccLandSeabed);
+      }
     }
 
     if ((capsMask & kOccLandSeabed) != 0u && footprint.mMaxSlope != 0.0f) {
@@ -3373,8 +3557,9 @@ namespace moho
       static_cast<std::size_t>(clampedX) + (static_cast<std::size_t>(clampedZ) * static_cast<std::size_t>(field->width));
 
     float terrainElevation = static_cast<float>(field->data[sampleIndex]) * kHeightWordScale;
-    if (mWaterEnabled != 0u && mWaterElevation > terrainElevation) {
-      terrainElevation = mWaterElevation;
+    const float waterElevation = GetWaterElevationAtVertex(clampedX, clampedZ); // engine addition: per vertex
+    if (waterElevation > terrainElevation) {
+      terrainElevation = waterElevation;
     }
     return terrainElevation;
   }
@@ -3461,8 +3646,8 @@ namespace moho
     // (0.0078125f) gives the real elevation.
     constexpr float kHeightSampleToWorld = 1.0f / 128.0f;
     // Decompiled value at `func_Rect2fToInt16`: world-to-collision-cell quantization.
-    constexpr int kWorldToCollisionCellShift = 2;
-    constexpr int kCollisionCellMax = 0xFFFF;
+    [[maybe_unused]] constexpr int kWorldToCollisionCellShift = 2;
+    [[maybe_unused]] constexpr int kCollisionCellMax = 0xFFFF;
 
     [[nodiscard]] float SampleClampedElevation(
       const CHeightField& field, const int cellX, const int cellZ
@@ -3654,11 +3839,11 @@ namespace moho
     const gpg::Rect2f skirtWorldRect = blueprint.GetSkirtRect(worldPos);
 
     // Integer skirt rect: floor the top-left and ceil the bottom-right for
-    // the map-bounds check.
-    const std::int32_t skirtCellX0 = static_cast<std::int32_t>(std::floor(skirtWorldRect.x0));
-    const std::int32_t skirtCellZ0 = static_cast<std::int32_t>(std::floor(skirtWorldRect.z0));
-    const std::int32_t skirtCellX1 = static_cast<std::int32_t>(std::ceil(skirtWorldRect.x1));
-    const std::int32_t skirtCellZ1 = static_cast<std::int32_t>(std::ceil(skirtWorldRect.z1));
+    // the map-bounds check (0x00565484..0x005654FB).
+    const std::int32_t skirtCellX0 = fa::FloorToIntX87(skirtWorldRect.x0);
+    const std::int32_t skirtCellZ0 = fa::FloorToIntX87(skirtWorldRect.z0);
+    const std::int32_t skirtCellX1 = fa::CeilToIntX87(skirtWorldRect.x1);
+    const std::int32_t skirtCellZ1 = fa::CeilToIntX87(skirtWorldRect.z1);
 
     const CHeightField* const field = map.mHeightField.get();
     if (skirtCellX0 < 0 || skirtCellX1 > (field->width - 1) ||
@@ -3678,7 +3863,8 @@ namespace moho
       layerCaps &= ~(static_cast<std::int32_t>(LAYER_Land) | static_cast<std::int32_t>(LAYER_Seabed));
     }
 
-    const float effectiveWaterElevation = map.mWaterEnabled != 0u ? map.mWaterElevation : -10000.0f;
+    // Engine addition: the water level at the structure's position.
+    const float effectiveWaterElevation = map.GetWaterElevationAt(worldPos.x, worldPos.z);
     if (effectiveWaterElevation > skirtMinHeight) {
       layerCaps &= ~static_cast<std::int32_t>(LAYER_Land);
     }
@@ -3784,12 +3970,16 @@ namespace moho
       return false;
     }
 
-    if ((dest.layers & (LAYER_Land | LAYER_Seabed)) != 0 &&
-        grid.terrainOccupation.GetRectOr(footprintX0, footprintZ0, footprintWidth, footprintHeight, false)) {
+    // 0x00720F23..0x00720F55: the static path tests the footprint through
+    // GetRectNeg (FUN_00720580, `GetRectOr(..., true)`), so a footprint that
+    // reaches the occupancy grid's last row or column counts as occupied.
+    const gpg::Rect2i footprintRect{
+      footprintX0, footprintZ0, footprintX0 + footprintWidth, footprintZ0 + footprintHeight
+    };
+    if ((dest.layers & (LAYER_Land | LAYER_Seabed)) != 0 && grid.terrainOccupation.GetRectNeg(footprintRect)) {
       dest.layers &= ~(LAYER_Land | LAYER_Seabed);
     }
-    if ((dest.layers & LAYER_Water) != 0 &&
-        grid.waterOccupation.GetRectOr(footprintX0, footprintZ0, footprintWidth, footprintHeight, false)) {
+    if ((dest.layers & LAYER_Water) != 0 && grid.waterOccupation.GetRectNeg(footprintRect)) {
       dest.layers &= ~LAYER_Water;
     }
     return dest.layers != LAYER_None;

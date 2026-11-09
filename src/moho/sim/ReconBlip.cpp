@@ -1,4 +1,7 @@
 #include "moho/sim/ReconBlip.h"
+#if FAF_SERVER_MODE
+#include "remote/UnderlayPaths.h"
+#endif
 
 #include <algorithm>
 #include <cstddef>
@@ -92,19 +95,9 @@ namespace
   constexpr const char* kReconBlipIsOnRadarHelpText = "bool = ReconBlip:IsOnRadar()";
   constexpr const char* kReconBlipIsKnownFakeName = "IsKnownFake";
   constexpr const char* kReconBlipIsKnownFakeHelpText = "bool = ReconBlip:IsKnownFake()";
-  constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
 
   constexpr std::uint32_t kUnitCollisionBucketFlags = 0x100u;
   constexpr std::uint32_t kReconEntityFamilyPrefix = 0x300u;
-  [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
-  {
-    if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
-      return *set;
-    }
-
-    static moho::CScrLuaInitFormSet fallbackSet("Sim");
-    return fallbackSet;
-  }
 
   int PushReconFlagFromLuaState(
     LuaPlus::LuaState* const state, const char* const helpText, const std::uint32_t flagMask
@@ -115,10 +108,7 @@ namespace
     }
 
     lua_State* const rawState = state->m_state;
-    const int argumentCount = lua_gettop(rawState);
-    if (argumentCount != 2) {
-      LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, helpText, 2, argumentCount);
-    }
+    moho::SCR_ExpectExactArgs(state, 2, helpText);
 
     const LuaPlus::LuaObject blipObject(LuaPlus::LuaStackObject(state, 1));
     ReconBlip* const blip = SCR_FromLua_ReconBlip(blipObject, state);
@@ -152,7 +142,7 @@ namespace
    * Copies one source entity mesh shared-pair `(px,pi)` and retains one shared
    * control-block owner when the control lane is non-null.
    */
-  [[nodiscard]] boost::SharedPtrRaw<RScmResource> CopyEntityMeshSharedRetained(const Entity* const source) noexcept
+  [[maybe_unused]] [[nodiscard]] boost::SharedPtrRaw<RScmResource> CopyEntityMeshSharedRetained(const Entity* const source) noexcept
   {
     boost::SharedPtrRaw<RScmResource> out{};
     if (source == nullptr) {
@@ -202,13 +192,6 @@ namespace
     return {direction.x * randomScale, direction.y * randomScale, direction.z * randomScale};
   }
 
-  [[nodiscard]] gpg::RRef MakeReconBlipRef(ReconBlip* const object) noexcept
-  {
-    gpg::RRef ref{};
-    ref.mObj = object;
-    ref.mType = object ? ReconBlip::StaticGetClass() : nullptr;
-    return ref;
-  }
 } // namespace
 
 gpg::RType* SPerArmyReconInfo::sType = nullptr;
@@ -282,11 +265,7 @@ int moho::cfunc_ReconBlipGetBlueprint(lua_State* const luaContext)
  */
 int moho::cfunc_ReconBlipGetBlueprintL(LuaPlus::LuaState* const state)
 {
-  lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kReconBlipGetBlueprintHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kReconBlipGetBlueprintHelpText);
 
   const LuaPlus::LuaObject blipObject(LuaPlus::LuaStackObject(state, 1));
   ReconBlip* const blip = SCR_FromLua_ReconBlip(blipObject, state);
@@ -315,10 +294,7 @@ int moho::cfunc_ReconBlipGetSource(lua_State* const luaContext)
 int moho::cfunc_ReconBlipGetSourceL(LuaPlus::LuaState* const state)
 {
   lua_State* const rawState = state->m_state;
-  const int argumentCount = lua_gettop(rawState);
-  if (argumentCount != 1) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kReconBlipGetSourceHelpText, 1, argumentCount);
-  }
+  moho::SCR_ExpectExactArgs(state, 1, kReconBlipGetSourceHelpText);
 
   const LuaPlus::LuaObject blipObject(LuaPlus::LuaStackObject(state, 1));
   ReconBlip* const blip = SCR_FromLua_ReconBlip(blipObject, state);
@@ -494,7 +470,7 @@ int moho::cfunc_ReconBlipIsKnownFakeL(LuaPlus::LuaState* const state)
 CScrLuaInitForm* moho::func_ReconBlipGetBlueprint_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipGetBlueprintName,
     &moho::cfunc_ReconBlipGetBlueprint,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -513,7 +489,7 @@ CScrLuaInitForm* moho::func_ReconBlipGetBlueprint_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipGetSource_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipGetSourceName,
     &moho::cfunc_ReconBlipGetSource,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -532,7 +508,7 @@ CScrLuaInitForm* moho::func_ReconBlipGetSource_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsSeenEver_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsSeenEverName,
     &moho::cfunc_ReconBlipIsSeenEver,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -551,7 +527,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsSeenEver_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsSeenNow_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsSeenNowName,
     &moho::cfunc_ReconBlipIsSeenNow,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -570,7 +546,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsSeenNow_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsMaybeDead_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsMaybeDeadName,
     &moho::cfunc_ReconBlipIsMaybeDead,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -589,7 +565,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsMaybeDead_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsOnOmni_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsOnOmniName,
     &moho::cfunc_ReconBlipIsOnOmni,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -608,7 +584,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsOnOmni_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsOnSonar_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsOnSonarName,
     &moho::cfunc_ReconBlipIsOnSonar,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -627,7 +603,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsOnSonar_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsOnRadar_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsOnRadarName,
     &moho::cfunc_ReconBlipIsOnRadar,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -646,7 +622,7 @@ CScrLuaInitForm* moho::func_ReconBlipIsOnRadar_LuaFuncDef()
 CScrLuaInitForm* moho::func_ReconBlipIsKnownFake_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
+    moho::SCR_SimLuaInitSet(),
     kReconBlipIsKnownFakeName,
     &moho::cfunc_ReconBlipIsKnownFake,
     &CScrLuaMetatableFactory<ReconBlip>::Instance(),
@@ -668,12 +644,9 @@ CScrLuaInitForm* moho::func_ReconBlipIsKnownFake_LuaFuncDef()
  * Constructs serializer-load baseline state for `ReconBlip`.
  */
 ReconBlip::ReconBlip(Sim* const sim) :
-    Entity(
-      nullptr,
-      sim,
-      static_cast<EntId>(moho::ToRaw(moho::EEntityIdSentinel::Invalid)),
-      kUnitCollisionBucketFlags
-    ),
+    // 0x005BED98: `call 0x6779E0`, the serializer's `Entity(Sim*, int)`: the id comes from the
+    // archive, so nothing registers in the entity DB here.
+    Entity(sim, kUnitCollisionBucketFlags),
     mCreator{},
     mDeleteWhenStale(0u),
     mPad279{0, 0, 0},
@@ -789,7 +762,7 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
   // 0x005BE8BE..0x005BE9D8: when the source unit has an animation actor, the
   // blip shares its poses -- prior pose first (0x005BDD70), then the current
   // pose (0x005BDD50) -- for both real and jammer blips.
-  if (sourceUnit && sourceUnit->AniActor) {
+  if (sourceUnit && sourceUnit->AniActor && POSE_HoldClientHandles(*sourceUnit->AniActor)) {
     mUnitVarDat.mPriorSharedPose = sourceUnit->AniActor->GetPriorPoseShared();
     mUnitVarDat.mSharedPose = sourceUnit->AniActor->GetPoseShared();
   }
@@ -841,7 +814,7 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
 ReconBlip::~ReconBlip()
 {
   // `mReconDat` is the last-declared member, so MSVC emits its
-  // `msvc8::vector<SPerArmyReconInfo>::~vector()` (FUN_005C5580, called at
+  // `fa::vector<SPerArmyReconInfo>::~vector()` (FUN_005C5580, called at
   // 0x005BECBB) as the first teardown step of this epilogue. Nothing to write.
   // FUN_005BEC90 destroys the payload in place and re-inits it before the
   // rest of the epilogue runs; `mUnitVarDat`'s own destructor then sees an
@@ -879,10 +852,7 @@ void ReconBlip::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg:
  */
 gpg::RRef ReconBlip::GetDerivedObjectRef()
 {
-  gpg::RRef objectRef{};
-  objectRef.mObj = this;
-  objectRef.mType = GetClass();
-  return objectRef;
+  return gpg::MakeSelfRef(this);
 }
 
 /**
@@ -944,8 +914,9 @@ bool ReconBlip::PickTargetPointAboveWater(std::int32_t& outTargetPoint) const
 
   outTargetPoint = -1;
   const STIMap* const mapData = SimulationRef->mMapData;
-  const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
-  return GetPositionWm3().y > waterElevation;
+  const Wm3::Vec3f position = GetPositionWm3();
+  const float waterElevation = mapData->GetWaterElevationAt(position.x, position.z); // engine addition: per position
+  return position.y > waterElevation;
 }
 
 /**
@@ -963,10 +934,11 @@ bool ReconBlip::PickTargetPointBelowWater(std::int32_t& outTargetPoint) const
 
   outTargetPoint = -1;
   const STIMap* const mapData = SimulationRef->mMapData;
-  const float waterElevation = (mapData->mWaterEnabled != 0u) ? mapData->mWaterElevation : -10000.0f;
+  const Wm3::Vec3f position = GetPositionWm3();
+  const float waterElevation = mapData->GetWaterElevationAt(position.x, position.z); // engine addition: per position
   // 0x005BF5D6: `comiss y,water` / `jbe` -> true, so an unordered (NaN) height
   // reads as below water.
-  return !(GetPositionWm3().y > waterElevation);
+  return !(position.y > waterElevation);
 }
 
 /**
@@ -1003,6 +975,9 @@ void ReconBlip::Refresh()
   // the blip (Entity::SetStrategicUnderlay) at 0x005BF89A-0x005BF8B4; the prior
   // recovery omitted this, so blips never picked up the unit's strategic icon.
   SetStrategicUnderlay(sourceUnit->GetStrategicUnderlay());
+#if FAF_SERVER_MODE
+  faf::remote::CopyUnderlayPath(static_cast<std::uint32_t>(sourceUnit->id_), static_cast<std::uint32_t>(id_));
+#endif
 
   // The blip mirrors the source unit's sync payload: +0x0A is `mIsBusy`
   // (which the UI reads back as "attached and hidden"), and +0x208/+0x209 are
@@ -1244,34 +1219,6 @@ bool ReconBlip::IsFake() const noexcept
   return mUnitConstDat.mFake != 0u;
 }
 
-SPerArmyReconInfo* ReconBlip::GetPerArmyReconInfo(const std::int32_t armyIndex) noexcept
-{
-  if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
-    return nullptr;
-  }
-
-  const std::ptrdiff_t count = mReconDat.end() - mReconDat.begin();
-  if (armyIndex >= count) {
-    return nullptr;
-  }
-
-  return mReconDat.begin() + armyIndex;
-}
-
-const SPerArmyReconInfo* ReconBlip::GetPerArmyReconInfo(const std::int32_t armyIndex) const noexcept
-{
-  if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
-    return nullptr;
-  }
-
-  const std::ptrdiff_t count = mReconDat.end() - mReconDat.begin();
-  if (armyIndex >= count) {
-    return nullptr;
-  }
-
-  return mReconDat.begin() + armyIndex;
-}
-
 /**
  * Address: 0x005BEE90 (FUN_005BEE90)
  * Mangled: ?CreateInterface@ReconBlip@Moho@@MAEXPAUSSyncData@2@@Z
@@ -1346,6 +1293,16 @@ void ReconBlip::SyncInterface(SSyncData* const syncData)
   SetUnitUpdateReconFlags(entry, static_cast<std::int32_t>(reconInfo.mReconFlags));
 
   Entity::SyncInterface(syncData);
+
+  // Only an active real contact in current line of sight publishes creator scroll.
+  // Jammer contacts may be visible while their creator is not; keep their endpoints.
+  // Radar/sonar and last-seen contacts likewise keep the blip's own endpoints.
+  // Capture values on the sim thread: no creator pointer survives into workers.
+  const bool copyCreatorScroll = !IsFake() && creator != nullptr && reconInfo.mNeedsFlush != 0u &&
+    reconInfo.mMaybeDead == 0u && (reconInfo.mReconFlags & static_cast<std::uint32_t>(RECON_LOSNow)) != 0u;
+  if (copyCreatorScroll) {
+    OverrideEntityUpdateScroll(syncData, creator->mVarDat);
+  }
 
   // 0x005BF168..0x005BF1C4: the record `Entity::SyncInterface` just queued (sim_ParallelEntitySync:
   // the same lanes are written after the deferred copy instead).

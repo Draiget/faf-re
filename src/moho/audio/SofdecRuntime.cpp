@@ -30,32 +30,6 @@ namespace moho
     std::shared_ptr<sfd::DecodedVideoFrame> borrowedFrame;
   };
 } // namespace moho
-void mwPlyGetHdrInf(
-  const char* bytes,
-  std::int32_t size,
-  moho::MwsfdHdrInf* out
-)
-{
-  if (!out)
-    return;
-  *out = {};
-  if (!bytes || size <= 0)
-    return;
-  moho::sfd::HeaderInfo header;
-  if (!moho::sfd::ParseSfdHeader(std::as_bytes(std::span(bytes, static_cast<std::size_t>(size))), header))
-    return;
-  out->playable = 1;
-  out->ftype = header.audioStreams ? moho::kMwsfcreStreamMps : moho::kMwsfcreStreamVideoOnly;
-  out->width = header.width;
-  out->height = header.height;
-  out->fps = header.fpsMilli;
-  out->frameCount = static_cast<std::int32_t>(header.frameCount);
-  out->compoMode = header.compositionMode;
-  out->videoStreamCount = header.videoStreams;
-  out->audioStreamCount = header.audioStreams;
-  out->audioSampleRate = header.audioSampleRate;
-  out->audioChannelCount = header.audioChannels;
-}
 std::int32_t mwPlyCalcWorkCprmSfd(
   const moho::MwsfcreCreateParams*
 )

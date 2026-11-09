@@ -6,18 +6,22 @@
 #include <cstdlib>
 #include <new>
 #include <stdexcept>
+#include <tuple>
 #include <vector>
 
 #include "CHostManager.h"
 #include "CGpgNetInterface.h"
 #include "CNetNullConnector.h"
+#if defined(_WIN32)
 #include "CNetTCPConnector.h"
 #include "CNetUDPConnector.h"
+#else
+#include "INetTCPSocket.h"
+#endif
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
-#include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "NetConVars.h"
 using namespace moho;
 
@@ -27,7 +31,7 @@ namespace moho
    * Address: 0x00BC4690 (FUN_00BC4690, dynamic initializer for `sProtocols`)
    * Address: 0x00BEF5B0 (FUN_00BEF5B0, dynamic atexit destructor for `sProtocols`)
    */
-  msvc8::vector<msvc8::string> sProtocols{};
+  fa::vector<fa::string> sProtocols{};
 } // namespace moho
 
 /**
@@ -160,7 +164,7 @@ void SSendStampWindow::AppendStamp(const SSendStamp& stamp)
   items.push_back(stamp);
 }
 
-void moho::ENetworkPlayerStateToStr(const ENetworkPlayerState state, msvc8::string& out)
+void moho::ENetworkPlayerStateToStr(const ENetworkPlayerState state, fa::string& out)
 {
   if (state >= ENetworkPlayerState::_Last) {
     out = gpg::STR_Printf("%d", static_cast<int32_t>(state));
@@ -192,7 +196,7 @@ void moho::ENetworkPlayerStateToStr(const ENetworkPlayerState state, msvc8::stri
   }
 }
 
-void moho::NetPacketTypeToStr(const EPacketType state, msvc8::string& out)
+void moho::NetPacketTypeToStr(const EPacketType state, fa::string& out)
 {
   switch (state) {
   case PT_Connect:
@@ -384,13 +388,13 @@ void SBandwidthUsageSeries::EnsureSampleCount(const uint32_t count)
 namespace
 {
   template <typename T>
-  [[nodiscard]] T* VectorData(msvc8::vector<T>& values) noexcept
+  [[nodiscard]] T* VectorData(fa::vector<T>& values) noexcept
   {
     return values.empty() ? nullptr : &values[0];
   }
 
   template <typename T>
-  [[nodiscard]] const T* VectorData(const msvc8::vector<T>& values) noexcept
+  [[nodiscard]] const T* VectorData(const fa::vector<T>& values) noexcept
   {
     return values.empty() ? nullptr : &values[0];
   }
@@ -402,7 +406,7 @@ namespace
   }
 
   template <typename T>
-  [[nodiscard]] size_t ClampVectorIndexFromPointer(const msvc8::vector<T>& values, const T* pointer) noexcept
+  [[nodiscard]] size_t ClampVectorIndexFromPointer(const fa::vector<T>& values, const T* pointer) noexcept
   {
     const T* const base = VectorData(values);
     if (!base || !pointer) {
@@ -454,16 +458,11 @@ namespace
   template <typename T>
   [[nodiscard]] T* CopyRangeBackward(T* destinationEnd, const T* const sourceBegin, const T* sourceEnd) noexcept
   {
-    while (sourceEnd != sourceBegin) {
-      --sourceEnd;
-      --destinationEnd;
-      *destinationEnd = *sourceEnd;
-    }
-    return destinationEnd;
+    return std::copy_backward(sourceBegin, sourceEnd, destinationEnd);
   }
 
   template <typename T>
-  [[nodiscard]] T* EraseRangeShiftLeft(msvc8::vector<T>& values, T* const destination, const T* const source)
+  [[nodiscard]] T* EraseRangeShiftLeft(fa::vector<T>& values, T* const destination, const T* const source)
   {
     T* const base = VectorData(values);
     if (!base) {
@@ -491,7 +490,7 @@ namespace
 
   template <typename T>
   [[nodiscard]] T* InsertValueCopies(
-    msvc8::vector<T>& values, T* const position, const uint32_t count, const T& value
+    fa::vector<T>& values, T* const position, const uint32_t count, const T& value
   )
   {
     if (count == 0u) {
@@ -532,7 +531,7 @@ namespace
   /**
    * Address: 0x0047E570 (FUN_0047E570, ExtractArgumentHighByteAlias)
    */
-  unsigned char ExtractArgumentHighByteAlias(const uint32_t value) noexcept
+  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -540,7 +539,7 @@ namespace
   /**
    * Address: 0x0047E5C0 (FUN_0047E5C0, ExtractArgumentHighByteAlias2)
    */
-  unsigned char ExtractArgumentHighByteAlias2(const uint32_t value) noexcept
+  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias2(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -548,7 +547,7 @@ namespace
   /**
    * Address: 0x0047E630 (FUN_0047E630, ExtractArgumentHighByteAlias3)
    */
-  unsigned char ExtractArgumentHighByteAlias3(const uint32_t value) noexcept
+  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias3(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -556,7 +555,7 @@ namespace
   /**
    * Address: 0x0047E6F0 (FUN_0047E6F0, ExtractArgumentHighByteAlias4)
    */
-  unsigned char ExtractArgumentHighByteAlias4(const uint32_t value) noexcept
+  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias4(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -564,7 +563,7 @@ namespace
   /**
    * Address: 0x0047E930 (FUN_0047E930, ExtractArgumentHighByteAlias5)
    */
-  unsigned char ExtractArgumentHighByteAlias5(const uint32_t value) noexcept
+  [[maybe_unused]] unsigned char ExtractArgumentHighByteAlias5(const uint32_t value) noexcept
   {
     return ExtractArgumentHighByte(value);
   }
@@ -672,68 +671,13 @@ void moho::NET_BuildBandwidthUsageSeries(
   }
 }
 
-/**
- * Address: 0x007F3F20 (FUN_007F3F20, func_ren_BandwidthUsage_Line)
- *
- * What it does:
- * Draws outbound/inbound bandwidth samples as two connected line strips.
- */
-void moho::REN_DrawBandwidthUsageLinePair(
-  CD3DPrimBatcher& primBatcher,
-  const SBandwidthUsageSeries& series,
-  const std::int32_t xOffset,
-  const std::int32_t yBase,
-  const float yScale,
-  const std::uint32_t inboundColor,
-  const std::uint32_t outboundColor
-)
-{
-  const std::uint32_t sampleCount = series.SampleCount();
-  if (sampleCount == 0u) {
-    return;
-  }
 
-  CD3DPrimBatcher::Vertex previousOutbound{};
-  CD3DPrimBatcher::Vertex previousInbound{};
-  bool hasPrevious = false;
-
-  for (std::uint32_t sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
-    const SBandwidthUsageSample& sample = series.samples[sampleIndex];
-    const float x = static_cast<float>(xOffset + static_cast<std::int32_t>(sampleIndex));
-
-    CD3DPrimBatcher::Vertex currentOutbound{};
-    currentOutbound.mX = x;
-    currentOutbound.mY = static_cast<float>(yBase) - (sample.outboundBytesPerSec * yScale);
-    currentOutbound.mZ = 0.0f;
-    currentOutbound.mColor = outboundColor;
-    currentOutbound.mU = 0.0f;
-    currentOutbound.mV = 0.0f;
-
-    CD3DPrimBatcher::Vertex currentInbound{};
-    currentInbound.mX = x;
-    currentInbound.mY = static_cast<float>(yBase) - (sample.inboundBytesPerSec * yScale);
-    currentInbound.mZ = 0.0f;
-    currentInbound.mColor = inboundColor;
-    currentInbound.mU = 0.0f;
-    currentInbound.mV = 0.0f;
-
-    if (hasPrevious) {
-      primBatcher.DrawLine(previousOutbound, currentOutbound);
-      primBatcher.DrawLine(previousInbound, currentInbound);
-    }
-
-    previousOutbound = currentOutbound;
-    previousInbound = currentInbound;
-    hasPrevious = true;
-  }
-}
-
-msvc8::string moho::NET_ReadLengthPrefixedArgPayload(gpg::BinaryReader& reader)
+fa::string moho::NET_ReadLengthPrefixedArgPayload(gpg::BinaryReader& reader)
 {
   uint32_t payloadLen = 0;
   reader.ReadExact(payloadLen);
 
-  msvc8::string payload;
+  fa::string payload;
   if (payloadLen != 0) {
     std::vector<char> payloadBuffer(payloadLen);
     reader.Read(payloadBuffer.data(), payloadLen);
@@ -837,6 +781,7 @@ INetConnector* moho::NET_MakeConnector(
  */
 INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<INetNATTraversalProvider> prov)
 {
+#if defined(_WIN32)
   if (!NET_Init()) {
     return nullptr;
   }
@@ -864,7 +809,29 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
     ::closesocket(sock);
     return nullptr;
   }
+  // Engine addition (issue #236): socket buffer sizes, off (0) by default.
+  // A large order burst is sent in one frame and can overflow the system's
+  // default buffers on either side.
+  for (const auto& [option, bytes, label] : {std::tuple{SO_RCVBUF, net_SocketRecvBuffer, "SO_RCVBUF"},
+                                             std::tuple{SO_SNDBUF, net_SocketSendBuffer, "SO_SNDBUF"}}) {
+    if (bytes > 0) {
+      const int value = bytes;
+      if (::setsockopt(sock, SOL_SOCKET, option, reinterpret_cast<const char*>(&value), sizeof(value)) == SOCKET_ERROR) {
+        gpg::Logf("NET_MakeUDPConnector: setsockopt(%s, %d) failed: %s", label, value, NET_GetWinsockErrorString());
+      } else {
+        gpg::Logf("NET_MakeUDPConnector: %s %d", label, value);
+      }
+    }
+  }
   return new CNetUDPConnector{sock, prov};
+#else
+  // Engine addition (dedicated-server plan WPL.5): the lockstep transport (the WSAEventSelect
+  // connectors and their sockets) is Windows only; NET_Init fails here, so this fails as the
+  // Windows function does when Winsock cannot start.
+  (void)port;
+  (void)prov;
+  return nullptr;
+#endif
 }
 
 /**
@@ -875,6 +842,7 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
  */
 INetConnector* moho::NET_MakeTCPConnector(const u_short port)
 {
+#if defined(_WIN32)
   if (!NET_Init()) {
     return nullptr;
   }
@@ -914,7 +882,26 @@ INetConnector* moho::NET_MakeTCPConnector(const u_short port)
     return nullptr;
   }
   return connector;
+#else
+  // Engine addition (dedicated-server plan WPL.5): see NET_MakeUDPConnector.
+  (void)port;
+  return nullptr;
+#endif
 }
+
+#if !defined(_WIN32)
+/**
+ * Engine addition (dedicated-server plan WPL.5): moho/net/INetTCPSocket.cpp (the Winsock TCP
+ * socket) is Windows only. NET_Init fails here, and NET_TCPConnect fails as the Windows
+ * function does then.
+ */
+moho::INetTCPSocket* moho::NET_TCPConnect(const u_long address, const u_short port)
+{
+  (void)address;
+  (void)port;
+  return nullptr;
+}
+#endif
 
 /**
  * Address: 0x0047F990 (FUN_0047F990)
@@ -936,7 +923,7 @@ CHostManager* moho::NET_GetHostManager()
  * What it does:
  * Resolves/caches a host-order IPv4 address through the global CHostManager cache.
  */
-msvc8::string moho::NET_GetHostName(const u_long address)
+fa::string moho::NET_GetHostName(const u_long address)
 {
   const auto manager = NET_GetHostManager();
   return manager->GetHostName(address);
@@ -1082,7 +1069,7 @@ const char* moho::NET_GetWinsockErrorString() noexcept
  * What it does:
  * Formats host-order IPv4 as "A.B.C.D".
  */
-msvc8::string moho::NET_GetDottedOctetFromUInt32(const uint32_t number)
+fa::string moho::NET_GetDottedOctetFromUInt32(const uint32_t number)
 {
   return gpg::STR_Printf(
     "%d.%d.%d.%d", (number >> 24) & 0xFF, (number >> 16) & 0xFF, (number >> 8) & 0xFF, number & 0xFF
@@ -1093,16 +1080,16 @@ msvc8::string moho::NET_GetDottedOctetFromUInt32(const uint32_t number)
  * Address: 0x00480200 (FUN_00480200)
  * Mangled: ?NET_GetUInt32FromDottedOcted@Moho@@YAIV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
  *
- * msvc8::string
+ * fa::string
  *
  * What it does:
  * Splits dotted IPv4 text by '.' and folds tokens using (acc << 8) | atoi(token).
  */
-uint32_t moho::NET_GetUInt32FromDottedOcted(const msvc8::string& host)
+uint32_t moho::NET_GetUInt32FromDottedOcted(const fa::string& host)
 {
   uint32_t value = 0;
   const char* cursor = host.c_str();
-  msvc8::string token;
+  fa::string token;
 
   while (gpg::STR_GetToken(cursor, ".", token)) {
     value = (value << 8) | static_cast<uint32_t>(std::atoi(token.c_str()));
@@ -1118,20 +1105,20 @@ uint32_t moho::NET_GetUInt32FromDottedOcted(const msvc8::string& host)
  * Converts `ENetProtocolType` to canonical display text.
  * Unsupported enum values throw `std::domain_error`.
  */
-msvc8::string moho::NET_GetProtocolName(const ENetProtocolType protocol)
+fa::string moho::NET_GetProtocolName(const ENetProtocolType protocol)
 {
   switch (protocol) {
   case ENetProtocolType::kNone:
-    return msvc8::string("None");
+    return fa::string("None");
   case ENetProtocolType::kTcp:
-    return msvc8::string("TCP");
+    return fa::string("TCP");
   case ENetProtocolType::kUdp:
-    return msvc8::string("UDP");
+    return fa::string("UDP");
   default:
     break;
   }
 
-  const msvc8::string msg = gpg::STR_Printf("invalid protocol (%d)", static_cast<int32_t>(protocol));
+  const fa::string msg = gpg::STR_Printf("invalid protocol (%d)", static_cast<int32_t>(protocol));
   throw std::domain_error(msg.c_str());
 }
 
@@ -1154,6 +1141,6 @@ ENetProtocolType moho::NET_ProtocolFromString(const char* str)
     return ENetProtocolType::kUdp;
   }
 
-  const msvc8::string msg = gpg::STR_Printf("invalid protocol (\"%s\")", str);
+  const fa::string msg = gpg::STR_Printf("invalid protocol (\"%s\")", str);
   throw std::domain_error(msg.c_str());
 }
