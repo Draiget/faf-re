@@ -525,7 +525,8 @@ namespace
     moho::SpatialShard<T>* const shard,
     const moho::EEntityType type,
     const moho::CGeomSolid3& volume,
-    std::vector<VolumeLeafGroup<T>>& groups
+    std::vector<VolumeLeafGroup<T>>& groups,
+    std::size_t& items
   )
   {
     if (SpatialShardHasNoRequestedType(*shard, type) || !volume.Intersects(shard->mBounds)) {
@@ -534,11 +535,19 @@ namespace
 
     if (shard->mLevel <= 0) {
       groups.push_back(VolumeLeafGroup<T>{shard->mData.data(), 16});
+      // Engine addition (ren_ParallelCullMinItems): the requested entries under this shard, its own counts.
+      const std::uint32_t typeBits = EntityTypeBits(type);
+      items += static_cast<std::size_t>(
+        ((typeBits & kSpatialEntityTypeUnit) != 0u ? shard->mUnitCount : 0) +
+        ((typeBits & kSpatialEntityTypeProjectile) != 0u ? shard->mProjectileCount : 0) +
+        ((typeBits & kSpatialEntityTypeProp) != 0u ? shard->mPropCount : 0) +
+        ((typeBits & kSpatialEntityTypeEntity) != 0u ? shard->mEntityCount : 0)
+      );
       return;
     }
 
     for (std::int32_t index = 0; index < 16; ++index) {
-      GatherVolumeLeafGroups(shard->mShards[index], type, volume, groups);
+      GatherVolumeLeafGroups(shard->mShards[index], type, volume, groups, items);
     }
   }
 
@@ -551,6 +560,22 @@ namespace
 
   // Below this many leaf groups the query runs on the calling thread.
   constexpr std::size_t kParallelCullMinGroups = 8u;
+
+  /**
+   * Engine change: `ren_ParallelCullMinItems`. Waking the user workers costs more than a small query's
+   * leaf work: the projectile-icon and minimap queries ran 0.01-0.05 ms slower in parallel while the
+   * whole-map mesh query ran 0.23 ms faster (tmp/claude/perf298/abrun_pcull.out). Below this many
+   * requested entries under the gathered shards the query runs on the calling thread. 0 keeps only the
+   * group count test. 1000 measured: projectile icons and minimap faster, mesh queries unchanged.
+   */
+  int ren_ParallelCullMinItems = 1000;
+
+  moho::TConVar<int> gTConVar_ren_ParallelCullMinItems(
+    "ren_ParallelCullMinItems",
+    "View queries with fewer entries than this under the shards they reach run on the calling thread "
+    "(0 = decide by shard count only).",
+    &ren_ParallelCullMinItems
+  );
 
   /**
    * Engine addition (`ren_ParallelCull`): a whole-database volume query, as `SpatialDB<T>::
@@ -576,15 +601,17 @@ namespace
     }
 
     std::vector<VolumeLeafGroup<T>> groups;
+    std::size_t items = 0;
     for (moho::SpatialShard<T>* const shard : shards) {
       if (shard != nullptr) {
-        GatherVolumeLeafGroups(shard, type, volume, groups);
+        GatherVolumeLeafGroups(shard, type, volume, groups, items);
       }
     }
     moho::SpatialShardData<T>* const rootLeaf = &rootData;
     groups.push_back(VolumeLeafGroup<T>{&rootLeaf, 1});
 
-    if (groups.size() < kParallelCullMinGroups) {
+    if (groups.size() < kParallelCullMinGroups ||
+        (ren_ParallelCullMinItems > 0 && items < static_cast<std::size_t>(ren_ParallelCullMinItems))) {
       for (const VolumeLeafGroup<T>& group : groups) {
         for (std::int32_t index = 0; index < group.mCount; ++index) {
           moho::SpatialShardData<T>& leaf = *group.mLeaves[index];
