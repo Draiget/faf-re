@@ -238,62 +238,15 @@ do
         Log('commands done: ' .. table.getn(Commands))
     end
 
-    local function CameraTour()
-        local camera = GetCamera('WorldCamera')
-        if not camera then
-            Log('no world camera')
-            return
-        end
-        SweepObject('camera', camera)
-        Try('zoom', camera.SetZoom, camera, 40, 0.5)
-        WaitSeconds(1)
-        Try('spin', camera.Spin, camera, 1, 0.3)
-        WaitSeconds(1)
-        Try('hold', camera.HoldRotation, camera)
-        Try('revert', camera.RevertRotation, camera)
-        local settings = Try('SaveSettings', camera.SaveSettings, camera)
-        Try('reset', camera.Reset, camera)
-        WaitSeconds(1)
-        if settings then
-            Try('RestoreSettings', camera.RestoreSettings, camera, settings)
-        end
-        Try('EnableEaseInOut', camera.EnableEaseInOut, camera)
-        Try('UseGameClock', camera.UseGameClock, camera)
-        Try('UseSystemClock', camera.UseSystemClock, camera)
-    end
-
-    local function UnitTour()
-        -- A replay starts as an observer, and category selection only takes the focus army's own units.
-        Try('focus army', ConExecute, 'SetFocusArmy 0')
-        WaitSeconds(1)
-        Try('select all', UISelectionByCategory, 'ALLUNITS', false, false, false, false)
-        WaitSeconds(1)
-        local units = GetSelectedUnits()
-        if not units then
-            Log('nothing selected')
-            return
-        end
-        Log('selected ' .. table.getn(units))
-        for i = 1, math.min(6, table.getn(units)) do
-            SweepObject('user unit ' .. i, units[i])
-        end
-        Try('select land', UISelectionByCategory, 'LAND', false, false, false, false)
-        WaitSeconds(2)
-        Try('select air', UISelectionByCategory, 'AIR', false, false, false, false)
-        WaitSeconds(2)
-        Try('select structures', UISelectionByCategory, 'STRUCTURE', false, false, false, false)
-        WaitSeconds(2)
-        Try('select none', SelectUnits, {})
-    end
-
-    -- One of each Maui control on the top frame, its getters swept, then destroyed.
-    -- Methods the control fuzz leaves out: they end the control, take the input focus for good, or are callbacks the
-    -- engine calls itself.
+    -- Methods the fuzz leaves out (controls, the camera, user units): they end the object, take the input focus for
+    -- good, or are callbacks the engine calls itself.
     local ControlFuzzSkip = {
         Destroy = true, OnDestroy = true, AcquireKeyboardFocus = true, AbandonKeyboardFocus = true, AcquireFocus = true,
         SetNeedsFrameUpdate = true, OnFrame = true, HandleEvent = true, OnKeyboardFocusChange = true,
-        -- ItemList:GetItem and the movie getters crash the original game the same way (see Skip above).
-        GetItem = true, GetFrameRate = true, GetNumFrames = true,
+        -- ItemList:GetItem and the movie getters crash the original game the same way (see Skip above), and so does
+        -- camera:RestoreSettings on a value that isn't a table: 0x007AD150 reads its fields with lua_rawget
+        -- (0x0090D050) and checks nothing first.
+        GetItem = true, GetFrameRate = true, GetNumFrames = true, RestoreSettings = true,
     }
 
     -- Every method of a control (the engine's and FAF's Lua class's) with each argument pattern: nothing, 1, a
@@ -339,6 +292,59 @@ do
         Log('fuzz ' .. label .. ': ' .. calls .. ' calls, ' .. failed .. ' errors')
     end
 
+    local function CameraTour()
+        local camera = GetCamera('WorldCamera')
+        if not camera then
+            Log('no world camera')
+            return
+        end
+        SweepObject('camera', camera)
+        FuzzControl('camera', camera, GetFrame(0))
+        Try('zoom', camera.SetZoom, camera, 40, 0.5)
+        WaitSeconds(1)
+        Try('spin', camera.Spin, camera, 1, 0.3)
+        WaitSeconds(1)
+        Try('hold', camera.HoldRotation, camera)
+        Try('revert', camera.RevertRotation, camera)
+        local settings = Try('SaveSettings', camera.SaveSettings, camera)
+        Try('reset', camera.Reset, camera)
+        WaitSeconds(1)
+        if settings then
+            Try('RestoreSettings', camera.RestoreSettings, camera, settings)
+        end
+        Try('EnableEaseInOut', camera.EnableEaseInOut, camera)
+        Try('UseGameClock', camera.UseGameClock, camera)
+        Try('UseSystemClock', camera.UseSystemClock, camera)
+    end
+
+    local function UnitTour()
+        -- A replay starts as an observer, and category selection only takes the focus army's own units.
+        Try('focus army', ConExecute, 'SetFocusArmy 0')
+        WaitSeconds(1)
+        Try('select all', UISelectionByCategory, 'ALLUNITS', false, false, false, false)
+        WaitSeconds(1)
+        local units = GetSelectedUnits()
+        if not units then
+            Log('nothing selected')
+            return
+        end
+        Log('selected ' .. table.getn(units))
+        for i = 1, math.min(6, table.getn(units)) do
+            SweepObject('user unit ' .. i, units[i])
+        end
+        for i = 1, math.min(3, table.getn(units)) do
+            FuzzControl('user unit ' .. i, units[i], units[table.getn(units)])
+        end
+        Try('select land', UISelectionByCategory, 'LAND', false, false, false, false)
+        WaitSeconds(2)
+        Try('select air', UISelectionByCategory, 'AIR', false, false, false, false)
+        WaitSeconds(2)
+        Try('select structures', UISelectionByCategory, 'STRUCTURE', false, false, false, false)
+        WaitSeconds(2)
+        Try('select none', SelectUnits, {})
+    end
+
+    -- One of each Maui control on the top frame, its getters swept, then destroyed.
     local function ControlTour()
         local parent = GetFrame(0)
         local made = {}
