@@ -16,8 +16,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #if defined(_WIN32)
@@ -61,6 +63,7 @@ namespace
     std::string beats;   // the beats= line: how far the playback got
     std::string verdict; // the VERDICT line
     std::string tail;    // the last lines, for a failure message
+    std::string output;  // everything printed, for the checks' summaries
     std::vector<std::string> keyframes; // "keyframes: N taken, M failed, ..." lines, one per session
     int seeks = 0;                      // "seek N: at beat" lines: moves that arrived
   };
@@ -91,6 +94,7 @@ namespace
       } else if (text.find("] seek ") != std::string::npos && text.find(": at beat ") != std::string::npos) {
         ++run.seeks;
       }
+      run.output += text;
       lines.push_back(std::move(text));
       if (lines.size() > 40) {
         lines.erase(lines.begin());
@@ -233,6 +237,148 @@ TEST(ReplayPlayback, RejoinRehearsalKeepsTheChecksums)
   );
   ExpectMatchedToTheEnd(run);
 }
+
+// The analysis modes (docs/SWITCHES.md, headless --help) on the first replay, all in one run: the sim builds army 0's
+// view and moves it to army 1 at beat 3000, as a player's client does, keeps what only a client reads, and writes
+// the checksum digests, the published state, the Sync keys, the sync lanes, the bones, the blueprint order, the Lua
+// pairs order and every file it touched. None of that may change the recorded checksums, and every file is written.
+TEST(ReplayPlayback, AnalysisModesWriteTheirFilesAndKeepTheChecksums)
+{
+  const std::vector<SReplay> replays = Replays();
+  if (replays.empty()) {
+    GTEST_SKIP() << "set FAF_REPLAY_DATA to a folder with replays/ and faf/bin/ (see the file's header)";
+  }
+  const SReplay& replay = replays.front();
+  SCOPED_TRACE("replay " + replay.id);
+  const std::filesystem::path out = LogFolder() / ("modes_" + replay.id);
+  std::error_code ignored;
+  std::filesystem::remove_all(out, ignored); // files from an earlier run would hide a missing one
+  std::filesystem::create_directories(out);
+  const std::vector<std::pair<std::string, std::string>> files = {
+    {"--digests", "digests.txt"},     {"--state-digests", "state.txt"}, {"--sync-keys", "keys.txt"},
+    {"--lane-sizes", "lanes.csv"},    {"--bone-stats", "bones.csv"},    {"--blueprint-order", "blueprints.txt"},
+    {"--lua-pairs", "pairs.txt"},     {"--disk-trace", "disk.txt"},
+  };
+  std::string arguments = " --focus 0 --focus-switch 3000:1 --keep-client-data --fpu-report";
+  for (const auto& [option, name] : files) {
+    arguments += " " + option + " " + Quoted(out / name);
+  }
+  const SRun run = PlayReplay(replay, "ctest_modes_" + replay.id, arguments);
+  ExpectMatchedToTheEnd(run);
+
+  for (const auto& [option, name] : files) {
+    EXPECT_GT(std::filesystem::file_size(out / name, ignored), 0u) << option << " wrote nothing to " << name;
+  }
+  // One "beat md5" line per checksummed beat, as many as the beats line counts.
+  const std::size_t at = run.beats.find("digests=");
+  ASSERT_NE(at, std::string::npos) << run.beats;
+  const int counted = std::atoi(run.beats.c_str() + at + 8);
+  EXPECT_GT(counted, 0) << run.beats;
+  std::ifstream digests(out / "digests.txt");
+  int lines = 0;
+  for (std::string line; std::getline(digests, line);) {
+    lines += line.empty() ? 0 : 1;
+  }
+  EXPECT_EQ(lines, counted);
+  std::filesystem::remove_all(out, ignored);
+}
+
+#if defined(FAF_HEADLESS_SERVER_MODE)
+namespace
+{
+  /** The first replay played once with one server check; its summary must hold every `expected` text. */
+  void ExpectServerCheck(const std::string& tag, const std::string& arguments, const std::vector<std::string>& expected)
+  {
+    const std::vector<SReplay> replays = Replays();
+    if (replays.empty()) {
+      GTEST_SKIP() << "set FAF_REPLAY_DATA to a folder with replays/ and faf/bin/ (see the file's header)";
+    }
+    const SReplay& replay = replays.front();
+    SCOPED_TRACE("replay " + replay.id);
+    const SRun run = PlayReplay(replay, "ctest_" + tag + "_" + replay.id, arguments);
+    ExpectMatchedToTheEnd(run);
+    for (const std::string& text : expected) {
+      EXPECT_NE(run.output.find(text), std::string::npos) << "no \"" << text << "\" in\n" << run.output;
+    }
+  }
+
+  std::string OutputFile(const std::string& name)
+  {
+    return Quoted(LogFolder() / name);
+  }
+} // namespace
+
+// The replay's launch rebuilt from its header as the server builds it (BuildLaunchInfo) and compared; nothing played.
+TEST(ReplayPlaybackServer, LaunchRebuildsFromTheHeader)
+{
+  const std::vector<SReplay> replays = Replays();
+  if (replays.empty()) {
+    GTEST_SKIP() << "set FAF_REPLAY_DATA to a folder with replays/ and faf/bin/ (see the file's header)";
+  }
+  const SReplay& replay = replays.front();
+  const SRun run = Play(
+    Quoted(FAF_HEADLESS_EXE) + " --launch-check --replay " + Quoted(replay.replay) + " /init " + Quoted(replay.init)
+  );
+  EXPECT_EQ(run.exitCode, 0) << run.output;
+  EXPECT_NE(run.output.find("LAUNCHCHECK"), std::string::npos) << run.output;
+  EXPECT_NE(run.output.find("differences=0"), std::string::npos) << run.output;
+}
+
+// Every command through the game server's seats, one per command source, each decoded and marshalled again as a
+// client sends it.
+TEST(ReplayPlaybackServer, SeatsCarryEveryCommandUnchanged)
+{
+  ExpectServerCheck("seats", " --seats --command-check", {"command check:", " 0 differing, 0 not marshalled again"});
+}
+
+// The visibility oracle for army 0 against what the sim publishes, every entity and beat, and the spatial oracle
+// against brute force.
+TEST(ReplayPlaybackServer, VisibilityOracleAgreesWithTheSim)
+{
+  ExpectServerCheck(
+    "oracle", " --focus 0 --oracle-check", {"oracle check:", " 0 entity-beats differ", " 0 differ from brute force"}
+  );
+}
+
+// The sync walk's change set against its packet, every beat.
+TEST(ReplayPlaybackServer, ChangeSetCoversEveryPacketEntry)
+{
+  ExpectServerCheck("changeset", " --changeset-check", {"change-set check:", "(0 failures)"});
+}
+
+// Every army's view frame encoded and decoded again, with per-view ids, every command sent back through the view ids,
+// and the spy checking that no frame names what its client does not hold.
+TEST(ReplayPlaybackServer, ViewFramesRoundTrip)
+{
+  ExpectServerCheck(
+    "frames", " --view-frames " + OutputFile("ctest_frames.csv") + " --view-ids --inbound-check --spy",
+    {"view frames:", " 0 encode failures, 0 round-trip failures", "inbound check:", " 0 differing",
+     "not mapping back to their family and source: 0"}
+  );
+}
+
+// The view frames over a simulated channel that loses 5 % of them and acknowledges 3 beats late, as a real link does:
+// each frame is encoded against the newest acknowledged one and must decode exactly (CClientFrameWindow).
+TEST(ReplayPlaybackServer, ViewFramesSurviveALossyLateAckChannel)
+{
+  ExpectServerCheck(
+    "lossy", " --view-frames " + OutputFile("ctest_lossy.csv") + " --view-loss 5 --view-ack-delay 3",
+    {"view frames:", " 0 encode failures, 0 round-trip failures", "channel: 0 frames arrived and did not decode"}
+  );
+}
+
+// The server's view work as a bench: every view's kept frame against one built whole, the Lua lane routed, the
+// session tables and pose lane, two pipeline threads and team views.
+TEST(ReplayPlaybackServer, ViewBenchFramesMatchWholeFrames)
+{
+  ExpectServerCheck(
+    "bench",
+    " --view-bench " + OutputFile("ctest_bench.csv") +
+      " --view-bench-check --lua-routing --view-tables --view-poses --view-pipeline 2 --view-teams --spy",
+    {"view bench:", " 0 encode failures, 0 check differences"}
+  );
+}
+#endif
 
 // The checks above can fail: with /desynctestbeat this client alone nudges one unit's health at beat 1500
 // (sim_DesyncTestNudgeBeat, docs/SWITCHES.md "Desync recorder"), so the recorded checksums stop matching from
