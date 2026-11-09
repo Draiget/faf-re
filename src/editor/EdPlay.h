@@ -88,7 +88,8 @@ namespace faf::editor
      * editor is up; `/playseconds <s>` stops it after s seconds of play, `/playcycles <n>` repeats that n
      * times, and `/playquit` closes the editor after the last one. `/playai <key>` plays against that AI
      * (solo without it), and `/playwholemap` switches the view to the whole map once play starts
-     * and back to the player's army halfway through.
+     * and back to the player's army halfway through. `/playafter <s>` waits s seconds after the editor is
+     * up before the first play.
      */
     void ReadCommandLine();
 
@@ -126,11 +127,19 @@ namespace faf::editor
     int mAutoCyclesLeft = 0;
     bool mAutoQuit = false;
     bool mAutoWholeMap = false;
+    float mAutoDelay = 0.0f;
+    double mAutoStartAt = -1.0;
     bool mAutoExitApp = false;
     bool mExitAppSent = false;
     bool mQuitRequested = false;
     double mPlayingSince = -1.0;
   };
+
+  /**
+   * Installs the editor's loading view in a state the game UI starts in (no faction movie, no
+   * "IN TRANSIT" screen; EdPlay.cpp); the editor sets it as `moho::gUIBeforeStartGameUI`.
+   */
+  void InstallLoadingView(LuaPlus::LuaState* state);
 
   /** "SCMP_009" for "/maps/scmp_009/SCMP_009_scenario.lua". */
   [[nodiscard]] std::string MapDisplayName(const std::string& scenarioPath);

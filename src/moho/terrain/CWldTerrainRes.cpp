@@ -790,23 +790,22 @@ namespace
     return taken;
   }
 
+  [[nodiscard]] bool NormalMapOnLoaderOn()
+  {
+    static const bool startupOff = moho::CFG_GetArgOption("/nonormalmaponloader", 0u, nullptr);
+    return moho::ren_NormalMapOnLoader && !startupOff;
+  }
+
   /**
-   * Runs on the map loader thread, with a few helpers. Rows go to whichever thread is free;
-   * only the loader's own thread reports progress, as that is where an abort throws.
+   * The whole map's normal blocks, encoded by the calling thread and a few helpers. Rows go to
+   * whichever thread is free; only the calling thread reports progress, as that is where an
+   * abort throws. Each block is `EncodeNormalBlock`'s, so the result is the one-thread result.
    */
-  void PrebuildNormalMap(
-    const moho::CWldTerrainRes* const owner,
+  [[nodiscard]] PrebuiltNormalMap EncodeNormalMapInParallel(
     const moho::CHeightField& field,
     moho::CBackgroundTaskControl& loadControl
   )
   {
-    static const bool startupOff = moho::CFG_GetArgOption("/nonormalmaponloader", 0u, nullptr);
-    if (!moho::ren_NormalMapOnLoader || startupOff || field.width <= 1 || field.height <= 1) {
-      return;
-    }
-
-    const auto start = std::chrono::steady_clock::now();
-
     PrebuiltNormalMap built{};
     built.blocksWide = AlignUpTo4(field.width - 1) / 4;
     built.blocksHigh = AlignUpTo4(field.height - 1) / 4;
@@ -856,6 +855,22 @@ namespace
       thread.join();
     }
     helpers.threads.clear();
+    return built;
+  }
+
+  /** Runs on the map loader thread (`EncodeNormalMapInParallel`), so `Finalize` only copies. */
+  void PrebuildNormalMap(
+    const moho::CWldTerrainRes* const owner,
+    const moho::CHeightField& field,
+    moho::CBackgroundTaskControl& loadControl
+  )
+  {
+    if (!NormalMapOnLoaderOn() || field.width <= 1 || field.height <= 1) {
+      return;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    PrebuiltNormalMap built = EncodeNormalMapInParallel(field, loadControl);
+    const std::uint32_t threadCount = std::clamp(std::thread::hardware_concurrency() / 2u, 1u, 4u);
 
     gpg::Logf(
       "Terrain: normal map encoded on the loader in %.2f s, %u threads",
@@ -2365,6 +2380,16 @@ namespace moho
       prebuilt = TakePrebuiltNormalMap(this);
       if (prebuilt.blocksWide != AlignUpTo4(field->width - 1) / 4 || prebuilt.blocksHigh != AlignUpTo4(field->height - 1) / 4) {
         prebuilt = {};
+      }
+      // None, or the map changed since the loader encoded it (a map start that flattens building
+      // skirts finalizes the terrain here): the same encoding, on this thread and a few helpers.
+      if (prebuilt.words.empty() && NormalMapOnLoaderOn()) {
+        const auto start = std::chrono::steady_clock::now();
+        prebuilt = EncodeNormalMapInParallel(*field, loadControl);
+        gpg::Logf(
+          "Terrain: normal map encoded in %.2f s (whole map, in parallel)",
+          std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count()
+        );
       }
     }
 

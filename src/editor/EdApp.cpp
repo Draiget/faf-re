@@ -27,6 +27,7 @@
 #include "moho/render/WRenViewport.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/ui/IUIManager.h"
 
 // imgui_impl_win32.h leaves this declaration to the application.
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -260,6 +261,8 @@ namespace faf::editor
       }
       // Each play's rules (every blueprint) are kept for the next play with the same mods.
       moho::RULE_SetKeepBetweenSessions(true);
+      // The editor's loading view in place of the game's movie and "IN TRANSIT" screen.
+      moho::gUIBeforeStartGameUI = &InstallLoadingView;
 
       if (!mGame.Init()) {
         ::MessageBoxW(nullptr, L"Neither Direct3D 12 nor Vulkan started, or the game data could not be read. See the log.",

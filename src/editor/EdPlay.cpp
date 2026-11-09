@@ -14,6 +14,7 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/RRuleGameRules.h"
 
 namespace faf::editor
 {
@@ -47,6 +48,7 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
     if faction < 1 then
         faction = SPL.GetRandomFaction()
     end
+    rawset(_G, '__EditorLoadingTitle', scenario.name or mapPath)
 
     local info = {}
     info.playerName = Prefs.GetFromCurrentProfile('Name') or 'Player'
@@ -106,6 +108,74 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
 end
 )lua";
 
+    /**
+     * The editor's loading view, installed in each state the game UI starts in (moho::gUIBeforeStartGameUI):
+     * FAF's gamemain.lua makes a provider whose StartLoadingDialog plays a faction movie with "IN TRANSIT"
+     * and loading tips, and whose StopLoadingDialog covers the view with an "IN TRANSIT" picture that
+     * fades over about 3.5 s before the panels slide in. The provider FAF creates is caught as it registers
+     * (InternalCreateWldUIProvider) and gets a line of text while loading instead, and the panels at once.
+     * The tips thread is what failed on the next play ("Game object has been destroyed"): it outlives a
+     * play shorter than its 7 s wait in the editor's UI state, which the game would have rebuilt.
+     */
+    constexpr const char kLoadingView[] = R"lua(
+if not rawget(_G, '__EditorLoadingView') then
+    rawset(_G, '__EditorLoadingView', true)
+    local gm = import('/lua/ui/game/gamemain.lua')
+    local createProvider = gm.CreateWldUIProvider
+    gm.CreateWldUIProvider = function()
+        local created = false
+        local internal = rawget(_G, 'InternalCreateWldUIProvider')
+        rawset(_G, 'InternalCreateWldUIProvider', function(object)
+            created = object
+            return internal(object)
+        end)
+        local ok, err = pcall(createProvider)
+        rawset(_G, 'InternalCreateWldUIProvider', internal)
+        if not ok then
+            error(err)
+        end
+        if not created then
+            return
+        end
+        local loadingText = false
+        created.StartLoadingDialog = function(self)
+            gm.supressExitDialog = true
+            local UIUtil = import('/lua/ui/uiutil.lua')
+            local LayoutHelpers = import('/lua/maui/layouthelpers.lua')
+            local title = rawget(_G, '__EditorLoadingTitle') or 'the map'
+            loadingText = UIUtil.CreateText(GetFrame(0), 'Loading ' .. title .. ' ...', 20, UIUtil.bodyFont)
+            loadingText:SetDropShadow(true)
+            LayoutHelpers.AtCenterIn(loadingText, GetFrame(0))
+        end
+        created.UpdateLoadingDialog = function(self, elapsedTime)
+        end
+        created.StopLoadingDialog = function(self)
+            if loadingText then
+                loadingText:Destroy()
+                loadingText = false
+            end
+            GetCursor():Show()
+            if not import('/lua/ui/campaign/campaignmanager.lua').campaignMode then
+                ForkThread(function()
+                    import('/lua/ui/game/tabs.lua').InitialAnimation()
+                    if not SessionIsReplay() then
+                        import('/lua/ui/game/economy.lua').InitialAnimation()
+                    end
+                    import('/lua/ui/game/score.lua').InitialAnimation()
+                    import('/lua/ui/game/multifunction.lua').InitialAnimation()
+                    if not SessionIsReplay() then
+                        import('/lua/ui/game/avatars.lua').InitialAnimation()
+                    end
+                    import('/lua/ui/game/controlgroups.lua').InitialAnimation()
+                    gm.HideGameUI('off')
+                end)
+            end
+            FlushEvents()
+        end
+    end
+end
+)lua";
+
     /** "AI: Easy" for "<LOC lobui_0347>AI: Easy". */
     std::string WithoutLocTag(std::string text)
     {
@@ -118,6 +188,13 @@ end
       return text;
     }
   } // namespace
+
+  void InstallLoadingView(LuaPlus::LuaState* const state)
+  {
+    if (state != nullptr && !moho::SCR_LuaDoString(kLoadingView, state)) {
+      gpg::Warnf("editor: the loading view did not install; the game's loading screen shows");
+    }
+  }
 
   std::string MapDisplayName(const std::string& scenarioPath)
   {
@@ -243,6 +320,19 @@ end
       }
     }
     gpg::Logf("editor: %zu AI types, %zu factions", mAiTypes.size(), mFactions.size());
+
+    // The game rules for the mods a skirmish play uses (FAF's GetCampaignMods: GetGameMods for any
+    // non-campaign map), built now on a thread so that the first Play takes them too. The session
+    // receives the same table as scenarioMods and the loader keys the rules by its SCR_ToString.
+    try {
+      const LuaPlus::LuaObject getGameMods = moho::SCR_Import(state, "/lua/mods.lua")["GetGameMods"];
+      if (getGameMods.IsFunction()) {
+        LuaPlus::LuaFunction<LuaPlus::LuaObject> call(getGameMods);
+        moho::RULE_PrepareKept(moho::SCR_ToString(call()));
+      }
+    } catch (const std::exception& error) {
+      gpg::Warnf("editor: the game's mods for the rules built ahead: %s", error.what());
+    }
   }
 
   bool EdPlay::SeesWholeMap() const
@@ -393,6 +483,9 @@ end
       }
     }
     mAutoWholeMap = moho::CFG_GetArgOption("/playwholemap", 0, nullptr);
+    if (moho::CFG_GetArgOption("/playafter", 1, &args) && !args.empty()) {
+      mAutoDelay = static_cast<float>(std::atof(args[0].c_str()));
+    }
     mAutoQuit = moho::CFG_GetArgOption("/playquit", 0, nullptr);
     mAutoExitApp = moho::CFG_GetArgOption("/playexitapp", 0, nullptr);
     gpg::Logf("editor: command-line play of %s, %d cycle(s), %.1f s each", MapDisplayName(mMaps[static_cast<std::size_t>(found)]).c_str(),
@@ -409,6 +502,12 @@ end
     if (action == moho::EWldFrameAction::Inactive) {
       mPlayingSince = -1.0;
       mExitAppSent = false;
+      if (mAutoStartAt < 0.0) {
+        mAutoStartAt = now + static_cast<double>(mAutoDelay);
+      }
+      if (now < mAutoStartAt) {
+        return;
+      }
       if (mAutoCyclesLeft > 0) {
         --mAutoCyclesLeft;
         mSelected = mAutoMaps[mAutoRunIndex++ % mAutoMaps.size()];

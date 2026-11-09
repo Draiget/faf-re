@@ -8,17 +8,26 @@
 #include <cstdio>
 #include <cstring>
 #include <intrin.h>
+#include <chrono>
+#include <condition_variable>
 #include <limits>
 #include <mutex>
 #include <new>
+#include <thread>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <typeinfo>
 #include <utility>
 
+#include <cfloat>
+
 #include "boost/thread.h"
 #include "../resource/RResId.h"
+#include "gpg/core/utils/Global.h"
+#include "moho/lua/ScriptChunkCache.h"
+#include "moho/misc/CZipFile.h"
+#include "platform/X87Precision.h"
 #include "gpg/core/algorithms/MD5.h"
 #include "legacy/containers/Vector.h"
 #include "gpg/core/containers/String.h"
@@ -833,12 +842,32 @@ namespace moho
       fa::string keptMods;
       const RRuleGameRules* lent = nullptr;
       fa::string lentMods;
+      /// RULE_PrepareKept: a thread building rules ahead of the first session; `ready` when it ends.
+      bool preparing = false;
+      std::condition_variable ready;
+      std::thread prepareThread;
     };
 
     KeptRules& Kept()
     {
-      static KeptRules kept;
-      return kept;
+      // Never destroyed: a joinable thread in a static would end the process at exit.
+      static KeptRules* const kept = new KeptRules();
+      return *kept;
+    }
+
+    /// Waits for a RULE_PrepareKept thread, if one runs, and joins it.
+    void FinishPreparing()
+    {
+      KeptRules& state = Kept();
+      std::thread finished;
+      {
+        std::unique_lock<std::mutex> guard(state.lock);
+        state.ready.wait(guard, [&] { return !state.preparing; });
+        finished = std::move(state.prepareThread);
+      }
+      if (finished.joinable()) {
+        finished.join();
+      }
     }
 
     /**
@@ -1179,13 +1208,57 @@ namespace moho
       state.enabled = keep; // also keeps the rules' Lua copy of the blueprints (KeepsScriptBlueprints)
     }
     if (!keep) {
+      FinishPreparing(); // a thread still building drops its rules, as keeping is off
       RULE_DeleteKept();
     }
+  }
+
+  void RULE_PrepareKept(const fa::string& gameMods)
+  {
+    KeptRules& state = Kept();
+    FinishPreparing(); // an earlier one, if any
+    const std::lock_guard<std::mutex> guard(state.lock);
+    if (!state.enabled || state.preparing || state.kept != nullptr || state.lent != nullptr) {
+      return;
+    }
+    state.preparing = true;
+    state.prepareThread = std::thread([gameMods] {
+      gpg::SetThreadName(0xFFFFFFFFu, "Rules ahead");
+      platform::SetX87PrecisionControl(_PC_24); // as the loader thread that builds them otherwise
+      const auto start = std::chrono::steady_clock::now();
+      RRuleGameRules* built = nullptr;
+      try {
+        const ScriptChunkCacheBatch scriptChunks;
+        const CZipFileReadScope archives;
+        built = RRuleGameRules::Create(gameMods, nullptr);
+      } catch (const std::exception& error) {
+        gpg::Warnf("RULE: building the rules ahead failed: %s", error.what());
+      }
+      KeptRules& kept = Kept();
+      RRuleGameRules* dropped = nullptr;
+      {
+        const std::lock_guard<std::mutex> done(kept.lock);
+        if (built != nullptr && kept.enabled && kept.kept == nullptr) {
+          kept.kept = built;
+          kept.keptMods = gameMods;
+        } else {
+          dropped = built;
+        }
+        kept.preparing = false;
+      }
+      kept.ready.notify_all();
+      gpg::Logf(
+        "RULE: rules built ahead in %.2f s%s",
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(), dropped != nullptr ? " (not kept)" : ""
+      );
+      delete dropped;
+    });
   }
 
   RRuleGameRules* RULE_TakeOrCreate(const fa::string& gameMods, CBackgroundTaskControl* const loadControl)
   {
     KeptRules& state = Kept();
+    FinishPreparing(); // rules being built ahead are taken when done, not built twice
     RRuleGameRules* reused = nullptr;
     RRuleGameRules* stale = nullptr;
     bool enabled = false;
@@ -1197,10 +1270,13 @@ namespace moho
         state.kept = nullptr;
       }
     }
+    if (stale != nullptr) {
+      gpg::Logf("RULE: the kept rules were built for other mods; building them again");
+    }
     delete stale; // other mods: their blueprints differ
     RRuleGameRules* const rules = reused != nullptr ? reused : RRuleGameRules::Create(gameMods, loadControl);
     if (reused != nullptr) {
-      gpg::Logf("RULE: the last session's rules are used again");
+      gpg::Logf("RULE: rules built earlier are used again");
     }
     if (enabled) {
       const std::lock_guard<std::mutex> guard(state.lock);

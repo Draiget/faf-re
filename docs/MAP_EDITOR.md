@@ -28,7 +28,13 @@ The Map panel sets the play up, the way FAF's `/map` quick start does (`SinglePl
 - **Fog**: fog of war ("explored") or none. The sim fixes fog when the game starts, so it applies from the next Play.
 - **See the whole map**, during play: the view switches to an observer's (no fog, every army) and back to your army. Editor plays have cheats on for this, without changing the `debug.enable_debug_facilities` preference the game reads.
 
-Campaign maps go through FAF's own campaign setup. No replay is written. The game's rules (every unit, projectile and effect blueprint) are built by the first play and kept for the next ones with the same mods (`RULE_SetKeepBetweenSessions`; the game builds them for every session).
+Campaign maps go through FAF's own campaign setup. No replay is written.
+
+How fast a play starts:
+
+- The game's rules (every unit, projectile and effect blueprint, about 1.5 s to build for FAF) are built on a thread of their own when the editor starts, for the mods a skirmish uses (`RULE_PrepareKept`), and each play's rules are kept for the next one (`RULE_SetKeepBetweenSessions`). A Play pressed before they are ready waits for them. The game builds them for every session.
+- Loading shows one line of text in the view ("Loading Seton's Clutch ...") instead of the game's faction movie, "IN TRANSIT" screen and loading tips, and the game's panels come in as soon as the map is ready instead of after the "IN TRANSIT" picture fades (`InstallLoadingView`, through `moho::gUIBeforeStartGameUI`).
+- Solo, a Play 5 s after the editor starts reaches the game in about 2.3 s on SCMP_009 and 2.7 s on Alpha 7 Quarantine (SCMP_021, 40 km); later plays in 1.0-1.3 s and 1.6-2.0 s (Direct3D 12, Vulkan). On SCMP_021 two engine changes do it: the 3584 building skirts its start flattens update the terrain normal map one tile at a time for all of them (`IWldTerrainRes::NotifyMapChanges`, 30 ms where one update per skirt took 1.6 to 3.3 s), and a whole-map normal-map rebuild after the map changed is encoded on 4 threads as the loader's (0.4 s, from 1.6 s).
 
 | Switch | Effect |
 |---|---|
@@ -40,6 +46,7 @@ Campaign maps go through FAF's own campaign setup. No replay is written. The gam
 | `/play <map>` | Plays that map (its folder or scenario name, e.g. `SCMP_009`) once the editor is up |
 | `/playseconds <s>` | With `/play`: stops after s seconds of play |
 | `/playcycles <n>` | With `/play`: plays and stops n times |
+| `/playafter <s>` | With `/play`: waits s seconds after the editor is up before the first play (timing a first play as a user would start it) |
 | `/playquit` | With `/play`: closes the editor after the last one (test runs) |
 | `/playai <key>` | With `/play`: against that AI (`rush`, `easy`, ...) instead of solo |
 | `/playwholemap` | With `/play` and `/playseconds`: switches to the whole map when play starts and back halfway (test runs) |
@@ -58,11 +65,10 @@ The Tools panel is laid out as the plan's mockup: a strip of tool icons and the 
 - **The game inside:** the editor's app (`EdApp.cpp`) holds the game's own `CScApp` and runs the game's loop (`WIN_AppExecute`), with what the game's `WinMain` sets up around it (the crash report's die handler, the accessibility hotkeys turned off and restored). The window, device, user interface, sound and world sessions are the game's, unchanged. Engine additions in `CScApp`, unused by the game: `moho::gAppRenderers` (Direct3D 12 and Vulkan only, no Direct3D 9/10 fallback), `moho::gAppWindowed` (one normal window; `SC_PrimaryAdapter` leaves it alone) and `moho::gAppBeforeDeviceCreate` (the editor's second head). The game's first-frame start (main menu or command-line session) is skipped; sessions start from Play.
 - **Two heads:** the device has the game's head 0 on the game's viewport, which the editor keeps over the middle of its dock layout, and a head 1 on the editor's own child window under it, for the panels. The game draws only head 0 (its viewport was made for one head); the editor draws head 1 each frame, and the game's paint presents both. When the layout or the window changes, the viewport is moved and both heads are resized (`CD3DDevice::InitContext`). The game's interface lays itself out in the viewport and takes its input there, as in the game.
 - **Panels:** [Dear ImGui](https://github.com/ocornut/imgui) 1.92.4, docking branch, pinned in `cmake/FafDependencies.cmake` and built by `cmake/deps/imgui`, drawn by `ui/EdImGuiRenderer.cpp` on gal's GPU programs (`gpg/gal/GpuDriven.h`): one HLSL source DXC builds for both APIs. Its input is the panels' window's; F5 is the editor's in either window.
-- **Play** (`EdPlay.cpp`): `StartCommandLineSession` on the map's scenario starts the session; `WLD_Teardown` ends it, before the game's frame would go on to its main menu. A Lua request to quit during play (`ExitApplication`) ends the session, not the editor.
+- **Play** (`EdPlay.cpp`): the editor's Lua launcher builds the session info as FAF's quick start does and calls `LaunchSinglePlayerSession`; `WLD_Teardown` ends the session, before the game's frame would go on to its main menu. A Lua request to quit during play (`ExitApplication`) ends the session, not the editor.
 - **Older renderers:** their DLLs are delay-loaded (`d3d9.dll`, `d3dx9_43.dll`, `d3d10.dll`, `d3d11.dll`), so the editor starts without the June 2010 DirectX runtime and never loads Direct3D 9. Direct3D 11 still loads when Direct3D 12 or Vulkan decode a texture: they do it on a private WARP device ([Renderer backends](RENDERER_BACKENDS.md)).
 
 ## Known issues
 
 - Each Play keeps about 15 MB more after it ends (20 cycles of SCMP_009 on Direct3D 12: the lowest point between sessions went from 798 to 1,101 MB). Not yet traced.
-- The first play builds the game's rules (every blueprint, about 1.3 s for FAF) and later plays reuse them, so a solo play of SCMP_009 reaches the game in about 2.8 s the first time and 1.0 s after (Direct3D 12 and Vulkan alike). Alpha 7 Quarantine (SCMP_021, 40 km) takes about 4.6 s the first time and 1.8 s (Direct3D 12) to 2 s (Vulkan) after; its start flattens 3584 building skirts, whose terrain normal-map updates the engine now does one tile at a time for all of them (`IWldTerrainRes::NotifyMapChanges`, 30 ms where one update per skirt took 1.6 to 3.3 s). The game's loading screen still shows.
 - A popup of the panels that reaches over the game's view is hidden behind it (the view is its own window).

@@ -928,4 +928,12 @@ namespace moho
 
   /** Deletes the kept rules, if any (the editor, before the engine shuts down). */
   void RULE_DeleteKept();
+
+  /**
+   * Builds the rules for `gameMods` on a thread of its own and keeps them, so that even the first
+   * session takes them (the editor, at startup, with the mods its plays use). A session load that
+   * starts meanwhile waits for them instead of building its own. Only while keeping is on and no
+   * rules are kept or lent; rules for other mods are deleted by the session that finds them.
+   */
+  void RULE_PrepareKept(const fa::string& gameMods);
 } // namespace moho
