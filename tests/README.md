@@ -69,6 +69,8 @@ FAF_REPLAY_DATA=<folder with replays/ and faf/bin/> FAF_REPLAY_INIT=init_replay.
 
 A replay that needs its own init file (the M28AI ones) is written `id:init`, for example `26943656:init_replay_noaff_m28_v0294.lua`.
 
+`UnitZooRunsEveryUnitAndCall` plays the first replay with the unit zoo, `tests/replay/zoo/lua/simInit.lua`. Its init file mounts that folder at `/zoo` and names it a hook folder, so the engine appends the script to FAF's `/lua/simInit.lua`. The zoo spawns every unit blueprint for the first two armies, wave by wave, and makes them fight. It then drives an AI platoon, building, a factory, an upgrade, a transport, missiles, reclaim, repair, capture and squad orders. Last, it calls every getter of the sim's Lua objects. The zoo changes the game, so the recorded checksums no longer apply. Instead, the sim's checksum at each recorded beat (headless prints it as `Checksum for beat N mismatched: <md5> (sim)`) is compared with `tests/replay/zoo/golden_26930624.txt`. The original game played the same zoo, and its checksums are those of that file up to beat 5050, which covers the waves and the scenarios. It never gets through the getter sweeps (some getters crash or hang it; the script names them), so the later beats are this engine's own. After changing the zoo, regenerate the file: the original game in a window with an init file that adds the same two lines to `init_parity.lua`, then headless.
+
 ## Coverage
 
 Line coverage of `src/` by these tests, from an instrumented build (`cmake/FafCoverage.cmake`):

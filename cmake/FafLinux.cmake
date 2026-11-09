@@ -454,7 +454,8 @@ add_test(NAME reflection COMMAND faf_reflection_tests)
 # Recorded games played back by headless (tests/replay/ReplayPlaybackTests.cpp); skipped without FAF_REPLAY_DATA.
 add_executable(faf_replay_playback_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/replay/ReplayPlaybackTests.cpp")
 target_link_libraries(faf_replay_playback_tests PRIVATE faf_codegen gtest_main)
-target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_EXE="$<TARGET_FILE:headless>" FAF_HEADLESS_SERVER_MODE=1)
+target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_EXE="$<TARGET_FILE:headless>" FAF_HEADLESS_SERVER_MODE=1
+  FAF_REPLAY_ZOO_DIR="${PROJECT_SOURCE_DIR}/tests/replay/zoo")
 add_dependencies(faf_replay_playback_tests headless)
 add_test(NAME replay_playback COMMAND faf_replay_playback_tests)
 set_tests_properties(replay_playback PROPERTIES TIMEOUT 7200)

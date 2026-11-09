@@ -18,6 +18,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -237,6 +238,81 @@ TEST(ReplayPlayback, RejoinRehearsalKeepsTheChecksums)
     " --rejoin-source " + plan[0] + " --focus " + plan[1] + " --rejoin-beat " + plan[2]
   );
   ExpectMatchedToTheEnd(run);
+}
+
+// The unit zoo (tests/replay/zoo/lua/simInit.lua): a hook folder appended to FAF's /lua/simInit.lua that, on top of
+// the first replay, spawns every unit blueprint for the first two armies wave by wave, calls every getter of the
+// sim's Lua objects, and drives building, factories, upgrades, transports, missiles, reclaim, repair, capture and an
+// AI platoon. The zoo changes the game, so the recorded checksums no longer apply (headless exits 1 for them); the
+// run has to reach the zoo's last step without a crash and play to the end.
+TEST(ReplayPlayback, UnitZooRunsEveryUnitAndCall)
+{
+  const std::vector<SReplay> replays = Replays();
+  if (replays.empty()) {
+    GTEST_SKIP() << "set FAF_REPLAY_DATA to a folder with replays/ and faf/bin/ (see the file's header)";
+  }
+  SReplay zoo = replays.front();
+  SCOPED_TRACE("replay " + zoo.id);
+  // The replay's own init file, then the zoo folder mounted at /zoo and named a hook folder.
+  const std::filesystem::path init = LogFolder() / ("zoo_init_" + zoo.id + ".lua");
+  {
+    std::ofstream out(init);
+    out << "InitFileDir = [[" << zoo.init.parent_path().generic_string() << "]]\n"
+        << "dofile([[" << zoo.init.generic_string() << "]])\n"
+        << "table.insert(path, { dir = [[" << std::filesystem::path(FAF_REPLAY_ZOO_DIR).generic_string()
+        << "]], mountpoint = '/zoo' })\n"
+        << "table.insert(hook, '/zoo')\n";
+  }
+  zoo.init = init;
+  const std::string label = "ctest_zoo_" + zoo.id;
+  const SRun run = PlayReplay(zoo, label, "");
+  EXPECT_TRUE(run.exitCode == 0 || run.exitCode == 1) << "headless exit code " << run.exitCode << "\n" << run.tail;
+  EXPECT_NE(run.verdict.find("crash=False"), std::string::npos) << run.verdict;
+  EXPECT_NE(run.beats.find("game-over=True"), std::string::npos) << run.beats;
+
+  std::ifstream logFile(LogFolder() / (label + ".log"));
+  const std::string log((std::istreambuf_iterator<char>(logFile)), std::istreambuf_iterator<char>());
+  EXPECT_NE(log.find("ZOO: waves done"), std::string::npos) << "the zoo's waves didn't finish";
+  EXPECT_NE(log.find("ZOO: scenarios done"), std::string::npos) << "the zoo's scenarios didn't finish";
+  EXPECT_NE(log.find("ZOO: sweeps done"), std::string::npos) << "the zoo's getter sweeps didn't finish";
+
+  // The sim's checksum at each recorded beat, from "Checksum for beat N mismatched: <md5> (sim) != ...".
+  std::map<int, std::string> sums;
+  const std::string marker = "Checksum for beat ";
+  for (std::size_t at = run.output.find(marker); at != std::string::npos; at = run.output.find(marker, at + 1)) {
+    std::istringstream line(run.output.substr(at + marker.size(), 80));
+    int beat = 0;
+    std::string word;
+    std::string md5;
+    if (line >> beat >> word >> md5 && word == "mismatched:") {
+      sums[beat] = md5;
+    }
+  }
+  // The golden file holds them for 26930624, the original game's up to the beat its header names.
+  const std::filesystem::path golden = std::filesystem::path(FAF_REPLAY_ZOO_DIR) / ("golden_" + zoo.id + ".txt");
+  if (!std::filesystem::exists(golden)) {
+    std::string pairs;
+    for (const auto& [beat, md5] : sums) {
+      pairs += std::to_string(beat) + " " + md5 + "\n";
+    }
+    GTEST_SKIP() << "no " << golden.string() << " for this replay; its pairs:\n" << pairs;
+  }
+  std::ifstream goldenFile(golden);
+  int compared = 0;
+  for (std::string text; std::getline(goldenFile, text);) {
+    if (text.empty() || text[0] == '#') {
+      continue;
+    }
+    std::istringstream line(text);
+    int beat = 0;
+    std::string md5;
+    ASSERT_TRUE(static_cast<bool>(line >> beat >> md5)) << text;
+    const auto found = sums.find(beat);
+    ASSERT_NE(found, sums.end()) << "no checksum for beat " << beat;
+    EXPECT_EQ(found->second, md5) << "beat " << beat;
+    ++compared;
+  }
+  EXPECT_GT(compared, 100) << golden.string();
 }
 
 // A rejoin from a save (issue #275: a client that lost a heavy game loads one instead of running from beat 0): the
