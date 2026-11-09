@@ -56,6 +56,7 @@ Every performance change has a switch that brings back the original path, and bo
 | `sim_ParallelBlipFlush` | 1 | `/con` | live | The bulk blip-unlink pass splices separate weak chains on sim workers (needs `sim_Workers` > 0) |
 | `sim_ParallelSyncHeap` | 1 | `/con` | live | With `sim_ParallelSync`, the allocating members of unit-update records are copied on workers too |
 | `sim_ParallelEntitySync` | 1 | `/con` | live | With `sim_ParallelSync`, entity-update records are copied on workers |
+| `sim_SyncFillsOneDispatch` | 1 | `/con` | live | With `sim_ParallelSync`, the unit-update and entity-update record copies go to the workers in one dispatch instead of two in a row; same packet |
 | `sim_CategoryLookupCache` | 1 | `/con` | live | Category lookups by name (`IsInCategory("RECLAIM")` and the like) remember their results per thread instead of walking the category tree each time; same results |
 | `sim_GatherPrefetch` | 1 | `/con` | live | Occupation-grid gathers load the next cell's nodes ahead of time; same results, same order |
 | `sim_CollectPrefetch` | 1 | `/con` | live | Entity collision collects load each candidate's bounds and primitive ahead of time; same results, same order |
