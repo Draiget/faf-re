@@ -80,8 +80,13 @@ namespace
       double jitterMs = 0.0;
       double partitionAt = -1.0;
       double partitionFor = 0.0;
+      double bandwidthKbps = 0.0; // plan WP10.7: the server-to-player direction carries at most this (kbit/s); 0: no cap
+      double bufferMs = 200.0;    // and holds at most this much waiting; past it a datagram is dropped, as a router does
 
-      [[nodiscard]] bool Any() const noexcept { return lossPercent > 0.0 || latencyMs > 0.0 || jitterMs > 0.0 || partitionAt >= 0.0; }
+      [[nodiscard]] bool Any() const noexcept
+      {
+        return lossPercent > 0.0 || latencyMs > 0.0 || jitterMs > 0.0 || partitionAt >= 0.0 || bandwidthKbps > 0.0;
+      }
     };
 
     ~CImpairedPath()
@@ -128,7 +133,17 @@ namespace
         return;
       }
       const double delayMs = mConfig.latencyMs + (mConfig.jitterMs > 0.0 ? std::uniform_real_distribution<double>(0.0, mConfig.jitterMs)(mRandom) : 0.0);
-      mHeld.emplace(nowUs + static_cast<std::uint64_t>(delayMs * 1000.0), SHeld{toServer, std::vector<std::uint8_t>(data, data + size)});
+      std::uint64_t sendAtUs = nowUs;
+      if (!toServer && mConfig.bandwidthKbps > 0.0) {
+        // A narrow line: each datagram leaves once the ones before it have; with more than bufferMs waiting it is dropped.
+        if (mLineFreeUs > nowUs + static_cast<std::uint64_t>(mConfig.bufferMs * 1000.0)) {
+          mLost.fetch_add(1u, std::memory_order_relaxed);
+          return;
+        }
+        mLineFreeUs = std::max(mLineFreeUs, nowUs) + static_cast<std::uint64_t>(static_cast<double>(size) * 8000.0 / mConfig.bandwidthKbps);
+        sendAtUs = mLineFreeUs;
+      }
+      mHeld.emplace(sendAtUs + static_cast<std::uint64_t>(delayMs * 1000.0), SHeld{toServer, std::vector<std::uint8_t>(data, data + size)});
     }
 
     void Run()
@@ -164,6 +179,7 @@ namespace
     CUdpSocket mServerSide;
     std::mt19937 mRandom;
     std::multimap<std::uint64_t, SHeld> mHeld;
+    std::uint64_t mLineFreeUs = 0; // when the capped direction's line is free again
     std::uint64_t mStartUs = 0;
     std::thread mThread;
     std::atomic<bool> mStop{false};
@@ -390,6 +406,10 @@ namespace
         out.path.jitterMs = Argument(value);
       } else if (name == "--partition-at") {
         out.path.partitionAt = Argument(value);
+      } else if (name == "--bandwidth-kbps") {
+        out.path.bandwidthKbps = Argument(value);
+      } else if (name == "--buffer-ms") {
+        out.path.bufferMs = Argument(value);
       } else if (name == "--partition-for") {
         out.path.partitionFor = Argument(value);
       } else if (name == "--rebuild") {
@@ -920,7 +940,7 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>]] [--speed-limit <step> --speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s>] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--rebuild <match.lua> /init <init.lua>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>]] [--speed-limit <step> --speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s>] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua>]\n"
     );
     return 3;
   }

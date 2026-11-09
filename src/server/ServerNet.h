@@ -165,6 +165,7 @@ namespace faf::server
       // view queued and the newest it has acked whole (an estimate: other messages share the stream).
       std::uint64_t backlogBytes = 0;
       std::uint32_t behindBeats = 0;
+      double behindSeconds = 0.0; // how long the oldest view it hasn't acked whole has waited
     };
     [[nodiscard]] std::vector<SSeatState> Seats();
     /** Plan WP17.2: each verdict made since the last call, as the seat stood then (uid, name and the verdict fields). */
@@ -226,7 +227,13 @@ namespace faf::server
       // Plan WP10.7: the reliable bytes queued to it from the views' path, and where each view's message ended in
       // them (with its beat), oldest first; the views behind the peer's acked prefix are dropped as it moves on.
       std::uint64_t viewBytesQueued = 0;
-      std::deque<std::pair<std::uint64_t, std::uint32_t>> viewEnds;
+      struct SViewEnd
+      {
+        std::uint64_t offset = 0; // where the view's message ends in the views' bytes
+        std::uint32_t beat = 0;
+        std::uint64_t queuedUs = 0;
+      };
+      std::deque<SViewEnd> viewEnds;
       std::uint32_t lastViewBeat = 0;
       remote::CServerClient* seat = nullptr;
       bool joinedEver = false;

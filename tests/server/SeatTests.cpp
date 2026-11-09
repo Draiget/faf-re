@@ -39,6 +39,7 @@
 #include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
 #include "remote/net/LobbySignals.h"
+#include "server/LinkSpeed.h"
 #include "server/LobbySignaller.h"
 #include "server/LobbyRelay.h"
 #include "server/LobbyScriptData.h"
@@ -1660,4 +1661,54 @@ TEST(FocusAndCameras, MessagesRoundTrip)
   std::vector<std::uint8_t> cut = faf::remote::EncodeCameras(cameras);
   cut.pop_back();
   EXPECT_FALSE(faf::remote::DecodeCameras(cut, back));
+}
+
+// Plan WP10.7 step 2: a link that falls further behind holds the game a step at a time; one that catches up lets go a
+// step at a time; one that is far but steady (its delay, not its throughput) never holds it.
+TEST(LinkSpeed, FallingBehindHoldsTheGameSteadyDelayDoesNot)
+{
+  using faf::server::CLinkSpeedGovernor;
+  using faf::server::SLinkSample;
+  CLinkSpeedGovernor governor;
+  const auto at = [&governor](const double now, const int speed, const double behindSeconds) {
+    const SLinkSample seat{1002, behindSeconds, false};
+    return governor.Update(now, speed, 10, std::span<const SLinkSample>(&seat, 1u));
+  };
+  EXPECT_TRUE(at(0.0, 10, 3.0).empty());    // 3 s behind: the window starts
+  EXPECT_TRUE(at(5.0, 10, 9.0).empty());    // within the window: nothing
+  auto news = at(10.0, 10, 4.0);            // 4 s behind, 1 s further: held a step under +10
+  ASSERT_EQ(news.size(), 1u);
+  EXPECT_EQ(news[0].limit, std::optional<int>(9));
+  EXPECT_EQ(governor.Slowest(), (std::optional<std::pair<int, std::int32_t>>(std::make_pair(9, 1002))));
+  news = at(20.0, 9, 6.3);                  // still falling behind at +9: +8
+  ASSERT_EQ(news.size(), 1u);
+  EXPECT_EQ(news[0].limit, std::optional<int>(8));
+  EXPECT_TRUE(at(30.0, 8, 1.6).empty());    // caught up: calm window 1
+  EXPECT_TRUE(at(40.0, 8, 0.3).empty());     // 2
+  news = at(50.0, 8, 0.1);                   // 3: a step up
+  ASSERT_EQ(news.size(), 1u);
+  EXPECT_EQ(news[0].limit, std::optional<int>(9));
+  EXPECT_TRUE(at(60.0, 9, 0.1).empty());
+  EXPECT_TRUE(at(70.0, 9, 0.1).empty());
+  news = at(80.0, 9, 0.1);                   // the next step reaches the requested +10: the limit goes
+  ASSERT_EQ(news.size(), 1u);
+  EXPECT_FALSE(news[0].limit.has_value());
+  EXPECT_FALSE(governor.Slowest().has_value());
+  // A far link: 3 s behind every window, never further: no limit.
+  CLinkSpeedGovernor steady;
+  for (int window = 0; window < 10; ++window) {
+    const SLinkSample seat{1001, 3.0, false};
+    EXPECT_TRUE(steady.Update(10.0 * window, 10, 10, std::span<const SLinkSample>(&seat, 1u)).empty()) << window;
+  }
+  // A held link whose player leaves lets go of the game.
+  CLinkSpeedGovernor leaving;
+  SLinkSample seat{1003, 3.0, false};
+  (void)leaving.Update(0.0, 10, 10, std::span<const SLinkSample>(&seat, 1u));
+  seat.behindSeconds = 5.0;
+  ASSERT_EQ(leaving.Update(10.0, 10, 10, std::span<const SLinkSample>(&seat, 1u)).size(), 1u);
+  seat.gone = true;
+  news = leaving.Update(11.0, 9, 10, std::span<const SLinkSample>(&seat, 1u));
+  ASSERT_EQ(news.size(), 1u);
+  EXPECT_FALSE(news[0].limit.has_value());
+  EXPECT_FALSE(leaving.Slowest().has_value());
 }

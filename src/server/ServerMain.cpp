@@ -83,6 +83,7 @@
 #include "server/ServerNet.h"
 #include "server/ServerViews.h"
 #include "remote/SpeedLimit.h"
+#include "server/LinkSpeed.h"
 #include "server/SpeedWatch.h"
 
 namespace
@@ -1812,13 +1813,19 @@ namespace
     // Plan WP10.7: the speed the game runs at: the one requested, held to the slowest playing seat's sim-speed limit, as
     // lockstep's `CClientManagerImpl::GetSimRate` holds it to the slowest client's.
     std::int32_t speedHolder = 0;
-    const auto pacedSpeed = [&net](const int requested) {
+    faf::server::CLinkSpeedGovernor linkSpeeds; // plan WP10.7 step 2: links that fall behind hold the game too
+    int pacedNow = 0;
+    const auto pacedSpeed = [&net, &linkSpeeds](const int requested) {
+      int paced = requested;
       if (net) {
-        if (const auto slowest = net->SlowestSpeedLimit(); slowest && slowest->first < requested) {
-          return std::clamp(slowest->first, faf::remote::kMinSpeedLimit, faf::remote::kMaxSpeedLimit);
+        if (const auto slowest = net->SlowestSpeedLimit(); slowest && slowest->first < paced) {
+          paced = slowest->first;
+        }
+        if (const auto link = linkSpeeds.Slowest(); link && link->first < paced) {
+          paced = link->first;
         }
       }
-      return requested;
+      return std::clamp(paced, faf::remote::kMinSpeedLimit, std::max(requested, faf::remote::kMinSpeedLimit));
     };
     const auto watchSpeed = [&](const double elapsed) {
       moho::CClientManagerImpl* const manager = driver->GetClientManager();
@@ -1828,22 +1835,44 @@ namespace
       const float gameRate = moho::SIM_GetMeasuredGameRate();
       const float beatMs = gameRate > 0.0f ? faf::server::kSpeedZeroBeatMs / gameRate : 0.0f;
       const int asked = manager->GetSimRateRequested();
+      // Plan WP10.7 step 2: each seat's link, how far behind it is at the speed the game runs at now.
+      std::vector<faf::server::CServerNet::SSeatState> seatStates;
+      const auto nameOf = [&seatStates](const std::int32_t uid) {
+        for (const faf::server::CServerNet::SSeatState& seat : seatStates) {
+          if (seat.uid == uid) {
+            return seat.name;
+          }
+        }
+        return "uid " + std::to_string(uid);
+      };
+      if (net) {
+        seatStates = net->Seats();
+        std::vector<faf::server::SLinkSample> samples;
+        samples.reserve(seatStates.size());
+        for (const faf::server::CServerNet::SSeatState& seat : seatStates) {
+          samples.push_back(faf::server::SLinkSample{seat.uid, seat.behindSeconds, seat.gone});
+        }
+        for (const faf::server::SLinkNews& change : linkSpeeds.Update(elapsed, pacedNow, asked, samples)) {
+          if (change.limit) {
+            Say("%s's link is %.1f s behind: it holds the game at %+d at most", nameOf(change.uid).c_str(), change.behindSeconds, *change.limit);
+          } else {
+            Say("%s's link keeps up again: it no longer holds the game", nameOf(change.uid).c_str());
+          }
+        }
+      }
       const int requested = pacedSpeed(asked);
-      // Plan WP10.7: who holds the game back, when it changes.
+      pacedNow = requested;
+      // Plan WP10.7: who holds the game back (a player's game, step 0, or their link, step 2), when it changes.
       const auto slowest = net ? net->SlowestSpeedLimit() : std::nullopt;
-      const std::int32_t holder = slowest && slowest->first < asked ? slowest->second : 0;
+      const auto link = net ? linkSpeeds.Slowest() : std::nullopt;
+      const bool byLink = link && link->first < asked && (!slowest || link->first < slowest->first);
+      const std::int32_t holder = byLink ? link->second : (slowest && slowest->first < asked ? slowest->second : 0);
       if (holder != speedHolder) {
         speedHolder = holder;
         if (holder != 0) {
-          std::string who = "uid " + std::to_string(holder);
-          for (const faf::server::CServerNet::SSeatState& seat : net->Seats()) {
-            if (seat.uid == holder) {
-              who = seat.name;
-            }
-          }
-          Say("Game speed held at %+d by %s's game (requested %+d)", requested, who.c_str(), asked);
+          Say("Game speed held at %+d by %s's %s (requested %+d)", requested, nameOf(holder).c_str(), byLink ? "link" : "game", asked);
         } else {
-          Say("Game speed no longer held by a player's game (requested %+d)", asked);
+          Say("Game speed no longer held by a player (requested %+d)", asked);
         }
       }
       if (views) {
@@ -1891,7 +1920,7 @@ namespace
         }
         Say("Status: game time %s, real time %s, speed %+d (requested %+d%s), %.1f beats/s, a beat takes %.0f ms, memory %ld MB, %.0f KB/s to players%s, %lu warnings in the log",
             GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(elapsed).c_str(), speed, asked,
-            requested < asked ? (", held at " + std::string(requested >= 0 ? "+" : "") + std::to_string(requested) + " by a player's game").c_str() : "",
+            requested < asked ? (", held at " + std::string(requested >= 0 ? "+" : "") + std::to_string(requested) + " by a player (see the hold line)").c_str() : "",
             beatsPerSecond, beatMs, ResidentMegabytes(),
             static_cast<double>(netBytes - statusNetBytes) / 1024.0 / (elapsed - lastStatus), behind.c_str(), warnings.Count());
         statusNetBytes = netBytes;

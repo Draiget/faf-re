@@ -215,7 +215,7 @@ namespace faf::server
           remote::net::ByteReader reader(bytes.data() + 1, bytes.size() - 1u);
           const auto beat = static_cast<std::uint32_t>(reader.Varint());
           if (reader.Ok()) {
-            seat.viewEnds.emplace_back(seat.viewBytesQueued, beat);
+            seat.viewEnds.push_back(SSeat::SViewEnd{seat.viewBytesQueued, beat, mNowUs});
             seat.lastViewBeat = beat;
           }
         }
@@ -495,10 +495,13 @@ namespace faf::server
       // Plan WP10.7: the views the peer has acked whole leave the list; the oldest left is the first it lacks.
       state.backlogBytes = seat.gone ? 0u : mLinks.ReliableUnacked(uid);
       const std::uint64_t acked = seat.viewBytesQueued > state.backlogBytes ? seat.viewBytesQueued - state.backlogBytes : 0u;
-      while (!seat.viewEnds.empty() && seat.viewEnds.front().first <= acked) {
+      while (!seat.viewEnds.empty() && seat.viewEnds.front().offset <= acked) {
         seat.viewEnds.pop_front();
       }
-      state.behindBeats = seat.gone || seat.viewEnds.empty() ? 0u : seat.lastViewBeat - seat.viewEnds.front().second + 1u;
+      state.behindBeats = seat.gone || seat.viewEnds.empty() ? 0u : seat.lastViewBeat - seat.viewEnds.front().beat + 1u;
+      state.behindSeconds = seat.gone || seat.viewEnds.empty() || mNowUs < seat.viewEnds.front().queuedUs
+                              ? 0.0
+                              : static_cast<double>(mNowUs - seat.viewEnds.front().queuedUs) * 1e-6;
       state.load = seat.loaded ? "loaded" : (seat.reported ? "rules" : (mContentKnown && seat.joinedEver ? "loading" : ""));
       state.mods = seat.modsVerdict;
       for (const remote::SModEntry& mod : seat.mods) {
