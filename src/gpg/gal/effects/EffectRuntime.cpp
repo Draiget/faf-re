@@ -16,6 +16,7 @@
 #include <thread>
 #include <utility>
 
+#include "ShadowCascades.h"
 #include "SpirvReflect.h"
 #include "gpg/core/utils/LocalCache.h"
 #include "gpg/core/utils/Logging.h"
@@ -191,6 +192,13 @@ namespace gpg::gal::effects
     , mTarget(target)
   {
     mDescription = ParseEffect(translatedSource);
+    // Engine addition (ren_ShadowCascades): an effect that reads the shadow map for lighting gets the
+    // cascade parameter its lookups go through (ShadowCascades.h).
+    if (std::any_of(mDescription.samplers.begin(), mDescription.samplers.end(), IsShadowLookupSampler) &&
+        FindParameter(kShadowCascadeParameter) < 0) {
+      translatedSource.insert(0U, ShadowCascadeDeclaration());
+      mDescription = ParseEffect(translatedSource);
+    }
     if (!originalSource.empty()) {
       ApplyDirect3D9PassStates(originalSource, mDescription);
     }

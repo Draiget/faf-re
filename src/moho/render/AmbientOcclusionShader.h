@@ -39,6 +39,7 @@ cbuffer AoConstants : register(b0)
     float4 TerrainShadowSize; // terrain-shadow cells across and down, shadow map reach (0: none), unused
     row_major float4x4 ShadowMatrix; // world to the sun's clip space, terrain.fx's ShadowMatrix
     float4 ShadowParams;  // 1 when ShadowMap holds this frame's sun shadow (contact shadows only where it is sunlit), then unused
+    float4 ShadowCascades[9]; // the effects' faf_ShadowCascades (ren_ShadowCascades, gpg/gal/effects/ShadowCascades.h)
 };
 
 #define CONTACT_STEPS 8
@@ -66,9 +67,27 @@ float SunVisibility(float3 world)
     }
     // Clip space to texture space as terrain.fx's vertex shaders do it.
     const float4 coord = mul(float4(world, 1.0), ShadowMatrix);
-    const float2 uv = float2(coord.x + coord.w, coord.w - coord.y) * 0.5 / coord.w;
+    float2 uv = float2(coord.x + coord.w, coord.w - coord.y) * 0.5 / coord.w;
     if (any(uv < 0.0) || any(uv > 1.0)) {
         return 1.0;
+    }
+    // The finest cascade tile that holds the point, as the effects' shadow lookups pick it.
+    const int count = (int)ShadowCascades[0].x;
+    if (count > 0) {
+        bool found = false;
+        [unroll] for (int k = 0; k < 4; ++k) {
+            if (!found && k < count) {
+                const float4 box = ShadowCascades[1 + 2 * k];
+                if (all(uv >= box.xy) && all(uv <= box.zw)) {
+                    const float4 map = ShadowCascades[2 + 2 * k];
+                    uv = uv * map.xy + map.zw;
+                    found = true;
+                }
+            }
+        }
+        if (!found) {
+            return 1.0;
+        }
     }
     uint width;
     uint height;

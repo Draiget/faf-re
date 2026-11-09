@@ -820,7 +820,8 @@ namespace
       if (sv.shadowBias.Exists()) {
         sv.shadowBias.SetFloat(shadowBias);
       }
-      const int shadowSize = shadow->mShadowSize;
+      // Engine change (ren_ShadowCascades): the whole-view map's texels, which is mShadowSize without the atlas.
+      const int shadowSize = ShadowMapTexels(*shadow);
       if (sv.shadowSize.Exists()) {
         sv.shadowSize.SetFloat(static_cast<float>(shadowSize));
       }

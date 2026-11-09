@@ -39,6 +39,7 @@
 #include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
+#include "gpg/gal/effects/ShadowCascades.h"
 
 namespace gpg::gal
 {
@@ -366,6 +367,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     D3D12_GPU_DESCRIPTOR_HANDLE samplers{};
     std::int32_t viewportParameter = -1;
     float lastViewport[4]{-1.0f, -1.0f, -1.0f, -1.0f};
+    std::int32_t shadowCascadeParameter = -1; // faf_ShadowCascades (ren_ShadowCascades)
+    std::uint64_t shadowCascadeVersion = 0;
 
     std::uint64_t constantsVersion = 0;
     std::uint64_t constantsSerial = 0;
@@ -2852,6 +2855,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       auto state = std::make_shared<ProgramState>();
       state->samplers = SamplerTable(program.Description().samplers);
       state->viewportParameter = program.FindParameter("faf_ViewportSize");
+      state->shadowCascadeParameter = program.FindParameter(effects::kShadowCascadeParameter);
       slot = state;
     }
     return *static_cast<ProgramState*>(slot.get());
@@ -2916,6 +2920,12 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         std::copy(std::begin(size), std::end(size), std::begin(state.lastViewport));
         parameters.SetVector(static_cast<std::uint32_t>(state.viewportParameter), size);
       }
+    }
+    if (state.shadowCascadeParameter >= 0 && state.shadowCascadeVersion != effects::gShadowCascades.version) {
+      state.shadowCascadeVersion = effects::gShadowCascades.version;
+      parameters.SetVectorArray(
+        static_cast<std::uint32_t>(state.shadowCascadeParameter), &effects::gShadowCascades.vectors[0][0], effects::kShadowCascadeVectors
+      );
     }
 
     // Engine change (ren_UsedTextureTable): a change only in bindings the pass's shaders don't read keeps the

@@ -16,6 +16,7 @@
 #include "GalTestSupport.h"
 #include "gpg/gal/effects/EffectDescription.h"
 #include "gpg/gal/effects/ModernHlsl.h"
+#include "gpg/gal/effects/ShadowCascades.h"
 
 using namespace gpg::gal::effects;
 using faf_gal_tests::Count;
@@ -370,6 +371,48 @@ float4 PSCube( float3 dir : TEXCOORD0 ) : COLOR0 { return texCUBE( AnySampler, d
   EXPECT_TRUE(Contains(hlsl, "#define VolumeSampler faf_make_sampler(faf_null2D, faf_nullCube, Volume__faf_3d, faf_smp_VolumeSampler)"));
   EXPECT_TRUE(Contains(hlsl, "#define Unbound faf_make_sampler(faf_null2D, faf_nullCube, faf_null3D, faf_smp_Unbound)"));
   EXPECT_TRUE(Contains(hlsl, "SamplerState faf_smp_Unbound : register(s2);"));
+}
+
+// Engine addition (ren_ShadowCascades): the lighting shadow samplers read through the cascade atlas, the
+// blur samplers on the same texture don't, and a sampler passed on whole keeps the plain type.
+TEST(GalModernHlsl, ShadowLookupSamplersReadThroughTheCascadeAtlas)
+{
+  const std::string body = R"fx(
+texture ShadowTexture;
+sampler2D ShadowSampler = sampler_state { Texture = (ShadowTexture); };
+sampler2D ShadowVerticalBlurSampler = sampler_state { Texture = (ShadowTexture); };
+float4 LitPS( float4 shadow : TEXCOORD0 ) : COLOR0 { return tex2D( ShadowSampler, shadow.xy ).g * tex2Dproj(ShadowSampler, shadow); }
+float4 BlurPS( float2 uv : TEXCOORD0 ) : COLOR0 { return tex2D( ShadowVerticalBlurSampler, uv ); }
+)fx";
+  const std::string source = std::string(ShadowCascadeDeclaration()) + body;
+  Generated generated = Generate(source);
+  const std::string& hlsl = generated.modern.hlsl;
+  EXPECT_TRUE(Contains(hlsl, "#define ShadowSampler faf_make_shadow_sampler(ShadowTexture, faf_nullCube, faf_null3D, faf_smp_ShadowSampler)"));
+  EXPECT_TRUE(Contains(hlsl, "#define ShadowVerticalBlurSampler faf_make_sampler("));
+  EXPECT_TRUE(Contains(hlsl, "float4 faf_ShadowCascades[9];"));
+  EXPECT_TRUE(Contains(hlsl, "float2 faf_shadow_uv(float2 uv)"));
+  EXPECT_LT(hlsl.find("float4 faf_ShadowCascades[9];"), hlsl.find("float2 faf_shadow_uv(float2 uv)")) << "the helpers read the parameter";
+  EXPECT_FALSE(HasNote(generated.modern.notes, "a shadow sampler is used other than in a tex2D lookup; shadow cascades are off"));
+
+  // Without the parameter (an effect the runtime didn't give it) nothing changes.
+  Generated plain = Generate(body);
+  EXPECT_TRUE(Contains(plain.modern.hlsl, "#define ShadowSampler faf_make_sampler("));
+  EXPECT_FALSE(Contains(plain.modern.hlsl, "faf_shadow_uv"));
+
+  // A sampler handed to a function can't take the cascade type: the effect keeps the plain one and the
+  // shadow renderer is told to keep the single map.
+  gShadowCascadesBlocked.store(false);
+  const std::string passed = std::string(ShadowCascadeDeclaration()) + R"fx(
+texture shadowTexture;
+sampler2D shadowSampler = sampler_state { Texture = (shadowTexture); };
+float Look( sampler2D s, float2 uv ) { return tex2D( s, uv ).r; }
+float4 PassPS( float2 uv : TEXCOORD0 ) : COLOR0 { return Look( shadowSampler, uv ); }
+)fx";
+  Generated blocked = Generate(passed);
+  EXPECT_TRUE(Contains(blocked.modern.hlsl, "#define shadowSampler faf_make_sampler("));
+  EXPECT_TRUE(HasNote(blocked.modern.notes, "a shadow sampler is used other than in a tex2D lookup; shadow cascades are off"));
+  EXPECT_TRUE(gShadowCascadesBlocked.load());
+  gShadowCascadesBlocked.store(false);
 }
 
 TEST(GalModernHlsl, Direct3D9AlphaTestIsEmulatedInThePixelEntry)

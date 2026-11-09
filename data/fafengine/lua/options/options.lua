@@ -193,6 +193,59 @@ do
     end
 end
 
+-- Finer shadows near the camera (ren_ShadowCascades), on Direct3D 12 and Vulkan. Shown only by an engine that
+-- has the command, as the ones below.
+do
+    local command = 'ren_ShadowCascades'
+    local function Supported()
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items and Supported() then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'shadow_resolution' then
+                position = index + 1
+            end
+        end
+        table.insert(video.items, position, {
+            title = 'Sharper near shadows',
+            key = 'shadow_cascades',
+            type = 'toggle',
+            default = 3,
+            tip = 'Extra shadow detail close to the camera when it is tilted. Direct3D 12 and Vulkan only; '
+                .. 'other renderers keep the original shadows.',
+            set = function(key, value, startup)
+                if value ~= 0 then
+                    value = 3
+                end
+                ConExecute(command .. ' ' .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = '<LOC _On>', key = 3 },
+                    { text = '<LOC _Off>', key = 0 },
+                },
+            },
+        })
+    end
+end
+
 -- Ambient occlusion (ren_Ao), on Direct3D 12 and Vulkan. Shown only by an engine that has the command,
 -- as the splat limit above.
 do

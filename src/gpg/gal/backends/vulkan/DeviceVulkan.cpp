@@ -36,6 +36,7 @@
 #include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
+#include "gpg/gal/effects/ShadowCascades.h"
 
 namespace gpg::gal
 {
@@ -256,6 +257,8 @@ namespace gpg::gal
     std::vector<VkSampler> samplers;
     std::int32_t viewportParameter = -1;
     float lastViewport[4]{-1.0f, -1.0f, -1.0f, -1.0f};
+    std::int32_t shadowCascadeParameter = -1; // faf_ShadowCascades (ren_ShadowCascades)
+    std::uint64_t shadowCascadeVersion = 0;
 
     std::uint64_t constantsVersion = 0;
     std::uint64_t constantsSerial = 0;
@@ -2621,6 +2624,7 @@ namespace gpg::gal
         state->samplers.push_back(SamplerFor(sampler));
       }
       state->viewportParameter = program.FindParameter("faf_ViewportSize");
+      state->shadowCascadeParameter = program.FindParameter(effects::kShadowCascadeParameter);
       slot = state;
     }
     return *static_cast<ProgramState*>(slot.get());
@@ -2751,6 +2755,12 @@ namespace gpg::gal
         std::copy(std::begin(size), std::end(size), std::begin(state.lastViewport));
         parameters.SetVector(static_cast<std::uint32_t>(state.viewportParameter), size);
       }
+    }
+    if (state.shadowCascadeParameter >= 0 && state.shadowCascadeVersion != effects::gShadowCascades.version) {
+      state.shadowCascadeVersion = effects::gShadowCascades.version;
+      parameters.SetVectorArray(
+        static_cast<std::uint32_t>(state.shadowCascadeParameter), &effects::gShadowCascades.vectors[0][0], effects::kShadowCascadeVectors
+      );
     }
 
     // $Globals in set 1, snapshotted as D3D9's BeginPass does.

@@ -12,13 +12,129 @@
 #include <utility>
 
 #include "EffectText.h"
+#include "ShadowCascades.h"
 
 namespace gpg::gal::effects
 {
   using namespace text;
 
+  ShadowCascadeConstants gShadowCascades{};
+  std::atomic<bool> gShadowCascadesBlocked{false};
+
+  bool IsShadowLookupSampler(const SamplerDesc& sampler)
+  {
+    return Lower(sampler.texture) == "shadowtexture" && Lower(sampler.name).find("blur") == std::string::npos;
+  }
+
+  std::string_view ShadowCascadeDeclaration() noexcept
+  {
+    return "float4 faf_ShadowCascades[9]; // engine addition (ren_ShadowCascades), filled by the backend\n";
+  }
+
   namespace
   {
+    static_assert(kShadowCascadeVectors == 9U, "ShadowCascadeDeclaration's array length");
+
+    // Engine addition (ren_ShadowCascades): the lighting shadow samplers' own type; see ShadowCascades.h.
+    // The shadow targets have one mip, so every lookup reads level 0 and needs no derivatives: a pixel's
+    // neighbours may sit in another tile.
+    constexpr const char* kShadowCascadeHelpers = R"hlsl(
+// ---- engine addition (ren_ShadowCascades): shadow lookups through the cascade atlas ----
+// HLSL converts between structs whose members match one for one, which would make every tex2D on this
+// type ambiguous with faf_sampler's. The sampler comes first here and the texture first there, so
+// neither converts to the other.
+struct faf_shadow_sampler
+{
+    SamplerState s;
+    Texture2D t2;
+};
+faf_shadow_sampler faf_make_shadow_sampler(Texture2D t2, TextureCube tc, Texture3D t3, SamplerState s)
+{
+    faf_shadow_sampler r;
+    r.s = s;
+    r.t2 = t2;
+    return r;
+}
+float2 faf_shadow_uv(float2 uv)
+{
+    const int count = (int)faf_ShadowCascades[0].x;
+    if (count <= 0) return uv;
+    [unroll] for (int k = 0; k < 4; ++k) {
+        if (k < count) {
+            const float4 box = faf_ShadowCascades[1 + 2 * k];
+            if (all(uv >= box.xy) && all(uv <= box.zw)) {
+                const float4 map = faf_ShadowCascades[2 + 2 * k];
+                return uv * map.xy + map.zw;
+            }
+        }
+    }
+    return faf_ShadowCascades[0].zw;
+}
+float4 faf_shadow_read(faf_shadow_sampler s, float2 uv) { return s.t2.SampleLevel(s.s, faf_shadow_uv(uv), 0); }
+float4 tex2D(faf_shadow_sampler s, float2 uv) { return faf_shadow_read(s, uv); }
+float4 tex2D(faf_shadow_sampler s, float2 uv, float2 dx, float2 dy) { return faf_shadow_read(s, uv); }
+float4 tex2Dbias(faf_shadow_sampler s, float4 uv) { return faf_shadow_read(s, uv.xy); }
+float4 tex2Dproj(faf_shadow_sampler s, float4 uv) { return faf_shadow_read(s, uv.xy / uv.w); }
+float4 tex2Dlod(faf_shadow_sampler s, float4 uv) { return faf_shadow_read(s, uv.xy); }
+float4 tex2Dgrad(faf_shadow_sampler s, float2 uv, float2 dx, float2 dy) { return faf_shadow_read(s, uv); }
+// ---- end of the cascade lookups ----
+)hlsl";
+
+    /**
+     * Engine addition (ren_ShadowCascades): true when every use of `sampler` in `source`, past its own
+     * declaration and outside comments, is the first argument of a tex2D-family call. Those are the
+     * calls faf_shadow_sampler answers; anything else (passing it to a function) needs a faf_sampler.
+     */
+    [[nodiscard]] bool ShadowSamplerOnlyLookedUp(const std::string_view source, const SamplerDesc& sampler)
+    {
+      static constexpr std::string_view kCalls[] = {"tex2D", "tex2Dbias", "tex2Dproj", "tex2Dlod", "tex2Dgrad"};
+      const std::string_view name = sampler.name;
+      std::size_t index = 0U;
+      while (index < source.size()) {
+        if (source.compare(index, 2U, "//") == 0) {
+          const std::size_t end = source.find('\n', index);
+          index = (end == std::string_view::npos) ? source.size() : end;
+          continue;
+        }
+        if (source.compare(index, 2U, "/*") == 0) {
+          const std::size_t end = source.find("*/", index + 2U);
+          index = (end == std::string_view::npos) ? source.size() : end + 2U;
+          continue;
+        }
+        if (index >= sampler.begin && index < sampler.end) {
+          index = sampler.end;
+          continue;
+        }
+        const bool whole = (index == 0U || !IsIdentifierChar(source[index - 1U])) && source.compare(index, name.size(), name) == 0 &&
+          (index + name.size() >= source.size() || !IsIdentifierChar(source[index + name.size()]));
+        if (!whole) {
+          ++index;
+          continue;
+        }
+        std::size_t before = index;
+        const auto skipSpace = [&] {
+          while (before > 0U && std::isspace(static_cast<unsigned char>(source[before - 1U])) != 0) {
+            --before;
+          }
+        };
+        skipSpace();
+        if (before == 0U || source[before - 1U] != '(') {
+          return false;
+        }
+        --before;
+        skipSpace();
+        std::size_t start = before;
+        while (start > 0U && IsIdentifierChar(source[start - 1U])) {
+          --start;
+        }
+        const std::string_view call = source.substr(start, before - start);
+        if (std::find(std::begin(kCalls), std::end(kCalls), call) == std::end(kCalls)) {
+          return false;
+        }
+        index += name.size();
+      }
+      return true;
+    }
     // Register numbers of the placeholder views a faf_sampler carries for the
     // dimensions its texture is never sampled in. The compiler removes them
     // with the dead fields; ModernEffect consumers can check none survive.
@@ -703,6 +819,28 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     TextureViews textureViews = BuildTextureViews(source, description, modern);
     std::vector<std::vector<TextureDimension>>& samplerDimensions = textureViews.samplerDimensions;
 
+    // Engine addition (ren_ShadowCascades): the lighting shadow samplers read through the atlas when the
+    // effect carries the cascade parameter (EffectProgram adds it) and only ever looks them up.
+    bool shadowCascades = false;
+    {
+      const bool declared = std::any_of(description.parameters.begin(), description.parameters.end(), [](const Parameter& parameter) {
+        return parameter.name == kShadowCascadeParameter && parameter.elements == kShadowCascadeVectors;
+      });
+      bool lookups = true;
+      bool any = false;
+      for (const SamplerDesc& sampler : description.samplers) {
+        if (IsShadowLookupSampler(sampler)) {
+          any = true;
+          lookups = lookups && ShadowSamplerOnlyLookedUp(source, sampler);
+        }
+      }
+      shadowCascades = declared && any && lookups;
+      if (declared && any && !lookups) {
+        gShadowCascadesBlocked.store(true);
+        modern.notes.push_back("a shadow sampler is used other than in a tex2D lookup; shadow cascades are off");
+      }
+    }
+
     // ---- parameters a function writes -------------------------------------------
     std::map<std::string, const Parameter*> numericParameters;
     for (const Parameter& parameter : description.parameters) {
@@ -769,7 +907,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         std::snprintf(declaration, sizeof(declaration), "SamplerState faf_smp_%s : register(s%u);\n", sampler->name.c_str(),
                       static_cast<unsigned>(index));
         body += declaration;
-        body += "#define " + sampler->name + " faf_make_sampler(" + view(TextureDimension::Texture2D, "faf_null2D") + ", " +
+        const char* const maker = (shadowCascades && IsShadowLookupSampler(*sampler)) ? "faf_make_shadow_sampler(" : "faf_make_sampler(";
+        body += "#define " + sampler->name + " " + maker + view(TextureDimension::Texture2D, "faf_null2D") + ", " +
           view(TextureDimension::TextureCube, "faf_nullCube") + ", " + view(TextureDimension::Texture3D, "faf_null3D") +
           ", faf_smp_" + sampler->name + ")\n";
         continue;
@@ -791,6 +930,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           }
         } else if (numericParameters.count(parameter->name) != 0U || parameter->parameterClass == ParameterClass::Struct) {
           body += GlobalDeclaration(*parameter) + "\n";
+          if (shadowCascades && parameter->name == kShadowCascadeParameter) {
+            body += kShadowCascadeHelpers;
+          }
         }
         // Anything else (strings, sampler parameters without state) has no shader-side form.
         continue;
