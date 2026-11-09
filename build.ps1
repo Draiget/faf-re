@@ -21,7 +21,7 @@
 .EXAMPLE
   .\build.ps1 -NoBuild              # copy the last build only
 .EXAMPLE
-  .\build.ps1 -Editor               # copy only the map editor, FafEditor_x64.exe, to bin_x64
+  .\build.ps1 -Editor               # build and copy only the map editor, FafEditor_x64.exe, to bin_x64
 #>
 [CmdletBinding()]
 param(
@@ -59,8 +59,8 @@ param(
   # Parallel compile jobs (default: CMake's choice, one per logical CPU).
   [int]$Jobs,
 
-  # Copy only the map editor (FafEditor_x64.exe / FafEditor.exe, src/editor) into the run
-  # folder, with its .pdb and the DXC DLLs; the game's exe and headless stay as they are.
+  # Build and copy only the map editor (FafEditor_x64.exe / FafEditor.exe, src/editor) into the
+  # run folder, with its .pdb; the game's exe and headless stay as they are.
   [switch]$Editor
 )
 
@@ -119,8 +119,12 @@ function Invoke-Build([hashtable]$t) {
     if ($Rebuild) { Invoke-CMake @('--preset', $t.Preset, '--fresh') }
     elseif (-not (Test-Path $cache)) { Invoke-CMake @('--preset', $t.Preset) }
 
-    Write-Host "== Building $($t.Exe).exe ($($t.Preset))" -ForegroundColor Cyan
+    # -Editor builds the editor's target only (and the engine library it links), not the game
+    # or headless.
+    $what = if ($Editor) { $t.Editor } else { $t.Exe }
+    Write-Host "== Building $what.exe ($($t.Preset))" -ForegroundColor Cyan
     $buildArgs = @('--build', '--preset', $t.Preset)
+    if ($Editor) { $buildArgs += @('--target', 'faf_editor') }
     if ($Jobs -gt 0) { $buildArgs += @('-j', "$Jobs") }
     Invoke-CMake $buildArgs
   }
