@@ -88,6 +88,9 @@ namespace faf::editor
         mWater = water;
       }
     }
+    /** The Water panel's Import / Export of FAForeverMapEditor's `.scmwtr`, taken by the app (it asks for the file). */
+    [[nodiscard]] bool TakeWaterImport() noexcept { return std::exchange(mWaterImport, false); }
+    [[nodiscard]] bool TakeWaterExport() noexcept { return std::exchange(mWaterExport, false); }
     [[nodiscard]] bool TakeWaterChange(WaterState& water, bool& final)
     {
       if (!mWaterChanged) {
@@ -591,6 +594,8 @@ namespace faf::editor
     bool mWaterEditing = false;
     bool mWaterChanged = false;
     bool mWaterFinal = false;
+    bool mWaterImport = false;
+    bool mWaterExport = false;
     std::vector<std::pair<std::string, std::string>> mUnitTypes;
     std::string mUnitType;
     std::string mUnitArmy;

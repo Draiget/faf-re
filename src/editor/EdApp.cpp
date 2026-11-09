@@ -1,4 +1,6 @@
 #include "editor/EdApp.h"
+#include <iterator>
+#include <fstream>
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 
 #include <Windows.h>
@@ -16,6 +18,7 @@
 #include <vector>
 
 #include "editor/EdLog.h"
+#include "editor/doc/EdWaterPreset.h"
 #include "editor/EdMemTrace.h"
 #include "editor/EdPlay.h"
 #include "editor/EdShell.h"
@@ -334,6 +337,7 @@ namespace faf::editor
       std::string mMarkerToolArg;
       /** `/framemarker <name>[@distance]` (test runs): the camera goes to that marker once the map is shown. */
       std::string mFrameMarkerArg;
+      bool mWaterFilesDone = false;
       /** `/waterset <on>,<level>,<deep>,<abyss>` (test runs): the sea set as one edit once the map is shown. */
       std::string mWaterSetArg;
       bool mWaterDragging = false;
@@ -923,6 +927,24 @@ namespace faf::editor
 
     namespace
     {
+      /** A Windows file dialog for one kind of file; empty when cancelled. */
+      std::filesystem::path AskFile(const HWND owner, const bool save, const wchar_t* const filter, const wchar_t* const extension,
+                                    const wchar_t* const title)
+      {
+        wchar_t path[MAX_PATH] = L"";
+        OPENFILENAMEW dialog{};
+        dialog.lStructSize = sizeof(dialog);
+        dialog.hwndOwner = owner;
+        dialog.lpstrFile = path;
+        dialog.nMaxFile = MAX_PATH;
+        dialog.lpstrFilter = filter;
+        dialog.lpstrDefExt = extension;
+        dialog.lpstrTitle = title;
+        dialog.Flags = save ? (OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR) : (OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR);
+        const BOOL chosen = save ? ::GetSaveFileNameW(&dialog) : ::GetOpenFileNameW(&dialog);
+        return chosen != FALSE ? std::filesystem::path(path) : std::filesystem::path{};
+      }
+
       /** The Windows file dialog for a height image; empty when cancelled. */
       std::filesystem::path AskHeightFile(const HWND owner, const bool save)
       {
@@ -1285,6 +1307,64 @@ namespace faf::editor
             tools.SetStamp(std::move(stamp), file.filename().string());
           } else {
             gpg::Warnf("editor: the stamp image didn't load: %s", error.c_str());
+          }
+        }
+      }
+      // The Water panel's settings file, or `/waterimport <file>`, `/waterexport <file>` for test runs.
+      {
+        std::filesystem::path importFile;
+        std::filesystem::path exportFile;
+        if (tools.TakeWaterImport()) {
+          importFile = AskFile(HandleOf(mGame.supcomFrame), false, L"Water settings (*.scmwtr)\0*.scmwtr\0All files\0*.*\0", L"scmwtr",
+                               L"Import water settings");
+        }
+        if (tools.TakeWaterExport()) {
+          exportFile = AskFile(HandleOf(mGame.supcomFrame), true, L"Water settings (*.scmwtr)\0*.scmwtr\0", L"scmwtr", L"Export water settings");
+        }
+        if (mScene.Attached() && !mWaterFilesDone) {
+          mWaterFilesDone = true;
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/waterimport", 1, &file) && !file.empty()) {
+            importFile = file[0].c_str();
+          }
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/waterexport", 1, &file) && !file.empty()) {
+            exportFile = file[0].c_str();
+          }
+        }
+        if (!importFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
+          std::ifstream in(importFile, std::ios::binary);
+          const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+          const WaterState before = mDocument.WaterNow();
+          WaterState water = before;
+          std::string error;
+          if (!in || !WaterFromScmwtr(text, water, error)) {
+            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
+          } else {
+            // The map keeps its own sea: on or off and its levels, as FAForeverMapEditor's import keeps them.
+            water.enabled = before.enabled;
+            water.elevation = before.elevation;
+            water.deep = before.deep;
+            water.abyss = before.abyss;
+            for (int i = 0; i < 6; ++i) {
+              if (water.textures[i] != before.textures[i]) {
+                gpg::Logf("editor: water texture %d in the file: %s (not applied; the map keeps %s)", i, water.textures[i].c_str(),
+                          before.textures[i].c_str());
+              }
+            }
+            mDocument.ApplyWater(water);
+            mDocument.WaterEdited(before);
+            gpg::Logf("editor: water settings imported from %s: colour %.3f %.3f %.3f, sun reflection %.2f", importFile.string().c_str(),
+                      static_cast<double>(water.shader.mWaterColor[0]), static_cast<double>(water.shader.mWaterColor[1]),
+                      static_cast<double>(water.shader.mWaterColor[2]), static_cast<double>(water.shader.mSunReflectionAmount));
+          }
+        }
+        if (!exportFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
+          std::ofstream out(exportFile, std::ios::binary | std::ios::trunc);
+          const std::string text = WaterToScmwtr(mDocument.WaterNow());
+          out.write(text.data(), static_cast<std::streamsize>(text.size()));
+          if (out) {
+            gpg::Logf("editor: water settings exported to %s", exportFile.string().c_str());
+          } else {
+            gpg::Warnf("editor: can't write %s", exportFile.string().c_str());
           }
         }
       }

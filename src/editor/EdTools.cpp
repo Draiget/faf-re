@@ -802,7 +802,7 @@ namespace faf::editor
          "Units, the shore and the minimap all follow the level.");
 
     SectionHeader("LOOK");
-    moho::WaterShaderNumericState& s = mWater.shader;
+    WaterNumbers& s = mWater.shader;
     ImGui::SetNextItemWidth(-1.0f);
     changed(ImGui::ColorEdit3("##watercolor", s.mWaterColor, ImGuiColorEditFlags_Float));
     ImGui::SetNextItemWidth(-1.0f);
@@ -842,6 +842,17 @@ namespace faf::editor
     }
     Note("The four normal maps' repeat, then each one's movement (x, z per second).");
     ImGui::EndDisabled();
+
+    SectionHeader("SETTINGS FILE");
+    if (ImGui::Button("Import .scmwtr...")) {
+      mWaterImport = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Export...")) {
+      mWaterExport = true;
+    }
+    Note("FAForeverMapEditor's water settings file. Import takes its look (colour, reflections, sun, waves) and keeps "
+         "this map's levels; its texture names are listed in the log, not applied yet.");
 
     SectionHeader("TEXTURES");
     static const char* const kTextureNames[6] = {"Cubemap", "Ramp", "Normals 1", "Normals 2", "Normals 3", "Normals 4"};

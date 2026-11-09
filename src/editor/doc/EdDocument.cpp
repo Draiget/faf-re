@@ -30,6 +30,7 @@
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/STIMap.h"
 #include "moho/terrain/StratumMaterial.h"
+#include "moho/terrain/water/CWaterShaderProperties.h"
 #include "moho/render/CWldTerrainDecal.h"
 #include "moho/terrain/splat/CWldSplat.h"
 
@@ -666,7 +667,8 @@ namespace faf::editor
     water.deep = map.mWaterElevationDeep;
     water.abyss = map.mWaterElevationAbyss;
     if (const moho::CWaterShaderProperties* const shader = mMap->mTerrainRes->GetWaterShaderProperties(); shader != nullptr) {
-      water.shader = shader->mNumericState;
+      static_assert(sizeof(WaterNumbers) == sizeof(moho::WaterShaderNumericState), "WaterNumbers mirrors WaterShaderNumericState");
+      std::memcpy(&water.shader, &shader->mNumericState, sizeof(water.shader));
       water.textures[0] = shader->mWaterCubemap.c_str();
       water.textures[1] = shader->mWaterRamp.c_str();
       for (int i = 0; i < 4; ++i) {
@@ -688,7 +690,7 @@ namespace faf::editor
     terrain->SetWaterElevationDeep(water.deep);
     terrain->SetWaterElevationAbyss(water.abyss);
     if (moho::CWaterShaderProperties* const shader = terrain->GetWaterShaderProperties(); shader != nullptr) {
-      shader->mNumericState = water.shader;
+      std::memcpy(&shader->mNumericState, &water.shader, sizeof(water.shader));
     }
     // The water map (depth below the sea, for the shore and the water's colour) follows the levels.
     if (now.enabled != water.enabled || now.elevation != water.elevation || now.deep != water.deep || now.abyss != water.abyss) {

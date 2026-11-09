@@ -342,6 +342,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/CheckTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdChecks.cpp
   editor/PathingTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdPathing.cpp
   editor/PackageTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdPackage.cpp
+  editor/WaterPresetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdWaterPreset.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
