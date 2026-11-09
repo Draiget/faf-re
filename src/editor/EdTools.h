@@ -131,6 +131,14 @@ namespace faf::editor
     /** The layer textures and their thumbnails (the Info panel shows the map's layers with them too). */
     [[nodiscard]] EdTextureLibrary& Library() noexcept { return mLibrary; }
 
+    /** The build grid around the cursor, snapping to its cells, and its step in game units (toolbar). */
+    [[nodiscard]] bool ShowGrid() const noexcept { return mShowGrid; }
+    void SetShowGrid(const bool show) noexcept { mShowGrid = show; }
+    [[nodiscard]] bool SnapToGrid() const noexcept { return mSnap; }
+    void SetSnapToGrid(const bool snap) noexcept { mSnap = snap; }
+    [[nodiscard]] float GridStep() const noexcept { return mGridStep; }
+    void SetGridStep(const float step) noexcept { mGridStep = step; }
+
     /** The Markers tool's connect mode: a click on a path node links it to the selection. */
     [[nodiscard]] bool ConnectPathNodes() const noexcept { return mConnectNodes; }
     void SetConnectPathNodes(const bool connect) noexcept { mConnectNodes = connect; }
@@ -439,6 +447,9 @@ namespace faf::editor
     int mSelectionCount = 0;
     std::vector<SaveEntry> mMarkerSelection;
     bool mConnectNodes = false;
+    bool mShowGrid = false;
+    bool mSnap = false;
+    float mGridStep = 1.0f;
     std::set<std::string> mHiddenMarkerTypes;
     std::vector<std::string> mAskSelect;
     bool mAskSelectAdd = false;

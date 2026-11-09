@@ -330,6 +330,8 @@ namespace faf::editor
       std::string mMarkerToolArg;
       /** `/framemarker <name>[@distance]` (test runs): the camera goes to that marker once the map is shown. */
       std::string mFrameMarkerArg;
+      /** `/grid`, `/snap`, `/gridstep <units>` (test runs): the toolbar's grid settings, set once the map is shown. */
+      bool mGridArgsPending = true;
       /**
        * `/uiclicks "x,y;dx,y;..."` (test runs): clicks fed to the panels through ImGui's input queue, in the panels'
        * pixels, `d` for a double-click, one every half second from frame 300. Posted window messages can't do it:
@@ -951,6 +953,18 @@ namespace faf::editor
         }
         if (std::string name; tools.TakeMarkerFrame(name)) {
           mScene.FrameMarker(name);
+        }
+        if (mGridArgsPending) {
+          mGridArgsPending = false;
+          if (moho::CFG_GetArgOption("/grid", 0, nullptr)) {
+            tools.SetShowGrid(true);
+          }
+          if (moho::CFG_GetArgOption("/snap", 0, nullptr)) {
+            tools.SetSnapToGrid(true);
+          }
+          if (fa::vector<fa::string> step; moho::CFG_GetArgOption("/gridstep", 1, &step) && !step.empty()) {
+            tools.SetGridStep(static_cast<float>(std::atof(step[0].c_str())));
+          }
         }
         if (!mFrameMarkerArg.empty()) {
           const std::size_t at = mFrameMarkerArg.find('@');

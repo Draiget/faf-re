@@ -72,7 +72,7 @@ namespace faf::editor
     const std::optional<EdDocument::PlayableRect> area = mMap != nullptr ? mDocument.PlayableArea() : std::nullopt;
     if (mMap == nullptr || mCamera == nullptr || mTools == nullptr ||
         (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty() && !area &&
-         mDocument.SaveData().Markers().empty()) ||
+         mDocument.SaveData().Markers().empty() && !mTools->ShowGrid()) ||
         moho::ren_Viewport == nullptr) {
       return;
     }
@@ -219,6 +219,40 @@ namespace faf::editor
       border(x1, z0, x1, z1);
       border(x1, z1, x0, z1);
       border(x0, z1, x0, z0);
+    }
+
+    // The build grid around the cursor: cell edges on whole steps, fading out with the distance.
+    if (mTools->ShowGrid()) {
+      float gx = 0.0f;
+      float gz = 0.0f;
+      if (GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz)) {
+        const float step = mTools->GridStep();
+        const int reach = std::max(4, static_cast<int>(std::ceil(28.0f / step)));
+        const float radius = static_cast<float>(reach) * step;
+        const float ox = std::floor(gx / step) * step;
+        const float oz = std::floor(gz / step) * step;
+        const auto shade = [&](const float x, const float z) {
+          const float fade = std::clamp(1.0f - std::hypot(x - gx, z - gz) / radius, 0.0f, 1.0f);
+          return (static_cast<std::uint32_t>(fade * fade * 200.0f) << 24) | 0x00FFFFFFu;
+        };
+        for (int k = -reach; k <= reach; ++k) {
+          for (int s = -reach; s < reach; ++s) {
+            // A segment of the line x = ox + k step, and one of z = oz + k step.
+            const float lx = ox + static_cast<float>(k) * step;
+            const float z0 = oz + static_cast<float>(s) * step;
+            const float z1 = z0 + step;
+            const float lz = oz + static_cast<float>(k) * step;
+            const float x0 = ox + static_cast<float>(s) * step;
+            const float x1 = x0 + step;
+            if (shade(lx, z0) > 0x00FFFFFFu || shade(lx, z1) > 0x00FFFFFFu) {
+              batcher->DrawLine(groundVertex(lx, z0, shade(lx, z0), 0.25f), groundVertex(lx, z1, shade(lx, z1), 0.25f));
+            }
+            if (shade(x0, lz) > 0x00FFFFFFu || shade(x1, lz) > 0x00FFFFFFu) {
+              batcher->DrawLine(groundVertex(x0, lz, shade(x0, lz), 0.25f), groundVertex(x1, lz, shade(x1, lz), 0.25f));
+            }
+          }
+        }
+      }
     }
 
     // Resource splats under the markers, then the markers: all of them with the Markers tool, the start positions
@@ -1330,6 +1364,15 @@ namespace faf::editor
     constexpr float kCopyReach = 1.5f;
   } // namespace
 
+  float EdMapScene::SnapToGrid(const float value) const
+  {
+    if (mTools == nullptr || !mTools->SnapToGrid()) {
+      return value;
+    }
+    const float step = mTools->GridStep();
+    return std::floor(value / step) * step + step * 0.5f;
+  }
+
   int EdMapScene::PickMarker(const float x, const float z) const
   {
     const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
@@ -1583,9 +1626,10 @@ namespace faf::editor
           centreZ[c] > static_cast<float>(field->height - 1)) {
         continue;
       }
-      // Marker positions as the game's saves place resources: on the half unit.
-      const float px = std::floor(centreX[c]) + 0.5f;
-      const float pz = std::floor(centreZ[c]) + 0.5f;
+      // Resources on the half unit, as the game's saves place them; other markers on the grid when snapping.
+      const bool resource = std::string(type.type) == "Mass" || std::string(type.type) == "Hydrocarbon";
+      const float px = resource ? std::floor(centreX[c]) + 0.5f : SnapToGrid(centreX[c]);
+      const float pz = resource ? std::floor(centreZ[c]) + 0.5f : SnapToGrid(centreZ[c]);
       const float py = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(px), static_cast<std::int32_t>(pz));
       // Names in use: the markers', and for a start position also every army the scenario lists (an extra army
       // such as ARMY_9 has no marker but its name is taken).
@@ -1619,7 +1663,14 @@ namespace faf::editor
     }
     if (!mMarkerSelection.empty()) {
       mDocument.SaveDataEdited(std::move(before));
-      gpg::Logf("editor: %zu %s markers placed, %zu markers now", mMarkerSelection.size(), type.type, markers.size());
+      float fx = 0.0f, fy = 0.0f, fz = 0.0f;
+      for (const SaveEntry& marker : markers) {
+        if (marker.name == mMarkerSelection.front()) {
+          (void)MarkerPosition(marker, fx, fy, fz);
+        }
+      }
+      gpg::Logf("editor: %zu %s markers placed (the first at %.2f, %.2f), %zu markers now", mMarkerSelection.size(), type.type,
+                static_cast<double>(fx), static_cast<double>(fz), markers.size());
     } else {
       mMarkerSelection = std::move(selectedBefore);
     }
@@ -1930,6 +1981,8 @@ namespace faf::editor
         continue;
       }
       const float heading = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
+      centreX[c] = SnapToGrid(centreX[c]);
+      centreZ[c] = SnapToGrid(centreZ[c]);
       moho::CWldPropEntry entry;
       entry.mBlueprintPath.assign(mTools->PropBlueprint().c_str());
       entry.mTransform.pos_ = Wm3::Vec3f{centreX[c],
@@ -2226,6 +2279,13 @@ namespace faf::editor
         ::ReleaseCapture();
         if (mMarkersMoved) {
           mDocument.SaveDataEdited(std::move(mMarkerBefore));
+          for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+            float x = 0.0f, y = 0.0f, z = 0.0f;
+            if (!mMarkerSelection.empty() && marker.name == mMarkerSelection.front() && MarkerPosition(marker, x, y, z)) {
+              gpg::Logf("editor: %zu markers moved, %s to %.2f, %.2f", mMarkerSelection.size(), marker.name.c_str(),
+                        static_cast<double>(x), static_cast<double>(z));
+            }
+          }
         }
         mMarkerBefore = {};
         return true;
@@ -2282,13 +2342,22 @@ namespace faf::editor
             std::hypot(groundX - mMarkerDragFromX, groundZ - mMarkerDragFromZ) > 0.05f) {
           std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
           for (std::size_t i = 0; i < mMarkerSelection.size() && i < mMarkerDragStart.size(); ++i) {
-            const float x = mMarkerDragStart[i][0] + groundX - mMarkerDragFromX;
-            const float z = mMarkerDragStart[i][2] + groundZ - mMarkerDragFromZ;
-            const float y = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z));
+            float x = mMarkerDragStart[i][0] + groundX - mMarkerDragFromX;
+            float z = mMarkerDragStart[i][2] + groundZ - mMarkerDragFromZ;
             for (SaveEntry& marker : markers) {
-              if (marker.name == mMarkerSelection[i]) {
-                marker.Set("position", Vector3Value(x, y, z));
+              if (marker.name != mMarkerSelection[i]) {
+                continue;
               }
+              const std::string type = MarkerTypeOf(marker);
+              if (type == "Mass" || type == "Hydrocarbon") {
+                x = std::floor(x) + 0.5f;
+                z = std::floor(z) + 0.5f;
+              } else {
+                x = SnapToGrid(x);
+                z = SnapToGrid(z);
+              }
+              const float y = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z));
+              marker.Set("position", Vector3Value(x, y, z));
             }
           }
           mMarkersMoved = true;
@@ -2324,8 +2393,8 @@ namespace faf::editor
         if (GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ) &&
             std::hypot(groundX - mDragFromX, groundZ - mDragFromZ) > 0.05f) {
           for (std::size_t i = 0; i < mSelection.size() && i < mDragStart.size(); ++i) {
-            const float x = mDragStart[i].x + groundX - mDragFromX;
-            const float z = mDragStart[i].z + groundZ - mDragFromZ;
+            const float x = SnapToGrid(mDragStart[i].x + groundX - mDragFromX);
+            const float z = SnapToGrid(mDragStart[i].z + groundZ - mDragFromZ);
             MovePropTo(mSelection[i], Wm3::Vec3f{x, mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z))), z});
           }
         }

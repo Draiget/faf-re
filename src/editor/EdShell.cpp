@@ -243,6 +243,50 @@ namespace faf::editor
       ImGui::EndDisabled();
       tip("Redo (Ctrl+Y)");
       ImGui::EndDisabled();
+      divider();
+
+      // The build grid and snapping.
+      const auto toggle = [](const char* const label, const bool on) {
+        if (on) {
+          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.55f, 0.36f, 0.16f, 1.0f));
+          ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.66f, 0.44f, 0.20f, 1.0f));
+        }
+        const bool clicked = ImGui::Button(label);
+        if (on) {
+          ImGui::PopStyleColor(2);
+        }
+        return clicked;
+      };
+      if (toggle("Grid", mTools.ShowGrid())) {
+        mTools.SetShowGrid(!mTools.ShowGrid());
+      }
+      tip("The build grid on the ground around the cursor: cells of the step's size, one unit being the cell units are built on");
+      ImGui::SameLine();
+      if (toggle("Snap", mTools.SnapToGrid())) {
+        mTools.SetSnapToGrid(!mTools.SnapToGrid());
+      }
+      tip("Markers and props placed or dragged go to the middle of a grid cell (mass and hydrocarbon points always sit on half units, as the game's saves place them)");
+      ImGui::SameLine();
+      {
+        static constexpr float kSteps[] = {0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
+        static constexpr const char* kStepNames[] = {"0.5", "1", "2", "4", "8"};
+        int current = 1;
+        for (int i = 0; i < 5; ++i) {
+          if (mTools.GridStep() == kSteps[i]) {
+            current = i;
+          }
+        }
+        ImGui::SetNextItemWidth(ImGui::CalcTextSize("0.5").x + ImGui::GetFrameHeight() * 2.0f);
+        if (ImGui::BeginCombo("##gridstep", kStepNames[current])) {
+          for (int i = 0; i < 5; ++i) {
+            if (ImGui::Selectable(kStepNames[i], i == current)) {
+              mTools.SetGridStep(kSteps[i]);
+            }
+          }
+          ImGui::EndCombo();
+        }
+        tip("The grid's step in game units");
+      }
 
       // The open map, at the right: its name, its folder, and a dot while it has unsaved edits.
       if (open) {

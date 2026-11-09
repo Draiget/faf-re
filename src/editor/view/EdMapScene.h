@@ -220,6 +220,8 @@ namespace faf::editor
     EdDocument::SaveSnapshot mMarkerBefore;
     /** The marker nearest (x, z) within reach of the cursor, or -1. */
     [[nodiscard]] int PickMarker(float x, float z) const;
+    /** The middle of the grid cell holding `value` when the toolbar's Snap is on, else `value`. */
+    [[nodiscard]] float SnapToGrid(float value) const;
     /** Whether the Markers panel hides this marker's type. */
     [[nodiscard]] bool MarkerHidden(const SaveEntry& marker) const;
     void DeleteSelectedMarkers();
