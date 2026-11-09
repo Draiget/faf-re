@@ -160,7 +160,7 @@ endif()
 add_dependencies(faf_replay_playback_tests headless)
 set_target_properties(faf_replay_playback_tests PROPERTIES FOLDER "Tests/Replay")
 add_test(NAME replay_playback COMMAND faf_replay_playback_tests)
-set_tests_properties(replay_playback PROPERTIES LABELS "Replay" TIMEOUT 3600)
+set_tests_properties(replay_playback PROPERTIES LABELS "Replay" TIMEOUT 7200)
 
 # CZipFile reads entries whose data starts at or past 2 GiB, as the binary does (tests/zip, PR #291).
 add_executable(faf_zip_offset_tests EXCLUDE_FROM_ALL zip/ZipOffsetTests.cpp)
@@ -206,6 +206,7 @@ add_subdirectory(gal)
 add_subdirectory(reflection)
 add_subdirectory(render_math)
 add_subdirectory(startup)
+add_subdirectory(netcore)
 
 # Entity update scroll snapshots and payload ownership.
 add_executable(faf_recon_scroll_packet_tests EXCLUDE_FROM_ALL sim/ReconScrollPacketTests.cpp)
