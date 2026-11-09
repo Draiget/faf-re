@@ -10,6 +10,7 @@
 #include "gpg/gal/backends/common/PipelineMemo.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/effects/EffectRuntime.h"
+#include "gpg/gal/effects/TextureFiltering.h"
 #include "moho/console/CConCommand.h"
 #include "moho/render/ProjectileIconRenderer.h"
 #include "moho/render/RangeGpuRenderer.h"
@@ -105,6 +106,15 @@ namespace moho
       "Vulkan: a target switching between being drawn into, sampled and copied waits only for the work that used it "
       "(1, the default), or for all earlier work on the GPU (0). Read at each switch.",
       &gpg::gal::gVulkanPreciseBarriers
+    );
+
+    /** Engine addition: `ren_TextureAnisotropy` (see gpg/gal/effects/TextureFiltering.h). */
+    TConVar<int> gTConVar_ren_TextureAnisotropy(
+      "ren_TextureAnisotropy",
+      "Direct3D 12 and Vulkan: anisotropic filtering (2-16) for the tiled textures the effects sample trilinearly - "
+      "terrain layers, unit albedo, normal and specular maps - so ground and hulls seen at a slant stay sharp; 0 keeps "
+      "the effects' own filtering. 8 by default. Applies at the next draw of each effect.",
+      &gpg::gal::effects::gTextureAnisotropy
     );
 
     /** Engine addition: `d3d_UploadIdleMB` (see gpg/gal/PlacedResources.h). */

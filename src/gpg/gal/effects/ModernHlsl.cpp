@@ -13,12 +13,14 @@
 
 #include "EffectText.h"
 #include "ShadowCascades.h"
+#include "TextureFiltering.h"
 
 namespace gpg::gal::effects
 {
   using namespace text;
 
   ShadowCascadeConstants gShadowCascades{};
+  int gTextureAnisotropy = 8;
   std::atomic<bool> gShadowCascadesBlocked{false};
 
   bool IsShadowLookupSampler(const SamplerDesc& sampler)

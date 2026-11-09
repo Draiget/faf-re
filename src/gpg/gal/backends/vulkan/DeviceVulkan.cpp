@@ -37,6 +37,7 @@
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
 #include "gpg/gal/effects/ShadowCascades.h"
+#include "gpg/gal/effects/TextureFiltering.h"
 
 namespace gpg::gal
 {
@@ -255,6 +256,7 @@ namespace gpg::gal
   struct DeviceVulkan::ProgramState
   {
     std::vector<VkSampler> samplers;
+    int samplerAnisotropy = -1; // effects::gTextureAnisotropy the samplers were made for (ren_TextureAnisotropy)
     std::int32_t viewportParameter = -1;
     float lastViewport[4]{-1.0f, -1.0f, -1.0f, -1.0f};
     std::int32_t shadowCascadeParameter = -1; // faf_ShadowCascades (ren_ShadowCascades)
@@ -2646,14 +2648,22 @@ namespace gpg::gal
     std::shared_ptr<void>& slot = program.BackendState();
     if (slot == nullptr) {
       auto state = std::make_shared<ProgramState>();
-      for (const effects::SamplerDesc& sampler : program.Description().samplers) {
-        state->samplers.push_back(SamplerFor(sampler));
-      }
       state->viewportParameter = program.FindParameter("faf_ViewportSize");
       state->shadowCascadeParameter = program.FindParameter(effects::kShadowCascadeParameter);
       slot = state;
     }
-    return *static_cast<ProgramState*>(slot.get());
+    ProgramState& state = *static_cast<ProgramState*>(slot.get());
+    // Engine addition (ren_TextureAnisotropy): the samplers follow the switch; the descriptor table holding the
+    // old ones is rebuilt on the next bind.
+    if (state.samplerAnisotropy != effects::gTextureAnisotropy) {
+      state.samplerAnisotropy = effects::gTextureAnisotropy;
+      state.samplers.clear();
+      for (const effects::SamplerDesc& sampler : program.Description().samplers) {
+        state.samplers.push_back(SamplerFor(effects::WithTextureAnisotropy(sampler)));
+      }
+      state.tableFrame = ~0ULL;
+    }
+    return state;
   }
 
   VkDescriptorSet DeviceVulkan::AllocateSet(const VkDescriptorSetLayout layout)

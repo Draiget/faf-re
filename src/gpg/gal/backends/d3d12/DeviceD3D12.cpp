@@ -40,6 +40,7 @@
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
 #include "gpg/gal/effects/ShadowCascades.h"
+#include "gpg/gal/effects/TextureFiltering.h"
 
 namespace gpg::gal
 {
@@ -365,6 +366,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   struct DeviceD3D12::ProgramState
   {
     D3D12_GPU_DESCRIPTOR_HANDLE samplers{};
+    int samplerAnisotropy = -1; // effects::gTextureAnisotropy the table was made for (ren_TextureAnisotropy)
     std::int32_t viewportParameter = -1;
     float lastViewport[4]{-1.0f, -1.0f, -1.0f, -1.0f};
     std::int32_t shadowCascadeParameter = -1; // faf_ShadowCascades (ren_ShadowCascades)
@@ -2853,12 +2855,21 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     std::shared_ptr<void>& slot = program.BackendState();
     if (slot == nullptr) {
       auto state = std::make_shared<ProgramState>();
-      state->samplers = SamplerTable(program.Description().samplers);
       state->viewportParameter = program.FindParameter("faf_ViewportSize");
       state->shadowCascadeParameter = program.FindParameter(effects::kShadowCascadeParameter);
       slot = state;
     }
-    return *static_cast<ProgramState*>(slot.get());
+    ProgramState& state = *static_cast<ProgramState*>(slot.get());
+    // Engine addition (ren_TextureAnisotropy): the sampler table follows the switch (tables are cached by content).
+    if (state.samplerAnisotropy != effects::gTextureAnisotropy) {
+      state.samplerAnisotropy = effects::gTextureAnisotropy;
+      std::vector<effects::SamplerDesc> samplers = program.Description().samplers;
+      for (effects::SamplerDesc& sampler : samplers) {
+        sampler = effects::WithTextureAnisotropy(sampler);
+      }
+      state.samplers = SamplerTable(samplers);
+    }
+    return state;
   }
 
   void DeviceD3D12::BindPass(effects::EffectProgram& program, const std::uint32_t technique, const std::uint32_t pass)

@@ -246,6 +246,60 @@ do
     end
 end
 
+-- Texture filtering (ren_TextureAnisotropy), on Direct3D 12 and Vulkan: anisotropic filtering for the tiled ground
+-- and unit textures. Shown only by an engine that has the command, as the ones below.
+do
+    local command = 'ren_TextureAnisotropy'
+    local function Supported()
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items and Supported() then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'texture_level' then
+                position = index + 1
+            end
+        end
+        -- Option values are levels, so a saved preference never reaches the command as text.
+        local levels = { [0] = '0', [1] = '4', [2] = '8', [3] = '16' }
+        table.insert(video.items, position, {
+            title = 'Texture filtering',
+            key = 'texture_anisotropy',
+            type = 'toggle',
+            default = 2,
+            tip = 'Keeps ground and unit textures sharp when seen at a slant (anisotropic filtering). '
+                .. 'Direct3D 12 and Vulkan only.',
+            set = function(key, value, startup)
+                ConExecute(command .. ' ' .. (levels[value] or levels[2]))
+            end,
+            custom = {
+                states = {
+                    { text = 'Trilinear', key = 0 },
+                    { text = '4x', key = 1 },
+                    { text = '8x', key = 2 },
+                    { text = '16x', key = 3 },
+                },
+            },
+        })
+    end
+end
+
 -- Ambient occlusion (ren_Ao), on Direct3D 12 and Vulkan. Shown only by an engine that has the command,
 -- as the splat limit above.
 do

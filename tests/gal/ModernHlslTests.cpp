@@ -17,6 +17,7 @@
 #include "gpg/gal/effects/EffectDescription.h"
 #include "gpg/gal/effects/ModernHlsl.h"
 #include "gpg/gal/effects/ShadowCascades.h"
+#include "gpg/gal/effects/TextureFiltering.h"
 
 using namespace gpg::gal::effects;
 using faf_gal_tests::Count;
@@ -476,6 +477,37 @@ TEST(GalModernHlsl, ADomainFunctionWithTheWrongParametersDropsTheTessellation)
   EXPECT_TRUE(pass.hullShader.entry.empty());
   EXPECT_TRUE(pass.domainShader.entry.empty());
   EXPECT_TRUE(HasNote(generated.modern.notes, "technique Tessellated: Place needs 4 varying parameters"));
+}
+
+// Engine addition (ren_TextureAnisotropy): only a trilinear sampler that wraps both ways turns anisotropic.
+TEST(GalTextureFiltering, OnlyTiledTrilinearSamplersTurnAnisotropic)
+{
+  const int saved = gTextureAnisotropy;
+  SamplerDesc tiled{};
+  tiled.filter = 0x15U; // MIN_MAG_MIP_LINEAR
+  tiled.addressU = 1U;  // WRAP
+  tiled.addressV = 1U;
+  SamplerDesc clamped = tiled;
+  clamped.addressU = 3U; // CLAMP
+  SamplerDesc point = tiled;
+  point.filter = 0x00U; // MIN_MAG_MIP_POINT
+  SamplerDesc noMips = tiled;
+  noMips.filter = 0x14U; // MIN_MAG_LINEAR_MIP_POINT
+
+  gTextureAnisotropy = 8;
+  EXPECT_EQ(WithTextureAnisotropy(tiled).filter, 0x55U);
+  EXPECT_EQ(WithTextureAnisotropy(tiled).maxAnisotropy, 8U);
+  EXPECT_EQ(WithTextureAnisotropy(clamped).filter, 0x15U) << "clamped textures keep their filter";
+  EXPECT_EQ(WithTextureAnisotropy(point).filter, 0x00U);
+  EXPECT_EQ(WithTextureAnisotropy(noMips).filter, 0x14U);
+
+  gTextureAnisotropy = 32;
+  EXPECT_EQ(WithTextureAnisotropy(tiled).maxAnisotropy, 16U) << "capped at what the APIs allow";
+  gTextureAnisotropy = 1;
+  EXPECT_EQ(WithTextureAnisotropy(tiled).filter, 0x15U) << "1 leaves every sampler as written";
+  gTextureAnisotropy = 0;
+  EXPECT_EQ(WithTextureAnisotropy(tiled).filter, 0x15U);
+  gTextureAnisotropy = saved;
 }
 
 TEST(GalModernHlsl, Direct3D9AlphaTestIsEmulatedInThePixelEntry)
