@@ -114,6 +114,8 @@ namespace faf::editor
     void SelectMarkers(const std::vector<std::string>& names, bool add);
     /** Moves the camera over a marker, at most `distance` away. */
     void FrameMarker(const std::string& name, float distance = 140.0f);
+    /** Sets the scenario's teams (the panel's slot order, the FFA repair), as one undo step. */
+    void ChangeTeams(const std::vector<ScenarioTeam>& teams);
     /** Sets the scenario's extra armies (names split on spaces), as one undo step. */
     void ChangeExtraArmies(const std::string& armies);
     /**

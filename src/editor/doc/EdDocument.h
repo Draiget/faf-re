@@ -192,6 +192,9 @@ namespace faf::editor
     [[nodiscard]] const std::string& Scenario() const noexcept { return mScenario; }
     /** The armies of the scenario's team list, in order, and its extra armies. */
     [[nodiscard]] std::vector<std::string> Armies() const { return ScenarioArmies(mScenario); }
+    /** The scenario's teams; setting them rewrites its `teams` block. */
+    [[nodiscard]] std::vector<ScenarioTeam> Teams() const { return ScenarioTeams(mScenario); }
+    void SetTeams(const std::vector<ScenarioTeam>& teams);
     [[nodiscard]] std::vector<std::string> ExtraArmies() const { return ScenarioExtraArmies(mScenario); }
     void SetExtraArmies(const std::vector<std::string>& armies);
     /** An army added to the scenario's list and to `_save.lua`'s Armies (when it isn't there), removed, renamed. */

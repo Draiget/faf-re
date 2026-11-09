@@ -411,8 +411,74 @@ namespace faf::editor
     return army;
   }
 
+  std::vector<ScenarioTeam> ScenarioTeams(const std::string& scenario)
+  {
+    std::vector<ScenarioTeam> teams;
+    std::size_t open = 0, close = 0;
+    int indent = 0;
+    if (!FindBlock(scenario, std::regex(R"(\bteams\s*=\s*\{)"), 0, open, close, indent)) {
+      return teams;
+    }
+    // Each table one level in: its name and its armies.
+    const std::regex nameKey(R"(\bname\s*=\s*['"]([^'"]*)['"])");
+    const std::regex armiesKey(R"(\barmies\s*=\s*\{([^}]*)\})");
+    const std::regex quoted(R"(['"]([^'"]+)['"])");
+    for (std::size_t at = open + 1; at < close;) {
+      const std::size_t start = scenario.find('{', at);
+      if (start == std::string::npos || start >= close) {
+        break;
+      }
+      const std::size_t end = MatchBracket(scenario, start);
+      if (end == std::string::npos || end > close) {
+        break;
+      }
+      const std::string table = scenario.substr(start, end - start + 1);
+      ScenarioTeam team;
+      std::smatch match;
+      if (std::regex_search(table, match, nameKey)) {
+        team.name = match[1].str();
+      }
+      if (std::regex_search(table, match, armiesKey)) {
+        const std::string list = match[1].str();
+        for (auto it = std::sregex_iterator(list.begin(), list.end(), quoted); it != std::sregex_iterator(); ++it) {
+          team.armies.push_back((*it)[1].str());
+        }
+      }
+      teams.push_back(std::move(team));
+      at = end + 1;
+    }
+    return teams;
+  }
+
+  std::string WithScenarioTeams(const std::string& scenario, const std::vector<ScenarioTeam>& teams)
+  {
+    std::size_t open = 0, close = 0;
+    int indent = 0;
+    if (!FindBlock(scenario, std::regex(R"(\bteams\s*=\s*\{)"), 0, open, close, indent)) {
+      return scenario;
+    }
+    std::string body = "\n";
+    for (const ScenarioTeam& team : teams) {
+      std::string list;
+      for (const std::string& army : team.armies) {
+        list += Quote(army) + ",";
+      }
+      body += std::string(static_cast<std::size_t>(indent), ' ') + "{ name = " + Quote(team.name) + ", armies = {" + list + "} },\n";
+    }
+    body += std::string(static_cast<std::size_t>(std::max(indent - 4, 0)), ' ');
+    return scenario.substr(0, open + 1) + body + scenario.substr(close);
+  }
+
   std::vector<std::string> ScenarioArmies(const std::string& scenario)
   {
+    // Every team's armies, in order (a map with one FFA team has them all there).
+    if (const std::vector<ScenarioTeam> teams = ScenarioTeams(scenario); !teams.empty()) {
+      std::vector<std::string> armies;
+      for (const ScenarioTeam& team : teams) {
+        armies.insert(armies.end(), team.armies.begin(), team.armies.end());
+      }
+      return armies;
+    }
     std::vector<std::string> armies;
     std::smatch match;
     if (!std::regex_search(scenario, match, std::regex(R"(armies\s*=\s*\{([^}]*)\})"))) {

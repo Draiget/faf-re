@@ -1808,6 +1808,21 @@ namespace faf::editor
     }
   }
 
+  void EdMapScene::ChangeTeams(const std::vector<ScenarioTeam>& teams)
+  {
+    if (teams == mDocument.Teams()) {
+      return;
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    mDocument.SetTeams(teams);
+    mDocument.SaveDataEdited(std::move(before));
+    std::string order;
+    for (const std::string& army : mDocument.Armies()) {
+      order += (order.empty() ? "" : " ") + army;
+    }
+    gpg::Logf("editor: teams: %zu, slots %s", teams.size(), order.c_str());
+  }
+
   void EdMapScene::ChangeExtraArmies(const std::string& armies)
   {
     std::vector<std::string> names;

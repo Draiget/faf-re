@@ -82,6 +82,21 @@ namespace faf::editor
   /** A new army's entry for `_save.lua`'s Armies, as the game's saves write one (no units, no plans). */
   SaveEntry NewArmyEntry(const std::string& name);
 
+  /** A team of a `_scenario.lua`'s standard configuration: its name and its armies, in order. */
+  struct ScenarioTeam
+  {
+    std::string name;
+    std::vector<std::string> armies;
+    bool operator==(const ScenarioTeam& other) const { return name == other.name && armies == other.armies; }
+  };
+  /** The teams of the scenario's `teams = { { name = 'FFA', armies = {...} }, ... }`, in order. */
+  std::vector<ScenarioTeam> ScenarioTeams(const std::string& scenario);
+  /**
+   * The scenario with its `teams` block written from `teams`, each team on one line as the game's scenarios write
+   * them; the text around it is kept.
+   */
+  std::string WithScenarioTeams(const std::string& scenario, const std::vector<ScenarioTeam>& teams);
+
   /** The armies of a `_scenario.lua`'s first team (`armies = {'ARMY_1', ...}`), in order. */
   std::vector<std::string> ScenarioArmies(const std::string& scenario);
   /** The scenario with its first team's armies replaced. */

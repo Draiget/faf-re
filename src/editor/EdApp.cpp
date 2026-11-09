@@ -1008,6 +1008,10 @@ namespace faf::editor
         }
         tools.SetMarkerSelection(mScene.SelectedMarkers());
         tools.SetArmies(mDocument.Armies(), mDocument.ExtraArmies());
+        tools.SetTeams(mDocument.Teams());
+        if (std::vector<ScenarioTeam> teams; tools.TakeTeamsChange(teams)) {
+          mScene.ChangeTeams(teams);
+        }
         if (std::string extra; tools.TakeExtraArmiesChange(extra)) {
           mScene.ChangeExtraArmies(extra);
         }

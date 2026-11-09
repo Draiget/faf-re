@@ -449,12 +449,25 @@ namespace faf::editor
     mModified = true;
   }
 
+  void EdDocument::SetTeams(const std::vector<ScenarioTeam>& teams)
+  {
+    mScenario = WithScenarioTeams(mScenario, teams);
+    mFacts.armies = Armies();
+    mModified = true;
+  }
+
   void EdDocument::AddArmy(const std::string& name)
   {
-    std::vector<std::string> armies = Armies();
+    // A new army joins the first team (a map's one FFA team).
+    std::vector<ScenarioTeam> teams = Teams();
+    const std::vector<std::string> armies = Armies();
     if (std::find(armies.begin(), armies.end(), name) == armies.end()) {
-      armies.push_back(name);
-      mScenario = WithScenarioArmies(mScenario, armies);
+      if (teams.empty()) {
+        mScenario = WithScenarioArmies(mScenario, {name});
+      } else {
+        teams.front().armies.push_back(name);
+        mScenario = WithScenarioTeams(mScenario, teams);
+      }
     }
     bool known = false;
     for (const SaveEntry& entry : mSave.Armies()) {
@@ -469,9 +482,12 @@ namespace faf::editor
 
   void EdDocument::RemoveArmy(const std::string& name)
   {
-    std::vector<std::string> armies = Armies();
-    armies.erase(std::remove(armies.begin(), armies.end(), name), armies.end());
-    mScenario = WithScenarioArmies(mScenario, armies);
+    // From whichever team has it.
+    std::vector<ScenarioTeam> teams = Teams();
+    for (ScenarioTeam& team : teams) {
+      team.armies.erase(std::remove(team.armies.begin(), team.armies.end(), name), team.armies.end());
+    }
+    mScenario = WithScenarioTeams(mScenario, teams);
     const std::vector<std::string> extra = ExtraArmies();
     if (std::find(extra.begin(), extra.end(), name) == extra.end()) {
       auto& entries = mSave.Armies();
@@ -483,9 +499,11 @@ namespace faf::editor
 
   void EdDocument::RenameArmy(const std::string& from, const std::string& to)
   {
-    std::vector<std::string> armies = Armies();
-    std::replace(armies.begin(), armies.end(), from, to);
-    mScenario = WithScenarioArmies(mScenario, armies);
+    std::vector<ScenarioTeam> teams = Teams();
+    for (ScenarioTeam& team : teams) {
+      std::replace(team.armies.begin(), team.armies.end(), from, to);
+    }
+    mScenario = WithScenarioTeams(mScenario, teams);
     for (SaveEntry& entry : mSave.Armies()) {
       if (entry.name == from) {
         entry.name = to;

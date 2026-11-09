@@ -140,6 +140,17 @@ namespace faf::editor
       mArmies = std::move(armies);
       mExtraArmies = std::move(extra);
     }
+    /** The scenario's teams, for the panel's slot order and its FFA check; a change it asks for, taken once. */
+    void SetTeams(std::vector<ScenarioTeam> teams) { mTeams = std::move(teams); }
+    [[nodiscard]] bool TakeTeamsChange(std::vector<ScenarioTeam>& teams)
+    {
+      if (!mTeamsChanged) {
+        return false;
+      }
+      mTeamsChanged = false;
+      teams = mTeamsChange;
+      return true;
+    }
     [[nodiscard]] bool TakeExtraArmiesChange(std::string& extra)
     {
       if (!mExtraChanged) {
@@ -531,6 +542,9 @@ namespace faf::editor
     float mDetectedMatch = 0.0f;
     std::vector<std::string> mArmies;
     std::vector<std::string> mExtraArmies;
+    std::vector<ScenarioTeam> mTeams;
+    std::vector<ScenarioTeam> mTeamsChange;
+    bool mTeamsChanged = false;
     char mExtraBuffer[256]{};
     bool mExtraEditing = false;
     bool mExtraChanged = false;

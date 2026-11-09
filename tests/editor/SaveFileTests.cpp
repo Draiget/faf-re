@@ -176,6 +176,32 @@ Scenario = {
     EXPECT_EQ(faf::editor::ScenarioArmies(fewer).size(), 3u);
   }
 
+  TEST(SaveFile, ScenarioTeamsAreReadAndWritten)
+  {
+    // As the game's scenarios write them (SCMP_009): one team on one line.
+    const std::string scenario = "version = 3\nScenarioInfo = {\n    Configurations = {\n        ['standard'] = {\n            teams = {\n"
+                                 "                { name = 'FFA', armies = {'ARMY_1','ARMY_2','ARMY_3',} },\n            },\n"
+                                 "            customprops = {\n                ['ExtraArmies'] = STRING( 'ARMY_9 NEUTRAL_CIVILIAN' ),\n"
+                                 "            },\n        },\n    },\n}\n";
+    std::vector<faf::editor::ScenarioTeam> teams = faf::editor::ScenarioTeams(scenario);
+    ASSERT_EQ(teams.size(), 1u);
+    EXPECT_EQ(teams[0].name, "FFA");
+    ASSERT_EQ(teams[0].armies.size(), 3u);
+    // Unchanged teams write the same text back.
+    EXPECT_EQ(faf::editor::WithScenarioTeams(scenario, teams), scenario);
+    // Two teams: ARMY_3 moves to a new one.
+    teams[0].armies.pop_back();
+    teams.push_back({"Bottom", {"ARMY_3"}});
+    const std::string two = faf::editor::WithScenarioTeams(scenario, teams);
+    const std::vector<faf::editor::ScenarioTeam> back = faf::editor::ScenarioTeams(two);
+    ASSERT_EQ(back.size(), 2u);
+    EXPECT_EQ(back[1].name, "Bottom");
+    EXPECT_EQ(back[1].armies, std::vector<std::string>{"ARMY_3"});
+    // Every team's armies, in order; the text after the block is kept.
+    EXPECT_EQ(faf::editor::ScenarioArmies(two), (std::vector<std::string>{"ARMY_1", "ARMY_2", "ARMY_3"}));
+    EXPECT_EQ(faf::editor::ScenarioExtraArmies(two).size(), 2u);
+  }
+
   TEST(SaveFile, ScriptPlayableAreaIsSetAndRemoved)
   {
     const std::string script = "local ScenarioUtils = import('/lua/sim/ScenarioUtilities.lua')\n\nfunction OnPopulate()\n"

@@ -1061,11 +1061,52 @@ namespace faf::editor
 
     SectionHeader("ARMIES");
     {
-      std::string list;
-      for (const std::string& army : mArmies) {
-        list += (list.empty() ? "" : ", ") + army;
+      // The game reads the first team, which must be named FFA (SinglePlayerLaunch.lua, VerifyScenarioConfiguration);
+      // its order is the lobby's slot order. Teams themselves are set in the lobby.
+      const bool oneFfa = mTeams.size() == 1 && mTeams.front().name == "FFA";
+      if (!oneFfa && !mTeams.empty()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
+        ImGui::TextWrapped("The scenario has %zu team%s%s. The game needs one team named FFA with every player army: the lobby "
+                           "takes its slots from the first team only.",
+                           mTeams.size(), mTeams.size() == 1 ? "" : "s", mTeams.front().name == "FFA" ? "" : ", the first not named FFA");
+        ImGui::PopStyleColor();
+        if (ImGui::Button("Make one FFA team")) {
+          ScenarioTeam all{"FFA", {}};
+          for (const ScenarioTeam& team : mTeams) {
+            all.armies.insert(all.armies.end(), team.armies.begin(), team.armies.end());
+          }
+          mTeamsChange = {all};
+          mTeamsChanged = true;
+        }
       }
-      ImGui::TextWrapped("%zu players: %s", mArmies.size(), list.empty() ? "(none)" : list.c_str());
+      if (!mTeams.empty()) {
+        const std::vector<std::string>& slots = mTeams.front().armies;
+        ImGui::TextDisabled("Lobby slots, in order (%zu)", slots.size());
+        for (std::size_t i = 0; i < slots.size(); ++i) {
+          ImGui::PushID(static_cast<int>(i));
+          ImGui::Text("%zu", i + 1);
+          ImGui::SameLine(28.0f);
+          ImGui::TextUnformatted(slots[i].c_str());
+          const float buttons = ImGui::GetFrameHeight() * 2.0f + ImGui::GetStyle().ItemSpacing.x;
+          ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - buttons);
+          ImGui::BeginDisabled(i == 0);
+          if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
+            mTeamsChange = mTeams;
+            std::swap(mTeamsChange.front().armies[i], mTeamsChange.front().armies[i - 1]);
+            mTeamsChanged = true;
+          }
+          ImGui::EndDisabled();
+          ImGui::SameLine();
+          ImGui::BeginDisabled(i + 1 == slots.size());
+          if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
+            mTeamsChange = mTeams;
+            std::swap(mTeamsChange.front().armies[i], mTeamsChange.front().armies[i + 1]);
+            mTeamsChanged = true;
+          }
+          ImGui::EndDisabled();
+          ImGui::PopID();
+        }
+      }
       if (!mExtraEditing) {
         std::string extra;
         for (const std::string& army : mExtraArmies) {
@@ -1082,7 +1123,8 @@ namespace faf::editor
         mExtraEditing = ImGui::IsItemActive();
       }
       Note("Placing a start position adds its army (ARMY_n) to the scenario's team list and to _save.lua's armies; deleting or "
-           "renaming it follows. Extra armies (ARMY_17, NEUTRAL_CIVILIAN...) hold the map's neutral and civilian units.");
+           "renaming it follows. The order is the lobby's slot order; teams are chosen in the lobby. Extra armies (ARMY_17, "
+           "NEUTRAL_CIVILIAN...) hold the map's neutral and civilian units.");
     }
     DrawPlayableArea();
   }
