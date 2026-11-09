@@ -67,8 +67,9 @@ namespace faf::editor
 
   void EdMapScene::DrawBrushRings()
   {
+    const std::optional<EdDocument::PlayableRect> area = mMap != nullptr ? mDocument.PlayableArea() : std::nullopt;
     if (mMap == nullptr || mCamera == nullptr || mTools == nullptr ||
-        (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty()) ||
+        (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty() && !area) ||
         moho::ren_Viewport == nullptr) {
       return;
     }
@@ -187,6 +188,34 @@ namespace faf::editor
 
     if (!walls.empty()) {
       batcher->DrawQuads(walls.data(), static_cast<std::uint32_t>(walls.size() / 4));
+    }
+
+    // The playable area: the ground outside it darkened as the game shows it, its border in amber.
+    if (area) {
+      if (mOutsideStale || mOutsideFor != area) {
+        BuildOutsideQuads(*area);
+      }
+      if (!mOutsideQuads.empty()) {
+        batcher->DrawQuads(mOutsideQuads.data(), static_cast<std::uint32_t>(mOutsideQuads.size() / 4));
+      }
+      constexpr std::uint32_t kBorderColor = 0xF0FFB030u;
+      const float x0 = static_cast<float>(area->x0);
+      const float z0 = static_cast<float>(area->z0);
+      const float x1 = static_cast<float>(area->x1);
+      const float z1 = static_cast<float>(area->z1);
+      const auto border = [&](const float ax, const float az, const float bx, const float bz) {
+        const int steps = std::max(1, static_cast<int>(std::hypot(bx - ax, bz - az) / 4.0f));
+        for (int s = 0; s < steps; ++s) {
+          const float t0 = static_cast<float>(s) / steps;
+          const float t1 = static_cast<float>(s + 1) / steps;
+          batcher->DrawLine(groundVertex(ax + (bx - ax) * t0, az + (bz - az) * t0, kBorderColor, 0.8f),
+                            groundVertex(ax + (bx - ax) * t1, az + (bz - az) * t1, kBorderColor, 0.8f));
+        }
+      };
+      border(x0, z0, x1, z0);
+      border(x1, z0, x1, z1);
+      border(x1, z1, x0, z1);
+      border(x0, z1, x0, z0);
     }
 
     // The selected props, ringed in yellow.
@@ -388,6 +417,7 @@ namespace faf::editor
     const bool done = kind == EdDocument::EditKind::Masks    ? UndoMasks(false)
                       : kind == EdDocument::EditKind::Layers ? UndoLayers(false)
                       : kind == EdDocument::EditKind::Props  ? UndoProps(false)
+                      : kind == EdDocument::EditKind::SaveData ? UndoSaveData(false)
                                                              : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -404,6 +434,7 @@ namespace faf::editor
     const bool done = kind == EdDocument::EditKind::Masks    ? UndoMasks(true)
                       : kind == EdDocument::EditKind::Layers ? UndoLayers(true)
                       : kind == EdDocument::EditKind::Props  ? UndoProps(true)
+                      : kind == EdDocument::EditKind::SaveData ? UndoSaveData(true)
                                                              : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -1029,7 +1060,8 @@ namespace faf::editor
 
   void EdMapScene::RefreshHeights(const std::vector<SampleRect>& rects)
   {
-    mWeightStale = true; // the overlay lies on the ground
+    mWeightStale = true; // the overlays lie on the ground
+    mOutsideStale = true;
     moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
     // The samples are written in place; the field's own setter, given them back, refreshes its tiers of
     // min/max heights and its revision (the shadow and vision passes watch it). Then the terrain redraws
@@ -1191,6 +1223,91 @@ namespace faf::editor
     mSelection.clear();
     RebuildProps();
     return true;
+  }
+
+  bool EdMapScene::UndoSaveData(const bool redo)
+  {
+    auto& from = redo ? mDocument.SaveDataRedo() : mDocument.SaveDataUndo();
+    auto& to = redo ? mDocument.SaveDataUndo() : mDocument.SaveDataRedo();
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mDocument.RestoreSaveData(redo ? step.second : step.first);
+    to.push_back(std::move(step));
+    mOutsideStale = true;
+    return true;
+  }
+
+  void EdMapScene::ChangePlayableArea(const std::optional<EdDocument::PlayableRect>& area)
+  {
+    if (mMap == nullptr || mDocument.PlayableArea() == area) {
+      return;
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    mDocument.SetPlayableArea(area);
+    mDocument.SaveDataEdited(std::move(before));
+    mOutsideStale = true;
+    if (area) {
+      gpg::Logf("editor: playable area %d, %d to %d, %d", area->x0, area->z0, area->x1, area->z1);
+    } else {
+      gpg::Logf("editor: no playable area");
+    }
+  }
+
+  void EdMapScene::BuildOutsideQuads(const EdDocument::PlayableRect& area)
+  {
+    mOutsideQuads.clear();
+    mOutsideFor = area;
+    mOutsideStale = false;
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr) {
+      return;
+    }
+    // The ground outside the area under a dark veil, in blocks of 8 units cut at the border.
+    constexpr int kBlock = 8;
+    constexpr std::uint32_t kVeil = 0x99000000u;
+    const int width = field->width - 1;
+    const int height = field->height - 1;
+    const auto groundAt = [field](const float x, const float z) {
+      const int sx = std::clamp(static_cast<int>(std::lround(x)), 0, field->width - 1);
+      const int sz = std::clamp(static_cast<int>(std::lround(z)), 0, field->height - 1);
+      moho::CD3DPrimBatcher::Vertex vertex{};
+      vertex.mX = x;
+      vertex.mY = static_cast<float>(field->data[sz * field->width + sx]) / 128.0f + 0.25f;
+      vertex.mZ = z;
+      vertex.mColor = kVeil;
+      return vertex;
+    };
+    for (int z0 = 0; z0 < height; z0 += kBlock) {
+      for (int x0 = 0; x0 < width; x0 += kBlock) {
+        const int x1 = std::min(width, x0 + kBlock);
+        const int z1 = std::min(height, z0 + kBlock);
+        // The part of the block outside the area: the block itself when it misses the area, else up to four strips.
+        const auto quad = [&](const int qx0, const int qz0, const int qx1, const int qz1) {
+          if (qx0 >= qx1 || qz0 >= qz1) {
+            return;
+          }
+          mOutsideQuads.push_back(groundAt(static_cast<float>(qx0), static_cast<float>(qz0)));
+          mOutsideQuads.push_back(groundAt(static_cast<float>(qx1), static_cast<float>(qz0)));
+          mOutsideQuads.push_back(groundAt(static_cast<float>(qx1), static_cast<float>(qz1)));
+          mOutsideQuads.push_back(groundAt(static_cast<float>(qx0), static_cast<float>(qz1)));
+        };
+        const int ix0 = std::max(x0, area.x0);
+        const int iz0 = std::max(z0, area.z0);
+        const int ix1 = std::min(x1, area.x1);
+        const int iz1 = std::min(z1, area.z1);
+        if (ix0 >= ix1 || iz0 >= iz1) {
+          quad(x0, z0, x1, z1);
+          continue;
+        }
+        quad(x0, z0, x1, iz0);
+        quad(x0, iz1, x1, z1);
+        quad(x0, iz0, ix0, iz1);
+        quad(ix1, iz0, x1, iz1);
+      }
+    }
   }
 
   int EdMapScene::PickProp(const float x, const float z) const
@@ -1466,6 +1583,29 @@ namespace faf::editor
     }
     switch (message) {
     case WM_LBUTTONDOWN: {
+      if (mTools != nullptr && mTools->MarkersToolActive()) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea();
+        if (!area || !GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          return true;
+        }
+        // The edges within reach of the cursor (a corner takes two).
+        const float reach = std::max(4.0f, mDistance * 0.015f);
+        const bool alongZ = groundZ > static_cast<float>(area->z0) - reach && groundZ < static_cast<float>(area->z1) + reach;
+        const bool alongX = groundX > static_cast<float>(area->x0) - reach && groundX < static_cast<float>(area->x1) + reach;
+        mBorderEdges = 0;
+        mBorderEdges |= alongZ && std::fabs(groundX - static_cast<float>(area->x0)) < reach ? 1 : 0;
+        mBorderEdges |= alongX && std::fabs(groundZ - static_cast<float>(area->z0)) < reach ? 2 : 0;
+        mBorderEdges |= alongZ && std::fabs(groundX - static_cast<float>(area->x1)) < reach ? 4 : 0;
+        mBorderEdges |= alongX && std::fabs(groundZ - static_cast<float>(area->z1)) < reach ? 8 : 0;
+        if (mBorderEdges != 0) {
+          mBorderBefore = mDocument.SaveDataNow();
+          ::SetCapture(window);
+          ::SetFocus(window);
+        }
+        return true;
+      }
       if (mTools != nullptr && (mTools->SelectToolActive() || mTools->PropsToolActive())) {
         float groundX = 0.0f;
         float groundZ = 0.0f;
@@ -1541,6 +1681,18 @@ namespace faf::editor
       return true;
     }
     case WM_LBUTTONUP:
+      if (mBorderEdges != 0) {
+        mBorderEdges = 0;
+        ::ReleaseCapture();
+        if (mBorderBefore.script != mDocument.Script() || mBorderBefore.areas != mDocument.SaveData().Areas()) {
+          mDocument.SaveDataEdited(std::move(mBorderBefore));
+          if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea()) {
+            gpg::Logf("editor: playable area %d, %d to %d, %d", area->x0, area->z0, area->x1, area->z1);
+          }
+        }
+        mBorderBefore = {};
+        return true;
+      }
       if (mObjectStroke) {
         EndObjectStroke();
         ::ReleaseCapture();
@@ -1574,7 +1726,29 @@ namespace faf::editor
       return true;
     case WM_MOUSEMOVE: {
       if (mDrag == Drag::None) {
-        if (mDragSelection && mObjectStroke) {
+        if (mBorderEdges != 0) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea();
+        const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+        if (area && field != nullptr && GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          // On the game's 4-unit grid, inside the map, at least 4 units wide.
+          const auto snap = [](const float value, const int limit) { return std::clamp(static_cast<int>(std::lround(value / 4.0f)) * 4, 0, limit); };
+          const int w = field->width - 1;
+          const int h = field->height - 1;
+          EdDocument::PlayableRect next = *area;
+          if ((mBorderEdges & 1) != 0) next.x0 = std::min(snap(groundX, w), next.x1 - 4);
+          if ((mBorderEdges & 2) != 0) next.z0 = std::min(snap(groundZ, h), next.z1 - 4);
+          if ((mBorderEdges & 4) != 0) next.x1 = std::max(snap(groundX, w), next.x0 + 4);
+          if ((mBorderEdges & 8) != 0) next.z1 = std::max(snap(groundZ, h), next.z0 + 4);
+          if (!(next == *area)) {
+            mDocument.SetPlayableArea(next);
+            mOutsideStale = true;
+          }
+        }
+        return true;
+      }
+      if (mDragSelection && mObjectStroke) {
         float groundX = 0.0f;
         float groundZ = 0.0f;
         // Not until the cursor has moved: a click alone leaves the props where (and as high as) they are.

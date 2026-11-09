@@ -815,8 +815,47 @@ namespace faf::editor
     Note("The decal texture browser and spline decals come in stage 6.");
   }
 
+  void EdTools::DrawPlayableArea()
+  {
+    SectionHeader("PLAYABLE AREA");
+    bool on = mArea.has_value();
+    if (ImGui::Checkbox("The map has a playable area", &on)) {
+      mAreaChanged = true;
+      if (on) {
+        // A border a tenth of the map in from each side, on the game's 4-unit grid.
+        const int marginX = (mMapWidth / 10) / 4 * 4;
+        const int marginZ = (mMapHeight / 10) / 4 * 4;
+        mAreaChange = std::array<int, 4>{marginX, marginZ, (mMapWidth - marginX) / 4 * 4, (mMapHeight - marginZ) / 4 * 4};
+      } else {
+        mAreaChange.reset();
+      }
+    }
+    if (mArea) {
+      std::array<int, 4> area = *mArea;
+      static const char* const kEdges[4] = {"##x0", "##z0", "##x1", "##z1"};
+      static const char* const kFormats[4] = {"Left %d", "Top %d", "Right %d", "Bottom %d"};
+      for (int i = 0; i < 4; ++i) {
+        ImGui::SetNextItemWidth(-1.0f);
+        const int limit = i % 2 == 0 ? mMapWidth : mMapHeight;
+        if (ImGui::DragInt(kEdges[i], &area[static_cast<std::size_t>(i)], 1.0f, 0, limit, kFormats[i])) {
+          area[static_cast<std::size_t>(i)] = std::clamp(area[static_cast<std::size_t>(i)] / 4 * 4, 0, limit);
+          if (area[0] < area[2] && area[1] < area[3]) {
+            mAreaChanged = true;
+            mAreaChange = area;
+          }
+        }
+      }
+      char size[64];
+      (void)std::snprintf(size, sizeof(size), "%d x %d of %d x %d", area[2] - area[0], area[3] - area[1], mMapWidth, mMapHeight);
+      ImGui::TextDisabled("%s", size);
+    }
+    Note("The game rounds each edge down to a multiple of 4. The ground outside is darkened as in the game; with the Markers tool, "
+         "drag the border's edges in the view. Saved as an area of _save.lua that _script.lua's OnPopulate makes the playable area.");
+  }
+
   void EdTools::DrawMarkers()
   {
+    DrawPlayableArea();
     static const char* const kTypes[] = {"Mass", "Hydro", "Start"};
     Segmented(kTypes, 3, mMarkerType);
     DrawSymmetry();

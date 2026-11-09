@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -79,6 +80,9 @@ namespace faf::editor
 
     /** Changes one slot as the Tools panel asked, as one undo step. */
     void ChangeLayerSlot(int slot, const EdTools::LayerSlot& value);
+
+    /** Sets or removes the playable area as one undo step. */
+    void ChangePlayableArea(const std::optional<EdDocument::PlayableRect>& area);
 
     /** Removes the selected props (Edit > Delete selection, the Delete key), as one undo step. */
     void DeleteSelected() { DeleteSelection(); }
@@ -175,6 +179,15 @@ namespace faf::editor
     std::vector<std::uint8_t> mMaskPlane;
     bool UndoHeights(bool redo);
     bool UndoLayers(bool redo);
+    bool UndoSaveData(bool redo);
+    /** The playable area's border and the darkened ground outside it, rebuilt when the area or the heights change. */
+    std::vector<moho::CD3DPrimBatcher::Vertex> mOutsideQuads;
+    std::optional<EdDocument::PlayableRect> mOutsideFor;
+    bool mOutsideStale = true;
+    void BuildOutsideQuads(const EdDocument::PlayableRect& area);
+    /** A Markers-tool drag of the border's edges: which edges (bits: left, top, right, bottom), and the area before. */
+    int mBorderEdges = 0;
+    EdDocument::SaveSnapshot mBorderBefore;
     /** A size drag on one slot keeps adding to its undo step until something else happens. */
     bool mLayerDragJoin = false;
     /** Sets a texture slot's paths and sizes on the terrain (its textures load), the Info panel's facts too. */

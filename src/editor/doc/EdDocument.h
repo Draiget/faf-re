@@ -4,12 +4,14 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include "editor/doc/EdMapFile.h"
 #include "editor/doc/EdNewMap.h"
+#include "editor/doc/EdSaveFile.h"
 #include "editor/undo/EdHeightHistory.h"
 #include "moho/sim/CWldMap.h"
 
@@ -166,7 +168,37 @@ namespace faf::editor
       Masks,
       Layers,
       Props,
+      SaveData,
     };
+    /** The map's `_save.lua` (markers, areas) and `_script.lua` as the editor keeps them. */
+    [[nodiscard]] SaveFile& SaveData() noexcept { return mSave; }
+    [[nodiscard]] std::string& Script() noexcept { return mScript; }
+    /** A playable area: the rectangle FAF's SetPlayableArea makes of it (each edge down to a multiple of 4). */
+    struct PlayableRect
+    {
+      int x0 = 0;
+      int z0 = 0;
+      int x1 = 0;
+      int z1 = 0;
+      bool operator==(const PlayableRect& other) const { return x0 == other.x0 && z0 == other.z0 && x1 == other.x1 && z1 == other.z1; }
+    };
+    /** The playable area the map's script sets (its area's rectangle, rounded as the game rounds it), or none. */
+    [[nodiscard]] std::optional<PlayableRect> PlayableArea() const;
+    /** Sets or clears it (the area `AREA_1`, or the one the script names, and the script's call). */
+    void SetPlayableArea(const std::optional<PlayableRect>& area);
+    /** The markers, areas and script as a whole, for undo. */
+    struct SaveSnapshot
+    {
+      std::vector<SaveEntry> markers;
+      std::vector<SaveEntry> areas;
+      std::string script;
+    };
+    [[nodiscard]] SaveSnapshot SaveDataNow() const;
+    void RestoreSaveData(const SaveSnapshot& snapshot);
+    /** A markers/areas/script edit ended: its before and now become the newest undo step. */
+    void SaveDataEdited(SaveSnapshot before);
+    [[nodiscard]] std::vector<std::pair<SaveSnapshot, SaveSnapshot>>& SaveDataUndo() noexcept { return mSaveUndo; }
+    [[nodiscard]] std::vector<std::pair<SaveSnapshot, SaveSnapshot>>& SaveDataRedo() noexcept { return mSaveRedo; }
     /** The map's props as a whole, for undo: the entries and the records they were read with (same order). */
     struct PropSnapshot
     {
@@ -234,6 +266,13 @@ namespace faf::editor
     HeightHistory mHeights;
     MaskGrid mMasks;
     MaskHistory mMaskHistory;
+    SaveFile mSave;
+    std::string mScript;
+    std::string mScriptRead;
+    std::vector<std::pair<SaveSnapshot, SaveSnapshot>> mSaveUndo;
+    std::vector<std::pair<SaveSnapshot, SaveSnapshot>> mSaveRedo;
+    /** Writes `_save.lua` and `_script.lua` beside the map file when they changed (Save). */
+    bool WriteLuaFiles(const std::filesystem::path& folder, std::string& error);
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropUndo;
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropRedo;
     std::vector<LayerEdit> mLayerUndo;

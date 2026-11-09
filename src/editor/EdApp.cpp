@@ -5,6 +5,9 @@
 #include <commdlg.h>
 
 #include <algorithm>
+#include <optional>
+#include <cstdio>
+#include <array>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -322,6 +325,7 @@ namespace faf::editor
       int mBrowseArg = -1;
       // `/shader <name>` with `/open` (test runs): the map's terrain shader changed once it is shown.
       std::string mShaderArg;
+      std::string mPlayableAreaArg;
       // `/proptool <mode>,<blueprint>` and `/tool <index>` (test runs).
       std::string mPropToolArg;
       int mToolArg = -1;
@@ -704,6 +708,9 @@ namespace faf::editor
       if (fa::vector<fa::string> tool; moho::CFG_GetArgOption("/tool", 1, &tool) && !tool.empty()) {
         mToolArg = std::atoi(tool[0].c_str());
       }
+      if (fa::vector<fa::string> area; moho::CFG_GetArgOption("/playablearea", 1, &area) && !area.empty()) {
+        mPlayableAreaArg = area[0].c_str();
+      }
       if (fa::vector<fa::string> shader; moho::CFG_GetArgOption("/shader", 1, &shader) && !shader.empty()) {
         mShaderArg = shader[0].c_str();
       }
@@ -846,6 +853,25 @@ namespace faf::editor
           mScene.ChangeLayerSlot(slot, value);
         }
         tools.SetLayerSlots(mScene.LayerSlots());
+        // The playable area: the panel shows it and asks for changes; `/playablearea x0,z0,x1,z1` (or `none`) for test runs.
+        if (const moho::CHeightField* const field = mDocument.Map()->mTerrainRes->GetHeightField(); field != nullptr) {
+          const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea();
+          tools.SetPlayableArea(area ? std::optional<std::array<int, 4>>(std::array<int, 4>{area->x0, area->z0, area->x1, area->z1}) : std::nullopt,
+                                field->width - 1, field->height - 1);
+        }
+        if (std::optional<std::array<int, 4>> change; tools.TakePlayableAreaChange(change)) {
+          mScene.ChangePlayableArea(change ? std::optional<EdDocument::PlayableRect>(EdDocument::PlayableRect{(*change)[0], (*change)[1], (*change)[2], (*change)[3]})
+                                           : std::nullopt);
+        }
+        if (!mPlayableAreaArg.empty()) {
+          int x0 = 0, z0 = 0, x1 = 0, z1 = 0;
+          if (mPlayableAreaArg == "none") {
+            mScene.ChangePlayableArea(std::nullopt);
+          } else if (std::sscanf(mPlayableAreaArg.c_str(), "%d,%d,%d,%d", &x0, &z0, &x1, &z1) == 4) {
+            mScene.ChangePlayableArea(EdDocument::PlayableRect{x0, z0, x1, z1});
+          }
+          mPlayableAreaArg.clear();
+        }
         if (float coverage[8]; mScene.MaskCoverage(coverage)) {
           tools.SetCoverage(coverage);
         }

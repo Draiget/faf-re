@@ -40,6 +40,8 @@ namespace faf::editor
     MapFacts facts;
     std::string error;
     MapFileRecords records;
+    SaveFile save;
+    std::string script;
     /** CreateNew: what to make and where; the scenario's game path once made. */
     bool create = false;
     NewMapSettings settings;
@@ -289,6 +291,16 @@ namespace faf::editor
       load.records.preview = ReadPreviewRecord(facts.mapPath);
       load.records.props = ReadPropRecords(facts.mapPath, *load.map);
 
+      // The save's and script's text, for the markers, areas and playable area the editor changes.
+      if (std::string text; !facts.savePath.empty() && ReadGameFile(facts.savePath, text)) {
+        std::string error;
+        if (!load.save.Parse(std::move(text), error)) {
+          gpg::Warnf("editor: %s: %s", facts.savePath.c_str(), error.c_str());
+        }
+      }
+      if (!facts.scriptPath.empty()) {
+        (void)ReadGameFile(facts.scriptPath, load.script);
+      }
       if (!facts.savePath.empty()) {
         const LuaPlus::LuaObject save = RunInTable(state, facts.savePath);
         if (save.IsTable() && save["Scenario"].IsTable()) {
@@ -352,6 +364,98 @@ namespace faf::editor
     mLoad->createFolder = target;
     mThread = std::thread([load = mLoad.get()] { Run(*load); });
     message = "Making " + target.string();
+    return true;
+  }
+
+  std::optional<EdDocument::PlayableRect> EdDocument::PlayableArea() const
+  {
+    const std::optional<std::string> name = ScriptPlayableArea(mScript);
+    if (!name) {
+      return std::nullopt;
+    }
+    for (const SaveEntry& area : mSave.Areas()) {
+      if (area.name != *name) {
+        continue;
+      }
+      const std::vector<double> numbers = ValueNumbers(area.Get("rectangle"));
+      if (numbers.size() < 4) {
+        return std::nullopt;
+      }
+      // FAF's SetPlayableArea: each edge less its remainder of 4.
+      const auto round = [](const double value) {
+        const int whole = static_cast<int>(value);
+        return whole - whole % 4;
+      };
+      return PlayableRect{round(numbers[0]), round(numbers[1]), round(numbers[2]), round(numbers[3])};
+    }
+    return std::nullopt;
+  }
+
+  void EdDocument::SetPlayableArea(const std::optional<PlayableRect>& area)
+  {
+    if (!area) {
+      mScript = WithScriptPlayableArea(mScript, "");
+      mModified = true;
+      return;
+    }
+    const std::string name = ScriptPlayableArea(mScript).value_or("AREA_1");
+    SaveEntry* entry = nullptr;
+    for (SaveEntry& existing : mSave.Areas()) {
+      entry = existing.name == name ? &existing : entry;
+    }
+    if (entry == nullptr) {
+      mSave.Areas().push_back({name, {}});
+      entry = &mSave.Areas().back();
+    }
+    entry->Set("rectangle", RectangleValue(area->x0, area->z0, area->x1, area->z1));
+    mScript = WithScriptPlayableArea(mScript, name);
+    mModified = true;
+  }
+
+  EdDocument::SaveSnapshot EdDocument::SaveDataNow() const
+  {
+    return {mSave.Markers(), mSave.Areas(), mScript};
+  }
+
+  void EdDocument::RestoreSaveData(const SaveSnapshot& snapshot)
+  {
+    mSave.Markers() = snapshot.markers;
+    mSave.Areas() = snapshot.areas;
+    mScript = snapshot.script;
+    mModified = true;
+  }
+
+  void EdDocument::SaveDataEdited(SaveSnapshot before)
+  {
+    mSaveUndo.emplace_back(std::move(before), SaveDataNow());
+    EditEnded(EditKind::SaveData);
+    mModified = true;
+  }
+
+  bool EdDocument::WriteLuaFiles(const std::filesystem::path& folder, std::string& error)
+  {
+    const auto write = [&](const std::string& gamePath, const std::string& text) {
+      const std::filesystem::path file = folder / gamePath.substr(gamePath.find_last_of('/') + 1);
+      std::ofstream out(file, std::ios::binary);
+      out.write(text.data(), static_cast<std::streamsize>(text.size()));
+      if (!out) {
+        error = "can't write " + file.string();
+        return false;
+      }
+      return true;
+    };
+    if (mSave.Loaded() && mSave.Changed()) {
+      if (!write(mFacts.savePath, mSave.Text())) {
+        return false;
+      }
+      mSave.MarkSaved();
+    }
+    if (mScript != mScriptRead && !mFacts.scriptPath.empty()) {
+      if (!write(mFacts.scriptPath, mScript)) {
+        return false;
+      }
+      mScriptRead = mScript;
+    }
     return true;
   }
 
@@ -429,6 +533,7 @@ namespace faf::editor
     mMaskHistory.ClearRedo();
     mLayerRedo.clear();
     mPropRedo.clear();
+    mSaveRedo.clear();
   }
 
   bool EdDocument::PopUndo(EditKind& kind)
@@ -497,6 +602,14 @@ namespace faf::editor
     mError = std::move(load->error);
     mMap = std::move(load->map);
     mFileRecords = std::move(load->records);
+    mSave = std::move(load->save);
+    mScript = std::move(load->script);
+    mScriptRead = mScript;
+    // The markers the save's text gives, against those its Lua gave (every map should agree).
+    if (mSave.Loaded() && static_cast<int>(mSave.Markers().size()) != load->facts.markerCount) {
+      gpg::Warnf("editor: %s: %zu markers in the save's text, %d in its Lua", load->facts.savePath.c_str(), mSave.Markers().size(),
+                 load->facts.markerCount);
+    }
     mLua = std::move(load->lua);
     // A missing save keeps the map open: the editor still has its terrain, props and decals.
     mState = mMap != nullptr ? State::Open : State::Failed;
@@ -668,7 +781,11 @@ namespace faf::editor
         continue;
       }
       std::string bytes;
-      if (!ReadGameFile(source, bytes)) {
+      if (Lower(source) == Lower(mFacts.savePath) && mSave.Loaded() && mSave.Changed()) {
+        bytes = mSave.Text(); // the edited markers and areas
+      } else if (Lower(source) == Lower(mFacts.scriptPath) && mScript != mScriptRead) {
+        bytes = mScript; // the edited script (its playable area)
+      } else if (!ReadGameFile(source, bytes)) {
         message = "Can't read " + source;
         return false;
       }
@@ -697,6 +814,12 @@ namespace faf::editor
     mSaveTarget = newMapFile;
     mBackedUp = true; // a new folder has nothing to back up
     mModified = false;
+    // From now on the map's files are the new folder's: a later Save writes there, under the new names.
+    mSave.MarkSaved();
+    mScriptRead = mScript;
+    for (std::string* const path : {&mFacts.mapPath, &mFacts.savePath, &mFacts.scriptPath, &mFacts.scenarioPath}) {
+      *path = ReplaceNoCase(ReplaceNoCase(*path, oldPrefix + oldBase, newPrefix + newBase), oldPrefix, newPrefix);
+    }
     message = "Saved as " + target.string() + " (" + std::to_string(copied + 1) + " files); the game lists it from its next start";
     return true;
   }
@@ -757,6 +880,10 @@ namespace faf::editor
       message = "Saving " + file.string() + " failed: " + failure;
       return false;
     }
+    if (!WriteLuaFiles(file.parent_path(), failure)) {
+      message = "Saved " + file.string() + ", but " + failure;
+      return false;
+    }
     mModified = false;
     message = "Saved " + file.string();
     return true;
@@ -780,6 +907,11 @@ namespace faf::editor
     mLayerRedo.clear();
     mPropUndo.clear();
     mPropRedo.clear();
+    mSave = {};
+    mScript.clear();
+    mScriptRead.clear();
+    mSaveUndo.clear();
+    mSaveRedo.clear();
     mFileRecords = {};
     mSaveTarget.clear();
     mModified = false;

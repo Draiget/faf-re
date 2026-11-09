@@ -5,7 +5,9 @@
 #include "editor/tools/EdTextureLibrary.h"
 
 #include <cmath>
+#include <array>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -42,6 +44,26 @@ namespace faf::editor
     /** The prop blueprints the rules have (their ids), for the palette. */
     void SetPropBlueprints(std::vector<std::string> blueprints) { mPropBlueprints = std::move(blueprints); }
     [[nodiscard]] bool HasPropBlueprints() const noexcept { return !mPropBlueprints.empty(); }
+    /** The Markers tool. */
+    [[nodiscard]] bool MarkersToolActive() const noexcept { return mTool == 6; }
+    /** The map's playable area (x0, z0, x1, z1) as it is, and the map's size, for the panel. */
+    void SetPlayableArea(const std::optional<std::array<int, 4>>& area, const int width, const int height)
+    {
+      mArea = area;
+      mMapWidth = width;
+      mMapHeight = height;
+    }
+    /** A change the panel asked for: the new area, or none to remove it. */
+    [[nodiscard]] bool TakePlayableAreaChange(std::optional<std::array<int, 4>>& area)
+    {
+      if (!mAreaChanged) {
+        return false;
+      }
+      mAreaChanged = false;
+      area = mAreaChange;
+      return true;
+    }
+
     /** How many objects the view has selected, for the Select tool's panel. */
     void SetSelectionCount(const int count) noexcept { mSelectionCount = count; }
     /** Test runs (`/proptool`): the Props tool with this blueprint and mode. */
@@ -322,6 +344,12 @@ namespace faf::editor
     bool mPropRandomTurn = true;
     char mPropFilter[64]{};
     int mSelectionCount = 0;
+    std::optional<std::array<int, 4>> mArea;
+    int mMapWidth = 0;
+    int mMapHeight = 0;
+    bool mAreaChanged = false;
+    std::optional<std::array<int, 4>> mAreaChange;
+    void DrawPlayableArea();
     MaskOp mMaskOp = MaskOp::None;
     std::vector<std::string> mShaders;
     std::string mShader;
