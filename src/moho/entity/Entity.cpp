@@ -903,23 +903,20 @@ namespace moho
   }
 
 
+  // Engine addition (sim_EntityPool): see EntityPool.
   void* Entity::operator new(
     std::size_t size
   )
   {
-    void* p = EntityPool::sInstance->Allocate(size);
-    if (p == nullptr) {
-      throw std::bad_alloc();
-    }
-    return p;
+    return EntityPool::sInstance->Allocate(size);
   }
 
   void* Entity::operator new(
       std::size_t size,
       std::nothrow_t
   ) noexcept
-  { 
-    return EntityPool::sInstance->Allocate(size);
+  {
+    return EntityPool::sInstance->TryAllocate(size);
   }
 
   void Entity::operator delete(

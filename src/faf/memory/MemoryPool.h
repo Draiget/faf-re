@@ -74,6 +74,19 @@ namespace faf
       m_pools.emplace_back(blockSize, nextCapacity);
     }
 
+    /// True when a pool hands out blocks of exactly `size` bytes.
+    bool Has(
+      std::size_t size
+    ) const noexcept
+    {
+      for (const auto& pool : m_pools) {
+        if (pool.GetBlockSize() == size) {
+          return true;
+        }
+      }
+      return false;
+    }
+
     void* Allocate(
       std::size_t size
     )
