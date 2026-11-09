@@ -37,6 +37,13 @@ namespace faf::editor
     /** Draws one ImGui frame into the bound target. */
     void Render(ImDrawData* drawData);
 
+    /**
+     * An image of the editor's own for `ImGui::Image` (thumbnails): `width` x `height` BGRA pixels, row by
+     * row. Returns its ImTextureID (0 when it can't be made); it lives until DestroyImage.
+     */
+    static std::uint64_t CreateImage(int width, int height, const std::uint32_t* bgra);
+    static void DestroyImage(std::uint64_t image);
+
   private:
     void UpdateTexture(ImTextureData* texture);
     void EnsureCapacity(std::uint32_t vertexCount, std::uint32_t indexCount);

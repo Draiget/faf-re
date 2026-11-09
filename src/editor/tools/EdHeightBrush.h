@@ -13,6 +13,22 @@ namespace faf::editor
     Smooth,
     Flatten,
     Noise,
+    /** Towards the panel's height. */
+    SetHeight,
+    /** Towards the nearest step of the panel's step height. */
+    Terrace,
+    /** Towards the plane through three picked points. */
+    Plane,
+    /** Adds a height image over the brush's circle, once per click. */
+    Stamp,
+  };
+
+  /** A height image for stamps: `width` x `height` words, read between samples over the brush's square. */
+  struct HeightStamp
+  {
+    int width = 0;
+    int height = 0;
+    std::vector<std::uint16_t> words;
   };
 
   /** The Tools panel's symmetry modes, in its order. The diagonal and turn modes need a square map. */
@@ -47,7 +63,28 @@ namespace faf::editor
     float flattenTo = 0.0f;
     /** N-way turns: the number of copies, 2 to kMaxSymmetryCopies. */
     int turns = 3;
+    /** Set height's height, in height words. */
+    float setTo = 0.0f;
+    /** Terrace's step, in height words (at least 1). */
+    float terraceStep = 640.0f;
+    /** Plane: height words = planeX * x + planeZ * z + planeC, at sample (x, z); used when `planeSet`. */
+    bool planeSet = false;
+    double planeX = 0.0;
+    double planeZ = 0.0;
+    double planeC = 0.0;
+    /** Stamp: the image (null: none) and the height its brightest value adds, in height words, times strength. */
+    const HeightStamp* stamp = nullptr;
+    float stampHeight = 2560.0f;
+    /** Limits: only samples between these heights (height words), and only where the slope (rise over run) is at most this. */
+    bool limitHeight = false;
+    float limitLow = 0.0f;
+    float limitHigh = 65535.0f;
+    bool limitSlope = false;
+    float limitMaxSlope = 1.0f;
   };
+
+  /** The plane through three points (x, height words, z); false when they are on one line (seen from above). */
+  bool PlaneThrough(const double (&x)[3], const double (&h)[3], const double (&z)[3], double& planeX, double& planeZ, double& planeC);
 
   /** A rectangle of samples, both ends included. */
   struct SampleRect

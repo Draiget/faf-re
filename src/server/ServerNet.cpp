@@ -1,4 +1,5 @@
 #include "server/ServerNet.h"
+#include "remote/SpeedLimit.h"
 
 #include <algorithm>
 #include <chrono>
@@ -477,6 +478,7 @@ namespace faf::server
         state.ready = *ready ? "yes" : "no";
       }
       state.lobbySlot = mLobby.LobbySlotOf(uid);
+      state.speedLimit = seat.gone ? std::nullopt : seat.speedLimit;
       state.load = seat.loaded ? "loaded" : (seat.reported ? "rules" : (mContentKnown && seat.joinedEver ? "loading" : ""));
       state.mods = seat.modsVerdict;
       for (const remote::SModEntry& mod : seat.mods) {
@@ -711,6 +713,18 @@ namespace faf::server
     return std::exchange(mReadyNews, {});
   }
 
+  std::optional<std::pair<int, std::int32_t>> CServerNet::SlowestSpeedLimit()
+  {
+    const std::scoped_lock lock(mNewsLock);
+    std::optional<std::pair<int, std::int32_t>> slowest;
+    for (const SSeatState& seat : mSeatStates) {
+      if (seat.speedLimit && (!slowest || *seat.speedLimit < slowest->first)) {
+        slowest.emplace(*seat.speedLimit, seat.uid);
+      }
+    }
+    return slowest;
+  }
+
   std::vector<CServerNet::SSeatState> CServerNet::TakeJudged()
   {
     const std::scoped_lock lock(mNewsLock);
@@ -881,6 +895,19 @@ namespace faf::server
         seat.modsReported = true;
         seat.mods = std::move(mods);
         JudgeMods(uid, seat);
+      }
+      return;
+    }
+    case remote::net::ESeatMessage::SpeedLimit: {
+      // Plan WP10.7: the player's game says how fast it keeps up; the server runs at the slowest playing seat's.
+      const std::optional<int> limit = remote::DecodeSpeedLimit(message);
+      if (!limit) {
+        ++mBadMessages;
+        return;
+      }
+      if (seat.speedLimit != limit) {
+        seat.speedLimit = limit;
+        Say(seat.name + "'s game keeps up with speed " + (*limit >= 0 ? "+" : "") + std::to_string(*limit));
       }
       return;
     }

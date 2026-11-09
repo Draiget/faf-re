@@ -1,6 +1,9 @@
 #include "editor/EdTools.h"
 
 #include <cmath>
+#include <string>
+#include <cctype>
+#include <algorithm>
 #include <cstdio>
 
 #include "imgui.h"
@@ -237,12 +240,54 @@ namespace faf::editor
   {
     SectionHeader("BRUSH");
     if (withModes) {
-      static const char* const kModes[] = {"Raise", "Lower", "Smooth", "Flatten", "Noise"};
-      Segmented(kModes, 3, mBrushMode);
-      int second = mBrushMode - 3;
-      Segmented(kModes + 3, 2, second);
-      if (second >= 0 && second != mBrushMode - 3) {
-        mBrushMode = second + 3;
+      // Three rows of three; each entry is its HeightBrushMode.
+      static const char* const kRows[3][3] = {{"Raise", "Lower", "Smooth"}, {"Flatten", "Set height", "Noise"}, {"Terrace", "Plane", "Stamp"}};
+      static constexpr int kModeOf[3][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}};
+      for (int row = 0; row < 3; ++row) {
+        int chosen = -1;
+        for (int i = 0; i < 3; ++i) {
+          chosen = kModeOf[row][i] == mBrushMode ? i : chosen;
+        }
+        const int before = chosen;
+        Segmented(kRows[row], 3, chosen);
+        if (chosen != before && chosen >= 0) {
+          mBrushMode = kModeOf[row][chosen];
+        }
+      }
+      switch (static_cast<HeightBrushMode>(mBrushMode)) {
+      case HeightBrushMode::Flatten:
+        Note("Flattens to the height under the stroke's first point.");
+        break;
+      case HeightBrushMode::SetHeight:
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##setheight", &mSetHeight, 0.25f, 0.0f, 500.0f, "Height %.1f");
+        break;
+      case HeightBrushMode::Terrace:
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##terrace", &mTerraceStep, 0.1f, 0.5f, 100.0f, "Step %.1f");
+        break;
+      case HeightBrushMode::Plane: {
+        char text[120];
+        (void)std::snprintf(text, sizeof(text), "Ctrl+click three points on the terrain; the brush moves the ground towards their plane (%d of 3%s).",
+                            mPlanePoints, mPlanePoints == 3 && !mPlaneSet ? ", on one line" : "");
+        Note(text);
+        if (ImGui::Button("Clear points")) {
+          ClearPlanePoints();
+        }
+        break;
+      }
+      case HeightBrushMode::Stamp:
+        if (ImGui::Button("Stamp image...")) {
+          mStampRequested = true;
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", mStamp != nullptr ? mStampName.c_str() : "none");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloat("##stampheight", &mStampHeight, 0.25f, -200.0f, 200.0f, "Stamp height %.1f");
+        Note("Each click adds the image over the brush's square: white adds the stamp height times strength.");
+        break;
+      default:
+        break;
       }
     }
     ImGui::SetNextItemWidth(-1.0f);
@@ -253,7 +298,7 @@ namespace faf::editor
     ImGui::SliderFloat("##falloff", &mFalloff, 0.0f, 1.0f, "Falloff %.2f");
   }
 
-  void EdTools::DrawSymmetry()
+  void EdTools::DrawSymmetry(const bool withCheck)
   {
     SectionHeader("SYMMETRY");
     const float available = ImGui::GetContentRegionAvail().x;
@@ -304,6 +349,9 @@ namespace faf::editor
                           copies);
     }
     Note(note);
+    if (!withCheck) {
+      return;
+    }
 
     SectionHeader("SYMMETRY CHECK");
     if (mSymmetry == 0) {
@@ -349,9 +397,7 @@ namespace faf::editor
   {
     DrawBrush(true);
     DrawSymmetry();
-    SectionHeader("LIMIT");
-    ImGui::Checkbox("Only between heights", &mLimitHeight);
-    ImGui::Checkbox("Only below slope", &mLimitSlope);
+    DrawLimits();
     SectionHeader("HEIGHT FIELD");
     if (ImGui::Button("Import...")) {
       mImportRequested = true;
@@ -370,16 +416,301 @@ namespace faf::editor
          ".raw or .r16. Heights are times the scale both ways. An import is one undo step.");
   }
 
+  void EdTools::AddPlanePoint(const float x, const float height, const float z) noexcept
+  {
+    if (mPlanePoints == 3) {
+      // The oldest goes.
+      for (int i = 0; i < 2; ++i) {
+        mPlanePointX[i] = mPlanePointX[i + 1];
+        mPlanePointH[i] = mPlanePointH[i + 1];
+        mPlanePointZ[i] = mPlanePointZ[i + 1];
+      }
+      mPlanePoints = 2;
+    }
+    mPlanePointX[mPlanePoints] = x;
+    mPlanePointH[mPlanePoints] = height;
+    mPlanePointZ[mPlanePoints] = z;
+    ++mPlanePoints;
+    mPlaneSet = false;
+    if (mPlanePoints == 3) {
+      // In samples and height words, as the brush reads it.
+      const double px[3] = {mPlanePointX[0], mPlanePointX[1], mPlanePointX[2]};
+      const double ph[3] = {mPlanePointH[0] * 128.0, mPlanePointH[1] * 128.0, mPlanePointH[2] * 128.0};
+      const double pz[3] = {mPlanePointZ[0], mPlanePointZ[1], mPlanePointZ[2]};
+      mPlaneSet = PlaneThrough(px, ph, pz, mPlaneX, mPlaneZ, mPlaneC);
+    }
+  }
+
+  int EdTools::PlanePoints(float (&x)[3], float (&height)[3], float (&z)[3]) const noexcept
+  {
+    for (int i = 0; i < mPlanePoints; ++i) {
+      x[i] = mPlanePointX[i];
+      height[i] = mPlanePointH[i];
+      z[i] = mPlanePointZ[i];
+    }
+    return mPlanePoints;
+  }
+
+  namespace
+  {
+    /** "grass001" from "/env/evergreen/layers/grass001_albedo.dds"; "(empty)" for none. */
+    std::string LayerLabel(const std::string& path)
+    {
+      if (path.empty()) {
+        return "(empty)";
+      }
+      std::string name = path.substr(path.find_last_of('/') + 1);
+      for (const char* const suffix : {"_albedo.dds", ".dds"}) {
+        const std::string tail = suffix;
+        if (name.size() > tail.size()) {
+          std::string lower = name.substr(name.size() - tail.size());
+          for (char& c : lower) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          if (lower == tail) {
+            name.resize(name.size() - tail.size());
+            break;
+          }
+        }
+      }
+      return name;
+    }
+  } // namespace
+
+  void EdTools::DrawLimits()
+  {
+    SectionHeader("LIMIT");
+    ImGui::Checkbox("Only between heights", &mLimitHeight);
+    if (mLimitHeight) {
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::DragFloatRange2("##limitheights", &mLimitLow, &mLimitHigh, 0.25f, 0.0f, 512.0f, "From %.1f", "to %.1f");
+    }
+    ImGui::Checkbox("Only below slope", &mLimitSlope);
+    if (mLimitSlope) {
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::SliderFloat("##limitslope", &mLimitSlopeDegrees, 1.0f, 85.0f, "%.0f degrees");
+    }
+  }
+
+  void EdTools::DrawLayerSlots()
+  {
+    SectionHeader("LAYERS");
+    if (mSlots.size() != 10) {
+      Note("Open a map to see its layers.");
+      return;
+    }
+    mLibrary.Pump(3);
+    static const char* const kSlotNames[10] = {"Lower", "1", "2", "3", "4", "5", "6", "7", "8", "Upper"};
+    const float thumb = ImGui::GetFrameHeight() * 1.6f;
+    for (int slot = 0; slot < 10; ++slot) {
+      LayerSlot& layer = mSlots[static_cast<std::size_t>(slot)];
+      ImGui::PushID(slot);
+      const std::uint64_t image = mLibrary.Thumbnail(layer.albedo);
+      const ImVec2 at = ImGui::GetCursorScreenPos();
+      if (image != 0U) {
+        ImGui::Image(static_cast<ImTextureID>(image), ImVec2(thumb, thumb));
+      } else {
+        ImGui::Dummy(ImVec2(thumb, thumb));
+        ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + thumb, at.y + thumb), IM_COL32(58, 65, 75, 255));
+      }
+      if (ImGui::IsItemClicked()) {
+        mBrowseSlot = slot;
+        mBrowseOpen = true;
+      }
+      ImGui::SameLine();
+      ImGui::BeginGroup();
+      ImGui::Text("%s  %s", kSlotNames[slot], LayerTextureName(layer.albedo).c_str());
+      if (ImGui::IsItemHovered() && !layer.albedo.empty()) {
+        ImGui::SetTooltip("%s\n%s", layer.albedo.c_str(), layer.normals.empty() ? "(no normal map)" : layer.normals.c_str());
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      float size = layer.albedoSize;
+      if (ImGui::DragFloat("##size", &size, 0.05f, 0.1f, 1024.0f, "Size %.2f") && size > 0.0f) {
+        // Albedo and normal map keep their ratio (most maps have them equal).
+        const float ratio = layer.albedoSize > 0.0f ? layer.normalsSize / layer.albedoSize : 1.0f;
+        mChangedSlot = slot;
+        mChangedValue = layer;
+        mChangedValue.albedoSize = size;
+        mChangedValue.normalsSize = size * ratio;
+      }
+      ImGui::EndGroup();
+      ImGui::PopID();
+    }
+    Note("Click a thumbnail to choose its texture.");
+    DrawTextureBrowser();
+  }
+
+  void EdTools::DrawTextureBrowser()
+  {
+    constexpr const char* kTitle = "Layer textures";
+    if (mBrowseOpen) {
+      mBrowseOpen = false;
+      ImGui::OpenPopup(kTitle);
+    }
+    ImGui::SetNextWindowSize(ImVec2(760.0f, 560.0f), ImGuiCond_FirstUseEver);
+    if (!ImGui::BeginPopupModal(kTitle, nullptr)) {
+      return;
+    }
+    ImGui::Text("Layer %s", mBrowseSlot == 0 ? "Lower" : (mBrowseSlot == 9 ? "Upper" : std::to_string(mBrowseSlot).c_str()));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(260.0f);
+    ImGui::InputTextWithHint("##filter", "search name or biome", mBrowseFilter, sizeof(mBrowseFilter));
+    ImGui::SameLine();
+    if (mBrowseSlot >= 1 && mBrowseSlot <= 8 && ImGui::Button("Empty")) {
+      mChangedSlot = mBrowseSlot;
+      mChangedValue = mSlots[static_cast<std::size_t>(mBrowseSlot)];
+      mChangedValue.albedo.clear();
+      mChangedValue.normals.clear();
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      ImGui::CloseCurrentPopup();
+    }
+    std::string filter = mBrowseFilter;
+    for (char& c : filter) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    if (ImGui::BeginChild("##grid", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+      const float cell = 96.0f;
+      const int columns = std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / (cell + 8.0f)));
+      int shown = 0;
+      std::string biome;
+      for (const LayerTexture& texture : mLibrary.Textures()) {
+        std::string key = texture.biome + "/" + texture.name;
+        for (char& c : key) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        if (!filter.empty() && key.find(filter) == std::string::npos) {
+          continue;
+        }
+        if (texture.biome != biome) {
+          biome = texture.biome;
+          shown = 0;
+          ImGui::SeparatorText(biome.c_str());
+        }
+        if (shown % columns != 0) {
+          ImGui::SameLine();
+        }
+        ++shown;
+        ImGui::PushID(texture.path.c_str());
+        ImGui::BeginGroup();
+        const std::uint64_t image = mLibrary.Thumbnail(texture.path);
+        bool picked = false;
+        if (image != 0U) {
+          picked = ImGui::ImageButton("##pick", static_cast<ImTextureID>(image), ImVec2(cell, cell));
+        } else {
+          picked = ImGui::Button("...", ImVec2(cell + 6.0f, cell + 6.0f));
+        }
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + cell);
+        ImGui::TextUnformatted(texture.name.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::EndGroup();
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip("%s\n%s", texture.path.c_str(), texture.normals.empty() ? "(no normal map beside it)" : texture.normals.c_str());
+        }
+        if (picked && mBrowseSlot >= 0 && mBrowseSlot < static_cast<int>(mSlots.size())) {
+          mChangedSlot = mBrowseSlot;
+          mChangedValue = mSlots[static_cast<std::size_t>(mBrowseSlot)];
+          mChangedValue.albedo = texture.path;
+          if (!texture.normals.empty()) {
+            mChangedValue.normals = texture.normals;
+          }
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::PopID();
+      }
+    }
+    ImGui::EndChild();
+    mLibrary.Pump(6);
+    ImGui::EndPopup();
+  }
+
   void EdTools::DrawTexture()
   {
+    DrawLayerSlots();
+    SectionHeader("PAINT LAYER");
+    // Strata 1-8 have masks; the lower layer is under everything and the upper one is blended by its alpha.
+    for (int layer = 0; layer < 8; ++layer) {
+      // The slots as the terrain has them now (a swapped texture shows at once), else the names read at open.
+      const std::string path = mSlots.size() == 10 ? mSlots[static_cast<std::size_t>(layer + 1)].albedo
+                               : static_cast<std::size_t>(layer + 1) < mLayerNames.size() ? mLayerNames[static_cast<std::size_t>(layer + 1)] : "";
+      char label[160];
+      (void)std::snprintf(label, sizeof(label), "%d  %s##layer%d", layer + 1, LayerLabel(path).c_str(), layer);
+      if (ImGui::Selectable(label, mMaskLayer == layer)) {
+        mMaskLayer = layer;
+      }
+      if (!path.empty() && ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("%s", path.c_str());
+      }
+    }
+    if (mSlots.size() == 10) {
+      ImGui::TextDisabled("Under all: %s", LayerLabel(mSlots.front().albedo).c_str());
+    } else if (!mLayerNames.empty()) {
+      ImGui::TextDisabled("Under all: %s", LayerLabel(mLayerNames.front()).c_str());
+    }
+    SectionHeader("BRUSH");
+    static const char* const kMaskModes[] = {"Paint", "Erase", "Smooth"};
+    Segmented(kMaskModes, 3, mMaskMode);
+    ImGui::Checkbox("Lower the layers above", &mLowerAbove);
     DrawBrush(false);
-    DrawSymmetry();
+    DrawSymmetry(false);
+    DrawLimits();
+
     SectionHeader("RULES");
-    Note("Sand below sea + 4, rock above slope 0.3, snow above 72.");
-    ImGui::BeginDisabled();
-    ImGui::Button("Apply rules to whole map", ImVec2(-1.0f, 0.0f));
+    Note("Each rule sets its layer to full where the ground is in its height and slope range; they run in order over the whole map.");
+    int remove = -1;
+    for (std::size_t i = 0; i < mRules.size(); ++i) {
+      MaskRule& rule = mRules[i];
+      ImGui::PushID(static_cast<int>(i));
+      ImGui::SetNextItemWidth(70.0f);
+      int layer = rule.layer + 1;
+      if (ImGui::InputInt("##layer", &layer)) {
+        rule.layer = std::clamp(layer - 1, 0, 7);
+      }
+      ImGui::SameLine();
+      ImGui::TextUnformatted("layer");
+      ImGui::SameLine();
+      if (ImGui::SmallButton("Remove")) {
+        remove = static_cast<int>(i);
+      }
+      ImGui::Checkbox("Height", &rule.useHeight);
+      if (rule.useHeight) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloatRange2("##heights", &rule.low, &rule.high, 0.25f, 0.0f, 512.0f, "%.1f", "%.1f");
+      }
+      ImGui::Checkbox("Slope", &rule.useSlope);
+      if (rule.useSlope) {
+        float lowDegrees = std::atan(rule.minSlope) * 57.29578f;
+        float highDegrees = std::atan(std::min(rule.maxSlope, 1000.0f)) * 57.29578f;
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::DragFloatRange2("##slopes", &lowDegrees, &highDegrees, 0.5f, 0.0f, 90.0f, "%.0f deg", "%.0f deg")) {
+          rule.minSlope = std::tan(lowDegrees * 0.0174532925f);
+          rule.maxSlope = highDegrees >= 89.9f ? 1000.0f : std::tan(highDegrees * 0.0174532925f);
+        }
+      }
+      ImGui::Separator();
+      ImGui::PopID();
+    }
+    if (remove >= 0) {
+      mRules.erase(mRules.begin() + remove);
+    }
+    if (ImGui::Button("Add rule")) {
+      MaskRule rule;
+      rule.layer = mMaskLayer;
+      rule.useSlope = true;
+      rule.minSlope = std::tan(30.0f * 0.0174532925f);
+      rule.maxSlope = 1000.0f;
+      mRules.push_back(rule);
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(mRules.empty());
+    if (ImGui::Button("Apply rules to whole map")) {
+      mRulesRequested = true;
+    }
     ImGui::EndDisabled();
-    Note("Layer painting, previews and names come in stage 4.");
   }
 
   void EdTools::DrawWater()

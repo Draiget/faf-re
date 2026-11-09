@@ -82,6 +82,7 @@
 #include "server/LobbySignaller.h"
 #include "server/ServerNet.h"
 #include "server/ServerViews.h"
+#include "remote/SpeedLimit.h"
 #include "server/SpeedWatch.h"
 
 namespace
@@ -1134,6 +1135,7 @@ namespace
                    ",\"joined\":" + flag(seat.joined) + ",\"loaded\":" + flag(seat.loaded) + ",\"lost\":" + flag(seat.lost) +
                    ",\"gone\":" + flag(seat.gone) + ",\"away\":" + flag(seat.away) + ",\"ping_ms\":" + std::to_string(seat.pingMs) +
                    ",\"ready\":" + faf::server::JsonString(seat.ready) + ",\"slot\":" + std::to_string(seat.lobbySlot) +
+                   ",\"speed_limit\":" + (seat.speedLimit ? std::to_string(*seat.speedLimit) : std::string("null")) +
                    ",\"load\":" + faf::server::JsonString(seat.load) +
                    ",\"content\":" + faf::server::JsonString(seat.content) +
                    ",\"mods\":" + faf::server::JsonString(seat.mods) + ",\"ui_mods\":[";
@@ -1803,6 +1805,17 @@ namespace
     bool awayPauseSeen = false;
     double awayCharged = 0.0;
 
+    // Plan WP10.7: the speed the game runs at: the one requested, held to the slowest playing seat's sim-speed limit, as
+    // lockstep's `CClientManagerImpl::GetSimRate` holds it to the slowest client's.
+    std::int32_t speedHolder = 0;
+    const auto pacedSpeed = [&net](const int requested) {
+      if (net) {
+        if (const auto slowest = net->SlowestSpeedLimit(); slowest && slowest->first < requested) {
+          return std::clamp(slowest->first, faf::remote::kMinSpeedLimit, faf::remote::kMaxSpeedLimit);
+        }
+      }
+      return requested;
+    };
     const auto watchSpeed = [&](const double elapsed) {
       moho::CClientManagerImpl* const manager = driver->GetClientManager();
       if (manager == nullptr) {
@@ -1810,7 +1823,25 @@ namespace
       }
       const float gameRate = moho::SIM_GetMeasuredGameRate();
       const float beatMs = gameRate > 0.0f ? faf::server::kSpeedZeroBeatMs / gameRate : 0.0f;
-      const int requested = manager->GetSimRateRequested();
+      const int asked = manager->GetSimRateRequested();
+      const int requested = pacedSpeed(asked);
+      // Plan WP10.7: who holds the game back, when it changes.
+      const auto slowest = net ? net->SlowestSpeedLimit() : std::nullopt;
+      const std::int32_t holder = slowest && slowest->first < asked ? slowest->second : 0;
+      if (holder != speedHolder) {
+        speedHolder = holder;
+        if (holder != 0) {
+          std::string who = "uid " + std::to_string(holder);
+          for (const faf::server::CServerNet::SSeatState& seat : net->Seats()) {
+            if (seat.uid == holder) {
+              who = seat.name;
+            }
+          }
+          Say("Game speed held at %+d by %s's game (requested %+d)", requested, who.c_str(), asked);
+        } else {
+          Say("Game speed no longer held by a player's game (requested %+d)", asked);
+        }
+      }
       if (views) {
         views->SetFrameSimRate(requested); // #178: the players' clients pace their display by it
       }
@@ -1823,12 +1854,12 @@ namespace
       oldest = {elapsed, end.beats};
       ++beatSamples;
 
-      const faf::server::SSpeedNews news = speedWatch.Update(faf::server::SSpeedSample{elapsed, requested, speed, beatMs});
+      const faf::server::SSpeedNews news = speedWatch.Update(faf::server::SSpeedSample{elapsed, asked, speed, beatMs}); // what was asked; a hold is said above
       if (news.requestChanged) {
         Say("Game speed requested: %+d (was %+d)", requested, news.requestedBefore);
       }
       if (news.speedChanged) {
-        Say("Sim speed %+d (was %+d, requested %+d), a beat takes %.0f ms", speed, news.speedBefore, requested, beatMs);
+        Say("Sim speed %+d (was %+d, requested %+d), a beat takes %.0f ms", speed, news.speedBefore, asked, beatMs);
       }
       if (news.slowStarted) {
         Say("WARNING: the sim is close to speed -1: a beat takes %.0f ms, -1 starts at %.0f ms", beatMs, faf::server::kSpeedZeroBeatMs);
@@ -1840,8 +1871,10 @@ namespace
       if (statusSeconds > 0.0 && elapsed - lastStatus >= statusSeconds) {
         const double beatsPerSecond = (end.beats - statusBeats) / (elapsed - lastStatus);
         const std::uint64_t netBytes = net ? net->BytesSent() : 0u;
-        Say("Status: game time %s, real time %s, speed %+d (requested %+d), %.1f beats/s, a beat takes %.0f ms, memory %ld MB, %.0f KB/s to players, %lu warnings in the log",
-            GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(elapsed).c_str(), speed, requested, beatsPerSecond, beatMs, ResidentMegabytes(),
+        Say("Status: game time %s, real time %s, speed %+d (requested %+d%s), %.1f beats/s, a beat takes %.0f ms, memory %ld MB, %.0f KB/s to players, %lu warnings in the log",
+            GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(elapsed).c_str(), speed, asked,
+            requested < asked ? (", held at " + std::string(requested >= 0 ? "+" : "") + std::to_string(requested) + " by a player's game").c_str() : "",
+            beatsPerSecond, beatMs, ResidentMegabytes(),
             static_cast<double>(netBytes - statusNetBytes) / 1024.0 / (elapsed - lastStatus), warnings.Count());
         statusNetBytes = netBytes;
         lastStatus = elapsed;
@@ -2144,7 +2177,7 @@ namespace
           }
         }
         if (moho::CClientManagerImpl* const manager = driver->GetClientManager(); manager != nullptr) {
-          nextBeatAt = std::max(nextBeatAt, lastBeatAt - kMaxCatchUpSeconds) + faf::server::SecondsPerBeat(manager->GetSimRateRequested());
+          nextBeatAt = std::max(nextBeatAt, lastBeatAt - kMaxCatchUpSeconds) + faf::server::SecondsPerBeat(pacedSpeed(manager->GetSimRateRequested()));
         }
         if (stalled) {
           stalled = false;

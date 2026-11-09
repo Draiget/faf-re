@@ -1,5 +1,7 @@
 #include "editor/ui/EdImGuiRenderer.h"
 
+#include <unordered_map>
+
 #include <algorithm>
 #include <cstring>
 
@@ -105,7 +107,48 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
       }
       (void)texture.Unlock(0);
     }
+    /** The editor's own images (CreateImage), by their ImTextureID. */
+    std::unordered_map<std::uint64_t, boost::shared_ptr<gpg::gal::Texture>>& OwnImages()
+    {
+      static std::unordered_map<std::uint64_t, boost::shared_ptr<gpg::gal::Texture>> images;
+      return images;
+    }
   } // namespace
+
+  std::uint64_t EdImGuiRenderer::CreateImage(const int width, const int height, const std::uint32_t* const bgra)
+  {
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+    if (device == nullptr || width < 1 || height < 1 || bgra == nullptr) {
+      return 0U;
+    }
+    gpg::gal::TextureContext context{};
+    context.source_ = 2U;
+    context.type_ = 1U;
+    context.usage_ = 0U; // written once
+    context.format_ = kTextureFormatBgra8;
+    context.mipmapLevels_ = 1U;
+    context.width_ = static_cast<std::uint32_t>(width);
+    context.height_ = static_cast<std::uint32_t>(height);
+    boost::shared_ptr<gpg::gal::Texture> texture = device->CreateTexture(&context);
+    if (texture.get() == nullptr) {
+      return 0U;
+    }
+    const RECT whole{};
+    const gpg::gal::TextureLockRect lock = texture->Lock(0, whole, 0);
+    for (int y = 0; y < height; ++y) {
+      std::memcpy(static_cast<std::uint8_t*>(lock.bits) + static_cast<std::ptrdiff_t>(y) * lock.pitch, bgra + static_cast<std::ptrdiff_t>(y) * width,
+                  static_cast<std::size_t>(width) * 4U);
+    }
+    (void)texture->Unlock(0);
+    const auto id = static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(texture.get()));
+    OwnImages()[id] = std::move(texture);
+    return id;
+  }
+
+  void EdImGuiRenderer::DestroyImage(const std::uint64_t image)
+  {
+    OwnImages().erase(image);
+  }
 
   bool EdImGuiRenderer::Init()
   {

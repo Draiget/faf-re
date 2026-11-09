@@ -38,6 +38,7 @@
 #include "moho/net/CMessageStream.h"
 #include "moho/net/ELobbyMsg.h"
 #include "moho/net/ECmdStreamOp.h"
+#include "remote/SpeedLimit.h"
 #include "remote/net/Datagram.h"
 #include "remote/FrameWindow.h"
 #include "remote/SeatRoster.h"
@@ -229,6 +230,8 @@ namespace
     // Plan WP11.4: once the server's roster lists other players and this many seconds have gone (`--chat`: 0, `--chat-at`),
     // send each of them one chat line through the server, as FAF's chat sends one (a Lua table in byte form).
     double chatAt = -1.0;
+    int speedLimit = 0;           // plan WP10.7: reported as this player's game's sim-speed limit
+    double speedLimitAt = -1.0;
   };
 
   /** FAF chat.lua's message, `{Chat = true, to = 'all', text = ...}`, as `SessionSendChatMessage` writes it. */
@@ -389,6 +392,10 @@ namespace
         out.rebuild = value;
       } else if (name == "--chat-at") {
         out.chatAt = Argument(value);
+      } else if (name == "--speed-limit") {
+        out.speedLimit = std::atoi(value);
+      } else if (name == "--speed-limit-at") {
+        out.speedLimitAt = Argument(value);
       } else {
         return false;
       }
@@ -903,7 +910,7 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>]] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--rebuild <match.lua> /init <init.lua>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>]] [--speed-limit <step> --speed-limit-at <s>] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--rebuild <match.lua> /init <init.lua>]\n"
     );
     return 3;
   }
@@ -1203,6 +1210,12 @@ int main(const int argc, char** const argv)
       writer.Bytes(reinterpret_cast<const std::uint8_t*>(text.data()), text.size());
       (void)link.SendReliable(frame.data(), frame.size());
       std::printf("probe %d: %.1f s: lobby: script data to uid %d\n", options.uid, elapsed, options.lobbySayTo);
+    }
+    if (Due(options.speedLimitAt, elapsed)) {
+      // Plan WP10.7: as a server-mode game reports what it keeps up with.
+      const std::vector<std::uint8_t> limit = faf::remote::EncodeSpeedLimit(options.speedLimit);
+      (void)link.SendReliable(limit.data(), limit.size());
+      std::printf("probe %d: %.1f s: speed limit %+d sent\n", options.uid, elapsed, options.speedLimit);
     }
     if (options.chatAt >= 0.0 && !rosterSeen.chatted && elapsed >= options.chatAt && rosterSeen.connected > 1u) {
       rosterSeen.chatted = true;

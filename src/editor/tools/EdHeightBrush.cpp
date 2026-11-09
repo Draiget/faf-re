@@ -176,9 +176,49 @@ namespace faf::editor
       return snapshots;
     }
 
-    /** The brush's new height for one sample, from the heights before the step. */
+    /** The stamp's value (0..1) at offset (dx, dz) from the brush's centre, over the brush's square; 0 outside. */
+    [[nodiscard]] float StampAt(const HeightStamp& stamp, const float dx, const float dz, const float radius)
+    {
+      if (stamp.width < 2 || stamp.height < 2 || radius <= 0.0f) {
+        return 0.0f;
+      }
+      const float u = (dx / radius * 0.5f + 0.5f) * static_cast<float>(stamp.width - 1);
+      const float v = (dz / radius * 0.5f + 0.5f) * static_cast<float>(stamp.height - 1);
+      if (u < 0.0f || v < 0.0f || u > static_cast<float>(stamp.width - 1) || v > static_cast<float>(stamp.height - 1)) {
+        return 0.0f;
+      }
+      const int x0 = std::min(stamp.width - 2, static_cast<int>(u));
+      const int z0 = std::min(stamp.height - 2, static_cast<int>(v));
+      const float fx = u - static_cast<float>(x0);
+      const float fz = v - static_cast<float>(z0);
+      const auto at = [&](const int x, const int z) {
+        return static_cast<float>(stamp.words[static_cast<std::size_t>(z) * static_cast<std::size_t>(stamp.width) + static_cast<std::size_t>(x)]);
+      };
+      const float value = (at(x0, z0) * (1.0f - fx) + at(x0 + 1, z0) * fx) * (1.0f - fz) + (at(x0, z0 + 1) * (1.0f - fx) + at(x0 + 1, z0 + 1) * fx) * fz;
+      return value / 65535.0f;
+    }
+
+    /** Whether the limits let the brush change this sample (read before the step). */
+    [[nodiscard]] bool WithinLimits(const Snapshot& snapshot, const int sx, const int sz, const HeightBrush& brush)
+    {
+      const float current = snapshot.At(sx, sz);
+      if (brush.limitHeight && (current < brush.limitLow || current > brush.limitHigh)) {
+        return false;
+      }
+      if (brush.limitSlope) {
+        // Rise over run in game units, from the neighbours on each side (one sample is one unit).
+        const float dx = (snapshot.At(sx + 1, sz) - snapshot.At(sx - 1, sz)) * 0.5f / kWordsPerUnit;
+        const float dz = (snapshot.At(sx, sz + 1) - snapshot.At(sx, sz - 1)) * 0.5f / kWordsPerUnit;
+        if (std::hypot(dx, dz) > brush.limitMaxSlope) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    /** The brush's new height for one sample, from the heights before the step; (dx, dz) from its nearest copy's centre. */
     [[nodiscard]] float BrushedHeight(const Snapshot& snapshot, const int sx, const int sz, const float weight, const HeightBrush& brush,
-                                      const float seconds)
+                                      const float seconds, const float dx, const float dz)
     {
       const float strength = std::clamp(brush.strength, 0.0f, 1.0f);
       const float blend = std::min(1.0f, strength * kBlendPerSecond * seconds);
@@ -201,6 +241,22 @@ namespace faf::editor
         return current + (brush.flattenTo - current) * blend * weight;
       case HeightBrushMode::Noise:
         return current + SampleNoise(sx, sz) * weight * strength * kNoiseUnitsPerSecond * kWordsPerUnit * seconds;
+      case HeightBrushMode::SetHeight:
+        return current + (brush.setTo - current) * blend * weight;
+      case HeightBrushMode::Terrace: {
+        const float step = std::max(1.0f, brush.terraceStep);
+        return current + (std::round(current / step) * step - current) * blend * weight;
+      }
+      case HeightBrushMode::Plane:
+        if (!brush.planeSet) {
+          return current;
+        }
+        return current + (static_cast<float>(brush.planeX * sx + brush.planeZ * sz + brush.planeC) - current) * blend * weight;
+      case HeightBrushMode::Stamp:
+        if (brush.stamp == nullptr) {
+          return current;
+        }
+        return current + StampAt(*brush.stamp, dx, dz, brush.radius) * brush.stampHeight * strength * weight;
       }
       return current;
     }
@@ -211,11 +267,19 @@ namespace faf::editor
     }
 
     [[nodiscard]] float StrongestWeight(const int sx, const int sz, const float (&centreX)[kMaxSymmetryCopies],
-                                        const float (&centreZ)[kMaxSymmetryCopies], const int centres, const HeightBrush& brush)
+                                        const float (&centreZ)[kMaxSymmetryCopies], const int centres, const HeightBrush& brush,
+                                        int* const strongest = nullptr)
     {
       float weight = 0.0f;
+      float nearest = 0.0f;
       for (int c = 0; c < centres; ++c) {
-        weight = std::max(weight, Weight(std::hypot(static_cast<float>(sx) - centreX[c], static_cast<float>(sz) - centreZ[c]), brush));
+        const float distance = std::hypot(static_cast<float>(sx) - centreX[c], static_cast<float>(sz) - centreZ[c]);
+        const float w = Weight(distance, brush);
+        if (strongest != nullptr && (c == 0 || distance < nearest)) {
+          nearest = distance;
+          *strongest = c;
+        }
+        weight = std::max(weight, w);
       }
       return weight;
     }
@@ -257,10 +321,12 @@ namespace faf::editor
             if (TurnSector(width, height, brush.turns, sx, sz) != 0 || !FirstRectHolding(rects, r, sx, sz)) {
               continue;
             }
-            const float weight = StrongestWeight(sx, sz, centreX, centreZ, centres, brush);
-            if (weight > 0.0f) {
+            int nearest = 0;
+            const float weight = StrongestWeight(sx, sz, centreX, centreZ, centres, brush, &nearest);
+            if (weight > 0.0f && WithinLimits(snapshots[r], sx, sz, brush)) {
               heights[static_cast<std::size_t>(sz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(sx)] =
-                ToWord(BrushedHeight(snapshots[r], sx, sz, weight, brush, seconds));
+                ToWord(BrushedHeight(snapshots[r], sx, sz, weight, brush, seconds, static_cast<float>(sx) - centreX[nearest],
+                                     static_cast<float>(sz) - centreZ[nearest]));
             }
           }
         }
@@ -285,6 +351,25 @@ namespace faf::editor
       }
     }
   } // namespace
+
+  bool PlaneThrough(const double (&x)[3], const double (&h)[3], const double (&z)[3], double& planeX, double& planeZ, double& planeC)
+  {
+    // h = a x + b z + c through the three points: Cramer's rule on the two differences.
+    const double x1 = x[1] - x[0];
+    const double z1 = z[1] - z[0];
+    const double h1 = h[1] - h[0];
+    const double x2 = x[2] - x[0];
+    const double z2 = z[2] - z[0];
+    const double h2 = h[2] - h[0];
+    const double determinant = x1 * z2 - x2 * z1;
+    if (std::fabs(determinant) < 1e-6) {
+      return false;
+    }
+    planeX = (h1 * z2 - h2 * z1) / determinant;
+    planeZ = (x1 * h2 - x2 * h1) / determinant;
+    planeC = h[0] - planeX * x[0] - planeZ * z[0];
+    return true;
+  }
 
   int TurnSector(const int width, const int height, const int turns, const int x, const int z)
   {
@@ -401,11 +486,13 @@ namespace faf::editor
           if (!first || !FirstRectHolding(rects, r, sx, sz)) {
             continue;
           }
-          const float weight = StrongestWeight(sx, sz, centreX, centreZ, centres, brush);
-          if (weight <= 0.0f) {
+          int nearest = 0;
+          const float weight = StrongestWeight(sx, sz, centreX, centreZ, centres, brush, &nearest);
+          if (weight <= 0.0f || !WithinLimits(snapshots[r], sx, sz, brush)) {
             continue;
           }
-          const std::uint16_t word = ToWord(BrushedHeight(snapshots[r], sx, sz, weight, brush, seconds));
+          const std::uint16_t word = ToWord(BrushedHeight(snapshots[r], sx, sz, weight, brush, seconds, static_cast<float>(sx) - centreX[nearest],
+                                                          static_cast<float>(sz) - centreZ[nearest]));
           for (int m = 0; m < members; ++m) {
             heights[static_cast<std::size_t>(memberZ[m]) * static_cast<std::size_t>(width) + static_cast<std::size_t>(memberX[m])] = word;
           }

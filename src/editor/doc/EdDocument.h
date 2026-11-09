@@ -147,6 +147,47 @@ namespace faf::editor
 
     /** The height field's undo history, reset when a map opens. */
     [[nodiscard]] HeightHistory& Heights() noexcept { return mHeights; }
+
+    /** The stratum masks as the editor paints them (read from the map's textures when the view first shows it). */
+    struct MaskGrid
+    {
+      int width = 0;
+      int height = 0;
+      std::vector<std::uint64_t> texels;
+    };
+    [[nodiscard]] MaskGrid& Masks() noexcept { return mMasks; }
+    [[nodiscard]] MaskHistory& MaskUndo() noexcept { return mMaskHistory; }
+
+    /** One undo order over every kind of edit: Ctrl+Z takes back the newest edit, whatever it changed. */
+    enum class EditKind
+    {
+      Heights,
+      Masks,
+      Layers,
+    };
+    /** A texture slot's change (path or size), for undo: its values before and after, as the terrain has them. */
+    struct LayerEdit
+    {
+      int slot = 0;
+      std::string albedoBefore, normalsBefore, albedoAfter, normalsAfter;
+      float albedoSizeBefore = 1.0f, normalsSizeBefore = 1.0f, albedoSizeAfter = 1.0f, normalsSizeAfter = 1.0f;
+    };
+    [[nodiscard]] std::vector<LayerEdit>& LayerUndo() noexcept { return mLayerUndo; }
+    [[nodiscard]] std::vector<LayerEdit>& LayerRedo() noexcept { return mLayerRedo; }
+    /** The slot's albedo path in the facts the Info panel shows. */
+    void SetLayerFact(int slot, const std::string& albedo)
+    {
+      if (slot >= 0 && static_cast<std::size_t>(slot) < mFacts.layers.size()) {
+        mFacts.layers[static_cast<std::size_t>(slot)] = albedo;
+      }
+    }
+    /** An edit of `kind` was recorded in its history: it is the newest; what was undone can't be redone. */
+    void EditEnded(EditKind kind);
+    /** The kind of the edit Undo (Redo) takes back (gives back) next; false when there is none. */
+    bool PopUndo(EditKind& kind);
+    bool PopRedo(EditKind& kind);
+    void PushRedo(EditKind kind) { mRedoOrder.push_back(kind); }
+    void PushUndo(EditKind kind) { mUndoOrder.push_back(kind); }
     /** Whether the map changed since it was opened (or last saved). */
     [[nodiscard]] bool Modified() const noexcept { return mModified; }
     void SetModified(bool modified) noexcept { mModified = modified; }
@@ -172,6 +213,12 @@ namespace faf::editor
     std::thread mThread;
     std::function<void()> mBeforeDrop;
     HeightHistory mHeights;
+    MaskGrid mMasks;
+    MaskHistory mMaskHistory;
+    std::vector<LayerEdit> mLayerUndo;
+    std::vector<LayerEdit> mLayerRedo;
+    std::vector<EditKind> mUndoOrder;
+    std::vector<EditKind> mRedoOrder;
     MapFileRecords mFileRecords;
     bool mModified = false;
     bool mBackedUp = false;

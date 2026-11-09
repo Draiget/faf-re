@@ -114,6 +114,12 @@ namespace faf::remote::net
      * so the server takes them as reported.
      */
     ModReport = 17,
+    /**
+     * Player to server, reliable (plan WP10.7): varint (speed limit + 10). The player's sim-speed limit: the speed step
+     * its game keeps up with, from what applying the server's views costs it (remote/SpeedLimit.h), as a lockstep
+     * client's `CLIMSG_IntParam` reports its sim's. Sent when it changes. The server runs at the slowest playing seat's.
+     */
+    SpeedLimit = 18,
   };
 
   /** What became of a player's command. */

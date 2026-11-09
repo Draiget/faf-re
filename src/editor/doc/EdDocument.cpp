@@ -229,6 +229,13 @@ namespace faf::editor
       terrain.mWaterElevation = settings.seaLevel;
       terrain.mWaterElevationDeep = settings.seaLevel - 2.5f;
       terrain.mWaterElevationAbyss = settings.seaLevel - 15.0f;
+      // The water map (shore and depth shading) is built from the heights and the sea's levels when the
+      // terrain enters edit mode, as Reset does once for the empty map.
+      {
+        moho::CBackgroundTaskControl control{nullptr};
+        map->mTerrainRes->EnterEditMode(control);
+        map->mTerrainRes->ExitEditMode();
+      }
       // The preview is written from its record; the chunk object only has to be there.
       map->mMapPreviewChunk = new moho::RWldMapPreviewChunk();
       MapFileRecords records;
@@ -345,6 +352,35 @@ namespace faf::editor
     mLoad->createFolder = target;
     mThread = std::thread([load = mLoad.get()] { Run(*load); });
     message = "Making " + target.string();
+    return true;
+  }
+
+  void EdDocument::EditEnded(const EditKind kind)
+  {
+    mUndoOrder.push_back(kind);
+    mRedoOrder.clear();
+    mHeights.ClearRedo();
+    mMaskHistory.ClearRedo();
+    mLayerRedo.clear();
+  }
+
+  bool EdDocument::PopUndo(EditKind& kind)
+  {
+    if (mUndoOrder.empty()) {
+      return false;
+    }
+    kind = mUndoOrder.back();
+    mUndoOrder.pop_back();
+    return true;
+  }
+
+  bool EdDocument::PopRedo(EditKind& kind)
+  {
+    if (mRedoOrder.empty()) {
+      return false;
+    }
+    kind = mRedoOrder.back();
+    mRedoOrder.pop_back();
     return true;
   }
 
@@ -669,6 +705,12 @@ namespace faf::editor
     mMap.reset();
     mLua.reset();
     mHeights.Reset(0, 0);
+    mMasks = {};
+    mMaskHistory.Reset(0, 0);
+    mUndoOrder.clear();
+    mRedoOrder.clear();
+    mLayerUndo.clear();
+    mLayerRedo.clear();
     mFileRecords = {};
     mSaveTarget.clear();
     mModified = false;

@@ -7,6 +7,7 @@
 
 #include <Windows.h>
 
+#include "editor/EdTools.h"
 #include "editor/tools/EdHeightBrush.h"
 
 namespace moho
@@ -60,6 +61,11 @@ namespace faf::editor
     /** Writes the map's heights as a height image, `width` samples wide (0: the map's own size). */
     bool ExportHeights(const std::filesystem::path& file, int width, float scale, std::string& message);
 
+    /** The open map's ten texture slots (lower, strata 1-8, upper) as the terrain has them. */
+    [[nodiscard]] std::vector<EdTools::LayerSlot> LayerSlots() const;
+    /** Changes one slot as the Tools panel asked, as one undo step. */
+    void ChangeLayerSlot(int slot, const EdTools::LayerSlot& value);
+
     /** Undoes or redoes the newest height stroke (Ctrl+Z, Ctrl+Y); false when there is none. */
     bool Undo();
     bool Redo();
@@ -99,6 +105,26 @@ namespace faf::editor
     HeightBrush mCheckedWith;
     bool mCheckDone = false;
     bool mPainting = false;
+
+    /** The Texture tool: the masks read into the document once, edit mode on (the original editor's). */
+    void LoadMasks();
+    void PaintMask(float frameSeconds);
+    void EndMaskStroke();
+    /** Writes texels of `layers` (bit k: stratum k) in the rectangles back into the map's mask textures. */
+    void UploadMasks(const std::vector<SampleRect>& rects, unsigned layers);
+    void ApplyRules();
+    bool mPaintingMask = false;
+    std::uint32_t mMaskSteps = 0;
+    std::vector<std::uint8_t> mMaskPlane;
+    bool UndoHeights(bool redo);
+    bool UndoLayers(bool redo);
+    /** A size drag on one slot keeps adding to its undo step until something else happens. */
+    bool mLayerDragJoin = false;
+    /** Sets a texture slot's paths and sizes on the terrain (its textures load), the Info panel's facts too. */
+    void SetLayerSlot(int slot, const std::string& albedo, const std::string& normals, float albedoSize, float normalsSize);
+    bool UndoMasks(bool redo);
+    /** Stamp mode: the click's stamp is down. */
+    bool mStamped = false;
 
     /** Draws the brush rings on the terrain from the renderer's editor hook (`ED_SetHook`). */
     void DrawBrushRings();

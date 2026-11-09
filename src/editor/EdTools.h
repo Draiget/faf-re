@@ -1,8 +1,14 @@
 #pragma once
 
 #include "editor/tools/EdHeightBrush.h"
+#include "editor/tools/EdMaskBrush.h"
+#include "editor/tools/EdTextureLibrary.h"
 
+#include <cmath>
+#include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace faf::editor
 {
@@ -19,6 +25,69 @@ namespace faf::editor
 
     /** Whether the Terrain tool is the chosen one (the viewport's left button paints heights). */
     [[nodiscard]] bool TerrainToolActive() const noexcept { return mTool == 1; }
+    /** Whether the Texture tool is the chosen one (the viewport's left button paints a layer's mask). */
+    [[nodiscard]] bool TextureToolActive() const noexcept { return mTool == 2; }
+
+    /** The texture brush as the panel sets it: the brush's shape, the layer, the mode. */
+    [[nodiscard]] MaskBrush CurrentMaskBrush() const noexcept
+    {
+      MaskBrush brush;
+      brush.shape = CurrentHeightBrush();
+      brush.mode = static_cast<MaskBrushMode>(mMaskMode);
+      brush.layer = mMaskLayer;
+      brush.lowerAbove = mLowerAbove;
+      return brush;
+    }
+    /** The open map's layer texture paths (lower, strata 1-8, upper), for the layer list. */
+    void SetLayerNames(std::vector<std::string> names) { mLayerNames = std::move(names); }
+
+    /** One of the map's ten texture slots (lower, strata 1-8, upper): albedo and normal map, each with its size in game units. */
+    struct LayerSlot
+    {
+      std::string albedo;
+      std::string normals;
+      float albedoSize = 4.0f;
+      float normalsSize = 4.0f;
+      bool operator==(const LayerSlot& other) const
+      {
+        return albedo == other.albedo && normals == other.normals && albedoSize == other.albedoSize && normalsSize == other.normalsSize;
+      }
+    };
+    /** The open map's slots as the terrain has them, each frame. */
+    void SetLayerSlots(std::vector<LayerSlot> slots) { mSlots = std::move(slots); }
+    /** A slot the panel changed (its texture or size): the app applies it. */
+    [[nodiscard]] bool TakeLayerChange(int& slot, LayerSlot& value)
+    {
+      if (mChangedSlot < 0) {
+        return false;
+      }
+      slot = std::exchange(mChangedSlot, -1);
+      value = mChangedValue;
+      return true;
+    }
+    /** Apply rules to whole map was pressed; the rules. */
+    [[nodiscard]] bool TakeRulesRequest() noexcept { return std::exchange(mRulesRequested, false); }
+    [[nodiscard]] const std::vector<MaskRule>& Rules() const noexcept { return mRules; }
+    /** Test runs (`/maskrule`): one more rule, then Apply. */
+    void AddRule(const MaskRule& rule)
+    {
+      mTool = 2;
+      mRules.push_back(rule);
+    }
+    void RequestRules() noexcept { mRulesRequested = true; }
+    /** Test runs (`/browse`): the texture browser opened for a slot. */
+    void OpenBrowser(const int slot) noexcept
+    {
+      mTool = 2;
+      mBrowseSlot = slot;
+      mBrowseOpen = true;
+    }
+    /** Test runs (`/masklayer`): the Texture tool on this layer. */
+    void SetMaskLayer(const int layer) noexcept
+    {
+      mTool = 2;
+      mMaskLayer = layer;
+    }
 
     /** The terrain brush as the panel sets it (Flatten's height is the stroke's, set by the viewport). */
     [[nodiscard]] HeightBrush CurrentHeightBrush() const noexcept
@@ -30,7 +99,38 @@ namespace faf::editor
       brush.strength = mStrength;
       brush.falloff = mFalloff;
       brush.turns = mNWay;
+      brush.setTo = mSetHeight * 128.0f;
+      brush.terraceStep = mTerraceStep * 128.0f;
+      brush.planeSet = mPlaneSet;
+      brush.planeX = mPlaneX;
+      brush.planeZ = mPlaneZ;
+      brush.planeC = mPlaneC;
+      brush.stamp = mStamp.get();
+      brush.stampHeight = mStampHeight * 128.0f;
+      brush.limitHeight = mLimitHeight;
+      brush.limitLow = mLimitLow * 128.0f;
+      brush.limitHigh = mLimitHigh * 128.0f;
+      brush.limitSlope = mLimitSlope;
+      brush.limitMaxSlope = std::tan(mLimitSlopeDegrees * 0.0174532925f);
       return brush;
+    }
+
+    /** Plane mode: a picked point (game units: x, height, z); the plane goes through the last three. */
+    void AddPlanePoint(float x, float height, float z) noexcept;
+    void ClearPlanePoints() noexcept
+    {
+      mPlanePoints = 0;
+      mPlaneSet = false;
+    }
+    /** The picked points, oldest first, for the view to mark. */
+    [[nodiscard]] int PlanePoints(float (&x)[3], float (&height)[3], float (&z)[3]) const noexcept;
+
+    /** Stamp mode: the image the Stamp image button loaded. */
+    [[nodiscard]] bool TakeStampRequest() noexcept { return std::exchange(mStampRequested, false); }
+    void SetStamp(HeightStamp stamp, std::string name)
+    {
+      mStamp = std::make_shared<HeightStamp>(std::move(stamp));
+      mStampName = std::move(name);
     }
 
     /** Test runs (`/symcheck`): the Terrain tool with this symmetry (the panel's index), then Check or Copy. */
@@ -42,6 +142,12 @@ namespace faf::editor
     }
     void RequestCheck() noexcept { mCheckRequested = true; }
     void RequestImport() noexcept { mImportRequested = true; }
+    /** Test runs (`/brush`): the Terrain tool with this brush mode (a HeightBrushMode). */
+    void SetBrushMode(const int mode) noexcept
+    {
+      mTool = 1;
+      mBrushMode = mode;
+    }
     void RequestRepair() noexcept { mRepairRequested = true; }
 
     /** The height field's Import and Export buttons, taken by the app each frame (it asks for the file). */
@@ -84,7 +190,8 @@ namespace faf::editor
     void DrawMarkers();
     void DrawSelect();
     void DrawBrush(bool withModes);
-    void DrawSymmetry();
+    void DrawSymmetry(bool withCheck = true);
+    void DrawLimits();
 
     int mTool = 1;
     int mBrushMode = 0;
@@ -94,7 +201,24 @@ namespace faf::editor
     int mSymmetry = 6; // both axes
     int mNWay = 3;
     bool mLimitHeight = false;
+    float mLimitLow = 0.0f;
+    float mLimitHigh = 100.0f;
     bool mLimitSlope = false;
+    float mLimitSlopeDegrees = 30.0f;
+    float mSetHeight = 20.0f;
+    float mTerraceStep = 5.0f;
+    float mPlanePointX[3]{};
+    float mPlanePointH[3]{};
+    float mPlanePointZ[3]{};
+    int mPlanePoints = 0;
+    bool mPlaneSet = false;
+    double mPlaneX = 0.0;
+    double mPlaneZ = 0.0;
+    double mPlaneC = 0.0;
+    std::shared_ptr<HeightStamp> mStamp;
+    std::string mStampName;
+    float mStampHeight = 20.0f;
+    bool mStampRequested = false;
     int mMarkerType = 0;
     int mDecalMode = 1; // spline
     float mWaterLevel = 20.0f;
@@ -105,6 +229,22 @@ namespace faf::editor
     bool mExportRequested = false;
     float mHeightScale = 1.0f;
     int mExportSize = 0;
+
+    int mMaskLayer = 0;
+    int mMaskMode = 0;
+    bool mLowerAbove = true;
+    std::vector<std::string> mLayerNames;
+    std::vector<LayerSlot> mSlots;
+    int mChangedSlot = -1;
+    LayerSlot mChangedValue;
+    EdTextureLibrary mLibrary;
+    void DrawLayerSlots();
+    void DrawTextureBrowser();
+    int mBrowseSlot = -1;
+    bool mBrowseOpen = false;
+    char mBrowseFilter[64]{};
+    std::vector<MaskRule> mRules;
+    bool mRulesRequested = false;
 
     bool mCheckRequested = false;
     bool mRepairRequested = false;
