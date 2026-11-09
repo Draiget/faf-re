@@ -1779,6 +1779,52 @@ namespace
  * Engine addition: one world view of `Render`'s per-view loop (0x007F9253..0x007F9779), in the
  * binary's order. A view it skips returns, where the binary jumps to the next entry.
  */
+/**
+ * Engine addition (ren_Fxaa, ren_Sharpen, ren_Grade): anti-aliasing, sharpening and grading for a
+ * world view on Direct3D 12 and Vulkan, which have no multisampled back buffer. The head is copied
+ * into the refraction target (the view's refraction pass is done with it) and drawn back through each
+ * pass inside the view's viewport, colour only. It runs before the view's overlay pass, so strategic
+ * icons, range rings and the other overlays stay pixel-exact, as the interface does.
+ */
+void moho::WRenViewport::RenderWorldViewPostEffects()
+{
+  if (!mPrimaryTargetLocks[mHead] || RenderAdditionsDisabled()) {
+    return;
+  }
+  moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  const auto overHeadCopy = [&](const char* const profileName, auto&& render) {
+    const gpg::gal::RenderProfileScope profile(profileName);
+    Wm3::Vector2i viewPos{};
+    Wm3::Vector2i viewSize{};
+    float viewMinZ = 0.0f;
+    float viewMaxZ = 1.0f;
+    device->GetView(&viewPos, &viewSize, &viewMinZ, &viewMaxZ);
+    boost::shared_ptr<moho::ID3DRenderTarget> headTarget{};
+    device->GetWriterLock1(headTarget, mHead);
+    device->SetViewRect(headTarget.get(), mPrimaryTargetLocks[mHead].get(), nullptr, nullptr);
+    moho::ID3DRenderTarget::SurfaceHandle copy{};
+    (void)mPrimaryTargetLocks[mHead]->GetSurface(copy);
+    if (!copy) {
+      return;
+    }
+    // The passes read pixel positions of the whole head (SV_Position over the head's size) and
+    // write only inside the view.
+    device->SetViewport(&viewPos, &viewSize, viewMinZ, viewMaxZ);
+    render(*copy, device->GetHeadWidth(static_cast<unsigned int>(mHead)), device->GetHeadHeight(static_cast<unsigned int>(mHead)));
+    device->SetViewport(&viewPos, &viewSize, viewMinZ, viewMaxZ);
+  };
+  if (moho::FxaaRenderer& fxaa = moho::FxaaRenderer::Get(); fxaa.IsActive()) {
+    overHeadCopy("Fxaa", [&](gpg::gal::RenderTarget& copy, const int width, const int height) {
+      fxaa.Render(copy, width, height);
+    });
+  }
+  if (moho::PostRenderer& post = moho::PostRenderer::Get(); post.IsActive()) {
+    overHeadCopy("Post", [&](gpg::gal::RenderTarget& copy, const int width, const int height) {
+      post.Render(copy, width, height);
+    });
+  }
+}
+
 void moho::WRenViewport::RenderWorldView(
   const SWorldViewInfo* const worldView, const int head, const SWorldViewInfo* const begin, const bool regenerateShoreline
 )
@@ -2103,6 +2149,8 @@ void moho::WRenViewport::RenderWorldView(
   // one in `Cartographic::Render` only ever runs for a view whose
   // orthographic flag is set, which is the minimap and whichever view the
   // player has toggled into cartographic mode.
+  RenderWorldViewPostEffects();
+
   if (moho::ren_Ui && worldView->mView != nullptr) {
     const gpg::gal::RenderProfileScope profileViewOverlay("ViewOverlay");
     worldView->mView->Render(
@@ -2304,46 +2352,8 @@ void moho::WRenViewport::Render(const int head, fa::vector<SWorldViewInfo>& worl
     static_cast<moho::CDecalManager*>(decalTerrainRes->GetDecalManager())->ClearPendingChanges();
   }
 
-  // Engine addition (ren_Fxaa): anti-aliasing for the world views on Direct3D 12 and Vulkan, which
-  // have no multisampled back buffer. The head is copied into the refraction target (free again
-  // once the views are drawn) and drawn back through FXAA over the whole head, colour only, before
-  // the cartographic views and the interface. Sharpening and grading (ren_Sharpen, ren_Grade) follow
-  // the same way, over FXAA's result.
-  if (begin != end && mPrimaryTargetLocks[mHead] && !RenderAdditionsDisabled()) {
-    const auto overHeadCopy = [&](const char* const profileName, auto&& render) {
-      const gpg::gal::RenderProfileScope profile(profileName);
-      boost::shared_ptr<moho::ID3DRenderTarget> headTarget{};
-      device->GetWriterLock1(headTarget, mHead);
-      device->SetViewRect(headTarget.get(), mPrimaryTargetLocks[mHead].get(), nullptr, nullptr);
-      moho::ID3DRenderTarget::SurfaceHandle copy{};
-      (void)mPrimaryTargetLocks[mHead]->GetSurface(copy);
-      if (!copy) {
-        return;
-      }
-      Wm3::Vector2i savedPos{};
-      Wm3::Vector2i savedSize{};
-      float savedMinZ = 0.0f;
-      float savedMaxZ = 1.0f;
-      device->GetView(&savedPos, &savedSize, &savedMinZ, &savedMaxZ);
-      const int width = device->GetHeadWidth(static_cast<unsigned int>(mHead));
-      const int height = device->GetHeadHeight(static_cast<unsigned int>(mHead));
-      Wm3::Vector2i headPos{0, 0};
-      Wm3::Vector2i headSize{width, height};
-      device->SetViewport(&headPos, &headSize, savedMinZ, savedMaxZ);
-      render(*copy, width, height);
-      device->SetViewport(&savedPos, &savedSize, savedMinZ, savedMaxZ);
-    };
-    if (moho::FxaaRenderer& fxaa = moho::FxaaRenderer::Get(); fxaa.IsActive()) {
-      overHeadCopy("Fxaa", [&](gpg::gal::RenderTarget& copy, const int width, const int height) {
-        fxaa.Render(copy, width, height);
-      });
-    }
-    if (moho::PostRenderer& post = moho::PostRenderer::Get(); post.IsActive()) {
-      overHeadCopy("Post", [&](gpg::gal::RenderTarget& copy, const int width, const int height) {
-        post.Render(copy, width, height);
-      });
-    }
-  }
+  // FXAA, sharpening and grading run inside each world view, before its overlays
+  // (RenderWorldViewPostEffects).
 
   // Shared tail, reached from the per-view loop, from the empty-list jump
   // (loc_7F9779) and from the ren_Oblivion jump (loc_7F979E) alike. The binary

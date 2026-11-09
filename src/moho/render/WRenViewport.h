@@ -442,6 +442,12 @@ namespace moho
       const SWorldViewInfo* worldView, int head, const SWorldViewInfo* begin, bool regenerateShoreline
     );
 
+    /**
+     * Engine addition: FXAA, sharpening and grading (ren_Fxaa, ren_Sharpen, ren_Grade) over the world
+     * view being drawn, inside its viewport, before its overlay pass.
+     */
+    void RenderWorldViewPostEffects();
+
     void UpdateRenderViewportCoordinates();
 
     /**
