@@ -686,6 +686,12 @@ namespace moho
      */
     void UpdateInterpolatedFields();
 
+    /// Engine addition: whether UpdateInterpolatedFields would do work now (its early-out test, inverted).
+    [[nodiscard]] bool InterpolatedFieldsStale() const noexcept
+    {
+      return !(sCurrentInterpolant == currInterpolant || (frameCounter == sFrameCounter && interpolationStateFresh != 0u));
+    }
+
     /**
      * Address: 0x007DAE20 (FUN_007DAE20, Moho::MeshInstance::GetInterpolatedPos)
      *

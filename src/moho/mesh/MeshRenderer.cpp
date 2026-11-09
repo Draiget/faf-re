@@ -1,5 +1,7 @@
 #include "moho/mesh/MeshPrivate.h"
 
+#include "moho/console/CConCommand.h"
+
 namespace moho
 {
 
@@ -21,6 +23,19 @@ namespace moho
   float ren_ShadowBias = 0.005f;
 
   ShadowCasterRegion gShadowCasterRegion{};
+
+  /**
+   * Engine change: `ren_MeshParallelInterp`. MeshRenderer::Batch places every gathered mesh between
+   * ticks (MeshInstance::UpdateInterpolatedFields: position, orientation, pose blend, bounds) on the
+   * user worker pool before its serial walk, whose own calls then find the work done. Each instance
+   * writes only its own fields and pose, and the result doesn't depend on the order.
+   */
+  bool ren_MeshParallelInterp = true;
+  TConVar<bool> gTConVar_ren_MeshParallelInterp(
+    "ren_MeshParallelInterp",
+    "Place the meshes a pass gathers between ticks on worker threads (1, the default), or one by one in the pass (0).",
+    &ren_MeshParallelInterp
+  );
 }
 
 namespace
@@ -1625,6 +1640,34 @@ namespace
     meshSpatialDb.CollectAllInVolume(
       collected, &const_cast<GeomCamera3&>(camera).solid2, cameraForward, fadePlane
     );
+
+    // Engine change (ren_MeshParallelInterp): the instances the walk below would place, placed first on
+    // the worker pool. The gates are the walk's own, so the same instances are updated either way.
+    if (ren_MeshParallelInterp && CUserWorkerPool::ConfiguredWorkerCount() != 0U) {
+      static std::vector<MeshInstance*> sStale;
+      sStale.clear();
+      for (MeshInstance* const instance : collected) {
+        const bool isStatic = instance->isStaticPose != 0u;
+        if ((!ren_MeshSkinned && isStatic) || (!ren_MeshStatic && !isStatic) || instance->isHidden != 0u) {
+          continue;
+        }
+        if (instance->visibilityCamera != nullptr && instance->visibilityCamera != &camera) {
+          continue;
+        }
+        if (instance->InterpolatedFieldsStale()) {
+          sStale.push_back(instance);
+        }
+      }
+      constexpr std::size_t kParallelInterpMin = 64U;
+      constexpr std::size_t kParallelInterpGrain = 32U;
+      if (sStale.size() >= kParallelInterpMin) {
+        CUserWorkerPool::Get().ParallelFor(sStale.size(), kParallelInterpGrain, [&](const std::size_t begin, const std::size_t end) {
+          for (std::size_t index = begin; index < end; ++index) {
+            sStale[index]->UpdateInterpolatedFields();
+          }
+        });
+      }
+    }
 
 
     for (MeshInstance* const instance : collected) {
