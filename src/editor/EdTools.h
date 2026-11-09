@@ -65,6 +65,39 @@ namespace faf::editor
       value = mChangedValue;
       return true;
     }
+    /** Each stratum's share of the map (0..1), for the paint list. */
+    void SetCoverage(const float (&coverage)[8]) noexcept
+    {
+      for (int i = 0; i < 8; ++i) {
+        mCoverage[i] = coverage[i];
+      }
+      mHasCoverage = true;
+    }
+    /** The paint layer's mask buttons: Clear, Import, Export. */
+    enum class MaskOp
+    {
+      None,
+      Clear,
+      Import,
+      Export,
+    };
+    [[nodiscard]] MaskOp TakeMaskOp() noexcept { return std::exchange(mMaskOp, MaskOp::None); }
+    [[nodiscard]] int MaskLayer() const noexcept { return mMaskLayer; }
+    /** The terrain shaders the game data has, and the map's. */
+    void SetShaders(std::vector<std::string> shaders, std::string current)
+    {
+      mShaders = std::move(shaders);
+      mShader = std::move(current);
+    }
+    [[nodiscard]] bool TakeShaderChange(std::string& shader)
+    {
+      if (mShaderChange.empty()) {
+        return false;
+      }
+      shader = std::exchange(mShaderChange, {});
+      return true;
+    }
+
     /** Apply rules to whole map was pressed; the rules. */
     [[nodiscard]] bool TakeRulesRequest() noexcept { return std::exchange(mRulesRequested, false); }
     [[nodiscard]] const std::vector<MaskRule>& Rules() const noexcept { return mRules; }
@@ -136,7 +169,7 @@ namespace faf::editor
     /** Test runs (`/symcheck`): the Terrain tool with this symmetry (the panel's index), then Check or Copy. */
     void SetSymmetry(const int index, const int turns) noexcept
     {
-      mTool = 1;
+      mTool = mTool == 2 ? 2 : 1; // the Texture tool checks the masks
       mSymmetry = index;
       mNWay = turns;
     }
@@ -165,8 +198,9 @@ namespace faf::editor
     [[nodiscard]] bool ShowDifferences() const noexcept { return mShowDifferences; }
 
     /** The check's result for the panel, for the symmetry it checked (`checked` 0: nothing to show). */
-    void SetCheckResult(const int checked, const int differing, const int largestWords, const HeightBrush& checkedWith) noexcept
+    void SetCheckResult(const int checked, const int differing, const int largestWords, const HeightBrush& checkedWith, const bool masks = false) noexcept
     {
+      mCheckedMasks = masks;
       mChecked = checked;
       mDiffering = differing;
       mLargest = largestWords;
@@ -177,7 +211,7 @@ namespace faf::editor
     /** True if the last check was made with the panel's current symmetry. */
     [[nodiscard]] bool CheckIsCurrent() const noexcept
     {
-      return mChecked > 0 && mCheckedSymmetry == mSymmetry && (mSymmetry != 9 || mCheckedTurns == mNWay);
+      return mChecked > 0 && mCheckedSymmetry == mSymmetry && (mSymmetry != 9 || mCheckedTurns == mNWay) && mCheckedMasks == TextureToolActive();
     }
 
   private:
@@ -245,6 +279,14 @@ namespace faf::editor
     char mBrowseFilter[64]{};
     std::vector<MaskRule> mRules;
     bool mRulesRequested = false;
+
+    bool mCheckedMasks = false;
+    float mCoverage[8]{};
+    bool mHasCoverage = false;
+    MaskOp mMaskOp = MaskOp::None;
+    std::vector<std::string> mShaders;
+    std::string mShader;
+    std::string mShaderChange;
 
     bool mCheckRequested = false;
     bool mRepairRequested = false;

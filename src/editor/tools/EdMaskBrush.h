@@ -79,6 +79,28 @@ namespace faf::editor
     float maxSlope = 100.0f;
   };
 
+  /** What the symmetry check found on the masks: texels whose copies differ, in blocks of texels. */
+  struct MaskSymmetryReport
+  {
+    int checked = 0;
+    int differing = 0;
+    /** The largest difference of one layer's weight between copies (0-255). */
+    int largest = 0;
+    std::vector<SampleRect> blocks;
+  };
+
+  /**
+   * Compares every texel (all eight layers) with its copies under `symmetry`; N-way turns compare a texel
+   * outside the first sector with its nearest turned-back texel.
+   */
+  MaskSymmetryReport CheckMaskSymmetry(const std::uint64_t* texels, int maskWidth, int maskHeight, Symmetry symmetry, int turns);
+
+  /** Copies the source part's texels to their copies (the first member of each group; for turns the first sector). */
+  SampleRect MakeMasksSymmetric(std::uint64_t* texels, int maskWidth, int maskHeight, Symmetry symmetry, int turns);
+
+  /** Each layer's share of full weight over the map, 0..1. */
+  void MaskCoverage(const std::uint64_t* texels, std::size_t count, float (&coverage)[8]);
+
   /** Applies the rules in order over every texel; returns the whole mask's rectangle for undo and upload. */
   SampleRect ApplyMaskRules(std::uint64_t* texels, int maskWidth, int maskHeight, const MaskTerrain& terrain, const std::vector<MaskRule>& rules);
 } // namespace faf::editor

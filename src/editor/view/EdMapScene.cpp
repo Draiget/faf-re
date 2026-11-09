@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 #include <windowsx.h>
 
@@ -22,6 +23,7 @@
 #include "moho/render/IEdRenderHook.h"
 #include "moho/render/RCamManager.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
+#include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/render/SimpleRenderWorldView.h"
 #include "moho/render/WRenViewport.h"
@@ -469,6 +471,10 @@ namespace faf::editor
     const EdDocument::LayerEdit edit = from.back();
     from.pop_back();
     to.push_back(edit);
+    if (edit.slot < 0) {
+      SetTerrainShaderName(redo ? edit.albedoAfter : edit.albedoBefore);
+      return true;
+    }
     if (redo) {
       SetLayerSlot(edit.slot, edit.albedoAfter, edit.normalsAfter, edit.albedoSizeAfter, edit.normalsSizeAfter);
     } else {
@@ -488,6 +494,7 @@ namespace faf::editor
     }
     UploadMasks(rects, 0xFFu);
     mDocument.SetModified(true);
+    UpdateCoverage();
     return true;
   }
 
@@ -535,6 +542,7 @@ namespace faf::editor
       }
     }
     mDocument.MaskUndo().Reset(masks.width, masks.height);
+    UpdateCoverage();
     // How much of the map each layer covers (the share of full weight), for the log.
     std::string cover;
     for (int layer = 0; layer < 8; ++layer) {
@@ -570,6 +578,166 @@ namespace faf::editor
         mMap->mTerrainRes->UpdateStratumMask(layer, mMaskPlane.data(), rect.x0, rect.z0, rect.x1 + 1, rect.z1 + 1);
       }
     }
+  }
+
+  void EdMapScene::UpdateCoverage()
+  {
+    const EdDocument::MaskGrid& masks = mDocument.Masks();
+    mCoverageValid = !masks.texels.empty();
+    if (mCoverageValid) {
+      faf::editor::MaskCoverage(masks.texels.data(), masks.texels.size(), mCoverage);
+    }
+  }
+
+  bool EdMapScene::MaskCoverage(float (&coverage)[8]) const
+  {
+    if (!mCoverageValid || mDocument.Masks().texels.empty()) {
+      return false;
+    }
+    for (int i = 0; i < 8; ++i) {
+      coverage[i] = mCoverage[i];
+    }
+    return true;
+  }
+
+  void EdMapScene::WholeMaskChanged(const SampleRect& whole)
+  {
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    mDocument.MaskUndo().EndStroke(masks.texels.data());
+    mDocument.EditEnded(EdDocument::EditKind::Masks);
+    UploadMasks({whole}, 0xFFu);
+    mDocument.SetModified(true);
+    UpdateCoverage();
+    mLayerDragJoin = false;
+  }
+
+  bool EdMapScene::ClearMaskLayer(const int layer, std::string& message)
+  {
+    LoadMasks();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (masks.texels.empty() || mPaintingMask) {
+      message = "No map's masks to change.";
+      return false;
+    }
+    const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
+    mDocument.MaskUndo().BeginStroke();
+    mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
+    for (std::uint64_t& texel : masks.texels) {
+      texel = WithMaskByte(texel, layer, 0);
+    }
+    WholeMaskChanged(whole);
+    message = "Cleared the mask of layer " + std::to_string(layer + 1);
+    return true;
+  }
+
+  bool EdMapScene::ImportMaskLayer(const int layer, const std::filesystem::path& file, std::string& message)
+  {
+    LoadMasks();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (masks.texels.empty() || mPaintingMask) {
+      message = "No map's masks to change.";
+      return false;
+    }
+    HeightImage image;
+    std::string error;
+    if (!ReadHeightImage(file, masks.width, masks.height, image, error)) {
+      message = "Mask import failed: " + error;
+      return false;
+    }
+    image = ResampleHeights(image, masks.width, masks.height);
+    const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
+    mDocument.MaskUndo().BeginStroke();
+    mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
+    for (std::size_t i = 0; i < masks.texels.size(); ++i) {
+      masks.texels[i] = WithMaskByte(masks.texels[i], layer, static_cast<std::uint8_t>(image.words[i] >> 8));
+    }
+    WholeMaskChanged(whole);
+    message = "Imported the mask of layer " + std::to_string(layer + 1) + " from " + file.string();
+    return true;
+  }
+
+  bool EdMapScene::ExportMaskLayer(const int layer, const std::filesystem::path& file, std::string& message)
+  {
+    LoadMasks();
+    const EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (masks.texels.empty()) {
+      message = "No map's masks to export.";
+      return false;
+    }
+    HeightImage image;
+    image.width = masks.width;
+    image.height = masks.height;
+    image.words.resize(masks.texels.size());
+    for (std::size_t i = 0; i < masks.texels.size(); ++i) {
+      image.words[i] = static_cast<std::uint16_t>(MaskByte(masks.texels[i], layer) * 257u);
+    }
+    std::string error;
+    if (!WriteHeightImage(file, image, error)) {
+      message = "Mask export failed: " + error;
+      return false;
+    }
+    message = "Exported the mask of layer " + std::to_string(layer + 1) + " to " + file.string();
+    return true;
+  }
+
+  std::vector<std::string> EdMapScene::TerrainShaders()
+  {
+    if (!mShaders.empty()) {
+      return mShaders;
+    }
+    moho::CD3DDevice* const device = moho::D3D_GetDevice();
+    moho::CD3DEffect* const effect = device != nullptr && device->GetResources() != nullptr ? device->GetResources()->FindEffect("terrain") : nullptr;
+    if (effect == nullptr) {
+      return {};
+    }
+    // Every technique of the terrain effect it marks composite: the shaders a map may name, as the engine
+    // checks when it draws a map (ResolveTerrainCompositeShaderUsage).
+    fa::vector<fa::string> techniques;
+    effect->EnumerateValidTechniques(techniques);
+    const fa::string usage("usage", 5U);
+    const fa::string undefined("undefined", 9U);
+    for (const fa::string& name : techniques) {
+      const fa::string found = effect->GetStringAnnotation(name, usage, undefined);
+      if (std::strcmp(found.c_str(), "composite") == 0) {
+        mShaders.emplace_back(name.c_str());
+      }
+    }
+    std::string list;
+    for (const std::string& shader : mShaders) {
+      list += (list.empty() ? "" : ", ") + shader;
+    }
+    gpg::Logf("editor: %zu terrain shaders: %s", mShaders.size(), list.c_str());
+    return mShaders;
+  }
+
+  void EdMapScene::SetTerrainShaderName(const std::string& shader)
+  {
+    moho::StratumMaterial& strata = mMap->mTerrainRes->GetStratumMaterial();
+    strata.mShaderName.assign(shader.c_str());
+    // ResolveTerrainCompositeShaderUsage (0x0089F350) checks the new name once before it is drawn or saved.
+    strata.byte0 = 0;
+    strata.byte1 = 1;
+    mDocument.SetModified(true);
+    gpg::Logf("editor: terrain shader %s", shader.c_str());
+  }
+
+  std::string EdMapScene::TerrainShader() const
+  {
+    return mMap != nullptr ? std::string(mMap->mTerrainRes->GetStratumMaterial().mShaderName.c_str()) : std::string{};
+  }
+
+  void EdMapScene::ChangeTerrainShader(const std::string& shader)
+  {
+    if (mMap == nullptr || shader == TerrainShader()) {
+      return;
+    }
+    EdDocument::LayerEdit edit;
+    edit.slot = -1;
+    edit.albedoBefore = TerrainShader();
+    edit.albedoAfter = shader;
+    mDocument.LayerUndo().push_back(edit);
+    mDocument.EditEnded(EdDocument::EditKind::Layers);
+    SetTerrainShaderName(shader);
   }
 
   void EdMapScene::PaintMask(const float frameSeconds)
@@ -610,6 +778,10 @@ namespace faf::editor
       if (mDocument.MaskUndo().UndoCount() > before) {
         mDocument.EditEnded(EdDocument::EditKind::Masks);
       }
+      UpdateCoverage();
+      if (mCheckDone && mTools != nullptr && mTools->TextureToolActive()) {
+        RunSymmetryCheck();
+      }
     }
     mPaintingMask = false;
     mLayerDragJoin = false;
@@ -627,10 +799,7 @@ namespace faf::editor
     mDocument.MaskUndo().BeginStroke();
     mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
     (void)ApplyMaskRules(masks.texels.data(), masks.width, masks.height, MaskTerrain{field->data, field->width, field->height}, mTools->Rules());
-    mDocument.MaskUndo().EndStroke(masks.texels.data());
-    mDocument.EditEnded(EdDocument::EditKind::Masks);
-    UploadMasks({whole}, 0xFFu);
-    mDocument.SetModified(true);
+    WholeMaskChanged(whole);
     gpg::Logf("editor: %zu texture rules applied to the whole map", mTools->Rules().size());
   }
 
@@ -641,6 +810,26 @@ namespace faf::editor
       return;
     }
     mCheckedWith = mTools->CurrentHeightBrush();
+    if (mTools->TextureToolActive()) {
+      LoadMasks();
+      const EdDocument::MaskGrid& masks = mDocument.Masks();
+      if (masks.texels.empty()) {
+        return;
+      }
+      MaskSymmetryReport report = CheckMaskSymmetry(masks.texels.data(), masks.width, masks.height, mCheckedWith.symmetry, mCheckedWith.turns);
+      // The overlay is drawn in height samples.
+      const int perTexel = std::max(1, (field->width - 1) / masks.width);
+      mDifferences.clear();
+      for (const SampleRect& block : report.blocks) {
+        mDifferences.push_back({block.x0 * perTexel, block.z0 * perTexel, std::min(field->width - 1, (block.x1 + 1) * perTexel),
+                                std::min(field->height - 1, (block.z1 + 1) * perTexel)});
+      }
+      mCheckDone = true;
+      mTools->SetCheckResult(report.checked, report.differing, report.largest, mCheckedWith, true);
+      gpg::Logf("editor: mask symmetry check (mode %d): %d of %d texels differ, by up to %d of 255", static_cast<int>(mCheckedWith.symmetry),
+                report.differing, report.checked, report.largest);
+      return;
+    }
     SymmetryReport report = CheckSymmetry(field->data, field->width, field->height, mCheckedWith.symmetry, mCheckedWith.turns);
     mDifferences = std::move(report.blocks);
     mCheckDone = true;
@@ -658,6 +847,21 @@ namespace faf::editor
     }
     const HeightBrush brush = mTools->CurrentHeightBrush();
     if (EffectiveSymmetry(brush.symmetry, field->width, field->height) == Symmetry::None) {
+      return;
+    }
+    if (mTools->TextureToolActive()) {
+      LoadMasks();
+      EdDocument::MaskGrid& masks = mDocument.Masks();
+      if (masks.texels.empty()) {
+        return;
+      }
+      const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
+      mDocument.MaskUndo().BeginStroke();
+      mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
+      (void)MakeMasksSymmetric(masks.texels.data(), masks.width, masks.height, brush.symmetry, brush.turns);
+      WholeMaskChanged(whole);
+      gpg::Logf("editor: copied the source part of the masks to their other copies");
+      RunSymmetryCheck();
       return;
     }
     // One undo step over the whole map.

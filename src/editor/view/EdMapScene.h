@@ -63,6 +63,18 @@ namespace faf::editor
 
     /** The open map's ten texture slots (lower, strata 1-8, upper) as the terrain has them. */
     [[nodiscard]] std::vector<EdTools::LayerSlot> LayerSlots() const;
+    /** The paint layer's mask cleared, or read from / written to a grey image (PNG, RAW: 0-255 as 0-65535). */
+    bool ClearMaskLayer(int layer, std::string& message);
+    bool ImportMaskLayer(int layer, const std::filesystem::path& file, std::string& message);
+    bool ExportMaskLayer(int layer, const std::filesystem::path& file, std::string& message);
+    /** Each stratum's share of the map, once the masks are read. */
+    [[nodiscard]] bool MaskCoverage(float (&coverage)[8]) const;
+    /** The terrain shaders the game's terrain effect marks composite (the ones a map may name), and the map's. */
+    [[nodiscard]] std::vector<std::string> TerrainShaders();
+    [[nodiscard]] std::string TerrainShader() const;
+    /** Sets the map's terrain shader, as one undo step. */
+    void ChangeTerrainShader(const std::string& shader);
+
     /** Changes one slot as the Tools panel asked, as one undo step. */
     void ChangeLayerSlot(int slot, const EdTools::LayerSlot& value);
 
@@ -114,6 +126,14 @@ namespace faf::editor
     void UploadMasks(const std::vector<SampleRect>& rects, unsigned layers);
     void ApplyRules();
     bool mPaintingMask = false;
+    /** Ends a whole-mask change: the undo step, every layer uploaded, the coverage and a check made kept up to date. */
+    void WholeMaskChanged(const SampleRect& whole);
+    std::vector<std::string> mShaders;
+    float mCoverage[8]{};
+    bool mCoverageValid = false;
+    void UpdateCoverage();
+    /** The map's terrain shader by name; the engine checks it again when it next draws (byte0, its latch). */
+    void SetTerrainShaderName(const std::string& shader);
     std::uint32_t mMaskSteps = 0;
     std::vector<std::uint8_t> mMaskPlane;
     bool UndoHeights(bool redo);

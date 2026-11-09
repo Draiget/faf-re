@@ -319,6 +319,8 @@ namespace faf::editor
       /** The game's view shows nothing while a modal dialog of the panels is open (FitGameView). */
       bool mViewStepsAside = false;
       int mBrowseArg = -1;
+      // `/shader <name>` with `/open` (test runs): the map's terrain shader changed once it is shown.
+      std::string mShaderArg;
       int mBrowseFrames = 0;
       std::string mStampArg;
       /** The Tools panel's height field Import and Export: the file dialog, then the view. */
@@ -682,6 +684,9 @@ namespace faf::editor
       if (fa::vector<fa::string> layer; moho::CFG_GetArgOption("/masklayer", 1, &layer) && !layer.empty()) {
         mMaskLayerArg = std::atoi(layer[0].c_str()) - 1;
       }
+      if (fa::vector<fa::string> shader; moho::CFG_GetArgOption("/shader", 1, &shader) && !shader.empty()) {
+        mShaderArg = shader[0].c_str();
+      }
       if (fa::vector<fa::string> slot; moho::CFG_GetArgOption("/browse", 1, &slot) && !slot.empty()) {
         mBrowseArg = std::atoi(slot[0].c_str());
       }
@@ -781,6 +786,13 @@ namespace faf::editor
     void EditorApp::DriveHeightFiles()
     {
       EdTools& tools = mShell->Tools();
+      const auto report = [](const bool ok, const std::string& message) {
+        if (ok) {
+          gpg::Logf("editor: %s", message.c_str());
+        } else {
+          gpg::Warnf("editor: %s", message.c_str());
+        }
+      };
       // The open map's layers for the Texture tool's list.
       if (mDocument.GetState() == EdDocument::State::Open && mLayerNamesOf != mDocument.Path()) {
         mLayerNamesOf = mDocument.Path();
@@ -794,6 +806,39 @@ namespace faf::editor
           mScene.ChangeLayerSlot(slot, value);
         }
         tools.SetLayerSlots(mScene.LayerSlots());
+        if (float coverage[8]; mScene.MaskCoverage(coverage)) {
+          tools.SetCoverage(coverage);
+        }
+        if (tools.TextureToolActive()) {
+          tools.SetShaders(mScene.TerrainShaders(), mScene.TerrainShader());
+        }
+        if (!mShaderArg.empty()) {
+          mScene.ChangeTerrainShader(std::exchange(mShaderArg, {}));
+        }
+        if (std::string shader; tools.TakeShaderChange(shader)) {
+          mScene.ChangeTerrainShader(shader);
+        }
+        switch (tools.TakeMaskOp()) {
+        case EdTools::MaskOp::Clear: {
+          std::string message;
+          report(mScene.ClearMaskLayer(tools.MaskLayer(), message), message);
+          break;
+        }
+        case EdTools::MaskOp::Import:
+          if (const std::filesystem::path file = AskHeightFile(HandleOf(mGame.supcomFrame), false); !file.empty()) {
+            std::string message;
+            report(mScene.ImportMaskLayer(tools.MaskLayer(), file, message), message);
+          }
+          break;
+        case EdTools::MaskOp::Export:
+          if (const std::filesystem::path file = AskHeightFile(HandleOf(mGame.supcomFrame), true); !file.empty()) {
+            std::string message;
+            report(mScene.ExportMaskLayer(tools.MaskLayer(), file, message), message);
+          }
+          break;
+        default:
+          break;
+        }
         if (mBrowseArg >= 0 && ++mBrowseFrames == 60) {
           tools.OpenBrowser(mBrowseArg);
           mBrowseArg = -1;
@@ -871,13 +916,6 @@ namespace faf::editor
       }
       const bool importAsked = tools.TakeImportRequest();
       const bool exportAsked = tools.TakeExportRequest();
-      const auto report = [](const bool ok, const std::string& message) {
-        if (ok) {
-          gpg::Logf("editor: %s", message.c_str());
-        } else {
-          gpg::Warnf("editor: %s", message.c_str());
-        }
-      };
       if (!mScene.Attached()) {
         if (importAsked || exportAsked) {
           gpg::Warnf("editor: open a map first; its heights are imported and exported from the view");

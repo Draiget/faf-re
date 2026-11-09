@@ -367,14 +367,17 @@ namespace faf::editor
       Note("Compares every vertex with its copies; differing ones are marked red on the terrain.");
       return;
     }
-    const float largest = static_cast<float>(mLargest) / 128.0f;
+    // Heights in game units; mask weights as a share of full.
+    const float largest = mCheckedMasks ? static_cast<float>(mLargest) / 2.55f : static_cast<float>(mLargest) / 128.0f;
+    const char* const unit = mCheckedMasks ? "mask texels" : "vertices";
+    const char* const format = mCheckedMasks ? "%.0f%%" : "%.2f";
+    char amount[32];
+    (void)std::snprintf(amount, sizeof(amount), format, static_cast<double>(largest));
     char result[200];
     if (mDiffering == 0) {
-      (void)std::snprintf(result, sizeof(result), "All %d vertices match their copies (largest difference %.2f).", mChecked,
-                          static_cast<double>(largest));
+      (void)std::snprintf(result, sizeof(result), "All %d %s match their copies (largest difference %s).", mChecked, unit, amount);
     } else {
-      (void)std::snprintf(result, sizeof(result), "%d of %d vertices differ from a copy, by up to %.2f.", mDiffering, mChecked,
-                          static_cast<double>(largest));
+      (void)std::snprintf(result, sizeof(result), "%d of %d %s differ from a copy, by up to %s.", mDiffering, mChecked, unit, amount);
     }
     ImGui::TextWrapped("%s", result);
     if (mDiffering > 0) {
@@ -537,6 +540,17 @@ namespace faf::editor
       ImGui::PopID();
     }
     Note("Click a thumbnail to choose its texture.");
+    if (!mShaders.empty()) {
+      ImGui::SetNextItemWidth(-1.0f);
+      if (ImGui::BeginCombo("##shader", ("Shader " + mShader).c_str())) {
+        for (const std::string& shader : mShaders) {
+          if (ImGui::Selectable(shader.c_str(), shader == mShader) && shader != mShader) {
+            mShaderChange = shader;
+          }
+        }
+        ImGui::EndCombo();
+      }
+    }
     DrawTextureBrowser();
   }
 
@@ -636,7 +650,12 @@ namespace faf::editor
       const std::string path = mSlots.size() == 10 ? mSlots[static_cast<std::size_t>(layer + 1)].albedo
                                : static_cast<std::size_t>(layer + 1) < mLayerNames.size() ? mLayerNames[static_cast<std::size_t>(layer + 1)] : "";
       char label[160];
-      (void)std::snprintf(label, sizeof(label), "%d  %s##layer%d", layer + 1, LayerLabel(path).c_str(), layer);
+      if (mHasCoverage) {
+        (void)std::snprintf(label, sizeof(label), "%d  %s  %.0f%%##layer%d", layer + 1, LayerLabel(path).c_str(),
+                            static_cast<double>(mCoverage[layer] * 100.0f), layer);
+      } else {
+        (void)std::snprintf(label, sizeof(label), "%d  %s##layer%d", layer + 1, LayerLabel(path).c_str(), layer);
+      }
       if (ImGui::Selectable(label, mMaskLayer == layer)) {
         mMaskLayer = layer;
       }
@@ -649,12 +668,23 @@ namespace faf::editor
     } else if (!mLayerNames.empty()) {
       ImGui::TextDisabled("Under all: %s", LayerLabel(mLayerNames.front()).c_str());
     }
+    if (ImGui::SmallButton("Clear")) {
+      mMaskOp = MaskOp::Clear;
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Import...")) {
+      mMaskOp = MaskOp::Import;
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Export...")) {
+      mMaskOp = MaskOp::Export;
+    }
     SectionHeader("BRUSH");
     static const char* const kMaskModes[] = {"Paint", "Erase", "Smooth"};
     Segmented(kMaskModes, 3, mMaskMode);
     ImGui::Checkbox("Lower the layers above", &mLowerAbove);
     DrawBrush(false);
-    DrawSymmetry(false);
+    DrawSymmetry(true);
     DrawLimits();
 
     SectionHeader("RULES");

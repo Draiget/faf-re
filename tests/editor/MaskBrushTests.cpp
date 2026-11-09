@@ -150,6 +150,26 @@ namespace
     EXPECT_EQ(MaskByte(world.At(4, 16), 6), 0);
   }
 
+  TEST(MaskBrush, SymmetryCheckFindsAPlantedTexelAndRepairsIt)
+  {
+    for (const Symmetry symmetry : {Symmetry::LeftRight, Symmetry::BothDiagonals, Symmetry::QuarterTurns, Symmetry::NWay}) {
+      World world;
+      MaskBrush brush;
+      brush.shape.symmetry = symmetry;
+      brush.shape.radius = 12.0f;
+      brush.layer = 2;
+      Step(world, brush, 20.0f, 14.0f, 0.3f);
+      EXPECT_EQ(faf::editor::CheckMaskSymmetry(world.texels.data(), kMask, kMask, symmetry, 3).differing, 0) << static_cast<int>(symmetry);
+      std::uint64_t& planted = world.texels[static_cast<std::size_t>(3 * kMask + 25)];
+      planted = faf::editor::WithMaskByte(planted, 6, 90);
+      const faf::editor::MaskSymmetryReport report = faf::editor::CheckMaskSymmetry(world.texels.data(), kMask, kMask, symmetry, 3);
+      EXPECT_GE(report.differing, 1) << static_cast<int>(symmetry);
+      EXPECT_EQ(report.largest, 90) << static_cast<int>(symmetry);
+      (void)faf::editor::MakeMasksSymmetric(world.texels.data(), kMask, kMask, symmetry, 3);
+      EXPECT_EQ(faf::editor::CheckMaskSymmetry(world.texels.data(), kMask, kMask, symmetry, 3).differing, 0) << static_cast<int>(symmetry);
+    }
+  }
+
   TEST(MaskBrush, HistoryUndoesByteForByte)
   {
     World world;

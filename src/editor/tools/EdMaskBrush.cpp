@@ -254,7 +254,8 @@ namespace faf::editor
             const double back = -kTwoPi * k / turns;
             const int sx = static_cast<int>(std::lround(cx + (tx - cx) * std::cos(back) - (tz - cz) * std::sin(back)));
             const int sz = static_cast<int>(std::lround(cz + (tx - cx) * std::sin(back) + (tz - cz) * std::cos(back)));
-            if (sx >= 0 && sz >= 0 && sx < maskWidth && sz < maskHeight) {
+            // Only from the first sector (a rounded turned-back texel next to its edge can fall outside it).
+            if (sx >= 0 && sz >= 0 && sx < maskWidth && sz < maskHeight && TurnSector(maskWidth, maskHeight, turns, sx, sz) == 0) {
               texels[index(tx, tz)] = texels[index(sx, sz)];
             }
           }
@@ -289,6 +290,139 @@ namespace faf::editor
       }
     }
     return shape.rects;
+  }
+
+  namespace
+  {
+    /** N-way turns: the nearest texel to (x, z) turned back into the first sector; false off the mask. */
+    bool TurnedBackTexel(const int maskWidth, const int maskHeight, const int turns, const int x, const int z, int& outX, int& outZ)
+    {
+      const int k = TurnSector(maskWidth, maskHeight, turns, x, z);
+      const double cx = (maskWidth - 1) * 0.5;
+      const double cz = (maskHeight - 1) * 0.5;
+      const double back = -kTwoPi * k / std::clamp(turns, 2, kMaxSymmetryCopies);
+      outX = static_cast<int>(std::lround(cx + (x - cx) * std::cos(back) - (z - cz) * std::sin(back)));
+      outZ = static_cast<int>(std::lround(cz + (x - cx) * std::sin(back) + (z - cz) * std::cos(back)));
+      return outX >= 0 && outZ >= 0 && outX < maskWidth && outZ < maskHeight;
+    }
+
+    [[nodiscard]] int LargestByteDifference(const std::uint64_t a, const std::uint64_t b)
+    {
+      int largest = 0;
+      for (int layer = 0; layer < 8; ++layer) {
+        largest = std::max(largest, std::abs(static_cast<int>(MaskByte(a, layer)) - static_cast<int>(MaskByte(b, layer))));
+      }
+      return largest;
+    }
+  } // namespace
+
+  MaskSymmetryReport CheckMaskSymmetry(const std::uint64_t* const texels, const int maskWidth, const int maskHeight, const Symmetry requested,
+                                       const int turns)
+  {
+    MaskSymmetryReport report;
+    const Symmetry symmetry = EffectiveSymmetry(requested, maskWidth, maskHeight);
+    if (texels == nullptr || maskWidth < 2 || maskHeight < 2 || symmetry == Symmetry::None) {
+      return report;
+    }
+    constexpr int kBlock = 4;
+    const int blocksX = (maskWidth + kBlock - 1) / kBlock;
+    const int blocksZ = (maskHeight + kBlock - 1) / kBlock;
+    std::vector<std::uint8_t> marked(static_cast<std::size_t>(blocksX) * static_cast<std::size_t>(blocksZ), 0);
+    const auto at = [&](const int x, const int z) {
+      return texels[static_cast<std::size_t>(z) * static_cast<std::size_t>(maskWidth) + static_cast<std::size_t>(x)];
+    };
+    for (int z = 0; z < maskHeight; ++z) {
+      for (int x = 0; x < maskWidth; ++x) {
+        int largest = 0;
+        if (symmetry == Symmetry::NWay) {
+          int sx = 0;
+          int sz = 0;
+          if (TurnSector(maskWidth, maskHeight, turns, x, z) == 0 || !TurnedBackTexel(maskWidth, maskHeight, turns, x, z, sx, sz) ||
+              TurnSector(maskWidth, maskHeight, turns, sx, sz) != 0) {
+            continue;
+          }
+          largest = LargestByteDifference(at(x, z), at(sx, sz));
+        } else {
+          int copyX[kMaxSymmetryCopies];
+          int copyZ[kMaxSymmetryCopies];
+          const int copies = SymmetricSamples(symmetry, turns, maskWidth, maskHeight, x, z, copyX, copyZ);
+          for (int c = 1; c < copies; ++c) {
+            largest = std::max(largest, LargestByteDifference(at(x, z), at(copyX[c], copyZ[c])));
+          }
+        }
+        ++report.checked;
+        report.largest = std::max(report.largest, largest);
+        if (largest > 0) {
+          ++report.differing;
+          marked[static_cast<std::size_t>(z / kBlock) * static_cast<std::size_t>(blocksX) + static_cast<std::size_t>(x / kBlock)] = 1;
+        }
+      }
+    }
+    for (int bz = 0; bz < blocksZ; ++bz) {
+      for (int bx = 0; bx < blocksX; ++bx) {
+        if (marked[static_cast<std::size_t>(bz) * static_cast<std::size_t>(blocksX) + static_cast<std::size_t>(bx)] != 0) {
+          report.blocks.push_back(
+            {bx * kBlock, bz * kBlock, std::min(maskWidth - 1, bx * kBlock + kBlock - 1), std::min(maskHeight - 1, bz * kBlock + kBlock - 1)});
+        }
+      }
+    }
+    return report;
+  }
+
+  SampleRect MakeMasksSymmetric(std::uint64_t* const texels, const int maskWidth, const int maskHeight, const Symmetry requested, const int turns)
+  {
+    const Symmetry symmetry = EffectiveSymmetry(requested, maskWidth, maskHeight);
+    if (texels == nullptr || maskWidth < 2 || maskHeight < 2 || symmetry == Symmetry::None) {
+      return {};
+    }
+    const auto index = [maskWidth](const int x, const int z) {
+      return static_cast<std::size_t>(z) * static_cast<std::size_t>(maskWidth) + static_cast<std::size_t>(x);
+    };
+    if (symmetry == Symmetry::NWay) {
+      // Only texels outside the first sector are written, from texels inside it.
+      for (int z = 0; z < maskHeight; ++z) {
+        for (int x = 0; x < maskWidth; ++x) {
+          int sx = 0;
+          int sz = 0;
+          if (TurnSector(maskWidth, maskHeight, turns, x, z) != 0 && TurnedBackTexel(maskWidth, maskHeight, turns, x, z, sx, sz) &&
+              TurnSector(maskWidth, maskHeight, turns, sx, sz) == 0) {
+            texels[index(x, z)] = texels[index(sx, sz)];
+          }
+        }
+      }
+    } else {
+      for (int z = 0; z < maskHeight; ++z) {
+        for (int x = 0; x < maskWidth; ++x) {
+          int copyX[kMaxSymmetryCopies];
+          int copyZ[kMaxSymmetryCopies];
+          const int copies = SymmetricSamples(symmetry, turns, maskWidth, maskHeight, x, z, copyX, copyZ);
+          bool first = true;
+          for (int c = 1; c < copies && first; ++c) {
+            first = copyZ[c] > z || (copyZ[c] == z && copyX[c] >= x);
+          }
+          if (!first) {
+            continue;
+          }
+          for (int c = 1; c < copies; ++c) {
+            texels[index(copyX[c], copyZ[c])] = texels[index(x, z)];
+          }
+        }
+      }
+    }
+    return {0, 0, maskWidth - 1, maskHeight - 1};
+  }
+
+  void MaskCoverage(const std::uint64_t* const texels, const std::size_t count, float (&coverage)[8])
+  {
+    std::uint64_t sums[8]{};
+    for (std::size_t i = 0; i < count; ++i) {
+      for (int layer = 0; layer < 8; ++layer) {
+        sums[layer] += MaskByte(texels[i], layer);
+      }
+    }
+    for (int layer = 0; layer < 8; ++layer) {
+      coverage[layer] = count == 0 ? 0.0f : static_cast<float>(static_cast<double>(sums[layer]) / (255.0 * static_cast<double>(count)));
+    }
   }
 
   SampleRect ApplyMaskRules(std::uint64_t* const texels, const int maskWidth, const int maskHeight, const MaskTerrain& terrain,
