@@ -33,6 +33,9 @@ static const float TerrainTessFadeStart = 60.0;
 static const float TerrainTessFadeEnd = 160.0;
 // Camera distance at which the relief reads mip 0; each doubling reads one level coarser.
 static const float TerrainTessLodDistance = 12.0;
+// Share of relief layers in the ground's blend where relief starts, and where it is at full strength.
+static const float TerrainTessCoverageStart = 0.35;
+static const float TerrainTessCoverageFull = 0.85;
 
 // How much relief each ground layer gets, set by the engine from the layer's file name
 // (TerrainTessellation.cpp): 1 for rock, sand, dirt, gravel and the like, 0 for grass, moss and
@@ -102,15 +105,16 @@ float TerrainTessLuma(float4 colour)
 }
 
 // 0 where a texel is as bright as its surroundings or brighter, up to 1 where it is much darker,
-// times the layer's weight (TerrainTessLayers*); no texture reads for a layer without relief.
-float TerrainTessRelief(sampler2D s, float2 uv, float lod, float weight)
+// times the layer's weight (TerrainTessLayers*) and its share of the blend; no texture reads for a
+// layer without relief or one that barely shows.
+float TerrainTessRelief(sampler2D s, float2 uv, float lod, float weight, float share)
 {
-    if (weight <= 0) {
+    if (weight * share <= 0.01) {
         return 0;
     }
     float fine = TerrainTessLuma(tex2Dlod(s, float4(uv, 0, lod)));
     float coarse = TerrainTessLuma(tex2Dlod(s, float4(uv, 0, lod + TerrainTessCoarseLevels)));
-    return saturate((coarse - fine) * TerrainTessContrast / max(coarse, 0.05)) * weight;
+    return saturate((coarse - fine) * TerrainTessContrast / max(coarse, 0.05)) * weight * share;
 }
 
 // How far below the surface the ground at `world` goes, blended over the strata the same way
@@ -128,16 +132,40 @@ float TerrainTessDepth(float3 world)
     float lod = clamp(log2(max(distanceToCamera, 1.0) / TerrainTessLodDistance), 0, 8);
 
     float4 mask0 = saturate(tex2Dlod(UtilitySamplerA, float4(uv, 0, 0)) * 2 - 1);
-    float relief = TerrainTessRelief(LowerAlbedoSampler, uv * LowerAlbedoTile.xy, lod, TerrainTessLayers0.x);
-    relief = lerp(relief, TerrainTessRelief(Stratum0AlbedoSampler, uv * Stratum0AlbedoTile.xy, lod, TerrainTessLayers0.y), mask0.x);
-    relief = lerp(relief, TerrainTessRelief(Stratum1AlbedoSampler, uv * Stratum1AlbedoTile.xy, lod, TerrainTessLayers0.z), mask0.y);
-    relief = lerp(relief, TerrainTessRelief(Stratum2AlbedoSampler, uv * Stratum2AlbedoTile.xy, lod, TerrainTessLayers0.w), mask0.z);
-    relief = lerp(relief, TerrainTessRelief(Stratum3AlbedoSampler, uv * Stratum3AlbedoTile.xy, lod, TerrainTessLayers1.x), mask0.w);
     float4 mask1 = saturate(tex2Dlod(UtilitySamplerB, float4(uv, 0, 0)) * 2 - 1);
-    relief = lerp(relief, TerrainTessRelief(Stratum4AlbedoSampler, uv * Stratum4AlbedoTile.xy, lod, TerrainTessLayers1.y), mask1.x);
-    relief = lerp(relief, TerrainTessRelief(Stratum5AlbedoSampler, uv * Stratum5AlbedoTile.xy, lod, TerrainTessLayers1.z), mask1.y);
-    relief = lerp(relief, TerrainTessRelief(Stratum6AlbedoSampler, uv * Stratum6AlbedoTile.xy, lod, TerrainTessLayers1.w), mask1.z);
-    relief = lerp(relief, TerrainTessRelief(Stratum7AlbedoSampler, uv * Stratum7AlbedoTile.xy, lod, TerrainTessLayers2.x), mask1.w);
+    // Each layer's share of the blend: the colour pass lerps lower, stratum 0, ... stratum 7 in turn,
+    // so a layer keeps its mask times what every later layer leaves. Same result as that chain, but a
+    // layer that doesn't show is never sampled (most ground shows two or three of the nine).
+    float share7 = mask1.w;
+    float rest = 1 - mask1.w;
+    float share6 = mask1.z * rest; rest *= 1 - mask1.z;
+    float share5 = mask1.y * rest; rest *= 1 - mask1.y;
+    float share4 = mask1.x * rest; rest *= 1 - mask1.x;
+    float share3 = mask0.w * rest; rest *= 1 - mask0.w;
+    float share2 = mask0.z * rest; rest *= 1 - mask0.z;
+    float share1 = mask0.y * rest; rest *= 1 - mask0.y;
+    float share0 = mask0.x * rest; rest *= 1 - mask0.x;
+    float shareLower = rest;
+    // How much of the visible ground is a layer with relief. Where grass half covers sand, the sand's
+    // ripples would otherwise shade ground that looks green; the relief fades out as that share drops
+    // below about half.
+    float coverage = shareLower * TerrainTessLayers0.x + share0 * TerrainTessLayers0.y + share1 * TerrainTessLayers0.z +
+                     share2 * TerrainTessLayers0.w + share3 * TerrainTessLayers1.x + share4 * TerrainTessLayers1.y +
+                     share5 * TerrainTessLayers1.z + share6 * TerrainTessLayers1.w + share7 * TerrainTessLayers2.x;
+    float strength = smoothstep(TerrainTessCoverageStart, TerrainTessCoverageFull, coverage);
+    if (strength <= 0) {
+        return 0;
+    }
+    float relief = TerrainTessRelief(LowerAlbedoSampler, uv * LowerAlbedoTile.xy, lod, TerrainTessLayers0.x, shareLower);
+    relief += TerrainTessRelief(Stratum0AlbedoSampler, uv * Stratum0AlbedoTile.xy, lod, TerrainTessLayers0.y, share0);
+    relief += TerrainTessRelief(Stratum1AlbedoSampler, uv * Stratum1AlbedoTile.xy, lod, TerrainTessLayers0.z, share1);
+    relief += TerrainTessRelief(Stratum2AlbedoSampler, uv * Stratum2AlbedoTile.xy, lod, TerrainTessLayers0.w, share2);
+    relief += TerrainTessRelief(Stratum3AlbedoSampler, uv * Stratum3AlbedoTile.xy, lod, TerrainTessLayers1.x, share3);
+    relief += TerrainTessRelief(Stratum4AlbedoSampler, uv * Stratum4AlbedoTile.xy, lod, TerrainTessLayers1.y, share4);
+    relief += TerrainTessRelief(Stratum5AlbedoSampler, uv * Stratum5AlbedoTile.xy, lod, TerrainTessLayers1.z, share5);
+    relief += TerrainTessRelief(Stratum6AlbedoSampler, uv * Stratum6AlbedoTile.xy, lod, TerrainTessLayers1.w, share6);
+    relief += TerrainTessRelief(Stratum7AlbedoSampler, uv * Stratum7AlbedoTile.xy, lod, TerrainTessLayers2.x, share7);
+    relief *= strength;
     // The upper albedo layer paints over the strata and has no relief of its own.
     float upper = tex2Dlod(UpperAlbedoSampler, float4(uv * UpperAlbedoTile.xy, 0, lod)).w;
     relief *= 1 - upper;
@@ -198,6 +226,39 @@ VS_OUTPUT TerrainTessGlowDS(float3 weights, TERRAIN_TESS_POINT a, TERRAIN_TESS_P
     offset *= 0.01;
     result.mTexDecal = offset;
     return result;
+}
+
+// ---- normals: the relief's slope tilts the layers' normals ----------------------------------
+// Lighting reads the normals pass, not the geometry, so sunken ground alone barely shows. These
+// add the relief's slope, sampled a short step away along x and z, to the normal FAF's normals
+// pass blends from the layers' normal maps (tangent space: x along world x, y along world z).
+
+// Slope gain: 1 tilts as much as the sunken geometry slopes. The geometry sinks at most
+// TerrainTessDepthScale, too little for the eye from above; the shading carries most of the depth.
+static const float TerrainTessShade = 6.0;
+// World units between the slope samples.
+static const float TerrainTessShadeStep = 0.15;
+// Direction of the normal maps' y axis against world z.
+static const float TerrainTessShadeSignY = 1.0;
+
+float4 TerrainTessTilt(float4 encoded, float3 world)
+{
+    float depth = TerrainTessDepth(world);
+    float alongX = TerrainTessDepth(world + float3(TerrainTessShadeStep, 0, 0)) - depth;
+    float alongZ = TerrainTessDepth(world + float3(0, 0, TerrainTessShadeStep)) - depth;
+    float3 normal = encoded.xyz * 2 - 1;
+    normal.xy += float2(alongX, alongZ * TerrainTessShadeSignY) * (TerrainTessShade / TerrainTessShadeStep);
+    return float4(normalize(normal) * 0.5 + 0.5, encoded.w);
+}
+
+float4 TerrainTessNormalsPS(VS_OUTPUT inV) : COLOR
+{
+    return TerrainTessTilt(TerrainNormalsPS(inV), inV.mTexWT.xzy);
+}
+
+float4 TerrainTessNormalsXP(VS_OUTPUT inV) : COLOR
+{
+    return TerrainTessTilt(TerrainNormalsXP(inV), inV.mTexWT.xzy);
 }
 
 // The basis passes: TerrainVS on the original surface, pulled a hair towards the camera. Where
@@ -267,7 +328,7 @@ technique TTerrainNormalsTess
         VertexShader = compile vs_1_1 TerrainTessVS();
         HullShader = compile hs_5_0 TerrainTessFactors();
         DomainShader = compile ds_5_0 TerrainTessDS( false );
-        PixelShader = compile ps_2_0 TerrainNormalsPS();
+        PixelShader = compile ps_2_0 TerrainTessNormalsPS();
     }
 }
 
@@ -281,7 +342,7 @@ technique TTerrainNormalsXPTess
         VertexShader = compile vs_1_1 TerrainTessVS();
         HullShader = compile hs_5_0 TerrainTessFactors();
         DomainShader = compile ds_5_0 TerrainTessDS( false );
-        PixelShader = compile ps_2_0 TerrainNormalsXP();
+        PixelShader = compile ps_2_0 TerrainTessNormalsXP();
     }
 }
 
