@@ -76,6 +76,24 @@ namespace
     EXPECT_TRUE(faf::editor::MarkerLinks(markers[2]).empty());
   }
 
+  TEST(Markers, GroupsForTheTree)
+  {
+    using faf::editor::MarkerGroup;
+    const auto of = [](const char* const type) {
+      return faf::editor::MarkerGroupOf(faf::editor::NewMarker(*faf::editor::FindMarkerType(type), "m", 0.0f, 0.0f, 0.0f));
+    };
+    EXPECT_EQ(of("Blank Marker"), MarkerGroup::Starts);
+    EXPECT_EQ(of("Mass"), MarkerGroup::Resources);
+    EXPECT_EQ(of("Hydrocarbon"), MarkerGroup::Resources);
+    EXPECT_EQ(of("Rally Point"), MarkerGroup::Ai);
+    EXPECT_EQ(of("Naval Link"), MarkerGroup::Ai);
+    EXPECT_EQ(of("Air Path Node"), MarkerGroup::PathNodes);
+    EXPECT_EQ(of("Camera Info"), MarkerGroup::Other);
+    // A type the palette doesn't know (a mod's) goes to Other.
+    SaveEntry odd{"x", {{"type", faf::editor::StringValue("Weather Generator")}}};
+    EXPECT_EQ(faf::editor::MarkerGroupOf(odd), MarkerGroup::Other);
+  }
+
   TEST(Markers, NearestOfATypeWithinReach)
   {
     const faf::editor::MarkerType* const land = faf::editor::FindMarkerType("Land Path Node");

@@ -88,6 +88,7 @@ namespace faf::editor
       kMenuMap = 1102,
       kMenuLog = 1103,
       kMenuInfo = 1107,
+      kMenuMarkers = 1108,
       kMenuPanelsWhilePlaying = 1104,
       kMenuResetLayout = 1105,
       kMenuImGuiDemo = 1106,
@@ -500,6 +501,7 @@ namespace faf::editor
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuTools, L"&Tools");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuMap, L"&Map");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuInfo, L"&Info");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuMarkers, L"Mar&kers");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLog, L"&Log");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuPanelsWhilePlaying, L"&Panels while playing");
       ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
@@ -539,6 +541,7 @@ namespace faf::editor
       check(kMenuTools, mShell->ShowTools());
       check(kMenuMap, mShell->ShowMap());
       check(kMenuInfo, mShell->ShowInfo());
+      check(kMenuMarkers, mShell->ShowMarkers());
       check(kMenuLog, mShell->ShowLog());
       check(kMenuPanelsWhilePlaying, mShell->PanelsWhilePlaying());
       check(kMenuImGuiDemo, mShell->ShowDemo());
@@ -594,6 +597,9 @@ namespace faf::editor
       case kMenuMap:
         mShell->ShowMap() = !mShell->ShowMap();
         return;
+      case kMenuMarkers:
+        mShell->ShowMarkers() = !mShell->ShowMarkers();
+        break;
       case kMenuInfo:
         mShell->ShowInfo() = !mShell->ShowInfo();
         break;
@@ -931,6 +937,16 @@ namespace faf::editor
           mScene.ChangeLayerSlot(slot, value);
         }
         tools.SetLayerSlots(mScene.LayerSlots());
+        {
+          std::vector<std::string> names;
+          bool add = false;
+          if (tools.TakeMarkerSelect(names, add)) {
+            mScene.SelectMarkers(names, add);
+          }
+        }
+        if (std::string name; tools.TakeMarkerFrame(name)) {
+          mScene.FrameMarker(name);
+        }
         tools.SetMarkerSelection(mScene.SelectedMarkers());
         tools.SetArmies(mDocument.Armies(), mDocument.ExtraArmies());
         if (std::string extra; tools.TakeExtraArmiesChange(extra)) {

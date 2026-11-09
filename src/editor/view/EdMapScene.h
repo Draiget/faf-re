@@ -87,6 +87,10 @@ namespace faf::editor
     [[nodiscard]] std::vector<SaveEntry> SelectedMarkers() const;
     /** Changes a property of a marker ("name" renames it), as one undo step. */
     void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
+    /** Selects markers by name (`add` toggles them in the selection instead), for the Markers panel. */
+    void SelectMarkers(const std::vector<std::string>& names, bool add);
+    /** Moves the camera over a marker, closer if it was far. */
+    void FrameMarker(const std::string& name);
     /** Sets the scenario's extra armies (names split on spaces), as one undo step. */
     void ChangeExtraArmies(const std::string& armies);
     /**
@@ -216,6 +220,8 @@ namespace faf::editor
     EdDocument::SaveSnapshot mMarkerBefore;
     /** The marker nearest (x, z) within reach of the cursor, or -1. */
     [[nodiscard]] int PickMarker(float x, float z) const;
+    /** Whether the Markers panel hides this marker's type. */
+    [[nodiscard]] bool MarkerHidden(const SaveEntry& marker) const;
     void DeleteSelectedMarkers();
     void DrawMarkers(moho::CD3DPrimBatcher& batcher, bool all);
     EdDocument::SaveSnapshot mBorderBefore;

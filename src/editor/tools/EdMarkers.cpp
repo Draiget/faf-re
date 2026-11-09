@@ -228,6 +228,42 @@ namespace faf::editor
     return changed;
   }
 
+  MarkerGroup MarkerGroupOf(const SaveEntry& marker)
+  {
+    const std::string type = MarkerTypeOf(marker);
+    if (type == "Blank Marker") {
+      return MarkerGroup::Starts;
+    }
+    if (type == "Mass" || type == "Hydrocarbon") {
+      return MarkerGroup::Resources;
+    }
+    if (IsPathNode(marker)) {
+      return MarkerGroup::PathNodes;
+    }
+    // The palette's own group for the types it knows (rally points, expansions, naval links...).
+    if (const MarkerType* const known = FindMarkerType(type); known != nullptr && std::string(known->group) == "AI") {
+      return MarkerGroup::Ai;
+    }
+    return MarkerGroup::Other;
+  }
+
+  const char* MarkerGroupName(const MarkerGroup group)
+  {
+    switch (group) {
+    case MarkerGroup::Starts:
+      return "Start positions";
+    case MarkerGroup::Resources:
+      return "Resources";
+    case MarkerGroup::Ai:
+      return "AI markers";
+    case MarkerGroup::PathNodes:
+      return "Path nodes";
+    case MarkerGroup::Other:
+      break;
+    }
+    return "Other";
+  }
+
   int MarkerNear(const std::vector<SaveEntry>& markers, const std::string& type, const float x, const float z, const float reach)
   {
     int best = -1;

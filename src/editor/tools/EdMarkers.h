@@ -56,6 +56,20 @@ namespace faf::editor
   bool SetMarkerLink(std::vector<SaveEntry>& markers, const std::string& a, const std::string& b, bool linked);
   /** Drops every link naming `name` (the marker is being deleted); returns how many markers changed. */
   int RemoveLinksTo(std::vector<SaveEntry>& markers, const std::string& name);
+  /** The marker tree's groups, in the order the panel lists them. */
+  enum class MarkerGroup
+  {
+    Starts,
+    Resources,
+    Ai,
+    PathNodes,
+    Other,
+  };
+  constexpr int kMarkerGroupCount = 5;
+  /** A marker's group: start positions, mass and hydrocarbon, AI markers, path nodes, everything else. */
+  MarkerGroup MarkerGroupOf(const SaveEntry& marker);
+  const char* MarkerGroupName(MarkerGroup group);
+
   /** The nearest marker of `type` within `reach` of (x, z), or -1. */
   int MarkerNear(const std::vector<SaveEntry>& markers, const std::string& type, float x, float z, float reach);
 } // namespace faf::editor

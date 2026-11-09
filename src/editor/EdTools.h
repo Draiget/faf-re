@@ -9,6 +9,7 @@
 #include <array>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -95,6 +96,40 @@ namespace faf::editor
       extra = mExtraBuffer;
       return true;
     }
+
+    /** The Markers panel: the types it hides (not drawn, not picked), and what it asks the view for. */
+    [[nodiscard]] const std::set<std::string>& HiddenMarkerTypes() const noexcept { return mHiddenMarkerTypes; }
+    [[nodiscard]] std::set<std::string>& HiddenMarkerTypes() noexcept { return mHiddenMarkerTypes; }
+    /** Select these markers (`add`: Ctrl, toggles them in the selection); the Markers tool comes up to edit them. */
+    void AskMarkerSelect(std::vector<std::string> names, const bool add)
+    {
+      mAskSelect = std::move(names);
+      mAskSelectAdd = add;
+      mAskSelectSet = true;
+      mTool = 6;
+    }
+    void AskMarkerFrame(std::string name) { mAskFrame = std::move(name); }
+    [[nodiscard]] bool TakeMarkerSelect(std::vector<std::string>& names, bool& add)
+    {
+      if (!mAskSelectSet) {
+        return false;
+      }
+      mAskSelectSet = false;
+      names = std::move(mAskSelect);
+      add = mAskSelectAdd;
+      return true;
+    }
+    [[nodiscard]] bool TakeMarkerFrame(std::string& name)
+    {
+      if (mAskFrame.empty()) {
+        return false;
+      }
+      name = std::exchange(mAskFrame, {});
+      return true;
+    }
+    [[nodiscard]] const std::vector<SaveEntry>& MarkerSelection() const noexcept { return mMarkerSelection; }
+    /** The layer textures and their thumbnails (the Info panel shows the map's layers with them too). */
+    [[nodiscard]] EdTextureLibrary& Library() noexcept { return mLibrary; }
 
     /** The Markers tool's connect mode: a click on a path node links it to the selection. */
     [[nodiscard]] bool ConnectPathNodes() const noexcept { return mConnectNodes; }
@@ -404,6 +439,11 @@ namespace faf::editor
     int mSelectionCount = 0;
     std::vector<SaveEntry> mMarkerSelection;
     bool mConnectNodes = false;
+    std::set<std::string> mHiddenMarkerTypes;
+    std::vector<std::string> mAskSelect;
+    bool mAskSelectAdd = false;
+    bool mAskSelectSet = false;
+    std::string mAskFrame;
     int mDetectedSymmetry = -2; // -2: no map opened yet
     float mDetectedMatch = 0.0f;
     std::vector<std::string> mArmies;

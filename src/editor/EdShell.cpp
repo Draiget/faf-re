@@ -20,6 +20,7 @@ namespace faf::editor
     constexpr const char* kToolsWindow = "Tools";
     constexpr const char* kMapWindow = "Map";
     constexpr const char* kInfoWindow = "Info";
+    constexpr const char* kMarkersWindow = "Markers";
     constexpr const char* kLogWindow = "Log";
     constexpr const char* kDockSpace = "EditorDockSpace";
 
@@ -98,6 +99,9 @@ namespace faf::editor
       if (mShowInfo) {
         DrawInfoPanel();
       }
+      if (mShowMarkers) {
+        DrawMarkersPanel();
+      }
       if (mShowLog) {
         if (ImGui::Begin(kLogWindow, &mShowLog)) {
           mLog.Draw();
@@ -126,6 +130,7 @@ namespace faf::editor
     ImGui::DockBuilderDockWindow(kToolsWindow, left);
     ImGui::DockBuilderDockWindow(kMapWindow, right);
     ImGui::DockBuilderDockWindow(kInfoWindow, right);
+    ImGui::DockBuilderDockWindow(kMarkersWindow, right);
     ImGui::DockBuilderDockWindow(kLogWindow, bottom);
     ImGui::DockBuilderFinish(dockspaceId);
   }
@@ -391,126 +396,6 @@ namespace faf::editor
     }
     ImGui::EndChild();
     ImGui::EndDisabled();
-    ImGui::End();
-  }
-
-  void EdShell::DrawInfoPanel()
-  {
-    // A layout saved before this panel existed has no place for it: it goes beside the Map panel.
-    if (const ImGuiWindow* const map = ImGui::FindWindowByName(kMapWindow); map != nullptr && map->DockId != 0) {
-      ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
-    }
-    // A map that starts opening (the Map panel's button, `/open`) brings this tab to the front once, after the
-    // first frames: on those the saved layout picks each dock's front tab and would override it.
-    if (!mDocument.Path().empty() && mDocument.Path() != mInfoShownFor && ImGui::GetFrameCount() > 3) {
-      mInfoShownFor = mDocument.Path();
-      mShowInfo = true;
-      ImGui::SetNextWindowFocus();
-    }
-    if (!ImGui::Begin(kInfoWindow, &mShowInfo)) {
-      ImGui::End();
-      return;
-    }
-    switch (mDocument.GetState()) {
-    case EdDocument::State::Empty:
-      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-      ImGui::TextWrapped("No map open. Double-click one in the Map panel, or pick it and press Open.");
-      ImGui::PopStyleColor();
-      ImGui::End();
-      return;
-    case EdDocument::State::Loading:
-      ImGui::Text("Opening %s ...", MapDisplayName(mDocument.Path()).c_str());
-      ImGui::End();
-      return;
-    case EdDocument::State::Failed:
-      ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.40f, 1.0f), "%s did not open", MapDisplayName(mDocument.Path()).c_str());
-      ImGui::TextWrapped("%s", mDocument.Error().c_str());
-      ImGui::End();
-      return;
-    case EdDocument::State::Open:
-      break;
-    }
-
-    const MapFacts& facts = mDocument.Facts();
-    ImGui::TextUnformatted(facts.name.empty() ? MapDisplayName(facts.scenarioPath).c_str() : facts.name.c_str());
-    if (facts.mapVersion > 0) {
-      ImGui::TextDisabled("%s, version %d, opened in %.2f s", MapDisplayName(facts.scenarioPath).c_str(), facts.mapVersion,
-                          facts.loadSeconds);
-    } else {
-      ImGui::TextDisabled("%s, opened in %.2f s", MapDisplayName(facts.scenarioPath).c_str(), facts.loadSeconds);
-    }
-    if (!mDocument.Error().empty()) {
-      ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "%s", mDocument.Error().c_str());
-    }
-    if (!facts.description.empty()) {
-      ImGui::TextWrapped("%s", facts.description.c_str());
-    }
-    ImGui::Separator();
-
-    constexpr ImGuiTableFlags kTable = ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg;
-    const auto row = [](const char* const label, const char* const format, auto... values) {
-      ImGui::TableNextRow();
-      ImGui::TableSetColumnIndex(0);
-      ImGui::TextDisabled("%s", label);
-      ImGui::TableSetColumnIndex(1);
-      ImGui::Text(format, values...);
-    };
-    if (ImGui::BeginTable("##facts", 2, kTable)) {
-      ImGui::TableSetupColumn("##label", ImGuiTableColumnFlags_WidthFixed);
-      ImGui::TableSetupColumn("##value", ImGuiTableColumnFlags_WidthStretch);
-      row("Size", "%d x %d (%.0f x %.0f km)", facts.sizeX, facts.sizeZ, facts.sizeX / 51.2, facts.sizeZ / 51.2);
-      row("Height field", "%d x %d samples", facts.fieldWidth, facts.fieldHeight);
-      if (facts.water) {
-        row("Water", "at %.2f", static_cast<double>(facts.waterElevation));
-      } else {
-        row("Water", "%s", "none");
-      }
-      row("Type", "%s", facts.type.c_str());
-      row("Terrain shader", "%s", facts.terrainShader.c_str());
-      row("Props", "%d", facts.props);
-      row("Decals", "%d", facts.decals);
-      row("Markers", "%d", facts.markerCount);
-      row("Armies", "%zu", facts.armies.size());
-      ImGui::EndTable();
-    }
-
-    if (ImGui::CollapsingHeader("Texture layers", ImGuiTreeNodeFlags_DefaultOpen)) {
-      static constexpr const char* kSlots[] = {"Lower", "1", "2", "3", "4", "5", "6", "7", "8", "Upper"};
-      if (ImGui::BeginTable("##layers", 2, kTable)) {
-        ImGui::TableSetupColumn("##slot", ImGuiTableColumnFlags_WidthFixed);
-        ImGui::TableSetupColumn("##texture", ImGuiTableColumnFlags_WidthStretch);
-        for (std::size_t i = 0; i < facts.layers.size() && i < std::size(kSlots); ++i) {
-          ImGui::TableNextRow();
-          ImGui::TableSetColumnIndex(0);
-          ImGui::TextDisabled("%s", kSlots[i]);
-          ImGui::TableSetColumnIndex(1);
-          if (facts.layers[i].empty()) {
-            ImGui::TextDisabled("(empty)");
-          } else {
-            ImGui::TextUnformatted(facts.layers[i].c_str());
-          }
-        }
-        ImGui::EndTable();
-      }
-    }
-    if (ImGui::CollapsingHeader("Markers")) {
-      for (const auto& [type, count] : facts.markers) {
-        ImGui::Text("%d", count);
-        ImGui::SameLine(48.0f);
-        ImGui::TextUnformatted(type.c_str());
-      }
-    }
-    if (ImGui::CollapsingHeader("Armies")) {
-      for (const std::string& army : facts.armies) {
-        ImGui::BulletText("%s", army.c_str());
-      }
-    }
-    if (ImGui::CollapsingHeader("Files")) {
-      ImGui::TextWrapped("%s", facts.scenarioPath.c_str());
-      ImGui::TextWrapped("%s", facts.mapPath.c_str());
-      ImGui::TextWrapped("%s", facts.savePath.c_str());
-      ImGui::TextWrapped("%s", facts.scriptPath.c_str());
-    }
     ImGui::End();
   }
 

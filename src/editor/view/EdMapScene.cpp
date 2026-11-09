@@ -1336,7 +1336,7 @@ namespace faf::editor
     float bestDistance = reach;
     for (std::size_t i = 0; i < markers.size(); ++i) {
       float mx = 0.0f, my = 0.0f, mz = 0.0f;
-      if (!MarkerPosition(markers[i], mx, my, mz)) {
+      if (!MarkerPosition(markers[i], mx, my, mz) || MarkerHidden(markers[i])) {
         continue;
       }
       const float d = std::hypot(mx - x, mz - z);
@@ -1346,6 +1346,41 @@ namespace faf::editor
       }
     }
     return best;
+  }
+
+  bool EdMapScene::MarkerHidden(const SaveEntry& marker) const
+  {
+    return mTools != nullptr && !mTools->HiddenMarkerTypes().empty() && mTools->HiddenMarkerTypes().count(MarkerTypeOf(marker)) != 0;
+  }
+
+  void EdMapScene::SelectMarkers(const std::vector<std::string>& names, const bool add)
+  {
+    if (!add) {
+      mMarkerSelection.clear();
+    }
+    for (const std::string& name : names) {
+      const auto at = std::find(mMarkerSelection.begin(), mMarkerSelection.end(), name);
+      if (at == mMarkerSelection.end()) {
+        mMarkerSelection.push_back(name);
+      } else if (add) {
+        mMarkerSelection.erase(at);
+      }
+    }
+  }
+
+  void EdMapScene::FrameMarker(const std::string& name)
+  {
+    for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (marker.name == name && MarkerPosition(marker, x, y, z)) {
+        mTargetX = x;
+        mTargetZ = z;
+        mDistance = std::min(mDistance, 140.0f);
+        ApplyCamera();
+        gpg::Logf("editor: the view goes to %s at %.0f, %.0f", name.c_str(), static_cast<double>(x), static_cast<double>(z));
+        return;
+      }
+    }
   }
 
   std::vector<SaveEntry> EdMapScene::SelectedMarkers() const
@@ -1639,7 +1674,7 @@ namespace faf::editor
       std::map<std::string, std::array<float, 3>> positions;
       for (const SaveEntry& marker : markers) {
         float x = 0.0f, y = 0.0f, z = 0.0f;
-        if (MarkerPosition(marker, x, y, z)) {
+        if (!MarkerHidden(marker) && MarkerPosition(marker, x, y, z)) {
           positions[marker.name] = {x, y, z};
         }
       }
@@ -1668,7 +1703,7 @@ namespace faf::editor
       const std::string type = MarkerTypeOf(marker);
       const bool start = type == "Blank Marker";
       const bool resource = type == "Mass" || type == "Hydrocarbon";
-      if (!all && !start && !resource) {
+      if ((!all && !start && !resource) || MarkerHidden(marker)) {
         continue;
       }
       float x = 0.0f, y = 0.0f, z = 0.0f;

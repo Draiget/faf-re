@@ -31,6 +31,7 @@ namespace faf::editor
     bool& ShowTools() noexcept { return mShowTools; }
     bool& ShowMap() noexcept { return mShowMap; }
     bool& ShowInfo() noexcept { return mShowInfo; }
+    bool& ShowMarkers() noexcept { return mShowMarkers; }
     bool& ShowLog() noexcept { return mShowLog; }
     bool& ShowDemo() noexcept { return mShowDemo; }
     bool& PanelsWhilePlaying() noexcept { return mPanelsWhilePlaying; }
@@ -67,7 +68,13 @@ namespace faf::editor
     void HandleKeys();
     void DrawToolsPanel();
     void DrawMapPanel();
+    /** The open map: title, kind as chips, counts as cards, layers with thumbnails, armies, files (ui/EdInfoPanels.cpp). */
     void DrawInfoPanel();
+    /** The map's markers as a tree by group and type: select, go to, hide a type (ui/EdInfoPanels.cpp). */
+    void DrawMarkersPanel();
+    bool mShowMarkers = true;
+    bool mFocusMarkers = false;
+    char mMarkerFilter[64]{};
     void DrawSaveAsDialog();
     bool mOpenSaveAs = false;
     char mSaveAsName[128]{};

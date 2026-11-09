@@ -23,4 +23,5 @@ set(FAF_EDITOR_SOURCES
   undo/EdHeightHistory.cpp
   view/EdMapScene.cpp
   ui/EdImGuiRenderer.cpp
+  ui/EdInfoPanels.cpp
 )
