@@ -34,6 +34,7 @@ namespace faf::editor
     bool& ShowInfo() noexcept { return mShowInfo; }
     bool& ShowMarkers() noexcept { return mShowMarkers; }
     bool& ShowCheck() noexcept { return mShowCheck; }
+    bool& ShowScript() noexcept { return mShowScript; }
     /** Runs the check at the next frame (`/check` for test runs). */
     void RequestCheck() noexcept
     {
@@ -82,6 +83,14 @@ namespace faf::editor
     void DrawMarkersPanel();
     /** The Check: runs the map's checks and lists what they found; a click goes to it (ui/EdInfoPanels.cpp). */
     void DrawCheckPanel();
+    /** The map's `_script.lua`, edited: Apply makes the change one undo step, Check compiles it (ui/EdInfoPanels.cpp). */
+    void DrawScriptPanel();
+    bool mShowScript = false;
+    bool mFocusScript = false;
+    std::string mScriptBuffer;
+    std::string mScriptFor;
+    std::string mScriptMessage;
+    int mScriptErrorLine = 0;
     void RunCheck();
     bool mShowCheck = true;
     std::vector<CheckIssue> mCheckIssues;

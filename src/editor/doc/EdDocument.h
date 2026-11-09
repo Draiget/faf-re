@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "editor/doc/EdWater.h"
+#include "editor/tools/EdChecks.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdSymmetryCheck.h"
 #include "editor/doc/EdMapFile.h"
@@ -201,6 +202,11 @@ namespace faf::editor
     /** The map's `_save.lua` (markers, areas) and `_script.lua` as the editor keeps them. */
     [[nodiscard]] SaveFile& SaveData() noexcept { return mSave; }
     [[nodiscard]] std::string& Script() noexcept { return mScript; }
+    /**
+     * Compiles the scenario, save and script texts as they are now (edits included) and returns their syntax errors,
+     * each with its file and line.
+     */
+    [[nodiscard]] std::vector<CheckIssue> CheckScripts() const;
     [[nodiscard]] const std::string& Scenario() const noexcept { return mScenario; }
     /** The armies of the scenario's team list, in order, and its extra armies. */
     [[nodiscard]] std::vector<std::string> Armies() const { return ScenarioArmies(mScenario); }

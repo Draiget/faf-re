@@ -17,6 +17,7 @@
 
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "lua/luaplus/include/lauxlib.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/CVirtualFileSystem.h"
@@ -605,6 +606,51 @@ namespace faf::editor
     }
     EditEnded(EditKind::Props);
     mModified = true;
+  }
+
+  std::vector<CheckIssue> EdDocument::CheckScripts() const
+  {
+    std::vector<CheckIssue> issues;
+    if (mLua == nullptr) {
+      return issues;
+    }
+    lua_State* const L = mLua->GetCState();
+    const auto name = [](const std::string& path, const char* const fallback) {
+      const std::size_t slash = path.find_last_of('/');
+      return path.empty() ? std::string(fallback) : path.substr(slash == std::string::npos ? 0 : slash + 1);
+    };
+    const std::pair<std::string, const std::string*> files[] = {
+      {name(mPath, "_scenario.lua"), &mScenario},
+      {name(mFacts.savePath, "_save.lua"), nullptr},
+      {name(mFacts.scriptPath, "_script.lua"), &mScript},
+    };
+    const std::string save = mSave.Text();
+    for (const auto& [file, text] : files) {
+      const std::string& source = text != nullptr ? *text : save;
+      if (source.empty()) {
+        continue;
+      }
+      const int top = lua_gettop(L);
+      const std::string chunk = "=" + file;
+      if (luaL_loadbuffer(L, source.data(), source.size(), chunk.c_str()) != 0) {
+        const char* const message = lua_tostring(L, -1);
+        CheckIssue issue;
+        issue.level = CheckIssue::Level::Error;
+        issue.file = file;
+        int line = 0;
+        std::string text2;
+        if (message != nullptr && ParseLuaError(message, line, text2)) {
+          issue.line = line;
+          issue.text = text2;
+        } else {
+          issue.text = message != nullptr ? message : "does not compile";
+        }
+        issue.marker = file;
+        issues.push_back(std::move(issue));
+      }
+      lua_settop(L, top);
+    }
+    return issues;
   }
 
   WaterState EdDocument::WaterNow() const

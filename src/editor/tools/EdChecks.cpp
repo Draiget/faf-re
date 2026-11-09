@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 
 #include "editor/tools/EdMarkers.h"
 
@@ -19,6 +20,44 @@ namespace faf::editor
       break;
     }
     return "note";
+  }
+
+  bool ParseLuaError(const std::string& error, int& line, std::string& message)
+  {
+    // This engine's Lua writes `name(12): message`.
+    for (std::size_t open = error.find('('); open != std::string::npos; open = error.find('(', open + 1)) {
+      std::size_t digits = open + 1;
+      while (digits < error.size() && error[digits] >= '0' && error[digits] <= '9') {
+        ++digits;
+      }
+      if (digits > open + 1 && error.compare(digits, 2, "):") == 0) {
+        line = std::atoi(error.c_str() + open + 1);
+        message = error.substr(digits + 2);
+        while (!message.empty() && message.front() == ' ') {
+          message.erase(0, 1);
+        }
+        return true;
+      }
+    }
+    // The line is the number between the last two colons before the message.
+    std::size_t at = error.find("]:");
+    at = at == std::string::npos ? error.find(':') : at + 1;
+    while (at != std::string::npos) {
+      std::size_t digits = at + 1;
+      while (digits < error.size() && error[digits] >= '0' && error[digits] <= '9') {
+        ++digits;
+      }
+      if (digits > at + 1 && digits < error.size() && error[digits] == ':') {
+        line = std::atoi(error.c_str() + at + 1);
+        message = error.substr(digits + 1);
+        while (!message.empty() && message.front() == ' ') {
+          message.erase(0, 1);
+        }
+        return true;
+      }
+      at = error.find(':', at + 1);
+    }
+    return false;
   }
 
   std::vector<CheckIssue> CheckMarkers(const MarkerCheckInput& input)

@@ -511,16 +511,26 @@ namespace faf::editor
     input.width = facts.fieldWidth;
     input.height = facts.fieldHeight;
     mCheckIssues = CheckMarkers(input);
+    // The scripts' syntax, as the files are now (edits included).
+    for (CheckIssue& issue : mDocument.CheckScripts()) {
+      mCheckIssues.insert(mCheckIssues.begin(), std::move(issue));
+    }
     std::vector<EdTools::CheckPin> pins;
     int counts[3] = {0, 0, 0};
     for (const CheckIssue& issue : mCheckIssues) {
-      pins.push_back({issue.x, issue.z, static_cast<int>(issue.level)});
+      if (issue.file.empty()) {
+        pins.push_back({issue.x, issue.z, static_cast<int>(issue.level)});
+      }
       ++counts[static_cast<int>(issue.level)];
     }
     mTools.SetCheckPins(std::move(pins));
     gpg::Logf("editor: check: %d errors, %d warnings, %d notes", counts[0], counts[1], counts[2]);
     for (const CheckIssue& issue : mCheckIssues) {
-      gpg::Logf("editor: check %s: %s: %s", CheckLevelName(issue.level), issue.marker.c_str(), issue.text.c_str());
+      if (!issue.file.empty()) {
+        gpg::Logf("editor: check %s: %s line %d: %s", CheckLevelName(issue.level), issue.file.c_str(), issue.line, issue.text.c_str());
+      } else {
+        gpg::Logf("editor: check %s: %s: %s", CheckLevelName(issue.level), issue.marker.c_str(), issue.text.c_str());
+      }
     }
   }
 
@@ -554,8 +564,9 @@ namespace faf::editor
       RunCheck();
     }
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("Start positions and mass and hydrocarbon points: off the playable area, under water, without a partner at "
-                       "their symmetric copies (the Tools panel's symmetry), or overlapping. Scripts and pathing come next.");
+    ImGui::TextWrapped("The scripts' syntax (_scenario.lua, _save.lua, _script.lua as edited), then start positions and mass and "
+                       "hydrocarbon points: off the playable area, under water, without a partner at their symmetric copies (the Tools "
+                       "panel's symmetry), or overlapping. Pathing comes next.");
     ImGui::PopStyleColor();
     if (!mCheckRan) {
       ImGui::End();
@@ -579,7 +590,13 @@ namespace faf::editor
       const ImVec2 row = ImGui::GetCursorScreenPos();
       const float line = ImGui::GetTextLineHeight();
       if (ImGui::Selectable("##issue", false, ImGuiSelectableFlags_SpanAvailWidth, ImVec2(0.0f, line * 2.0f + 2.0f))) {
-        if (!issue.marker.empty()) {
+        if (!issue.file.empty()) {
+          // A script's error: its text in the Script panel, at the line.
+          mShowScript = true;
+          mFocusScript = true;
+          mScriptErrorLine = issue.line;
+          mScriptMessage = issue.file + " line " + std::to_string(issue.line) + ": " + issue.text;
+        } else if (!issue.marker.empty()) {
           mTools.AskMarkerSelect({issue.marker}, false);
           mTools.AskMarkerFrame(issue.marker);
         }
@@ -589,13 +606,109 @@ namespace faf::editor
       }
       ImDrawList* const draw = ImGui::GetWindowDrawList();
       draw->AddCircleFilled(ImVec2(row.x + line * 0.4f, row.y + line * 0.5f), line * 0.28f, ImGui::GetColorU32(kColors[static_cast<int>(issue.level)]));
-      draw->AddText(ImVec2(row.x + line * 1.1f, row.y), ImGui::GetColorU32(ImGuiCol_Text), issue.marker.c_str());
+      const std::string title = issue.file.empty() ? issue.marker : issue.file + " line " + std::to_string(issue.line);
+      draw->AddText(ImVec2(row.x + line * 1.1f, row.y), ImGui::GetColorU32(ImGuiCol_Text), title.c_str());
       draw->PushClipRect(row, ImVec2(ImGui::GetItemRectMax().x, row.y + line * 2.0f + 2.0f), true);
       draw->AddText(ImVec2(row.x + line * 1.1f, row.y + line), ImGui::GetColorU32(ImGuiCol_TextDisabled), issue.text.c_str());
       draw->PopClipRect();
       ImGui::PopID();
     }
     ImGui::EndChild();
+    ImGui::End();
+  }
+  namespace
+  {
+    /** ImGui's text callback growing a std::string as the text grows. */
+    int GrowString(ImGuiInputTextCallbackData* const data)
+    {
+      if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+        auto* const text = static_cast<std::string*>(data->UserData);
+        text->resize(static_cast<std::size_t>(data->BufTextLen));
+        data->Buf = text->data();
+      }
+      return 0;
+    }
+  } // namespace
+
+  void EdShell::DrawScriptPanel()
+  {
+    if (const ImGuiWindow* const map = ImGui::FindWindowByName(kMapWindow); map != nullptr && map->DockId != 0) {
+      ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
+    }
+    if (mFocusScript) {
+      mFocusScript = false;
+      ImGui::SetNextWindowFocus();
+    }
+    if (!ImGui::Begin("Script", &mShowScript)) {
+      ImGui::End();
+      return;
+    }
+    if (mDocument.GetState() != EdDocument::State::Open) {
+      ImGui::TextDisabled("No map open.");
+      ImGui::End();
+      return;
+    }
+    // The panel's copy follows the document until it is edited, and again after Apply or Revert.
+    const bool edited = mScriptFor == mDocument.Path() && mScriptBuffer != mDocument.Script();
+    if (mScriptFor != mDocument.Path()) {
+      mScriptFor = mDocument.Path();
+      mScriptBuffer = mDocument.Script();
+      mScriptMessage.clear();
+    }
+    ImGui::TextDisabled("%s", MapDisplayName(mDocument.Facts().scriptPath).c_str());
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", mDocument.Facts().scriptPath.c_str());
+    ImGui::BeginDisabled(!edited);
+    if (ImGui::Button("Apply")) {
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      mDocument.Script() = mScriptBuffer;
+      mDocument.SaveDataEdited(std::move(before));
+      mScriptMessage = "applied (one undo step)";
+      gpg::Logf("editor: script applied, %zu bytes", mScriptBuffer.size());
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Revert")) {
+      mScriptBuffer = mDocument.Script();
+      mScriptMessage.clear();
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Check")) {
+      // The panel's text as it would be applied.
+      const std::string kept = mDocument.Script();
+      mDocument.Script() = mScriptBuffer;
+      const std::vector<CheckIssue> issues = mDocument.CheckScripts();
+      mDocument.Script() = kept;
+      mScriptMessage = "compiles";
+      mScriptErrorLine = 0;
+      for (const CheckIssue& issue : issues) {
+        if (issue.file == MapDisplayName(mDocument.Facts().scriptPath) || issue.file.find("_script.lua") != std::string::npos) {
+          mScriptMessage = "line " + std::to_string(issue.line) + ": " + issue.text;
+          mScriptErrorLine = issue.line;
+        }
+      }
+      gpg::Logf("editor: script check: %s", mScriptMessage.c_str());
+    }
+    if (!mScriptMessage.empty()) {
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextColored(mScriptErrorLine > 0 ? ImVec4(0.95f, 0.45f, 0.40f, 1.0f) : ImVec4(0.55f, 0.80f, 0.55f, 1.0f), "%s", mScriptMessage.c_str());
+      ImGui::PopTextWrapPos();
+    }
+    if (mScriptErrorLine > 0) {
+      // The line in question, under the buttons.
+      std::size_t start = 0;
+      for (int line = 1; line < mScriptErrorLine && start != std::string::npos; ++line) {
+        start = mScriptBuffer.find('\n', start);
+        start = start == std::string::npos ? start : start + 1;
+      }
+      if (start != std::string::npos) {
+        const std::size_t end = mScriptBuffer.find('\n', start);
+        ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "%d: %s", mScriptErrorLine,
+                           mScriptBuffer.substr(start, end == std::string::npos ? std::string::npos : end - start).c_str());
+      }
+    }
+    ImGui::InputTextMultiline("##script", mScriptBuffer.data(), mScriptBuffer.capacity() + 1, ImVec2(-1.0f, -1.0f),
+                              ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize, &GrowString, &mScriptBuffer);
     ImGui::End();
   }
 } // namespace faf::editor

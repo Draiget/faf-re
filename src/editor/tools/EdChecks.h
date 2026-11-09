@@ -25,7 +25,16 @@ namespace faf::editor
     std::string text;
     float x = 0.0f;
     float z = 0.0f;
+    /** For a script finding: the file (`_script.lua`...) and the line (0 when none). */
+    std::string file;
+    int line = 0;
   };
+
+  /**
+   * Splits a Lua compile error (`[string "x_script.lua"]:12: '=' expected near 'end'`, or `x_script.lua:12: ...`) into
+   * its line and message; false when it has no line.
+   */
+  bool ParseLuaError(const std::string& error, int& line, std::string& message);
 
   /** What the marker checks look at. */
   struct MarkerCheckInput

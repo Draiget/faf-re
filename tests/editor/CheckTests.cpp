@@ -46,6 +46,23 @@ namespace
     EXPECT_TRUE(faf::editor::CheckMarkers(input).empty());
   }
 
+  TEST(Check, LuaErrorsSplitIntoLineAndMessage)
+  {
+    int line = 0;
+    std::string message;
+    ASSERT_TRUE(faf::editor::ParseLuaError("[string \"seton_script.lua\"]:12: '=' expected near 'end'", line, message));
+    EXPECT_EQ(line, 12);
+    EXPECT_EQ(message, "'=' expected near 'end'");
+    ASSERT_TRUE(faf::editor::ParseLuaError("/maps/x/x_save.lua:3: unexpected symbol near ':'", line, message));
+    EXPECT_EQ(line, 3);
+    EXPECT_EQ(message, "unexpected symbol near ':'");
+    // As this engine's Lua writes them.
+    ASSERT_TRUE(faf::editor::ParseLuaError("SCMP_009_script.lua(10): <name> or `...' expected near `<eof>'", line, message));
+    EXPECT_EQ(line, 10);
+    EXPECT_EQ(message, "<name> or `...' expected near `<eof>'");
+    EXPECT_FALSE(faf::editor::ParseLuaError("not enough memory", line, message));
+  }
+
   TEST(Check, FindsEachKindOfProblem)
   {
     const std::vector<SaveEntry> markers = {
