@@ -2161,6 +2161,14 @@ void moho::WRenViewport::RenderWorldView(
     );
   }
 
+  // Unit-silhouette overlay, 0x007F95EC..0x007F9614: inside the world-view loop, for the first view only
+  // (`cmp ecx, [edx+4]` compares the loop's current view with the list's begin), with this view's camera
+  // ([ebp+219Ch], `mCam`) and the head the loop draws (`[esp+60h]`). The loop clears the camera after every view
+  // (0x007F970F), so the pass can't run after it.
+  if (moho::ren_UnitSilhouette && worldView == begin) {
+    mSilhouetteRenderer.Render(*mCam, head);
+  }
+
   // Per-view debug-canvas overlay pass. Binary (WRenViewport::Render
   // @0x007F90D0, 0x007F9639..0x007F96D3): resets the 2D draw origin to
   // local screen space unconditionally, then - only while a world session
@@ -2395,24 +2403,6 @@ void moho::WRenViewport::Render(const int head, fa::vector<SWorldViewInfo>& worl
       const gpg::gal::RenderProfileScope profileDrawUi("DrawUi");
       uiManager->DrawUI(mHead, mPrimBatcher.get());
     }
-  }
-
-  // Unit-silhouette overlay. Binary (WRenViewport::Render @0x007F90D0,
-  // 0x007F95EC..0x007F9614) calls it right after the UI prim-batcher pass:
-  //   lea ecx, [ebp+2134h]   -> &mSilhouetteRenderer
-  //   mov edi, [ebp+219Ch]   -> the camera
-  //   push eax               -> the render-target index
-  //
-  // The binary additionally requires `var_80 == [anonymous_4 + 4]` - a
-  // session-identity check between the world view being drawn and its STI map
-  // (the decompiler spells it `v72 == v74->mSTImap`). Both operands are
-  // per-iteration locals of the binary's world-view loop, and this pass sits
-  // at outer scope here, so that half of the guard is NOT modelled yet: the
-  // overlay currently draws whenever the tuning flag is on, which is a
-  // superset of the binary's condition. Resolve the two locals and tighten
-  // this before relying on the pass for anything but bring-up.
-  if (moho::ren_UnitSilhouette) {
-    mSilhouetteRenderer.Render(*mCam, mHead);
   }
 
   // Bloom post-process pass. Binary (the DoBloom call at 0x007F983A) gates it
