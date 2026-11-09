@@ -2,6 +2,7 @@
 
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskBrush.h"
+#include "editor/tools/EdMarkers.h"
 #include "editor/tools/EdTextureLibrary.h"
 
 #include <cmath>
@@ -62,6 +63,32 @@ namespace faf::editor
       mAreaChanged = false;
       area = mAreaChange;
       return true;
+    }
+
+    /** The Markers tool's type to place (an entry of MarkerTypes()). */
+    [[nodiscard]] const MarkerType& PlaceMarkerType() const noexcept { return MarkerTypes()[static_cast<std::size_t>(mMarkerType)]; }
+    /** The markers the view has selected (copies of their entries), for the properties panel. */
+    void SetMarkerSelection(std::vector<SaveEntry> selection) { mMarkerSelection = std::move(selection); }
+    /** A property of the selected marker the panel changed (`key` "name" renames it). */
+    [[nodiscard]] bool TakeMarkerEdit(std::string& marker, std::string& key, std::string& value)
+    {
+      if (mMarkerEditKey.empty()) {
+        return false;
+      }
+      marker = std::exchange(mMarkerEditName, {});
+      key = std::exchange(mMarkerEditKey, {});
+      value = std::exchange(mMarkerEditValue, {});
+      return true;
+    }
+    /** Test runs (`/markertool`): the Markers tool placing this type. */
+    void SetMarkerTool(const std::string& type) noexcept
+    {
+      mTool = 6;
+      for (std::size_t i = 0; i < MarkerTypes().size(); ++i) {
+        if (type == MarkerTypes()[i].type) {
+          mMarkerType = static_cast<int>(i);
+        }
+      }
     }
 
     /** How many objects the view has selected, for the Select tool's panel. */
@@ -344,6 +371,12 @@ namespace faf::editor
     bool mPropRandomTurn = true;
     char mPropFilter[64]{};
     int mSelectionCount = 0;
+    std::vector<SaveEntry> mMarkerSelection;
+    std::string mMarkerEditName;
+    std::string mMarkerEditKey;
+    std::string mMarkerEditValue;
+    char mMarkerEditBuffer[256]{};
+    std::string mMarkerEditing;
     std::optional<std::array<int, 4>> mArea;
     int mMapWidth = 0;
     int mMapHeight = 0;

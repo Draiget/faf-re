@@ -17,6 +17,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp
   tools/EdMaskBrush.cpp
+  tools/EdMarkers.cpp
   tools/EdTextureLibrary.cpp
   tools/EdSymmetryCheck.cpp
   undo/EdHeightHistory.cpp

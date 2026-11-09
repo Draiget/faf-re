@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -12,6 +13,7 @@
 #include "editor/doc/EdDocument.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "editor/tools/EdHeightBrush.h"
+#include "editor/tools/EdMarkers.h"
 
 namespace moho
 {
@@ -80,6 +82,13 @@ namespace faf::editor
 
     /** Changes one slot as the Tools panel asked, as one undo step. */
     void ChangeLayerSlot(int slot, const EdTools::LayerSlot& value);
+
+    /** The selected markers' entries, for the panel. */
+    [[nodiscard]] std::vector<SaveEntry> SelectedMarkers() const;
+    /** Changes a property of a marker ("name" renames it), as one undo step. */
+    void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
+    /** Places markers of the Markers tool's type at (x, z) and its symmetric copies, as one undo step. */
+    void PlaceMarkers(float x, float z);
 
     /** Sets or removes the playable area as one undo step. */
     void ChangePlayableArea(const std::optional<EdDocument::PlayableRect>& area);
@@ -187,6 +196,18 @@ namespace faf::editor
     void BuildOutsideQuads(const EdDocument::PlayableRect& area);
     /** A Markers-tool drag of the border's edges: which edges (bits: left, top, right, bottom), and the area before. */
     int mBorderEdges = 0;
+    /** The Markers tool: selected markers by name, a drag of them, and its start positions. */
+    std::vector<std::string> mMarkerSelection;
+    bool mDragMarkers = false;
+    bool mMarkersMoved = false;
+    float mMarkerDragFromX = 0.0f;
+    float mMarkerDragFromZ = 0.0f;
+    std::vector<std::array<float, 3>> mMarkerDragStart;
+    EdDocument::SaveSnapshot mMarkerBefore;
+    /** The marker nearest (x, z) within reach of the cursor, or -1. */
+    [[nodiscard]] int PickMarker(float x, float z) const;
+    void DeleteSelectedMarkers();
+    void DrawMarkers(moho::CD3DPrimBatcher& batcher, bool all);
     EdDocument::SaveSnapshot mBorderBefore;
     /** A size drag on one slot keeps adding to its undo step until something else happens. */
     bool mLayerDragJoin = false;

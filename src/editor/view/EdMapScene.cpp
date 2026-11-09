@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <functional>
+#include <map>
 #include <cstring>
 
 #include <windowsx.h>
@@ -69,7 +70,8 @@ namespace faf::editor
   {
     const std::optional<EdDocument::PlayableRect> area = mMap != nullptr ? mDocument.PlayableArea() : std::nullopt;
     if (mMap == nullptr || mCamera == nullptr || mTools == nullptr ||
-        (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty() && !area) ||
+        (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty() && !area &&
+         mDocument.SaveData().Markers().empty()) ||
         moho::ren_Viewport == nullptr) {
       return;
     }
@@ -217,6 +219,9 @@ namespace faf::editor
       border(x1, z1, x0, z1);
       border(x0, z1, x0, z0);
     }
+
+    // Markers: all of them with the Markers tool, the start positions and resources otherwise.
+    DrawMarkers(*batcher, mTools->MarkersToolActive());
 
     // The selected props, ringed in yellow.
     if (!mSelection.empty() && mMap->mProps != nullptr) {
@@ -1237,6 +1242,7 @@ namespace faf::editor
     mDocument.RestoreSaveData(redo ? step.second : step.first);
     to.push_back(std::move(step));
     mOutsideStale = true;
+    gpg::Logf("editor: %s a markers/areas edit: %zu markers", redo ? "redid" : "undid", mDocument.SaveData().Markers().size());
     return true;
   }
 
@@ -1306,6 +1312,197 @@ namespace faf::editor
         quad(x0, iz1, x1, z1);
         quad(x0, iz0, ix0, iz1);
         quad(ix1, iz0, x1, iz1);
+      }
+    }
+  }
+
+  int EdMapScene::PickMarker(const float x, const float z) const
+  {
+    const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    const float reach = std::max(2.5f, mDistance * 0.006f); // about the size the markers are drawn at
+    int best = -1;
+    float bestDistance = reach;
+    for (std::size_t i = 0; i < markers.size(); ++i) {
+      float mx = 0.0f, my = 0.0f, mz = 0.0f;
+      if (!MarkerPosition(markers[i], mx, my, mz)) {
+        continue;
+      }
+      const float d = std::hypot(mx - x, mz - z);
+      if (d < bestDistance) {
+        bestDistance = d;
+        best = static_cast<int>(i);
+      }
+    }
+    return best;
+  }
+
+  std::vector<SaveEntry> EdMapScene::SelectedMarkers() const
+  {
+    std::vector<SaveEntry> selected;
+    for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+      if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end()) {
+        selected.push_back(marker);
+      }
+    }
+    return selected;
+  }
+
+  void EdMapScene::EditMarker(const std::string& name, const std::string& key, const std::string& value)
+  {
+    std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    for (SaveEntry& marker : markers) {
+      if (marker.name != name) {
+        continue;
+      }
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      if (key == "name") {
+        // A free name only; links naming the marker follow it.
+        for (const SaveEntry& other : markers) {
+          if (other.name == value) {
+            gpg::Warnf("editor: a marker named %s already exists", value.c_str());
+            return;
+          }
+        }
+        for (SaveEntry& other : markers) {
+          std::vector<std::string> links = MarkerLinks(other);
+          if (std::find(links.begin(), links.end(), name) == links.end()) {
+            continue;
+          }
+          std::string joined;
+          for (const std::string& link : links) {
+            joined += (joined.empty() ? "" : " ") + (link == name ? value : link);
+          }
+          other.Set("adjacentTo", StringValue(joined));
+        }
+        marker.name = value;
+        std::replace(mMarkerSelection.begin(), mMarkerSelection.end(), name, value);
+      } else {
+        marker.Set(key, value);
+      }
+      mDocument.SaveDataEdited(std::move(before));
+      return;
+    }
+  }
+
+  void EdMapScene::PlaceMarkers(const float x, const float z)
+  {
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    if (mTools == nullptr || field == nullptr) {
+      return;
+    }
+    const MarkerType& type = mTools->PlaceMarkerType();
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies];
+    const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    mMarkerSelection.clear();
+    for (int c = 0; c < copies; ++c) {
+      if (centreX[c] < 0.0f || centreZ[c] < 0.0f || centreX[c] > static_cast<float>(field->width - 1) ||
+          centreZ[c] > static_cast<float>(field->height - 1)) {
+        continue;
+      }
+      // Marker positions as the game's saves place resources: on the half unit.
+      const float px = std::floor(centreX[c]) + 0.5f;
+      const float pz = std::floor(centreZ[c]) + 0.5f;
+      const float py = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(px), static_cast<std::int32_t>(pz));
+      SaveEntry marker = NewMarker(type, NextMarkerName(markers, type), px, py, pz);
+      mMarkerSelection.push_back(marker.name);
+      markers.push_back(std::move(marker));
+    }
+    if (!mMarkerSelection.empty()) {
+      mDocument.SaveDataEdited(std::move(before));
+      gpg::Logf("editor: %zu %s markers placed, %zu markers now", mMarkerSelection.size(), type.type, markers.size());
+    }
+  }
+
+  void EdMapScene::DeleteSelectedMarkers()
+  {
+    if (mMarkerSelection.empty()) {
+      return;
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    const std::size_t count = markers.size();
+    markers.erase(std::remove_if(markers.begin(), markers.end(),
+                                 [&](const SaveEntry& marker) {
+                                   return std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end();
+                                 }),
+                  markers.end());
+    mMarkerSelection.clear();
+    if (markers.size() != count) {
+      mDocument.SaveDataEdited(std::move(before));
+      gpg::Logf("editor: %zu markers deleted, %zu now", count - markers.size(), markers.size());
+    }
+  }
+
+  void EdMapScene::DrawMarkers(moho::CD3DPrimBatcher& batcher, const bool all)
+  {
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    if (field == nullptr || markers.empty()) {
+      return;
+    }
+    const auto vertex = [](const float x, const float y, const float z, const std::uint32_t color) {
+      moho::CD3DPrimBatcher::Vertex v{};
+      v.mX = x;
+      v.mY = y;
+      v.mZ = z;
+      v.mColor = color;
+      return v;
+    };
+    // Path nodes' links first, faint, each pair once.
+    if (all) {
+      std::map<std::string, std::array<float, 3>> positions;
+      for (const SaveEntry& marker : markers) {
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        if (MarkerPosition(marker, x, y, z)) {
+          positions[marker.name] = {x, y, z};
+        }
+      }
+      for (const SaveEntry& marker : markers) {
+        const auto from = positions.find(marker.name);
+        if (from == positions.end()) {
+          continue;
+        }
+        const std::uint32_t color = (MarkerColor(marker) & 0x00FFFFFFu) | 0x70000000u;
+        for (const std::string& link : MarkerLinks(marker)) {
+          const auto to = positions.find(link);
+          if (to != positions.end() && marker.name < link) {
+            batcher.DrawLine(vertex(from->second[0], from->second[1] + 2.0f, from->second[2], color),
+                             vertex(to->second[0], to->second[1] + 2.0f, to->second[2], color));
+          }
+        }
+      }
+    }
+    for (const SaveEntry& marker : markers) {
+      const std::string type = MarkerTypeOf(marker);
+      const bool start = type == "Blank Marker";
+      const bool resource = type == "Mass" || type == "Hydrocarbon";
+      if (!all && !start && !resource) {
+        continue;
+      }
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (!MarkerPosition(marker, x, y, z)) {
+        continue;
+      }
+      const std::uint32_t color = MarkerColor(marker);
+      const float r = start ? 5.0f : (type == "Hydrocarbon" ? 3.0f : 1.6f);
+      const float base = y + 0.5f;
+      // A diamond on the ground and a post above it.
+      batcher.DrawLine(vertex(x - r, base, z, color), vertex(x, base, z - r, color));
+      batcher.DrawLine(vertex(x, base, z - r, color), vertex(x + r, base, z, color));
+      batcher.DrawLine(vertex(x + r, base, z, color), vertex(x, base, z + r, color));
+      batcher.DrawLine(vertex(x, base, z + r, color), vertex(x - r, base, z, color));
+      batcher.DrawLine(vertex(x, base, z, color), vertex(x, base + (start ? 10.0f : 4.0f), z, color));
+      if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end()) {
+        constexpr std::uint32_t kSelected = 0xF0FFE040u;
+        for (int s = 0; s < 20; ++s) {
+          const float a0 = 2.0f * kPi * static_cast<float>(s) / 20.0f;
+          const float a1 = 2.0f * kPi * static_cast<float>(s + 1) / 20.0f;
+          batcher.DrawLine(vertex(x + std::cos(a0) * (r + 1.5f), base, z + std::sin(a0) * (r + 1.5f), kSelected),
+                           vertex(x + std::cos(a1) * (r + 1.5f), base, z + std::sin(a1) * (r + 1.5f), kSelected));
+        }
       }
     }
   }
@@ -1587,7 +1784,7 @@ namespace faf::editor
         float groundX = 0.0f;
         float groundZ = 0.0f;
         const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea();
-        if (!area || !GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+        if (!GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
           return true;
         }
         // The edges within reach of the cursor (a corner takes two).
@@ -1595,15 +1792,54 @@ namespace faf::editor
         const bool alongZ = groundZ > static_cast<float>(area->z0) - reach && groundZ < static_cast<float>(area->z1) + reach;
         const bool alongX = groundX > static_cast<float>(area->x0) - reach && groundX < static_cast<float>(area->x1) + reach;
         mBorderEdges = 0;
+        if (area) {
         mBorderEdges |= alongZ && std::fabs(groundX - static_cast<float>(area->x0)) < reach ? 1 : 0;
         mBorderEdges |= alongX && std::fabs(groundZ - static_cast<float>(area->z0)) < reach ? 2 : 0;
         mBorderEdges |= alongZ && std::fabs(groundX - static_cast<float>(area->x1)) < reach ? 4 : 0;
         mBorderEdges |= alongX && std::fabs(groundZ - static_cast<float>(area->z1)) < reach ? 8 : 0;
+        }
         if (mBorderEdges != 0) {
           mBorderBefore = mDocument.SaveDataNow();
           ::SetCapture(window);
           ::SetFocus(window);
+          return true;
         }
+        // Markers: pick, delete, or place.
+        const int hit = PickMarker(groundX, groundZ);
+        std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+        if (hit >= 0 && (wParam & MK_SHIFT) != 0) {
+          mMarkerSelection = {markers[static_cast<std::size_t>(hit)].name};
+          DeleteSelectedMarkers();
+          return true;
+        }
+        if (hit < 0) {
+          PlaceMarkers(groundX, groundZ);
+          return true;
+        }
+        const std::string& name = markers[static_cast<std::size_t>(hit)].name;
+        if ((wParam & MK_CONTROL) == 0 && std::find(mMarkerSelection.begin(), mMarkerSelection.end(), name) == mMarkerSelection.end()) {
+          mMarkerSelection.clear();
+        }
+        if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), name) == mMarkerSelection.end()) {
+          mMarkerSelection.push_back(name);
+        }
+        mDragMarkers = true;
+        mMarkersMoved = false;
+        mMarkerDragFromX = groundX;
+        mMarkerDragFromZ = groundZ;
+        mMarkerBefore = mDocument.SaveDataNow();
+        mMarkerDragStart.clear();
+        for (const std::string& selected : mMarkerSelection) {
+          std::array<float, 3> start{};
+          for (const SaveEntry& marker : markers) {
+            if (marker.name == selected) {
+              (void)MarkerPosition(marker, start[0], start[1], start[2]);
+            }
+          }
+          mMarkerDragStart.push_back(start);
+        }
+        ::SetCapture(window);
+        ::SetFocus(window);
         return true;
       }
       if (mTools != nullptr && (mTools->SelectToolActive() || mTools->PropsToolActive())) {
@@ -1681,6 +1917,15 @@ namespace faf::editor
       return true;
     }
     case WM_LBUTTONUP:
+      if (mDragMarkers) {
+        mDragMarkers = false;
+        ::ReleaseCapture();
+        if (mMarkersMoved) {
+          mDocument.SaveDataEdited(std::move(mMarkerBefore));
+        }
+        mMarkerBefore = {};
+        return true;
+      }
       if (mBorderEdges != 0) {
         mBorderEdges = 0;
         ::ReleaseCapture();
@@ -1726,7 +1971,27 @@ namespace faf::editor
       return true;
     case WM_MOUSEMOVE: {
       if (mDrag == Drag::None) {
-        if (mBorderEdges != 0) {
+        if (mDragMarkers) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ) &&
+            std::hypot(groundX - mMarkerDragFromX, groundZ - mMarkerDragFromZ) > 0.05f) {
+          std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+          for (std::size_t i = 0; i < mMarkerSelection.size() && i < mMarkerDragStart.size(); ++i) {
+            const float x = mMarkerDragStart[i][0] + groundX - mMarkerDragFromX;
+            const float z = mMarkerDragStart[i][2] + groundZ - mMarkerDragFromZ;
+            const float y = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z));
+            for (SaveEntry& marker : markers) {
+              if (marker.name == mMarkerSelection[i]) {
+                marker.Set("position", Vector3Value(x, y, z));
+              }
+            }
+          }
+          mMarkersMoved = true;
+        }
+        return true;
+      }
+      if (mBorderEdges != 0) {
         float groundX = 0.0f;
         float groundZ = 0.0f;
         std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea();
@@ -1816,6 +2081,10 @@ namespace faf::editor
         return true;
       }
       mFast = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
+      if (down && wParam == VK_DELETE && mTools != nullptr && mTools->MarkersToolActive() && !mMarkerSelection.empty()) {
+        DeleteSelectedMarkers();
+        return true;
+      }
       if (down && mTools != nullptr && mTools->SelectToolActive() && !mSelection.empty()) {
         if (wParam == VK_DELETE) {
           DeleteSelection();

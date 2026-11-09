@@ -326,6 +326,7 @@ namespace faf::editor
       // `/shader <name>` with `/open` (test runs): the map's terrain shader changed once it is shown.
       std::string mShaderArg;
       std::string mPlayableAreaArg;
+      std::string mMarkerToolArg;
       // `/proptool <mode>,<blueprint>` and `/tool <index>` (test runs).
       std::string mPropToolArg;
       int mToolArg = -1;
@@ -708,6 +709,9 @@ namespace faf::editor
       if (fa::vector<fa::string> tool; moho::CFG_GetArgOption("/tool", 1, &tool) && !tool.empty()) {
         mToolArg = std::atoi(tool[0].c_str());
       }
+      if (fa::vector<fa::string> type; moho::CFG_GetArgOption("/markertool", 1, &type) && !type.empty()) {
+        mMarkerToolArg = type[0].c_str();
+      }
       if (fa::vector<fa::string> area; moho::CFG_GetArgOption("/playablearea", 1, &area) && !area.empty()) {
         mPlayableAreaArg = area[0].c_str();
       }
@@ -853,6 +857,15 @@ namespace faf::editor
           mScene.ChangeLayerSlot(slot, value);
         }
         tools.SetLayerSlots(mScene.LayerSlots());
+        tools.SetMarkerSelection(mScene.SelectedMarkers());
+        if (std::string marker, key, value; tools.TakeMarkerEdit(marker, key, value)) {
+          mScene.EditMarker(marker, key, value);
+        }
+        if (!mMarkerToolArg.empty()) {
+          // `/markertool <type>` (test runs).
+          tools.SetMarkerTool(mMarkerToolArg);
+          mMarkerToolArg.clear();
+        }
         // The playable area: the panel shows it and asks for changes; `/playablearea x0,z0,x1,z1` (or `none`) for test runs.
         if (const moho::CHeightField* const field = mDocument.Map()->mTerrainRes->GetHeightField(); field != nullptr) {
           const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea();

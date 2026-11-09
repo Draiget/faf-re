@@ -855,10 +855,66 @@ namespace faf::editor
 
   void EdTools::DrawMarkers()
   {
+    SectionHeader("PLACE");
+    const std::vector<MarkerType>& types = MarkerTypes();
+    mMarkerType = std::clamp(mMarkerType, 0, static_cast<int>(types.size()) - 1);
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::BeginCombo("##markertype", types[static_cast<std::size_t>(mMarkerType)].type)) {
+      std::string group;
+      for (std::size_t i = 0; i < types.size(); ++i) {
+        if (group != types[i].group) {
+          group = types[i].group;
+          ImGui::SeparatorText(group.c_str());
+        }
+        if (ImGui::Selectable(types[i].type, static_cast<int>(i) == mMarkerType)) {
+          mMarkerType = static_cast<int>(i);
+        }
+      }
+      ImGui::EndCombo();
+    }
+    Note("Click the ground to place one (with its symmetric copies), click a marker to select it (Ctrl adds), drag to move, "
+         "Shift+click or Delete removes. Start positions are named ARMY_1, ARMY_2... (the scenario's army list is edited with the armies).");
+    DrawSymmetry(false);
+
+    SectionHeader("SELECTED");
+    if (mMarkerSelection.empty()) {
+      Note("No marker selected.");
+    } else if (mMarkerSelection.size() > 1) {
+      char count[48];
+      (void)std::snprintf(count, sizeof(count), "%zu markers selected", mMarkerSelection.size());
+      ImGui::TextUnformatted(count);
+    } else {
+      const SaveEntry& marker = mMarkerSelection.front();
+      // The name, then each property's value as the save writes it; Enter applies a change.
+      const auto field = [&](const std::string& key, const std::string& value) {
+        ImGui::PushID(key.c_str());
+        ImGui::TextDisabled("%s", key.c_str());
+        ImGui::SameLine(90.0f);
+        const std::string id = marker.name + "/" + key;
+        if (mMarkerEditing != id) {
+          (void)std::snprintf(mMarkerEditBuffer, sizeof(mMarkerEditBuffer), "%s", value.c_str());
+        }
+        ImGui::SetNextItemWidth(-1.0f);
+        char buffer[256];
+        (void)std::snprintf(buffer, sizeof(buffer), "%s", mMarkerEditing == id ? mMarkerEditBuffer : value.c_str());
+        if (ImGui::InputText("##value", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
+          mMarkerEditName = marker.name;
+          mMarkerEditKey = key;
+          mMarkerEditValue = buffer;
+          mMarkerEditing.clear();
+        } else if (ImGui::IsItemActive()) {
+          mMarkerEditing = id;
+          (void)std::snprintf(mMarkerEditBuffer, sizeof(mMarkerEditBuffer), "%s", buffer);
+        } else if (mMarkerEditing == id) {
+          mMarkerEditing.clear();
+        }
+        ImGui::PopID();
+      };
+      field("name", marker.name);
+      for (const auto& [key, value] : marker.properties) {
+        field(key, value);
+      }
+    }
     DrawPlayableArea();
-    static const char* const kTypes[] = {"Mass", "Hydro", "Start"};
-    Segmented(kTypes, 3, mMarkerType);
-    DrawSymmetry();
-    Note("Markers in _save.lua come in stage 6.");
   }
 } // namespace faf::editor
