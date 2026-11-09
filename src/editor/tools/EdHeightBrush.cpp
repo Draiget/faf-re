@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <type_traits>
+#include <utility>
 
 namespace faf::editor
 {
@@ -13,24 +15,26 @@ namespace faf::editor
     // Smooth and Flatten at full strength close this share of the gap each second (capped at all of it).
     constexpr float kBlendPerSecond = 8.0f;
     constexpr float kWordsPerUnit = 128.0f;
+    constexpr double kTwoPi = 6.283185307179586;
+    // N-way turns: copies are written this many samples past the brush's edge, since the heights a copy
+    // reads between samples (and their own turned-back samples) reach that far.
+    constexpr float kTurnRim = 2.0f;
 
     [[nodiscard]] bool NeedsSquare(const Symmetry symmetry)
     {
-      return symmetry == Symmetry::DiagonalBack || symmetry == Symmetry::DiagonalForward ||
-             symmetry == Symmetry::BothDiagonals || symmetry == Symmetry::QuarterTurns;
+      return symmetry == Symmetry::DiagonalBack || symmetry == Symmetry::DiagonalForward || symmetry == Symmetry::BothDiagonals ||
+             symmetry == Symmetry::QuarterTurns || symmetry == Symmetry::NWay;
     }
 
-    [[nodiscard]] Symmetry Effective(const Symmetry symmetry, const int width, const int height)
+    [[nodiscard]] int Turns(const int turns)
     {
-      if (symmetry == Symmetry::NWay || (NeedsSquare(symmetry) && width != height)) {
-        return Symmetry::None;
-      }
-      return symmetry;
+      return std::clamp(turns, 2, kMaxSymmetryCopies);
     }
 
     /** The copies of a point under `symmetry`, for samples (T int) and for the brush's centre (T float). */
     template <typename T>
-    int Copies(const Symmetry symmetry, const T w, const T h, const T x, const T z, T (&outX)[4], T (&outZ)[4])
+    int Copies(const Symmetry symmetry, const int turns, const T w, const T h, const T x, const T z, T (&outX)[kMaxSymmetryCopies],
+               T (&outZ)[kMaxSymmetryCopies])
     {
       int n = 0;
       const auto add = [&](const T cx, const T cz) {
@@ -70,6 +74,24 @@ namespace faf::editor
         add(w - x, w - z);
         add(z, w - x);
         break;
+      case Symmetry::NWay: {
+        const double cx = static_cast<double>(w) * 0.5;
+        const double cz = static_cast<double>(h) * 0.5;
+        const double dx = static_cast<double>(x) - cx;
+        const double dz = static_cast<double>(z) - cz;
+        const int count = Turns(turns);
+        for (int k = 1; k < count; ++k) {
+          const double angle = kTwoPi * k / count;
+          const double rx = cx + dx * std::cos(angle) - dz * std::sin(angle);
+          const double rz = cz + dx * std::sin(angle) + dz * std::cos(angle);
+          if constexpr (std::is_integral_v<T>) {
+            add(static_cast<T>(std::lround(rx)), static_cast<T>(std::lround(rz)));
+          } else {
+            add(static_cast<T>(rx), static_cast<T>(rz));
+          }
+        }
+        break;
+      }
       default:
         break;
       }
@@ -104,71 +126,27 @@ namespace faf::editor
     {
       return x >= rect.x0 && x <= rect.x1 && z >= rect.z0 && z <= rect.z1;
     }
-  } // namespace
 
-  int SymmetricSamples(const Symmetry symmetry, const int width, const int height, const int x, const int z, int (&outX)[4],
-                       int (&outZ)[4])
-  {
-    return Copies<int>(Effective(symmetry, width, height), width - 1, height - 1, x, z, outX, outZ);
-  }
-
-  int HeightBrushCentres(const int width, const int height, const float x, const float z, const Symmetry symmetry, float (&outX)[4],
-                         float (&outZ)[4])
-  {
-    return Copies<float>(Effective(symmetry, width, height), static_cast<float>(width - 1), static_cast<float>(height - 1), x, z, outX,
-                         outZ);
-  }
-
-  std::vector<SampleRect> HeightBrushRects(const int width, const int height, const float x, const float z, const HeightBrush& brush)
-  {
-    std::vector<SampleRect> rects;
-    if (width < 2 || height < 2 || brush.radius <= 0.0f) {
+    /** The rectangle each centre's brush covers, clipped to the map; empty ones left out. */
+    std::vector<SampleRect> RectsAround(const int width, const int height, const float (&centreX)[kMaxSymmetryCopies],
+                                        const float (&centreZ)[kMaxSymmetryCopies], const int centres, const float radius)
+    {
+      std::vector<SampleRect> rects;
+      for (int i = 0; i < centres; ++i) {
+        SampleRect rect{
+          std::max(0, static_cast<int>(std::floor(centreX[i] - radius))),
+          std::max(0, static_cast<int>(std::floor(centreZ[i] - radius))),
+          std::min(width - 1, static_cast<int>(std::ceil(centreX[i] + radius))),
+          std::min(height - 1, static_cast<int>(std::ceil(centreZ[i] + radius))),
+        };
+        if (rect.x0 <= rect.x1 && rect.z0 <= rect.z1) {
+          rects.push_back(rect);
+        }
+      }
       return rects;
     }
-    const Symmetry symmetry = Effective(brush.symmetry, width, height);
-    float centreX[4];
-    float centreZ[4];
-    const int centres = Copies<float>(symmetry, static_cast<float>(width - 1), static_cast<float>(height - 1), x, z, centreX, centreZ);
-    for (int i = 0; i < centres; ++i) {
-      SampleRect rect{
-        std::max(0, static_cast<int>(std::floor(centreX[i] - brush.radius))),
-        std::max(0, static_cast<int>(std::floor(centreZ[i] - brush.radius))),
-        std::min(width - 1, static_cast<int>(std::ceil(centreX[i] + brush.radius))),
-        std::min(height - 1, static_cast<int>(std::ceil(centreZ[i] + brush.radius))),
-      };
-      if (rect.x0 <= rect.x1 && rect.z0 <= rect.z1) {
-        rects.push_back(rect);
-      }
-    }
-    return rects;
-  }
 
-  std::vector<SampleRect> ApplyHeightBrush(std::uint16_t* const heights, const int width, const int height, const float x,
-                                           const float z, const HeightBrush& brush, const float seconds)
-  {
-    if (heights == nullptr || width < 2 || height < 2 || brush.radius <= 0.0f || seconds <= 0.0f) {
-      return {};
-    }
-    const Symmetry symmetry = Effective(brush.symmetry, width, height);
-
-    // The brush's copies and the rectangle each one covers.
-    float centreX[4];
-    float centreZ[4];
-    const int centres = Copies<float>(symmetry, static_cast<float>(width - 1), static_cast<float>(height - 1), x, z, centreX, centreZ);
-    std::vector<SampleRect> rects;
-    for (int i = 0; i < centres; ++i) {
-      SampleRect rect{
-        std::max(0, static_cast<int>(std::floor(centreX[i] - brush.radius))),
-        std::max(0, static_cast<int>(std::floor(centreZ[i] - brush.radius))),
-        std::min(width - 1, static_cast<int>(std::ceil(centreX[i] + brush.radius))),
-        std::min(height - 1, static_cast<int>(std::ceil(centreZ[i] + brush.radius))),
-      };
-      if (rect.x0 <= rect.x1 && rect.z0 <= rect.z1) {
-        rects.push_back(rect);
-      }
-    }
-
-    // Smooth reads its neighbours as they were before this step, from a copy of each rectangle plus one sample.
+    /** A copy of a rectangle of heights plus one sample around it, read as they were before a step. */
     struct Snapshot
     {
       SampleRect area;
@@ -180,79 +158,254 @@ namespace faf::editor
         return words[static_cast<std::size_t>((cz - area.z0) * (area.x1 - area.x0 + 1) + (cx - area.x0))];
       }
     };
-    std::vector<Snapshot> snapshots;
-    snapshots.reserve(rects.size());
-    for (const SampleRect& rect : rects) {
-      Snapshot snapshot;
-      snapshot.area = {std::max(0, rect.x0 - 1), std::max(0, rect.z0 - 1), std::min(width - 1, rect.x1 + 1), std::min(height - 1, rect.z1 + 1)};
-      for (int sz = snapshot.area.z0; sz <= snapshot.area.z1; ++sz) {
-        const std::uint16_t* const row = heights + static_cast<std::size_t>(sz) * static_cast<std::size_t>(width);
-        snapshot.words.insert(snapshot.words.end(), row + snapshot.area.x0, row + snapshot.area.x1 + 1);
+
+    std::vector<Snapshot> TakeSnapshots(const std::uint16_t* const heights, const int width, const int height,
+                                        const std::vector<SampleRect>& rects)
+    {
+      std::vector<Snapshot> snapshots;
+      snapshots.reserve(rects.size());
+      for (const SampleRect& rect : rects) {
+        Snapshot snapshot;
+        snapshot.area = {std::max(0, rect.x0 - 1), std::max(0, rect.z0 - 1), std::min(width - 1, rect.x1 + 1), std::min(height - 1, rect.z1 + 1)};
+        for (int sz = snapshot.area.z0; sz <= snapshot.area.z1; ++sz) {
+          const std::uint16_t* const row = heights + static_cast<std::size_t>(sz) * static_cast<std::size_t>(width);
+          snapshot.words.insert(snapshot.words.end(), row + snapshot.area.x0, row + snapshot.area.x1 + 1);
+        }
+        snapshots.push_back(std::move(snapshot));
       }
-      snapshots.push_back(std::move(snapshot));
+      return snapshots;
     }
 
-    const float strength = std::clamp(brush.strength, 0.0f, 1.0f);
-    const float blend = std::min(1.0f, strength * kBlendPerSecond * seconds);
+    /** The brush's new height for one sample, from the heights before the step. */
+    [[nodiscard]] float BrushedHeight(const Snapshot& snapshot, const int sx, const int sz, const float weight, const HeightBrush& brush,
+                                      const float seconds)
+    {
+      const float strength = std::clamp(brush.strength, 0.0f, 1.0f);
+      const float blend = std::min(1.0f, strength * kBlendPerSecond * seconds);
+      const float current = snapshot.At(sx, sz);
+      switch (brush.mode) {
+      case HeightBrushMode::Raise:
+        return current + weight * strength * kRaiseUnitsPerSecond * kWordsPerUnit * seconds;
+      case HeightBrushMode::Lower:
+        return current - weight * strength * kRaiseUnitsPerSecond * kWordsPerUnit * seconds;
+      case HeightBrushMode::Smooth: {
+        float sum = 0.0f;
+        for (int dz = -1; dz <= 1; ++dz) {
+          for (int dx = -1; dx <= 1; ++dx) {
+            sum += snapshot.At(sx + dx, sz + dz);
+          }
+        }
+        return current + (sum / 9.0f - current) * blend * weight;
+      }
+      case HeightBrushMode::Flatten:
+        return current + (brush.flattenTo - current) * blend * weight;
+      case HeightBrushMode::Noise:
+        return current + SampleNoise(sx, sz) * weight * strength * kNoiseUnitsPerSecond * kWordsPerUnit * seconds;
+      }
+      return current;
+    }
+
+    [[nodiscard]] std::uint16_t ToWord(const float value)
+    {
+      return static_cast<std::uint16_t>(std::lround(std::clamp(value, 0.0f, 65535.0f)));
+    }
+
+    [[nodiscard]] float StrongestWeight(const int sx, const int sz, const float (&centreX)[kMaxSymmetryCopies],
+                                        const float (&centreZ)[kMaxSymmetryCopies], const int centres, const HeightBrush& brush)
+    {
+      float weight = 0.0f;
+      for (int c = 0; c < centres; ++c) {
+        weight = std::max(weight, Weight(std::hypot(static_cast<float>(sx) - centreX[c], static_cast<float>(sz) - centreZ[c]), brush));
+      }
+      return weight;
+    }
+
+    /** True if the sample is within `reach` of a centre. */
+    [[nodiscard]] bool NearACentre(const int sx, const int sz, const float (&centreX)[kMaxSymmetryCopies],
+                                   const float (&centreZ)[kMaxSymmetryCopies], const int centres, const float reach)
+    {
+      for (int c = 0; c < centres; ++c) {
+        if (std::hypot(static_cast<float>(sx) - centreX[c], static_cast<float>(sz) - centreZ[c]) < reach) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /** True if no rectangle before `r` holds the sample (each sample is handled once). */
+    [[nodiscard]] bool FirstRectHolding(const std::vector<SampleRect>& rects, const std::size_t r, const int sx, const int sz)
+    {
+      for (std::size_t e = 0; e < r; ++e) {
+        if (Contains(rects[e], sx, sz)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    /** N-way turns: see ApplyHeightBrush. */
+    void ApplyTurned(std::uint16_t* const heights, const int width, const int height, const std::vector<SampleRect>& rects,
+                     const float (&centreX)[kMaxSymmetryCopies], const float (&centreZ)[kMaxSymmetryCopies], const int centres,
+                     const HeightBrush& brush, const float seconds)
+    {
+      // The first sector, painted with the brush from the heights before the step.
+      const std::vector<Snapshot> snapshots = TakeSnapshots(heights, width, height, rects);
+      for (std::size_t r = 0; r < rects.size(); ++r) {
+        const SampleRect& rect = rects[r];
+        for (int sz = rect.z0; sz <= rect.z1; ++sz) {
+          for (int sx = rect.x0; sx <= rect.x1; ++sx) {
+            if (TurnSector(width, height, brush.turns, sx, sz) != 0 || !FirstRectHolding(rects, r, sx, sz)) {
+              continue;
+            }
+            const float weight = StrongestWeight(sx, sz, centreX, centreZ, centres, brush);
+            if (weight > 0.0f) {
+              heights[static_cast<std::size_t>(sz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(sx)] =
+                ToWord(BrushedHeight(snapshots[r], sx, sz, weight, brush, seconds));
+            }
+          }
+        }
+      }
+
+      // Every other sample the brush covers copies the first sector; TurnedHeight reads only the first
+      // sector, which this pass doesn't write.
+      for (std::size_t r = 0; r < rects.size(); ++r) {
+        const SampleRect& rect = rects[r];
+        for (int sz = rect.z0; sz <= rect.z1; ++sz) {
+          for (int sx = rect.x0; sx <= rect.x1; ++sx) {
+            double value = 0.0;
+            if (TurnSector(width, height, brush.turns, sx, sz) == 0 || !FirstRectHolding(rects, r, sx, sz) ||
+                !NearACentre(sx, sz, centreX, centreZ, centres, brush.radius + kTurnRim) ||
+                !TurnedHeight(heights, width, height, brush.turns, sx, sz, value)) {
+              continue;
+            }
+            heights[static_cast<std::size_t>(sz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(sx)] =
+              ToWord(static_cast<float>(value));
+          }
+        }
+      }
+    }
+  } // namespace
+
+  int TurnSector(const int width, const int height, const int turns, const int x, const int z)
+  {
+    const int count = Turns(turns);
+    double angle = std::atan2(z - (height - 1) * 0.5, x - (width - 1) * 0.5);
+    if (angle < 0.0) {
+      angle += kTwoPi;
+    }
+    return std::min(count - 1, static_cast<int>(angle / (kTwoPi / count)));
+  }
+
+  bool TurnedHeight(const std::uint16_t* const heights, const int width, const int height, const int turns, const int x, const int z,
+                    double& value)
+  {
+    const int count = Turns(turns);
+    const double cx = (width - 1) * 0.5;
+    const double cz = (height - 1) * 0.5;
+    // A point turned back by the sector of sample (sx, sz).
+    const auto turnBack = [&](const int sx, const int sz, const double px, const double pz, double& outX, double& outZ) {
+      const double back = -kTwoPi * TurnSector(width, height, count, sx, sz) / count;
+      outX = cx + (px - cx) * std::cos(back) - (pz - cz) * std::sin(back);
+      outZ = cz + (px - cx) * std::sin(back) + (pz - cz) * std::cos(back);
+    };
+    double px = 0.0;
+    double pz = 0.0;
+    turnBack(x, z, x, z, px, pz);
+    if (px < 0.0 || pz < 0.0 || px > width - 1 || pz > height - 1) {
+      return false;
+    }
+    const int x0 = std::min(width - 2, static_cast<int>(px));
+    const int z0 = std::min(height - 2, static_cast<int>(pz));
+    const double fx = px - x0;
+    const double fz = pz - z0;
+    const auto at = [&](const int ax, const int az) {
+      int sx = ax;
+      int sz = az;
+      if (TurnSector(width, height, count, ax, az) != 0) {
+        // Outside the first sector: its own turned-back sample.
+        double bx = 0.0;
+        double bz = 0.0;
+        turnBack(ax, az, ax, az, bx, bz);
+        sx = std::clamp(static_cast<int>(std::lround(bx)), 0, width - 1);
+        sz = std::clamp(static_cast<int>(std::lround(bz)), 0, height - 1);
+      }
+      return static_cast<double>(heights[static_cast<std::size_t>(sz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(sx)]);
+    };
+    value = (at(x0, z0) * (1.0 - fx) + at(x0 + 1, z0) * fx) * (1.0 - fz) + (at(x0, z0 + 1) * (1.0 - fx) + at(x0 + 1, z0 + 1) * fx) * fz;
+    return true;
+  }
+
+  Symmetry EffectiveSymmetry(const Symmetry symmetry, const int width, const int height)
+  {
+    return NeedsSquare(symmetry) && width != height ? Symmetry::None : symmetry;
+  }
+
+  int SymmetricSamples(const Symmetry symmetry, const int turns, const int width, const int height, const int x, const int z,
+                       int (&outX)[kMaxSymmetryCopies], int (&outZ)[kMaxSymmetryCopies])
+  {
+    return Copies<int>(EffectiveSymmetry(symmetry, width, height), turns, width - 1, height - 1, x, z, outX, outZ);
+  }
+
+  int HeightBrushCentres(const int width, const int height, const float x, const float z, const Symmetry symmetry, const int turns,
+                         float (&outX)[kMaxSymmetryCopies], float (&outZ)[kMaxSymmetryCopies])
+  {
+    return Copies<float>(EffectiveSymmetry(symmetry, width, height), turns, static_cast<float>(width - 1), static_cast<float>(height - 1), x,
+                         z, outX, outZ);
+  }
+
+  std::vector<SampleRect> HeightBrushRects(const int width, const int height, const float x, const float z, const HeightBrush& brush)
+  {
+    if (width < 2 || height < 2 || brush.radius <= 0.0f) {
+      return {};
+    }
+    float centreX[kMaxSymmetryCopies];
+    float centreZ[kMaxSymmetryCopies];
+    const int centres = HeightBrushCentres(width, height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
+    const bool turned = EffectiveSymmetry(brush.symmetry, width, height) == Symmetry::NWay;
+    return RectsAround(width, height, centreX, centreZ, centres, brush.radius + (turned ? kTurnRim : 0.0f));
+  }
+
+  std::vector<SampleRect> ApplyHeightBrush(std::uint16_t* const heights, const int width, const int height, const float x,
+                                           const float z, const HeightBrush& brush, const float seconds)
+  {
+    if (heights == nullptr || width < 2 || height < 2 || brush.radius <= 0.0f || seconds <= 0.0f) {
+      return {};
+    }
+    const Symmetry symmetry = EffectiveSymmetry(brush.symmetry, width, height);
+
+    // The brush's copies and the rectangle each one covers.
+    float centreX[kMaxSymmetryCopies];
+    float centreZ[kMaxSymmetryCopies];
+    const int centres = HeightBrushCentres(width, height, x, z, symmetry, brush.turns, centreX, centreZ);
+    const std::vector<SampleRect> rects =
+      RectsAround(width, height, centreX, centreZ, centres, brush.radius + (symmetry == Symmetry::NWay ? kTurnRim : 0.0f));
+    if (symmetry == Symmetry::NWay) {
+      ApplyTurned(heights, width, height, rects, centreX, centreZ, centres, brush, seconds);
+      return rects;
+    }
+
+    // Smooth reads its neighbours as they were before this step.
+    const std::vector<Snapshot> snapshots = TakeSnapshots(heights, width, height, rects);
     for (std::size_t r = 0; r < rects.size(); ++r) {
       const SampleRect& rect = rects[r];
-      const Snapshot& snapshot = snapshots[r];
       for (int sz = rect.z0; sz <= rect.z1; ++sz) {
         for (int sx = rect.x0; sx <= rect.x1; ++sx) {
           // Each group once: from its first member, and from the first rectangle that holds it.
-          int memberX[4];
-          int memberZ[4];
-          const int members = Copies<int>(symmetry, width - 1, height - 1, sx, sz, memberX, memberZ);
+          int memberX[kMaxSymmetryCopies];
+          int memberZ[kMaxSymmetryCopies];
+          const int members = Copies<int>(symmetry, brush.turns, width - 1, height - 1, sx, sz, memberX, memberZ);
           bool first = true;
           for (int m = 1; m < members && first; ++m) {
             first = memberZ[m] > sz || (memberZ[m] == sz && memberX[m] >= sx);
           }
-          if (!first) {
+          if (!first || !FirstRectHolding(rects, r, sx, sz)) {
             continue;
           }
-          bool earlier = false;
-          for (std::size_t e = 0; e < r && !earlier; ++e) {
-            earlier = Contains(rects[e], sx, sz);
-          }
-          if (earlier) {
-            continue;
-          }
-
-          float weight = 0.0f;
-          for (int c = 0; c < centres; ++c) {
-            weight = std::max(weight, Weight(std::hypot(static_cast<float>(sx) - centreX[c], static_cast<float>(sz) - centreZ[c]), brush));
-          }
+          const float weight = StrongestWeight(sx, sz, centreX, centreZ, centres, brush);
           if (weight <= 0.0f) {
             continue;
           }
-
-          const float current = snapshot.At(sx, sz);
-          float next = current;
-          switch (brush.mode) {
-          case HeightBrushMode::Raise:
-            next = current + weight * strength * kRaiseUnitsPerSecond * kWordsPerUnit * seconds;
-            break;
-          case HeightBrushMode::Lower:
-            next = current - weight * strength * kRaiseUnitsPerSecond * kWordsPerUnit * seconds;
-            break;
-          case HeightBrushMode::Smooth: {
-            float sum = 0.0f;
-            for (int dz = -1; dz <= 1; ++dz) {
-              for (int dx = -1; dx <= 1; ++dx) {
-                sum += snapshot.At(sx + dx, sz + dz);
-              }
-            }
-            next = current + (sum / 9.0f - current) * blend * weight;
-            break;
-          }
-          case HeightBrushMode::Flatten:
-            next = current + (brush.flattenTo - current) * blend * weight;
-            break;
-          case HeightBrushMode::Noise:
-            next = current + SampleNoise(sx, sz) * weight * strength * kNoiseUnitsPerSecond * kWordsPerUnit * seconds;
-            break;
-          }
-          const auto word = static_cast<std::uint16_t>(std::lround(std::clamp(next, 0.0f, 65535.0f)));
+          const std::uint16_t word = ToWord(BrushedHeight(snapshots[r], sx, sz, weight, brush, seconds));
           for (int m = 0; m < members; ++m) {
             heights[static_cast<std::size_t>(memberZ[m]) * static_cast<std::size_t>(width) + static_cast<std::size_t>(memberX[m])] = word;
           }

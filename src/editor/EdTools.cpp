@@ -290,12 +290,52 @@ namespace faf::editor
       ImGui::SliderInt("##nway", &mNWay, 3, 8, "Copies %d");
     }
     const int copies = mSymmetry == 9 ? mNWay : kSymmetry[mSymmetry].copies;
-    char note[200];
-    (void)std::snprintf(note, sizeof(note),
-                        "Every edit is written to all %d copies. Where copies overlap, each vertex takes the strongest copy, "
-                        "so the halves stay identical.",
-                        copies);
+    char note[300];
+    if (mSymmetry == 9) {
+      (void)std::snprintf(note, sizeof(note),
+                          "Every edit is written to all %d copies: the first sector (from the centre towards the right, turning down) "
+                          "is painted, the others copy it. Turns other than 4 fall between vertices, so their copies are "
+                          "close, not identical; the check shows by how much.",
+                          copies);
+    } else {
+      (void)std::snprintf(note, sizeof(note),
+                          "Every edit is written to all %d copies. Where copies overlap, each vertex takes the strongest copy, "
+                          "so the halves stay identical.",
+                          copies);
+    }
     Note(note);
+
+    SectionHeader("SYMMETRY CHECK");
+    if (mSymmetry == 0) {
+      Note("Pick a symmetry to check the map against it.");
+      return;
+    }
+    if (ImGui::Button("Check")) {
+      mCheckRequested = true;
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Show differences", &mShowDifferences);
+    if (!CheckIsCurrent()) {
+      Note("Compares every vertex with its copies; differing ones are marked red on the terrain.");
+      return;
+    }
+    const float largest = static_cast<float>(mLargest) / 128.0f;
+    char result[200];
+    if (mDiffering == 0) {
+      (void)std::snprintf(result, sizeof(result), "All %d vertices match their copies (largest difference %.2f).", mChecked,
+                          static_cast<double>(largest));
+    } else {
+      (void)std::snprintf(result, sizeof(result), "%d of %d vertices differ from a copy, by up to %.2f.", mDiffering, mChecked,
+                          static_cast<double>(largest));
+    }
+    ImGui::TextWrapped("%s", result);
+    if (mDiffering > 0) {
+      if (ImGui::Button("Copy the source part to the other copies")) {
+        mRepairRequested = true;
+      }
+      Note(mSymmetry == 9 ? "The source part is the first sector. One undo step."
+                          : "The source part is the top or left one (the copy nearest the map's top-left corner). One undo step.");
+    }
   }
 
   void EdTools::DrawSelect()

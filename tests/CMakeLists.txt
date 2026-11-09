@@ -333,9 +333,10 @@ set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 include(FafTests)
 faf_add_tests_target("${CMAKE_CURRENT_SOURCE_DIR}")
 
-# The map editor height brush and its undo (src/editor/tools, src/editor/undo): exact symmetry, byte-exact undo.
-add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.cpp editor/HeightHistoryTests.cpp
-  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
+# The map editor height brush, symmetry check and undo (src/editor/tools, src/editor/undo): exact symmetry, byte-exact undo.
+add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.cpp editor/HeightHistoryTests.cpp editor/SymmetryCheckTests.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
 target_include_directories(faf_editor_brush_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main)
 set_target_properties(faf_editor_brush_tests PROPERTIES FOLDER "Tests/Editor")

@@ -8,6 +8,7 @@
 #include "editor/EdTools.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/tools/EdHeightBrush.h"
+#include "editor/tools/EdSymmetryCheck.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/mesh/Mesh.h"
@@ -139,8 +140,36 @@ namespace faf::editor
         turnAxis();
       }
       break;
+    case Symmetry::NWay:
+      // The turn centre and the sectors' edges, from the centre to the map's edge.
+      if (square) {
+        turnAxis();
+        const int turns = std::clamp(brush.turns, 2, kMaxSymmetryCopies);
+        for (int k = 0; k < turns; ++k) {
+          const float angle = 2.0f * kPi * static_cast<float>(k) / static_cast<float>(turns);
+          const float dx = std::cos(angle);
+          const float dz = std::sin(angle);
+          // To the square's edge along this ray.
+          const float reach = 0.5f * w / std::max(std::fabs(dx), std::fabs(dz));
+          groundLine(w * 0.5f, h * 0.5f, w * 0.5f + dx * reach, h * 0.5f + dz * reach);
+        }
+      }
+      break;
     default:
       break;
+    }
+
+    // The symmetry check's differing vertices, as red blocks on the ground.
+    if (mCheckDone && mTools->ShowDifferences() && mTools->CheckIsCurrent()) {
+      constexpr std::uint32_t kDifferenceColor = 0x90FF3030u;
+      for (const SampleRect& block : mDifferences) {
+        const float x0 = static_cast<float>(block.x0);
+        const float z0 = static_cast<float>(block.z0);
+        const float x1 = static_cast<float>(block.x1);
+        const float z1 = static_cast<float>(block.z1);
+        batcher->DrawQuad(groundVertex(x0, z0, kDifferenceColor, 0.3f), groundVertex(x1, z0, kDifferenceColor, 0.3f),
+                          groundVertex(x1, z1, kDifferenceColor, 0.3f), groundVertex(x0, z1, kDifferenceColor, 0.3f));
+      }
     }
 
     float groundX = 0.0f;
@@ -149,9 +178,9 @@ namespace faf::editor
       batcher->Flush();
       return;
     }
-    float centreX[4];
-    float centreZ[4];
-    const int centres = HeightBrushCentres(field->width, field->height, groundX, groundZ, brush.symmetry, centreX, centreZ);
+    float centreX[kMaxSymmetryCopies];
+    float centreZ[kMaxSymmetryCopies];
+    const int centres = HeightBrushCentres(field->width, field->height, groundX, groundZ, brush.symmetry, brush.turns, centreX, centreZ);
     constexpr int kSegments = 64;
     const float inner = brush.radius * (1.0f - std::clamp(brush.falloff, 0.0f, 1.0f));
     for (int c = 0; c < centres; ++c) {
@@ -252,6 +281,10 @@ namespace faf::editor
     if (mMap != nullptr && mDocument.Heights().Stroking()) {
       if (const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField()) {
         mDocument.Heights().EndStroke(field->data);
+        // A check that was made is kept up to date as the map changes.
+        if (mCheckDone) {
+          RunSymmetryCheck();
+        }
       }
     }
     mPainting = false;
@@ -266,6 +299,9 @@ namespace faf::editor
     }
     RefreshHeights(rects);
     mDocument.SetModified(true);
+    if (mCheckDone) {
+      RunSymmetryCheck();
+    }
     return true;
   }
 
@@ -278,7 +314,48 @@ namespace faf::editor
     }
     RefreshHeights(rects);
     mDocument.SetModified(true);
+    if (mCheckDone) {
+      RunSymmetryCheck();
+    }
     return true;
+  }
+
+  void EdMapScene::RunSymmetryCheck()
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mTools == nullptr) {
+      return;
+    }
+    mCheckedWith = mTools->CurrentHeightBrush();
+    SymmetryReport report = CheckSymmetry(field->data, field->width, field->height, mCheckedWith.symmetry, mCheckedWith.turns);
+    mDifferences = std::move(report.blocks);
+    mCheckDone = true;
+    mTools->SetCheckResult(report.checked, report.differing, report.largest, mCheckedWith);
+    gpg::Logf("editor: symmetry check (mode %d, %d turns): %d of %d vertices differ, by up to %d words; %zu blocks marked",
+              static_cast<int>(mCheckedWith.symmetry), mCheckedWith.turns, report.differing, report.checked, report.largest,
+              mDifferences.size());
+  }
+
+  void EdMapScene::RepairSymmetry()
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || mTools == nullptr || mPainting) {
+      return;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    if (EffectiveSymmetry(brush.symmetry, field->width, field->height) == Symmetry::None) {
+      return;
+    }
+    // One undo step over the whole map.
+    const SampleRect whole{0, 0, field->width - 1, field->height - 1};
+    mDocument.Heights().BeginStroke();
+    mDocument.Heights().BeforeWrite(field->data, whole);
+    (void)MakeSymmetric(field->data, field->width, field->height, brush.symmetry, brush.turns);
+    mDocument.Heights().EndStroke(field->data);
+    RefreshHeights({whole});
+    mDocument.SetModified(true);
+    gpg::Logf("editor: copied the source part of the map to its other copies");
+    RunSymmetryCheck();
   }
 
   void EdMapScene::RefreshHeights(const std::vector<SampleRect>& rects)
@@ -330,6 +407,14 @@ namespace faf::editor
     MoveWithKeys(frameSeconds);
     if (mPainting) {
       PaintStroke(frameSeconds);
+    }
+    if (mTools != nullptr) {
+      if (mTools->TakeCheckRequest()) {
+        RunSymmetryCheck();
+      }
+      if (mTools->TakeRepairRequest()) {
+        RepairSymmetry();
+      }
     }
     // A session runs the camera manager from its own frame; between plays the editor does.
     moho::CAM_GetManager()->Frame(0.0f, frameSeconds);

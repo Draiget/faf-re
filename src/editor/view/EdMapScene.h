@@ -51,7 +51,7 @@ namespace faf::editor
     void Detach();
 
     /** The tool settings the left mouse button acts with (the Tools panel's). */
-    void SetTools(const EdTools* tools) noexcept { mTools = tools; }
+    void SetTools(EdTools* tools) noexcept { mTools = tools; }
 
     /** Undoes or redoes the newest height stroke (Ctrl+Z, Ctrl+Y); false when there is none. */
     bool Undo();
@@ -81,7 +81,16 @@ namespace faf::editor
     void EndStroke();
     /** Hands written samples back to the height field (its tiers and revision) and redraws their terrain. */
     void RefreshHeights(const std::vector<SampleRect>& rects);
-    const EdTools* mTools = nullptr;
+    EdTools* mTools = nullptr;
+
+    /** The symmetry check (EdSymmetryCheck.cpp) on the map's heights, its result to the Tools panel. */
+    void RunSymmetryCheck();
+    /** Copies the source part to the other copies, as one undo step. */
+    void RepairSymmetry();
+    /** The blocks of samples the last check found differing, drawn red while the panel shows differences. */
+    std::vector<SampleRect> mDifferences;
+    HeightBrush mCheckedWith;
+    bool mCheckDone = false;
     bool mPainting = false;
 
     /** Draws the brush rings on the terrain from the renderer's editor hook (`ED_SetHook`). */

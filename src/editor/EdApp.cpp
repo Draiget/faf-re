@@ -280,6 +280,12 @@ namespace faf::editor
       bool mRoundTripShown = false;
       // `/saveas <folder>` with `/open`: the drawn map saved as that new folder, then the editor closes.
       std::string mSaveAsFolder;
+      // `/symcheck <mode>[x<turns>][:repair]` with `/open`: the symmetry check on the drawn map (mode: the Tools
+      // panel's symmetry index), then the copy of the source part when asked; the editor stays open.
+      int mSymCheckMode = -1;
+      int mSymCheckTurns = 3;
+      bool mSymCheckRepair = false;
+      int mSymCheckFrames = 0;
       int mRoundTripFrames = 0;
       void SaveDocument();
       std::string mIniPath;
@@ -627,6 +633,15 @@ namespace faf::editor
       if (fa::vector<fa::string> folder; moho::CFG_GetArgOption("/saveas", 1, &folder) && !folder.empty()) {
         mSaveAsFolder = folder[0].c_str();
       }
+      if (fa::vector<fa::string> check; moho::CFG_GetArgOption("/symcheck", 1, &check) && !check.empty()) {
+        // `<mode>[x<turns>][:repair]`, one argument (the option reader takes whatever follows it).
+        const std::string spec = check[0].c_str();
+        mSymCheckMode = std::atoi(spec.c_str());
+        if (const std::size_t x = spec.find('x'); x != std::string::npos) {
+          mSymCheckTurns = std::max(2, std::atoi(spec.c_str() + x + 1));
+        }
+        mSymCheckRepair = spec.find(":repair") != std::string::npos;
+      }
       // With `/open`, the round trip runs on that one map once it has been drawn for a while (its terrain
       // finalized, normal map built), then the editor closes.
       if (!mRoundTripFolder.empty() && moho::CFG_GetArgOption("/open", 1, nullptr)) {
@@ -671,6 +686,15 @@ namespace faf::editor
     void EditorApp::DriveOpens()
     {
       const bool finished = mDocument.Poll();
+      if (mSymCheckMode >= 0 && mScene.Attached()) {
+        ++mSymCheckFrames;
+        if (mSymCheckFrames == 120) {
+          mShell->Tools().SetSymmetry(mSymCheckMode, mSymCheckTurns);
+          mShell->Tools().RequestCheck();
+        } else if (mSymCheckFrames == 150 && mSymCheckRepair) {
+          mShell->Tools().RequestRepair();
+        }
+      }
       if (!mSaveAsFolder.empty() && mScene.Attached() && ++mRoundTripFrames == 180) {
         std::string message;
         const bool saved = mDocument.SaveAsNewFolder(mSaveAsFolder, message);

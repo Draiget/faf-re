@@ -37,7 +37,7 @@ namespace faf::editor
     void OpenSaveAs() noexcept { mOpenSaveAs = true; }
     void RequestExit() noexcept { mExit = true; }
 
-    [[nodiscard]] const EdTools& Tools() const noexcept { return mTools; }
+    [[nodiscard]] EdTools& Tools() noexcept { return mTools; }
 
     /** File > Exit was chosen. */
     [[nodiscard]] bool ExitRequested() const noexcept { return mExit; }

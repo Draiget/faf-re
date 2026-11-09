@@ -13,6 +13,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdMapFile.cpp
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
+  tools/EdSymmetryCheck.cpp
   undo/EdHeightHistory.cpp
   view/EdMapScene.cpp
   ui/EdImGuiRenderer.cpp

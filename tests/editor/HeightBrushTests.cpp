@@ -6,6 +6,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <random>
 #include <vector>
@@ -42,9 +44,9 @@ namespace
   {
     for (int z = 0; z < field.height; ++z) {
       for (int x = 0; x < field.width; ++x) {
-        int cx[4];
-        int cz[4];
-        const int n = SymmetricSamples(symmetry, field.width, field.height, x, z, cx, cz);
+        int cx[faf::editor::kMaxSymmetryCopies];
+        int cz[faf::editor::kMaxSymmetryCopies];
+        const int n = SymmetricSamples(symmetry, 3, field.width, field.height, x, z, cx, cz);
         for (int i = 1; i < n; ++i) {
           if (field.At(cx[i], cz[i]) != field.At(x, z)) {
             return ::testing::AssertionFailure() << "(" << x << "," << z << ")=" << field.At(x, z) << " but copy (" << cx[i] << ","
@@ -90,6 +92,73 @@ namespace
     ::testing::Values(Symmetry::None, Symmetry::LeftRight, Symmetry::TopBottom, Symmetry::DiagonalBack, Symmetry::DiagonalForward,
                       Symmetry::HalfTurn, Symmetry::BothAxes, Symmetry::BothDiagonals, Symmetry::QuarterTurns)
   );
+
+  /** RandomStrokes with N-way turns of `turns` copies. */
+  void RandomTurnedStrokes(Field& field, const int turns, const unsigned seed)
+  {
+    std::mt19937 random(seed);
+    std::uniform_real_distribution<float> along(0.0f, static_cast<float>(field.width - 1));
+    std::uniform_int_distribution<int> mode(0, 4);
+    std::uniform_real_distribution<float> unit(0.05f, 1.0f);
+    for (int stroke = 0; stroke < 200; ++stroke) {
+      HeightBrush brush;
+      brush.mode = static_cast<HeightBrushMode>(mode(random));
+      brush.symmetry = Symmetry::NWay;
+      brush.turns = turns;
+      brush.radius = 2.0f + unit(random) * 12.0f;
+      brush.strength = unit(random);
+      brush.falloff = unit(random);
+      brush.flattenTo = unit(random) * 20000.0f;
+      (void)ApplyHeightBrush(field.words.data(), field.width, field.height, along(random), along(random), brush, 0.016f + unit(random) * 0.05f);
+    }
+  }
+
+  TEST(HeightBrush, FourWayTurnIsExact)
+  {
+    // Four turns land on samples: the same groups as quarter turns, bit for bit.
+    Field field(65, 65, 8000);
+    RandomTurnedStrokes(field, 4, 77u);
+    EXPECT_TRUE(CopiesEqual(field, Symmetry::QuarterTurns));
+  }
+
+  TEST(HeightBrush, ThreeWayTurnCopiesStayClose)
+  {
+    // Three turns fall between samples: every painted sample stays within a small share of the raise of
+    // the height at its point turned by a third, read between samples.
+    Field field(129, 129, 8000);
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::Raise;
+    brush.symmetry = Symmetry::NWay;
+    brush.turns = 3;
+    brush.radius = 12.0f;
+    brush.strength = 1.0f;
+    brush.falloff = 1.0f;
+    const std::vector<SampleRect> rects = ApplyHeightBrush(field.words.data(), 129, 129, 90.0f, 70.0f, brush, 0.1f);
+    EXPECT_EQ(rects.size(), 3u);
+    int peak = 0;
+    double worst = 0.0;
+    const double c = 64.0;
+    for (int z = 0; z < 129; ++z) {
+      for (int x = 0; x < 129; ++x) {
+        peak = std::max(peak, field.At(x, z) - 8000);
+        const double angle = 2.0943951023931953;
+        const double px = c + (x - c) * std::cos(angle) - (z - c) * std::sin(angle);
+        const double pz = c + (x - c) * std::sin(angle) + (z - c) * std::cos(angle);
+        if (px < 0.0 || pz < 0.0 || px > 127.0 || pz > 127.0) {
+          continue;
+        }
+        const int x0 = static_cast<int>(px);
+        const int z0 = static_cast<int>(pz);
+        const double fx = px - x0;
+        const double fz = pz - z0;
+        const double turned = (field.At(x0, z0) * (1.0 - fx) + field.At(x0 + 1, z0) * fx) * (1.0 - fz) +
+                              (field.At(x0, z0 + 1) * (1.0 - fx) + field.At(x0 + 1, z0 + 1) * fx) * fz;
+        worst = std::max(worst, std::fabs(turned - field.At(x, z)));
+      }
+    }
+    EXPECT_GT(peak, 300);
+    EXPECT_LT(worst, peak * 0.1) << "peak " << peak;
+  }
 
   TEST(HeightBrush, StrokeOnTheMirrorLineAppliesOnce)
   {

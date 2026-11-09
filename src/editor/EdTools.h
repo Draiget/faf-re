@@ -2,6 +2,8 @@
 
 #include "editor/tools/EdHeightBrush.h"
 
+#include <utility>
+
 namespace faf::editor
 {
   /**
@@ -27,7 +29,40 @@ namespace faf::editor
       brush.radius = mRadius;
       brush.strength = mStrength;
       brush.falloff = mFalloff;
+      brush.turns = mNWay;
       return brush;
+    }
+
+    /** Test runs (`/symcheck`): the Terrain tool with this symmetry (the panel's index), then Check or Copy. */
+    void SetSymmetry(const int index, const int turns) noexcept
+    {
+      mTool = 1;
+      mSymmetry = index;
+      mNWay = turns;
+    }
+    void RequestCheck() noexcept { mCheckRequested = true; }
+    void RequestRepair() noexcept { mRepairRequested = true; }
+
+    /** The symmetry check's buttons, taken by the view each frame. */
+    [[nodiscard]] bool TakeCheckRequest() noexcept { return std::exchange(mCheckRequested, false); }
+    [[nodiscard]] bool TakeRepairRequest() noexcept { return std::exchange(mRepairRequested, false); }
+    /** Whether the view marks the vertices whose copies differ. */
+    [[nodiscard]] bool ShowDifferences() const noexcept { return mShowDifferences; }
+
+    /** The check's result for the panel, for the symmetry it checked (`checked` 0: nothing to show). */
+    void SetCheckResult(const int checked, const int differing, const int largestWords, const HeightBrush& checkedWith) noexcept
+    {
+      mChecked = checked;
+      mDiffering = differing;
+      mLargest = largestWords;
+      mCheckedSymmetry = static_cast<int>(checkedWith.symmetry);
+      mCheckedTurns = checkedWith.turns;
+    }
+
+    /** True if the last check was made with the panel's current symmetry. */
+    [[nodiscard]] bool CheckIsCurrent() const noexcept
+    {
+      return mChecked > 0 && mCheckedSymmetry == mSymmetry && (mSymmetry != 9 || mCheckedTurns == mNWay);
     }
 
   private:
@@ -55,5 +90,14 @@ namespace faf::editor
     int mDecalMode = 1; // spline
     float mWaterLevel = 20.0f;
     bool mSea = true;
+
+    bool mCheckRequested = false;
+    bool mRepairRequested = false;
+    bool mShowDifferences = true;
+    int mChecked = 0;
+    int mDiffering = 0;
+    int mLargest = 0;
+    int mCheckedSymmetry = -1;
+    int mCheckedTurns = 0;
   };
 } // namespace faf::editor
