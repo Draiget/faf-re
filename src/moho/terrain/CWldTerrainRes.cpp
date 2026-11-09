@@ -409,12 +409,17 @@ namespace
         std::uint32_t packedSample = 0;
         packedSample |= static_cast<std::uint32_t>(terrainRes.mWaterFoam[pixelIndex]) << 24u;
         packedSample |= static_cast<std::uint32_t>(terrainRes.mWaterFlatness[pixelIndex]) << 16u;
+        // Unlike the sea-only map, a texel with any corner above its water gets no depth: the
+        // shaders sample this texture bilinearly, and the terrain shader's own test against a
+        // single WaterElevation (the highest level here) can't stop a shore texel's depth from
+        // colouring the bank above a lower water. Depth then fades out within the shore texel.
         const float level = water.level;
-        if (level > h00 || level > h10 || level > h01 || level > h11) {
+        const bool anyAbove = level < h00 || level < h10 || level < h01 || level < h11;
+        if (!anyAbove && (level > h00 || level > h10 || level > h01 || level > h11)) {
           const float depthByte = std::clamp(((level - h00) / (level - water.abyss)) * 255.0f, 0.0f, 255.0f);
           packedSample |= static_cast<std::uint32_t>(static_cast<std::uint8_t>(depthByte)) << 8u;
         }
-        if (level < h00 || level < h10 || level < h01 || level < h11) {
+        if (anyAbove) {
           packedSample |= 0xFFu;
         }
         terrainRes.mEditWordBuffer.begin[pixelIndex] = packedSample;
