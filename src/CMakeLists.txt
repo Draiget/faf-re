@@ -462,6 +462,8 @@ endif()
 target_link_libraries(headless PRIVATE faf_sim)
 if(FAF_SERVER_MODE)
   target_compile_definitions(headless PRIVATE FAF_SERVER_MODE=1)
+  # The server-mode objects (remote/ContentCheck.cpp) read and write with the channel's ByteReader/ByteWriter.
+  target_link_libraries(headless PRIVATE faf_netchannel)
   # The channel to the server (CClientLink) for /connectserver, in the client's objects.
   target_link_libraries(faf_main PRIVATE faf_netchannel faf_monocypher)
   # The client's own sources (the replay player's checks among them) read the server-mode declarations too.
