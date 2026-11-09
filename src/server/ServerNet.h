@@ -241,6 +241,7 @@ namespace faf::server
       std::vector<remote::SCameraReport> cameras; // plan WP11.1: its cameras, as last reported
       std::uint64_t cameraUpdates = 0;
       std::uint64_t camerasAtUs = 0;
+      double cameraTokens = 0.0; // plan WP11.1: the camera updates it may still send now (refilled at eight a second)
       // Plan WP11.4: its client in the session, as every player's roster lists it.
       int clientIndex = -1;
       std::vector<std::uint8_t> sources;
@@ -293,7 +294,7 @@ namespace faf::server
     std::vector<std::pair<std::int32_t, bool>> mReadyNews; // plan WP17.2 (`TakeReadyChanges`)          // plan WP17.2: each seat's verdicts as they were made (`TakeJudged`)
     std::uint64_t mBadMessages = 0;
     std::uint64_t mFocusRefused = 0;   // plan WP11.1
-    std::uint64_t mCamerasDropped = 0; // plan WP11.1: camera updates faster than five a second
+    std::uint64_t mCamerasDropped = 0; // plan WP11.1: camera updates past the bucket (eight a second, four at once)
     std::uint64_t mViewMismatches = 0;
     remote::wire::SRoster mRosterSent; // the last sent to everyone, without a local index
     bool mRosterSentEver = false;

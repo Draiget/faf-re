@@ -945,17 +945,25 @@ namespace faf::server
       return;
     }
     case remote::net::ESeatMessage::Cameras: {
-      // Plan WP11.1: what the player's cameras see, kept for camera-ordered work (WP8.2); faster than 5 a second dropped.
+      // Plan WP11.1: what the player's cameras see, kept for camera-ordered work (WP8.2). A game sends four a second
+      // (kCameraPeriodMs), but they arrive bunched (frame hitches, datagrams carrying two), so a bucket of tokens
+      // refilled at eight a second and holding four takes them all and drops only a sustained flood.
       std::vector<remote::SCameraReport> cameras;
       if (!remote::DecodeCameras(message, cameras)) {
         ++mBadMessages;
         return;
       }
-      if (seat.camerasAtUs != 0u && mNowUs - seat.camerasAtUs < 200'000u) {
+      constexpr double kCameraTokensPerSecond = 8.0;
+      constexpr double kCameraBurst = 4.0;
+      seat.cameraTokens = seat.camerasAtUs == 0u
+                            ? kCameraBurst
+                            : std::min(kCameraBurst, seat.cameraTokens + static_cast<double>(mNowUs - seat.camerasAtUs) * 1e-6 * kCameraTokensPerSecond);
+      seat.camerasAtUs = mNowUs;
+      if (seat.cameraTokens < 1.0) {
         ++mCamerasDropped;
         return;
       }
-      seat.camerasAtUs = mNowUs;
+      seat.cameraTokens -= 1.0;
       seat.cameras = std::move(cameras);
       if (++seat.cameraUpdates == 1u) {
         Say(seat.name + "'s game sends its cameras");
