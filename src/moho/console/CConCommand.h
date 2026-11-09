@@ -144,6 +144,10 @@ namespace moho
   extern float ui_BuildPlaceTarmacAlpha;
   extern float ui_CommandClickScale;
   extern float ui_fuelbarHeight;
+  // Engine addition: planned factory ghost selection and pre-orders switch.
+  extern bool ui_FactoryPreOrders;
+  [[nodiscard]] bool IsFactoryPreOrdersEnabled();
+  void SetFactoryPreOrdersEnabled(bool enabled);
 
   /**
    * Address: 0x0041E390 (FUN_0041E390)

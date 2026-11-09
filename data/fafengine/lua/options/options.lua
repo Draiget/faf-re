@@ -116,6 +116,25 @@ do
                 },
             },
         })
+        Add({
+            title = "Planned factory pre-orders",
+            key = 'factory_preorders',
+            type = 'toggle',
+            default = 1,
+            tip = "Allow selecting planned factories under construction to queue production orders, set rally points, and toggle repeat build ahead of time.",
+            set = function(key, value, startup)
+                if value ~= 0 then
+                    value = 1
+                end
+                ConExecute("ui_FactoryPreOrders " .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    {text = "<LOC _On>", key = 1},
+                    {text = "<LOC _Off>", key = 0},
+                },
+            },
+        })
     end
 end
 
