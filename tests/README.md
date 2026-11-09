@@ -79,6 +79,11 @@ tools/coverage/report.sh build/clang-x64-release-coverage tmp/coverage
 ```
 `tmp/coverage/folders.txt` lists covered lines per `src/` folder, `summary.txt` per file, and `html/` line by line. Set `LLVM_ROOT` when `llvm-cov` is not on `PATH`.
 
+The renderers, UI and sound run only in the game client, so they count only when the instrumented client (`--target faf_main`) plays a game: run it with `LLVM_PROFILE_FILE=<folder>/%p-%m.profraw` and `/replay <file> /exitattick <tick>` (it quits cleanly there, which writes the counters), then add its counters to the report without running ctest again:
+```bash
+FAF_COVERAGE_EXTRA_RAW=<folder> FAF_COVERAGE_SKIP_CTEST=1 tools/coverage/report.sh build/clang-x64-release-coverage tmp/coverage
+```
+
 Run a specific test executable with GTest filter:
 ```powershell
 .\build\clang-x64-release\tests\faf_net_tests.exe --gtest_filter=Existing_NetRobustness.*
