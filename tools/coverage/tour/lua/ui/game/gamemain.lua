@@ -762,7 +762,87 @@ do
         Log('vars done: ' .. table.getn(Vars))
     end
 
+    -- The live tour (/tourlive, in a game rather than a replay): orders through the user-side command functions, queued
+    -- so the command graph has queues to draw, a factory build order, the dock command and the zoom calls.
+    local LiveCommands = {
+        'UNITCOMMAND_Move', 'UNITCOMMAND_Attack', 'UNITCOMMAND_AggressiveMove', 'UNITCOMMAND_Patrol',
+        'UNITCOMMAND_Guard', 'UNITCOMMAND_Reclaim', 'UNITCOMMAND_Repair', 'UNITCOMMAND_Capture', 'UNITCOMMAND_Stop',
+        'UNITCOMMAND_Dive', 'UNITCOMMAND_Pause', 'UNITCOMMAND_Upgrade', 'UNITCOMMAND_Script', 'UNITCOMMAND_Ferry',
+        'UNITCOMMAND_FormMove', 'UNITCOMMAND_Tactical', 'UNITCOMMAND_Nuke', 'UNITCOMMAND_TransportLoadUnits',
+        'UNITCOMMAND_TransportUnloadUnits', 'UNITCOMMAND_Sacrifice', 'UNITCOMMAND_Overcharge',
+        'Move', 'Stop', 'Attack', 'Patrol',
+    }
+
+    local function LiveTour()
+        Try('select all', UISelectionByCategory, 'ALLUNITS', false, false, false, false)
+        WaitSeconds(1)
+        local units = GetSelectedUnits() or {}
+        Log('live: ' .. table.getn(units) .. ' units')
+        for i = 1, table.getn(LiveCommands) do
+            local command = LiveCommands[i]
+            Try('IssueUnitCommand ' .. command, IssueUnitCommand, units, command, nil, false)
+            Try('IssueCommand ' .. command, IssueCommand, command, nil, false)
+            WaitSeconds(0.2)
+        end
+        -- A Lua dragger makes the session's command graph (CMauiLuaDragger takes GetCommandGraph(true)); held while
+        -- the queued orders above are pending, the graph builds and updates their nodes. (Drawing it needs a real
+        -- Shift key on a foreground window, which the tour leaves alone.)
+        local ok, draggerModule = pcall(import, '/lua/maui/dragger.lua')
+        local dragger = ok and draggerModule and rawget(draggerModule, 'Dragger') and Try('Dragger', draggerModule.Dragger)
+        WaitSeconds(10)
+        if dragger then
+            Try('dragger destroy', dragger.Destroy, dragger)
+        end
+        -- Command mode for each kind of order, a few seconds each: a driver posting mouse clicks to the window (if one
+        -- runs) issues them through the world view's command code.
+        local okMode, commandMode = pcall(import, '/lua/ui/game/commandmode.lua')
+        if okMode and commandMode and rawget(commandMode, 'StartCommandMode') then
+            local orders = { 'RULEUCC_Move', 'RULEUCC_Attack', 'RULEUCC_Patrol', 'RULEUCC_Guard', 'RULEUCC_Reclaim',
+                             'RULEUCC_Repair', 'RULEUCC_Capture', 'RULEUCC_Ferry', 'RULEUCC_Tactical', 'RULEUCC_Nuke' }
+            for i = 1, table.getn(orders) do
+                Try('select all for ' .. orders[i], UISelectionByCategory, 'ALLUNITS', false, false, false, false)
+                Try('StartCommandMode ' .. orders[i], commandMode.StartCommandMode, 'order', { name = orders[i] })
+                WaitSeconds(3)
+                Try('EndCommandMode', commandMode.EndCommandMode, true)
+            end
+            Try('select engineers', UISelectionByCategory, 'ENGINEER', false, false, false, false)
+            Try('StartCommandMode build', commandMode.StartCommandMode, 'build', { name = 'ueb1101' })
+            WaitSeconds(4)
+            Try('EndCommandMode', commandMode.EndCommandMode, true)
+        end
+        WaitSeconds(3)
+        Try('select factories', UISelectionByCategory, 'FACTORY', false, false, false, false)
+        Try('IssueBlueprintCommand', IssueBlueprintCommand, 'UNITCOMMAND_BuildFactory', 'uel0105', 2, false)
+        Try('IssueDockCommand', IssueDockCommand, false)
+        WaitSeconds(2)
+        Try('select all again', UISelectionByCategory, 'ALLUNITS', false, false, false, false)
+        local again = GetSelectedUnits() or {}
+        if again[1] then
+            Try('UIZoomTo', UIZoomTo, again, 1)
+            WaitSeconds(2)
+            Try('UISelectAndZoomTo', UISelectAndZoomTo, again[1], 1)
+        end
+        WaitSeconds(10)
+        Log('live done')
+    end
+
     local function Tour()
+        if HasCommandLineArg('/tourlive') then
+            -- The map's scripted AI builds the army for a minute and a half first: more units, more kinds of order.
+            WaitSeconds(90)
+            Log('start live')
+            LiveTour()
+            UnitTour()
+            CameraTour()
+            ControlTour()
+            SweepGlobals()
+            RunCommands()
+            Log('done')
+            if HasCommandLineArg('/tourexit') then
+                ExitApplication()
+            end
+            return
+        end
         if HasCommandLineArg('/tourvars') then
             WaitSeconds(5)
             Log('start vars')
