@@ -4,7 +4,10 @@
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/Error.hpp"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if defined(_WIN32)
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#endif
 #include "moho/render/d3d/CD3DDevice.h"
 
 namespace moho

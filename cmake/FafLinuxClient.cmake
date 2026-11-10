@@ -58,6 +58,13 @@ endforeach()
 list(LENGTH _faf_client_files _faf_client_count)
 message(STATUS "faf_client: ${_faf_client_count} client translation units")
 
+# DirectX-Headers (cmake/FafDependencies.cmake): the DXGI format numbers the Vulkan backend and the
+# texture code use (<dxgiformat.h>).
+if(FAF_FETCH_DEPENDENCIES)
+  set(FAF_DEPENDENCIES_ONLY DirectX-Headers)
+  include(FafDependencies)
+endif()
+
 # The part of wxWindows 2.4.2 the game code uses (src/platform/posix/wx/wx/defs.h).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/wx/WxStandIn.cpp")
 
@@ -65,4 +72,5 @@ add_library(faf_client_objs OBJECT ${_faf_client_files})
 target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd)
 target_include_directories(faf_client_objs PRIVATE
   "${PROJECT_SOURCE_DIR}/src/platform/posix/wx"
-  "${FAF_DEPENDENCIES_DIR}/vulkan/include")
+  "${FAF_DEPENDENCIES_DIR}/vulkan/include"
+  "${FAF_DEPENDENCIES_DIR}/DirectX-Headers/include/directx")

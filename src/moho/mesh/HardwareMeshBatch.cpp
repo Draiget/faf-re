@@ -30,13 +30,19 @@
 #include "gpg/gal/Texture.hpp"
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if defined(_WIN32)
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
+#endif
 #include "gpg/gal/EffectTechnique.hpp"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if defined(_WIN32)
 #include "gpg/gal/backends/d3d9/Float16HardwareVertexFormatterD3D9.hpp"
 #include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
 #include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
 #include "gpg/gal/backends/d3d9/VertexFormatD3D9.hpp"
+#endif
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/ShaderVar.h"
@@ -930,7 +936,10 @@ namespace moho
     // The two open-pass draws are FAF's; they keep the binary's fatal handling
     // of a failed draw, as the per-pass draw below does.
     if (sOpenPassTechnique != nullptr && technique == sOpenPassTechnique) {
+#if defined(_WIN32)
+      // Only the Direct3D 9 device keeps a pass open (below), so the technique is a D3D9 one.
       static_cast<gpg::gal::EffectTechniqueD3D9*>(technique)->CommitChanges();
+#endif
       try {
         device->DrawIndexedPrimitive(&drawContext);
       } catch (const gpg::gal::Error& error) {

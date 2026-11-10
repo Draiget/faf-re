@@ -2,7 +2,10 @@
 #include "gpg/core/profiling/Profiler.h"
 
 #include <Windows.h>
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if defined(_WIN32)
 #include <d3d9.h>
+#endif
 
 #include <algorithm>
 #include <chrono>
@@ -26,7 +29,10 @@
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/RenderTargetContext.hpp"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if defined(_WIN32)
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#endif
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "moho/console/CConCommand.h"

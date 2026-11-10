@@ -6,7 +6,10 @@
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectVariable.hpp"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if defined(_WIN32)
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
+#endif
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DRenderTarget.h"
 #include "moho/render/ID3DTextureSheet.h"

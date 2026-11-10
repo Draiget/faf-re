@@ -7,17 +7,9 @@
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
 
-#if defined(_WIN32)
+// On Linux, the POSIX stand-ins (platform/posix/win32): <d3d9types.h> declares D3DLOCKED_RECT
+// and <Windows.h> RECT.
 #include <d3d9types.h>
-#else
-// RECT comes from the POSIX <Windows.h> (platform/posix/win32), which platform/PosixCompat.h
-// includes in every Linux translation unit.
-struct D3DLOCKED_RECT
-{
-  int Pitch;
-  void* pBits;
-};
-#endif
 
 namespace gpg
 {

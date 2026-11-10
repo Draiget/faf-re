@@ -8,11 +8,11 @@
 //
 // Minimal cross-platform aliases for D3D9 state enums.
 // On Windows the real <d3d9types.h> declares them - at global scope, where the
-// SDK's own headers (<d3d9.h>, <d3dx9.h>) expect to find them.
+// SDK's own headers (<d3d9.h>, <d3dx9.h>) expect to find them. On Linux the
+// POSIX stand-in (platform/posix/win32/d3d9types.h) declares the two structures
+// the render interface takes, D3DVIEWPORT9 and D3DLOCKED_RECT.
 //
-#if defined(_WIN32)
 #include <d3d9types.h>
-#endif
 
 namespace gpg::gal
 {

@@ -259,6 +259,16 @@ set(_faf_download_DirectXTex
     "DirectXTex-may2026"
     "DirectXTex-may2026.tar.gz")
 
+# DirectX-Headers 1.619.5 (MIT): the DXGI format numbers (dxgiformat.h) the Vulkan backend and
+# the texture code use, and the D3D12 shader reflection structures DXC fills in, on Linux, which
+# has no Windows SDK (the Linux client, issue #255). The tag's source archive; headers only.
+# Windows builds use the Windows SDK's copies, so only a run that names it downloads it.
+set(_faf_download_DirectX-Headers
+    "https://github.com/microsoft/DirectX-Headers/archive/refs/tags/v1.619.5.tar.gz"
+    "24a0b7d8079a2dbbc90753c0d8bc812040d052acce2302e69a97c5d873b313b8"
+    "DirectX-Headers-1.619.5"
+    "DirectX-Headers-1.619.5.tar.gz")
+
 # Dear ImGui 1.92.4, docking branch (MIT): the map editor's panels (src/editor, .plans/map-editor).
 # The tag's source archive; cmake/deps/imgui builds the core and the Win32 platform backend.
 set(_faf_download_imgui
@@ -436,6 +446,9 @@ faf_dependency_download(mbedtls)
 faf_dependency_download(monocypher)
 faf_dependency_download(DirectXTex)
 faf_dependency_download(imgui)
+if(FAF_DEPENDENCIES_ONLY)
+  faf_dependency_download(DirectX-Headers)  # Linux only (see its entry above)
+endif()
 if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
   faf_dependency_download(freetype)
 endif()

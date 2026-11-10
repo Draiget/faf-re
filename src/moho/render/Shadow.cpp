@@ -33,7 +33,10 @@ namespace gpg::gal
 {
   long DebugSaveSurfaceToFileA(const char* filePath, unsigned int fileFormat, void* sourceSurface);
 }
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if defined(_WIN32)
 #include "gpg/gal/backends/d3d9/RenderTargetD3D9.hpp"
+#endif
 
 #include <algorithm>
 #include <cmath>
@@ -1114,6 +1117,7 @@ namespace moho
     gMeshDepthSkipsTraced = false;
 
     const auto dumpShadowTargets = [&](const bool includeBlur) {
+#if defined(_WIN32)
       static bool sDumped = false;
       static unsigned sDumpCalls = 0;
       if (sDumped || (sDumpCalls++ % 120u) != 60u) {
@@ -1150,6 +1154,10 @@ namespace moho
       if (includeBlur) {
         dump(mBlurTargetB, "shadow_blurB");
       }
+#else
+      // The dump saves D3D9 surfaces; the Linux client has no D3D9 backend (issue #255).
+      (void)includeBlur;
+#endif
     };
 
     if (!mShadowBlurEnabled) {
