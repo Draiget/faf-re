@@ -11,6 +11,9 @@
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
+
+#include <cstring>
+#include <fstream>
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
@@ -41,6 +44,42 @@ namespace faf::editor
     (void)found->second.sheet->GetTexture(texture);
     // The texture lives as long as the sheet, which this keeps.
     return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(texture.get()));
+  }
+
+  bool EdPropThumbnails::Save(const std::string& name, const std::string& file, std::string& blueprint)
+  {
+    for (auto& [path, entry] : mEntries) {
+      if (path.find(name) == std::string::npos || entry.failed || !entry.sheet) {
+        continue;
+      }
+      std::uint32_t pitch = 0;
+      void* bits = nullptr;
+      if (!entry.sheet->Lock(&pitch, &bits)) {
+        return false;
+      }
+      // A bottom-up 32-bit BMP: the sheet's rows from the last.
+      std::vector<std::uint8_t> out(54 + static_cast<std::size_t>(kSide) * kSide * 4, 0);
+      const auto put32 = [&](const std::size_t at, const std::uint32_t value) { std::memcpy(out.data() + at, &value, 4); };
+      out[0] = 'B';
+      out[1] = 'M';
+      put32(2, static_cast<std::uint32_t>(out.size()));
+      put32(10, 54);
+      put32(14, 40);
+      put32(18, kSide);
+      put32(22, kSide);
+      out[26] = 1;
+      out[28] = 32;
+      for (int y = 0; y < kSide; ++y) {
+        std::memcpy(out.data() + 54 + static_cast<std::size_t>(kSide - 1 - y) * kSide * 4,
+                    static_cast<const std::uint8_t*>(bits) + static_cast<std::size_t>(y) * pitch, static_cast<std::size_t>(kSide) * 4);
+      }
+      (void)entry.sheet->Unlock();
+      std::ofstream stream(file, std::ios::binary | std::ios::trunc);
+      stream.write(reinterpret_cast<const char*>(out.data()), static_cast<std::streamsize>(out.size()));
+      blueprint = path;
+      return static_cast<bool>(stream);
+    }
+    return false;
   }
 
   void EdPropThumbnails::Pump(int count)

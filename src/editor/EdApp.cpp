@@ -386,6 +386,9 @@ namespace faf::editor
       bool mBodiesDragging = false;
       EdDocument::SaveSnapshot mBodiesBefore;
       bool mBrowserArg = false;
+      /** `/thumbdump <name>,<file>` (test runs): a prop thumbnail saved once it is made. */
+      std::string mThumbDumpArg;
+      int mThumbDumpFrames = 0;
       /** `/openfolder <scenario file>` (test runs): a map opened from a folder anywhere on disk. */
       std::string mOpenFolderArg;
       std::string mBrowserFilterArg;
@@ -843,6 +846,15 @@ namespace faf::editor
           mShell->Browser().Download(mVaultMapArg);
           mVaultMapArg.clear();
         }
+        if (!mThumbDumpArg.empty() && ++mThumbDumpFrames % 30 == 0) {
+          const std::size_t comma = mThumbDumpArg.find(',');
+          std::string blueprint;
+          if (comma != std::string::npos &&
+              mPropThumbnails.Save(mThumbDumpArg.substr(0, comma), mThumbDumpArg.substr(comma + 1), blueprint)) {
+            gpg::Logf("editor: thumbnail of %s saved to %s", blueprint.c_str(), mThumbDumpArg.substr(comma + 1).c_str());
+            mThumbDumpArg.clear();
+          }
+        }
         if (!mOpenFolderArg.empty()) {
           mShell->Browser().OpenFromDisk(std::filesystem::u8path(mOpenFolderArg));
           mOpenFolderArg.clear();
@@ -964,6 +976,9 @@ namespace faf::editor
       // `/browser` shows the map browser; `/vaultmap <name>` downloads a vault map and opens it (test runs).
       if (moho::CFG_GetArgOption("/browser", 0, nullptr)) {
         mBrowserArg = true;
+      }
+      if (fa::vector<fa::string> dump; moho::CFG_GetArgOption("/thumbdump", 1, &dump) && !dump.empty()) {
+        mThumbDumpArg = dump[0].c_str();
       }
       if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/openfolder", 1, &file) && !file.empty()) {
         mOpenFolderArg = file[0].c_str();

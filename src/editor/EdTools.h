@@ -14,6 +14,7 @@
 #include "editor/tools/EdTextureLibrary.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <functional>
 #include <cmath>
 #include <array>
@@ -537,12 +538,18 @@ namespace faf::editor
       mSelectSelected = std::move(selected);
       mSelectHover = std::move(hover);
     }
-    /** Test runs (`/proptool`): the Props tool with this blueprint and mode. */
+    /** Test runs (`/proptool`): the Props tool with this blueprint and mode, the list filtered to its name. */
     void SetPropTool(std::string blueprint, const int mode) noexcept
     {
       mTool = 4;
       mPropBlueprint = std::move(blueprint);
       mPropMode = mode;
+      const std::size_t slash = mPropBlueprint.find_last_of('/');
+      std::string name = slash == std::string::npos ? mPropBlueprint : mPropBlueprint.substr(slash + 1);
+      if (const std::size_t suffix = name.find("_prop.bp"); suffix != std::string::npos) {
+        name.resize(suffix);
+      }
+      (void)std::snprintf(mPropFilter, sizeof(mPropFilter), "%s", name.c_str());
     }
     void SetTool(const int tool) noexcept { mTool = tool; }
 
