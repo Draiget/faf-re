@@ -48,6 +48,9 @@
 #include "moho/core/Thread.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#if FAFRE_PLATFORM_POSIX
+#include "platform/posix/Win32WindowPosix.h" // the window system's clipboard (issue #256)
+#endif
 
 #pragma warning(push)
 #pragma warning(disable : 4996)
@@ -78,7 +81,10 @@ namespace moho
    * constructor (0x004F38F0) and registers the exit-time destructor thunk
    * 0x00BF18D0, which calls ~CWinLogTarget (0x004F39B0).
    */
+#if FAFRE_PLATFORM_WINDOWS
+  // It feeds the log window, a developer window, Windows only (WxRuntimeTypes.h).
   CWinLogTarget sLogWindowTarget{};
+#endif
 }
 
 namespace
@@ -87,9 +93,12 @@ namespace
   constexpr float kInfiniteWakeupMs = std::numeric_limits<float>::infinity();
 
   moho::IWinApp* sSupComApp = nullptr;
+#if FAFRE_PLATFORM_WINDOWS
   HHOOK sWindowHook = nullptr;
+#endif
   gpg::time::Timer wakeupTimer;
   float wakeupTimerDur = kInfiniteWakeupMs;
+#if FAFRE_PLATFORM_WINDOWS
   [[maybe_unused]] constexpr DWORD kPlatformSymbolHandlerOptions =
     SYMOPT_FAIL_CRITICAL_ERRORS | // suppress critical-error UI while probing symbols.
     SYMOPT_LOAD_LINES | // include source line records for resolved addresses.
@@ -99,6 +108,7 @@ namespace
     kPlatformSymbolHandlerOptions == 0x216u,
     "PLAT_Init symbol options must match recovered SymSetOptions(0x216)"
   );
+#endif
 
   /**
    * The splash screen WINX_InitSplash shows (0x010A9BE4), a VC8
@@ -107,10 +117,12 @@ namespace
    * by 0x00BC73E0) deletes what is left, and 0x004F7390 is `reset` out of
    * line.
    */
+#if FAFRE_PLATFORM_WINDOWS
   std::unique_ptr<wxSplashScreen> sSplashScreen;
 
   /** The PNG handler WINX_InitSplash installs on first use (0x010C6D48). */
   wxPNGHandler* sSplashPngHandler = nullptr;
+#endif
 
   using LegacyUnaryCdeclCallback = int(__cdecl*)(int value);
   using LegacyUnaryDispatchAdapter = int(__cdecl*)(LegacyUnaryCdeclCallback* callbackLane, int value);
@@ -1272,6 +1284,9 @@ namespace
     return outPair;
   }
 
+  // The registry, dxdiag, the Windows-key hook, the crash dialog and the structured-exception
+  // filter are Windows' (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
   struct ParsedRegistryPath
   {
     HKEY rootKey = HKEY_CURRENT_USER;
@@ -1339,6 +1354,7 @@ namespace
     parsed.valueName = valueName;
     return parsed;
   }
+#endif // FAFRE_PLATFORM_WINDOWS: the registry
 
 
   /**
@@ -1369,6 +1385,7 @@ namespace
    * Launches `dxdiag.exe` with an output path under the report directory, waits
    * up to 60 seconds for completion, then registers the file when it exists.
    */
+#if FAFRE_PLATFORM_WINDOWS
   void PLAT_CreateDxdiagForReport()
   {
     const std::wstring outputPath = GetErrorReportOutputDirSnapshot() + kDxdiagOutputFileName;
@@ -1403,6 +1420,7 @@ namespace
       moho::PLAT_RegisterFileForErrorReport(outputPath.c_str());
     }
   }
+#endif // FAFRE_PLATFORM_WINDOWS: dxdiag
 
   /**
    * Address: 0x004F2000 (FUN_004F2000, func_HasCorrectPlatform)
@@ -1461,6 +1479,14 @@ namespace
    */
   bool DispatchPendingMessage()
   {
+#if !FAFRE_PLATFORM_WINDOWS
+    // The window system's events, through the wx stand-in (issue #256).
+    if (!wxTheApp->Pending()) {
+      return false;
+    }
+    wxTheApp->Dispatch();
+    return true;
+#else
     MSG message{};
     if (::PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE) == FALSE) {
       return false;
@@ -1471,6 +1497,7 @@ namespace
     }
     wxTheApp->DoMessage(reinterpret_cast<WXMSG*>(&message));
     return true;
+#endif
   }
 
   DWORD ComputeWaitTimeoutMs()
@@ -1494,6 +1521,7 @@ namespace
    * Suppresses left/right Windows keys for low-level keyboard hook events when
    * app-level key suppression is enabled; otherwise forwards to next hook.
    */
+#if FAFRE_PLATFORM_WINDOWS
   LRESULT CALLBACK WindowHook(const int code, const WPARAM wParam, const LPARAM lParam)
   {
     if (code == HC_ACTION && sSupComApp->AppDoSuppressWindowsKeys() && wParam >= WM_KEYDOWN && wParam <= WM_KEYUP) {
@@ -1938,6 +1966,7 @@ namespace
     gpg::diag::ShowCrashReportDialog(gpg::diag::CrashLatestReportPath());
     return EXCEPTION_CONTINUE_SEARCH;
   }
+#endif // FAFRE_PLATFORM_WINDOWS: the Windows-key hook, the crash dialog and the exception filter
 
 } // namespace
 
@@ -1955,6 +1984,11 @@ bool moho::WIN_CopyToClipboard(const wchar_t* const text)
     return false;
   }
 
+#if !FAFRE_PLATFORM_WINDOWS
+  // The window system's clipboard, in UTF-8 (platform/posix/Win32WindowPosix.h, issue #256).
+  return platform::posix::gSetClipboardTextHook != nullptr &&
+    platform::posix::gSetClipboardTextHook(gpg::STR_WideToUtf8(text).c_str());
+#else
   const std::size_t characterCount = std::wcslen(text) + 1;
   const std::size_t payloadBytes = characterCount * sizeof(wchar_t);
 
@@ -1988,6 +2022,7 @@ bool moho::WIN_CopyToClipboard(const wchar_t* const text)
 
   ::CloseClipboard();
   return true;
+#endif
 }
 
 /**
@@ -2136,6 +2171,10 @@ void moho::WIN_AppExecute(IWinApp* const app)
   }
 
   sSupComApp = app;
+#if !FAFRE_PLATFORM_WINDOWS
+  // No low-level keyboard hook: the window system keeps the desktop's keys (issue #256).
+  HMODULE const selfModule = ::GetModuleHandleW(nullptr);
+#else
   const HMODULE module = ::GetModuleHandleW(nullptr);
   sWindowHook = ::SetWindowsHookExW(WH_KEYBOARD_LL, &WindowHook, module, 0);
 
@@ -2145,6 +2184,7 @@ void moho::WIN_AppExecute(IWinApp* const app)
     reinterpret_cast<LPCWSTR>(&WindowHook),
     &selfModule
   );
+#endif
   // enterLoop = false: wx initialises and builds the MohoApp, and the loop
   // below pumps it (0x004F2117, wxEntry 0x00992FF0).
   wxEntry(reinterpret_cast<WXHINSTANCE>(selfModule), nullptr, nullptr, 0, false);
@@ -2245,10 +2285,12 @@ void moho::WIN_AppExecute(IWinApp* const app)
     wxApp::CleanUp();
   }
 
+#if FAFRE_PLATFORM_WINDOWS
   if (sWindowHook != nullptr) {
     ::UnhookWindowsHookEx(sWindowHook);
     sWindowHook = nullptr;
   }
+#endif
 
   RES_Exit();
   sSupComApp = nullptr;
@@ -2263,7 +2305,10 @@ void moho::WIN_AppExecute(IWinApp* const app)
  */
 void moho::PLAT_CatchStructuredExceptions()
 {
+#if FAFRE_PLATFORM_WINDOWS
   (void)::SetUnhandledExceptionFilter(&TopLevelExceptionFilter);
+#endif
+  // Elsewhere crashes are signals, which gpg/core/diagnostics/posix/DiagnosticsPosix.cpp reports.
 }
 
 
@@ -2355,6 +2400,14 @@ bool moho::PLAT_SetRegistryValue(
     return false;
   }
 
+#if !FAFRE_PLATFORM_WINDOWS
+  // No registry: the write fails as a key Windows refuses to create does (the Linux client, issue #255).
+  (void)data;
+  (void)dataSize;
+  (void)valueType;
+  gpg::Logf("PLAT_SetRegistryValue: Unable to create registry key \"%s\"", keyPath);
+  return false;
+#else
   // The shipped body builds a mutable copy of the path in a byte vector so
   // `ParseRegistryPathInPlace` can split it; the vector frees itself on every
   // return path, which is what the explicit teardown calls at each `return`
@@ -2397,6 +2450,7 @@ bool moho::PLAT_SetRegistryValue(
 
   (void)::RegCloseKey(openedKey);
   return true;
+#endif
 }
 
 /**
@@ -2449,6 +2503,11 @@ std::uint32_t moho::PLAT_GetRegistryValue(
     return 0;
   }
 
+#if !FAFRE_PLATFORM_WINDOWS
+  // No registry: nothing to read, as for a key Windows doesn't have (the Linux client, issue #255).
+  gpg::Logf("PLAT_GetRegistryValue: Unable to open registry key \"%s\"", keyPath);
+  return 0;
+#else
   // The shipped body builds a mutable copy of the path in a byte vector so
   // `ParseRegistryPathInPlace` can split it; the vector frees itself on every
   // return path, which is what the explicit teardown calls at each `return`
@@ -2482,6 +2541,7 @@ std::uint32_t moho::PLAT_GetRegistryValue(
 
   (void)::RegCloseKey(openedKey);
   return bytesRead;
+#endif
 }
 
 /**
@@ -2496,6 +2556,14 @@ std::uint32_t moho::PLAT_GetRegistryValue(
  */
 fa::string moho::WIN_GetClipboardText()
 {
+#if !FAFRE_PLATFORM_WINDOWS
+  // The window system's clipboard, in UTF-8 (platform/posix/Win32WindowPosix.h, issue #256).
+  if (platform::posix::gGetClipboardTextHook == nullptr) {
+    return {};
+  }
+  const std::string text = platform::posix::gGetClipboardTextHook();
+  return fa::string(text.c_str());
+#else
   const HWND ownerWindow = sMainWindow != nullptr
     ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle()))
     : nullptr;
@@ -2516,6 +2584,7 @@ fa::string moho::WIN_GetClipboardText()
 
   (void)::CloseClipboard();
   return clipboardText;
+#endif
 }
 
 
@@ -2554,11 +2623,17 @@ void moho::WIN_ShowCrashDialog(
   details << "Callstack:\n";
 
   void* contextRecord = nullptr;
+#if FAFRE_PLATFORM_WINDOWS
   if (exceptionInfo != nullptr) {
     contextRecord = exceptionInfo->ContextRecord;
   } else {
     skipCallstackFrames += 2;
   }
+#else
+  // Exception records are Windows'; elsewhere the call stack is this thread's own.
+  (void)exceptionInfo;
+  skipCallstackFrames += 2;
+#endif
 
   std::uintptr_t stackFrames[64]{};
   const std::uint32_t frameCount = PLAT_GetCallStack(contextRecord, 64, stackFrames);
@@ -2585,6 +2660,10 @@ void moho::WIN_ShowCrashDialog(
   details << recentLogLines.c_str();
 
   const std::string bodyText = details.str();
+#if !FAFRE_PLATFORM_WINDOWS
+  // The crash dialog is a Windows dialog resource: the same text in a message box.
+  WIN_OkBox(caption != nullptr ? caption : "Crash", bodyText.c_str());
+#else
   CrashDialogInitData dialogInit{
     caption != nullptr ? caption : "Crash",
     bodyText.c_str(),
@@ -2608,6 +2687,7 @@ void moho::WIN_ShowCrashDialog(
     gpg::Logf("DialogBoxParam failed: %s", dialogError.c_str());
     WIN_OkBox(dialogInit.caption, dialogInit.body);
   }
+#endif
 }
 
 
@@ -2706,12 +2786,15 @@ namespace
  */
 void moho::WINX_Exit()
 {
+  // The managed dialogs are developer windows, Windows only (WxRuntimeTypes.h).
+#if FAFRE_PLATFORM_WINDOWS
   for (std::size_t index = 0; index < managedWindows.size(); ++index) {
     if (WWinManagedDialog* const dialog = managedWindows[index].GetObjectPtr(); dialog != nullptr) {
       (void)dialog->Destroy();
       managedWindows[index].UnlinkFromOwnerChain();
     }
   }
+#endif
 
   for (std::size_t index = 0; index < managedFrames.size(); ++index) {
     if (WWinManagedFrame* const frame = managedFrames[index].GetObjectPtr(); frame != nullptr) {
@@ -2751,6 +2834,10 @@ wxString moho::WINX_Printf(const char* const format, ...)
  */
 void moho::WINX_InitSplash(const gpg::StrArg filename)
 {
+#if !FAFRE_PLATFORM_WINDOWS
+  // No splash window on Linux yet (the window system is issue #256).
+  (void)filename;
+#else
   if (sSplashPngHandler == nullptr) {
     sSplashPngHandler = new wxPNGHandler();
     wxImage::AddHandler(sSplashPngHandler);
@@ -2787,6 +2874,7 @@ void moho::WINX_InitSplash(const gpg::StrArg filename)
     splashSize,
     wxSIMPLE_BORDER | wxSTAY_ON_TOP
   ));
+#endif
 }
 
 /**
@@ -2799,6 +2887,7 @@ void moho::WINX_InitSplash(const gpg::StrArg filename)
  */
 void moho::WINX_PrecreateLogWindow()
 {
+#if FAFRE_PLATFORM_WINDOWS
   if (sLogWindowTarget.dialog != nullptr) {
     return;
   }
@@ -2806,6 +2895,8 @@ void moho::WINX_PrecreateLogWindow()
   WWinLogWindow* const createdLogWindow = new WWinLogWindow();
   boost::mutex::scoped_lock lock(sLogWindowTarget.lock);
   sLogWindowTarget.dialog = createdLogWindow;
+#endif
+  // The log window is a developer window, Windows only (WxRuntimeTypes.h).
 }
 
 /**
@@ -2817,7 +2908,9 @@ void moho::WINX_PrecreateLogWindow()
  */
 void moho::WINX_ExitSplash()
 {
+#if FAFRE_PLATFORM_WINDOWS
   sSplashScreen.reset();
+#endif
 }
 
 #pragma warning(pop)

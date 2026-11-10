@@ -198,6 +198,7 @@ struct OSVERSIONINFOW
   DWORD dwPlatformId;
   WCHAR szCSDVersion[128];
 };
+#define VER_PLATFORM_WIN32_WINDOWS 1u
 #define VER_PLATFORM_WIN32_NT 2u
 BOOL GetVersionExW(OSVERSIONINFOW* info);
 
@@ -279,6 +280,8 @@ DWORD GetCurrentThreadId();
 HANDLE GetCurrentThread();
 HANDLE GetCurrentProcess();
 DWORD GetCurrentProcessId();
+// Ends this process at once with `exitCode` (std::_Exit); other processes fail with ERROR_INVALID_HANDLE.
+BOOL TerminateProcess(HANDLE process, UINT exitCode);
 void Sleep(DWORD milliseconds);
 DWORD SleepEx(DWORD milliseconds, BOOL alertable);
 
@@ -967,6 +970,8 @@ SHORT GetKeyState(int virtualKey);
 SHORT GetAsyncKeyState(int virtualKey);
 HCURSOR SetCursor(HCURSOR cursor);
 int ShowCursor(BOOL show);
+// Frees a cursor the window system made (platform::posix::gCreateCursorHook).
+BOOL DestroyIcon(HICON icon);
 // Confines the cursor to `rect` (screen coordinates), or frees it for null.
 BOOL ClipCursor(const RECT* rect);
 // Monitors, as the window system reports them (platform::posix::SetMonitors, Win32WindowPosix.h);
@@ -1001,6 +1006,20 @@ BOOL SetWindowTextW(HWND window, const wchar_t* text);
 #define SPI_GETFONTSMOOTHINGCONTRAST 0x200Cu
 #define SPI_GETFONTSMOOTHINGORIENTATION 0x2012u
 BOOL SystemParametersInfoW(UINT action, UINT parameter, void* data, UINT winIni);
+// Message boxes go to the window system (platform::posix::gMessageBoxHook); without one the text
+// goes to stderr and the box answers as if closed: IDOK, or IDNO for a yes/no box.
+#define MB_OK 0x0u
+#define MB_YESNO 0x4u
+#define MB_TYPEMASK 0xFu
+#define IDOK 1
+#define IDCANCEL 2
+#define IDYES 6
+#define IDNO 7
+int MessageBoxW(HWND window, const wchar_t* text, const wchar_t* caption, UINT type);
+
+// Registry value types, for the code that names them; the Linux client has no registry.
+#define REG_SZ 1u
+#define REG_DWORD 4u
 
 // --- GDI text (WinGDI.h) for the Linux client (issue #255) ------------------------------------
 // CD3DFont rasterizes a character's glyph with GDI into a 32-bit scratch bitmap and reads its

@@ -969,6 +969,16 @@ void GetSystemInfo(SYSTEM_INFO* const info)
   info->dwAllocationGranularity = 65536u;
 }
 
+BOOL TerminateProcess(const HANDLE process, const UINT exitCode)
+{
+  // Only this process is ever named (GetCurrentProcess's pseudo-handle).
+  if (process != GetCurrentProcess()) {
+    tLastError = ERROR_INVALID_HANDLE;
+    return FALSE;
+  }
+  std::_Exit(static_cast<int>(exitCode));
+}
+
 BOOL GetVersionExW(OSVERSIONINFOW* const info)
 {
   if (info == nullptr) {

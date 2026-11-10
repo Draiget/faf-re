@@ -105,4 +105,16 @@ public:
   )
     : wxTopLevelWindow(parent, id, title, pos, size, style, name)
   {}
+  // The name as a wxString, as WWinManagedFrame passes it (the window keeps no name).
+  wxFrame(
+    wxWindow* const parent,
+    const wxWindowID id,
+    const wxString& title,
+    const wxPoint& pos,
+    const wxSize& size,
+    const long style,
+    const wxString& name
+  )
+    : wxTopLevelWindow(parent, id, title, pos, size, style, name.c_str())
+  {}
 };

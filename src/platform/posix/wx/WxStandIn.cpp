@@ -303,6 +303,33 @@ bool wxApp::Pending()
 
 void wxApp::Dispatch() {}
 
+void wxApp::CleanUp()
+{
+  delete wxTheApp; // the destructor clears wxTheApp
+}
+
+int wxEntry(
+  const WXHINSTANCE instance, const WXHINSTANCE previousInstance, char* const commandLine, const int showCommand,
+  const bool enterLoop
+)
+{
+  (void)instance;
+  (void)previousInstance;
+  (void)commandLine;
+  (void)showCommand;
+  if (wxTheApp == nullptr) {
+    if (const wxApp::InitializerFunction create = wxApp::GetInitializerFunction(); create != nullptr) {
+      (void)create(); // the constructor sets wxTheApp
+    }
+  }
+  if (wxTheApp == nullptr || !wxTheApp->OnInit()) {
+    return -1;
+  }
+  // The engine runs its own loop (enterLoop false); nothing here runs one for it.
+  (void)enterLoop;
+  return 0;
+}
+
 void wxApp::ExitMainLoop()
 {
   m_keepGoing = FALSE;

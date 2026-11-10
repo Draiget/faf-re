@@ -15,7 +15,6 @@ set(_faf_client_windows_only
   "^gpg/gal/backends/(d3d9|d3d10|d3d11|d3d12|dxgi)/"
   "/FX11/"
   "^gpg/gal/(DxgiAdapterInfo|D3DErrorToWideString)\\.cpp$"
-  "^gpg/gal/backends/common/WindowsCursor\\.cpp$"
   "^moho/movie/sfd/DirectSoundMovieSink\\.cpp$"
   # The Win32 crash dialog; gpg/core/diagnostics/posix/DiagnosticsPosix.cpp has the POSIX one.
   "^gpg/core/diagnostics/CrashReportDialog\\.cpp$"
@@ -23,10 +22,10 @@ set(_faf_client_windows_only
   "^gpg/gal/MatrixPortable\\.cpp$"
   # wxWindows 2.4.2 has no Linux port; the wx stand-in (src/platform/posix/wx) covers only what
   # the game code uses. Left out until their own issues land:
-  #   the Windows entry point and process setup (WinMain, WinApp: crash handler, clipboard,
-  #   splash, wx start) and the wx dialogs; the Linux entry point is issue #256 (SDL3). The main
-  #   frame, the viewports and CScApp build over the wx stand-in.
-  "^moho/app/(WinMain|WinApp|WxAppWindows)\\.cpp$"
+  #   the Windows entry point (src/platform/posix/ClientMainPosix.cpp takes its place, issue
+  #   #256). WinApp (the main loop), the app windows, the main frame, the viewports and CScApp
+  #   build over the wx stand-in and the POSIX <Windows.h>.
+  "^moho/app/WinMain\\.cpp$"
   #   the wx script debugger (issue #260);
   "^moho/misc/(ScrDebugWindow|ScrFileCtrl|ScrSourceCtrl|ScrWatchCtrl|ScrGotoDialog|ScrPauseEvent|TreeData)\\.cpp$"
   #   the developer windows and Windows desktop features: emitter editor, log window,

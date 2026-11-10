@@ -4,8 +4,24 @@
 // window, cursor and key-state calls of platform/posix/win32/Windows.h. Win32WindowPosix.cpp keeps
 // the state; these functions update it from the window system's events.
 
+#include <string>
+
 namespace platform::posix
 {
+  // Shows a message box (MessageBoxW); returns true for Yes (a yes/no box) or OK.
+  extern bool (*gMessageBoxHook)(void* window, const char* utf8Text, const char* utf8Caption, bool yesNo);
+  // The game's cursor (gpg/gal/backends/common/WindowsCursor.cpp): a 32x32 colour cursor from
+  // B,G,R,A pixels in rows bottom-up (a DIB's order) with its hotspot; returns the window system's
+  // cursor as the HICON/HCURSOR the engine keeps, or null.
+  extern void* (*gCreateCursorHook)(const unsigned int* bgraBottomUp, int hotspotX, int hotspotY);
+  // DestroyIcon on such a cursor.
+  extern void (*gDestroyCursorHook)(void* cursor);
+  // SetCursor's new cursor (null: none), and ShowCursor crossing between shown and hidden.
+  extern void (*gSetCursorHook)(void* cursor);
+  extern void (*gShowCursorHook)(bool shown);
+  // The clipboard's text in UTF-8 (WIN_CopyToClipboard, WIN_GetClipboardText).
+  extern bool (*gSetClipboardTextHook)(const char* utf8Text);
+  extern std::string (*gGetClipboardTextHook)();
   // A window's rectangle in screen coordinates, as GetWindowRect reports it.
   void SetWindowScreenRect(void* window, int left, int top, int right, int bottom);
   // The window is gone: GetWindowRect fails for it and a capture on it ends.

@@ -20,4 +20,9 @@ inline HRESULT CoInitializeEx(void* const reserved, const DWORD flags) noexcept
   return S_OK;
 }
 
+inline HRESULT CoInitialize(void* const reserved) noexcept
+{
+  return CoInitializeEx(reserved, COINIT_APARTMENTTHREADED);
+}
+
 inline void CoUninitialize() noexcept {}

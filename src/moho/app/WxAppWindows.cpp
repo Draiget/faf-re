@@ -14,6 +14,10 @@ fa::vector<moho::WeakPtr<moho::WWinManagedFrame>> moho::managedFrames;
 wxWindow* moho::sMainWindow = nullptr;
 moho::WRenViewport* moho::ren_Viewport = nullptr;
 
+// The managed dialogs, the bitmap controls and the input box are developer windows, Windows only
+// (WxRuntimeTypes.h; the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
+
 /**
  * Address: 0x004F3F50 (FUN_004F3F50)
  *
@@ -51,6 +55,7 @@ moho::WWinManagedDialog::WWinManagedDialog(
  * (0x004F40AE), then ~wxDialog follows.
  */
 moho::WWinManagedDialog::~WWinManagedDialog() = default;
+#endif
 
 /**
  * Address: 0x004F40E0 (FUN_004F40E0)
@@ -121,6 +126,7 @@ void moho::MohoApp::ExitMainLoop()
 {
   m_keepGoing = FALSE;
 }
+#if FAFRE_PLATFORM_WINDOWS
 namespace
 {
 
@@ -375,6 +381,7 @@ void moho::CON_WxInputBox(const fa::vector<fa::string>& args)
     CON_Printf("Canceled");
   }
 }
+#endif // FAFRE_PLATFORM_WINDOWS: the developer windows
 namespace moho
 {
 

@@ -96,6 +96,13 @@ namespace platform::posix
     }
   }
 
+  void* (*gCreateCursorHook)(const unsigned int* bgraBottomUp, int hotspotX, int hotspotY) = nullptr;
+  void (*gDestroyCursorHook)(void* cursor) = nullptr;
+  void (*gSetCursorHook)(void* cursor) = nullptr;
+  void (*gShowCursorHook)(bool shown) = nullptr;
+  bool (*gMessageBoxHook)(void* window, const char* utf8Text, const char* utf8Caption, bool yesNo) = nullptr;
+  bool (*gSetClipboardTextHook)(const char* utf8Text) = nullptr;
+  std::string (*gGetClipboardTextHook)() = nullptr;
   void (*gSetWindowTitleHook)(void* window, const char* utf8Title) = nullptr;
   void (*gScreenSaverHook)(bool allowed) = nullptr;
   void (*gWarpCursorHook)(int x, int y) = nullptr;
@@ -229,19 +236,47 @@ SHORT GetAsyncKeyState(const int virtualKey)
 
 HCURSOR SetCursor(const HCURSOR cursor)
 {
-  WindowState& state = State();
-  const std::lock_guard<std::mutex> lock(state.mutex);
-  const HCURSOR previous = state.cursorShape;
-  state.cursorShape = cursor;
+  HCURSOR previous = nullptr;
+  {
+    WindowState& state = State();
+    const std::lock_guard<std::mutex> lock(state.mutex);
+    previous = state.cursorShape;
+    state.cursorShape = cursor;
+  }
+  if (platform::posix::gSetCursorHook != nullptr) {
+    platform::posix::gSetCursorHook(cursor);
+  }
   return previous;
 }
 
 int ShowCursor(const BOOL show)
 {
-  WindowState& state = State();
-  const std::lock_guard<std::mutex> lock(state.mutex);
-  state.cursorShowCount += show ? 1 : -1;
-  return state.cursorShowCount;
+  int count = 0;
+  bool crossed = false;
+  {
+    WindowState& state = State();
+    const std::lock_guard<std::mutex> lock(state.mutex);
+    const bool wasShown = state.cursorShowCount >= 0;
+    state.cursorShowCount += show ? 1 : -1;
+    count = state.cursorShowCount;
+    crossed = wasShown != (count >= 0);
+  }
+  // Windows shows the cursor while the count is 0 or more.
+  if (crossed && platform::posix::gShowCursorHook != nullptr) {
+    platform::posix::gShowCursorHook(count >= 0);
+  }
+  return count;
+}
+
+BOOL DestroyIcon(const HICON icon)
+{
+  if (icon == nullptr) {
+    return FALSE;
+  }
+  if (platform::posix::gDestroyCursorHook != nullptr) {
+    platform::posix::gDestroyCursorHook(icon);
+  }
+  return TRUE;
 }
 
 namespace
@@ -486,6 +521,37 @@ BOOL SystemParametersInfoW(const UINT action, const UINT parameter, void* const 
     default:
       return FALSE;
   }
+}
+
+int MessageBoxW(const HWND window, const wchar_t* const text, const wchar_t* const caption, const UINT type)
+{
+  const auto utf8 = [](const wchar_t* const wide) {
+    std::string out;
+    for (const wchar_t* character = wide; character != nullptr && *character != L'\0'; ++character) {
+      const std::uint32_t code = static_cast<std::uint32_t>(*character);
+      if (code < 0x80u) {
+        out += static_cast<char>(code);
+      } else if (code < 0x800u) {
+        out += static_cast<char>(0xC0u | (code >> 6));
+        out += static_cast<char>(0x80u | (code & 0x3Fu));
+      } else {
+        out += static_cast<char>(0xE0u | ((code >> 12) & 0x0Fu));
+        out += static_cast<char>(0x80u | ((code >> 6) & 0x3Fu));
+        out += static_cast<char>(0x80u | (code & 0x3Fu));
+      }
+    }
+    return out;
+  };
+  const std::string utf8Text = utf8(text);
+  const std::string utf8Caption = utf8(caption);
+  const bool yesNo = (type & MB_TYPEMASK) == MB_YESNO;
+  if (platform::posix::gMessageBoxHook != nullptr) {
+    return platform::posix::gMessageBoxHook(window, utf8Text.c_str(), utf8Caption.c_str(), yesNo) ? (yesNo ? IDYES : IDOK)
+                                                                                                    : (yesNo ? IDNO : IDOK);
+  }
+  std::fprintf(stderr, "[%s] %s\n", utf8Caption.c_str(), utf8Text.c_str());
+  std::fflush(stderr);
+  return yesNo ? IDNO : IDOK;
 }
 
 BOOL IsWindowVisible(const HWND window)
