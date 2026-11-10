@@ -1007,8 +1007,14 @@ namespace moho
       return nullptr;
     }
 
-    ParticleBuffer* const particleBuffer = mAvailableParticleBuffers.front();
-    mAvailableParticleBuffers.pop_front();
+    // Engine change: the buffer released last. Retail takes the list's first, the one released longest ago
+    // (0x004939CA..0x004939CF in FUN_00493940: head at +0x14, its first node's value). A buffer makes its GPU
+    // buffers on first use and keeps them (ParticleBuffer::Initialize), so oldest-first walks the whole pool:
+    // with FAF's 4096 buffers (FA-Binary-Patches #165) every play reached about 11 never-used ones, each new
+    // buffer's memory kept to the end (WPE.16). Last-released-first keeps reusing the ones already made. Particles
+    // are drawn only, and each use refills its buffer with a discard lock, so the order shows nowhere.
+    ParticleBuffer* const particleBuffer = mAvailableParticleBuffers.back();
+    mAvailableParticleBuffers.pop_back();
     return particleBuffer;
   }
 
