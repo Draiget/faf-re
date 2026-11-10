@@ -28,6 +28,12 @@ namespace faf::editor
     int faction = 0;
     /** Fog of war as the game's "explored"; off is "none". */
     bool fog = true;
+    /** The player's start: an index into the scenario's first team (the lobby's slots); past its end, the first. */
+    int slot = 0;
+    /** How many of the other slots get an AI (0: all of them), in slot order. */
+    int aiCount = 0;
+    /** The game's "Prebuilt units" option: each army starts with a base. */
+    bool prebuilt = false;
   };
 
   /**
@@ -86,6 +92,12 @@ namespace faf::editor
      */
     [[nodiscard]] bool SeesWholeMap() const;
     void SetSeesWholeMap(bool wholeMap);
+    /**
+     * During play: the view leaves out the fog's shading (the game's `ren_FogOfWar`, WRenViewport) while the
+     * player keeps their army; units the army has no intel on stay unseen. Put back when the play ends.
+     */
+    [[nodiscard]] bool FogHidden() const;
+    void SetFogHidden(bool hidden);
 
     /** Starts the selected map on the next frame. */
     void Play() noexcept { mPlayRequested = true; }
@@ -116,6 +128,9 @@ namespace faf::editor
       std::string ai;
       std::string faction; // empty: random
       bool fog = true;
+      int slot = 0;
+      int aiCount = 0;
+      bool prebuilt = false;
     };
 
     void FindChoices();
@@ -155,6 +170,7 @@ namespace faf::editor
     /** The army the view had before it switched to the whole map. */
     int mPlayerArmy = 0;
     bool mWholeMap = false;
+    bool mFogHidden = false;
     int mSelected = 0;
     bool mPlayRequested = false;
     bool mStopRequested = false;

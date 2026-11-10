@@ -335,6 +335,8 @@ namespace faf::editor
       std::string mLayerArg;
       /** The game's view shows nothing while a modal dialog of the panels is open (FitGameView). */
       bool mViewStepsAside = false;
+      /** The popups' rectangles (view pixels) the view's window region leaves out, as last set. */
+      std::vector<RECT> mViewHoles;
       int mBrowseArg = -1;
       // `/shader <name>` with `/open` (test runs): the map's terrain shader changed once it is shown.
       std::string mShaderArg;
@@ -511,6 +513,8 @@ namespace faf::editor
       style.FrameRounding = 3.0f;
       style.TabRounding = 3.0f;
       style.Colors[ImGuiCol_WindowBg] = ImVec4(0.110f, 0.122f, 0.145f, 0.97f);
+      // Popups, menus and tooltips: opaque, so the panel under them doesn't show through.
+      style.Colors[ImGuiCol_PopupBg] = ImVec4(0.090f, 0.100f, 0.122f, 1.0f);
       style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.18f, 0.20f, 0.24f, 1.0f);
       style.Colors[ImGuiCol_Header] = ImVec4(0.89f, 0.58f, 0.26f, 0.30f);
       style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.89f, 0.58f, 0.26f, 0.45f);
@@ -2203,14 +2207,53 @@ namespace faf::editor
         height = clientHeight;
       }
 
-      // A modal dialog of the panels (New map, Save as, the texture browser) would be hidden behind the game's
-      // view, which is a window of its own over the panels' window: while one is open the view's window region
-      // is empty, so the dialog shows through. Hiding the window instead would stop its paint, and the panels'
-      // head is presented with it.
+      // The game's view is a window of its own over the panels' window, so anything of the panels' that reaches
+      // over it would be hidden: while a modal dialog (New map, Save as, the texture browser) is open the view's
+      // window region is empty, and a tooltip, menu or drop-down list over it is cut out of the region, so they
+      // show through. Hiding the window instead would stop its paint, and the panels' head is presented with it.
       const bool modal = mImGuiReady && ImGui::GetTopMostPopupModal() != nullptr;
-      if (modal != mViewStepsAside) {
+      std::vector<RECT> holes;
+      if (mImGuiReady && !modal) {
+        for (const ImGuiWindow* const window : ImGui::GetCurrentContext()->Windows) {
+          if (!window->WasActive || window->Hidden ||
+              (window->Flags & (ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_Popup | ImGuiWindowFlags_ChildMenu)) == 0 ||
+              (window->Flags & ImGuiWindowFlags_ChildWindow) != 0) {
+            continue;
+          }
+          RECT hole{static_cast<LONG>(window->Pos.x) - x, static_cast<LONG>(window->Pos.y) - y,
+                    static_cast<LONG>(window->Pos.x + window->Size.x + 1.0f) - x, static_cast<LONG>(window->Pos.y + window->Size.y + 1.0f) - y};
+          if (hole.right > 0 && hole.bottom > 0 && hole.left < width && hole.top < height) {
+            holes.push_back(hole);
+          }
+        }
+      }
+      const auto sameHoles = [&] {
+        if (holes.size() != mViewHoles.size()) {
+          return false;
+        }
+        for (std::size_t i = 0; i < holes.size(); ++i) {
+          if (::EqualRect(&holes[i], &mViewHoles[i]) == FALSE) {
+            return false;
+          }
+        }
+        return true;
+      };
+      if (modal != mViewStepsAside || !sameHoles()) {
         mViewStepsAside = modal;
-        ::SetWindowRgn(view, modal ? ::CreateRectRgn(0, 0, 0, 0) : nullptr, TRUE);
+        mViewHoles = holes;
+        HRGN region = nullptr;
+        if (modal) {
+          region = ::CreateRectRgn(0, 0, 0, 0);
+        } else if (!holes.empty()) {
+          region = ::CreateRectRgn(0, 0, width, height);
+          for (const RECT& hole : holes) {
+            const HRGN cut = ::CreateRectRgnIndirect(&hole);
+            (void)::CombineRgn(region, region, cut, RGN_DIFF);
+            ::DeleteObject(cut);
+          }
+        }
+        // The window owns the region from here on (SetWindowRgn).
+        ::SetWindowRgn(view, region, TRUE);
       }
 
       RECT panel{};

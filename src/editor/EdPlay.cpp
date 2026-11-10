@@ -28,6 +28,11 @@
 #include "moho/misc/Stats.h"
 
 
+namespace moho
+{
+  extern bool ren_FogOfWar;
+}
+
 namespace faf::editor
 {
   namespace
@@ -40,6 +45,8 @@ namespace faf::editor
      */
     constexpr const char kLauncher[] = R"lua(
 function EditorStartPlay(mapPath, aiKey, faction, fog)
+    -- The setup's other choices, set by the editor just before the call.
+    local extra = rawget(_G, '__EditorPlayExtra') or {}
     local SPL = import('/lua/singleplayerlaunch.lua')
     local Prefs = import('/lua/user/prefs.lua')
     local scenario = import('/lua/ui/maputil.lua').LoadScenario(mapPath)
@@ -52,7 +59,7 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
     end
     SPL.VerifyScenarioConfiguration(scenario)
     scenario.Options = {
-        FogOfWar = fog, NoRushOption = 'Off', PrebuiltUnits = 'Off', Difficulty = 2,
+        FogOfWar = fog, NoRushOption = 'Off', PrebuiltUnits = extra.prebuilt and 'On' or 'Off', Difficulty = 2,
         DoNotShareUnitCap = true, Timeouts = -1, GameSpeed = 'normal', UnitCap = '500',
         Victory = 'sandbox', CheatsEnabled = 'true', CivilianAlliance = 'enemy',
         TeamShareOverflow = 'enabled', Share = 'ShareUntilDeath',
@@ -73,26 +80,35 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
     local armies = scenario.Configurations.standard.teams[1].armies
     local numColors = table.getn(import('/lua/gamecolors.lua').GameColors.PlayerColors)
 
+    local slot = extra.slot or 1
+    if slot < 1 or slot > table.getn(armies) then
+        slot = 1
+    end
     local player = GetDefaultPlayerOptions(info.playerName)
     player.PlayerName = info.playerName
     player.Faction = faction
     player.Human = true
-    player.ArmyName = armies[1]
-    player.PlayerColor = math.mod(1, numColors)
-    player.ArmyColor = math.mod(1, numColors)
+    player.ArmyName = armies[slot]
+    player.PlayerColor = math.mod(slot, numColors)
+    player.ArmyColor = math.mod(slot, numColors)
     info.teamInfo[1] = player
 
     if aiKey ~= '' then
-        for index = 2, table.getn(armies) do
-            local ai = GetDefaultPlayerOptions(info.playerName)
-            ai.AIPersonality = aiKey
-            ai.Faction = SPL.GetRandomFaction()
-            ai.PlayerName = SPL.GetRandomName(ai.Faction, aiKey)
-            ai.Human = false
-            ai.ArmyName = armies[index]
-            ai.PlayerColor = math.mod(index, numColors)
-            ai.ArmyColor = math.mod(index, numColors)
-            info.teamInfo[index] = ai
+        local wanted = extra.aiCount or 0
+        local placed = 0
+        for index = 1, table.getn(armies) do
+            if index ~= slot and (wanted < 1 or placed < wanted) then
+                placed = placed + 1
+                local ai = GetDefaultPlayerOptions(info.playerName)
+                ai.AIPersonality = aiKey
+                ai.Faction = SPL.GetRandomFaction()
+                ai.PlayerName = SPL.GetRandomName(ai.Faction, aiKey)
+                ai.Human = false
+                ai.ArmyName = armies[index]
+                ai.PlayerColor = math.mod(index, numColors)
+                ai.ArmyColor = math.mod(index, numColors)
+                info.teamInfo[table.getn(info.teamInfo) + 1] = ai
+            end
         end
     end
 
@@ -403,6 +419,9 @@ end
       stored.faction = mFactions[static_cast<std::size_t>(setup.faction - 1)].key;
     }
     stored.fog = setup.fog;
+    stored.slot = setup.slot;
+    stored.aiCount = setup.aiCount;
+    stored.prebuilt = setup.prebuilt;
     return stored;
   }
 
@@ -422,6 +441,9 @@ end
       }
     }
     setup.fog = stored.fog;
+    setup.slot = stored.slot;
+    setup.aiCount = stored.aiCount;
+    setup.prebuilt = stored.prebuilt;
     return setup;
   }
 
@@ -436,7 +458,7 @@ end
   }
 
   // play_setups.ini: a [last] section and a [map <key>] section per map that keeps its own setup,
-  // each with opponents=solo|ai, ai=<key>, faction=<key>|random, fog=0|1.
+  // each with opponents=solo|ai, ai=<key>, faction=<key>|random, fog=0|1, slot=<n from 1>, aicount=<n, 0 all>, prebuilt=0|1.
   void EdPlay::ReadSetups()
   {
     mMapSetups.clear();
@@ -480,6 +502,12 @@ end
         current->faction = value == "random" ? std::string{} : value;
       } else if (key == "fog") {
         current->fog = value != "0";
+      } else if (key == "slot") {
+        current->slot = std::max(0, std::atoi(value.c_str()) - 1);
+      } else if (key == "aicount") {
+        current->aiCount = std::max(0, std::atoi(value.c_str()));
+      } else if (key == "prebuilt") {
+        current->prebuilt = value == "1";
       }
     }
     gpg::Logf("editor: play setups from %s (%s last, %zu maps of their own)", mSetupsFile.c_str(),
@@ -501,7 +529,10 @@ end
           << "opponents=" << (setup.withAi ? "ai" : "solo") << '\n'
           << "ai=" << setup.ai << '\n'
           << "faction=" << (setup.faction.empty() ? "random" : setup.faction) << '\n'
-          << "fog=" << (setup.fog ? 1 : 0) << "\n\n";
+          << "fog=" << (setup.fog ? 1 : 0) << '\n'
+          << "slot=" << setup.slot + 1 << '\n'
+          << "aicount=" << setup.aiCount << '\n'
+          << "prebuilt=" << (setup.prebuilt ? 1 : 0) << "\n\n";
     };
     out << "; FAF Map Editor: the last play setup, and the maps that keep their own (written by the editor)\n\n";
     if (mHaveLastSetup) {
@@ -535,10 +566,26 @@ end
     gpg::Logf("editor: the view shows %s", wholeMap ? "the whole map" : "the player's army");
   }
 
+  bool EdPlay::FogHidden() const
+  {
+    return mFogHidden && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing;
+  }
+
+  void EdPlay::SetFogHidden(const bool hidden)
+  {
+    if (hidden == mFogHidden) {
+      return;
+    }
+    mFogHidden = hidden;
+    moho::ren_FogOfWar = !hidden;
+    gpg::Logf("editor: the view %s the fog", hidden ? "leaves out" : "shows");
+  }
+
   bool EdPlay::StartSession(const std::string& scenario)
   {
     mPlayerArmy = 0;
     mWholeMap = false;
+    SetFogHidden(false);
     if (memtrace::Running()) {
       mTracePlay = memtrace::NextPlay();
     }
@@ -558,8 +605,13 @@ end
     const std::string aiKey = withAi ? mAiTypes[static_cast<std::size_t>(mSetup.ai)].key : std::string{};
     const int faction = mSetup.faction >= 1 && mSetup.faction <= static_cast<int>(mFactions.size()) ? mSetup.faction : 0;
     const char* const fog = mSetup.fog ? "explored" : "none";
-    gpg::Logf("editor: play %s (%s, faction %s, fog %s)", scenario.c_str(), withAi ? aiKey.c_str() : "solo",
-              faction > 0 ? mFactions[static_cast<std::size_t>(faction - 1)].key.c_str() : "random", fog);
+    gpg::Logf("editor: play %s (%s, faction %s, fog %s, slot %d, %d AI, prebuilt %s)", scenario.c_str(), withAi ? aiKey.c_str() : "solo",
+              faction > 0 ? mFactions[static_cast<std::size_t>(faction - 1)].key.c_str() : "random", fog, mSetup.slot + 1,
+              mSetup.aiCount, mSetup.prebuilt ? "on" : "off");
+    char extra[160];
+    (void)std::snprintf(extra, sizeof(extra), "__EditorPlayExtra = { slot = %d, aiCount = %d, prebuilt = %s }", mSetup.slot + 1,
+                        mSetup.aiCount, mSetup.prebuilt ? "true" : "false");
+    (void)moho::SCR_LuaDoString(extra, state);
     try {
       const LuaPlus::LuaObject start = state->GetGlobal("EditorStartPlay");
       if (start.IsNil()) {
@@ -765,6 +817,7 @@ end
     if ((mStopRequested && action != moho::EWldFrameAction::Inactive) || action == moho::EWldFrameAction::Exit) {
       gpg::Logf("editor: play ended (%s)", action == moho::EWldFrameAction::Exit ? "the session's exit" : "Stop");
       moho::WLD_Teardown();
+      SetFogHidden(false);
       mMemoryCheckAt = std::chrono::steady_clock::now() + std::chrono::seconds(2);
     }
     mStopRequested = false;

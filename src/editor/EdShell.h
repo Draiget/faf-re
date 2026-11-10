@@ -101,6 +101,8 @@ namespace faf::editor
     void HandleKeys();
     void DrawToolsPanel();
     void DrawMapPanel();
+    /** The Play setup (opponents, AI, faction, start slot, fog, prebuilt units) and the in-play view switches. */
+    void DrawPlaySetup();
     /** The open map: title, kind as chips, counts as cards, layers with thumbnails, armies, files (ui/EdInfoPanels.cpp). */
     void DrawInfoPanel();
     /** The map's markers as a tree by group and type: select, go to, hide a type (ui/EdInfoPanels.cpp). */

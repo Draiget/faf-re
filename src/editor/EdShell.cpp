@@ -299,11 +299,36 @@ namespace faf::editor
         const char* const word = playing ? "Stop" : "Play";
         const float textY = at.y + (size.y - ImGui::GetTextLineHeight()) * 0.5f;
         draw->AddText(ImVec2(at.x + 20.0f + 2.0f * r, textY), white, word);
+        // The key, on a darker cap so it reads on the green and the red.
         const ImVec2 keySize = ImGui::CalcTextSize("F5");
-        draw->AddText(ImVec2(at.x + size.x - keySize.x - 10.0f, textY), ImGui::GetColorU32(ImGuiCol_TextDisabled), "F5");
+        const ImVec2 capMin(at.x + size.x - keySize.x - 14.0f, at.y + 4.0f);
+        const ImVec2 capMax(at.x + size.x - 6.0f, at.y + size.y - 4.0f);
+        draw->AddRectFilled(capMin, capMax, IM_COL32(0, 0, 0, 90), 3.0f);
+        draw->AddRect(capMin, capMax, IM_COL32(255, 255, 255, 70), 3.0f);
+        draw->AddText(ImVec2(capMin.x + 4.0f, textY), IM_COL32(255, 255, 255, 230), "F5");
         ImGui::EndDisabled();
-        ImGui::PopStyleColor(3);
         tip(playing ? "Stop the session and go back to editing (F5)" : "Play the map picked in the Map panel (F5)");
+        // The setup, one click away.
+        ImGui::SameLine(0.0f, 1.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, ImGui::GetStyle().FramePadding.y));
+        if (ImGui::ArrowButton("##playsetup", ImGuiDir_Down)) {
+          ImGui::OpenPopup("##playsetuppopup");
+        }
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor(3);
+        tip("Play options: start slot, faction, AI opponents, fog, prebuilt units; while playing, hide the fog or watch as an observer");
+        ImGui::SetNextWindowSize(ImVec2(ImGui::GetFontSize() * 22.0f, 0.0f));
+        if (ImGui::BeginPopup("##playsetuppopup")) {
+          const std::vector<std::string>& playMaps = mPlay.Maps();
+          if (!playMaps.empty()) {
+            ImGui::TextUnformatted(mPlay.Titles()[static_cast<std::size_t>(mPlay.Selected())].c_str());
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", MapDisplayName(playMaps[static_cast<std::size_t>(mPlay.Selected())]).c_str());
+            ImGui::Separator();
+          }
+          DrawPlaySetup();
+          ImGui::EndPopup();
+        }
       }
       divider();
 
@@ -443,6 +468,139 @@ namespace faf::editor
     ImGui::End();
   }
 
+  void EdShell::DrawPlaySetup()
+  {
+    // Solo (fastest: no AI brains, so no AI map analysis) or against one AI type, the player's start and
+    // faction, and the game's options the editor sets.
+    PlaySetup& setup = mPlay.Setup();
+    ImGui::BeginDisabled(mPlay.Active());
+    int opponents = setup.withAi ? 1 : 0;
+    ImGui::RadioButton("Solo", &opponents, 0);
+    ImGui::SameLine();
+    ImGui::RadioButton("Against AI", &opponents, 1);
+    setup.withAi = opponents == 1;
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("Other slots get an AI. The AI's map analysis adds about 2 s to each start.");
+    }
+
+    // The slots: the open map's armies when it is the picked one, else numbers.
+    const std::vector<std::string>& maps = mPlay.Maps();
+    std::vector<std::string> slots;
+    if (!maps.empty() && mDocument.GetState() == EdDocument::State::Open &&
+        mDocument.Path() == maps[static_cast<std::size_t>(mPlay.Selected())]) {
+      const std::vector<ScenarioTeam> teams = mDocument.Teams();
+      if (!teams.empty()) {
+        slots = teams.front().armies;
+      }
+    }
+    const int slotCount = slots.empty() ? 16 : static_cast<int>(slots.size());
+    setup.slot = std::clamp(setup.slot, 0, slotCount - 1);
+    const auto slotName = [&](const int i) {
+      return slots.empty() ? "Slot " + std::to_string(i + 1) : std::to_string(i + 1) + "  " + slots[static_cast<std::size_t>(i)];
+    };
+    const float labelWidth = ImGui::CalcTextSize("AI opponents").x + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+    const auto label = [&](const char* const text) {
+      ImGui::AlignTextToFramePadding();
+      ImGui::TextDisabled("%s", text);
+      ImGui::SameLine(labelWidth);
+      ImGui::SetNextItemWidth(-1.0f);
+    };
+    label("Start");
+    if (ImGui::BeginCombo("##slot", slotName(setup.slot).c_str())) {
+      for (int i = 0; i < slotCount; ++i) {
+        if (ImGui::Selectable(slotName(i).c_str(), i == setup.slot)) {
+          setup.slot = i;
+        }
+      }
+      ImGui::EndCombo();
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("The lobby slot you play (its army's start position)");
+    }
+    const std::vector<PlayChoice>& factions = mPlay.Factions();
+    setup.faction = std::clamp(setup.faction, 0, static_cast<int>(factions.size()));
+    label("Faction");
+    if (ImGui::BeginCombo("##faction", setup.faction == 0 ? "Random" : factions[static_cast<std::size_t>(setup.faction - 1)].name.c_str())) {
+      if (ImGui::Selectable("Random", setup.faction == 0)) {
+        setup.faction = 0;
+      }
+      for (int i = 0; i < static_cast<int>(factions.size()); ++i) {
+        if (ImGui::Selectable(factions[static_cast<std::size_t>(i)].name.c_str(), setup.faction == i + 1)) {
+          setup.faction = i + 1;
+        }
+      }
+      ImGui::EndCombo();
+    }
+    const std::vector<PlayChoice>& aiTypes = mPlay.AiTypes();
+    if (setup.withAi && !aiTypes.empty()) {
+      setup.ai = std::clamp(setup.ai, 0, static_cast<int>(aiTypes.size()) - 1);
+      label("AI");
+      if (ImGui::BeginCombo("##ai", aiTypes[static_cast<std::size_t>(setup.ai)].name.c_str())) {
+        for (int i = 0; i < static_cast<int>(aiTypes.size()); ++i) {
+          if (ImGui::Selectable(aiTypes[static_cast<std::size_t>(i)].name.c_str(), i == setup.ai)) {
+            setup.ai = i;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      setup.aiCount = std::clamp(setup.aiCount, 0, slotCount - 1);
+      label("AI opponents");
+      const std::string count = setup.aiCount == 0 ? std::string("Every other slot") : std::to_string(setup.aiCount);
+      if (ImGui::BeginCombo("##aicount", count.c_str())) {
+        if (ImGui::Selectable("Every other slot", setup.aiCount == 0)) {
+          setup.aiCount = 0;
+        }
+        for (int i = 1; i < slotCount; ++i) {
+          if (ImGui::Selectable(std::to_string(i).c_str(), setup.aiCount == i)) {
+            setup.aiCount = i;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip("How many slots get an AI, taken in slot order; the rest stay empty");
+      }
+    }
+    ImGui::Checkbox("Fog of war", &setup.fog);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("The game's Fog of War option (explored, or none), set when the play starts");
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Prebuilt units", &setup.prebuilt);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("The game's Prebuilt Units option: each army starts with a small base");
+    }
+    bool keepOwn = mPlay.KeepsOwnSetup();
+    if (ImGui::Checkbox("Keep this setup for this map", &keepOwn)) {
+      mPlay.SetKeepsOwnSetup(keepOwn);
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("On: this map plays with its own setup, saved at each Play.\n"
+                        "Off: it plays with the setup of the last Play on any map.");
+    }
+    ImGui::EndDisabled();
+
+    // During play: the fog's shading left out of the view (the player keeps their army), or the observer's view.
+    ImGui::BeginDisabled(moho::WLD_GetFrameAction() != moho::EWldFrameAction::Playing);
+    bool noFog = mPlay.FogHidden();
+    if (ImGui::Checkbox("Hide the fog", &noFog)) {
+      mPlay.SetFogHidden(noFog);
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("While playing: the view leaves out the fog's shading and you keep your army.\n"
+                        "Enemy units your army has no intel on stay unseen; Observer view shows them.");
+    }
+    ImGui::SameLine();
+    bool wholeMap = mPlay.SeesWholeMap();
+    if (ImGui::Checkbox("Observer view", &wholeMap)) {
+      mPlay.SetSeesWholeMap(wholeMap);
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("While playing: view the map as an observer (every army's units, no fog), then back to your army.");
+    }
+    ImGui::EndDisabled();
+  }
+
   void EdShell::DrawMapPanel()
   {
     if (!ImGui::Begin(kMapWindow, &mShowMap)) {
@@ -468,68 +626,7 @@ namespace faf::editor
     ImGui::EndDisabled();
     ImGui::Separator();
 
-    // Play setup: solo (fastest: no AI brains, so no AI map analysis) or against one AI type, the
-    // player's faction, and the fog.
-    PlaySetup& setup = mPlay.Setup();
-    ImGui::BeginDisabled(mPlay.Active());
-    int opponents = setup.withAi ? 1 : 0;
-    ImGui::RadioButton("Solo", &opponents, 0);
-    ImGui::SameLine();
-    ImGui::RadioButton("Against AI", &opponents, 1);
-    setup.withAi = opponents == 1;
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("Every other army is an AI. The AI's map analysis adds about 2 s to each start.");
-    }
-    const std::vector<PlayChoice>& aiTypes = mPlay.AiTypes();
-    if (setup.withAi && !aiTypes.empty()) {
-      setup.ai = std::clamp(setup.ai, 0, static_cast<int>(aiTypes.size()) - 1);
-      ImGui::SetNextItemWidth(-1.0f);
-      if (ImGui::BeginCombo("##ai", aiTypes[static_cast<std::size_t>(setup.ai)].name.c_str())) {
-        for (int i = 0; i < static_cast<int>(aiTypes.size()); ++i) {
-          if (ImGui::Selectable(aiTypes[static_cast<std::size_t>(i)].name.c_str(), i == setup.ai)) {
-            setup.ai = i;
-          }
-        }
-        ImGui::EndCombo();
-      }
-    }
-    const std::vector<PlayChoice>& factions = mPlay.Factions();
-    setup.faction = std::clamp(setup.faction, 0, static_cast<int>(factions.size()));
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f);
-    if (ImGui::BeginCombo("Faction", setup.faction == 0 ? "Random" : factions[static_cast<std::size_t>(setup.faction - 1)].name.c_str())) {
-      if (ImGui::Selectable("Random", setup.faction == 0)) {
-        setup.faction = 0;
-      }
-      for (int i = 0; i < static_cast<int>(factions.size()); ++i) {
-        if (ImGui::Selectable(factions[static_cast<std::size_t>(i)].name.c_str(), setup.faction == i + 1)) {
-          setup.faction = i + 1;
-        }
-      }
-      ImGui::EndCombo();
-    }
-    ImGui::SameLine();
-    ImGui::Checkbox("Fog", &setup.fog);
-    bool keepOwn = mPlay.KeepsOwnSetup();
-    if (ImGui::Checkbox("Keep this setup for this map", &keepOwn)) {
-      mPlay.SetKeepsOwnSetup(keepOwn);
-    }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("On: this map plays with its own setup, saved at each Play.\n"
-                        "Off: it plays with the setup of the last Play on any map.");
-    }
-    ImGui::EndDisabled();
-
-    // During play: the whole map, as an observer sees it, or the player's own view with its fog.
-    ImGui::BeginDisabled(moho::WLD_GetFrameAction() != moho::EWldFrameAction::Playing);
-    bool wholeMap = mPlay.SeesWholeMap();
-    if (ImGui::Checkbox("See the whole map", &wholeMap)) {
-      mPlay.SetSeesWholeMap(wholeMap);
-    }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("While playing: view the map as an observer, with no fog,\nthen back to your army. "
-                        "The Fog setting above applies from the next Play.");
-    }
-    ImGui::EndDisabled();
+    DrawPlaySetup();
     ImGui::Separator();
 
     // Each map by its title, then its folder name; the filter matches either.
