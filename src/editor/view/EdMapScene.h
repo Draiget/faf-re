@@ -440,6 +440,8 @@ namespace faf::editor
     /** Ctrl+C, Ctrl+V or Ctrl+D (`key` 'C', 'V' or 'D'), as the keyboard gives them and test runs (`/uiclicks ^D`). */
     void CtrlKey(char key);
     /** A Units-tool group ask on `army`'s tree: select a group's units, or change the tree as one undo step. */
+    /** An army's settings in `_save.lua`, as one undo step. */
+    void ChangeArmySettings(const std::string& army, const ArmySettings& settings);
     void ChangeUnitGroups(const std::string& army, EdTools::GroupAsk ask, const std::vector<std::string>& path, const std::string& name);
 
   private:

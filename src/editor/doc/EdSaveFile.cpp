@@ -692,4 +692,93 @@ namespace faf::editor
     return scenario.substr(0, at) + match[1].str() + numbers[0] + match[3].str() + numbers[1] +
            scenario.substr(at + static_cast<std::size_t>(match.length(0)));
   }
+  namespace
+  {
+    std::string NumberText(const double value)
+    {
+      char text[48];
+      if (value == static_cast<double>(static_cast<long long>(value))) {
+        (void)std::snprintf(text, sizeof(text), "%lld", static_cast<long long>(value));
+      } else {
+        (void)std::snprintf(text, sizeof(text), "%g", value);
+      }
+      return text;
+    }
+
+    // A string value's text: 'x' as the saves write a bare string, else the value's own wrapper (STRING( 'x' )).
+    std::string StringText(const std::string& old, const std::string& value)
+    {
+      const std::size_t open = old.find('\'');
+      const std::size_t close = old.rfind('\'');
+      if (open == std::string::npos || close == open) {
+        return "'" + value + "'";
+      }
+      return old.substr(0, open + 1) + value + old.substr(close);
+    }
+  } // namespace
+
+  ArmySettings ReadArmySettings(const SaveEntry& army)
+  {
+    ArmySettings settings;
+    settings.personality = ValueString(army.Get("personality"));
+    settings.plans = ValueString(army.Get("plans"));
+    settings.color = std::atoi(army.Get("color").c_str());
+    settings.faction = std::atoi(army.Get("faction").c_str());
+    const std::string economy = army.Get("Economy");
+    std::smatch match;
+    if (std::regex_search(economy, match, std::regex(R"(\bmass\s*=\s*([-+0-9.eE]+))"))) {
+      settings.mass = std::atof(match[1].str().c_str());
+    }
+    if (std::regex_search(economy, match, std::regex(R"(\benergy\s*=\s*([-+0-9.eE]+))"))) {
+      settings.energy = std::atof(match[1].str().c_str());
+    }
+    const std::string alliances = army.Get("Alliances");
+    const std::regex entry(R"(\[\s*'([^']*)'\s*\]\s*=\s*'([^']*)')");
+    for (auto it = std::sregex_iterator(alliances.begin(), alliances.end(), entry); it != std::sregex_iterator(); ++it) {
+      settings.alliances.emplace_back((*it)[1].str(), (*it)[2].str());
+    }
+    return settings;
+  }
+
+  void WriteArmySettings(SaveEntry& army, const ArmySettings& settings)
+  {
+    const ArmySettings now = ReadArmySettings(army);
+    if (settings.personality != now.personality) {
+      army.Set("personality", StringText(army.Get("personality"), settings.personality));
+    }
+    if (settings.plans != now.plans) {
+      army.Set("plans", StringText(army.Get("plans"), settings.plans));
+    }
+    if (settings.color != now.color) {
+      army.Set("color", std::to_string(settings.color));
+    }
+    if (settings.faction != now.faction) {
+      army.Set("faction", std::to_string(settings.faction));
+    }
+    if (settings.mass != now.mass || settings.energy != now.energy) {
+      // Each number replaced where it stands (a "$1" + digits replacement would read as another group).
+      std::string economy = army.Get("Economy");
+      const auto replaceNumber = [&economy](const char* const key, const double value) {
+        std::smatch match;
+        if (std::regex_search(economy, match, std::regex(std::string(R"(\b)") + key + R"(\s*=\s*([-+0-9.eE]+))"))) {
+          economy.replace(static_cast<std::size_t>(match.position(1)), static_cast<std::size_t>(match.length(1)), NumberText(value));
+        }
+      };
+      replaceNumber("mass", settings.mass);
+      replaceNumber("energy", settings.energy);
+      army.Set("Economy", economy);
+    }
+    if (settings.alliances != now.alliances) {
+      // The closing brace's indent as the value has it; the entries one level in.
+      const std::string old = army.Get("Alliances");
+      const std::size_t close = old.rfind('}');
+      const std::size_t lineStart = close == std::string::npos ? std::string::npos : old.rfind('\n', close);
+      const std::string closing = lineStart == std::string::npos ? std::string(12, ' ') : old.substr(lineStart + 1, close - lineStart - 1);
+      std::string text = "{\n";
+      for (const auto& [other, stance] : settings.alliances) {
+        text += closing + "    [" + Quote(other) + "] = " + Quote(stance) + ",\n";
+      }
+      army.Set("Alliances", text + closing + "}");
+    }
+  }
 } // namespace faf::editor

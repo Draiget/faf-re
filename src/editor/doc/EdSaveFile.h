@@ -114,6 +114,32 @@ namespace faf::editor
   /** A new army's entry for `_save.lua`'s Armies, as the game's saves write one (no units, no plans). */
   SaveEntry NewArmyEntry(const std::string& name);
 
+  /**
+   * An army's settings in `_save.lua`: personality, plans, color, faction, Economy's mass and energy (the starting
+   * resources FAF's InitializeArmies gives it), Alliances (each other army and 'Enemy', 'Ally' or 'Neutral').
+   */
+  struct ArmySettings
+  {
+    std::string personality;
+    std::string plans;
+    int color = 0;
+    int faction = 0;
+    double mass = 0.0;
+    double energy = 0.0;
+    std::vector<std::pair<std::string, std::string>> alliances;
+    bool operator==(const ArmySettings& other) const
+    {
+      return personality == other.personality && plans == other.plans && color == other.color && faction == other.faction &&
+             mass == other.mass && energy == other.energy && alliances == other.alliances;
+    }
+  };
+  ArmySettings ReadArmySettings(const SaveEntry& army);
+  /**
+   * Puts into the entry what differs from what it holds, each value's own text kept around its number or string
+   * (Economy's mass and energy changed in place); Alliances written anew in the saves' layout.
+   */
+  void WriteArmySettings(SaveEntry& army, const ArmySettings& settings);
+
   /** A team of a `_scenario.lua`'s standard configuration: its name and its armies, in order. */
   struct ScenarioTeam
   {

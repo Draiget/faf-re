@@ -306,4 +306,57 @@ Scenario = {
     EXPECT_TRUE(again.Chains()[2].markers.empty());
     EXPECT_NE(save.Text().find("    next_queue_id = '1',\r\n}"), std::string::npos);
   }
+  TEST(SaveFile, ArmySettingsChangeOnlyWhatDiffers)
+  {
+    // An army as SCMP_009's save writes it (CR LF), with SCMP_023's alliance shape.
+    const std::string text =
+      "Scenario = {\r\n"
+      "    Armies = {\r\n"
+      "        ['ARMY_1'] =  \r\n"
+      "        {\r\n"
+      "            personality = '',\r\n"
+      "            plans = '',\r\n"
+      "            color = 0,\r\n"
+      "            faction = 0,\r\n"
+      "            Economy = {\r\n"
+      "                mass = 0,\r\n"
+      "                energy = 0,\r\n"
+      "            },\r\n"
+      "            Alliances = {\r\n"
+      "                ['ARMY_2'] = 'Enemy',\r\n"
+      "            },\r\n"
+      "        },\r\n"
+      "    },\r\n"
+      "}\r\n";
+    faf::editor::SaveFile save;
+    std::string error;
+    ASSERT_TRUE(save.Parse(text, error)) << error;
+    ASSERT_EQ(save.Armies().size(), 1u);
+    faf::editor::ArmySettings settings = faf::editor::ReadArmySettings(save.Armies()[0]);
+    EXPECT_EQ(settings.alliances, (std::vector<std::pair<std::string, std::string>>{{"ARMY_2", "Enemy"}}));
+    // Unchanged: the text as it was.
+    faf::editor::WriteArmySettings(save.Armies()[0], settings);
+    EXPECT_EQ(save.Text(), text);
+    // Starting resources and a faction: only those numbers change, in place.
+    settings.mass = 650;
+    settings.energy = 2500.5;
+    settings.faction = 2;
+    settings.plans = "/maps/x/plan.lua";
+    faf::editor::WriteArmySettings(save.Armies()[0], settings);
+    std::string expected = text;
+    expected.replace(expected.find("plans = ''"), 10, "plans = '/maps/x/plan.lua'");
+    expected.replace(expected.find("faction = 0"), 11, "faction = 2");
+    expected.replace(expected.find("mass = 0"), 8, "mass = 650");
+    expected.replace(expected.find("energy = 0"), 10, "energy = 2500.5");
+    EXPECT_EQ(save.Text(), expected);
+    // Alliances written anew in the saves' layout.
+    settings.alliances.emplace_back("ARMY_3", "Ally");
+    faf::editor::WriteArmySettings(save.Armies()[0], settings);
+    EXPECT_NE(save.Text().find("            Alliances = {\r\n                ['ARMY_2'] = 'Enemy',\r\n                ['ARMY_3'] = 'Ally',\r\n            },"),
+              std::string::npos)
+      << save.Text();
+    faf::editor::SaveFile again;
+    ASSERT_TRUE(again.Parse(save.Text(), error)) << error;
+    EXPECT_TRUE(faf::editor::ReadArmySettings(again.Armies()[0]) == settings);
+  }
 } // namespace

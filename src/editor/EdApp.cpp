@@ -351,6 +351,7 @@ namespace faf::editor
       bool mViewAidArgsDone = false;
       int mUnitTreeFrames = 0;
       bool mUnitGroupArgDone = false;
+      bool mArmyEconomyArgDone = false;
       int mReclaimFrames = 0;
       bool mReclaimLogged = false;
       int mLayerFileStep = 0;
@@ -1227,6 +1228,35 @@ namespace faf::editor
         }
         tools.SetMarkerSelection(mScene.SelectedMarkers());
         tools.SetArmies(mDocument.Armies(), mDocument.ExtraArmies());
+        {
+          std::vector<std::pair<std::string, ArmySettings>> armies;
+          for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+            armies.emplace_back(entry.name, ReadArmySettings(entry));
+          }
+          tools.SetArmySettings(std::move(armies));
+          std::string army;
+          if (ArmySettings settings; tools.TakeArmySettingsChange(army, settings)) {
+            mScene.ChangeArmySettings(army, settings);
+          }
+          // `/armyeconomy <army>,<mass>,<energy>` (test runs): that army's starting resources, once.
+          if (!mArmyEconomyArgDone) {
+            mArmyEconomyArgDone = true;
+            if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/armyeconomy", 1, &value) && !value.empty()) {
+              const std::string text = value[0].c_str();
+              const std::size_t first = text.find(',');
+              const std::size_t second = first == std::string::npos ? std::string::npos : text.find(',', first + 1);
+              const std::string name = text.substr(0, first);
+              for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+                if (entry.name == name && second != std::string::npos) {
+                  ArmySettings settings = ReadArmySettings(entry);
+                  settings.mass = std::atof(text.c_str() + first + 1);
+                  settings.energy = std::atof(text.c_str() + second + 1);
+                  mScene.ChangeArmySettings(name, settings);
+                }
+              }
+            }
+          }
+        }
         tools.SetTeams(mDocument.Teams());
         if (std::vector<ScenarioTeam> teams; tools.TakeTeamsChange(teams)) {
           mScene.ChangeTeams(teams);

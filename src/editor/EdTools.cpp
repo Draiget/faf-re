@@ -1653,6 +1653,109 @@ namespace faf::editor
            "renaming it follows. The order is the lobby's slot order; teams are chosen in the lobby. Extra armies (ARMY_17, "
            "NEUTRAL_CIVILIAN...) hold the map's neutral and civilian units.");
     }
+    DrawArmySettings();
     DrawPlayableArea();
+  }
+
+  void EdTools::DrawArmySettings()
+  {
+    SectionHeader("ARMY SETTINGS");
+    if (mArmySettings.empty()) {
+      Note("No armies in _save.lua.");
+      return;
+    }
+    mArmySettingsIndex = std::clamp(mArmySettingsIndex, 0, static_cast<int>(mArmySettings.size()) - 1);
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::BeginCombo("##armysettings", mArmySettings[static_cast<std::size_t>(mArmySettingsIndex)].first.c_str())) {
+      for (std::size_t i = 0; i < mArmySettings.size(); ++i) {
+        if (ImGui::Selectable(mArmySettings[i].first.c_str(), static_cast<int>(i) == mArmySettingsIndex)) {
+          mArmySettingsIndex = static_cast<int>(i);
+        }
+      }
+      ImGui::EndCombo();
+    }
+    auto& [name, settings] = mArmySettings[static_cast<std::size_t>(mArmySettingsIndex)];
+    ArmySettings edit = settings;
+    bool active = false;
+    bool finished = false;
+    const auto watch = [&](const bool) {
+      active = active || ImGui::IsItemActive();
+      finished = finished || ImGui::IsItemDeactivatedAfterEdit();
+    };
+    float mass = static_cast<float>(edit.mass);
+    float energy = static_cast<float>(edit.energy);
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::DragFloat("##mass", &mass, 10.0f, 0.0f, 1000000.0f, "Starting mass %.0f"));
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::DragFloat("##energy", &energy, 10.0f, 0.0f, 1000000.0f, "Starting energy %.0f"));
+    edit.mass = mass;
+    edit.energy = energy;
+    static const char* const kFactions[4] = {"0 (UEF)", "1 (Aeon)", "2 (Cybran)", "3 (Seraphim)"};
+    int faction = std::clamp(edit.faction, 0, 3);
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::Combo("##faction", &faction, kFactions, 4)) {
+      edit.faction = faction;
+      finished = true;
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    watch(ImGui::DragInt("##color", &edit.color, 0.1f, 0, 32, "Colour %d"));
+    char plans[256];
+    (void)std::snprintf(plans, sizeof(plans), "%s", edit.plans.c_str());
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::InputTextWithHint("##plans", "plans (an AI plan file)", plans, sizeof(plans), ImGuiInputTextFlags_EnterReturnsTrue)) {
+      edit.plans = plans;
+      finished = true;
+    }
+    active = active || ImGui::IsItemActive();
+    char personality[128];
+    (void)std::snprintf(personality, sizeof(personality), "%s", edit.personality.c_str());
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::InputTextWithHint("##personality", "personality", personality, sizeof(personality), ImGuiInputTextFlags_EnterReturnsTrue)) {
+      edit.personality = personality;
+      finished = true;
+    }
+    active = active || ImGui::IsItemActive();
+    // Its stance toward each other army: none (the entry left out), Enemy, Ally, Neutral.
+    if (ImGui::TreeNodeEx("##alliances", ImGuiTreeNodeFlags_SpanAvailWidth, "Alliances (%zu)", edit.alliances.size())) {
+      static const char* const kStances[4] = {"-", "Enemy", "Ally", "Neutral"};
+      for (const auto& [other, ignored] : mArmySettings) {
+        if (other == name) {
+          continue;
+        }
+        const auto found = std::find_if(edit.alliances.begin(), edit.alliances.end(), [&](const auto& pair) { return pair.first == other; });
+        int stance = 0;
+        for (int s = 1; s < 4 && found != edit.alliances.end(); ++s) {
+          stance = found->second == kStances[s] ? s : stance;
+        }
+        ImGui::PushID(other.c_str());
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 6.0f);
+        if (ImGui::Combo("##stance", &stance, kStances, 4)) {
+          if (stance == 0 && found != edit.alliances.end()) {
+            edit.alliances.erase(found);
+          } else if (stance > 0 && found != edit.alliances.end()) {
+            found->second = kStances[stance];
+          } else if (stance > 0) {
+            edit.alliances.emplace_back(other, kStances[stance]);
+          }
+          finished = true;
+        }
+        ImGui::SameLine();
+        ImGui::TextUnformatted(other.c_str());
+        ImGui::PopID();
+      }
+      ImGui::TreePop();
+    }
+    mArmyEditing = active;
+    if (!(edit == settings)) {
+      settings = edit;
+    }
+    if (finished) {
+      mArmySettingsChanged = true;
+      mArmySettingsName = name;
+      mArmySettingsEdit = settings;
+    }
+    Note("FAF's skirmish start (InitializeArmies) gives each army its starting mass and energy here; its faction and colour "
+         "come from the lobby and its alliances from the teams, so those matter to scripted maps. The retail maps leave mass "
+         "and energy at 0. Each change is one undo step.");
   }
 } // namespace faf::editor

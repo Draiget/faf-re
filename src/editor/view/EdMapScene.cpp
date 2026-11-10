@@ -1687,6 +1687,22 @@ namespace faf::editor
     return true;
   }
 
+  void EdMapScene::ChangeArmySettings(const std::string& army, const ArmySettings& settings)
+  {
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    for (SaveEntry& entry : mDocument.SaveData().Armies()) {
+      if (entry.name == army) {
+        WriteArmySettings(entry, settings);
+      }
+    }
+    if (before.armies == mDocument.SaveData().Armies()) {
+      return;
+    }
+    mDocument.SaveDataEdited(std::move(before));
+    gpg::Logf("editor: army %s: mass %.0f, energy %.0f, faction %d, colour %d, %zu alliances", army.c_str(), settings.mass, settings.energy,
+              settings.faction, settings.color, settings.alliances.size());
+  }
+
   void EdMapScene::ChangeUnitGroups(const std::string& army, const EdTools::GroupAsk ask, const std::vector<std::string>& path,
                                     const std::string& name)
   {
