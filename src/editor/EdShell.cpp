@@ -554,14 +554,6 @@ namespace faf::editor
     // faction, and the game's options the editor sets.
     PlaySetup& setup = mPlay.Setup();
     ImGui::BeginDisabled(mPlay.Active());
-    int opponents = setup.withAi ? 1 : 0;
-    ImGui::RadioButton("Solo", &opponents, 0);
-    ImGui::SameLine();
-    ImGui::RadioButton("Against AI", &opponents, 1);
-    setup.withAi = opponents == 1;
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("Other slots get an AI. The AI's map analysis adds about 2 s to each start.");
-    }
 
     // The slots: the open map's armies when it is the picked one, else numbers.
     const std::vector<std::string>& maps = mPlay.Maps();
@@ -574,6 +566,69 @@ namespace faf::editor
       }
     }
     const int slotCount = slots.empty() ? 16 : static_cast<int>(slots.size());
+
+    // Profiles: built-in setups and the mapper's own; Save keeps the setup as it is under a name.
+    {
+      const std::vector<PlayProfile> profiles = mPlay.Profiles();
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.55f);
+      if (ImGui::BeginCombo("##profile", "Profile...")) {
+        bool savedHeader = false;
+        for (const PlayProfile& profile : profiles) {
+          if (!profile.builtIn && !savedHeader) {
+            ImGui::SeparatorText("Saved");
+            savedHeader = true;
+          }
+          if (ImGui::Selectable(profile.name.c_str())) {
+            mPlay.ApplyProfile(profile.name, slots.empty() ? 8 : slotCount);
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::SameLine();
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Save").x - ImGui::GetStyle().FramePadding.x * 4.0f);
+      ImGui::InputTextWithHint("##profilename", "name", mProfileName, sizeof(mProfileName));
+      ImGui::SameLine();
+      ImGui::BeginDisabled(mProfileName[0] == '\0');
+      if (ImGui::Button("Save")) {
+        mPlay.SaveProfile(mProfileName);
+        mProfileName[0] = '\0';
+      }
+      ImGui::EndDisabled();
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip("Keep this setup as a profile of that name (play_setups.ini)");
+      }
+    }
+
+    int mode = !setup.slots.empty() ? 2 : setup.withAi ? 1 : 0;
+    const int modeBefore = mode;
+    ImGui::RadioButton("Solo", &mode, 0);
+    ImGui::SameLine();
+    ImGui::RadioButton("Against AI", &mode, 1);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("Other slots get an AI. The AI's map analysis adds about 2 s to each start.");
+    }
+    ImGui::SameLine();
+    ImGui::RadioButton("Custom", &mode, 2);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("Slot by slot: you, an AI or empty, and teams (a team's armies start allied)");
+    }
+    if (mode != modeBefore) {
+      setup.withAi = mode != 0;
+      if (mode == 2 && setup.slots.empty()) {
+        // Every slot: you in your start, AIs in the others.
+        const int count = slots.empty() ? 8 : slotCount;
+        for (int i = 0; i < count; ++i) {
+          PlaySlot slot;
+          slot.role = i == setup.slot ? PlaySlot::Role::You : PlaySlot::Role::Ai;
+          slot.ai = setup.ai;
+          setup.slots.push_back(slot);
+        }
+      } else if (mode != 2) {
+        setup.slots.clear();
+      }
+      mPlay.PrepareRules();
+    }
+    const bool custom = mode == 2;
     setup.slot = std::clamp(setup.slot, 0, slotCount - 1);
     const auto slotName = [&](const int i) {
       return slots.empty() ? "Slot " + std::to_string(i + 1) : std::to_string(i + 1) + "  " + slots[static_cast<std::size_t>(i)];
@@ -585,6 +640,7 @@ namespace faf::editor
       ImGui::SameLine(labelWidth);
       ImGui::SetNextItemWidth(-1.0f);
     };
+    if (!custom) {
     label("Start");
     if (ImGui::BeginCombo("##slot", slotName(setup.slot).c_str())) {
       for (int i = 0; i < slotCount; ++i) {
@@ -596,6 +652,7 @@ namespace faf::editor
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
       ImGui::SetTooltip("The lobby slot you play (its army's start position)");
+    }
     }
     const std::vector<PlayChoice>& factions = mPlay.Factions();
     setup.faction = std::clamp(setup.faction, 0, static_cast<int>(factions.size()));
@@ -624,6 +681,7 @@ namespace faf::editor
         }
         ImGui::EndCombo();
       }
+      if (!custom) {
       setup.aiCount = std::clamp(setup.aiCount, 0, slotCount - 1);
       label("AI opponents");
       const std::string count = setup.aiCount == 0 ? std::string("Every other slot") : std::to_string(setup.aiCount);
@@ -640,6 +698,60 @@ namespace faf::editor
       }
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         ImGui::SetTooltip("How many slots get an AI, taken in slot order; the rest stay empty");
+      }
+      }
+    }
+    // Custom: one row per slot (role, its AI, its team); one You at most.
+    if (custom && !aiTypes.empty()) {
+      static const char* const kRoles[3] = {"Empty", "You", "AI"};
+      static const char* const kTeams[5] = {"-", "Team 1", "Team 2", "Team 3", "Team 4"};
+      bool changed = false;
+      const float roleWidth = ImGui::CalcTextSize("Empty").x + ImGui::GetFrameHeight() * 1.6f;
+      const float teamWidth = ImGui::CalcTextSize("Team 4").x + ImGui::GetFrameHeight() * 1.6f;
+      for (std::size_t i = 0; i < setup.slots.size(); ++i) {
+        PlaySlot& slot = setup.slots[i];
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%zu", i + 1);
+        ImGui::SameLine(ImGui::GetFontSize() * 1.6f);
+        int role = static_cast<int>(slot.role);
+        ImGui::SetNextItemWidth(roleWidth);
+        if (ImGui::Combo("##role", &role, kRoles, 3)) {
+          slot.role = static_cast<PlaySlot::Role>(role);
+          if (slot.role == PlaySlot::Role::You) {
+            for (std::size_t k = 0; k < setup.slots.size(); ++k) {
+              if (k != i && setup.slots[k].role == PlaySlot::Role::You) {
+                setup.slots[k].role = PlaySlot::Role::Empty;
+              }
+            }
+          }
+          changed = true;
+        }
+        ImGui::SameLine();
+        const float aiWidth = ImGui::GetContentRegionAvail().x - teamWidth - ImGui::GetStyle().ItemSpacing.x;
+        if (slot.role == PlaySlot::Role::Ai) {
+          slot.ai = std::clamp(slot.ai, 0, static_cast<int>(aiTypes.size()) - 1);
+          ImGui::SetNextItemWidth(aiWidth);
+          if (ImGui::BeginCombo("##slotai", aiTypes[static_cast<std::size_t>(slot.ai)].name.c_str())) {
+            for (int k = 0; k < static_cast<int>(aiTypes.size()); ++k) {
+              if (ImGui::Selectable(aiTypes[static_cast<std::size_t>(k)].name.c_str(), k == slot.ai)) {
+                slot.ai = k;
+                changed = true;
+              }
+            }
+            ImGui::EndCombo();
+          }
+        } else {
+          ImGui::Dummy(ImVec2(aiWidth, ImGui::GetFrameHeight()));
+        }
+        ImGui::SameLine();
+        slot.team = std::clamp(slot.team, 0, 4);
+        ImGui::SetNextItemWidth(teamWidth);
+        changed = ImGui::Combo("##team", &slot.team, kTeams, 5) || changed;
+        ImGui::PopID();
+      }
+      if (changed) {
+        mPlay.PrepareRules();
       }
     }
     // The sim mods played with; an AI mod's AI types are in the AI list, and its mod comes along when one is chosen.
@@ -677,6 +789,27 @@ namespace faf::editor
     ImGui::Checkbox("Prebuilt units", &setup.prebuilt);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
       ImGui::SetTooltip("The game's Prebuilt Units option: each army starts with a small base");
+    }
+    {
+      static const char* const kVictoryKeys[5] = {"sandbox", "demoralization", "domination", "eradication", "decapitation"};
+      static const char* const kVictoryNames[5] = {"Sandbox (no end)", "Assassination", "Supremacy", "Annihilation", "Decapitation"};
+      int victory = 0;
+      for (int i = 0; i < 5; ++i) {
+        victory = setup.victory == kVictoryKeys[i] ? i : victory;
+      }
+      label("Victory");
+      if (ImGui::Combo("##victory", &victory, kVictoryNames, 5)) {
+        setup.victory = kVictoryKeys[victory];
+      }
+      label("Unit cap");
+      ImGui::SliderInt("##unitcap", &setup.unitCap, 250, 1500, "%d units");
+      setup.unitCap = std::clamp(setup.unitCap / 50 * 50, 250, 1500);
+      label("AI cheat x");
+      ImGui::SliderFloat("##cheatmult", &setup.cheatMult, 1.0f, 5.0f, "%.1f");
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip("The cheating AIs' resource and build multiplier (the lobby's AIx options)");
+      }
+      setup.cheatMult = std::round(setup.cheatMult * 10.0f) / 10.0f;
     }
     bool keepOwn = mPlay.KeepsOwnSetup();
     if (ImGui::Checkbox("Keep this setup for this map", &keepOwn)) {

@@ -27,6 +27,22 @@ namespace faf::editor
     std::vector<PlayChoice> aiTypes;
   };
 
+  /** One lobby slot of a custom setup: empty, you, or an AI; and its team. */
+  struct PlaySlot
+  {
+    enum class Role
+    {
+      Empty,
+      You,
+      Ai,
+    };
+    Role role = Role::Empty;
+    /** The AI type (an index into `EdPlay::AiTypes()`) for an AI slot. */
+    int ai = 0;
+    /** 0 no team, else the team's number: armies of one team start allied (FAF's Team, this plus one). */
+    int team = 0;
+  };
+
   /** How Play sets the session up. */
   struct PlaySetup
   {
@@ -46,6 +62,20 @@ namespace faf::editor
     bool prebuilt = false;
     /** The sim mods played with (uids); the chosen AI's own mod comes along anyway. */
     std::vector<std::string> mods;
+    /** A custom setup, slot by slot (empty: the simple one above, your slot and the AI opponents). */
+    std::vector<PlaySlot> slots;
+    /** The game's Victory option: sandbox, demoralization, domination, eradication, decapitation. */
+    std::string victory = "sandbox";
+    int unitCap = 500;
+    /** The cheating AIs' resource and build multiplier (FAF's CheatMult and BuildMult). */
+    float cheatMult = 1.5f;
+  };
+
+  /** A named setup: a built-in one or one the mapper saved. */
+  struct PlayProfile
+  {
+    std::string name;
+    bool builtIn = false;
   };
 
   /**
@@ -99,6 +129,12 @@ namespace faf::editor
     [[nodiscard]] std::vector<std::string> PlayedMods() const;
     /** After the setup's mods change: the game's rules for them built ahead on a thread, so the next Play is quick. */
     void PrepareRules();
+    /** The profiles: the built-in ones, then the saved ones by name. */
+    [[nodiscard]] std::vector<PlayProfile> Profiles() const;
+    /** The setup becomes the profile's (`slots` is how many start positions the map has, for the built-in ones). */
+    void ApplyProfile(const std::string& name, int slots);
+    /** The setup as it is, saved as a profile of that name (written to play_setups.ini). */
+    void SaveProfile(const std::string& name);
     [[nodiscard]] const std::vector<PlayChoice>& Factions() const noexcept { return mFactions; }
     [[nodiscard]] PlaySetup& Setup() noexcept { return mSetup; }
 
@@ -150,6 +186,11 @@ namespace faf::editor
       int aiCount = 0;
       bool prebuilt = false;
       std::vector<std::string> mods;
+      /** `you::0,ai:m28ai:2,empty::0`: role, AI key, team per slot. */
+      std::string slots;
+      std::string victory = "sandbox";
+      int unitCap = 500;
+      float cheatMult = 1.5f;
     };
 
     void FindChoices();
@@ -187,6 +228,7 @@ namespace faf::editor
     StoredSetup mLastSetup;
     bool mHaveLastSetup = false;
     std::map<std::string, StoredSetup> mMapSetups;
+    std::map<std::string, StoredSetup> mProfiles;
     bool mKeepOwnSetup = false;
     /** The army the view had before it switched to the whole map. */
     int mPlayerArmy = 0;
@@ -203,7 +245,9 @@ namespace faf::editor
     int mAutoCyclesLeft = 0;
     bool mAutoQuit = false;
     bool mAutoWholeMap = false;
-    bool mAutoNoFog = false; // `/playnofog`: Hide the fog once play starts
+    bool mAutoNoFog = false;
+    int mAutoProfile = 0; // `/playprofile <n>`
+    bool mAutoLogArmies = false; // `/playlogarmies` // `/playnofog`: Hide the fog once play starts
     float mAutoDelay = 0.0f;
     int mAutoAi = -1; // `/playai`: this AI for every test play, over the map's remembered setup
     double mAutoStartAt = -1.0;

@@ -60,12 +60,12 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
     SPL.VerifyScenarioConfiguration(scenario)
     scenario.Options = {
         FogOfWar = fog, NoRushOption = 'Off', PrebuiltUnits = extra.prebuilt and 'On' or 'Off', Difficulty = 2,
-        DoNotShareUnitCap = true, Timeouts = -1, GameSpeed = 'normal', UnitCap = '500',
-        Victory = 'sandbox', CheatsEnabled = 'true', CivilianAlliance = 'enemy',
+        DoNotShareUnitCap = true, Timeouts = -1, GameSpeed = 'normal', UnitCap = tostring(extra.unitCap or 500),
+        Victory = extra.victory or 'sandbox', CheatsEnabled = 'true', CivilianAlliance = 'enemy',
         TeamShareOverflow = 'enabled', Share = 'ShareUntilDeath',
         -- As FAF's lobby has them (lobbyOptions.lua defaults, lobby.lua fills Ratings and ClanTags): AI mods
         -- read them (M28AI writes its AIs' ratings into Ratings, cheating AIs read the multipliers).
-        CheatMult = '1.5', BuildMult = '1.5', Ratings = {}, ClanTags = {},
+        CheatMult = extra.cheatMult or '1.5', BuildMult = extra.cheatMult or '1.5', Ratings = {}, ClanTags = {},
     }
     if faction < 1 then
         faction = SPL.GetRandomFaction()
@@ -88,34 +88,62 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
     local armies = scenario.Configurations.standard.teams[1].armies
     local numColors = table.getn(import('/lua/gamecolors.lua').GameColors.PlayerColors)
 
-    local slot = extra.slot or 1
-    if slot < 1 or slot > table.getn(armies) then
-        slot = 1
+    local function newAi(index, key, team)
+        local ai = GetDefaultPlayerOptions(info.playerName)
+        ai.AIPersonality = key
+        ai.Faction = SPL.GetRandomFaction()
+        ai.PlayerName = SPL.GetRandomName(ai.Faction, key)
+        ai.Human = false
+        ai.ArmyName = armies[index]
+        ai.PlayerColor = math.mod(index, numColors)
+        ai.ArmyColor = math.mod(index, numColors)
+        ai.Team = team or 1
+        return ai
     end
-    local player = GetDefaultPlayerOptions(info.playerName)
-    player.PlayerName = info.playerName
-    player.Faction = faction
-    player.Human = true
-    player.ArmyName = armies[slot]
-    player.PlayerColor = math.mod(slot, numColors)
-    player.ArmyColor = math.mod(slot, numColors)
-    info.teamInfo[1] = player
+    local function newPlayer(index, team)
+        local player = GetDefaultPlayerOptions(info.playerName)
+        player.PlayerName = info.playerName
+        player.Faction = faction
+        player.Human = true
+        player.ArmyName = armies[index]
+        player.PlayerColor = math.mod(index, numColors)
+        player.ArmyColor = math.mod(index, numColors)
+        player.Team = team or 1
+        return player
+    end
 
-    if aiKey ~= '' then
-        local wanted = extra.aiCount or 0
-        local placed = 0
-        for index = 1, table.getn(armies) do
-            if index ~= slot and (wanted < 1 or placed < wanted) then
-                placed = placed + 1
-                local ai = GetDefaultPlayerOptions(info.playerName)
-                ai.AIPersonality = aiKey
-                ai.Faction = SPL.GetRandomFaction()
-                ai.PlayerName = SPL.GetRandomName(ai.Faction, aiKey)
-                ai.Human = false
-                ai.ArmyName = armies[index]
-                ai.PlayerColor = math.mod(index, numColors)
-                ai.ArmyColor = math.mod(index, numColors)
-                info.teamInfo[table.getn(info.teamInfo) + 1] = ai
+    if extra.slots and table.getn(extra.slots) > 0 then
+        -- A custom setup, slot by slot: you first (army 1 is the player's), then the AIs in slot order.
+        local you = nil
+        for index, s in extra.slots do
+            if s.role == 'you' and armies[index] and not you then
+                you = index
+                info.teamInfo[1] = newPlayer(index, s.team + 1)
+            end
+        end
+        if not you then
+            info.teamInfo[1] = newPlayer(1, 1)
+            you = 1
+        end
+        for index, s in extra.slots do
+            if s.role == 'ai' and armies[index] and index ~= you then
+                info.teamInfo[table.getn(info.teamInfo) + 1] = newAi(index, s.ai, s.team + 1)
+            end
+        end
+    else
+        local slot = extra.slot or 1
+        if slot < 1 or slot > table.getn(armies) then
+            slot = 1
+        end
+        info.teamInfo[1] = newPlayer(slot, 1)
+        if aiKey ~= '' then
+            local wanted = extra.aiCount or 0
+            local placed = 0
+            for index = 1, table.getn(armies) do
+                if index ~= slot and (wanted < 1 or placed < wanted) then
+                    placed = placed + 1
+                    info.teamInfo[table.getn(info.teamInfo) + 1] = newAi(index, aiKey, 1)
+                end
             end
         end
     end
@@ -439,10 +467,20 @@ end
   std::vector<std::string> EdPlay::PlayedMods() const
   {
     std::vector<std::string> mods = mSetup.mods;
-    if (mSetup.withAi && mSetup.ai >= 0 && mSetup.ai < static_cast<int>(mAiTypes.size())) {
-      const std::string& aiMod = mAiTypes[static_cast<std::size_t>(mSetup.ai)].mod;
-      if (!aiMod.empty() && std::find(mods.begin(), mods.end(), aiMod) == mods.end()) {
-        mods.push_back(aiMod);
+    const auto addAiMod = [&](const int ai) {
+      if (ai >= 0 && ai < static_cast<int>(mAiTypes.size())) {
+        const std::string& aiMod = mAiTypes[static_cast<std::size_t>(ai)].mod;
+        if (!aiMod.empty() && std::find(mods.begin(), mods.end(), aiMod) == mods.end()) {
+          mods.push_back(aiMod);
+        }
+      }
+    };
+    if (mSetup.slots.empty() && mSetup.withAi) {
+      addAiMod(mSetup.ai);
+    }
+    for (const PlaySlot& slot : mSetup.slots) {
+      if (slot.role == PlaySlot::Role::Ai) {
+        addAiMod(slot.ai);
       }
     }
     // Only mods the game data still has.
@@ -541,6 +579,16 @@ end
     stored.aiCount = setup.aiCount;
     stored.prebuilt = setup.prebuilt;
     stored.mods = setup.mods;
+    stored.slots.clear();
+    for (const PlaySlot& slot : setup.slots) {
+      const std::string role = slot.role == PlaySlot::Role::You ? "you" : slot.role == PlaySlot::Role::Ai ? "ai" : "empty";
+      const std::string key =
+        slot.role == PlaySlot::Role::Ai && slot.ai >= 0 && slot.ai < static_cast<int>(mAiTypes.size()) ? mAiTypes[static_cast<std::size_t>(slot.ai)].key : "";
+      stored.slots += (stored.slots.empty() ? "" : ",") + role + ":" + key + ":" + std::to_string(slot.team);
+    }
+    stored.victory = setup.victory;
+    stored.unitCap = setup.unitCap;
+    stored.cheatMult = setup.cheatMult;
     return stored;
   }
 
@@ -564,6 +612,32 @@ end
     setup.aiCount = stored.aiCount;
     setup.prebuilt = stored.prebuilt;
     setup.mods = stored.mods;
+    setup.slots.clear();
+    for (std::size_t at = 0; at < stored.slots.size();) {
+      const std::size_t comma = std::min(stored.slots.find(',', at), stored.slots.size());
+      const std::string item = stored.slots.substr(at, comma - at);
+      at = comma + 1;
+      const std::size_t first = item.find(':');
+      const std::size_t second = first == std::string::npos ? std::string::npos : item.find(':', first + 1);
+      if (second == std::string::npos) {
+        continue;
+      }
+      PlaySlot slot;
+      const std::string role = item.substr(0, first);
+      slot.role = role == "you" ? PlaySlot::Role::You : role == "ai" ? PlaySlot::Role::Ai : PlaySlot::Role::Empty;
+      const std::string key = item.substr(first + 1, second - first - 1);
+      slot.ai = setup.ai;
+      for (std::size_t i = 0; i < mAiTypes.size(); ++i) {
+        if (mAiTypes[i].key == key) {
+          slot.ai = static_cast<int>(i);
+        }
+      }
+      slot.team = std::max(0, std::atoi(item.c_str() + second + 1));
+      setup.slots.push_back(slot);
+    }
+    setup.victory = stored.victory.empty() ? "sandbox" : stored.victory;
+    setup.unitCap = stored.unitCap;
+    setup.cheatMult = stored.cheatMult;
     return setup;
   }
 
@@ -582,6 +656,7 @@ end
   void EdPlay::ReadSetups()
   {
     mMapSetups.clear();
+    mProfiles.clear();
     mHaveLastSetup = false;
     std::ifstream in(mSetupsFile);
     if (!in) {
@@ -603,6 +678,8 @@ end
           mHaveLastSetup = true;
         } else if (section.rfind("map ", 0) == 0 && section.size() > 4) {
           current = &mMapSetups[section.substr(4)];
+        } else if (section.rfind("profile ", 0) == 0 && section.size() > 8) {
+          current = &mProfiles[section.substr(8)];
         } else {
           current = nullptr;
         }
@@ -628,6 +705,14 @@ end
         current->aiCount = std::max(0, std::atoi(value.c_str()));
       } else if (key == "prebuilt") {
         current->prebuilt = value == "1";
+      } else if (key == "slots") {
+        current->slots = value;
+      } else if (key == "victory") {
+        current->victory = value;
+      } else if (key == "unitcap") {
+        current->unitCap = std::clamp(std::atoi(value.c_str()), 100, 10000);
+      } else if (key == "cheatmult") {
+        current->cheatMult = static_cast<float>(std::atof(value.c_str()));
       } else if (key == "mods") {
         current->mods.clear();
         for (std::size_t at = 0; at < value.size();) {
@@ -666,7 +751,11 @@ end
       for (std::size_t i = 0; i < setup.mods.size(); ++i) {
         out << (i > 0 ? "," : "") << setup.mods[i];
       }
-      out << "\n\n";
+      out << '\n'
+          << "slots=" << setup.slots << '\n'
+          << "victory=" << setup.victory << '\n'
+          << "unitcap=" << setup.unitCap << '\n'
+          << "cheatmult=" << setup.cheatMult << "\n\n";
     };
     out << "; FAF Map Editor: the last play setup, and the maps that keep their own (written by the editor)\n\n";
     if (mHaveLastSetup) {
@@ -675,6 +764,77 @@ end
     for (const auto& [key, setup] : mMapSetups) {
       write("map ", key, setup);
     }
+    for (const auto& [name, setup] : mProfiles) {
+      write("profile ", name, setup);
+    }
+  }
+
+  namespace
+  {
+    /** The built-in profiles, in the menu's order. */
+    const char* const kBuiltInProfiles[] = {"Solo sandbox", "You vs 1 AI", "2 v 2 with AI", "Free for all with AI"};
+  } // namespace
+
+  std::vector<PlayProfile> EdPlay::Profiles() const
+  {
+    std::vector<PlayProfile> profiles;
+    for (const char* const name : kBuiltInProfiles) {
+      profiles.push_back({name, true});
+    }
+    for (const auto& [name, setup] : mProfiles) {
+      profiles.push_back({name, false});
+    }
+    return profiles;
+  }
+
+  void EdPlay::ApplyProfile(const std::string& name, const int slots)
+  {
+    if (const auto saved = mProfiles.find(name); saved != mProfiles.end()) {
+      mSetup = Restore(saved->second);
+      gpg::Logf("editor: play profile %s", name.c_str());
+      return;
+    }
+    // The built-in ones keep the faction, fog and mods; the AI is the chosen one.
+    PlaySetup& setup = mSetup;
+    setup.slots.clear();
+    setup.slot = 0;
+    setup.aiCount = 0;
+    setup.prebuilt = false;
+    if (name == kBuiltInProfiles[0]) {
+      setup.withAi = false;
+      setup.victory = "sandbox";
+    } else if (name == kBuiltInProfiles[1]) {
+      setup.withAi = true;
+      setup.aiCount = 1;
+      setup.victory = "demoralization";
+    } else if (name == kBuiltInProfiles[2] || name == kBuiltInProfiles[3]) {
+      // Slots 1 and 2, 3 and 4 face each other on maps whose starts are paired (the Armies panel pairs them):
+      // two v two puts the odd slots on one team and the even on the other.
+      const int count = name == kBuiltInProfiles[2] ? std::min(4, std::max(slots, 2)) : std::max(slots, 2);
+      setup.withAi = true;
+      setup.victory = "demoralization";
+      for (int i = 0; i < count; ++i) {
+        PlaySlot slot;
+        slot.role = i == 0 ? PlaySlot::Role::You : PlaySlot::Role::Ai;
+        slot.ai = setup.ai;
+        slot.team = name == kBuiltInProfiles[2] ? 1 + (i % 2) : 0;
+        setup.slots.push_back(slot);
+      }
+    } else {
+      return;
+    }
+    gpg::Logf("editor: play profile %s (%zu slots)", name.c_str(), setup.slots.size());
+    PrepareRules();
+  }
+
+  void EdPlay::SaveProfile(const std::string& name)
+  {
+    if (name.empty()) {
+      return;
+    }
+    mProfiles[name] = Store(mSetup);
+    WriteSetups();
+    gpg::Logf("editor: play profile %s saved", name.c_str());
   }
 
   bool EdPlay::SeesWholeMap() const
@@ -736,7 +896,9 @@ end
       gpg::Warnf("editor: the session launcher did not load; playing with FAF's quick start");
       return moho::StartCommandLineSession(scenario.c_str(), false);
     }
-    const bool withAi = mSetup.withAi && mSetup.ai >= 0 && mSetup.ai < static_cast<int>(mAiTypes.size());
+    const bool withAi = (mSetup.withAi || std::any_of(mSetup.slots.begin(), mSetup.slots.end(),
+                                                      [](const PlaySlot& slot) { return slot.role == PlaySlot::Role::Ai; })) &&
+                        mSetup.ai >= 0 && mSetup.ai < static_cast<int>(mAiTypes.size());
     const std::string aiKey = withAi ? mAiTypes[static_cast<std::size_t>(mSetup.ai)].key : std::string{};
     const int faction = mSetup.faction >= 1 && mSetup.faction <= static_cast<int>(mFactions.size()) ? mSetup.faction : 0;
     const char* const fog = mSetup.fog ? "explored" : "none";
@@ -751,9 +913,27 @@ end
     for (const std::string& uid : playedMods) {
       extraText += "['" + uid + "'] = true, ";
     }
-    (void)moho::SCR_LuaDoString((extraText + "} }").c_str(), state);
+    extraText += "}, slots = {";
+    for (const PlaySlot& slot : mSetup.slots) {
+      const std::string role = slot.role == PlaySlot::Role::You ? "you" : slot.role == PlaySlot::Role::Ai ? "ai" : "empty";
+      const std::string key = slot.ai >= 0 && slot.ai < static_cast<int>(mAiTypes.size()) ? mAiTypes[static_cast<std::size_t>(slot.ai)].key : "rush";
+      extraText += "{ role = '" + role + "', ai = '" + key + "', team = " + std::to_string(slot.team) + " }, ";
+    }
+    char options[160];
+    (void)std::snprintf(options, sizeof(options), "}, victory = '%s', unitCap = %d, cheatMult = '%.1f' }", mSetup.victory.c_str(), mSetup.unitCap,
+                        static_cast<double>(mSetup.cheatMult));
+    (void)moho::SCR_LuaDoString((extraText + options).c_str(), state);
     if (!playedMods.empty()) {
       gpg::Logf("editor: play with %zu mod%s", playedMods.size(), playedMods.size() == 1 ? "" : "s");
+    }
+    if (!mSetup.slots.empty()) {
+      std::string list;
+      for (const PlaySlot& slot : mSetup.slots) {
+        list += slot.role == PlaySlot::Role::You ? " you" : slot.role == PlaySlot::Role::Ai ? " ai" : " -";
+        list += slot.team > 0 ? "/t" + std::to_string(slot.team) : std::string();
+      }
+      gpg::Logf("editor: play slots:%s; victory %s, unit cap %d, AI cheat %.1f", list.c_str(), mSetup.victory.c_str(), mSetup.unitCap,
+                static_cast<double>(mSetup.cheatMult));
     }
     try {
       const LuaPlus::LuaObject start = state->GetGlobal("EditorStartPlay");
@@ -861,8 +1041,13 @@ end
         gpg::Warnf("editor: /playai %s: no such AI type", args[0].c_str());
       }
     }
+    // `/playprofile <n>`: the n-th profile (1 the first built-in one) applied before each test play.
+    if (moho::CFG_GetArgOption("/playprofile", 1, &args) && !args.empty()) {
+      mAutoProfile = std::atoi(args[0].c_str());
+    }
     mAutoWholeMap = moho::CFG_GetArgOption("/playwholemap", 0, nullptr);
     mAutoNoFog = moho::CFG_GetArgOption("/playnofog", 0, nullptr);
+    mAutoLogArmies = moho::CFG_GetArgOption("/playlogarmies", 0, nullptr);
     if (moho::CFG_GetArgOption("/playafter", 1, &args) && !args.empty()) {
       mAutoDelay = static_cast<float>(std::atof(args[0].c_str()));
     }
@@ -895,6 +1080,9 @@ end
           mSetup.withAi = true;
           mSetup.ai = mAutoAi;
         }
+        if (const std::vector<PlayProfile> profiles = Profiles(); mAutoProfile >= 1 && mAutoProfile <= static_cast<int>(profiles.size())) {
+          ApplyProfile(profiles[static_cast<std::size_t>(mAutoProfile - 1)].name, 8);
+        }
         mPlayRequested = true;
       } else {
         mAutoRun = false;
@@ -912,6 +1100,23 @@ end
         }
         if (mAutoNoFog) {
           SetFogHidden(true);
+        }
+        // `/playlogarmies`: each army's name and its stance to the others, as the UI sees them (IsAlly).
+        if (mAutoLogArmies) {
+          if (LuaPlus::LuaState* const state = moho::USER_GetLuaState(); state != nullptr) {
+            (void)moho::SCR_LuaDoString(R"lua(
+local armies = GetArmiesTable().armiesTable
+for i, a in armies do
+    local line = 'editor: army ' .. i .. ' ' .. tostring(a.nickname) .. (a.human and ' (you)' or '') .. ':'
+    for j, b in armies do
+        if j ~= i and not b.civilian and not a.civilian then
+            line = line .. ' ' .. j .. (IsAlly(i, j) and '=ally' or '=enemy')
+        end
+    end
+    LOG(line)
+end
+)lua", state);
+          }
         }
       } else if (mAutoWholeMap && mWholeMap && now - mPlayingSince >= static_cast<double>(mAutoSeconds) * 0.5) {
         if (const moho::CWldSession* const session = moho::WLD_GetActiveSession()) {
