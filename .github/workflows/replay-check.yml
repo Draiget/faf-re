@@ -37,7 +37,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GAME_VERSION: "3835"
+  # The game version the core set is played on: the one FAF plays (docs/PR_REPLAY_CHECK.md).
+  GAME_VERSION: "3840"
+  # tests/replay_sets' stored call hashes were recorded on game version 3835's core replays: the
+  # replay-sets job plans and stages those, apart from the core set's.
+  SETS_GAME_VERSION: "3835"
   PYTHON_VERSION: "3.14"
   # The clang-cl the Windows builds use, as a maintainer's build.ps1 does (LLVM 22.1.7), with
   # Visual Studio 2022's MSVC toolset (14.44 on the maintainer's machine): the Windows jobs run on
@@ -72,6 +76,18 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      # The replay-sets job's replays (SETS_GAME_VERSION's core set), from that version's index. A cache
+      # restores only to the path it was saved from, so this one is moved aside before the next.
+      - uses: actions/cache/restore@v6
+        with:
+          path: cache/index
+          key: index-${{ env.SETS_GAME_VERSION }}-latest
+          restore-keys: index-${{ env.SETS_GAME_VERSION }}-
+      - run: >
+          mkdir -p cache/index &&
+          python tools/parity-data/plan.py --corpus tools/parity-data/corpus/$SETS_GAME_VERSION.tsv.gz --index cache/index
+          --set core --slots 1 --budget-minutes 90 --out plan-sets.json &&
+          mv cache/index cache/index-sets
       - uses: actions/cache/restore@v6
         with:
           path: cache/index
@@ -104,7 +120,9 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: plan
-          path: plan.json
+          path: |
+            plan.json
+            plan-sets.json
           retention-days: 7
 
   # The core set's replays, maps and M28AI versions, the FAF game files and the encrypted retail
@@ -163,6 +181,60 @@ jobs:
           path: stage
           retention-days: 1
 
+
+  # The same for the replay-sets job: SETS_GAME_VERSION's core replays and game files.
+  data-sets:
+    needs: plan
+    runs-on: ubuntu-24.04
+    # For PARITY_RETAIL_ID, this environment's variable; the job runs no code of the pull request.
+    # No deployment: the secrets and variables come without one, and a deployment per job posts
+    # "deployed to parity" to the pull request each time.
+    environment:
+      name: parity
+      deployment: false
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: plan
+      - uses: actions/cache/restore@v6
+        with:
+          path: game
+          key: game-${{ env.SETS_GAME_VERSION }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v6
+        with:
+          path: retail.enc
+          key: retail-${{ vars.PARITY_RETAIL_ID }}
+          fail-on-cache-miss: true
+      # A cache entry matches only a restore with the same path lines: these are the prewarm's.
+      - uses: actions/cache/restore@v6
+        with:
+          path: |
+            cache/maps
+            !cache/maps/.partial-*
+          key: maps-${{ env.SETS_GAME_VERSION }}-latest
+          restore-keys: maps-${{ env.SETS_GAME_VERSION }}-
+      - uses: actions/cache/restore@v6
+        with:
+          path: |
+            cache/m28
+            !cache/m28/.partial-*
+          key: m28-${{ env.SETS_GAME_VERSION }}-latest
+          restore-keys: m28-${{ env.SETS_GAME_VERSION }}-
+      - run: >
+          mkdir -p cache/maps cache/m28 &&
+          python tools/parity-data/stage.py --plan plan-sets.json --maps cache/maps --m28 cache/m28 --out stage
+          --game-version "$SETS_GAME_VERSION" &&
+          mv game retail.enc stage/
+      - uses: actions/upload-artifact@v7
+        with:
+          name: data-sets
+          path: stage
+          retention-days: 1
   build-linux:
     needs: plan
     if: contains(fromJSON(needs.plan.outputs.platforms), 'linux-x64')
@@ -349,9 +421,9 @@ jobs:
   # A failure here names the function that changed, where a checksum only names the beat. The
   # tools are the workflow's own commit; the exe is the pull request's, as in the play jobs.
   replay-sets:
-    needs: [plan, data, build-call-hash]
+    needs: [plan, data-sets, build-call-hash]
     if: >
-      !cancelled() && needs.data.result == 'success' && needs.build-call-hash.result == 'success'
+      !cancelled() && needs.data-sets.result == 'success' && needs.build-call-hash.result == 'success'
     runs-on: windows-2022
     timeout-minutes: 240
     environment:
@@ -384,7 +456,7 @@ jobs:
           path: call-hash
       - uses: actions/download-artifact@v8
         with:
-          name: data
+          name: data-sets
           path: data
       - env:
           KEY: ${{ secrets.PARITY_RETAIL_KEY }}
@@ -401,7 +473,7 @@ jobs:
       - shell: bash
         run: >
           python tools/parity-data/sets_stage.py --sets tests/replay_sets --pack data/game --replays data/replays
-          --maps data/maps --m28 data/m28 --work work --pool pool --game-version "$GAME_VERSION"
+          --maps data/maps --m28 data/m28 --work work --pool pool --game-version "$SETS_GAME_VERSION"
       - shell: pwsh
         run: >
           tools\retail-recorder\check_replay_sets.ps1 -BuildDir "$PWD\call-hash" -Pool "$PWD\pool"
