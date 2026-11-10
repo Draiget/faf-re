@@ -340,6 +340,18 @@ namespace moho
       &ren_MsdfTextMinSize
     );
 
+    /**
+     * Engine change: `ren_MsdfGlyphReuse`. MSDF text looked each character's glyph up twice, a binary search
+     * in the check that every character has one and again while drawing; the drawing loop now takes the
+     * glyphs the check found, in the same order.
+     */
+    bool ren_MsdfGlyphReuse = true;
+    TConVar<bool> gTConVar_ren_MsdfGlyphReuse(
+      "ren_MsdfGlyphReuse",
+      "MSDF text draws the glyphs its check found (1, the default), or looks each one up again while drawing (0).",
+      &ren_MsdfGlyphReuse
+    );
+
     constexpr const char* kMsdfTechnique = "TMsdfText";
     constexpr const char* kModFontFallbackFace = "Arial";
     constexpr const char* kScreenTextTechnique = "TAlphaBlendLinearSampleNoDepth";
@@ -551,15 +563,32 @@ namespace moho
       const SMsdfFontAtlas* const fallback = binding.mIsMod ? binding.mFallbackAtlas.get() : nullptr;
 
       // A character a mod's font lacks comes from the default font's atlas, on the same page and in the same draw.
+      // Engine change (ren_MsdfGlyphReuse): the glyphs found here, in order, for the drawing loop below, which
+      // looked each one up again.
+      struct FoundGlyph
+      {
+        const SMsdfGlyph* glyph;
+        bool fromFallback;
+        wchar_t codepoint;
+      };
+      static std::vector<FoundGlyph> sFound;
+      const bool reuseGlyphs = ren_MsdfGlyphReuse;
+      sFound.clear();
       bool usesFallback = false;
       wchar_t codepoint = 0;
       for (const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint); codepoint != 0;
            encoded = gpg::STR_DecodeUtf8Char(encoded, codepoint)) {
-        if (FindMsdfGlyph(atlas, static_cast<std::uint32_t>(codepoint)) == nullptr) {
-          if (fallback == nullptr || FindMsdfGlyph(*fallback, static_cast<std::uint32_t>(codepoint)) == nullptr) {
+        const SMsdfGlyph* found = FindMsdfGlyph(atlas, static_cast<std::uint32_t>(codepoint));
+        bool fromFallback = false;
+        if (found == nullptr) {
+          if (fallback == nullptr || (found = FindMsdfGlyph(*fallback, static_cast<std::uint32_t>(codepoint))) == nullptr) {
             return false;
           }
           usesFallback = true;
+          fromFallback = true;
+        }
+        if (reuseGlyphs) {
+          sFound.push_back(FoundGlyph{found, fromFallback, codepoint});
         }
       }
 
@@ -616,22 +645,16 @@ namespace moho
       };
       Vector3f cursor = origin;
       float totalAdvance = 0.0f;
-      for (const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint); codepoint != 0;
-           encoded = gpg::STR_DecodeUtf8Char(encoded, codepoint)) {
+      // Draws one character; false once the clip width is reached.
+      const auto drawGlyph = [&](const wchar_t character, const SMsdfGlyph* const found, const bool fromFallback) {
         // The clip width is the control's, so it counts unscaled advances: a pop doesn't change what fits.
-        const float advance = font.GetCharInfo(codepoint).mAdvance;
+        const float advance = font.GetCharInfo(character).mAdvance;
         totalAdvance += advance;
         if (std::isfinite(maxAdvance) && totalAdvance > maxAdvance) {
-          break;
+          return false;
         }
-        const SMsdfGlyph* found = FindMsdfGlyph(atlas, static_cast<std::uint32_t>(codepoint));
-        float glyphPageX = static_cast<float>(pageX);
-        float glyphPageY = static_cast<float>(pageY);
-        if (found == nullptr) {
-          found = FindMsdfGlyph(*fallback, static_cast<std::uint32_t>(codepoint));
-          glyphPageX = static_cast<float>(fallbackPageX);
-          glyphPageY = static_cast<float>(fallbackPageY);
-        }
+        const float glyphPageX = static_cast<float>(fromFallback ? fallbackPageX : pageX);
+        const float glyphPageY = static_cast<float>(fromFallback ? fallbackPageY : pageY);
         const SMsdfGlyph& glyph = *found;
         if (glyph.mAtlasRight > glyph.mAtlasLeft) {
           const Vector3f topLeft = corner(cursor, glyph.mPlaneLeft, glyph.mPlaneTop);
@@ -666,6 +689,27 @@ namespace moho
           }
         }
         cursor.x += advance * textScale;
+        return true;
+      };
+
+      if (reuseGlyphs) {
+        for (const FoundGlyph& found : sFound) {
+          if (!drawGlyph(found.codepoint, found.glyph, found.fromFallback)) {
+            break;
+          }
+        }
+      } else {
+        for (const char* encoded = gpg::STR_DecodeUtf8Char(text, codepoint); codepoint != 0;
+             encoded = gpg::STR_DecodeUtf8Char(encoded, codepoint)) {
+          const SMsdfGlyph* found = FindMsdfGlyph(atlas, static_cast<std::uint32_t>(codepoint));
+          const bool fromFallback = found == nullptr;
+          if (fromFallback) {
+            found = FindMsdfGlyph(*fallback, static_cast<std::uint32_t>(codepoint));
+          }
+          if (!drawGlyph(codepoint, found, fromFallback)) {
+            break;
+          }
+        }
       }
 
       if (!instanced) {
