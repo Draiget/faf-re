@@ -101,7 +101,6 @@ namespace moho
         const gpg::gal::imaging::Image::Subresource& top = image.subresources.front();
         const std::uint32_t columns = std::max<std::uint32_t>(1U, (top.width * 3U) / 5U);
         double sum[3]{};
-        double alpha = 0.0;
         double samples = 0.0;
         for (std::uint32_t row = 0U; row < top.height; ++row) {
           const std::uint8_t* const pixels = image.bytes.data() + top.offset + static_cast<std::size_t>(row) * top.rowPitch;
@@ -111,7 +110,6 @@ namespace moho
             for (int channel = 0; channel < 3; ++channel) {
               sum[channel] += a * pixel[channel] / 255.0;
             }
-            alpha += a;
             samples += 1.0;
           }
         }
