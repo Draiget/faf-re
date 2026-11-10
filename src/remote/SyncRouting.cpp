@@ -51,6 +51,7 @@ namespace faf::remote
       {"CampaignMode", ESyncRoute::Everyone},
       {"CancelCountdown", ESyncRoute::Everyone},
       {"ChangeCameraZoom", ESyncRoute::Everyone},
+      {"ChatMessages", ESyncRoute::Chat},
       {"Cheaters", ESyncRoute::Everyone},
       {"CreateSimDialogue", ESyncRoute::Everyone},
       {"DestroyDialogue", ESyncRoute::Everyone},
@@ -1447,6 +1448,56 @@ namespace faf::remote
     CloseKey(key, "NukeLaunchData");
   }
 
+  void CSyncRouter::RouteChat(moho::Sim& sim, LuaPlus::LuaObject& key, LuaPlus::LuaObject& value)
+  {
+    // Game version 3840's `lua/ChatUtils.lua` `RelayChatMessage` writes a message only on a client whose focus
+    // `IsLocalRecipient` lets it through, and the server's own sync runs at focus -1, where every message passes. So
+    // each view gets what its focus would: focus -1 everything; `to == 'all'` everyone; `'allies'` the sender and
+    // whoever the view's army is allied with (`IsAlly(focus, msg.From)`); a number the sender and that army. `From`
+    // and a numeric `to` are Lua's army numbers, from 1. The list is numbered again per view: the UI walks it
+    // (`ChatController.OnSyncChatMessages`), and a dropped entry must leave no hole.
+    const std::string_view name = "ChatMessages";
+    mScratch.clear();
+    Encode(key, mScratch);
+    for (std::size_t index = 0; index < mPlayers.size(); ++index) {
+      SPlayerSync& view = mPlayers[index];
+      const std::int32_t focus = view.army; // 0-based, -1 an observer
+      view.body.insert(view.body.end(), mScratch.begin(), mScratch.end());
+      view.body.push_back(kTagTableBegin);
+      int next = 1;
+      for (LuaPlus::LuaTableIterator entry(value, 1); !entry.m_isDone; entry.Next()) {
+        LuaPlus::LuaObject message = entry.GetValue();
+        bool wanted = focus < 0;
+        if (!wanted && message.IsTable()) {
+          LuaPlus::LuaObject fromField = message["From"];
+          LuaPlus::LuaObject toField = message["to"];
+          const std::int32_t from = fromField.IsNumber() ? static_cast<std::int32_t>(fromField.GetNumber()) - 1 : -1;
+          if (toField.IsString()) {
+            const std::string_view to = toField.GetString();
+            wanted = to == "all" || (to == "allies" && (focus == from || Allied(sim, index, from)));
+          } else if (toField.IsNumber()) {
+            wanted = focus == from || focus == static_cast<std::int32_t>(toField.GetNumber()) - 1;
+          }
+        }
+        if (wanted) {
+          AppendNumber(view.body, static_cast<float>(next++));
+          Encode(message, view.body);
+        }
+      }
+      if (view.contextUsed) {
+        LuaPlus::LuaObject own = view.context[std::string(name).c_str()];
+        if (own.IsTable()) {
+          for (LuaPlus::LuaTableIterator entry(own, 1); !entry.m_isDone; entry.Next()) {
+            LuaPlus::LuaObject message = entry.GetValue();
+            AppendNumber(view.body, static_cast<float>(next++));
+            Encode(message, view.body);
+          }
+        }
+      }
+      view.body.push_back(kTagTableEnd);
+    }
+  }
+
   void CSyncRouter::RouteScoreAccum(LuaPlus::LuaObject& key, LuaPlus::LuaObject& value)
   {
     mScratch.clear();
@@ -1494,6 +1545,9 @@ namespace faf::remote
           return;
         case ESyncRoute::NukeLaunch:
           RouteNukes(sim, key, value);
+          return;
+        case ESyncRoute::Chat:
+          RouteChat(sim, key, value);
           return;
         case ESyncRoute::ScoreAccum:
           RouteScoreAccum(key, value);

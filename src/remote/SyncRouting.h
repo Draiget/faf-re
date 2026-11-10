@@ -61,6 +61,7 @@ namespace faf::remote
     Score,        // by army: the view and its allies whole, others their score (`lua/sim/score.lua:283`)
     ScoreAccum,   // everyone, with the view's own `focusArmyIndex` (`lua/sim/score.lua:284`)
     NukeLaunch,   // a list: allies whole, enemies without the location (`DefaultProjectileWeapon.lua:1078`)
+    Chat,         // a list of chat messages, each to whom `ChatUtils.IsLocalRecipient` lets it (game version 3840)
     Observers,    // nothing for a player: debug data, or written at focus -1 for observers alone
   };
 
@@ -70,8 +71,11 @@ namespace faf::remote
     ESyncRoute route;
   };
 
-  /** The FAF game version `SyncKeyRoutes` was audited on; running on another one is logged. */
-  inline constexpr std::string_view kSyncPolicyGameVersion = "3835";
+  /**
+   * The FAF game version `SyncKeyRoutes` was audited on; running on another one is logged. 3840 writes the keys 3835
+   * does and one more, `ChatMessages` (`ESyncRoute::Chat`).
+   */
+  inline constexpr std::string_view kSyncPolicyGameVersion = "3840";
   /** That version's keys (`.plans/dedicated-server/research/WP6.1-sync-keys.md`), sorted. */
   [[nodiscard]] std::span<const SSyncKeyRoute> SyncKeyRoutes() noexcept;
   /** The route of `key`, or `ESyncRoute::Observers` with `known` false. */
@@ -205,6 +209,7 @@ namespace faf::remote
     void RouteById(moho::Sim& sim, LuaPlus::LuaObject& key, std::string_view name, LuaPlus::LuaObject& value, ESyncRoute route);
     void RouteScore(moho::Sim& sim, LuaPlus::LuaObject& key, LuaPlus::LuaObject& value);
     void RouteNukes(moho::Sim& sim, LuaPlus::LuaObject& key, LuaPlus::LuaObject& value);
+    void RouteChat(moho::Sim& sim, LuaPlus::LuaObject& key, LuaPlus::LuaObject& value);
     void RouteScoreAccum(LuaPlus::LuaObject& key, LuaPlus::LuaObject& value);
     void CloseKey(LuaPlus::LuaObject& key, std::string_view name);
 
