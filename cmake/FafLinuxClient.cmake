@@ -259,5 +259,9 @@ target_include_directories(faf_client_objs PRIVATE
 # `--target faf_client` lists what is still unresolved.
 add_executable(faf_client EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/src/platform/posix/ClientMainPosix.cpp")
 target_include_directories(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/wx")
-target_link_libraries(faf_client PRIVATE faf_client_objs faf_client_dxc faf_client_imaging faf_sim faf_directxtex_linux)
+# The simulation's objects first: their static initializers run in link order, and the client's
+# register factories for the sim's reflected types (SBatchTextureDataFactory.cpp looks up
+# SBatchTextureData, whose type info faf_sim registers). The sim's never need the client's, as
+# headless links faf_sim alone.
+target_link_libraries(faf_client PRIVATE faf_sim faf_client_objs faf_client_dxc faf_client_imaging faf_directxtex_linux)
 target_link_options(faf_client PRIVATE -Wl,--error-limit=0)
