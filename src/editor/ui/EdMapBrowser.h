@@ -2,7 +2,9 @@
 
 #include <cstdint>
 #include <map>
+#include <filesystem>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "editor/doc/EdVault.h"
@@ -36,6 +38,13 @@ namespace faf::editor
     void Draw();
     /** Downloads a vault map (its folder name or link) and opens it; `/vaultmap <name>` in test runs. */
     void Download(const std::string& name);
+    /**
+     * A map from any folder on disk, by its `_scenario.lua`: the folder mounted where the scenario says its files are
+     * (`/maps/<folder>/`), then opened; `/openfolder <file>` in test runs. Refused when another folder has that name.
+     */
+    void OpenFromDisk(const std::filesystem::path& scenarioFile);
+    /** The panel's "Open from a folder..." asked for a file (the app shows the dialog). */
+    [[nodiscard]] bool TakeOpenFileAsk() noexcept { return std::exchange(mOpenFileAsk, false); }
 
   private:
     struct Details
@@ -72,5 +81,6 @@ namespace faf::editor
     int mPicturesThisFrame = 0;
     EdVaultDownload mDownload;
     std::string mStatus;
+    bool mOpenFileAsk = false;
   };
 } // namespace faf::editor

@@ -239,6 +239,11 @@ namespace faf::editor
       return window != nullptr ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(window->GetHandle())) : nullptr;
     }
 
+    namespace
+    {
+      std::filesystem::path AskFile(HWND owner, bool save, const wchar_t* filter, const wchar_t* extension, const wchar_t* title);
+    } // namespace
+
     /**
      * The map editor as the engine's app: the game's own `CScApp` (window, Direct3D 12 or Vulkan device,
      * user interface, sound, world sessions) inside it, unchanged, and the editor around it: ImGui drawn over
@@ -381,6 +386,8 @@ namespace faf::editor
       bool mBodiesDragging = false;
       EdDocument::SaveSnapshot mBodiesBefore;
       bool mBrowserArg = false;
+      /** `/openfolder <scenario file>` (test runs): a map opened from a folder anywhere on disk. */
+      std::string mOpenFolderArg;
       std::string mBrowserFilterArg;
       std::string mVaultMapArg;
       /** `/waterbody <body>` (test runs, '+' for spaces): a body added as one edit once the map is shown. */
@@ -836,6 +843,17 @@ namespace faf::editor
           mShell->Browser().Download(mVaultMapArg);
           mVaultMapArg.clear();
         }
+        if (!mOpenFolderArg.empty()) {
+          mShell->Browser().OpenFromDisk(std::filesystem::u8path(mOpenFolderArg));
+          mOpenFolderArg.clear();
+        }
+        if (mShell->Browser().TakeOpenFileAsk()) {
+          const std::filesystem::path file = AskFile(HandleOf(mGame.supcomFrame), false, L"Map scenario (*_scenario.lua)\0*_scenario.lua\0", L"lua",
+                                                     L"Open a map from a folder: pick its _scenario.lua");
+          if (!file.empty()) {
+            mShell->Browser().OpenFromDisk(file);
+          }
+        }
         mShell->Draw();
         switch (mShell->TakeCommand()) {
         case EdShell::Command::Save:
@@ -946,6 +964,10 @@ namespace faf::editor
       // `/browser` shows the map browser; `/vaultmap <name>` downloads a vault map and opens it (test runs).
       if (moho::CFG_GetArgOption("/browser", 0, nullptr)) {
         mBrowserArg = true;
+      }
+      if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/openfolder", 1, &file) && !file.empty()) {
+        mOpenFolderArg = file[0].c_str();
+        std::replace(mOpenFolderArg.begin(), mOpenFolderArg.end(), '+', ' ');
       }
       if (fa::vector<fa::string> filter; moho::CFG_GetArgOption("/browserfilter", 1, &filter) && !filter.empty()) {
         mBrowserArg = true;

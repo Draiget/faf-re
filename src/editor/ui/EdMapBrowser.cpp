@@ -5,6 +5,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
+#include <iterator>
 
 #include <Windows.h>
 #include <shellapi.h>
@@ -217,6 +219,78 @@ namespace faf::editor
     (void)std::snprintf(mFilter, sizeof(mFilter), "%s", text.c_str());
   }
 
+  void EdMapBrowser::OpenFromDisk(const std::filesystem::path& scenarioFile)
+  {
+    const auto refuse = [&](const std::string& why) {
+      mStatus = why;
+      gpg::Warnf("editor: open from a folder: %s", why.c_str());
+    };
+    const std::filesystem::path folder = scenarioFile.parent_path();
+    const std::string file = scenarioFile.filename().string();
+    if (Lower(file).size() < 13 || Lower(file).compare(file.size() - 13, 13, "_scenario.lua") != 0) {
+      refuse("pick a map's _scenario.lua");
+      return;
+    }
+    // Where the scenario says its files are: its map's folder in /maps (a folder renamed on disk still works).
+    std::string text;
+    {
+      std::ifstream in(scenarioFile, std::ios::binary);
+      text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    }
+    LuaText info;
+    std::string error;
+    std::string mount;
+    if (ReadLuaAssignment(text, "ScenarioInfo", info, error)) {
+      if (const LuaText* const map = info.Field("map")) {
+        const std::string path = Lower(Unquote(map->atom));
+        if (path.rfind("/maps/", 0) == 0 && path.find('/', 6) != std::string::npos) {
+          mount = path.substr(6, path.find('/', 6) - 6);
+        }
+      }
+    }
+    if (mount.empty()) {
+      mount = Lower(folder.filename().string());
+    }
+    bool scmap = false;
+    std::error_code code;
+    for (const auto& entry : std::filesystem::directory_iterator(folder, code)) {
+      scmap = scmap || Lower(entry.path().extension().string()) == ".scmap";
+    }
+    if (!scmap) {
+      refuse("the folder has no .scmap");
+      return;
+    }
+    const std::string scenario = "/maps/" + mount + "/" + Lower(file);
+    if (const std::string listed = ListedScenario(mount); !listed.empty()) {
+      // The same folder (mounted at startup): open it. Another folder of that name: the game would mix them.
+      fa::string disk;
+      moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS();
+      const bool same = vfs != nullptr && vfs->FindFile(&disk, listed.c_str(), nullptr) != nullptr &&
+                        std::filesystem::equivalent(std::filesystem::path(disk.c_str()).parent_path(), folder, code);
+      if (!same) {
+        refuse("the game already has a map folder named " + mount + " (" + std::string(disk.c_str()) + "); rename one of them");
+        return;
+      }
+      mStatus = "Opened " + listed;
+      OpenMap(listed);
+      return;
+    }
+    if (!moho::DISK_MountDirectoryNow(folder, ("/maps/" + mount).c_str())) {
+      refuse("the game's file system isn't set up");
+      return;
+    }
+    mPlay.FindMaps();
+    const std::string listed = ListedScenario(mount);
+    if (listed.empty()) {
+      refuse("mounted " + folder.string() + " as /maps/" + mount + ", but the game doesn't list a map there");
+      return;
+    }
+    gpg::Logf("editor: open from a folder: %s mounted as /maps/%s; opening %s", folder.string().c_str(), mount.c_str(), listed.c_str());
+    mStatus = "Opened " + listed + " from " + folder.string();
+    OpenMap(listed);
+    (void)scenario;
+  }
+
   void EdMapBrowser::Download(const std::string& name)
   {
     VaultMapName map;
@@ -329,6 +403,16 @@ namespace faf::editor
       rows.push_back(i);
     }
     ImGui::TextDisabled("%zu of %zu maps; double-click one to open it for editing", rows.size(), maps.size());
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Open from a folder...")) {
+      mOpenFileAsk = true;
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("A map folder anywhere on disk: pick its _scenario.lua. The editor adds it to the game's maps until it closes.");
+    }
+    if (!mStatus.empty()) {
+      ImGui::TextWrapped("%s", mStatus.c_str());
+    }
 
     const float picture = ImGui::GetTextLineHeight() * 3.6f;
     const ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable;
