@@ -2183,6 +2183,52 @@ BOOL FindNextFileA(const HANDLE handle, WIN32_FIND_DATAA* const found)
   return TRUE;
 }
 
+namespace
+{
+  void WidenFound(const WIN32_FIND_DATAA& narrow, WIN32_FIND_DATAW* const wide)
+  {
+    *wide = WIN32_FIND_DATAW{};
+    wide->dwFileAttributes = narrow.dwFileAttributes;
+    wide->ftCreationTime = narrow.ftCreationTime;
+    wide->ftLastAccessTime = narrow.ftLastAccessTime;
+    wide->ftLastWriteTime = narrow.ftLastWriteTime;
+    wide->nFileSizeHigh = narrow.nFileSizeHigh;
+    wide->nFileSizeLow = narrow.nFileSizeLow;
+    const std::wstring name = WidenUtf8(narrow.cFileName);
+    const std::size_t count = (std::min)(name.size(), static_cast<std::size_t>(MAX_PATH - 1));
+    std::copy_n(name.c_str(), count, wide->cFileName);
+    wide->cFileName[count] = L'\0';
+  }
+} // namespace
+
+HANDLE FindFirstFileW(const wchar_t* const fileName, WIN32_FIND_DATAW* const found)
+{
+  if (fileName == nullptr || found == nullptr) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return INVALID_HANDLE_VALUE;
+  }
+  WIN32_FIND_DATAA narrow{};
+  const HANDLE search = FindFirstFileA(NarrowPath(fileName).c_str(), &narrow);
+  if (search != INVALID_HANDLE_VALUE) {
+    WidenFound(narrow, found);
+  }
+  return search;
+}
+
+BOOL FindNextFileW(const HANDLE search, WIN32_FIND_DATAW* const found)
+{
+  if (found == nullptr) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return FALSE;
+  }
+  WIN32_FIND_DATAA narrow{};
+  if (!FindNextFileA(search, &narrow)) {
+    return FALSE;
+  }
+  WidenFound(narrow, found);
+  return TRUE;
+}
+
 BOOL FindClose(const HANDLE handle)
 {
   if (handle == nullptr || handle == INVALID_HANDLE_VALUE) {

@@ -227,6 +227,82 @@ int ShowCursor(const BOOL show)
   return state.cursorShowCount;
 }
 
+namespace
+{
+  struct Monitors
+  {
+    std::mutex mutex;
+    std::vector<RECT> rects;  // screen rectangles; the first is the primary
+  };
+
+  Monitors& AllMonitors()
+  {
+    static Monitors monitors;
+    return monitors;
+  }
+
+  // The squared distance from `point` to `rect` (0 inside).
+  long long DistanceSquared(const POINT point, const RECT& rect)
+  {
+    const long long dx = point.x < rect.left ? rect.left - point.x : (point.x >= rect.right ? point.x - rect.right + 1 : 0);
+    const long long dy = point.y < rect.top ? rect.top - point.y : (point.y >= rect.bottom ? point.y - rect.bottom + 1 : 0);
+    return dx * dx + dy * dy;
+  }
+} // namespace
+
+void platform::posix::SetMonitors(const int* const rects, const int count)
+{
+  Monitors& monitors = AllMonitors();
+  const std::lock_guard<std::mutex> lock(monitors.mutex);
+  monitors.rects.clear();
+  for (int index = 0; index < count; ++index) {
+    monitors.rects.push_back(RECT{rects[index * 4], rects[index * 4 + 1], rects[index * 4 + 2], rects[index * 4 + 3]});
+  }
+}
+
+// A monitor handle is its index plus one.
+HMONITOR MonitorFromPoint(const POINT point, const DWORD flags)
+{
+  Monitors& monitors = AllMonitors();
+  const std::lock_guard<std::mutex> lock(monitors.mutex);
+  if (monitors.rects.empty()) {
+    return nullptr;
+  }
+  std::size_t nearest = 0;
+  long long nearestDistance = -1;
+  for (std::size_t index = 0; index < monitors.rects.size(); ++index) {
+    const long long distance = DistanceSquared(point, monitors.rects[index]);
+    if (distance == 0) {
+      return reinterpret_cast<HMONITOR>(index + 1);
+    }
+    if (nearestDistance < 0 || distance < nearestDistance) {
+      nearest = index;
+      nearestDistance = distance;
+    }
+  }
+  if (flags == MONITOR_DEFAULTTONEAREST) {
+    return reinterpret_cast<HMONITOR>(nearest + 1);
+  }
+  return flags == MONITOR_DEFAULTTOPRIMARY ? reinterpret_cast<HMONITOR>(std::size_t{1}) : nullptr;
+}
+
+BOOL GetMonitorInfoW(const HMONITOR monitor, MONITORINFO* const info)
+{
+  if (info == nullptr || monitor == nullptr) {
+    return FALSE;
+  }
+  Monitors& monitors = AllMonitors();
+  const std::lock_guard<std::mutex> lock(monitors.mutex);
+  const std::size_t index = reinterpret_cast<std::size_t>(monitor) - 1;
+  if (index >= monitors.rects.size()) {
+    return FALSE;
+  }
+  info->rcMonitor = monitors.rects[index];
+  info->rcWork = monitors.rects[index];  // the window system doesn't report panels apart
+  info->dwFlags = index == 0 ? MONITORINFOF_PRIMARY : 0u;
+  return TRUE;
+}
+
 BOOL ClipCursor(const RECT* const rect)
 {
   if (platform::posix::gClipCursorHook != nullptr) {

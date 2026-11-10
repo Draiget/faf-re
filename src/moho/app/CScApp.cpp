@@ -985,6 +985,10 @@ namespace
    */
   void PublishWindowedPresentationBounds(HWND const windowHandle)
   {
+#if !FAFRE_PLATFORM_WINDOWS
+    // Windows' fullscreen-presentation shared memory; nothing reads it elsewhere (issue #255).
+    (void)windowHandle;
+#else
     HANDLE const mapping = ::CreateFileMappingW(
       INVALID_HANDLE_VALUE,
       nullptr,
@@ -1004,6 +1008,7 @@ namespace
 
     ::GetWindowRect(windowHandle, windowRect);
     (void)::UnmapViewOfFile(windowRect);
+#endif
   }
 
   /**
@@ -1015,6 +1020,11 @@ namespace
    */
   [[nodiscard]] BOOL AppendLuaDebuggerSystemMenu(HWND const windowHandle)
   {
+#if !FAFRE_PLATFORM_WINDOWS
+    // No window system menu, and the Lua debugger is a wx window (issue #260).
+    (void)windowHandle;
+    return FALSE;
+#else
     HMENU const systemMenu = ::GetSystemMenu(windowHandle, FALSE);
     if (systemMenu == nullptr) {
       return FALSE;
@@ -1023,6 +1033,7 @@ namespace
     (void)::AppendMenuW(systemMenu, MF_SEPARATOR, 0u, nullptr);
     (void)::AppendMenuW(systemMenu, MF_STRING, 1u, L"New Item");
     return ::AppendMenuW(systemMenu, MF_STRING, 2u, L"Open Lua Debugger");
+#endif
   }
 
   /**

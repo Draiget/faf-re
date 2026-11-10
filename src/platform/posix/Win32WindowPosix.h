@@ -25,4 +25,7 @@ namespace platform::posix
   extern void (*gClipCursorHook)(bool clip, int left, int top, int right, int bottom);
   // The window system has events: wakes a MsgWaitForMultipleObjectsEx in the main loop.
   void WakeMessageWait();
+  // The monitors, `count` rectangles of four ints each (left, top, right, bottom, screen
+  // coordinates), the primary first: MonitorFromPoint and GetMonitorInfoW answer from them.
+  void SetMonitors(const int* rects, int count);
 } // namespace platform::posix

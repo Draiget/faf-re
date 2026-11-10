@@ -83,7 +83,7 @@ message(STATUS "faf_client: ${_faf_client_count} client translation units")
 # the Vulkan backend and the texture code use (<dxgiformat.h>); SDL3 for the window, input and
 # audio output; FAudio for XACT and X3DAudio (issue #258).
 if(FAF_FETCH_DEPENDENCIES)
-  set(FAF_DEPENDENCIES_ONLY DirectX-Headers SDL3 FAudio dxc-linux DirectXTex DirectXMath stb)
+  set(FAF_DEPENDENCIES_ONLY DirectX-Headers SDL3 FAudio dxc-linux DirectXTex DirectXMath stb freetype msdfgen)
   include(FafDependencies)
 endif()
 
@@ -123,6 +123,11 @@ target_include_directories(faf_client_dxc PRIVATE
   "${FAF_DEPENDENCIES_DIR}/dxc-linux/include")
 target_compile_options(faf_client_dxc PRIVATE -pthread -Wall "SHELL:-include platform/PlatformDefines.h"
   -Wundef-prefix=FAFRE_PLATFORM_ -Werror=undef-prefix)
+
+# MSDF text (moho/render/font, issue #306): FreeType and msdfgen, built as Windows builds them
+# (their recipes take FAF_LINUX already).
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/freetype" "${CMAKE_BINARY_DIR}/deps/freetype")
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/msdfgen" "${CMAKE_BINARY_DIR}/deps/msdfgen")
 
 # Textures (issue #255): DirectXTex's CPU code, as Windows builds it (cmake/deps/directxtex) minus
 # its WIC codec, on DirectXMath and DirectX-Headers, with empty SAL annotations
@@ -176,7 +181,8 @@ add_dependencies(faf_client_objs faf_client_dxc faf_client_imaging)
 # behind this opt-in since C++17, as boost.thread's std::auto_ptr (cmake/FafLinux.cmake).
 target_compile_definitions(faf_client_objs PRIVATE _LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1)
 target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd
-  FAudio-static SDL3::SDL3-static)  # FAudio names its static target FAudio-static, with no alias
+  FAudio-static SDL3::SDL3-static  # FAudio names its static target FAudio-static, with no alias
+  faf_freetype faf_msdfgen)
 target_include_directories(faf_client_objs PRIVATE
   "${PROJECT_SOURCE_DIR}/src/platform/posix/wx"
   "${FAF_DEPENDENCIES_DIR}/vulkan/include"

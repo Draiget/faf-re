@@ -780,6 +780,22 @@ struct WIN32_FIND_DATAA
 };
 HANDLE FindFirstFileA(const char* fileName, WIN32_FIND_DATAA* found);
 BOOL FindNextFileA(HANDLE search, WIN32_FIND_DATAA* found);
+struct WIN32_FIND_DATAW
+{
+  DWORD dwFileAttributes;
+  FILETIME ftCreationTime;
+  FILETIME ftLastAccessTime;
+  FILETIME ftLastWriteTime;
+  DWORD nFileSizeHigh;
+  DWORD nFileSizeLow;
+  DWORD dwReserved0;
+  DWORD dwReserved1;
+  wchar_t cFileName[MAX_PATH];
+  wchar_t cAlternateFileName[14];
+};
+// The A search with UTF-8 names, widened (wchar_t is UTF-32 here).
+HANDLE FindFirstFileW(const wchar_t* fileName, WIN32_FIND_DATAW* found);
+BOOL FindNextFileW(HANDLE search, WIN32_FIND_DATAW* found);
 BOOL FindClose(HANDLE search);
 #define ERROR_NO_MORE_FILES 18u
 
@@ -952,6 +968,21 @@ HCURSOR SetCursor(HCURSOR cursor);
 int ShowCursor(BOOL show);
 // Confines the cursor to `rect` (screen coordinates), or frees it for null.
 BOOL ClipCursor(const RECT* rect);
+// Monitors, as the window system reports them (platform::posix::SetMonitors, Win32WindowPosix.h);
+// MonitorFromPoint fails while none is known.
+struct MONITORINFO
+{
+  DWORD cbSize;
+  RECT rcMonitor;
+  RECT rcWork;
+  DWORD dwFlags;
+};
+#define MONITOR_DEFAULTTONULL 0x0u
+#define MONITOR_DEFAULTTOPRIMARY 0x1u
+#define MONITOR_DEFAULTTONEAREST 0x2u
+#define MONITORINFOF_PRIMARY 0x1u
+HMONITOR MonitorFromPoint(POINT point, DWORD flags);
+BOOL GetMonitorInfoW(HMONITOR monitor, MONITORINFO* info);
 
 // Virtual-key codes (WinUser.h), with their Windows values: the client's key bindings
 // convert wx key codes to and from them (wxCharCodeWXToMSW, issue #255).
