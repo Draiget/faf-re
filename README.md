@@ -5,14 +5,14 @@
 **The *Supreme Commander: Forged Alliance* engine, rebuilt as C++20**
 
 [![Replay parity](https://img.shields.io/badge/replay%20parity-96.7%25-brightgreen)](docs/RETAIL_REPLAY_PARITY.md)
-[![x64 vs retail](https://img.shields.io/badge/x64%20vs%20retail-19%25%20less%20time-blue)](docs/PERFORMANCE.md)
+[![x64 vs retail](https://img.shields.io/badge/x64%20vs%20retail-41%25%20less%20time-blue)](docs/PERFORMANCE.md)
 [![Platforms](https://img.shields.io/badge/platforms-Windows%20x64%20%7C%20x86-blue)](#build)
 
 [Build](#build) · [Retail parity](#retail-parity) · [Performance](#performance) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
-The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as readable, buildable C++20 so it can be maintained instead of staying frozen in a binary. It builds for x86 and x64, plays real games bit for bit like the retail `ForgedAlliance.exe`, and the x64 build plays replays about a quarter faster.
+The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as readable, buildable C++20 so it can be maintained instead of staying frozen in a binary. It builds for x86 and x64, plays real games bit for bit like the retail `ForgedAlliance.exe`, and the x64 build plays replays in about 40 % less time.
 
 > An independent preservation and interoperability effort, inspired by and indebted to the [Forged Alliance Forever](https://faforever.com) community. Not affiliated with, endorsed by, or supported by the original publisher or developer. See [LEGAL.md](LEGAL.md).
 
@@ -23,7 +23,7 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as r
 | Renderers | [![Direct3D 9](https://img.shields.io/badge/Direct3D-9-0078D6)](docs/RENDERER_BACKENDS.md) [![Direct3D 10](https://img.shields.io/badge/Direct3D-10-0078D6)](docs/RENDERER_BACKENDS.md) [![Direct3D 11](https://img.shields.io/badge/Direct3D-11-0078D6)](docs/RENDERER_BACKENDS.md) [![Direct3D 12](https://img.shields.io/badge/Direct3D-12-0078D6)](docs/RENDERER_BACKENDS.md) [![Vulkan 1.3](https://img.shields.io/badge/Vulkan-1.3-AC162C)](docs/RENDERER_BACKENDS.md) |
 | Replay parity | Latest nightly (04–05/11/2026): 2,127 of 2,139 vault replays played (99.4 %) match every recorded checksum, 5 more are expected desyncs that aren't this engine's, 7 were new failures of ours, fixed since, as is 27064121, which failed after them; no CI run has played those fixes yet. Largest run: 12,714 of 13,148 (96.7 %) on CI (30–31/10/2026) ([Retail replay parity](docs/RETAIL_REPLAY_PARITY.md)) |
 | Live multiplayer | Retail, rebuilt x86 and rebuilt x64 in one game: 21 min of AI-driven fighting without a desync; retail and our x64 also ran 30 min without a desync, with and without sim workers |
-| Performance | x64 replays take 19 % less time than retail on average (4 % to 33 %) ([Performance](docs/PERFORMANCE.md)) |
+| Performance | x64 plays five vault replays in 41 % less time than retail all together (23 % to 45 % per replay), measured 10/11/2026 ([Performance](docs/PERFORMANCE.md)) |
 | Recovery | Complete: every engine function the game uses is written as source (40,617 functions). The rest of the shipped exe is library code we link from source (wxWidgets, the MSVC runtime, libpng, Wild Magic, ...) or unreferenced fragments; 0 functions are outstanding |
 
 Most symbols in the retail engine were never hand-written: they are template instantiations, folded aliases, unwind glue and static-init thunks the 2007 compiler emitted from a single source line. Those are rebuilt as that one line, so the function count understates how much is covered.
@@ -55,7 +55,15 @@ Method, per-replay results and the causes of past divergences: [docs/RETAIL_REPL
 
 ## Performance
 
-- **Against retail**: on five vault replays the x64 build saves 4 % (least), 33 % (most) and 19 % (average) of the time. The bigger the battle, the bigger the gain.
+- **Against retail**: on five vault replays, played back to back with retail in the same session, the x64 build saves 41 % of the time all together (5122 s → 3027 s, 1.69× the speed). The bigger the battle, the bigger the gain:
+
+  | Replay | Players | Retail | x64 | Time saved |
+  |---|---|---|---|---|
+  | 26919967 | 12 | 1752 s | 964 s | 45 % |
+  | 26935800 | 12 | 1560 s | 868 s | 44 % |
+  | 26928802 | 8 | 1327 s | 834 s | 37 % |
+  | 26997072 | 10 | 236 s | 170 s | 28 % |
+  | 26923388 | 2 | 247 s | 191 s | 23 % |
 - **Scale**: x86 runs out of address space at about 60,000 units; x64 was still running at 90,000.
 - **Exact**: sim work runs on worker threads only where the result is provably the same as serial, and every change has a switch that restores the original code ([docs/SWITCHES.md](docs/SWITCHES.md)).
 
