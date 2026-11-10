@@ -25,7 +25,8 @@ namespace faf::server
   {
     std::int32_t uid = 0;
     double behindSeconds = 0.0; // how long the oldest view the player hasn't acked has waited
-    bool gone = false;
+    bool gone = false;          // out of the game, or lost and in its reconnect window: holds nothing
+    double silentSeconds = 0.0; // since the server last heard the player's channel
   };
 
   /** A seat's link limit that changed: the new one, or nothing when it went; how far behind the link was. */
@@ -44,6 +45,12 @@ namespace faf::server
     static constexpr double kWindowSeconds = 10.0;
     static constexpr int kCalmWindows = 3;
     static constexpr int kMinSpeed = -10;
+    /**
+     * A link heard from less recently than this isn't slow but silent (a crashed or cut-off client): a slow link still
+     * acks, late. The away and reconnect rules deal with a silent one (`CServerNet`), so its windows start again and
+     * it takes no step down (plan WP3.8: killing one client must not slow the game for everyone).
+     */
+    static constexpr double kSilentSeconds = 2.0;
 
     /** `speed`: the speed the game runs at now; `asked`: the speed requested. Returns the limits that changed. */
     std::vector<SLinkNews> Update(const double now, const int speed, const int asked, const std::span<const SLinkSample> seats)
@@ -61,6 +68,11 @@ namespace faf::server
         }
         SLink& link = mLinks[seat.uid];
         const double behind = seat.behindSeconds;
+        if (seat.silentSeconds > kSilentSeconds) {
+          link.windowAt = now;
+          link.windowBehind = behind;
+          continue;
+        }
         if (link.windowAt < 0.0) {
           link.windowAt = now;
           link.windowBehind = behind;

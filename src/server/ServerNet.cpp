@@ -542,6 +542,9 @@ namespace faf::server
       state.behindSeconds = seat.gone || seat.viewEnds.empty() || mNowUs < seat.viewEnds.front().queuedUs
                               ? 0.0
                               : static_cast<double>(mNowUs - seat.viewEnds.front().queuedUs) * 1e-6;
+      state.silentSeconds = seat.joinedEver && !seat.gone && !seat.lost && mNowUs >= mStartUs
+                              ? static_cast<double>(mLinks.SilentUs(uid, mNowUs - mStartUs)) * 1e-6
+                              : 0.0;
       state.load = seat.loaded ? "loaded" : (seat.reported ? "rules" : (mContentKnown && seat.joinedEver ? "loading" : ""));
       state.mods = seat.modsVerdict;
       for (const remote::SModEntry& mod : seat.mods) {

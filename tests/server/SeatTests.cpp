@@ -1711,4 +1711,16 @@ TEST(LinkSpeed, FallingBehindHoldsTheGameSteadyDelayDoesNot)
   ASSERT_EQ(news.size(), 1u);
   EXPECT_FALSE(news[0].limit.has_value());
   EXPECT_FALSE(leaving.Slowest().has_value());
+  // Plan WP3.8: a silent link (a crashed client, before its channel times out) falls behind ever further, and is held
+  // to nothing: it isn't slow, it's gone quiet.
+  CLinkSpeedGovernor silent;
+  SLinkSample dead{1004, 3.0, false, 0.1};
+  (void)silent.Update(0.0, 10, 10, std::span<const SLinkSample>(&dead, 1u));
+  dead.behindSeconds = 6.0;
+  dead.silentSeconds = 5.0;
+  EXPECT_TRUE(silent.Update(10.0, 10, 10, std::span<const SLinkSample>(&dead, 1u)).empty());
+  dead.behindSeconds = 16.0;
+  dead.silentSeconds = 15.0;
+  EXPECT_TRUE(silent.Update(20.0, 10, 10, std::span<const SLinkSample>(&dead, 1u)).empty());
+  EXPECT_FALSE(silent.Slowest().has_value());
 }

@@ -1902,7 +1902,8 @@ namespace
         std::vector<faf::server::SLinkSample> samples;
         samples.reserve(seatStates.size());
         for (const faf::server::CServerNet::SSeatState& seat : seatStates) {
-          samples.push_back(faf::server::SLinkSample{seat.uid, seat.behindSeconds, seat.gone});
+          // Plan WP3.8: a lost seat (its channel timed out, the reconnect window running) holds nothing, as a gone one.
+          samples.push_back(faf::server::SLinkSample{seat.uid, seat.behindSeconds, seat.gone || seat.lost, seat.silentSeconds});
         }
         for (const faf::server::SLinkNews& change : linkSpeeds.Update(elapsed, pacedNow, asked, samples)) {
           if (change.limit) {

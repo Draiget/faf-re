@@ -175,6 +175,7 @@ namespace faf::server
       std::uint64_t backlogBytes = 0;
       std::uint32_t behindBeats = 0;
       double behindSeconds = 0.0; // how long the oldest view it hasn't acked whole has waited
+      double silentSeconds = 0.0; // since its channel was last heard (0 before it joined, when lost or gone)
     };
     [[nodiscard]] std::vector<SSeatState> Seats();
     /** Plan WP17.2: each verdict made since the last call, as the seat stood then (uid, name and the verdict fields). */
