@@ -120,6 +120,13 @@ namespace
   )
   {
     for (moho::UserEntity* const entity : selection) {
+      if (entity != nullptr && moho::IsFactoryPreOrdersEnabled()) {
+        if (const auto* asUnit = entity->IsUserUnit()) {
+          if (moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
+            continue;
+          }
+        }
+      }
       moho::DrawSelectionBrackets(entity, &batcher, &camera, interpolationAlpha);
     }
   }
@@ -147,6 +154,13 @@ namespace
     static std::vector<std::uint8_t> sBuilt;
     sEntities.clear();
     for (moho::UserEntity* const entity : session.mSelection) {
+      if (entity != nullptr && moho::IsFactoryPreOrdersEnabled()) {
+        if (const auto* asUnit = entity->IsUserUnit()) {
+          if (moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
+            continue;
+          }
+        }
+      }
       sEntities.push_back(entity);
     }
     for (moho::UserEntity* const entity : moho::sSelectionBrackets) {
@@ -618,9 +632,7 @@ namespace moho
 
         for (const auto* const proxy : selectedProxies) {
           if (proxy != nullptr) {
-            if (proxy->mUserUnit == nullptr || session->mSelection.Find(proxy->mUserUnit) == session->mSelection.end()) {
-              DrawSelectionBracketsForProxy(*proxy, batcher, camera);
-            }
+            DrawSelectionBracketsForProxy(*proxy, batcher, camera);
           }
         }
 

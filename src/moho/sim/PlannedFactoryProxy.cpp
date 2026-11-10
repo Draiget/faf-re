@@ -188,7 +188,13 @@ namespace moho
       }
       if (existing->mUserUnit != nullptr) {
         existing->mUserUnit->mTransform.pos_ = { pos.x, pos.y, pos.z };
+        existing->mUserUnit->mTransform.orient_ = { 0.0f, 0.0f, 0.0f, 1.0f };
         existing->mUserUnit->mVariableData.mCurTransform.pos_ = { pos.x, pos.y, pos.z };
+        existing->mUserUnit->mVariableData.mCurTransform.orient_ = { 0.0f, 0.0f, 0.0f, 1.0f };
+        existing->mUserUnit->mVariableData.mLastTransform.pos_ = { pos.x, pos.y, pos.z };
+        existing->mUserUnit->mVariableData.mLastTransform.orient_ = { 0.0f, 0.0f, 0.0f, 1.0f };
+        existing->mUserUnit->mVariableData.mCurImpactValue = 1.0f;
+        existing->mUserUnit->mLastInterpAmt = 0.0f;
         float halfSizeX = 3.5f;
         float halfSizeZ = 3.5f;
         if (const auto* rbp = dynamic_cast<const RUnitBlueprint*>(existing->mBlueprint)) {
@@ -235,6 +241,10 @@ namespace moho
       userUnit->mTransform.orient_ = { 0.0f, 0.0f, 0.0f, 1.0f };
       userUnit->mVariableData.mCurTransform.pos_ = { pos.x, pos.y, pos.z };
       userUnit->mVariableData.mCurTransform.orient_ = { 0.0f, 0.0f, 0.0f, 1.0f };
+      userUnit->mVariableData.mLastTransform.pos_ = { pos.x, pos.y, pos.z };
+      userUnit->mVariableData.mLastTransform.orient_ = { 0.0f, 0.0f, 0.0f, 1.0f };
+      userUnit->mVariableData.mCurImpactValue = 1.0f;
+      userUnit->mLastInterpAmt = 0.0f;
       userUnit->mVariableData.mFractionComplete = 0.0f;
       userUnit->mVariableData.mHealth = 0.0f;
       userUnit->mVariableData.mMaxHealth = 0.0f;
@@ -261,6 +271,8 @@ namespace moho
       newProxy->mUserUnit = userUnit;
     }
 
+    gpg::Logf("[PlannedFactory] Registered proxy %u at (%.1f, %.1f, %.1f) for builder %u",
+              newProxy->mProxyId, pos.x, pos.y, pos.z, builderId);
     mProxies.push_back(std::move(newProxy));
     return mProxies.back().get();
   }
@@ -424,6 +436,7 @@ namespace moho
       });
 
     if (it != mProxies.end()) {
+      gpg::Logf("[PlannedFactory] RemoveProxy %u", proxyId);
       mProxies.erase(it);
       return true;
     }
@@ -446,6 +459,7 @@ namespace moho
 
   void PlannedFactoryManager::SelectProxy(const std::uint32_t proxyId, const bool addToSelection)
   {
+    gpg::Logf("[PlannedFactory] SelectProxy %u (add=%d)", proxyId, addToSelection ? 1 : 0);
     if (!addToSelection) {
       ClearSelection();
     }
@@ -511,6 +525,8 @@ namespace moho
     if (!IsFactoryPreOrdersEnabled() || bpId.empty() || count <= 0) {
       return;
     }
+    gpg::Logf("[PlannedFactory] QueuePlannedFactoryOrders: %dx '%s' (clear=%d) for %zu selected proxies",
+              count, bpId.c_str(), clearQueue ? 1 : 0, GetSelectedProxies().size());
     for (auto* const proxy : GetSelectedProxies()) {
       if (proxy != nullptr) {
         if (clearQueue) {
@@ -746,7 +762,13 @@ namespace moho
     if (unit == nullptr) {
       return false;
     }
-    const Wm3::Vec3f& uPos = unit->GetPosition();
+    Wm3::Vec3f uPos = unit->GetPosition();
+    if (uPos.x == 0.0f && uPos.z == 0.0f) {
+      uPos = unit->mVariableData.mCurTransform.pos_;
+    }
+    if (uPos.x == 0.0f && uPos.z == 0.0f) {
+      return false;
+    }
     return DispatchPreOrdersForUnit(unit, Vector3f{uPos.x, uPos.y, uPos.z});
   }
 
@@ -757,6 +779,11 @@ namespace moho
     }
 
     CWldSession* const session = WLD_GetActiveSession();
+    const auto unitId = (session != nullptr) ? unit->mParams.mEntityId : 0u;
+
+    gpg::Logf("[PlannedFactory] DispatchPreOrdersForUnit: unit %u at (%.1f, %.1f, %.1f), proxies count=%zu",
+              unitId, unitPos.x, unitPos.y, unitPos.z, mProxies.size());
+
     if (session != nullptr) {
       const UserArmy* const focusArmy = session->GetFocusUserArmy();
       if (focusArmy != nullptr && unit->mArmy != nullptr && unit->mArmy != focusArmy) {
@@ -782,6 +809,10 @@ namespace moho
     if (proxy == nullptr) {
       return false;
     }
+
+    gpg::Logf("[PlannedFactory] Matching proxy %u found for unit %u! Dispatching %zu pre-orders (rally=%d, repeat=%d)",
+              proxy->mProxyId, unitId, proxy->mPreOrders.size(),
+              proxy->mHasRallyPoint ? 1 : 0, proxy->mRepeatBuild ? 1 : 0);
 
     if (mDispatchHook) {
       mDispatchHook(unit, *proxy);
@@ -814,13 +845,13 @@ namespace moho
       ISSUE_FactoryCommand(targetUnits, rallyCommand, false);
     }
 
-    if (proxy->mRepeatBuild) {
+    if (proxy->mRepeatBuild && session != nullptr) {
       if (ISTIDriver* const driver = WLD_GetDriver(); driver != nullptr) {
         driver->ProcessInfoPair(unit->mParams.mEntityId, "SetRepeatQueue", "true");
       }
     }
 
-    if (proxy->mUserUnit != nullptr && unit != nullptr) {
+    if (proxy->mUserUnit != nullptr && unit != nullptr && session != nullptr) {
       proxy->mUserUnit->mUnitVarDat.mSelectionInheritorId = unit->mParams.mEntityId;
     }
 

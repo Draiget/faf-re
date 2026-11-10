@@ -754,7 +754,7 @@ UserUnit::UserUnit(CWldSession* const session, const SCreateUnitParams& params)
     }
   }
 
-  if (mIsFactory && !mPreOrdersDispatched && mVariableData.mFractionComplete > 0.0f) {
+  if ((mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched && !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)) {
     if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
       mPreOrdersDispatched = true;
     }
@@ -975,7 +975,7 @@ bool UserUnit::UnitDataUpdateRunsLua(const SSTIUnitVariableData& payload) const
 
 void UserUnit::FinishUnitDataLinks()
 {
-  if (mIsFactory && !mPreOrdersDispatched && mVariableData.mFractionComplete > 0.0f) {
+  if ((mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched && !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)) {
     if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
       mPreOrdersDispatched = true;
     }
@@ -1244,7 +1244,7 @@ void UserUnit::Tick(const std::int32_t seqNo)
     AdvanceUserCommandManagerBySeq(mFactoryManager, seqNo);
   }
 
-  if (mIsFactory && !mPreOrdersDispatched && mVariableData.mFractionComplete > 0.0f) {
+  if ((mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched && !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)) {
     if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
       mPreOrdersDispatched = true;
     }
@@ -1354,7 +1354,7 @@ void UserUnit::UpdateEntityData(const SSTIEntityVariableData& variableData)
 {
   UserEntity::UpdateEntityData(variableData);
 
-  if (mIsFactory && !mPreOrdersDispatched && mVariableData.mFractionComplete > 0.0f) {
+  if ((mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched && !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)) {
     if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
       mPreOrdersDispatched = true;
     }

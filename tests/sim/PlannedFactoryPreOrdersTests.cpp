@@ -845,3 +845,15 @@ TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersMatchesWithinFoundationRadius
   EXPECT_TRUE(dispatched);
   EXPECT_EQ(mgr.GetCount(), 0u);
 }
+
+TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersZeroPositionHandling)
+{
+  moho::PlannedFactoryManager mgr;
+  moho::Vector3f pos{300.0f, 10.0f, 400.0f};
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(2, 0, nullptr, pos);
+  ASSERT_NE(proxy, nullptr);
+
+  // Position at (0, 0, 0) indicates uninitialized / un-replicated position, should return false
+  EXPECT_FALSE(mgr.DispatchPreOrdersForUnit(reinterpret_cast<moho::UserUnit*>(0x1000), {0.0f, 0.0f, 0.0f}));
+  EXPECT_EQ(mgr.GetCount(), 1u);
+}
