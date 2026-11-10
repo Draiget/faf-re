@@ -739,6 +739,11 @@ namespace
     bool queued = false;
     bool moved = false;
     bool active = false;
+    // Plan WPR.13: when it was sent (s since the probe started, the view beat then), and the server's answer.
+    double sentAt = 0.0;
+    std::uint32_t sentBeat = 0;
+    double answeredAt = -1.0;
+    std::uint64_t answerBeat = 0;
   };
 
   [[nodiscard]] const faf::remote::wire::SEntityRecord* OwnUnit(const SViews& views)
@@ -1374,6 +1379,8 @@ int main(const int argc, char** const argv)
             std::printf("probe %d: %.1f s: the %s: %s, beat %llu\n", options.uid, elapsed, what, AnswerText(answer), static_cast<unsigned long long>(beat));
             if (std::strcmp(what, "order") == 0) {
               orderAnswered = true;
+              watch.answeredAt = elapsed;
+              watch.answerBeat = beat;
               orderApplied = static_cast<ECommandAnswer>(answer) == ECommandAnswer::Applied;
             }
           }
@@ -1461,6 +1468,15 @@ int main(const int argc, char** const argv)
         if (!watch.queued && std::find(commands.begin(), commands.end(), static_cast<std::int32_t>(watch.commandId)) != commands.end()) {
           watch.queued = true;
           std::printf("probe %d: %.1f s: the order is on unit 0x%08x's queue at beat %u\n", options.uid, elapsed, watch.unit, views.frame.beat);
+          // Plan WPR.13: issue time to the first beat whose published commands hold the order (the beat the server's
+          // answer names), and to the first view this player got of a beat that holds it.
+          std::printf(
+            "probe %d: order latency: sent at view beat %u; the server ran it at beat %llu (%lld beats on), its answer after %.0f ms; first view "
+            "holding it, beat %u, after %.0f ms\n",
+            options.uid, watch.sentBeat, static_cast<unsigned long long>(watch.answerBeat),
+            static_cast<long long>(watch.answerBeat) - static_cast<long long>(watch.sentBeat), watch.answeredAt < 0.0 ? -1.0 : (watch.answeredAt - watch.sentAt) * 1000.0,
+            views.frame.beat, (elapsed - watch.sentAt) * 1000.0
+          );
         }
         if (!watch.moved && !(record->position == watch.from)) {
           watch.moved = true;
@@ -1521,6 +1537,8 @@ int main(const int argc, char** const argv)
         watch.commandId = (views.source << 24u) | nextCommand++;
         watch.from = unit->position;
         watch.active = true;
+        watch.sentAt = elapsed;
+        watch.sentBeat = views.frame.beat;
         SendCommand(link, kOpIssueCommand, OrderPayload(watch.unit, watch.commandId, moho::EUnitCommandType::UNITCOMMAND_Move, kGroundTarget, views.mapX * 0.5f, views.mapZ * 0.5f));
         asked.push_back("order");
         std::printf("probe %d: %.1f s: ordered unit 0x%08x to the map's middle, command 0x%08x, at view beat %u\n", options.uid, elapsed, watch.unit, watch.commandId, views.frame.beat);
