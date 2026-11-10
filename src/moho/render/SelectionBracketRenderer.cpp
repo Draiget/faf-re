@@ -618,7 +618,9 @@ namespace moho
 
         for (const auto* const proxy : selectedProxies) {
           if (proxy != nullptr) {
-            DrawSelectionBracketsForProxy(*proxy, batcher, camera);
+            if (proxy->mUserUnit == nullptr || session->mSelection.Find(proxy->mUserUnit) == session->mSelection.end()) {
+              DrawSelectionBracketsForProxy(*proxy, batcher, camera);
+            }
           }
         }
 

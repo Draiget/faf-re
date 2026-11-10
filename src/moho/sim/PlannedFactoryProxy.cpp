@@ -24,18 +24,23 @@ namespace moho
     if (mUserUnit != nullptr) {
       CWldSession* const session = WLD_GetActiveSession();
       if (session != nullptr) {
-        if (static_cast<std::uint32_t>(mUserUnit->mUnitVarDat.mSelectionInheritorId) == ToRaw(EEntityIdSentinel::Invalid)) {
-          if (session->mSelection.Find(mUserUnit) != session->mSelection.end()) {
-            WeakSet<UserEntity> sel = session->GetSelection();
-            (void)sel.Remove(mUserUnit);
-            session->SetSelection(sel);
+        if (session->mSelection.Find(mUserUnit) != session->mSelection.end()) {
+          WeakSet<UserEntity> sel = session->GetSelection();
+          (void)sel.Remove(mUserUnit);
+          if (static_cast<std::uint32_t>(mUserUnit->mUnitVarDat.mSelectionInheritorId) != ToRaw(EEntityIdSentinel::Invalid)) {
+            if (UserEntity* const newUnit = session->LookupEntityId(mUserUnit->mUnitVarDat.mSelectionInheritorId)) {
+              (void)sel.Add(newUnit);
+            }
           }
+          session->SetSelection(sel);
         }
-        session->RemoveEntity(mUserUnit);
+        mUserUnit->mVariableData.mIsDead = 1;
+        mUserUnit->mMarkedForDeletion = 1;
+        session->OrphanEntity(mUserUnit);
+      } else {
+        delete mUserUnit;
       }
-      UserUnit* const unitToDelete = mUserUnit;
       mUserUnit = nullptr;
-      delete unitToDelete;
     }
   }
 
@@ -233,6 +238,8 @@ namespace moho
       userUnit->mVariableData.mFractionComplete = 0.0f;
       userUnit->mVariableData.mHealth = 0.0f;
       userUnit->mVariableData.mMaxHealth = 0.0f;
+      constexpr std::uint32_t kStrategicIconEntitySuppressedMask = 0x20u;
+      userUnit->mIntelStateFlags |= kStrategicIconEntitySuppressedMask;
 
       const auto* unitBp = dynamic_cast<const RUnitBlueprint*>(bp);
       if (unitBp != nullptr && session->mRules != nullptr) {

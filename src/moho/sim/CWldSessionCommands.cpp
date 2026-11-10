@@ -3151,7 +3151,22 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
     }
   }
 
-  UserEntity* const hoverEntity = mouseInfo->HoveredEntity();
+  UserEntity* hoverEntity = mouseInfo->HoveredEntity();
+  if (hoverEntity != nullptr && IsFactoryPreOrdersEnabled()) {
+    if (const UserUnit* const u = hoverEntity->IsUserUnit()) {
+      if (PlannedFactoryManager::Get().IsPlannedProxyUnit(u)) {
+        if (const auto* proxy = PlannedFactoryManager::Get().FindByUserUnit(u)) {
+          if (proxy->mBuilderEntityId != 0) {
+            hoverEntity = wldSession->LookupEntityId(static_cast<EntId>(proxy->mBuilderEntityId));
+          } else {
+            hoverEntity = nullptr;
+          }
+        } else {
+          hoverEntity = nullptr;
+        }
+      }
+    }
+  }
 
   if (hoverEntity == nullptr) {
     // No hover: consult the command the cursor is dragging. An attack/form-

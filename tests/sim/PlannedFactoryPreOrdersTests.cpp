@@ -682,9 +682,9 @@ TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersForUnitWithHookAndOnceOnlySup
   std::size_t receivedOrdersCount = 0;
   bool receivedRepeat = false;
 
-  mgr.SetDispatchHook([&](moho::UserUnit* /*unit*/, const moho::PlannedUnitProxy& p) {
+  mgr.SetDispatchHook([&](moho::UserUnit* u, const moho::PlannedUnitProxy& p) {
     hookInvoked = true;
-    receivedUnit = unit;
+    receivedUnit = u;
     receivedOrdersCount = p.mPreOrders.size();
     receivedRepeat = p.mRepeatBuild;
   });

@@ -779,6 +779,25 @@ namespace moho
     // concrete, valid point that violates the focus army's no-rush constraints.
     bool shouldIssue = true;
     if (data.mTarget.mType != EAiTargetType::AITARGET_None) {
+      if (moho::IsFactoryPreOrdersEnabled() && data.mTarget.mType == EAiTargetType::AITARGET_Entity) {
+        if (UserEntity* const targetEntity = session->LookupEntityId(static_cast<EntId>(data.mTarget.mEnt))) {
+          if (const UserUnit* asUnit = targetEntity->IsUserUnit()) {
+            if (moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
+              if (const auto* proxy = moho::PlannedFactoryManager::Get().FindByUserUnit(asUnit)) {
+                if (proxy->mBuilderEntityId != 0 && session->LookupEntityId(static_cast<EntId>(proxy->mBuilderEntityId)) != nullptr) {
+                  data.mTarget.mEnt = static_cast<std::int32_t>(proxy->mBuilderEntityId);
+                } else {
+                  data.mTarget.mType = EAiTargetType::AITARGET_Ground;
+                  data.mTarget.mPos = Wm3::Vector3f(proxy->mPosition.x, proxy->mPosition.y, proxy->mPosition.z);
+                }
+              } else {
+                return;
+              }
+            }
+          }
+        }
+      }
+
       const float kInvalidLane = gpg::NaN;
       Wm3::Vec3f targetPoint{kInvalidLane, kInvalidLane, kInvalidLane};
 
