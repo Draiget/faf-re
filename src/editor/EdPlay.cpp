@@ -1195,6 +1195,12 @@ end
     if (mMemoryCheckAt != std::chrono::steady_clock::time_point{} && std::chrono::steady_clock::now() >= mMemoryCheckAt &&
         action == moho::EWldFrameAction::Inactive) {
       mMemoryCheckAt = {};
+      // The editor's UI Lua state holds the play's garbage until its own next collection (0.4 MB a play on
+      // SCMP_009), and the Lua range keeps its highest size: collected now, so each play starts from the same
+      // floor (WPE.16). The state is this thread's.
+      if (LuaPlus::LuaState* const ui = moho::USER_GetLuaState(); ui != nullptr) {
+        lua_setgcthreshold(ui->m_state, 0);
+      }
       PROCESS_MEMORY_COUNTERS_EX counters{};
       counters.cb = sizeof(counters);
       if (::GetProcessMemoryInfo(::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters))) {
@@ -1252,6 +1258,11 @@ end
       lastArena = arena;
       constexpr double kMB = 1048576.0;
       const LuaPlus::LuaState* const ui = moho::USER_GetLuaState();
+      // The rules kept between plays (their blueprints' Lua state): what each play adds to it stays.
+      if (moho::RRuleGameRules* const kept = moho::RULE_PeekKept(); kept != nullptr) {
+        const LuaPlus::LuaState* const rules = static_cast<moho::RRuleGameRulesImpl*>(kept)->mLuaState;
+        gpg::Logf("editor: the kept rules' Lua state counts %d KB", rules != nullptr ? lua_getgccount(rules->m_state) : 0);
+      }
       gpg::Logf("editor: Lua range: %.1f MB committed, %.1f MB in spans (%.1f MB small-block spans, %.1f MB of them free on "
                 "the shared lists; %.1f MB in %zu freed large runs), %zu light cells; the UI state counts %d KB",
                 arena.committedBytes / kMB, arena.spanBytes / kMB, arena.smallSpanBytes / kMB, arena.smallFreeBytes / kMB,
