@@ -1510,6 +1510,11 @@ namespace faf::editor
         const int limit = i % 2 == 0 ? mMapWidth : mMapHeight;
         if (ImGui::DragInt(kEdges[i], &area[static_cast<std::size_t>(i)], 1.0f, 0, limit, kFormats[i])) {
           area[static_cast<std::size_t>(i)] = std::clamp(area[static_cast<std::size_t>(i)] / 4 * 4, 0, limit);
+          // Centred: the opposite edge as far in from its side.
+          if (mBorderCentred) {
+            const int opposite = (i + 2) % 4;
+            area[static_cast<std::size_t>(opposite)] = std::clamp((limit - area[static_cast<std::size_t>(i)]) / 4 * 4, 0, limit);
+          }
           if (area[0] < area[2] && area[1] < area[3]) {
             mAreaChanged = true;
             mAreaChange = area;
@@ -1519,9 +1524,11 @@ namespace faf::editor
       char size[64];
       (void)std::snprintf(size, sizeof(size), "%d x %d of %d x %d", area[2] - area[0], area[3] - area[1], mMapWidth, mMapHeight);
       ImGui::TextDisabled("%s", size);
+      ImGui::Checkbox("Keep it centred", &mBorderCentred);
     }
-    Note("The game rounds each edge down to a multiple of 4. The ground outside is darkened as in the game; with the Markers tool, "
-         "drag the border's edges in the view. Saved as an area of _save.lua that _script.lua's OnPopulate makes the playable area.");
+    Note("The game rounds each edge down to a multiple of 4. The ground outside is darkened as in the game; drag the border's "
+         "edges in the view with the toolbar's border button on (or the Markers tool). Saved as an area of _save.lua that "
+         "_script.lua's OnPopulate makes the playable area.");
   }
 
   void EdTools::DrawMarkers()

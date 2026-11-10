@@ -460,6 +460,14 @@ namespace faf::editor
       }
       ImGui::SameLine();
       divider();
+      // The map border, edited from any tool.
+      if (IconToggle("##border", EdIcon::Border, mTools.EditingBorder())) {
+        mTools.EditingBorder() = !mTools.EditingBorder();
+        mShowProperties = mShowProperties || mTools.EditingBorder();
+      }
+      tip(mTools.EditingBorder() ? "Map border: on. Drag its edges in the view; its settings are in the Properties panel"
+                                 : "Map border (the playable area): edit it from any tool");
+      divider();
       // What the view shows, one toggle per kind (Blender's object type visibility); hidden things aren't picked.
       if (IconToggle("##showprops", EdIcon::Tree, mTools.ShowProps())) {
         mTools.ShowProps() = !mTools.ShowProps();

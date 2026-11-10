@@ -14,6 +14,7 @@ namespace faf::editor
     Crosshair,
     PathNodes,
     Pin,
+    Border,
   };
 
   /** Draws `icon` in the square at `p`, `s` wide. */

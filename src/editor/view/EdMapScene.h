@@ -397,6 +397,8 @@ namespace faf::editor
     };
     /** The marker, unit or prop nearest the cursor on screen, each within its own reach; the decal under it when none is. */
     [[nodiscard]] PickHit PickAnything(POINT at) const;
+    /** The border's edges within reach of a ground point: 1 left, 2 top, 4 right, 8 bottom (a corner, two). */
+    [[nodiscard]] int BorderEdgesAt(float groundX, float groundZ) const;
     /** The kind the Select tool works on: the last one clicked while it has a selection, else the first that has one. */
     [[nodiscard]] PickKind SelectedKind() const;
     void ClearAllSelections();

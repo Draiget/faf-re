@@ -80,6 +80,7 @@ namespace faf::editor
         (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && !mTools->SelectToolActive() &&
          mSelection.empty() && !area &&
          mDocument.SaveData().Markers().empty() && mDocument.SaveData().Chains().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() && !mTools->UnitsToolActive() &&
+         !mTools->EditingBorder() &&
          mTools->CheckPins().empty() && !mTools->ShowingPathing() && !mTools->ShowSlope() && !mTools->ShowKmGrid() && !mRulerShown && !mBoxing) ||
         moho::ren_Viewport == nullptr) {
       return;
@@ -227,6 +228,54 @@ namespace faf::editor
       border(x1, z0, x1, z1);
       border(x1, z1, x0, z1);
       border(x0, z1, x0, z0);
+      // Being edited: the edge under the cursor lit, handles on the corners and the edges' middles.
+      if (mTools->EditingBorder()) {
+        float gx = 0.0f;
+        float gz = 0.0f;
+        const int hot = GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz) ? BorderEdgesAt(gx, gz) : 0;
+        constexpr std::uint32_t kHot = 0xFFFFE040u;
+        const auto litEdge = [&](const float ax, const float az, const float bx, const float bz) {
+          for (const float lift : {1.0f, 1.4f, 1.8f}) {
+            const int steps = std::max(1, static_cast<int>(std::hypot(bx - ax, bz - az) / 4.0f));
+            for (int s = 0; s < steps; ++s) {
+              const float t0 = static_cast<float>(s) / steps;
+              const float t1 = static_cast<float>(s + 1) / steps;
+              batcher->DrawLine(groundVertex(ax + (bx - ax) * t0, az + (bz - az) * t0, kHot, lift),
+                                groundVertex(ax + (bx - ax) * t1, az + (bz - az) * t1, kHot, lift));
+            }
+          }
+        };
+        if ((hot & 1) != 0) litEdge(x0, z0, x0, z1);
+        if ((hot & 2) != 0) litEdge(x0, z0, x1, z0);
+        if ((hot & 4) != 0) litEdge(x1, z0, x1, z1);
+        if ((hot & 8) != 0) litEdge(x0, z1, x1, z1);
+        const float r = std::max(2.0f, mDistance * 0.006f);
+        std::vector<moho::CD3DPrimBatcher::Vertex> handles;
+        for (const auto& [hx, hz] : {std::pair{x0, z0}, std::pair{x1, z0}, std::pair{x1, z1}, std::pair{x0, z1}, std::pair{(x0 + x1) * 0.5f, z0},
+                                     std::pair{x1, (z0 + z1) * 0.5f}, std::pair{(x0 + x1) * 0.5f, z1}, std::pair{x0, (z0 + z1) * 0.5f}}) {
+          handles.push_back(groundVertex(hx - r, hz - r, kBorderColor, 1.2f));
+          handles.push_back(groundVertex(hx + r, hz - r, kBorderColor, 1.2f));
+          handles.push_back(groundVertex(hx + r, hz + r, kBorderColor, 1.2f));
+          handles.push_back(groundVertex(hx - r, hz + r, kBorderColor, 1.2f));
+        }
+        batcher->DrawQuads(handles.data(), static_cast<std::uint32_t>(handles.size() / 4));
+      }
+    } else if (mTools->EditingBorder()) {
+      // No border yet: the map's own edge, dashed, so the mode shows where one would go (the Properties panel adds it).
+      constexpr std::uint32_t kEdge = 0xC0FFB030u;
+      const auto dashed = [&](const float ax, const float az, const float bx, const float bz) {
+        const int steps = std::max(2, static_cast<int>(std::hypot(bx - ax, bz - az) / 6.0f));
+        for (int s = 0; s < steps; s += 2) {
+          const float t0 = static_cast<float>(s) / steps;
+          const float t1 = static_cast<float>(s + 1) / steps;
+          batcher->DrawLine(groundVertex(ax + (bx - ax) * t0, az + (bz - az) * t0, kEdge, 0.8f),
+                            groundVertex(ax + (bx - ax) * t1, az + (bz - az) * t1, kEdge, 0.8f));
+        }
+      };
+      dashed(0.0f, 0.0f, w, 0.0f);
+      dashed(w, 0.0f, w, h);
+      dashed(w, h, 0.0f, h);
+      dashed(0.0f, h, 0.0f, 0.0f);
     }
 
     // The build grid around the cursor: cell edges on whole steps, fading out with the distance.
@@ -2801,6 +2850,23 @@ namespace faf::editor
     return std::floor(value / step) * step + step * 0.5f;
   }
 
+  int EdMapScene::BorderEdgesAt(const float groundX, const float groundZ) const
+  {
+    const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea();
+    if (!area) {
+      return 0;
+    }
+    const float reach = std::max(4.0f, mDistance * 0.015f);
+    const bool alongZ = groundZ > static_cast<float>(area->z0) - reach && groundZ < static_cast<float>(area->z1) + reach;
+    const bool alongX = groundX > static_cast<float>(area->x0) - reach && groundX < static_cast<float>(area->x1) + reach;
+    int edges = 0;
+    edges |= alongZ && std::fabs(groundX - static_cast<float>(area->x0)) < reach ? 1 : 0;
+    edges |= alongX && std::fabs(groundZ - static_cast<float>(area->z0)) < reach ? 2 : 0;
+    edges |= alongZ && std::fabs(groundX - static_cast<float>(area->x1)) < reach ? 4 : 0;
+    edges |= alongX && std::fabs(groundZ - static_cast<float>(area->z1)) < reach ? 8 : 0;
+    return edges;
+  }
+
   EdMapScene::PickHit EdMapScene::PickAnything(const POINT at) const
   {
     PickHit best;
@@ -4834,6 +4900,20 @@ namespace faf::editor
           mTools->SetRulerText({});
         }
       }
+      // The map border, edited from any tool: a press on an edge (or a corner, two of them) drags it.
+      if (mTools != nullptr && mTools->EditingBorder()) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          mBorderEdges = BorderEdgesAt(groundX, groundZ);
+          if (mBorderEdges != 0) {
+            mBorderBefore = mDocument.SaveDataNow();
+            ::SetCapture(window);
+            ::SetFocus(window);
+            return true;
+          }
+        }
+      }
       if (mTools != nullptr && mTools->MarkersToolActive()) {
         float groundX = 0.0f;
         float groundZ = 0.0f;
@@ -4862,16 +4942,8 @@ namespace faf::editor
           ::SetFocus(window);
           return true;
         }
-        const float reach = std::max(4.0f, mDistance * 0.015f);
-        mBorderEdges = 0;
-        if (area) {
-          const bool alongZ = groundZ > static_cast<float>(area->z0) - reach && groundZ < static_cast<float>(area->z1) + reach;
-          const bool alongX = groundX > static_cast<float>(area->x0) - reach && groundX < static_cast<float>(area->x1) + reach;
-          mBorderEdges |= alongZ && std::fabs(groundX - static_cast<float>(area->x0)) < reach ? 1 : 0;
-          mBorderEdges |= alongX && std::fabs(groundZ - static_cast<float>(area->z0)) < reach ? 2 : 0;
-          mBorderEdges |= alongZ && std::fabs(groundX - static_cast<float>(area->x1)) < reach ? 4 : 0;
-          mBorderEdges |= alongX && std::fabs(groundZ - static_cast<float>(area->z1)) < reach ? 8 : 0;
-        }
+        (void)area;
+        mBorderEdges = BorderEdgesAt(groundX, groundZ);
         if (mBorderEdges != 0) {
           mBorderBefore = mDocument.SaveDataNow();
           ::SetCapture(window);
@@ -5437,6 +5509,16 @@ namespace faf::editor
           if ((mBorderEdges & 2) != 0) next.z0 = std::min(snap(groundZ, h), next.z1 - 4);
           if ((mBorderEdges & 4) != 0) next.x1 = std::max(snap(groundX, w), next.x0 + 4);
           if ((mBorderEdges & 8) != 0) next.z1 = std::max(snap(groundZ, h), next.z0 + 4);
+          // Centred: the opposite edge as far in from its side.
+          if (mTools != nullptr && mTools->BorderCentred()) {
+            if ((mBorderEdges & 1) != 0) next.x1 = w - next.x0;
+            if ((mBorderEdges & 4) != 0) next.x0 = w - next.x1;
+            if ((mBorderEdges & 2) != 0) next.z1 = h - next.z0;
+            if ((mBorderEdges & 8) != 0) next.z0 = h - next.z1;
+            if (next.x1 - next.x0 < 4 || next.z1 - next.z0 < 4) {
+              next = *area;
+            }
+          }
           if (!(next == *area)) {
             mDocument.SetPlayableArea(next);
             mOutsideStale = true;

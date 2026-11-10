@@ -1,5 +1,7 @@
 #include "editor/ui/EdIcons.h"
 
+#include <initializer_list>
+
 namespace faf::editor
 {
   void DrawEdIcon(ImDrawList* const draw, const EdIcon icon, const ImVec2 p, const float s, const ImU32 color)
@@ -40,6 +42,14 @@ namespace faf::editor
       draw->AddCircleFilled(at(0.2f, 0.75f), s * 0.12f, color);
       draw->AddCircleFilled(at(0.5f, 0.3f), s * 0.12f, color);
       draw->AddCircleFilled(at(0.8f, 0.7f), s * 0.12f, color);
+      break;
+    case EdIcon::Border:
+      // A square inside the map's square, its corners as handles.
+      draw->AddRect(at(0.05f, 0.05f), at(0.95f, 0.95f), color, 0.0f, 0, line * 0.6f);
+      draw->AddRect(at(0.25f, 0.25f), at(0.75f, 0.75f), color, 0.0f, 0, line * 1.3f);
+      for (const ImVec2 corner : {at(0.25f, 0.25f), at(0.75f, 0.25f), at(0.75f, 0.75f), at(0.25f, 0.75f)}) {
+        draw->AddRectFilled(ImVec2(corner.x - s * 0.08f, corner.y - s * 0.08f), ImVec2(corner.x + s * 0.08f, corner.y + s * 0.08f), color);
+      }
       break;
     case EdIcon::Pin:
       draw->AddCircle(at(0.5f, 0.38f), s * 0.22f, color, 16, line * 1.4f);

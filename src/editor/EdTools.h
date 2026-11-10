@@ -382,6 +382,15 @@ namespace faf::editor
       return true;
     }
 
+    /**
+     * The map border (the playable area) edited from any tool: the toolbar's border button. While on, the view draws the
+     * border's handles and a drag on an edge moves it; the Properties panel shows the settings (DrawPlayableArea).
+     */
+    [[nodiscard]] bool& EditingBorder() noexcept { return mEditBorder; }
+    /** Moving one edge moves the opposite one the same way, so the border stays centred on the map. */
+    [[nodiscard]] bool BorderCentred() const noexcept { return mBorderCentred; }
+    /** The border's settings: on or off, the four edges, centred (the Markers tool and the Properties panel show them). */
+    void DrawPlayableArea();
     /** The toolbar's Show menu: prop and unit models drawn or hidden (hidden ones are not picked either). */
     [[nodiscard]] bool& ShowProps() noexcept { return mShowProps; }
     [[nodiscard]] bool& ShowUnits() noexcept { return mShowUnits; }
@@ -841,6 +850,8 @@ namespace faf::editor
     int mAirGridCount = 16;
     bool mAirGridReplace = true;
     bool mAirGridAsked = false;
+    bool mEditBorder = false;
+    bool mBorderCentred = false;
     bool mShowProps = true;
     bool mShowUnits = true;
     SelectionProperties mSelectionProperties;
@@ -920,7 +931,6 @@ namespace faf::editor
     int mMapHeight = 0;
     bool mAreaChanged = false;
     std::optional<std::array<int, 4>> mAreaChange;
-    void DrawPlayableArea();
     MaskOp mMaskOp = MaskOp::None;
     std::vector<std::string> mShaders;
     std::string mShader;

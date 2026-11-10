@@ -62,6 +62,13 @@ namespace faf::editor
       ImGui::End();
       return;
     }
+    // The map border while the toolbar's border button is on.
+    if (mTools.EditingBorder()) {
+      if (ImGui::CollapsingHeader("Map border", ImGuiTreeNodeFlags_DefaultOpen)) {
+        mTools.DrawPlayableArea();
+      }
+      ImGui::Spacing();
+    }
     const SelectionProperties& now = mTools.SelectionPropertiesNow();
     if (now.kind == SelectionProperties::Kind::None) {
       mPropertiesEditing = false;
