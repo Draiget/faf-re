@@ -1078,6 +1078,18 @@ namespace faf::editor
     DrawSymmetry(false);
     Note("Single shows the prop under the cursor and places it at a click, Scatter while the button is held, inside the brush; Erase removes those inside it. "
          "Shift+click erases in any mode. Symmetric copies are placed and removed with them.");
+
+    SectionHeader("MAP RECLAIM");
+    if (mReclaimSummary.empty()) {
+      Note("Counted once the game's rules are built.");
+    } else {
+      ImGui::TextWrapped("%s", mReclaimSummary.c_str());
+      for (const std::string& row : mReclaimRows) {
+        ImGui::TextDisabled("%s", row.c_str());
+      }
+      Note("Each prop's blueprint reclaim (Economy ReclaimMassMax, ReclaimEnergyMax), the most mass first. A scenario that keeps "
+           "a reclaim entry (FAForeverMapEditor's) gets these totals when it is saved.");
+    }
   }
 
   void EdTools::DrawDecals()

@@ -345,6 +345,8 @@ namespace faf::editor
       bool mPaintSetDone = false;
       bool mSkyboxFilesDone = false;
       bool mWaveSwitchesDone = false;
+      int mReclaimFrames = 0;
+      bool mReclaimLogged = false;
       int mLayerFileStep = 0;
       /** `/waterset <on>,<level>,<deep>,<abyss>` (test runs): the sea set as one edit once the map is shown. */
       std::string mWaterSetArg;
@@ -1105,6 +1107,33 @@ namespace faf::editor
         }
         if (tools.PropsToolActive()) {
           tools.SetPropDetails(mScene.PropDetails(tools.PropBlueprint()));
+          // The map's reclaim, counted twice a second while the Props tool shows.
+          if (++mReclaimFrames % 30 == 1) {
+            const EdDocument::ReclaimTotals reclaim = mDocument.PropReclaim();
+            if (reclaim.props > 0 || !reclaim.rows.empty()) {
+              char summary[200];
+              (void)std::snprintf(summary, sizeof(summary), "%d props: %.0f mass, %.0f energy. %d give none, %d have no blueprint.", reclaim.props,
+                                  reclaim.mass, reclaim.energy, reclaim.none, reclaim.unknown);
+              std::vector<std::string> rows;
+              for (std::size_t i = 0; i < reclaim.rows.size() && i < 8; ++i) {
+                const EdDocument::ReclaimRow& row = reclaim.rows[i];
+                std::string name = row.blueprint.substr(row.blueprint.find_last_of('/') + 1);
+                if (name.size() > 8 && name.compare(name.size() - 8, 8, "_prop.bp") == 0) {
+                  name.resize(name.size() - 8);
+                }
+                char line[200];
+                // The mass first, so a narrow panel cuts the name, not the number.
+                (void)std::snprintf(line, sizeof(line), "%.0f  %d x %s", static_cast<double>(row.mass * static_cast<float>(row.count)), row.count,
+                                    name.c_str());
+                rows.emplace_back(line);
+              }
+              if (!mReclaimLogged) {
+                mReclaimLogged = true;
+                gpg::Logf("editor: map reclaim: %s", summary);
+              }
+              tools.SetPropReclaim(summary, std::move(rows));
+            }
+          }
         }
         tools.SetDecalPathInfo(mScene.DecalPathPointCount(), mScene.DecalPathDecalCount());
         switch (tools.TakeDecalPathAction()) {

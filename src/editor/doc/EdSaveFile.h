@@ -113,6 +113,13 @@ namespace faf::editor
    */
   std::string WithScenarioTeams(const std::string& scenario, const std::vector<ScenarioTeam>& teams);
 
+  /**
+   * The scenario's `reclaim = { mass, energy }` (FAForeverMapEditor writes the map's reclaim there) with these numbers,
+   * the rest of its text as it was; a scenario without one comes back unchanged (nothing in FAF's game code or client
+   * reads it, so none is added).
+   */
+  std::string WithScenarioReclaim(const std::string& scenario, double mass, double energy);
+
   /** The armies of a `_scenario.lua`'s first team (`armies = {'ARMY_1', ...}`), in order. */
   std::vector<std::string> ScenarioArmies(const std::string& scenario);
   /** The scenario with its first team's armies replaced. */

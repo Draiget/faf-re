@@ -193,6 +193,27 @@ namespace faf::editor
     };
     /** The map's wave generators (through the wave system's own Save, WaveSystem::Save 0x00889AD0). */
     [[nodiscard]] std::vector<WaveRecord> WavesNow() const;
+    /** The map's prop reclaim, by blueprint (RPropBlueprint::Economy's ReclaimMassMax and ReclaimEnergyMax). */
+    struct ReclaimRow
+    {
+      std::string blueprint;
+      int count = 0;
+      float mass = 0.0f;
+      float energy = 0.0f;
+    };
+    struct ReclaimTotals
+    {
+      int props = 0;
+      double mass = 0.0;
+      double energy = 0.0;
+      /** Props whose blueprint gives none, and props whose blueprint the rules haven't got. */
+      int none = 0;
+      int unknown = 0;
+      /** Each blueprint's props, the most mass first. */
+      std::vector<ReclaimRow> rows;
+    };
+    /** Needs the game's rules; empty until they are built. */
+    [[nodiscard]] ReclaimTotals PropReclaim() const;
     /** How many wave generators the map has. */
     [[nodiscard]] int WaveCount() const;
     /** Puts these generators on the map in place of its own (WaveSystem::Load 0x008899E0); no undo step. */

@@ -72,6 +72,12 @@ namespace faf::editor
     /** The prop blueprints the rules have (their ids), for the palette. */
     void SetPropBlueprints(std::vector<std::string> blueprints) { mPropBlueprints = std::move(blueprints); }
     [[nodiscard]] bool HasPropBlueprints() const noexcept { return !mPropBlueprints.empty(); }
+    /** The map's prop reclaim for the panel (the app counts it now and then while the Props tool shows). */
+    void SetPropReclaim(std::string summary, std::vector<std::string> rows)
+    {
+      mReclaimSummary = std::move(summary);
+      mReclaimRows = std::move(rows);
+    }
     /** The Markers tool. */
     [[nodiscard]] bool MarkersToolActive() const noexcept { return mTool == 6; }
     /** The Check's results on the map, for the view's pins: where, and how bad (0 error, 1 warning, 2 note). */
@@ -680,6 +686,8 @@ namespace faf::editor
     bool mPaintSetImport = false;
     bool mPaintSetExport = false;
     std::string mPropDetails;
+    std::string mReclaimSummary;
+    std::vector<std::string> mReclaimRows;
     char mPropFilter[64]{};
     int mSelectionCount = 0;
     std::vector<SaveEntry> mMarkerSelection;

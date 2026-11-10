@@ -23,6 +23,8 @@
 #include "gpg/core/streams/PipeStream.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/terrain/water/WaveSystem.h"
 #include "moho/render/SkyDome.h"
 #include "moho/lua/CScrLuaInitForm.h"
@@ -572,6 +574,10 @@ namespace faf::editor
       }
       mScriptRead = mScript;
     }
+    // A scenario that keeps the map's reclaim (FAForeverMapEditor's `reclaim`) gets the props' totals.
+    if (const ReclaimTotals reclaim = PropReclaim(); reclaim.props > 0) {
+      mScenario = WithScenarioReclaim(mScenario, reclaim.mass, reclaim.energy);
+    }
     if (mScenario != mScenarioRead && !mFacts.scenarioPath.empty()) {
       if (!write(mFacts.scenarioPath, mScenario)) {
         return false;
@@ -705,6 +711,48 @@ namespace faf::editor
       gpg::Warnf("editor: the wave generators didn't read back (%zu bytes)", bytes.size());
     }
     return waves;
+  }
+
+  EdDocument::ReclaimTotals EdDocument::PropReclaim() const
+  {
+    ReclaimTotals totals;
+    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    if (rules == nullptr || mMap == nullptr || mMap->mProps == nullptr) {
+      return totals;
+    }
+    std::map<std::string, std::size_t> rowOf;
+    for (const moho::CWldPropEntry& entry : mMap->mProps->mEntries) {
+      const std::string path = entry.mBlueprintPath.c_str();
+      auto found = rowOf.find(path);
+      if (found == rowOf.end()) {
+        ReclaimRow row;
+        row.blueprint = path;
+        moho::RResId id{};
+        gpg::STR_CopyFilename(&id.name, &entry.mBlueprintPath);
+        if (const moho::RPropBlueprint* const blueprint = rules->GetPropBlueprint(id); blueprint != nullptr) {
+          row.mass = blueprint->Economy.ReclaimMassMax;
+          row.energy = blueprint->Economy.ReclaimEnergyMax;
+        } else {
+          row.mass = -1.0f;
+        }
+        found = rowOf.emplace(path, totals.rows.size()).first;
+        totals.rows.push_back(row);
+      }
+      ReclaimRow& row = totals.rows[found->second];
+      ++row.count;
+      ++totals.props;
+      if (row.mass < 0.0f) {
+        ++totals.unknown;
+      } else if (row.mass == 0.0f && row.energy == 0.0f) {
+        ++totals.none;
+      } else {
+        totals.mass += row.mass;
+        totals.energy += row.energy;
+      }
+    }
+    std::sort(totals.rows.begin(), totals.rows.end(),
+              [](const ReclaimRow& a, const ReclaimRow& b) { return a.mass * static_cast<float>(a.count) > b.mass * static_cast<float>(b.count); });
+    return totals;
   }
 
   int EdDocument::WaveCount() const
@@ -1318,6 +1366,12 @@ namespace faf::editor
       // The scenario's map_version is the new folder's version (the vault checks they match).
       if (Lower(source) == Lower(mFacts.scenarioPath) && FolderVersion(folder) > 0) {
         bytes = WithMapVersion(bytes, FolderVersion(folder));
+      }
+      // A scenario that keeps the map's reclaim gets the props' totals, as a save in place does.
+      if (Lower(source) == Lower(mFacts.scenarioPath)) {
+        if (const ReclaimTotals reclaim = PropReclaim(); reclaim.props > 0) {
+          bytes = WithScenarioReclaim(bytes, reclaim.mass, reclaim.energy);
+        }
       }
       std::ofstream out(destination, std::ios::binary);
       out.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));

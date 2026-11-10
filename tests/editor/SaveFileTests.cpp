@@ -257,4 +257,14 @@ Scenario = {
     const std::string without = faf::editor::WithScriptPlayableArea(renamed, "");
     EXPECT_FALSE(faf::editor::ScriptPlayableArea(without).has_value());
   }
+  TEST(SaveFile, ReclaimTotalsReplaceTheScenariosOwn)
+  {
+    const std::string scenario = "version = 3\r\nScenarioInfo = {\r\n    reclaim = {1234.500000, 99.000000},\r\n    size = {512, 512},\r\n}\r\n";
+    EXPECT_EQ(faf::editor::WithScenarioReclaim(scenario, 8001.25, 42.0),
+              "version = 3\r\nScenarioInfo = {\r\n    reclaim = {8001.250000, 42.000000},\r\n    size = {512, 512},\r\n}\r\n");
+    // FAFME's spacing kept; no entry, none added.
+    EXPECT_EQ(faf::editor::WithScenarioReclaim("reclaim = { 1, 2 },", 3.0, 4.0), "reclaim = { 3.000000, 4.000000 },");
+    const std::string none = "ScenarioInfo = {\n    size = {512, 512},\n}\n";
+    EXPECT_EQ(faf::editor::WithScenarioReclaim(none, 1.0, 2.0), none);
+  }
 } // namespace

@@ -632,4 +632,18 @@ namespace faf::editor
     }
     return out + "\nfunction OnPopulate()\n" + line + "end\n";
   }
+  std::string WithScenarioReclaim(const std::string& scenario, const double mass, const double energy)
+  {
+    std::smatch match;
+    const std::regex reclaim(R"((\breclaim\s*=\s*\{\s*)([-+0-9.eE]+)(\s*,\s*)([-+0-9.eE]+))");
+    if (!std::regex_search(scenario, match, reclaim)) {
+      return scenario;
+    }
+    char numbers[2][48];
+    (void)std::snprintf(numbers[0], sizeof(numbers[0]), "%.6f", mass);
+    (void)std::snprintf(numbers[1], sizeof(numbers[1]), "%.6f", energy);
+    const std::size_t at = static_cast<std::size_t>(match.position(0));
+    return scenario.substr(0, at) + match[1].str() + numbers[0] + match[3].str() + numbers[1] +
+           scenario.substr(at + static_cast<std::size_t>(match.length(0)));
+  }
 } // namespace faf::editor
