@@ -29,7 +29,7 @@
 #include <wx/wx.h>
 // The Linux client (issue #255) builds the frame, the application and the log target below over
 // the wx stand-in (src/platform/posix/wx); the developer windows need the real library.
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <wx/bmpbuttn.h>
 #include <wx/dcclient.h>
 #include <wx/ffile.h>
@@ -117,7 +117,7 @@ public:
    * priming and Alt-menu suppression, then forwards other lanes to base wx
    * default window-proc dispatch.
    */
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   long MSWDefWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override;
 #endif
 
@@ -133,7 +133,7 @@ public:
    * Windows only, as MSWDefWindowProc: on Linux the window system (issue #256) reports the
    * frame's size, activation and closing.
    */
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   long MSWWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override;
 #endif
 
@@ -530,7 +530,7 @@ namespace moho
     }
   };
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   // The developer windows (bitmap panel and check box, input box, managed dialogs, log window):
   // not in the Linux client (issue #255).
 
@@ -953,7 +953,7 @@ namespace moho
     "moho::WWinLogWindow::mPendingOutput must follow the binary's 0x1CC-byte object"
   );
 
-#endif // defined(_WIN32): the developer windows
+#endif // FAFRE_PLATFORM_WINDOWS: the developer windows
 
   /**
    * A frame the engine keeps a weak reference to in `managedFrames`, so

@@ -30,7 +30,7 @@ namespace gpg::gal
     NoOverwrite = 0x4,
   };
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   namespace d3d9
   {
     using RenderState = _D3DRENDERSTATETYPE;

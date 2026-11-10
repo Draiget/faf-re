@@ -19,7 +19,7 @@
 #include <string>
 
 // The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <d3d9.h>
 #endif
 
@@ -30,7 +30,7 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/RenderProfiler.h"
 // The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #endif
 #include "moho/console/CConCommand.h"

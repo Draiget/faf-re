@@ -5,7 +5,7 @@
 // D3DVIEWPORT9 (SetViewport/GetViewport, as the original's interface did) and the texture sheets
 // hand out a D3DLOCKED_RECT. Fields have their Windows types and order (d3d9types.h).
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #error "platform/posix/win32/d3d9types.h is for builds without the Windows SDK"
 #endif
 

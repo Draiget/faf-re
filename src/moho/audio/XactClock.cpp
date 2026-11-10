@@ -13,7 +13,7 @@
 #include "moho/audio/AudioEngine.h"
 #include "moho/misc/StartupHelpers.h"
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 // XACT's clock is patched through the KERNEL32 imports of its DLL. The Linux client's XACT is
 // FAudio, linked in, with no import table to patch (issue #258); SND_InstallXactClock does nothing
 // there.
@@ -153,13 +153,13 @@ namespace
     return patched;
   }
 } // namespace
-#endif // defined(_WIN32)
+#endif // FAFRE_PLATFORM_WINDOWS
 
 namespace moho
 {
   void SND_InstallXactClock(const IXACTEngine& engine)
   {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     (void)engine;
     gpg::Logf("SND: FAudio keeps its own clock; nothing to patch");
 #else

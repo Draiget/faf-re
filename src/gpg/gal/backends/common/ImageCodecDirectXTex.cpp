@@ -6,13 +6,13 @@
 #include <algorithm>
 #include <cstring>
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <objbase.h>
 #endif
 
 #include "DirectXTex.h"
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 // The Linux client (issue #255) has no WIC: stb reads and writes PNG, BMP and JPG
 // (platform/posix/imaging/StbImage.cpp holds the implementations).
 #include "stb_image.h"
@@ -30,7 +30,7 @@ namespace gpg::gal::imaging
       return bytes >= 4U && std::memcmp(data, "DDS ", 4U) == 0;
     }
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     /** WIC needs COM on the calling thread; the loader threads may not have it. */
     class ComScope
     {
@@ -103,7 +103,7 @@ namespace gpg::gal::imaging
         return DirectX::LoadFromDDSMemory(source, bytes, kDdsFlags, nullptr, outImage);
       }
       // PNG, BMP, JPG. D3DX11 refuses TGA files, and so does WIC.
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
       return LoadWithStb(source, bytes, outImage);
 #else
       const ComScope com;
@@ -375,7 +375,7 @@ namespace gpg::gal::imaging
     if (IsDds(data, bytes)) {
       result = DirectX::GetMetadataFromDDSMemory(source, bytes, kDdsFlags, meta);
     } else {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
       int width = 0;
       int height = 0;
       int channels = 0;
@@ -420,7 +420,7 @@ namespace gpg::gal::imaging
       }
       level = *plain.GetImage(0U, 0U, 0U);
     }
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     // stb writes 8-bit RGBA rows.
     DirectX::ScratchImage rgba;
     if (level.format != DXGI_FORMAT_R8G8B8A8_UNORM) {

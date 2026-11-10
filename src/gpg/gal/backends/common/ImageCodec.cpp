@@ -14,7 +14,7 @@
 #include <thread>
 #include <unordered_set>
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <d3d11.h>
 #include <wrl/client.h>
 // D3DX11 (DirectX SDK, June 2010): only the declarations come from the
@@ -30,7 +30,7 @@
 
 namespace gpg::gal::imaging
 {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   struct ImageCodec::State
   {
   };
@@ -119,7 +119,7 @@ namespace gpg::gal::imaging
 
   std::unique_ptr<ImageCodec::State> ImageCodec::LoadD3dx()
   {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     return nullptr;
 #else
     char forced[8]{};
@@ -159,7 +159,7 @@ namespace gpg::gal::imaging
 
   bool ImageCodec::UsesD3dx() const noexcept
   {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     return false;
 #else
     return mState->createTexture != nullptr;
@@ -661,7 +661,7 @@ namespace gpg::gal::imaging
     if (!UsesD3dx()) {
       return GetImageSizeWithDirectXTex(data, bytes, outWidth, outHeight);
     }
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     return E_NOTIMPL;
 #else
     const std::lock_guard<std::mutex> lock(mMutex);
@@ -675,7 +675,7 @@ namespace gpg::gal::imaging
 #endif
   }
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   HRESULT ImageCodec::DecodeWithD3dx(const void* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage)
   {
     (void)data;
@@ -817,7 +817,7 @@ namespace gpg::gal::imaging
 
   namespace
   {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     HRESULT CreateEncodable(ID3D11Device* const device, const Image& image, ComPtr<ID3D11Texture2D>& outTexture)
     {
       D3D11_TEXTURE2D_DESC desc{};
@@ -993,7 +993,7 @@ namespace gpg::gal::imaging
     if (!UsesD3dx()) {
       return EncodeWithDirectXTex(image, format, outBytes);
     }
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     return E_NOTIMPL;
 #else
     const std::lock_guard<std::mutex> lock(mMutex);
@@ -1104,7 +1104,7 @@ namespace gpg::gal::imaging
       }
       return result;
     }
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     return E_NOTIMPL;
 #else
     const std::lock_guard<std::mutex> lock(mMutex);

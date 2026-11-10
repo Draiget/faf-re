@@ -4,7 +4,7 @@
 // nothing checks them. Generated from the annotations those trees use
 // (tmp/claude/linux-faf/gen_sal.py); each is defined empty.
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #error "platform/posix/sal/sal.h is for builds without the Windows SDK"
 #endif
 

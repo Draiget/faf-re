@@ -2,7 +2,7 @@
 
 namespace
 {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   // The Win32 messages MSWWindowProc handles; on Linux the window system reports the frame's
   // size, activation and closing (issue #256).
   constexpr unsigned int kSupComFrameMessageSize = WM_SIZE;
@@ -24,7 +24,7 @@ namespace
   constexpr const char* kSupComFrameLuaDebuggerCommand = "SC_LuaDebugger";
   constexpr const char* kSupComFrameCursorLockPreferenceKey = "lock_fullscreen_cursor_to_window";
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   // The two helpers below serve MSWWindowProc only.
 
   /**
@@ -122,7 +122,7 @@ namespace
 
     ::ClipCursor(clipRectPtr);
   }
-#endif // defined(_WIN32)
+#endif // FAFRE_PLATFORM_WINDOWS
 }
 
 
@@ -180,7 +180,7 @@ void WSupComFrame::OnCloseWindow(
   (void)moho::ShowEscapeDialog(true);
 }
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 /**
  * Address: 0x008CDCD0 (FUN_008CDCD0, WSupComFrame::MSWDefWindowProc)
  *
@@ -216,7 +216,7 @@ long WSupComFrame::MSWDefWindowProc(
 
   return dispatchBase();
 }
-#endif // defined(_WIN32)
+#endif // FAFRE_PLATFORM_WINDOWS
 
 /**
  * Address: 0x008CDAD0 (FUN_008CDAD0, WSupComFrame::OnMove)
@@ -246,7 +246,7 @@ void WSupComFrame::OnMove(
   preferences->SetInteger(fa::string(kSupComFrameYPreferenceKey), GetPosition().y);
 }
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 /**
  * Address: 0x008CDD40 (FUN_008CDD40, WSupComFrame::MSWWindowProc)
  * Mangled: ?MSWWindowProc@WSupComFrame@@UAEJIIJ@Z
@@ -356,4 +356,4 @@ long WSupComFrame::MSWWindowProc(
 
   return 0;
 }
-#endif // defined(_WIN32): MSWWindowProc
+#endif // FAFRE_PLATFORM_WINDOWS: MSWWindowProc

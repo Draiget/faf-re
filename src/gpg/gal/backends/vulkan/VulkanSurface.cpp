@@ -1,6 +1,6 @@
 // FAF addition, not in the shipped binary: see VulkanSurface.h.
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <windows.h>
 
 #define VK_USE_PLATFORM_WIN32_KHR

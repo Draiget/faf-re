@@ -3,12 +3,12 @@
 #include "Error.hpp"
 // d3d11.h pulls in d3d10_1.h, which refuses to follow d3d10.h: D3D11 first.
 // The Linux client renders with Vulkan only (issue #255).
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d11/DeviceD3D11.h"
 #include "gpg/gal/backends/d3d12/DeviceD3D12.h"
 #endif
 #include "gpg/gal/backends/vulkan/DeviceVulkan.h"
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d10/DeviceD3D10.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #endif
@@ -177,7 +177,7 @@ namespace gpg::gal
 
         switch (context->mDeviceType)
         {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
         case DeviceApi::Direct3D9:
         {
             DeviceD3D9* const device = new DeviceD3D9();
@@ -228,7 +228,7 @@ namespace gpg::gal
             }
             break;
         }
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
         case DeviceApi::Direct3D12:
         {
             // FAF addition, not in the shipped binary: as Direct3D 11 above.
@@ -269,7 +269,7 @@ namespace gpg::gal
 
         switch (device->GetDeviceContext()->mDeviceType)
         {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
         case DeviceApi::Direct3D9:
             return static_cast<DeviceD3D9*>(device)->SupportsVertexTextureFormat(textureFormat);
         case DeviceApi::Direct3D10:

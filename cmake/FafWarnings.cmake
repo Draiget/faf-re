@@ -37,6 +37,14 @@ foreach(_faf_third_party_prefix boost/ wx/ Wm3)
   endif()
 endforeach()
 
+# The platform macros (src/platform/PlatformDefines.h) are always defined to 0 or 1: a `#if` on one
+# that isn't defined would read 0 and silently drop that platform's code, so it is an error.
+if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+  list(APPEND FAF_WARNING_OPTIONS "/clang:-Wundef-prefix=FAFRE_PLATFORM_" "/clang:-Werror=undef-prefix")
+else()
+  list(APPEND FAF_WARNING_OPTIONS "-Wundef-prefix=FAFRE_PLATFORM_" "-Werror=undef-prefix")
+endif()
+
 # Sources with wx 2.4 event tables, relative to src/. EVT_MENU and its family, and
 # the Connect calls written the way they expand, cast each handler to
 # wxObjectEventFunction, the one member-function type wx's tables hold. The cast is

@@ -24,7 +24,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Error.hpp"
-#if defined(_WIN32)  // the Direct3D 12 backend: Windows only (issue #255)
+#if FAFRE_PLATFORM_WINDOWS  // the Direct3D 12 backend: Windows only (issue #255)
 #include "gpg/gal/backends/d3d12/DeviceD3D12.h"
 #endif
 #include "moho/audio/AudioEngine.h"
@@ -1717,7 +1717,7 @@ namespace
     if (moho::CFG_GetArgOption("/nodeviceearly", 0, nullptr)) {
       ren_PrepareDeviceEarly = false;
     }
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     if (ren_PrepareDeviceEarly && RendererAttemptOrder(false).front() == gpg::gal::DeviceApi::Direct3D12) {
       gpg::gal::D3D12_PrepareDeviceEarly();
     }

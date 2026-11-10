@@ -4,7 +4,7 @@
 // render statistics show, read from /proc/self/status (VmRSS is the working set, VmHWM its peak,
 // VmData the private bytes). Fields have the Windows names and order.
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #error "platform/posix/win32/psapi.h is for builds without the Windows SDK"
 #endif
 

@@ -5,7 +5,7 @@
 // tables of D3D11_INPUT_ELEMENT_DESC; Linux has no Direct3D 11 itself. Fields have the Windows
 // types and order; the formats are DXGI's (DirectX-Headers' <dxgiformat.h>).
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #error "platform/posix/win32/d3d11.h is for builds without the Windows SDK"
 #endif
 

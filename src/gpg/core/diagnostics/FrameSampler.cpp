@@ -2,7 +2,7 @@
 
 #include "gpg/core/diagnostics/FrameSampler.h"
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 // The sampler suspends the main thread and walks its stack with DbgHelp: Windows only. The Linux
 // client (issue #255) marks frames for nothing.
 void gpg::diag::FrameSamplerMark() {}
@@ -388,4 +388,4 @@ namespace gpg::diag
     state.lastMark = now;
   }
 } // namespace gpg::diag
-#endif // defined(_WIN32)
+#endif // FAFRE_PLATFORM_WINDOWS

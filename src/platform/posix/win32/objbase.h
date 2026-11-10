@@ -4,7 +4,7 @@
 // threads that use XACT and the texture codec; on Linux neither is COM (FAudio, DirectXTex's CPU
 // code), so there is nothing to start or stop.
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #error "platform/posix/win32/objbase.h is for builds without the Windows SDK"
 #endif
 

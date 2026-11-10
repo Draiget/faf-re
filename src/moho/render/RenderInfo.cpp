@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 #include <filesystem>
 #include <system_error>
 #endif
@@ -68,7 +68,7 @@ namespace moho
     {
       files = 0U;
       bytes = 0U;
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
       // The Linux client (issue #255).
       std::error_code error;
       for (const auto& entry : std::filesystem::directory_iterator(directory, error)) {

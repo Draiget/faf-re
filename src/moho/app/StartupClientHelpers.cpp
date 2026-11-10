@@ -40,11 +40,11 @@
 #include <Shlwapi.h>
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
-#if defined(_WIN32)  // the Direct3D 10 backend: Windows only (issue #255)
+#if FAFRE_PLATFORM_WINDOWS  // the Direct3D 10 backend: Windows only (issue #255)
 #include "gpg/gal/backends/d3d10/DeviceD3D10.hpp"
 #endif
 // The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #endif
 #include "gpg/gal/Device.hpp"
@@ -1211,7 +1211,7 @@ void moho::CMovieManager::CreateDirectSound()
     return;
   }
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   // The Linux client (issue #255) has no DirectSound: the movie middleware runs without sound, as
   // when DirectSound fails on Windows. Movie sound there is the FFmpeg path's.
   gpg::Logf("Movies: no DirectSound on this platform.");
@@ -1278,7 +1278,7 @@ moho::CMovieManager::~CMovieManager()
 void moho::CMovieManager::ReleaseDirectSound()
 {
   ::ADXPC_SetupSoundDirectSound8(nullptr);
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   if (mPrimaryBuffer != nullptr) {
     mPrimaryBuffer->Release();
     mPrimaryBuffer = nullptr;

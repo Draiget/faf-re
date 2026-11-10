@@ -20,7 +20,7 @@
 #include <mmsystem.h>
 #include <dsound.h>
 #include <boost/ptr_container/exception.hpp>
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 // The Linux client's XACT and X3DAudio: FAudio (issue #258).
 #include <F3DAudio.h>
 #include "platform/posix/XactOverFact.h"
@@ -89,7 +89,7 @@ namespace
 
   const X3DAudioFunctions& X3DAudio()
   {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     // The Linux client (issue #258): FAudio's F3DAudio, built in, with X3DAudio's structures.
     static const X3DAudioFunctions functions = [] {
       X3DAudioFunctions linked;
@@ -1382,7 +1382,7 @@ namespace moho
 {
   namespace
   {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     // XACT's COM class and interface ids, for CoCreateInstance; the Linux client has FAudio (#258).
     const IID kXactAuditionComInterfaceClsid =
       {0xcedde475u, 0x50b5u, 0x47efu, {0x91u, 0xa7u, 0x3bu, 0x49u, 0xa0u, 0xe8u, 0xe5u, 0x88u}};
@@ -1405,7 +1405,7 @@ namespace moho
    */
   int func_CreateXACTinstance(const std::uint32_t mode, void** const outEngine)
   {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     // The Linux client (issue #258): XACT on FAudio's FACT; it has no debug or audition engine.
     (void)mode;
     return platform::posix::CreateXactEngineOverFact(outEngine);
@@ -2071,7 +2071,7 @@ namespace moho
       }
     }
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     // The Linux client (issue #258) has no DirectSound to ask: stereo, the default the Windows
     // code falls back to as well. The cues' matrices follow FAudio's final mix format.
     sSoundConfiguration->mSpeakerConfiguration = 3u;

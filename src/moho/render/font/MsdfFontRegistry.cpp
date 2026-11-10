@@ -16,7 +16,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 #include <cerrno>
 #include <csignal>
 #endif
@@ -185,7 +185,7 @@ namespace moho
 
     [[nodiscard]] bool IsProcessRunning(const unsigned long processId)
     {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
       // The Linux client (issue #255): signal 0 only checks the process exists (EPERM: it does,
       // under another user).
       return ::kill(static_cast<pid_t>(processId), 0) == 0 || errno == EPERM;

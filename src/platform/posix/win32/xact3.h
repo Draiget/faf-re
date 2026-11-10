@@ -8,7 +8,7 @@
 // Only the Linux client puts FAudio's headers on its include path; the simulation never includes
 // this header.
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #error "platform/posix/win32/xact3.h is for builds without the Windows SDK"
 #endif
 

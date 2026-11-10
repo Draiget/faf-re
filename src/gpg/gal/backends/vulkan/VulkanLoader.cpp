@@ -15,7 +15,7 @@ namespace gpg::gal::vulkan
     if (module != nullptr) {
       return true;
     }
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     module = ::LoadLibraryA("vulkan-1.dll");
 #else
     // The Linux client (issue #255): the Vulkan loader's soname; LoadLibraryA is dlopen there.

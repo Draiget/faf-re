@@ -157,7 +157,7 @@ void moho::WD3DViewport::PaintWithoutMessage()
   D3D_GetDevice()->Paint();
 }
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 namespace
 {
   constexpr std::uint16_t kClientHitTestCode = HTCLIENT;
@@ -237,4 +237,4 @@ long moho::WD3DViewport::MSWWindowProc(
 
   return wxWindow::MSWWindowProc(message, wParam, lParam);
 }
-#endif // defined(_WIN32)
+#endif // FAFRE_PLATFORM_WINDOWS

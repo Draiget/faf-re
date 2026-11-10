@@ -2,7 +2,7 @@
 // CRT calls declared in platform/posix/win32/Windows.h, for the Linux build. Windows builds do
 // not compile this file.
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 
 #include "platform/posix/win32/Windows.h"
 #include "platform/posix/win32/io.h"
@@ -2415,4 +2415,4 @@ extern "C" void* __RTtypeid(void* const object)
   return vtable[-1];
 }
 
-#endif // !defined(_WIN32)
+#endif // !FAFRE_PLATFORM_WINDOWS

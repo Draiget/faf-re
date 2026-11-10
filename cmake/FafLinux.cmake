@@ -223,6 +223,8 @@ set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
   # header).
   "SHELL:-include platform/LayoutAsserts.h"
+  # FAFRE_PLATFORM_LINUX and the other platform macros (see the header).
+  "SHELL:-include platform/PlatformDefines.h"
   # The Windows names the shared code uses (plan WPL.5).
   "SHELL:-include platform/PosixCompat.h"
   ${FAF_LINUX_MS_DIALECT}

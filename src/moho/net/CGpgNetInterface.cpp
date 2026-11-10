@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 #include <spawn.h>
 #include <unistd.h>  // environ
 #endif
@@ -1976,7 +1976,7 @@ void CGpgNetInterface::ConnectThread(
   const fa::string listenerAddress = gpg::STR_Printf("127.0.0.1:%d", static_cast<int>(localPort));
   const fa::string launchCommand = gpg::STR_Printf(launchCommandTemplate.c_str(), listenerAddress.c_str());
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   // The Linux client (issue #255): the command line through the shell, as CreateProcess takes one
   // command string; the child isn't waited for, as on Windows.
   {
@@ -2177,7 +2177,7 @@ int moho::cfunc_LaunchGPGNetL(LuaPlus::LuaState* const state)
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 0, kLaunchGPGNetHelpText);
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   // GPG's GPGNet client is a Windows program; the Linux client (issue #255) has none to start.
   gpg::Warnf("LaunchGPGNet: GPGNet is not available in the Linux client");
   lua_pushboolean(rawState, 0);

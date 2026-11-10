@@ -10,7 +10,7 @@
 // CreateFile, interlocked operations on 32-bit values, the performance counter, the calling
 // thread's id.
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #error "platform/posix/win32/Windows.h is for builds without the Windows SDK"
 #endif
 

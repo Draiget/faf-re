@@ -8,13 +8,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <mutex>
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <wrl/client.h>
 #endif
 
 #include <algorithm>
 #include <cctype>
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <d3d12shader.h>
 
 #include "dxcapi.h"
@@ -26,7 +26,7 @@
 
 namespace gpg::gal::effects
 {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   using Microsoft::WRL::ComPtr;
 
   struct ShaderCompiler::Library
@@ -46,7 +46,7 @@ namespace gpg::gal::effects
 
   namespace
   {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     /**
      * Engine addition: a DXC compiler and utils object per thread. One object must not be used
      * by two threads at once, but separate objects compile in parallel, so the background
@@ -102,7 +102,7 @@ namespace gpg::gal::effects
     return compiler;
   }
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   ShaderCompiler::ShaderCompiler()
   {
     std::vector<std::string> directories;
@@ -295,7 +295,7 @@ namespace gpg::gal::effects
     return Run(hlsl, arguments);
   }
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   CompiledShader ShaderCompiler::Run(const std::string_view hlsl, const std::vector<std::wstring>& arguments) const
   {
     platform::posix::dxc::Output output = platform::posix::dxc::Compile(hlsl, arguments);

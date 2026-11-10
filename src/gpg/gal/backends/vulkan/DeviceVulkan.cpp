@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <d3dcompiler.h>
 #include <wrl/client.h>
 #else
@@ -1873,7 +1873,7 @@ namespace gpg::gal
     for (const MacroPair& macro : kInjectedMacros) {
       localContext.DefineMacro(macro.name, macro.value);
     }
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     std::vector<std::pair<std::string, std::string>> defines;
     for (const EffectMacro& macro : localContext.mMacros) {
       defines.emplace_back(macro.keyText_.c_str(), macro.valueText_.c_str());

@@ -124,7 +124,7 @@ namespace moho
      * Windows only: on Linux the window system (issue #256) delivers the cursor, the network
      * panel's keys and the side mouse buttons itself.
      */
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     long MSWWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override;
 #endif
 

@@ -36,7 +36,7 @@
 #include "moho/animation/CAniSkel.h"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Set.h"
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include "moho/app/WEmitterWx.h"  // the emitter editor: Windows only (issue #255)
 #endif
 #include "moho/app/WinApp.h"
@@ -1183,7 +1183,7 @@ void moho::UI_DumpControls(const fa::vector<fa::string>& args)
  */
 void moho::WIN_ToggleLogDialog()
 {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   // The log window is a wx dialog, which the Linux client doesn't build (issue #255).
   gpg::Warnf("WIN_ToggleLogDialog: the log window is not available in the Linux client");
 #else
@@ -1221,7 +1221,7 @@ void moho::WIN_ShowLogDialog(const fa::vector<fa::string>& args)
 
   const bool showDialog = std::strcmp(showToken->c_str(), "true") == 0;
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   // The log window is a wx dialog, which the Linux client doesn't build (issue #255).
   (void)showDialog;
   gpg::Warnf("WIN_ShowLogDialog: the log window is not available in the Linux client");
@@ -2179,7 +2179,7 @@ void moho::CON_mesh_Rebatch(const fa::vector<fa::string>& args)
  */
 void moho::EFX_CreateEmitterWindow(const fa::vector<fa::string>& args)
 {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   // The emitter editor is a wx window, which the Linux client doesn't build (issue #255).
   (void)args;
   gpg::Warnf("EFX_CreateEmitterWindow: the emitter editor is not available in the Linux client");
@@ -3947,7 +3947,7 @@ namespace
    * Address: 0x00BC73F0 (FUN_00BC73F0, dynamic initializer for `gCConFunc_WxInputBox`)
    * Address: 0x00BF1960 (FUN_00BF1960, dynamic atexit destructor for `gCConFunc_WxInputBox`)
    */
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   // The input box is a wx dialog: not in the Linux client (issue #255).
   CConFunc gCConFunc_WxInputBox("WxInputBox", kConsoleStartupConWxInputBoxDescription, reinterpret_cast<CConFunc::Callback>(&CON_WxInputBox));
 #endif

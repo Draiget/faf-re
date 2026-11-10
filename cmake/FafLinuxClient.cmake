@@ -121,7 +121,8 @@ add_library(faf_client_dxc OBJECT "${PROJECT_SOURCE_DIR}/src/platform/posix/dxc/
 target_include_directories(faf_client_dxc PRIVATE
   "${PROJECT_SOURCE_DIR}/src"
   "${FAF_DEPENDENCIES_DIR}/dxc-linux/include")
-target_compile_options(faf_client_dxc PRIVATE -pthread -Wall)
+target_compile_options(faf_client_dxc PRIVATE -pthread -Wall "SHELL:-include platform/PlatformDefines.h"
+  -Wundef-prefix=FAFRE_PLATFORM_ -Werror=undef-prefix)
 
 # Textures (issue #255): DirectXTex's CPU code, as Windows builds it (cmake/deps/directxtex) minus
 # its WIC codec, on DirectXMath and DirectX-Headers, with empty SAL annotations
@@ -155,7 +156,8 @@ add_library(faf_directxtex_linux STATIC
   "${_faf_dxtex}/DirectXTexTGA.cpp"
   "${_faf_dxtex}/DirectXTexUtil.cpp")
 target_include_directories(faf_directxtex_linux SYSTEM PUBLIC ${_faf_imaging_includes})
-target_compile_options(faf_directxtex_linux PRIVATE -w -pthread)
+# The platform macros for src/platform/posix/sal/sal.h, which DirectXTex reads.
+target_compile_options(faf_directxtex_linux PRIVATE -w -pthread "SHELL:-include ${PROJECT_SOURCE_DIR}/src/platform/PlatformDefines.h")
 
 add_library(faf_client_imaging OBJECT
   "${PROJECT_SOURCE_DIR}/src/gpg/gal/backends/common/ImageCodecDirectXTex.cpp"
@@ -165,7 +167,8 @@ target_include_directories(faf_client_imaging PRIVATE
   "${PROJECT_SOURCE_DIR}/src"
   "${FAF_DEPENDENCIES_DIR}/stb")
 target_link_libraries(faf_client_imaging PUBLIC faf_directxtex_linux)
-target_compile_options(faf_client_imaging PRIVATE -pthread -Wall)
+target_compile_options(faf_client_imaging PRIVATE -pthread -Wall "SHELL:-include platform/PlatformDefines.h"
+  -Wundef-prefix=FAFRE_PLATFORM_ -Werror=undef-prefix)
 
 add_library(faf_client_objs OBJECT ${_faf_client_files})
 add_dependencies(faf_client_objs faf_client_dxc faf_client_imaging)

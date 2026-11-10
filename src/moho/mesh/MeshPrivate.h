@@ -24,7 +24,7 @@
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 // The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
 #endif
 #include "moho/animation/CAniPose.h"

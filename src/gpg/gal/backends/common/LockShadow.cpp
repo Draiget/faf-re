@@ -8,7 +8,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 #include <cstdio>
 
 #include <dlfcn.h>
@@ -58,7 +58,7 @@ namespace gpg::gal::backend
         HMODULE module = nullptr;
         char name[MAX_PATH]{};
         std::uintptr_t offset = reinterpret_cast<std::uintptr_t>(frames[index]);
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
         // The Linux client (issue #255): the module and its load address from the dynamic linker.
         (void)module;
         Dl_info info{};

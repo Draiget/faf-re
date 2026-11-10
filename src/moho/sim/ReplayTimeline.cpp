@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 #include <cerrno>
 #include <csignal>
 #include <cstring>
@@ -217,7 +217,7 @@ namespace moho
         const unsigned long owner = std::strtoul(entry.path().filename().string().c_str(), nullptr, 10);
         bool running = false;
         if (owner != 0u && owner != self) {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
           // The Linux client (issue #255): signal 0 only checks the process exists.
           running = ::kill(static_cast<pid_t>(owner), 0) == 0 || errno == EPERM;
 #else
@@ -508,7 +508,7 @@ namespace moho
      * It has to keep client data: without it, entities have no position history and emitters no curves, and the
      * viewer's sim crashes on the first trail in view after the load.
      */
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     // The Linux client (issue #255): the hidden process's id; PR_SET_PDEATHSIG ends it with the game.
     pid_t sPreparePid = 0;
 #else
@@ -531,7 +531,7 @@ namespace moho
         const std::lock_guard<std::mutex> lock(sCompressLock);
         sPrepareScanning = false;
       }
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
       if (sPreparePid > 0) {
         (void)::kill(sPreparePid, SIGKILL);
         (void)::waitpid(sPreparePid, nullptr, 0);
@@ -577,7 +577,7 @@ namespace moho
         + "\" --keyframe-every " + every + " --keyframe-first " + first + " --keyframe-dir \"" + directory.string() + "\" --keyframe-prepare"
         + (replay_KeyframeQuietDisk ? " --keyframe-quiet" : "");
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
       // The same arguments as the command line above, without a shell in between, so the death signal
       // reaches this exe itself. Lower priority, as BELOW_NORMAL_PRIORITY_CLASS.
       (void)command;
@@ -1043,7 +1043,7 @@ namespace moho
       StartKeyframePreparation();
     }
     // Turned off while it runs: the CPU it uses comes back at once, and what it has written stays.
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     if (!replay_PrepareKeyframes && sPreparePid > 0) {
 #else
     if (!replay_PrepareKeyframes && sPrepareProcess != nullptr) {
@@ -1075,7 +1075,7 @@ namespace moho
       return;
     }
     // Or will be: a save stops the sim, which shows.
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     // Still running: waitpid reaps nothing yet.
     if (replay_KeyframeQuietDisk && sPreparePid > 0 && ::waitpid(sPreparePid, nullptr, WNOHANG) == 0) {
       return;
