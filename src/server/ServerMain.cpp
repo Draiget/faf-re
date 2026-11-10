@@ -80,6 +80,7 @@
 #include "server/ObserverListener.h"
 #include "server/ReplayLog.h"
 #include "server/LobbySignaller.h"
+#include "server/Nftables.h"
 #include "server/ServerNet.h"
 #include "server/ServerViews.h"
 #include "remote/SpeedLimit.h"
@@ -101,7 +102,7 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--congestion-control]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
   // Plan WP13.7: how long a defeated player keeps their view with `DefeatedPlayerView = "disconnect"`: the defeat banner
@@ -1002,6 +1003,37 @@ namespace
     if (!ReadAddresses(state, allowedAddresses, end.error)) {
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
+    }
+    // Plan WPR.45: the kernel's half of the allowlist, for the deployment to load before the port opens (Nftables.h).
+    if (std::string nftablesPath; ReadOption("--nftables-out", nftablesPath)) {
+      if (!listening) {
+        end.error = "--nftables-out needs --listen, whose port the ruleset guards";
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+      faf::server::SNftablesConfig nft;
+      nft.port = netConfig.listen.port;
+      nft.listed = allowedAddresses;
+      nft.unlistedPerSourcePps = ReadOption("--unlisted-pps", text) ? static_cast<std::uint32_t>(std::max(0, std::atoi(text.c_str()))) : 100u;
+      nft.unlistedTotalPps = ReadOption("--unlisted-total-pps", text) ? static_cast<std::uint32_t>(std::max(0, std::atoi(text.c_str()))) : 2000u;
+      std::ofstream file(nftablesPath, std::ios::binary | std::ios::trunc);
+      file << faf::server::MakeNftablesRuleset(nft);
+      if (!file.good()) {
+        end.error = "the nftables ruleset couldn't be written to " + nftablesPath;
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+      file.close();
+      if (nft.unlistedPerSourcePps == 0) {
+        Say("nftables ruleset for UDP port %u written to %s: %d listed addresses pass, every other address is dropped", nft.port, nftablesPath.c_str(),
+            static_cast<int>(nft.listed.size()));
+      } else {
+        Say("nftables ruleset for UDP port %u written to %s: %d listed addresses pass; others %u datagrams a second each, %u together, into the challenge",
+            nft.port, nftablesPath.c_str(), static_cast<int>(nft.listed.size()), nft.unlistedPerSourcePps, nft.unlistedTotalPps);
+      }
+      if (moho::CFG_GetArgOption("--nftables-only", 0, nullptr)) {
+        return 0;
+      }
     }
     faf::remote::EContentCheck contentCheck = faf::remote::EContentCheck::Warn;
     if (!ReadContentCheck(state, contentCheck, end.error) || !ReadUiMods(state, netConfig.uiModsAllowed, end.error)) {
