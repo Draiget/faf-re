@@ -84,7 +84,8 @@ message(STATUS "faf_client: ${_faf_client_count} client translation units")
 # the Vulkan backend and the texture code use (<dxgiformat.h>); SDL3 for the window, input and
 # audio output; FAudio for XACT and X3DAudio (issue #258).
 if(FAF_FETCH_DEPENDENCIES)
-  set(FAF_DEPENDENCIES_ONLY DirectX-Headers SDL3 FAudio dxc-linux DirectXTex DirectXMath stb freetype msdfgen)
+  set(FAF_DEPENDENCIES_ONLY DirectX-Headers SDL3 FAudio dxc-linux DirectXTex DirectXMath stb freetype msdfgen
+    libjuice libdatachannel usrsctp plog mbedtls)
   include(FafDependencies)
 endif()
 
@@ -133,6 +134,12 @@ target_compile_options(faf_client_dxc PRIVATE -pthread -Wall "SHELL:-include pla
 # (their recipes take FAF_LINUX already).
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/freetype" "${CMAKE_BINARY_DIR}/deps/freetype")
 add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/msdfgen" "${CMAKE_BINARY_DIR}/deps/msdfgen")
+
+# The in-engine peer links (src/netlink, issue #233) on libjuice and libdatachannel, built as
+# Windows builds them (their recipes take FAF_LINUX).
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/libjuice" "${CMAKE_BINARY_DIR}/deps/libjuice")
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/libdatachannel" "${CMAKE_BINARY_DIR}/deps/libdatachannel")
+add_subdirectory("${PROJECT_SOURCE_DIR}/src/netlink" "${CMAKE_BINARY_DIR}/netlink")
 
 # Textures (issue #255): DirectXTex's CPU code, as Windows builds it (cmake/deps/directxtex) minus
 # its WIC codec, on DirectXMath and DirectX-Headers, with empty SAL annotations
@@ -239,7 +246,7 @@ add_dependencies(faf_client_objs faf_client_dxc faf_client_imaging faf_ffmpeg_bu
 target_compile_definitions(faf_client_objs PRIVATE _LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1)
 target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd
   FAudio-static SDL3::SDL3-static  # FAudio names its static target FAudio-static, with no alias
-  faf_freetype faf_msdfgen faf_ffmpeg)
+  faf_freetype faf_msdfgen faf_ffmpeg faf_netlink)
 target_include_directories(faf_client_objs PRIVATE
   "${PROJECT_SOURCE_DIR}/src/platform/posix/wx"
   "${FAF_DEPENDENCIES_DIR}/vulkan/include"
