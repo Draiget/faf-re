@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstdio>
+#include <iterator>
 #include <vector>
 #include <cstdlib>
 #include <cmath>
@@ -12,6 +13,8 @@
 #include <string>
 
 #include "editor/EdShell.h"
+#include "editor/doc/EdDocument.h"
+#include "editor/doc/EdAdaptiveTables.h"
 #include "editor/doc/EdSaveFile.h"
 #include "editor/ui/EdHelp.h"
 #include "imgui.h"
@@ -281,6 +284,179 @@ namespace faf::editor
           }
           active = active || ImGui::IsItemActive();
           ImGui::PopID();
+        }
+      }
+      // An adaptive map: which army this resource spawns with, which option group it belongs to (_tables.lua).
+      if ((now.type == "Mass" || now.type == "Hydrocarbon") && ImGui::CollapsingHeader("Adaptive map", ImGuiTreeNodeFlags_DefaultOpen)) {
+        const bool hydro = now.type == "Hydrocarbon";
+        const std::vector<ScenarioTeam> teams = mDocument.Teams();
+        const int slots = teams.empty() ? 0 : static_cast<int>(teams.front().armies.size());
+        AdaptiveTables tables;
+        std::string error;
+        const bool adaptive = mDocument.Adaptive();
+        if (adaptive && !ParseAdaptiveTables(mDocument.TablesText(), tables, error)) {
+          ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.35f, 1.0f), "_tables.lua doesn't read: %s", error.c_str());
+        } else if (!adaptive) {
+          HelpNote("Not an adaptive map. Adaptive maps (FAF's \"Ultimate maps\" script by CookieNoob and KeyBlue) spawn each "
+                   "player's resources only when that player is in the game, and let the lobby's options add or remove groups of "
+                   "resources. The editor writes the _tables.lua; the script's _script.lua and _options.lua come from an adaptive "
+                   "map (copy them into this map's folder).");
+          if (ImGui::Button("Make this map adaptive", ImVec2(-1.0f, 0.0f))) {
+            AdaptiveTables fresh;
+            fresh.maxPlayers = std::max(slots, 1);
+            fresh.mexArmy.assign(static_cast<std::size_t>(fresh.maxPlayers), {});
+            fresh.hydroArmy.assign(static_cast<std::size_t>(fresh.maxPlayers), {});
+            mDocument.SetTablesText(WithAdaptiveTables("", fresh));
+          }
+        } else if (AdaptiveEntry(now.name, hydro).empty()) {
+          // The script finds resources by name ("Mass 07" for the entry 7): a marker named otherwise can't be in a table.
+          ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "The script finds resources by name: \"%s 07\".", hydro ? "Hydrocarbon" : "Mass");
+          int highest = 0;
+          const std::string prefix = hydro ? "Hydrocarbon " : "Mass ";
+          for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+            if (marker.name.rfind(prefix, 0) == 0) {
+              highest = std::max(highest, std::atoi(marker.name.c_str() + prefix.size()));
+            }
+          }
+          char next[64];
+          (void)std::snprintf(next, sizeof(next), "%s%02d", prefix.c_str(), highest + 1);
+          if (ImGui::Button((std::string("Rename to ") + next).c_str(), ImVec2(-1.0f, 0.0f))) {
+            PropertyEdit change;
+            change.what = PropertyEdit::What::Name;
+            change.value = next;
+            mTools.AskPropertyEdit(change);
+          }
+        } else {
+          // Tables without the script that reads them do nothing in the game.
+          if (AdaptiveTablesPath(mDocument.Script()).empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
+            ImGui::TextWrapped("This map's _script.lua doesn't read its tables yet: put the adaptive _script.lua and "
+                               "_options.lua in its folder, importing %s.", mDocument.Facts().tablesPath.c_str());
+            ImGui::PopStyleColor();
+          }
+          // The edit: a copy of the tables changed, written into the file's text as one undo step.
+          AdaptiveTables changed = tables;
+          bool edited = false;
+          const auto remove = [&](std::vector<std::string>& list) {
+            const auto found = std::find(list.begin(), list.end(), now.name);
+            if (found != list.end()) {
+              list.erase(found);
+              return true;
+            }
+            return false;
+          };
+
+          // Spawns with: the army whose presence it needs (its line in spwnMexArmy / spwnHydroArmy).
+          std::vector<std::vector<std::string>>& byArmy = hydro ? changed.hydroArmy : changed.mexArmy;
+          int army = 0;
+          for (std::size_t i = 0; i < byArmy.size(); ++i) {
+            if (std::find(byArmy[i].begin(), byArmy[i].end(), now.name) != byArmy[i].end()) {
+              army = static_cast<int>(i) + 1;
+            }
+          }
+          const int armyCount = std::max({changed.maxPlayers, slots, static_cast<int>(byArmy.size())});
+          const auto armyName = [&](const int a) { return a == 0 ? std::string("Always (any players)") : "ARMY_" + std::to_string(a); };
+          row("Spawns with");
+          if (ImGui::BeginCombo("##adaptivearmy", armyName(army).c_str())) {
+            for (int a = 0; a <= armyCount; ++a) {
+              if (ImGui::Selectable(armyName(a).c_str(), a == army) && a != army) {
+                for (std::vector<std::string>& list : byArmy) {
+                  (void)remove(list);
+                }
+                if (a > 0) {
+                  if (static_cast<int>(byArmy.size()) < a) {
+                    byArmy.resize(static_cast<std::size_t>(a));
+                  }
+                  byArmy[static_cast<std::size_t>(a - 1)].push_back(now.name);
+                }
+                edited = true;
+              }
+            }
+            ImGui::EndCombo();
+          }
+
+          // Option group: one table of the lobby's options and its group (the option's key k removes groups k and above).
+          std::string table;
+          int group = 0;
+          for (const auto& [name, groups] : changed.options) {
+            for (std::size_t g = 0; g < groups.size(); ++g) {
+              if (std::find(groups[g].begin(), groups[g].end(), now.name) != groups[g].end()) {
+                table = name;
+                group = static_cast<int>(g) + 1;
+              }
+            }
+          }
+          const auto labelOf = [](const std::string& name) {
+            for (const OptionTable& option : KnownOptionTables()) {
+              if (name == option.name) {
+                return std::string(option.label);
+              }
+            }
+            return name.empty() ? std::string("None") : name;
+          };
+          const auto place = [&](const std::string& toTable, const int toGroup) {
+            for (auto& [name, groups] : changed.options) {
+              for (std::vector<std::string>& list : groups) {
+                (void)remove(list);
+              }
+            }
+            if (!toTable.empty()) {
+              auto found = std::find_if(changed.options.begin(), changed.options.end(), [&](const auto& entry) { return entry.first == toTable; });
+              if (found == changed.options.end()) {
+                changed.options.emplace_back(toTable, std::vector<std::vector<std::string>>{});
+                found = std::prev(changed.options.end());
+              }
+              if (static_cast<int>(found->second.size()) < toGroup) {
+                found->second.resize(static_cast<std::size_t>(toGroup));
+              }
+              found->second[static_cast<std::size_t>(toGroup - 1)].push_back(now.name);
+            }
+            edited = true;
+          };
+          row("Option");
+          if (ImGui::BeginCombo("##adaptivetable", labelOf(table).c_str())) {
+            if (ImGui::Selectable("None", table.empty()) && !table.empty()) {
+              place("", 0);
+            }
+            for (const OptionTable& option : KnownOptionTables()) {
+              if (option.hydro == hydro && ImGui::Selectable(option.label, table == option.name) && table != option.name) {
+                place(option.name, 1);
+              }
+            }
+            ImGui::EndCombo();
+          }
+          if (!table.empty()) {
+            int wanted = group;
+            row("Group");
+            if (ImGui::InputInt("##adaptivegroup", &wanted) && wanted >= 1 && wanted <= 16 && wanted != group) {
+              place(table, wanted);
+            }
+          }
+          if (!hydro) {
+            bool forward = std::find(changed.forwardCrazyrush.begin(), changed.forwardCrazyrush.end(), now.name) != changed.forwardCrazyrush.end();
+            bool one = std::find(changed.crazyrushOne.begin(), changed.crazyrushOne.end(), now.name) != changed.crazyrushOne.end();
+            row("Crazyrush");
+            if (ImGui::Checkbox("Forward", &forward)) {
+              if (!remove(changed.forwardCrazyrush)) {
+                changed.forwardCrazyrush.push_back(now.name);
+              }
+              edited = true;
+            }
+            ImGui::SameLine();
+            if (ImGui::Checkbox("The one core mex", &one)) {
+              if (!remove(changed.crazyrushOne)) {
+                changed.crazyrushOne.push_back(now.name);
+              }
+              edited = true;
+            }
+          }
+          if (edited) {
+            // The script reads armies up to maxPlayerOnMap: never fewer than the lobby's slots.
+            changed.maxPlayers = std::max(changed.maxPlayers, slots);
+            mDocument.SetTablesText(WithAdaptiveTables(mDocument.TablesText(), changed));
+          }
+          HelpNote("Spawns with: the resource is there only when that army's player is in the game. Option: the lobby's option "
+                   "of that name removes groups from its key up, so group 1 goes first. Written to _tables.lua as one undo step.");
         }
       }
       break;

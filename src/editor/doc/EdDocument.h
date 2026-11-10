@@ -42,6 +42,8 @@ namespace faf::editor
     std::string mapPath;
     std::string savePath;
     std::string scriptPath;
+    /** An adaptive map's `_tables.lua` (the script's import), or empty. */
+    std::string tablesPath;
     std::string name;
     std::string description;
     std::string type;
@@ -272,6 +274,14 @@ namespace faf::editor
     /** The map's `_save.lua` (markers, areas) and `_script.lua` as the editor keeps them. */
     [[nodiscard]] SaveFile& SaveData() noexcept { return mSave; }
     [[nodiscard]] std::string& Script() noexcept { return mScript; }
+    /** An adaptive map's `_tables.lua` as the editor keeps it (empty when the map has none yet). */
+    [[nodiscard]] const std::string& TablesText() const noexcept { return mTables; }
+    [[nodiscard]] bool Adaptive() const noexcept { return !mFacts.tablesPath.empty(); }
+    /**
+     * Sets the tables' text as one undo step; on a map without tables, the map becomes adaptive: its tables file is
+     * `<base>_tables.lua` beside the scenario and the scenario gets `AdaptiveMap = true`.
+     */
+    void SetTablesText(const std::string& text);
     /**
      * Compiles the scenario, save and script texts as they are now (edits included) and returns their syntax errors,
      * each with its file and line.
@@ -314,6 +324,8 @@ namespace faf::editor
       std::vector<SaveEntry> areas;
       std::string script;
       std::vector<SaveEntry> armies;
+      std::string tables;
+      std::string tablesPath;
       std::string scenario;
       std::vector<MarkerChain> chains;
     };
@@ -398,6 +410,8 @@ namespace faf::editor
     SaveFile mSave;
     std::string mScript;
     std::string mScriptRead;
+    std::string mTables;
+    std::string mTablesRead;
     std::string mScenario;
     std::string mScenarioRead;
     std::vector<std::pair<SaveSnapshot, SaveSnapshot>> mSaveUndo;

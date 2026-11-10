@@ -267,6 +267,48 @@ namespace faf::editor
     // and resources otherwise.
     DrawResourceSplats(*batcher, *field);
     DrawMarkers(*batcher, mTools->MarkersToolActive() || mTools->SelectToolActive());
+    // An adaptive map: each resource tied to an army, a dashed line to that army's start (FAForeverMapEditor draws the same).
+    if (mDocument.Adaptive() && (mTools->MarkersToolActive() || mTools->SelectToolActive())) {
+      if (mAdaptiveText != mDocument.TablesText()) {
+        mAdaptiveText = mDocument.TablesText();
+        std::string error;
+        if (!ParseAdaptiveTables(mAdaptiveText, mAdaptive, error)) {
+          mAdaptive = AdaptiveTables{};
+        }
+      }
+      const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+      const auto position = [&](const std::string& name, float& x, float& z) {
+        for (const SaveEntry& marker : markers) {
+          float y = 0.0f;
+          if (marker.name == name && !MarkerHidden(marker) && MarkerPosition(marker, x, y, z)) {
+            return true;
+          }
+        }
+        return false;
+      };
+      constexpr std::uint32_t kTie = 0xC0FFA040u;
+      for (const auto* const byArmy : {&mAdaptive.mexArmy, &mAdaptive.hydroArmy}) {
+        for (std::size_t a = 0; a < byArmy->size(); ++a) {
+          float sx = 0.0f, sz = 0.0f;
+          if (!position("ARMY_" + std::to_string(a + 1), sx, sz)) {
+            continue;
+          }
+          for (const std::string& name : (*byArmy)[a]) {
+            float x = 0.0f, z = 0.0f;
+            if (!position(name, x, z)) {
+              continue;
+            }
+            const int dashes = std::clamp(static_cast<int>(std::hypot(x - sx, z - sz) / 2.0f), 1, 200);
+            for (int d = 0; d < dashes; d += 2) {
+              const float t0 = static_cast<float>(d) / dashes;
+              const float t1 = static_cast<float>(d + 1) / dashes;
+              batcher->DrawLine(groundVertex(x + (sx - x) * t0, z + (sz - z) * t0, kTie, 1.0f),
+                                groundVertex(x + (sx - x) * t1, z + (sz - z) * t1, kTie, 1.0f));
+            }
+          }
+        }
+      }
+    }
 
     // The selected props, ringed in yellow.
     if (!mSelection.empty() && mMap->mProps != nullptr) {

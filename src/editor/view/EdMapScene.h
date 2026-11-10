@@ -17,6 +17,7 @@
 #include "editor/doc/EdUnitPreset.h"
 #include "editor/doc/EdMarkerPreset.h"
 #include "editor/EdTools.h"
+#include "editor/doc/EdAdaptiveTables.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdUnits.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
@@ -402,6 +403,9 @@ namespace faf::editor
     /** Where a pick sits and how big its ring is, for the hover ring. */
     [[nodiscard]] bool PickPlace(const PickHit& hit, float& x, float& z, float& radius) const;
     PickKind mSelectKind = PickKind::None;
+    /** The adaptive tables as last read, for the ties drawn from resources to their armies. */
+    std::string mAdaptiveText;
+    AdaptiveTables mAdaptive;
     bool mPropsCulled = false;
     bool mUnitsCulled = false;
     bool mDragMarkers = false;

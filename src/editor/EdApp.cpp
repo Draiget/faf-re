@@ -1,4 +1,5 @@
 #include "editor/EdApp.h"
+#include "editor/doc/EdAdaptiveTables.h"
 #include <iterator>
 #include <fstream>
 #include <regex>
@@ -359,6 +360,7 @@ namespace faf::editor
       bool mUnitGroupArgDone = false;
       bool mArmyEconomyArgDone = false;
       bool mPropEditArgDone = false;
+      bool mAdaptiveArgDone = false;
       int mReclaimFrames = 0;
       bool mReclaimLogged = false;
       int mLayerFileStep = 0;
@@ -904,6 +906,7 @@ namespace faf::editor
       }
       if (fa::vector<fa::string> marker; moho::CFG_GetArgOption("/framemarker", 1, &marker) && !marker.empty()) {
         mFrameMarkerArg = marker[0].c_str();
+        std::replace(mFrameMarkerArg.begin(), mFrameMarkerArg.end(), '+', ' '); // "Mass+08" for "Mass 08"
       }
       if (fa::vector<fa::string> type; moho::CFG_GetArgOption("/markertool", 1, &type) && !type.empty()) {
         mMarkerToolArg = type[0].c_str();
@@ -1103,6 +1106,33 @@ namespace faf::editor
         }
         tools.SetDecalSelectionCount(mScene.DecalSelectionCount());
         tools.SetSelectionProperties(mScene.SelectionPropertiesNow());
+        // `/adaptive <marker>,<army>` (test runs): ties a mass or hydrocarbon marker to an army in the adaptive tables, once
+        // (the map becomes adaptive first when it isn't).
+        if (!mAdaptiveArgDone) {
+          mAdaptiveArgDone = true;
+          if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/adaptive", 1, &value) && !value.empty()) {
+            std::string text = value[0].c_str();
+            std::replace(text.begin(), text.end(), '+', ' '); // "Mass+08,1": the command line splits at spaces
+            const std::size_t comma = text.find_last_of(',');
+            const std::string marker = text.substr(0, comma);
+            const int army = comma == std::string::npos ? 0 : std::atoi(text.c_str() + comma + 1);
+            AdaptiveTables tables;
+            std::string error;
+            if (mDocument.Adaptive()) {
+              (void)ParseAdaptiveTables(mDocument.TablesText(), tables, error);
+            }
+            const std::vector<ScenarioTeam> teams = mDocument.Teams();
+            const int slots = teams.empty() ? 1 : static_cast<int>(teams.front().armies.size());
+            tables.maxPlayers = mDocument.Adaptive() ? std::max(tables.maxPlayers, slots) : slots;
+            std::vector<std::vector<std::string>>& byArmy = marker.rfind("Hydrocarbon", 0) == 0 ? tables.hydroArmy : tables.mexArmy;
+            if (army >= 1) {
+              byArmy.resize(std::max(byArmy.size(), static_cast<std::size_t>(army)));
+              byArmy[static_cast<std::size_t>(army - 1)].push_back(marker);
+            }
+            mDocument.SetTablesText(WithAdaptiveTables(mDocument.TablesText(), tables));
+            gpg::Logf("editor: adaptive: %s spawns with ARMY_%d (tables %s)", marker.c_str(), army, mDocument.Facts().tablesPath.c_str());
+          }
+        }
         // `/propedit <position|heading|size>,<a>[,<b>,<c>]` (test runs): one edit of the selection, once it has one.
         if (!mPropEditArgDone && tools.SelectionPropertiesNow().kind != SelectionProperties::Kind::None) {
           mPropEditArgDone = true;

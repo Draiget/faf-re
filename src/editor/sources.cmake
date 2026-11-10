@@ -28,6 +28,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdTerrainTypes.cpp
   tools/EdViewAids.cpp
   tools/EdArmySlots.cpp
+  doc/EdAdaptiveTables.cpp
   ui/EdHelp.cpp
   ui/EdIcons.cpp
   ui/EdArmiesPanel.cpp

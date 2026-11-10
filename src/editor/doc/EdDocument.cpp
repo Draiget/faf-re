@@ -1,4 +1,5 @@
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdAdaptiveTables.h"
 
 #include <algorithm>
 #include <atomic>
@@ -54,6 +55,7 @@ namespace faf::editor
     MapFileRecords records;
     SaveFile save;
     std::string script;
+    std::string tables;
     std::string scenario;
     /** CreateNew: what to make and where; the scenario's game path once made. */
     bool create = false;
@@ -336,6 +338,17 @@ namespace faf::editor
       }
       if (!facts.scriptPath.empty()) {
         (void)ReadGameFile(facts.scriptPath, load.script);
+        // An adaptive map's tables: the file its script imports.
+        if (const std::string tables = AdaptiveTablesPath(load.script); !tables.empty() && ReadGameFile(tables, load.tables)) {
+          facts.tablesPath = tables;
+        }
+      }
+      // Else the tables beside the scenario (made in the editor before the adaptive script was put in).
+      if (facts.tablesPath.empty() && load.scenarioPath.size() > std::string("_scenario.lua").size()) {
+        const std::string beside = load.scenarioPath.substr(0, load.scenarioPath.size() - std::string("_scenario.lua").size()) + "_tables.lua";
+        if (ReadGameFile(beside, load.tables)) {
+          facts.tablesPath = beside;
+        }
       }
       (void)ReadGameFile(load.scenarioPath, load.scenario);
       if (!facts.savePath.empty()) {
@@ -530,7 +543,7 @@ namespace faf::editor
 
   EdDocument::SaveSnapshot EdDocument::SaveDataNow() const
   {
-    return {mSave.Markers(), mSave.Areas(), mScript, mSave.Armies(), mScenario, mSave.Chains()};
+    return {mSave.Markers(), mSave.Areas(), mScript, mSave.Armies(), mTables, mFacts.tablesPath, mScenario, mSave.Chains()};
   }
 
   void EdDocument::RestoreSaveData(const SaveSnapshot& snapshot)
@@ -539,10 +552,25 @@ namespace faf::editor
     mSave.Areas() = snapshot.areas;
     mScript = snapshot.script;
     mSave.Armies() = snapshot.armies;
+    mTables = snapshot.tables;
+    mFacts.tablesPath = snapshot.tablesPath;
     mScenario = snapshot.scenario;
     mSave.Chains() = snapshot.chains;
     mFacts.armies = Armies();
     mModified = true;
+  }
+
+  void EdDocument::SetTablesText(const std::string& text)
+  {
+    SaveSnapshot before = SaveDataNow();
+    if (mFacts.tablesPath.empty()) {
+      // The map becomes adaptive: the tables beside the scenario, and the scenario's flag.
+      const std::size_t cut = mFacts.scenarioPath.size() - std::min(mFacts.scenarioPath.size(), std::string("_scenario.lua").size());
+      mFacts.tablesPath = mFacts.scenarioPath.substr(0, cut) + "_tables.lua";
+      mScenario = WithScenarioAdaptive(mScenario);
+    }
+    mTables = text;
+    SaveDataEdited(std::move(before));
   }
 
   void EdDocument::SaveDataEdited(SaveSnapshot before)
@@ -575,6 +603,12 @@ namespace faf::editor
         return false;
       }
       mScriptRead = mScript;
+    }
+    if (mTables != mTablesRead && !mFacts.tablesPath.empty()) {
+      if (!write(mFacts.tablesPath, mTables)) {
+        return false;
+      }
+      mTablesRead = mTables;
     }
     // A scenario that keeps the map's reclaim (FAForeverMapEditor's `reclaim`) gets the props' totals.
     if (const ReclaimTotals reclaim = PropReclaim(); reclaim.props > 0) {
@@ -1269,6 +1303,8 @@ namespace faf::editor
     mSave = std::move(load->save);
     mScript = std::move(load->script);
     mScriptRead = mScript;
+    mTables = std::move(load->tables);
+    mTablesRead = mTables;
     mScenario = std::move(load->scenario);
     mScenarioRead = mScenario;
     // The markers the save's text gives, against those its Lua gave (every map should agree).
@@ -1424,6 +1460,11 @@ namespace faf::editor
       message = "The map's folder " + oldPrefix + " lists no files.";
       return false;
     }
+    // Tables made in the editor and not saved yet are copied too.
+    if (!mFacts.tablesPath.empty() && !mTables.empty() &&
+        std::none_of(files.begin(), files.end(), [&](const fa::string& file) { return Lower(file.c_str()) == Lower(mFacts.tablesPath); })) {
+      files.push_back(fa::string(mFacts.tablesPath.c_str()));
+    }
     std::filesystem::create_directories(target, error);
     if (error) {
       message = "Can't make " + target.string() + ": " + error.message();
@@ -1455,6 +1496,8 @@ namespace faf::editor
         bytes = mSave.Text(); // the edited markers and areas
       } else if (Lower(source) == Lower(mFacts.scriptPath) && mScript != mScriptRead) {
         bytes = mScript; // the edited script (its playable area)
+      } else if (Lower(source) == Lower(mFacts.tablesPath) && !mTables.empty()) {
+        bytes = mTables; // the adaptive tables as edited (maybe not on disk yet)
       } else if (Lower(source) == Lower(mFacts.scenarioPath) && mScenario != mScenarioRead) {
         bytes = mScenario; // the edited army list (its paths are moved below, as the copy's)
       } else if (!ReadGameFile(source, bytes)) {
@@ -1501,7 +1544,8 @@ namespace faf::editor
     mSave.MarkSaved();
     mScriptRead = mScript;
     mScenarioRead = mScenario;
-    for (std::string* const path : {&mFacts.mapPath, &mFacts.savePath, &mFacts.scriptPath, &mFacts.scenarioPath}) {
+    mTablesRead = mTables;
+    for (std::string* const path : {&mFacts.mapPath, &mFacts.savePath, &mFacts.scriptPath, &mFacts.scenarioPath, &mFacts.tablesPath}) {
       *path = ReplaceNoCase(ReplaceNoCase(*path, oldPrefix + oldBase, newPrefix + newBase), oldPrefix, newPrefix);
     }
     message = "Saved as " + target.string() + " (" + std::to_string(copied + 1) + " files); the game lists it from its next start";
@@ -1650,6 +1694,8 @@ namespace faf::editor
     mSave = {};
     mScript.clear();
     mScriptRead.clear();
+    mTables.clear();
+    mTablesRead.clear();
     mScenario.clear();
     mScenarioRead.clear();
     mSaveUndo.clear();
