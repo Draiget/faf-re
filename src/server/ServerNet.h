@@ -54,8 +54,9 @@ namespace faf::server
     /**
      * Plan WPR.50: in the lobby, a participant heard from for this long counts as away (`TakeLobbyPresence`), well
      * before its channel's own 10 s timeout, so a logical host that is gone is succeeded within 10 s. A client sends
-     * a keepalive every quarter second while its game runs; a frozen lobby screen stops them too, so not much shorter.
-     * 0: only the channel's timeout.
+     * a keepalive every quarter second, also while its game thread is busy (loading the lobby screen takes seconds),
+     * for up to 30 s of such a stall (`CoverStall`, remote/client/ServerConnect.cpp); a hung client goes quiet after
+     * that. 0: only the channel's timeout.
      */
     double lobbyAwaySeconds = 6.0;
     /** Plan WP17.1: the match file's `MatchLobbyControl`: organised (WPR.49's rules) or player-hosted. */

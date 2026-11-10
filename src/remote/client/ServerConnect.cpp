@@ -2,12 +2,15 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <exception>
 #include <cstdlib>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -115,7 +118,8 @@ namespace faf::remote
 
     /**
      * The client's channel to the server as the lobby uses it: lobby frames in arrival order (`CLobbyInbox`: a server
-     * signal holds back the frames after it), the rest kept for the game's session.
+     * signal holds back the frames after it), the rest kept for the game's session. Its methods take one lock: the
+     * stall cover (`CoverStall`) moves the link from its own thread while the game's thread is busy.
      */
     class CLinkRelayChannel final : public IRelayChannel
     {
@@ -124,16 +128,22 @@ namespace faf::remote
         : mLink(link)
       {}
 
-      void SendLobbyFrame(const std::span<const std::uint8_t> frame) override { (void)mLink.SendReliable(frame.data(), frame.size()); }
+      void SendLobbyFrame(const std::span<const std::uint8_t> frame) override
+      {
+        const std::scoped_lock lock(mLock);
+        (void)mLink.SendReliable(frame.data(), frame.size());
+      }
 
       bool TakeLobbyFrame(std::vector<std::uint8_t>& frame) override
       {
+        const std::scoped_lock lock(mLock);
         Pump();
         return mInbox.TakeLobbyFrame(frame);
       }
 
       bool Up() const override
       {
+        const std::scoped_lock lock(mLock);
         const net::CClientLink::EState state = mLink.State();
         return state == net::CClientLink::EState::Connected || state == net::CClientLink::EState::Connecting;
       }
@@ -155,6 +165,7 @@ namespace faf::remote
 
       [[nodiscard]] bool TakeSignal(net::SLobbySignal& signal)
       {
+        const std::scoped_lock lock(mLock);
         Pump();
         return mInbox.TakeSignal(signal);
       }
@@ -164,6 +175,7 @@ namespace faf::remote
       /** The next message for the game's session (not a lobby frame), in arrival order. */
       [[nodiscard]] bool TakeGameMessage(std::vector<std::uint8_t>& message)
       {
+        const std::scoped_lock lock(mLock);
         Pump();
         if (mForGameNext >= mForGame.size()) {
           mForGame.clear();
@@ -174,16 +186,61 @@ namespace faf::remote
         return true;
       }
 
-      void SendGameMessage(const std::span<const std::uint8_t> message) { (void)mLink.SendReliable(message.data(), message.size()); }
+      void SendGameMessage(const std::span<const std::uint8_t> message)
+      {
+        const std::scoped_lock lock(mLock);
+        (void)mLink.SendReliable(message.data(), message.size());
+      }
 
       /** The link moves (keepalives, acknowledgements); what arrives waits in order for its taker. */
-      void KeepAlive() { Pump(); }
+      void KeepAlive()
+      {
+        const std::scoped_lock lock(mLock);
+        Pump();
+      }
+
+      /**
+       * Called by the stall cover's thread every `kStallCheckMs`: moves the link when the game's thread hasn't for
+       * `kStallStartUs`, up to `kStallCoverUs` into the stall. FAF's lobby screen is built in one Lua call that takes
+       * seconds (a window's 6-8 s, measured 2026-11-09); with no keepalives the server took the player for away
+       * (`--lobby-away-seconds`, 6 s) and handed the lobby's host role to the next player. FAF's own lobby links stay
+       * up the same way: `CNetUDPConnector` runs on its own thread. A game thread stuck for longer than the cover is
+       * let go, so the server still sees a hung client as away.
+       */
+      void CoverStall()
+      {
+        const std::scoped_lock lock(mLock);
+        const std::uint64_t now = NowUs();
+        const std::uint64_t stalledUs = now - mLastPumpUs;
+        if (mLastPumpUs == 0 || stalledUs < kStallStartUs || stalledUs > kStallCoverUs) {
+          return;
+        }
+        if (!mStallSaid) {
+          mStallSaid = true;
+          gpg::Logf("Server session: the game's thread is busy; the link to the server is kept up meanwhile.");
+        }
+        mLink.Pump(now);
+        TakeArrived();
+      }
+
+      static constexpr int kStallCheckMs = 100;
 
     private:
-      // The lobby pulls every frame, and the session's task too: the link moves here.
+      static constexpr std::uint64_t kStallStartUs = 250'000;
+      static constexpr std::uint64_t kStallCoverUs = 30'000'000;
+
+      // The lobby pulls every frame, and the session's task too: the link moves here. The caller holds `mLock`.
       void Pump()
       {
-        mLink.Pump(NowUs());
+        const std::uint64_t now = NowUs();
+        mLastPumpUs = now;
+        mStallSaid = false;
+        mLink.Pump(now);
+        TakeArrived();
+      }
+
+      void TakeArrived()
+      {
         while (mLink.TakeReliable(mMessage)) {
           if (!mMessage.empty() && mMessage[0] == static_cast<std::uint8_t>(net::ESeatMessage::Lobby)) {
             mInbox.Push(std::move(mMessage));
@@ -194,6 +251,9 @@ namespace faf::remote
         }
       }
 
+      mutable std::mutex mLock;
+      std::uint64_t mLastPumpUs = 0; // 0: not pumped by the game's thread yet
+      bool mStallSaid = false;
       net::CClientLink& mLink;
       CLobbyInbox mInbox;
       std::vector<std::uint8_t> mMessage;
@@ -203,7 +263,7 @@ namespace faf::remote
       bool mConnectorLive = false;
     };
 
-    /** One server session: the link, the channel the lobby uses over it. */
+    /** One server session: the link, the channel the lobby uses over it, the thread that covers the game's stalls. */
     struct SServerSession
     {
       SServerSession(const std::int32_t uid, const net::Token& token, const net::SEndpoint& server)
@@ -212,9 +272,33 @@ namespace faf::remote
         , channel(link)
       {}
 
+      SServerSession(const SServerSession&) = delete;
+      SServerSession& operator=(const SServerSession&) = delete;
+
+      ~SServerSession()
+      {
+        stopCover.store(true);
+        if (stallCover.joinable()) {
+          stallCover.join();
+        }
+      }
+
+      /** Once connected: from here on the link is only touched through `channel`. */
+      void StartStallCover()
+      {
+        stallCover = std::thread([this] {
+          while (!stopCover.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(CLinkRelayChannel::kStallCheckMs));
+            channel.CoverStall();
+          }
+        });
+      }
+
       std::int32_t uid;
       net::CClientLink link;
       CLinkRelayChannel channel;
+      std::atomic<bool> stopCover{false};
+      std::thread stallCover;
     };
 
     std::unique_ptr<SServerSession> sSession;
@@ -382,6 +466,8 @@ namespace faf::remote
       return EServerSessionStart::Failed;
     }
     gpg::Logf("Server session: connected to %s", request.endpoint.c_str());
+    sSession->channel.KeepAlive(); // the stall cover counts from the game thread's last pump
+    sSession->StartStallCover();
 
     // The front end waits for the server's lobby signals (plan WP2.12): a task the UI side runs takes them and makes
     // the lobby as GPGNet's commands would (moho/app/ServerLobbyUi.h); `InternalCreateLobby` takes
