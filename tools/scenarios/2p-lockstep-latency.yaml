@@ -1,0 +1,33 @@
+name: 2p-lockstep-latency
+description: >
+  Plan WPR.13, the lockstep path: two clients of our x64 build on loopback, autolobby, SCMP_009, two minutes;
+  net_LogShownBeatMs=1 logs every 100 beats how long beats took from issue to the main thread, which is what an
+  order placed just before a beat closes waits (docs/SWITCHES.md). Read the `NET: beats to beat N shown M ms after
+  issue` lines in each game log. On 2026-11-10 (SCMP_009, loopback): 506-545 ms on average per 100 beats.
+timeout: 10m
+
+mode: direct
+lobby: auto
+map: SCMP_009
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\main_x64.exe'   # a build from 2026-11-03 on (net_LogShownBeatMs)
+  init: init.lua
+  nosound: true
+  tile: true
+
+players:
+  - { uid: 1, name: Alpha, args: ['/con', 'net_LogShownBeatMs=1'] }
+  - { uid: 2, name: Bravo, args: ['/con', 'net_LogShownBeatMs=1'] }
+
+steps:
+  - start: all
+  - host: 1
+  - join: others
+  - waitState: { uids: all, state: Launching, timeout: 5m }
+  - wait: 2m
+
+expect:
+  allLaunched: true
+  noDesync: true
+  noCrash: true
