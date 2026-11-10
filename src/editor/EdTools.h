@@ -397,6 +397,15 @@ namespace faf::editor
       }
       return 0xFFFF00FFu;
     }
+    /** The view aids: the slope bands, the km grid with the centre lines, and the status bar's cursor and ruler. */
+    [[nodiscard]] bool ShowSlope() const noexcept { return mShowSlope; }
+    void SetShowSlope(const bool on) noexcept { mShowSlope = on; }
+    [[nodiscard]] bool ShowKmGrid() const noexcept { return mShowKmGrid; }
+    void SetShowKmGrid(const bool on) noexcept { mShowKmGrid = on; }
+    void SetCursorText(std::string text) { mCursorText = std::move(text); }
+    [[nodiscard]] const std::string& CursorText() const noexcept { return mCursorText; }
+    void SetRulerText(std::string text) { mRulerText = std::move(text); }
+    [[nodiscard]] const std::string& RulerText() const noexcept { return mRulerText; }
     /** The type under the cursor (-1: none), for the panel. */
     void SetTerrainTypeUnderCursor(const int code) noexcept { mTypeUnderCursor = code; }
     /** Test runs (`/terraintype <code>`): the Texture tool painting that type. */
@@ -681,6 +690,10 @@ namespace faf::editor
     int mTexturePaint = 0;
     int mTerrainTypeCode = 81;
     bool mShowTerrainTypes = true;
+    bool mShowSlope = false;
+    bool mShowKmGrid = false;
+    std::string mCursorText;
+    std::string mRulerText;
     int mTypeUnderCursor = -1;
     char mTerrainTypeFilter[64]{};
     std::vector<TerrainTypeInfo> mTerrainTypes;

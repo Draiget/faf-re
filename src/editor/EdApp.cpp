@@ -348,6 +348,7 @@ namespace faf::editor
       bool mSkyboxFilesDone = false;
       bool mWaveSwitchesDone = false;
       bool mTerrainTypeArgDone = false;
+      bool mViewAidArgsDone = false;
       int mReclaimFrames = 0;
       bool mReclaimLogged = false;
       int mLayerFileStep = 0;
@@ -1900,6 +1901,22 @@ namespace faf::editor
           std::vector<TerrainTypeInfo> types = ParseTerrainTypes(lua);
           gpg::Logf("editor: %zu terrain types from /lua/TerrainTypes.lua", types.size());
           tools.SetTerrainTypes(std::move(types));
+        }
+      }
+      // `/slope`, `/kmgrid` for test runs: the view aids on.
+      if (mScene.Attached() && !mViewAidArgsDone) {
+        mViewAidArgsDone = true;
+        tools.SetShowSlope(moho::CFG_GetArgOption("/slope", 0, nullptr) || tools.ShowSlope());
+        tools.SetShowKmGrid(moho::CFG_GetArgOption("/kmgrid", 0, nullptr) || tools.ShowKmGrid());
+        if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/ruler", 1, &value) && !value.empty()) {
+          float ends[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+          std::string list = value[0].c_str();
+          for (int i = 0; i < 4 && !list.empty(); ++i) {
+            ends[i] = static_cast<float>(std::atof(list.c_str()));
+            const std::size_t comma = list.find(',');
+            list = comma == std::string::npos ? std::string() : list.substr(comma + 1);
+          }
+          mScene.SetRuler(ends[0], ends[1], ends[2], ends[3]);
         }
       }
       if (mScene.Attached() && !mTerrainTypeArgDone) {

@@ -11,6 +11,7 @@
 
 #include <Windows.h>
 
+#include "editor/tools/EdViewAids.h"
 #include "editor/tools/EdTerrainTypes.h"
 #include "editor/doc/EdLayerPreset.h"
 #include "editor/doc/EdUnitPreset.h"
@@ -298,6 +299,14 @@ namespace faf::editor
     bool mPaintingMask = false;
     /** A terrain type stroke: the grid before it, and the overlay's runs (rebuilt when the grid changes). */
     bool mPaintingTypes = false;
+    /** The slope view's runs (rebuilt when the heights change), and the ruler (Alt+drag): its ends, on while held. */
+    std::vector<TerrainTypeRun> mSlopeRuns;
+    std::uint64_t mSlopeHeights = 0;
+    int mSlopeFrames = 0;
+    bool mRuling = false;
+    bool mRulerShown = false;
+    float mRulerFrom[2] = {0.0f, 0.0f};
+    float mRulerTo[2] = {0.0f, 0.0f};
     std::vector<std::uint8_t> mTypesBefore;
     std::vector<TerrainTypeRun> mTypeRuns;
     int mTypeRunsRevision = -1;
@@ -392,6 +401,12 @@ namespace faf::editor
     bool UndoSkybox(bool redo);
     bool UndoWaves(bool redo);
     bool UndoTerrainTypes(bool redo);
+
+  public:
+    /** The ruler between two points (test runs, `/ruler`). */
+    void SetRuler(float x0, float z0, float x1, float z1);
+
+  private:
     /** Whether the Markers panel hides this marker's type. */
     [[nodiscard]] bool MarkerHidden(const SaveEntry& marker) const;
     void DeleteSelectedMarkers();

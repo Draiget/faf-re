@@ -79,7 +79,7 @@ namespace faf::editor
     if (mMap == nullptr || mCamera == nullptr || mTools == nullptr ||
         (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty() && !area &&
          mDocument.SaveData().Markers().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() && !mTools->UnitsToolActive() &&
-         mTools->CheckPins().empty() && !mTools->ShowingPathing()) ||
+         mTools->CheckPins().empty() && !mTools->ShowingPathing() && !mTools->ShowSlope() && !mTools->ShowKmGrid() && !mRulerShown) ||
         moho::ren_Viewport == nullptr) {
       return;
     }
@@ -297,6 +297,80 @@ namespace faf::editor
           batcher->DrawLine(groundVertex(p.x + std::cos(a0) * 1.5f, p.z + std::sin(a0) * 1.5f, 0xF0FFE040u),
                             groundVertex(p.x + std::cos(a1) * 1.5f, p.z + std::sin(a1) * 1.5f, 0xF0FFE040u));
         }
+      }
+    }
+    // The slope view: each run of cells in its band's colour (flat ones left out), rebuilt when the heights change.
+    if (mTools->ShowSlope()) {
+      if (mSlopeRuns.empty() || ++mSlopeFrames % 15 == 0) {
+        std::uint64_t hash = 1469598103934665603ULL;
+        const std::size_t count = static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height);
+        for (std::size_t i = 0; i < count; i += 7) {
+          hash = (hash ^ field->data[i]) * 1099511628211ULL;
+        }
+        if (hash != mSlopeHeights || mSlopeRuns.empty()) {
+          mSlopeHeights = hash;
+          const std::vector<std::uint8_t> bands = SlopeBands(field->data, field->width, field->height, 1.0f / 128.0f);
+          mSlopeRuns = TerrainTypeRuns(bands.data(), field->width - 1, field->height - 1, 0);
+        }
+      }
+      static constexpr std::uint32_t kBand[4] = {0u, 0x70F0E040u, 0x80F09030u, 0x90F04030u};
+      std::vector<moho::CD3DPrimBatcher::Vertex> quads;
+      quads.reserve(mSlopeRuns.size() * 4);
+      for (const TerrainTypeRun& run : mSlopeRuns) {
+        const std::uint32_t color = kBand[run.code & 3];
+        const float x0 = static_cast<float>(run.x0);
+        const float x1 = static_cast<float>(run.x1);
+        const float z0 = static_cast<float>(run.z);
+        quads.push_back(groundVertex(x0, z0, color, 0.3f));
+        quads.push_back(groundVertex(x1, z0, color, 0.3f));
+        quads.push_back(groundVertex(x1, z0 + 1.0f, color, 0.3f));
+        quads.push_back(groundVertex(x0, z0 + 1.0f, color, 0.3f));
+      }
+      if (!quads.empty()) {
+        batcher->DrawQuads(quads.data(), static_cast<std::uint32_t>(quads.size() / 4));
+      }
+    } else if (!mSlopeRuns.empty()) {
+      mSlopeRuns.clear();
+    }
+    // The km grid (lines every 51.2 units) and the map's centre lines, along the ground.
+    if (mTools->ShowKmGrid()) {
+      const float mapW = static_cast<float>(field->width - 1);
+      const float mapH = static_cast<float>(field->height - 1);
+      const auto line = [&](const float ax, const float az, const float bx, const float bz, const std::uint32_t color) {
+        const float length = std::hypot(bx - ax, bz - az);
+        const int steps = std::max(1, static_cast<int>(length / 4.0f));
+        for (int s = 0; s < steps; ++s) {
+          const float t0 = static_cast<float>(s) / static_cast<float>(steps);
+          const float t1 = static_cast<float>(s + 1) / static_cast<float>(steps);
+          batcher->DrawLine(groundVertex(ax + (bx - ax) * t0, az + (bz - az) * t0, color, 0.6f),
+                            groundVertex(ax + (bx - ax) * t1, az + (bz - az) * t1, color, 0.6f));
+        }
+      };
+      for (float x = kUnitsPerKm; x < mapW; x += kUnitsPerKm) {
+        line(x, 0.0f, x, mapH, 0x90FFFFFFu);
+      }
+      for (float z = kUnitsPerKm; z < mapH; z += kUnitsPerKm) {
+        line(0.0f, z, mapW, z, 0x90FFFFFFu);
+      }
+      line(mapW * 0.5f, 0.0f, mapW * 0.5f, mapH, 0xE040C0FFu);
+      line(0.0f, mapH * 0.5f, mapW, mapH * 0.5f, 0xE040C0FFu);
+    }
+    // The ruler: a line on the ground between its ends, with posts at them.
+    if (mRulerShown) {
+      constexpr std::uint32_t kRuler = 0xF0FFDC60u;
+      const float length = std::hypot(mRulerTo[0] - mRulerFrom[0], mRulerTo[1] - mRulerFrom[1]);
+      const int steps = std::max(1, static_cast<int>(length / 2.0f));
+      for (int s = 0; s < steps; ++s) {
+        const float t0 = static_cast<float>(s) / static_cast<float>(steps);
+        const float t1 = static_cast<float>(s + 1) / static_cast<float>(steps);
+        batcher->DrawLine(groundVertex(mRulerFrom[0] + (mRulerTo[0] - mRulerFrom[0]) * t0, mRulerFrom[1] + (mRulerTo[1] - mRulerFrom[1]) * t0, kRuler, 0.8f),
+                          groundVertex(mRulerFrom[0] + (mRulerTo[0] - mRulerFrom[0]) * t1, mRulerFrom[1] + (mRulerTo[1] - mRulerFrom[1]) * t1, kRuler, 0.8f));
+      }
+      for (const float* const end : {mRulerFrom, mRulerTo}) {
+        moho::CD3DPrimBatcher::Vertex bottom = groundVertex(end[0], end[1], kRuler, 0.0f);
+        moho::CD3DPrimBatcher::Vertex top = bottom;
+        top.mY += 6.0f;
+        batcher->DrawLine(bottom, top);
       }
     }
     // The terrain types (the Texture tool painting them): each run of cells in its type's colour, Default left out.
@@ -1328,6 +1402,35 @@ namespace faf::editor
     if (mPaintingTypes) {
       PaintTypes();
     }
+    // The ruler's far end, and the status bar's cursor: where it is on the ground, how high, how steep.
+    if (mTools != nullptr) {
+      float groundX = 0.0f;
+      float groundZ = 0.0f;
+      const moho::CHeightField* const heights = mMap->mTerrainRes->GetHeightField();
+      if (heights != nullptr && GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ) && groundX >= 0.0f &&
+          groundZ >= 0.0f && groundX < static_cast<float>(heights->width - 1) && groundZ < static_cast<float>(heights->height - 1)) {
+        if (mRuling) {
+          if ((::GetKeyState(VK_LBUTTON) & 0x8000) != 0) {
+            mRulerTo[0] = groundX;
+            mRulerTo[1] = groundZ;
+            mTools->SetRulerText(DistanceText(std::hypot(mRulerTo[0] - mRulerFrom[0], mRulerTo[1] - mRulerFrom[1])));
+          } else {
+            mRuling = false;
+            ::ReleaseCapture();
+            gpg::Logf("editor: ruler from %.1f, %.1f to %.1f, %.1f: %s", static_cast<double>(mRulerFrom[0]), static_cast<double>(mRulerFrom[1]),
+                      static_cast<double>(mRulerTo[0]), static_cast<double>(mRulerTo[1]), mTools->RulerText().c_str());
+          }
+        }
+        const float height = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(groundX), static_cast<std::int32_t>(groundZ));
+        const float slope = CellSlope(heights->data, heights->width, static_cast<int>(groundX), static_cast<int>(groundZ), 1.0f / 128.0f);
+        char text[96];
+        (void)std::snprintf(text, sizeof(text), "x %.1f  z %.1f  height %.2f  slope %.2f", static_cast<double>(groundX), static_cast<double>(groundZ),
+                            static_cast<double>(height), static_cast<double>(slope));
+        mTools->SetCursorText(text);
+      } else {
+        mTools->SetCursorText({});
+      }
+    }
     // The type under the cursor, for the panel.
     if (mTools != nullptr && mTools->PaintingTerrainTypes()) {
       float groundX = 0.0f;
@@ -1524,6 +1627,21 @@ namespace faf::editor
     to.push_back(std::move(step));
     gpg::Logf("editor: %s a terrain type stroke", redo ? "redid" : "undid");
     return true;
+  }
+
+  void EdMapScene::SetRuler(const float x0, const float z0, const float x1, const float z1)
+  {
+    mRulerShown = true;
+    mRuling = false;
+    mRulerFrom[0] = x0;
+    mRulerFrom[1] = z0;
+    mRulerTo[0] = x1;
+    mRulerTo[1] = z1;
+    if (mTools != nullptr) {
+      mTools->SetRulerText(DistanceText(std::hypot(x1 - x0, z1 - z0)));
+      gpg::Logf("editor: ruler from %.1f, %.1f to %.1f, %.1f: %s", static_cast<double>(x0), static_cast<double>(z0), static_cast<double>(x1),
+                static_cast<double>(z1), mTools->RulerText().c_str());
+    }
   }
 
   void EdMapScene::PaintTypes()
@@ -3482,6 +3600,29 @@ namespace faf::editor
     }
     switch (message) {
     case WM_LBUTTONDOWN: {
+      // Alt+drag measures, whatever the tool.
+      if ((::GetKeyState(VK_MENU) & 0x8000) != 0) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          mRuling = true;
+          mRulerShown = true;
+          mRulerFrom[0] = mRulerTo[0] = groundX;
+          mRulerFrom[1] = mRulerTo[1] = groundZ;
+          if (mTools != nullptr) {
+            mTools->SetRulerText(DistanceText(0.0f));
+          }
+          ::SetCapture(window);
+        }
+        return true;
+      }
+      if (mRulerShown && !mRuling) {
+        // A click without Alt puts the ruler away.
+        mRulerShown = false;
+        if (mTools != nullptr) {
+          mTools->SetRulerText({});
+        }
+      }
       if (mTools != nullptr && mTools->MarkersToolActive()) {
         float groundX = 0.0f;
         float groundZ = 0.0f;

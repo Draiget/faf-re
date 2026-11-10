@@ -373,6 +373,17 @@ namespace faf::editor
       tip("The move arrows keep markers and props on the ground when they move across it; off, they keep their height. "
           "Nothing is moved under the ground either way.");
       ImGui::SameLine();
+      if (toggle("Slope", mTools.ShowSlope())) {
+        mTools.SetShowSlope(!mTools.ShowSlope());
+      }
+      tip("Each cell's slope as the game's pathing reads it (its steepest edge): yellow above 0.25 (too steep to build on), orange "
+          "above 0.5, red above 0.75 (steeper than most land units climb)");
+      ImGui::SameLine();
+      if (toggle("Km grid", mTools.ShowKmGrid())) {
+        mTools.SetShowKmGrid(!mTools.ShowKmGrid());
+      }
+      tip("Lines every kilometre (51.2 units, the game's scale) and the map's centre lines. Alt+drag in the view measures a distance.");
+      ImGui::SameLine();
       {
         static constexpr float kSteps[] = {0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
         static constexpr const char* kStepNames[] = {"0.5", "1", "2", "4", "8"};
@@ -758,6 +769,14 @@ namespace faf::editor
       if (warnings > 0) {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "| %d warnings in the log", warnings);
+      }
+      if (!mTools.CursorText().empty()) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("| %s", mTools.CursorText().c_str());
+      }
+      if (!mTools.RulerText().empty()) {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(1.0f, 0.86f, 0.40f, 1.0f), "| ruler %s", mTools.RulerText().c_str());
       }
       char text[32];
       (void)std::snprintf(text, sizeof(text), "%.0f fps", ImGui::GetIO().Framerate);
