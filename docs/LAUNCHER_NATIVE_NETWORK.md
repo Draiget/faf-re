@@ -2,7 +2,7 @@
 
 Issue #274. With the switch `/nativenet` the game runs every peer link itself: ICE over libjuice, a link that FAF's Java ICE adapter accepts as one of its own, and WebRTC between two of our builds. The launcher starts no adapter. It talks to the game over GPGNet directly, as FAF clients did before ICE adapters existed. Without the switch nothing changes: the game talks to an adapter as described in [LAUNCHER_ADAPTER_CONTRACT.md](LAUNCHER_ADAPTER_CONTRACT.md).
 
-This page is what a launcher needs to support the mode: downlords-faf-client (open PR [FAForever/downlords-faf-client#3590](https://github.com/FAForever/downlords-faf-client/pull/3590), behind a preference and the `fafdevelop` mod), FAForeverRustClient (not started), and `tools/seat` (mpemu) today. The lobby server needs no change.
+This page is what a launcher needs to support the mode: downlords-faf-client (open PR [FAForever/downlords-faf-client#3590](https://github.com/FAForever/downlords-faf-client/pull/3590), for `fafdevelop` games whose exe is ours), FAForeverRustClient (not started), and `tools/seat` (mpemu) today. The lobby server needs no change.
 
 ## What the launcher does
 
@@ -29,7 +29,9 @@ That is the whole contract. The game never sends the adapter's callbacks: it has
 
 ## When the game crashes in a match
 
-With `/rejoinoffer` the game can come back to its match (issue #275). There's no adapter to keep the links, so they die with the game and the returning game builds new ones. The launcher stays connected to the lobby server, doesn't report the game as ended, and:
+The game can come back to its match (issue #275) when the launcher starts every game with `/rejoinoffer /rejoinkeyfile <file> /con net_PeerFeatures=1;net_RejoinAccept=1`. Each game writes a new seat key to that file as it begins (`CPeerFeatures::Announce`), and a game restarted with `/rejoin` reads it back to prove its seat; only the public half goes to the other players. The game offers a return (`RejoinOffer`) only when every player's engine announced it can take one. With these on, a player who drops and never comes back is ejected as in the original game. In a 3-player game on native links with `DisconnectionDelay02` 90, the other two waited 3 minutes and played on, both with these arguments and without them (2026-11-10).
+
+There's no adapter to keep the links, so they die with the game and the returning game builds new ones. The launcher stays connected to the lobby server, doesn't report the game as ended, and:
 
 1. **Remembers every `JoinGame` and `ConnectToPeer` for the game**, as the server sent them, and forgets a player when `DisconnectFromPeer` names them. The server sends these once and won't send them again.
 2. **Keeps its GPGNet listener open**, as the returning game connects to the same port. It drops `IceMsg` for the game while none is connected. Players' links retry, so nothing is lost by that.
@@ -115,7 +117,7 @@ The icon has its own thread and window, so the menu works while the game window 
 
 From reading both clients (Java: downlords-faf-client `develop` 66e624f119; Rust: FAForeverRustClient `develop` 70c88a5f9b, both 2026-10-31):
 
-- **downlords-faf-client.** Implement a second `IceAdapter` (`fa/relay/ice/IceAdapter.java`), chosen by a preference.
+- **downlords-faf-client.** Implement a second `IceAdapter` (`fa/relay/ice/IceAdapter.java`), chosen per game (#3590 picks it for `fafdevelop` with our exe).
   - Its `start` opens the GPGNet listener and returns its port. `LaunchCommandBuilder` already writes `/gpgnet` from that port; add `/nativenet` beside it.
   - Move the lobby subscriptions in `IceAdapterImpl.java:81-111` behind the choice, so only one implementation forwards.
   - The client has no GPGNet codec today, so one is needed. The adapter jar's `GPGNetServer` is the reference; `tools/gpgnet/codec.go` in this repository is another.
