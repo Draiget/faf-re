@@ -24,6 +24,14 @@ class wxMouseEvent;
 
 namespace moho
 {
+  /**
+   * Engine addition: when set, the viewport leaves the keyboard focus where it is as the mouse leaves it, instead
+   * of giving it to the second head's window (OnMouseLeave). The map editor sets it while it draws the view into
+   * its panels' window, the second head: the real cursor is then never over the viewport's own window, so the
+   * game saw the mouse leave all the time and the keys went to the panels. Off, as in retail, by default.
+   */
+  extern bool gViewportLeaveKeepsFocus;
+
   class CD3DDepthStencil;
   class CD3DDynamicTextureSheet;
   class CD3DPrimBatcher;

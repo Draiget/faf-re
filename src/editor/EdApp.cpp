@@ -201,6 +201,12 @@ namespace faf::editor
             }
             if (message == WM_MOUSEMOVE && ImGui::GetCurrentContext() != nullptr) {
               (void)ImGui_ImplWin32_WndProcHandler(window, message, wParam, lParam);
+              // The keyboard goes where the mouse is, as in Blender: over the view, WASD and the tools' keys are
+              // the view's without a click first (not while a text field of the panels is being typed in).
+              const HWND focus = ::GetFocus();
+              if ((focus == window || focus == ::GetAncestor(window, GA_ROOT)) && !ImGui::GetIO().WantTextInput) {
+                ::SetFocus(gViewWindow);
+              }
             }
             if (message == WM_LBUTTONDOWN || message == WM_RBUTTONDOWN || message == WM_MBUTTONDOWN) {
               ::SetFocus(gViewWindow);
@@ -409,6 +415,8 @@ namespace faf::editor
       bool mViewStepsAside = false;
       /** The popups' rectangles (view pixels) the view's window region leaves out, as last set. */
       std::vector<RECT> mViewHoles;
+      /** Frames run, for the stall line (the first ones load and are slow on purpose). */
+      std::uint64_t mFramesRun = 0;
       /** The game's head copied for the panels (CopyGameView), and its image for the draw lists. */
       void CopyGameView();
       [[nodiscard]] bool mViewStepsAsideForDialog() const
@@ -542,8 +550,12 @@ namespace faf::editor
         memtrace::Start();
       }
       // `/logtimes <file>`: every log line with its time, for timing a play's start.
+      // Without it, the same goes to editor_log.txt in the settings folder, so a freeze or a crash a user reports has a
+      // log with times to read (a run from the IDE passes no /log).
       if (fa::vector<fa::string> args; moho::CFG_GetArgOption("/logtimes", 1, &args) && !args.empty()) {
         mLog.WriteTimesTo(args[0].c_str());
+      } else if (const std::filesystem::path folder = EditorSettingsFolder(); !folder.empty()) {
+        mLog.WriteTimesTo((folder / "editor_log.txt").string());
       }
       // Each play's rules (every blueprint) are kept for the next play with the same mods.
       moho::RULE_SetKeepBetweenSessions(true);
@@ -933,6 +945,12 @@ namespace faf::editor
       // The opened map in the viewport while no play runs (a play's start sets the state off Inactive at once).
       const auto now = std::chrono::steady_clock::now();
       const float frameSeconds = std::chrono::duration<float>(now - mLastFrame).count();
+      // A stall: the lines before this one in the log say what the editor was doing.
+      if (frameSeconds > 0.33f && mFramesRun > 120) {
+        gpg::Warnf("editor: the editor stopped for %.2f s (frame %llu)", static_cast<double>(frameSeconds),
+                   static_cast<unsigned long long>(mFramesRun));
+      }
+      ++mFramesRun;
       mLastFrame = now;
       mScene.Update(frameSeconds, moho::WLD_GetFrameAction() == moho::EWldFrameAction::Inactive);
 
@@ -1113,6 +1131,9 @@ namespace faf::editor
         gComposite = false;
         gpg::Logf("editor: /nocomposite: the 3D view shows through its own window");
       }
+      // Composited, the cursor is never over the viewport's own window: the keys stay the view's when the game
+      // thinks the mouse left it (user report: WASD didn't move the camera).
+      moho::gViewportLeaveKeepsFocus = gComposite;
       mFafLoginArg = moho::CFG_GetArgOption("/faflogin", 0, nullptr);
       if (fa::vector<fa::string> query; moho::CFG_GetArgOption("/vaultquery", 1, &query) && !query.empty()) {
         mVaultQueryArg = query[0].c_str();

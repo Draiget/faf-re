@@ -34,6 +34,8 @@ namespace
 }
 
 
+bool moho::gViewportLeaveKeepsFocus = false;
+
 // ---------------------------------------------------------------------------
 // WRenViewport construction
 // ---------------------------------------------------------------------------
@@ -233,7 +235,7 @@ void moho::WRenViewport::OnMouseLeave(wxMouseEvent& event)
 {
   (void)event;
 
-  if (!gpg::gal::Device::IsReady()) {
+  if (!gpg::gal::Device::IsReady() || gViewportLeaveKeepsFocus) {
     return;
   }
 

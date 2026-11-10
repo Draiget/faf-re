@@ -1021,7 +1021,7 @@ namespace faf::editor
     const int columns = std::max(1, static_cast<int>((ImGui::GetContentRegionAvail().x + ImGui::GetStyle().ItemSpacing.x) /
                                                      (cardW + ImGui::GetStyle().ItemSpacing.x)));
     const bool working = mDownload.GetState() == EdVaultDownload::State::Working;
-    if (!mFound.empty() && ImGui::BeginChild("##vaultcards", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None)) {
+    if (!mFound.empty() && ImGui::BeginChild("##vaultcards", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
       if (ImGui::BeginTable("##vaultgrid", columns, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_PadOuterX)) {
         for (std::size_t i = 0; i < mFound.size(); ++i) {
           const VaultMap& map = mFound[i];

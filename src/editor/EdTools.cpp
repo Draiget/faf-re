@@ -189,7 +189,10 @@ namespace faf::editor
   {
     DrawStrip();
     ImGui::SameLine();
-    if (ImGui::BeginChild("##toolsettings", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None)) {
+    // The scrollbar always has its room: the symmetry tiles take their height from the width, so a scrollbar that
+    // came and went with the content's height flipped every frame (narrower, shorter, no scrollbar; wider, taller,
+    // a scrollbar again; user report).
+    if (ImGui::BeginChild("##toolsettings", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
       ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.67f, 0.70f, 0.74f, 1.0f));
       ImGui::TextUnformatted(kTools[mTool].name);
       ImGui::PopStyleColor();
