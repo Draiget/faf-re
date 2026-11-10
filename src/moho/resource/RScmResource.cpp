@@ -10,6 +10,7 @@
 #include <thread>
 #include <typeinfo>
 
+#include "moho/console/CConCommand.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -100,6 +101,10 @@ namespace moho
   {
     bool gKeepGeometry = true;
 
+    /// Engine addition: the switch behind PeekSkeletonEnabled. On, bone lookups
+    /// take the raw pointer; off, they take the shared handle GetSkeleton returns.
+    bool gPeekSkeleton = true;
+
     void DeleteTrimmedScmFile(const SScmFile* const file) noexcept
     {
       delete[] reinterpret_cast<const char*>(file);
@@ -115,6 +120,22 @@ namespace moho
   {
     return gKeepGeometry;
   }
+
+  bool RScmResource::PeekSkeletonEnabled() noexcept
+  {
+    return gPeekSkeleton;
+  }
+
+  /**
+   * Engine addition: /con sim_PeekSkeleton=0 brings back the original path, which
+   * builds a shared handle per lookup. Both paths read the same skeleton, so the
+   * switch changes only how the pointer is obtained, never what the sim computes.
+   */
+  TConVar<bool> gTConVar_sim_PeekSkeleton(
+    "sim_PeekSkeleton",
+    "Bone lookups take the skeleton pointer without building a shared handle (same bones).",
+    &gPeekSkeleton
+  );
 
   void RScmResource::DropGeometry()
   {

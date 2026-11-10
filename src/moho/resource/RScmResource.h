@@ -120,6 +120,12 @@ namespace moho
     static void SetKeepGeometry(bool keep) noexcept;
     [[nodiscard]] static bool KeepGeometry() noexcept;
     /**
+     * Engine addition: whether bone lookups take `PeekSkeleton` (on, the default) or
+     * the shared handle `GetSkeleton` returns (off, the original path). Both give the
+     * same bones, so the switch only chooses how the pointer is obtained.
+     */
+    [[nodiscard]] static bool PeekSkeletonEnabled() noexcept;
+    /**
      * Engine addition: builds the skeleton (its bone bounds need the vertices), then keeps only the
      * file's start, with the header, the bone names and the bones. Called while no one else holds
      * the skeleton yet. A file whose vertices or indices come before its bones stays whole.

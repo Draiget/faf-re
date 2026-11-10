@@ -18,6 +18,24 @@ namespace moho
 namespace
 {
   constexpr std::uint32_t kEntityAttributeRangeMask = 0x7FFFFFFFu;
+
+  /**
+   * Engine addition: the skeleton pointer a bone lookup needs, by whichever route
+   * `sim_PeekSkeleton` selects. On, `PeekSkeleton` returns it without building a
+   * shared handle; off, the original path builds one and drops it at once. Both
+   * read the same skeleton, so the two settings compute the same bones.
+   */
+  [[nodiscard]] const moho::CAniSkel* ReadSkeleton(moho::RScmResource* const resource) noexcept
+  {
+    if (resource == nullptr) {
+      return nullptr;
+    }
+    if (moho::RScmResource::PeekSkeletonEnabled()) {
+      return resource->PeekSkeleton();
+    }
+    return resource->GetSkeleton().get();
+  }
+
   constexpr std::uint32_t kEntityAttributeEnabledMask = 0x80000000u;
 
   [[nodiscard]] constexpr std::uint32_t EncodeIntelRangeLane(const std::uint32_t range) noexcept
@@ -1775,7 +1793,7 @@ namespace
       return 0;
     }
 
-    const CAniSkel* const skel = scmResource->PeekSkeleton();
+    const CAniSkel* const skel = ReadSkeleton(scmResource);
     if (skel == nullptr) {
       return 0;
     }
@@ -1797,7 +1815,7 @@ namespace
       return nullptr;
     }
 
-    const CAniSkel* const skel = scmResource->PeekSkeleton();
+    const CAniSkel* const skel = ReadSkeleton(scmResource);
     if (skel == nullptr) {
       return nullptr;
     }
@@ -1854,7 +1872,7 @@ namespace
       return -1;
     }
 
-    const CAniSkel* const skel = scmResource->PeekSkeleton();
+    const CAniSkel* const skel = ReadSkeleton(scmResource);
     if (skel == nullptr) {
       return -1;
     }
@@ -2189,7 +2207,7 @@ namespace
   {
     if (boneIndex >= 0) {
       if (RScmResource* const scmResource = mVarDat.mScmResource.get(); scmResource != nullptr) {
-        const CAniSkel* const skeleton = scmResource->PeekSkeleton();
+        const CAniSkel* const skeleton = ReadSkeleton(scmResource);
         if (skeleton != nullptr) {
           const SAniSkelBone* const bone = skeleton->GetBone(static_cast<std::uint32_t>(boneIndex));
           if (bone != nullptr) {
