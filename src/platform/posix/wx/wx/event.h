@@ -28,6 +28,15 @@ enum
   wxEVT_MIDDLE_DCLICK = wxEVT_FIRST + 110,
   wxEVT_RIGHT_DCLICK = wxEVT_FIRST + 111,
   wxEVT_MOUSEWHEEL = wxEVT_FIRST + 115,
+  wxEVT_SET_FOCUS = wxEVT_FIRST + 112,
+  wxEVT_KILL_FOCUS = wxEVT_FIRST + 113,
+
+  wxEVT_SIZE = wxEVT_FIRST + 400,
+  wxEVT_MOVE = wxEVT_FIRST + 401,
+  wxEVT_CLOSE_WINDOW = wxEVT_FIRST + 402,
+  wxEVT_ACTIVATE = wxEVT_FIRST + 409,
+  wxEVT_PAINT = wxEVT_FIRST + 416,
+  wxEVT_ERASE_BACKGROUND = wxEVT_FIRST + 417,
 
   wxEVT_CHAR = wxEVT_FIRST + 212,
   wxEVT_CHAR_HOOK = wxEVT_FIRST + 213,
@@ -62,6 +71,9 @@ public:
   void SetId(const int id) { m_id = id; }
   void Skip(const bool skip = true) { m_skipped = skip; }
   bool GetSkipped() const { return m_skipped; }
+  // wx 2.4.2 queues copies of events posted across threads; the stand-in only dispatches
+  // directly, so no copy is ever made.
+  virtual wxEvent* Clone() const { return nullptr; }
 
   wxObject* m_eventObject = nullptr;
   wxEventType m_eventType = wxEVT_NULL;
@@ -165,10 +177,83 @@ public:
   int m_linesPerAction = 0;
 };
 
+class wxDC;
+
+// The window events the application shell handles. The window system (issue #256) sends them.
+class wxPaintEvent : public wxEvent
+{
+public:
+  explicit wxPaintEvent(const int id = 0)
+    : wxEvent(id, wxEVT_PAINT)
+  {}
+};
+
+class wxEraseEvent : public wxEvent
+{
+public:
+  explicit wxEraseEvent(const int id = 0, wxDC* const dc = nullptr)
+    : wxEvent(id, wxEVT_ERASE_BACKGROUND)
+    , m_dc(dc)
+  {}
+
+  wxDC* GetDC() const { return m_dc; }
+
+  wxDC* m_dc = nullptr;
+};
+
+class wxSizeEvent : public wxEvent
+{
+public:
+  wxSizeEvent() : wxEvent(0, wxEVT_SIZE) {}
+  wxSizeEvent(const int width, const int height, const int id = 0)
+    : wxEvent(id, wxEVT_SIZE)
+    , m_width(width)
+    , m_height(height)
+  {}
+
+  int m_width = 0;
+  int m_height = 0;
+};
+
+class wxMoveEvent : public wxEvent
+{
+public:
+  wxMoveEvent() : wxEvent(0, wxEVT_MOVE) {}
+  wxMoveEvent(const int x, const int y, const int id = 0)
+    : wxEvent(id, wxEVT_MOVE)
+    , m_x(x)
+    , m_y(y)
+  {}
+
+  int m_x = 0;
+  int m_y = 0;
+};
+
+class wxCloseEvent : public wxEvent
+{
+public:
+  explicit wxCloseEvent(const wxEventType type = wxEVT_CLOSE_WINDOW, const int id = 0)
+    : wxEvent(id, type)
+  {}
+
+  void SetCanVeto(const bool canVeto) { m_canVeto = canVeto; }
+  bool CanVeto() const { return m_canVeto; }
+  void Veto(const bool veto = true) { m_veto = veto; }
+  bool GetVeto() const { return m_veto; }
+
+  bool m_canVeto = true;
+  bool m_veto = false;
+};
+
 typedef void (wxObject::*wxObjectEventFunction)(wxEvent&);
 typedef void (wxEvtHandler::*wxEventFunction)(wxEvent&);
 typedef void (wxEvtHandler::*wxCharEventFunction)(wxKeyEvent&);
 typedef void (wxEvtHandler::*wxMouseEventFunction)(wxMouseEvent&);
+typedef void (wxEvtHandler::*wxPaintEventFunction)(wxPaintEvent&);
+typedef void (wxEvtHandler::*wxEraseEventFunction)(wxEraseEvent&);
+typedef void (wxEvtHandler::*wxSizeEventFunction)(wxSizeEvent&);
+typedef void (wxEvtHandler::*wxMoveEventFunction)(wxMoveEvent&);
+typedef void (wxEvtHandler::*wxCloseEventFunction)(wxCloseEvent&);
 
 struct wxEventTableEntry
 {
@@ -256,6 +341,12 @@ protected:                                                 \
 #define EVT_LEAVE_WINDOW(func) wxFAF_EVT_ENTRY(wxEVT_LEAVE_WINDOW, wxMouseEventFunction, func)
 #define EVT_ENTER_WINDOW(func) wxFAF_EVT_ENTRY(wxEVT_ENTER_WINDOW, wxMouseEventFunction, func)
 #define EVT_MOUSEWHEEL(func) wxFAF_EVT_ENTRY(wxEVT_MOUSEWHEEL, wxMouseEventFunction, func)
+
+#define EVT_PAINT(func) wxFAF_EVT_ENTRY(wxEVT_PAINT, wxPaintEventFunction, func)
+#define EVT_ERASE_BACKGROUND(func) wxFAF_EVT_ENTRY(wxEVT_ERASE_BACKGROUND, wxEraseEventFunction, func)
+#define EVT_SIZE(func) wxFAF_EVT_ENTRY(wxEVT_SIZE, wxSizeEventFunction, func)
+#define EVT_MOVE(func) wxFAF_EVT_ENTRY(wxEVT_MOVE, wxMoveEventFunction, func)
+#define EVT_CLOSE(func) wxFAF_EVT_ENTRY(wxEVT_CLOSE_WINDOW, wxCloseEventFunction, func)
 
 // wx 2.4.2: the thirteen mouse event types, all to one sink.
 #define EVT_MOUSE_EVENTS(func)  \

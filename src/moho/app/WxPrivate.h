@@ -18,7 +18,10 @@
 #include <new>
 #include <string>
 
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if defined(_WIN32)
 #include <d3d9.h>
+#endif
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
@@ -26,7 +29,10 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/RenderProfiler.h"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if defined(_WIN32)
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#endif
 #include "moho/console/CConCommand.h"
 #include "moho/effects/rendering/SEfxCurve.h"
 #include "moho/mesh/Mesh.h"

@@ -17,13 +17,16 @@ set(_faf_client_windows_only
   "^gpg/gal/(DxgiAdapterInfo|D3DErrorToString|D3DErrorToWideString)\\.cpp$"
   "^gpg/gal/backends/common/WindowsCursor\\.cpp$"
   "^moho/movie/sfd/DirectSoundMovieSink\\.cpp$"
+  # The Win32 crash dialog; gpg/core/diagnostics/posix/DiagnosticsPosix.cpp has the POSIX one.
+  "^gpg/core/diagnostics/CrashReportDialog\\.cpp$"
   # faf_sim compiles its own copy (cmake/FafLinux.cmake).
   "^gpg/gal/MatrixPortable\\.cpp$"
   # wxWindows 2.4.2 has no Linux port; the wx stand-in (src/platform/posix/wx) covers only what
   # the game code uses. Left out until their own issues land:
-  #   the application shell - wx app and main loop, main frame, viewports, splash and
-  #   resolution switching (issue #256, SDL3);
-  "^moho/app/(WinMain|WinApp|CScApp|WxAppWindows|WSupComFrame|WD3DViewport|WRenViewport|ResolutionCommands)\\.cpp$"
+  #   the Windows entry point and process setup (WinMain, WinApp: crash handler, clipboard,
+  #   splash, wx start) and the wx dialogs; the Linux entry point is issue #256 (SDL3). The main
+  #   frame, the viewports and CScApp build over the wx stand-in.
+  "^moho/app/(WinMain|WinApp|WxAppWindows)\\.cpp$"
   #   the wx script debugger (issue #260);
   "^moho/misc/(ScrDebugWindow|ScrFileCtrl|ScrSourceCtrl|ScrWatchCtrl|ScrGotoDialog|ScrPauseEvent|TreeData)\\.cpp$"
   #   the developer windows and Windows desktop features: emitter editor, log window,
@@ -67,6 +70,8 @@ endif()
 
 # The part of wxWindows 2.4.2 the game code uses (src/platform/posix/wx/wx/defs.h).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/wx/WxStandIn.cpp")
+# The Win32 window, cursor and key-state calls the UI code makes (platform/posix/win32/Windows.h).
+list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32WindowPosix.cpp")
 
 add_library(faf_client_objs OBJECT ${_faf_client_files})
 target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd)

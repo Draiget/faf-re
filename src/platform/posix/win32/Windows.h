@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <cwchar>
@@ -730,6 +731,65 @@ inline int* _errno() noexcept
 {
   return &errno;
 }
+
+// The MSVC CRT's getenv_s: *required is the value's length with its terminator, 0 when the
+// variable is unset (the buffer then holds ""); ERANGE when the buffer is too small for it. A null
+// buffer with size 0 only asks for the length.
+inline int getenv_s(std::size_t* const required, char* const buffer, const std::size_t size, const char* const name) noexcept
+{
+  const char* const value = name != nullptr ? std::getenv(name) : nullptr;
+  if (value == nullptr) {
+    if (required != nullptr) {
+      *required = 0;
+    }
+    if (buffer != nullptr && size > 0u) {
+      buffer[0] = '\0';
+    }
+    return 0;
+  }
+  const std::size_t needed = std::strlen(value) + 1u;
+  if (required != nullptr) {
+    *required = needed;
+  }
+  if (buffer == nullptr && size == 0u) {
+    return 0;
+  }
+  if (buffer == nullptr || size < needed) {
+    if (buffer != nullptr && size > 0u) {
+      buffer[0] = '\0';
+    }
+    return ERANGE;
+  }
+  std::memcpy(buffer, value, needed);
+  return 0;
+}
+
+// --- Windows, cursor and keyboard state (WinUser.h) for the Linux client (issue #255) ---------
+// The client's UI code works with window handles: it reads and moves the cursor, captures the
+// mouse during drags, measures the main window and asks for key states. On Linux a window handle
+// is the window system's own (issue #256, SDL3), and src/platform/posix/Win32WindowPosix.cpp
+// answers these calls from what that system reports. Only the client links that file; the
+// simulation never calls them.
+using SHORT = std::int16_t;
+using USHORT = std::uint16_t;
+using HCURSOR = void*;
+using HICON = void*;
+using HMONITOR = void*;
+using HMENU = void*;
+
+BOOL GetCursorPos(POINT* point);
+BOOL SetCursorPos(int x, int y);
+BOOL GetWindowRect(HWND window, RECT* rect);
+BOOL GetClientRect(HWND window, RECT* rect);
+BOOL ScreenToClient(HWND window, POINT* point);
+BOOL ClientToScreen(HWND window, POINT* point);
+HWND SetCapture(HWND window);
+BOOL ReleaseCapture();
+HWND GetCapture();
+SHORT GetKeyState(int virtualKey);
+SHORT GetAsyncKeyState(int virtualKey);
+HCURSOR SetCursor(HCURSOR cursor);
+int ShowCursor(BOOL show);
 
 // Virtual-key codes (WinUser.h), with their Windows values: the client's key bindings
 // convert wx key codes to and from them (wxCharCodeWXToMSW, issue #255).

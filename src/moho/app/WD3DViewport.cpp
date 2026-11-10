@@ -157,6 +157,7 @@ void moho::WD3DViewport::PaintWithoutMessage()
   D3D_GetDevice()->Paint();
 }
 
+#if defined(_WIN32)
 namespace
 {
   constexpr std::uint16_t kClientHitTestCode = HTCLIENT;
@@ -236,3 +237,4 @@ long moho::WD3DViewport::MSWWindowProc(
 
   return wxWindow::MSWWindowProc(message, wParam, lParam);
 }
+#endif // defined(_WIN32)

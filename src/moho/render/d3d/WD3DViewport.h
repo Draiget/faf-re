@@ -120,8 +120,13 @@ namespace moho
      * What it does:
      * Answers WM_SETCURSOR over the client area itself, handing the cursor to
      * the D3D device; every other message goes to `wxWindow::MSWWindowProc`.
+     *
+     * Windows only: on Linux the window system (issue #256) delivers the cursor, the network
+     * panel's keys and the side mouse buttons itself.
      */
+#if defined(_WIN32)
     long MSWWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override;
+#endif
 
     /**
      * Address: 0x00430AC0 (FUN_00430AC0)

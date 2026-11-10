@@ -27,6 +27,9 @@
  */
 #include "platform/WxWidgets.h"
 #include <wx/wx.h>
+// The Linux client (issue #255) builds the frame, the application and the log target below over
+// the wx stand-in (src/platform/posix/wx); the developer windows need the real library.
+#if defined(_WIN32)
 #include <wx/bmpbuttn.h>
 #include <wx/dcclient.h>
 #include <wx/ffile.h>
@@ -40,6 +43,7 @@
 #include <wx/stream.h>
 #include <wx/treectrl.h>
 #include <wx/wfstream.h>
+#endif
 
 // The binary agrees with wx/gdicmn.h: wxWindow::Refresh (0x00968350) reads a
 // wxRect as {x, y, width, height}, and wxApp::Initialize (0x009927E0)
@@ -113,7 +117,9 @@ public:
    * priming and Alt-menu suppression, then forwards other lanes to base wx
    * default window-proc dispatch.
    */
+#if defined(_WIN32)
   long MSWDefWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override;
+#endif
 
   /**
    * Address: 0x008CDD40 (FUN_008CDD40, WSupComFrame::MSWWindowProc)
@@ -123,8 +129,13 @@ public:
    * Handles SupCom frame resize/maximize/app-activation/system-command
    * routing, updates persisted window prefs, and forwards unhandled messages
    * to base frame dispatch.
+   *
+   * Windows only, as MSWDefWindowProc: on Linux the window system (issue #256) reports the
+   * frame's size, activation and closing.
    */
+#if defined(_WIN32)
   long MSWWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override;
+#endif
 
   std::uint8_t mUnknown178;
   std::uint8_t mPendingMaximizeSync;
@@ -518,6 +529,10 @@ namespace moho
       m_keepGoing = TRUE;
     }
   };
+
+#if defined(_WIN32)
+  // The developer windows (bitmap panel and check box, input box, managed dialogs, log window):
+  // not in the Linux client (issue #255).
 
   /**
    * A panel that tiles a bitmap across itself on erase-background.
@@ -937,6 +952,8 @@ namespace moho
     offsetof(WWinLogWindow, mPendingOutput) == 0x1CC,
     "moho::WWinLogWindow::mPendingOutput must follow the binary's 0x1CC-byte object"
   );
+
+#endif // defined(_WIN32): the developer windows
 
   /**
    * A frame the engine keeps a weak reference to in `managedFrames`, so

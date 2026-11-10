@@ -36,7 +36,9 @@
 #include "moho/animation/CAniSkel.h"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Set.h"
-#include "moho/app/WEmitterWx.h"
+#if defined(_WIN32)
+#include "moho/app/WEmitterWx.h"  // the emitter editor: Windows only (issue #255)
+#endif
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/audio/CUserSoundManager.h"
@@ -2166,6 +2168,11 @@ void moho::CON_mesh_Rebatch(const fa::vector<fa::string>& args)
  */
 void moho::EFX_CreateEmitterWindow(const fa::vector<fa::string>& args)
 {
+#if !defined(_WIN32)
+  // The emitter editor is a wx window, which the Linux client doesn't build (issue #255).
+  (void)args;
+  gpg::Warnf("EFX_CreateEmitterWindow: the emitter editor is not available in the Linux client");
+#else
   // The editor is held through a weak pointer for the Show call; the
   // WeakPtr<WWinManagedFrame> Set emission is 0x0066A2A0.
   WeakPtr<WWinManagedFrame> editor;
@@ -2183,6 +2190,7 @@ void moho::EFX_CreateEmitterWindow(const fa::vector<fa::string>& args)
       : new WEmitterWx(nullptr, spawnPosition, nullptr)
   );
   editor.GetObjectPtr()->Show(true);
+#endif
 }
 
 

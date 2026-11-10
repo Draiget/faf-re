@@ -6,8 +6,15 @@
 #include <Windows.h>
 
 #include <wx/app.h>
+#include <wx/dc.h>
 #include <wx/event.h>
+#include <wx/frame.h>
+#include <wx/string.h>
 #include <wx/window.h>
+
+static wxBrush sBlackBrush;
+wxBrush* wxBLACK_BRUSH = &sBlackBrush;
+wxBrush wxNullBrush;
 
 // --- Event tables --------------------------------------------------------------------------
 
@@ -136,6 +143,47 @@ int wxMouseEvent::GetButton() const
 
 // --- Windows ---------------------------------------------------------------------------------
 
+const wxPoint wxDefaultPosition(-1, -1);
+const wxSize wxDefaultSize(-1, -1);
+
+wxWindow::wxWindow(
+  wxWindow* const parent,
+  const wxWindowID id,
+  const wxPoint& pos,
+  const wxSize& size,
+  const long style,
+  const wchar_t* const name
+)
+  : m_parent(parent)
+{
+  (void)id;
+  (void)style;
+  (void)name;
+  m_screenX = pos.x < 0 ? 0 : pos.x;
+  m_screenY = pos.y < 0 ? 0 : pos.y;
+  m_clientWidth = size.x < 0 ? 0 : size.x;
+  m_clientHeight = size.y < 0 ? 0 : size.y;
+}
+
+bool wxWindow::Destroy()
+{
+  delete this;
+  return true;
+}
+
+bool wxWindow::Show(const bool show)
+{
+  const bool changed = m_shown != show;
+  m_shown = show;
+  return changed;
+}
+
+void wxWindow::SetSize(const int width, const int height)
+{
+  m_clientWidth = width;
+  m_clientHeight = height;
+}
+
 wxWindow::~wxWindow()
 {
   // wx 2.4.2 deletes the handlers still pushed onto a window it destroys.
@@ -240,8 +288,11 @@ void wxApp::Dispatch() {}
 
 void wxApp::ExitMainLoop()
 {
-  m_exitRequested = true;
+  m_keepGoing = FALSE;
 }
+
+const wxString wxEmptyString;
+const wchar_t* wxFrameNameStr = L"frame";
 
 wxPoint wxGetMousePosition()
 {

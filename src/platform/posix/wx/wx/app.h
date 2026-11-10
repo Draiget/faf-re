@@ -1,8 +1,9 @@
 #pragma once
 
-// Engine addition (issue #255): the part of wx 2.4.2's wxApp (wx/app.h) the Linux client's game
-// code uses: the global application, its pending-event pump and the request to leave the main
-// loop. See wx/defs.h in this folder. The window system (issue #256) supplies the events.
+// Engine addition (issue #255): the part of wx 2.4.2's wxApp (wx/app.h) the Linux client uses:
+// the global application, its start hook, its pending-event pump and the keep-going flag the
+// main loop reads. See wx/defs.h in this folder. The window system (issue #256) supplies the
+// events.
 
 #include <wx/event.h>
 
@@ -12,17 +13,18 @@ public:
   wxApp();
   ~wxApp() override;
 
+  // Called once the application object exists, before the engine's own loop starts.
+  virtual bool OnInit() { return true; }
   // True while the window system has events queued.
   virtual bool Pending();
   // Delivers one queued event.
   virtual void Dispatch();
-  // Asks the main loop to return.
+  // Asks the main loop to return: clears m_keepGoing, as wx 2.4.2 does.
   virtual void ExitMainLoop();
 
-  bool IsMainLoopRunning() const { return !m_exitRequested; }
-
 protected:
-  bool m_exitRequested = false;
+  // wx 2.4.2 wxApp::m_keepGoing: the main loop runs while it is set.
+  int m_keepGoing = TRUE;
 };
 
 extern wxApp* wxTheApp;

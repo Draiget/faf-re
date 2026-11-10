@@ -57,6 +57,9 @@ public:
   }
 };
 
+extern const wxPoint wxDefaultPosition;
+extern const wxSize wxDefaultSize;
+
 /**
  * The mouse position in screen coordinates. The window system (issue #256) keeps it current;
  * until then it is (0, 0).
