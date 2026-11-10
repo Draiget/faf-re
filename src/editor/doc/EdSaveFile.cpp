@@ -315,6 +315,18 @@ namespace faf::editor
     return "STRING( " + Quote(text) + " )";
   }
 
+  std::string FloatValue(const double value)
+  {
+    char text[64];
+    (void)std::snprintf(text, sizeof(text), "FLOAT( %.6f )", value);
+    return text;
+  }
+
+  std::string BooleanValue(const bool value)
+  {
+    return value ? "BOOLEAN( true )" : "BOOLEAN( false )";
+  }
+
   bool SaveFile::Parse(std::string text, std::string& error)
   {
     mText = std::move(text);

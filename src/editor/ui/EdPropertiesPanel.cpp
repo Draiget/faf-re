@@ -1,11 +1,18 @@
 // The Properties panel (View > Properties): the selected marker, unit, prop or decal, by kind, Blender-style -- a
 // header with its kind and name, its transform as labelled rows, then what its kind has.
 
+#include <cctype>
+#include <cstdint>
 #include <cstdio>
+#include <vector>
+#include <cstdlib>
+#include <cmath>
+#include <algorithm>
 #include <cstring>
 #include <string>
 
 #include "editor/EdShell.h"
+#include "editor/doc/EdSaveFile.h"
 #include "editor/ui/EdHelp.h"
 #include "imgui.h"
 
@@ -77,6 +84,43 @@ namespace faf::editor
       mTools.AskPropertyEdit(change);
     };
 
+    // A picture first where the game has one: a unit's build icon, a decal's own texture.
+    {
+      std::string picture;
+      if (now.kind == SelectionProperties::Kind::Unit && !now.type.empty()) {
+        std::string id = now.type;
+        for (char& c : id) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        picture = "/textures/ui/common/icons/units/" + id + "_icon.dds";
+      } else if (now.kind == SelectionProperties::Kind::Decal && !now.type.empty()) {
+        picture = now.type;
+      }
+      if (!picture.empty()) {
+        mTools.Library().Pump(2);
+        const float side = ImGui::GetFrameHeight() * 2.6f;
+        const std::uint64_t image = mTools.Library().Thumbnail(picture, true);
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        if (image != 0U) {
+          ImGui::Image(static_cast<ImTextureID>(image), ImVec2(side, side));
+        } else {
+          ImGui::Dummy(ImVec2(side, side));
+          ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + side, at.y + side), IM_COL32(58, 65, 75, 255), 4.0f);
+        }
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        if (now.kind == SelectionProperties::Kind::Unit) {
+          const std::string title = mTools.UnitTypeName(now.type);
+          ImGui::TextUnformatted(title.empty() ? now.type.c_str() : title.c_str());
+          ImGui::TextDisabled("%s  |  %s", now.type.c_str(), now.owner.c_str());
+        } else {
+          const std::size_t slash = now.type.find_last_of('/');
+          ImGui::TextUnformatted(slash == std::string::npos ? now.type.c_str() : now.type.c_str() + slash + 1);
+          ImGui::TextDisabled("%.0f x %.0f", static_cast<double>(now.size[0]), static_cast<double>(now.size[1]));
+        }
+        ImGui::EndGroup();
+      }
+    }
     // The header: its kind as a chip, its name (a marker's can be renamed), how many more are selected.
     {
       const ImVec4 colour = KindColour(now.kind);
@@ -159,7 +203,7 @@ namespace faf::editor
       if (ImGui::CollapsingHeader("Marker", ImGuiTreeNodeFlags_DefaultOpen)) {
         row("Type");
         ImGui::TextUnformatted(now.type.c_str());
-        // Its other fields as `_save.lua` writes them; Enter applies one.
+        // Each field edited as its value: a number, a tick, a colour, a vector or text; written back in the save's form.
         mPropertiesFields.resize(now.fields.size());
         for (std::size_t i = 0; i < now.fields.size(); ++i) {
           const auto& [key, value] = now.fields[i];
@@ -168,16 +212,73 @@ namespace faf::editor
           }
           ImGui::PushID(static_cast<int>(i));
           row(key.c_str());
-          char buffer[512];
-          (void)std::snprintf(buffer, sizeof(buffer), "%s", mPropertiesFields[i].c_str());
-          if (ImGui::InputText("##field", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue) && value != buffer) {
-            PropertyEdit change;
-            change.what = PropertyEdit::What::Field;
-            change.key = key;
-            change.value = buffer;
-            mTools.AskPropertyEdit(change);
+          const auto ask = [&](const std::string& written) {
+            if (written != value) {
+              PropertyEdit change;
+              change.what = PropertyEdit::What::Field;
+              change.key = key;
+              change.value = written;
+              mTools.AskPropertyEdit(change);
+            }
+          };
+          std::string& held = mPropertiesFields[i];
+          if (held.rfind("FLOAT(", 0) == 0) {
+            const std::vector<double> numbers = ValueNumbers(held);
+            float number = numbers.empty() ? 0.0f : static_cast<float>(numbers.front());
+            if (ImGui::DragFloat("##float", &number, 0.1f, 0.0f, 0.0f, "%.2f")) {
+              held = FloatValue(number);
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+              ask(held);
+            }
+          } else if (held.rfind("BOOLEAN(", 0) == 0) {
+            bool on = held.find("true") != std::string::npos;
+            if (ImGui::Checkbox("##bool", &on)) {
+              held = BooleanValue(on);
+              ask(held);
+            }
+          } else if (held.rfind("VECTOR3(", 0) == 0) {
+            const std::vector<double> numbers = ValueNumbers(held);
+            float v[3] = {0.0f, 0.0f, 0.0f};
+            for (std::size_t n = 0; n < 3 && n < numbers.size(); ++n) {
+              v[n] = static_cast<float>(numbers[n]);
+            }
+            if (ImGui::DragFloat3("##vector", v, 0.1f, 0.0f, 0.0f, "%.2f")) {
+              held = Vector3Value(v[0], v[1], v[2]);
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+              ask(held);
+            }
+          } else if (held.rfind("STRING(", 0) == 0 && key == "color" && ValueString(held).size() == 8) {
+            // A colour: the save's `aarrggbb` hex.
+            const unsigned long argb = std::strtoul(ValueString(held).c_str(), nullptr, 16);
+            float colour[4] = {static_cast<float>((argb >> 16) & 0xFF) / 255.0f, static_cast<float>((argb >> 8) & 0xFF) / 255.0f,
+                               static_cast<float>(argb & 0xFF) / 255.0f, static_cast<float>((argb >> 24) & 0xFF) / 255.0f};
+            if (ImGui::ColorEdit4("##colour", colour, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_DisplayHex)) {
+              const auto byte = [](const float c) { return static_cast<unsigned>(std::lround(std::clamp(c, 0.0f, 1.0f) * 255.0f)); };
+              char hex[16];
+              (void)std::snprintf(hex, sizeof(hex), "%02x%02x%02x%02x", byte(colour[3]), byte(colour[0]), byte(colour[1]), byte(colour[2]));
+              held = StringValue(hex);
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit()) {
+              ask(held);
+            }
+          } else if (held.rfind("STRING(", 0) == 0) {
+            char buffer[512];
+            (void)std::snprintf(buffer, sizeof(buffer), "%s", ValueString(held).c_str());
+            if (ImGui::InputText("##text", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
+              ask(StringValue(buffer));
+            }
+            held = StringValue(buffer);
+          } else {
+            // Anything else as the save writes it.
+            char buffer[512];
+            (void)std::snprintf(buffer, sizeof(buffer), "%s", held.c_str());
+            if (ImGui::InputText("##raw", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
+              ask(buffer);
+            }
+            held = buffer;
           }
-          mPropertiesFields[i] = buffer;
           active = active || ImGui::IsItemActive();
           ImGui::PopID();
         }

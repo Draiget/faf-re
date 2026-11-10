@@ -216,6 +216,18 @@ namespace faf::editor
     /** The unit blueprints the rules have: id and name. */
     void SetUnitTypes(std::vector<std::pair<std::string, std::string>> types) { mUnitTypes = std::move(types); }
     [[nodiscard]] bool HasUnitTypes() const noexcept { return !mUnitTypes.empty(); }
+    /** A unit blueprint's name ("Mass Extractor"), or "" when the rules don't have it. */
+    [[nodiscard]] std::string UnitTypeName(const std::string& id) const
+    {
+      for (const auto& [type, name] : mUnitTypes) {
+        if (type.size() == id.size() && std::equal(type.begin(), type.end(), id.begin(), [](const char a, const char b) {
+              return std::tolower(static_cast<unsigned char>(a)) == std::tolower(static_cast<unsigned char>(b));
+            })) {
+          return name;
+        }
+      }
+      return {};
+    }
     void SetUnitSelectionCount(const int count) noexcept { mUnitSelectionCount = count; }
     /** Test runs (`/unittool <type>,<army>[,select]`). */
     void SetUnitTool(std::string type, std::string army, const bool select)
@@ -353,6 +365,9 @@ namespace faf::editor
       return true;
     }
 
+    /** The toolbar's Show menu: prop and unit models drawn or hidden (hidden ones are not picked either). */
+    [[nodiscard]] bool& ShowProps() noexcept { return mShowProps; }
+    [[nodiscard]] bool& ShowUnits() noexcept { return mShowUnits; }
     /** The Markers panel: the types it hides (not drawn, not picked), and what it asks the view for. */
     [[nodiscard]] const std::set<std::string>& HiddenMarkerTypes() const noexcept { return mHiddenMarkerTypes; }
     [[nodiscard]] std::set<std::string>& HiddenMarkerTypes() noexcept { return mHiddenMarkerTypes; }
@@ -805,6 +820,8 @@ namespace faf::editor
     std::string mReclaimSummary;
     std::vector<std::string> mReclaimRows;
     char mPropFilter[64]{};
+    bool mShowProps = true;
+    bool mShowUnits = true;
     SelectionProperties mSelectionProperties;
     PropertyEdit mPropertyEdit;
     std::string mSelectSelected;

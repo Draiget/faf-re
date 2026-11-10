@@ -1613,6 +1613,27 @@ namespace faf::editor
     if (mTools != nullptr && mTools->SelectToolActive()) {
       mTools->SetSelectInfo(SelectionText(), HoverText());
     }
+    // The Show menu: prop and unit models hidden by culling their instances (each frame while hidden, so new ones follow).
+    if (mTools != nullptr) {
+      const bool hideProps = !mTools->ShowProps();
+      if (hideProps || mPropsCulled) {
+        for (moho::MeshInstance* const instance : mProps) {
+          if (instance != nullptr) {
+            instance->Cull(hideProps);
+          }
+        }
+        mPropsCulled = hideProps;
+      }
+      const bool hideUnits = !mTools->ShowUnits();
+      if (hideUnits || mUnitsCulled) {
+        for (moho::MeshInstance* const instance : mUnits) {
+          if (instance != nullptr) {
+            instance->Cull(hideUnits);
+          }
+        }
+        mUnitsCulled = hideUnits;
+      }
+    }
     if (mTools != nullptr && mTools->TextureToolActive()) {
       LoadMasks();
     }
@@ -2770,10 +2791,10 @@ namespace faf::editor
         consider(PickKind::Marker, static_cast<int>(i), Wm3::Vec3f{x, y, z}, 4.0f, 14.0f);
       }
     }
-    for (std::size_t i = 0; i < mUnitRefs.size(); ++i) {
+    for (std::size_t i = 0; i < mUnitRefs.size() && (mTools == nullptr || mTools->ShowUnits()); ++i) {
       consider(PickKind::Unit, static_cast<int>(i), mUnitRefs[i].position, 2.5f, 16.0f);
     }
-    if (mMap->mProps != nullptr) {
+    if (mMap->mProps != nullptr && (mTools == nullptr || mTools->ShowProps())) {
       const auto& entries = mMap->mProps->mEntries;
       for (std::size_t i = 0; i < entries.size(); ++i) {
         consider(PickKind::Prop, static_cast<int>(i), entries[i].mTransform.pos_, 3.0f, 12.0f);

@@ -1,5 +1,7 @@
 #include "editor/EdShell.h"
+#include "editor/tools/EdMarkers.h"
 
+#include <set>
 #include <cctype>
 
 #include <algorithm>
@@ -454,6 +456,45 @@ namespace faf::editor
           ImGui::EndCombo();
         }
         tip("The grid's step in game units");
+      }
+      ImGui::SameLine();
+      // Show: kinds of things drawn or hidden in the view (Blender's object type visibility); hidden ones aren't picked.
+      if (ImGui::Button("Show")) {
+        ImGui::OpenPopup("##showmenu");
+      }
+      tip("Which kinds of things the view draws: models, and markers by group (path nodes, AI markers...)");
+      if (ImGui::BeginPopup("##showmenu")) {
+        ImGui::TextDisabled("Models");
+        ImGui::Checkbox("Props", &mTools.ShowProps());
+        ImGui::Checkbox("Units", &mTools.ShowUnits());
+        ImGui::Separator();
+        ImGui::TextDisabled("Markers");
+        // Each palette group: on while none of its types is hidden; a click shows or hides all of them.
+        std::vector<std::string> groups;
+        for (const MarkerType& type : MarkerTypes()) {
+          if (std::find(groups.begin(), groups.end(), type.group) == groups.end()) {
+            groups.emplace_back(type.group);
+          }
+        }
+        std::set<std::string>& hidden = mTools.HiddenMarkerTypes();
+        for (const std::string& group : groups) {
+          bool shown = true;
+          for (const MarkerType& type : MarkerTypes()) {
+            shown = shown && (group != type.group || hidden.count(type.type) == 0);
+          }
+          if (ImGui::Checkbox(group.c_str(), &shown)) {
+            for (const MarkerType& type : MarkerTypes()) {
+              if (group == type.group) {
+                if (shown) {
+                  hidden.erase(type.type);
+                } else {
+                  hidden.insert(type.type);
+                }
+              }
+            }
+          }
+        }
+        ImGui::EndPopup();
       }
 
       // The open map, at the right: its name, its folder, and a dot while it has unsaved edits.

@@ -402,6 +402,8 @@ namespace faf::editor
     /** Where a pick sits and how big its ring is, for the hover ring. */
     [[nodiscard]] bool PickPlace(const PickHit& hit, float& x, float& z, float& radius) const;
     PickKind mSelectKind = PickKind::None;
+    bool mPropsCulled = false;
+    bool mUnitsCulled = false;
     bool mDragMarkers = false;
     bool mMarkersMoved = false;
     float mMarkerDragFromX = 0.0f;

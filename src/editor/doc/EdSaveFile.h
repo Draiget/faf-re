@@ -32,6 +32,9 @@ namespace faf::editor
   std::string Vector3Value(double x, double y, double z);
   std::string RectangleValue(double x0, double y0, double x1, double y1);
   std::string StringValue(const std::string& text);
+  /** `FLOAT( 3.000000 )` and `BOOLEAN( true )`, as the game's saves write them. */
+  std::string FloatValue(double value);
+  std::string BooleanValue(bool value);
 
   /**
    * A map's `_save.lua` as the editor keeps it: the file's text, with the master chain's markers and the
