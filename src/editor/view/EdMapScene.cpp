@@ -647,20 +647,89 @@ namespace faf::editor
     if (from.empty() || mMap == nullptr) {
       return false;
     }
-    const EdDocument::LayerEdit edit = from.back();
-    from.pop_back();
-    to.push_back(edit);
-    if (edit.slot < 0) {
-      SetTerrainShaderName(redo ? edit.albedoAfter : edit.albedoBefore);
-      return true;
+    // One step: the last edit, and the ones made with it.
+    const int batch = from.back().batch;
+    int count = 0;
+    do {
+      const EdDocument::LayerEdit edit = from.back();
+      from.pop_back();
+      to.push_back(edit);
+      ++count;
+      if (edit.slot < 0) {
+        SetTerrainShaderName(redo ? edit.albedoAfter : edit.albedoBefore);
+      } else if (redo) {
+        SetLayerSlot(edit.slot, edit.albedoAfter, edit.normalsAfter, edit.albedoSizeAfter, edit.normalsSizeAfter);
+      } else {
+        SetLayerSlot(edit.slot, edit.albedoBefore, edit.normalsBefore, edit.albedoSizeBefore, edit.normalsSizeBefore);
+      }
+    } while (batch != 0 && !from.empty() && from.back().batch == batch);
+    mLayerDragJoin = false;
+    if (count > 1) {
+      gpg::Logf("editor: %s %d layer changes made together", redo ? "redid" : "undid", count);
     }
-    if (redo) {
-      SetLayerSlot(edit.slot, edit.albedoAfter, edit.normalsAfter, edit.albedoSizeAfter, edit.normalsSizeAfter);
-    } else {
-      SetLayerSlot(edit.slot, edit.albedoBefore, edit.normalsBefore, edit.albedoSizeBefore, edit.normalsSizeBefore);
+    return true;
+  }
+
+  std::vector<LayerSettings> EdMapScene::LayerSettingsNow() const
+  {
+    std::vector<LayerSettings> layers;
+    for (const EdTools::LayerSlot& slot : LayerSlots()) {
+      layers.push_back({slot.albedo, slot.normals, slot.albedoSize, slot.normalsSize});
+    }
+    return layers;
+  }
+
+  int EdMapScene::ApplyLayerSettings(const std::string& shader, const std::vector<std::pair<int, LayerSettings>>& layers)
+  {
+    if (mMap == nullptr) {
+      return 0;
+    }
+    const std::vector<EdTools::LayerSlot> slots = LayerSlots();
+    const int batch = ++mLayerBatch;
+    int changed = 0;
+    std::vector<EdDocument::LayerEdit>& undo = mDocument.LayerUndo();
+    if (!shader.empty() && shader != TerrainShader()) {
+      if (!mShaders.empty() && std::find(mShaders.begin(), mShaders.end(), shader) == mShaders.end()) {
+        gpg::Warnf("editor: the terrain shader %s isn't one this game has; set anyway", shader.c_str());
+      }
+      EdDocument::LayerEdit edit;
+      edit.slot = -1;
+      edit.albedoBefore = TerrainShader();
+      edit.albedoAfter = shader;
+      edit.batch = batch;
+      undo.push_back(edit);
+      SetTerrainShaderName(shader);
+      ++changed;
+    }
+    for (const auto& [slot, layer] : layers) {
+      if (slot < 0 || static_cast<std::size_t>(slot) >= slots.size()) {
+        continue;
+      }
+      const EdTools::LayerSlot& before = slots[static_cast<std::size_t>(slot)];
+      const EdTools::LayerSlot after{layer.albedo, layer.normals, layer.albedoSize, layer.normalsSize};
+      if (before == after) {
+        continue;
+      }
+      EdDocument::LayerEdit edit;
+      edit.slot = slot;
+      edit.albedoBefore = before.albedo;
+      edit.normalsBefore = before.normals;
+      edit.albedoSizeBefore = before.albedoSize;
+      edit.normalsSizeBefore = before.normalsSize;
+      edit.albedoAfter = after.albedo;
+      edit.normalsAfter = after.normals;
+      edit.albedoSizeAfter = after.albedoSize;
+      edit.normalsSizeAfter = after.normalsSize;
+      edit.batch = batch;
+      undo.push_back(edit);
+      SetLayerSlot(slot, after.albedo, after.normals, after.albedoSize, after.normalsSize);
+      ++changed;
+    }
+    if (changed > 0) {
+      mDocument.EditEnded(EdDocument::EditKind::Layers);
     }
     mLayerDragJoin = false;
-    return true;
+    return changed;
   }
 
   bool EdMapScene::UndoMasks(const bool redo)

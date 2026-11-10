@@ -10,6 +10,7 @@
 
 #include <Windows.h>
 
+#include "editor/doc/EdLayerPreset.h"
 #include "editor/doc/EdUnitPreset.h"
 #include "editor/doc/EdMarkerPreset.h"
 #include "editor/EdTools.h"
@@ -86,6 +87,13 @@ namespace faf::editor
 
     /** Changes one slot as the Tools panel asked, as one undo step. */
     void ChangeLayerSlot(int slot, const EdTools::LayerSlot& value);
+    /**
+     * Layers from a settings file, with the terrain shader when `shader` isn't empty: what differs is changed as one
+     * undo step. Returns how many slots (and the shader) changed.
+     */
+    int ApplyLayerSettings(const std::string& shader, const std::vector<std::pair<int, LayerSettings>>& layers);
+    /** The ten layers as the files hold them. */
+    [[nodiscard]] std::vector<LayerSettings> LayerSettingsNow() const;
 
     /** The selected markers' entries, for the panel. */
     [[nodiscard]] std::vector<SaveEntry> SelectedMarkers() const;
@@ -386,6 +394,7 @@ namespace faf::editor
     EdDocument::SaveSnapshot mBorderBefore;
     /** A size drag on one slot keeps adding to its undo step until something else happens. */
     bool mLayerDragJoin = false;
+    int mLayerBatch = 0;
     /** Sets a texture slot's paths and sizes on the terrain (its textures load), the Info panel's facts too. */
     void SetLayerSlot(int slot, const std::string& albedo, const std::string& normals, float albedoSize, float normalsSize);
     bool UndoMasks(bool redo);

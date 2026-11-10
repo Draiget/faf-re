@@ -342,6 +342,7 @@ namespace faf::editor
       bool mLightingFilesDone = false;
       bool mMarkerFilesDone = false;
       bool mUnitFilesDone = false;
+      int mLayerFileStep = 0;
       /** `/waterset <on>,<level>,<deep>,<abyss>` (test runs): the sea set as one edit once the map is shown. */
       std::string mWaterSetArg;
       bool mWaterDragging = false;
@@ -1508,6 +1509,89 @@ namespace faf::editor
           } else {
             gpg::Logf("editor: %zu units imported from %s into %s (%s to %s)%s", names.size(), importFile.string().c_str(),
                       tools.UnitArmy().c_str(), names.front().c_str(), names.back().c_str(), moved ? ", moved onto this map" : "");
+          }
+        }
+      }
+      // The Texture tool's layer files, or `/layerimport <slot>,<file>`, `/layerexport <slot>,<file>`, `/layersetimport <file>`,
+      // `/layersetexport <file>` for test runs (slot 0 the lower layer, 9 the upper one).
+      {
+        int slot = 0;
+        EdTools::LayerFileAsk ask = tools.TakeLayerFileAsk(slot);
+        std::filesystem::path file;
+        const wchar_t* const layerFilter = L"Layer settings (*.scmsl)\0*.scmsl\0All files\0*.*\0";
+        const wchar_t* const setFilter = L"Layer sets (*.scmst)\0*.scmst\0All files\0*.*\0";
+        switch (ask) {
+        case EdTools::LayerFileAsk::ImportLayer:
+          file = AskFile(HandleOf(mGame.supcomFrame), false, layerFilter, L"scmsl", L"Import layer settings");
+          break;
+        case EdTools::LayerFileAsk::ExportLayer:
+          file = AskFile(HandleOf(mGame.supcomFrame), true, layerFilter, L"scmsl", L"Export layer settings");
+          break;
+        case EdTools::LayerFileAsk::ImportSet:
+          file = AskFile(HandleOf(mGame.supcomFrame), false, setFilter, L"scmst", L"Import a layer set");
+          break;
+        case EdTools::LayerFileAsk::ExportSet:
+          file = AskFile(HandleOf(mGame.supcomFrame), true, setFilter, L"scmst", L"Export the layer set");
+          break;
+        case EdTools::LayerFileAsk::None:
+          break;
+        }
+        // Test runs: the switches in a fixed order, export before import, one each frame from the map's first one.
+        if (ask == EdTools::LayerFileAsk::None && mScene.Attached() && mLayerFileStep < 4) {
+          static const char* const kSwitches[4] = {"/layersetexport", "/layerexport", "/layersetimport", "/layerimport"};
+          static const EdTools::LayerFileAsk kAsks[4] = {EdTools::LayerFileAsk::ExportSet, EdTools::LayerFileAsk::ExportLayer,
+                                                         EdTools::LayerFileAsk::ImportSet, EdTools::LayerFileAsk::ImportLayer};
+          const int step = mLayerFileStep++;
+          if (fa::vector<fa::string> value; moho::CFG_GetArgOption(kSwitches[step], 1, &value) && !value.empty()) {
+            std::string text = value[0].c_str();
+            if (step % 2 == 1) {
+              const std::size_t comma = text.find(',');
+              slot = comma == std::string::npos ? 0 : std::atoi(text.c_str());
+              text = comma == std::string::npos ? text : text.substr(comma + 1);
+            }
+            ask = kAsks[step];
+            file = text;
+          }
+        }
+        if (!file.empty() && mDocument.GetState() == EdDocument::State::Open && mScene.Attached()) {
+          const bool set = ask == EdTools::LayerFileAsk::ImportSet || ask == EdTools::LayerFileAsk::ExportSet;
+          slot = std::clamp(slot, 0, 9);
+          if (ask == EdTools::LayerFileAsk::ExportLayer || ask == EdTools::LayerFileAsk::ExportSet) {
+            const std::vector<LayerSettings> layers = mScene.LayerSettingsNow();
+            const std::string text = set ? LayersToScmst(mScene.TerrainShader(), layers) : LayerToScmsl(layers[static_cast<std::size_t>(slot)]);
+            std::ofstream out(file, std::ios::binary | std::ios::trunc);
+            out.write(text.data(), static_cast<std::streamsize>(text.size()));
+            if (set) {
+              (out ? gpg::Logf : gpg::Warnf)("editor: the layer set (%s) exported to %s", mScene.TerrainShader().c_str(), file.string().c_str());
+            } else {
+              (out ? gpg::Logf : gpg::Warnf)("editor: layer %d (%s) exported to %s", slot, layers[static_cast<std::size_t>(slot)].albedo.c_str(),
+                                            file.string().c_str());
+            }
+          } else {
+            std::ifstream in(file, std::ios::binary);
+            const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            std::string error;
+            std::string shader;
+            std::vector<std::pair<int, LayerSettings>> changes;
+            bool read = static_cast<bool>(in);
+            if (read && set) {
+              std::vector<LayerSettings> layers;
+              read = LayersFromScmst(text, shader, layers, error);
+              for (int i = 0; read && i < 10; ++i) {
+                changes.emplace_back(i, layers[static_cast<std::size_t>(i)]);
+              }
+            } else if (read) {
+              LayerSettings layer;
+              read = LayerFromScmsl(text, layer, error);
+              changes.emplace_back(slot, layer);
+            }
+            if (!read) {
+              gpg::Warnf("editor: %s: %s", file.string().c_str(), in ? error.c_str() : "can't read it");
+            } else {
+              const int changed = mScene.ApplyLayerSettings(shader, changes);
+              gpg::Logf("editor: %s imported from %s: %d change%s (one undo step)", set ? "a layer set" : "a layer", file.string().c_str(),
+                        changed, changed == 1 ? "" : "s");
+            }
           }
         }
       }

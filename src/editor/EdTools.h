@@ -486,6 +486,20 @@ namespace faf::editor
     /** The Units tool's Import / Export of FAForeverMapEditor's `.scunits`, taken by the app. */
     [[nodiscard]] bool TakeUnitFileImport() noexcept { return std::exchange(mUnitFileImport, false); }
     [[nodiscard]] bool TakeUnitFileExport() noexcept { return std::exchange(mUnitFileExport, false); }
+    /** The Texture tool's layer files: what was asked (LayerFileAsk) and for which slot, taken by the app. */
+    enum class LayerFileAsk
+    {
+      None,
+      ImportLayer,
+      ExportLayer,
+      ImportSet,
+      ExportSet,
+    };
+    [[nodiscard]] LayerFileAsk TakeLayerFileAsk(int& slot) noexcept
+    {
+      slot = mLayerFileSlot;
+      return std::exchange(mLayerFileAsk, LayerFileAsk::None);
+    }
     [[nodiscard]] bool TakeExportRequest() noexcept { return std::exchange(mExportRequested, false); }
     /** Heights times this on import and export. */
     [[nodiscard]] float HeightScale() const noexcept { return mHeightScale; }
@@ -564,6 +578,8 @@ namespace faf::editor
     bool mMarkerFileExport = false;
     bool mUnitFileImport = false;
     bool mUnitFileExport = false;
+    LayerFileAsk mLayerFileAsk = LayerFileAsk::None;
+    int mLayerFileSlot = 1;
     bool mExportRequested = false;
     float mHeightScale = 1.0f;
     int mExportSize = 0;

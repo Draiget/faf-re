@@ -573,6 +573,37 @@ namespace faf::editor
         ImGui::EndCombo();
       }
     }
+
+    SectionHeader("LAYER FILES");
+    {
+      static const char* const kFileSlots[10] = {"Lower", "1", "2", "3", "4", "5", "6", "7", "8", "Upper"};
+      mLayerFileSlot = std::clamp(mLayerFileSlot, 0, 9);
+      ImGui::SetNextItemWidth(-1.0f);
+      if (ImGui::BeginCombo("##layerfileslot", (std::string("Layer ") + kFileSlots[mLayerFileSlot]).c_str())) {
+        for (int slot = 0; slot < 10; ++slot) {
+          if (ImGui::Selectable(kFileSlots[slot], slot == mLayerFileSlot)) {
+            mLayerFileSlot = slot;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      if (ImGui::Button("Import layer...")) {
+        mLayerFileAsk = LayerFileAsk::ImportLayer;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Export layer...")) {
+        mLayerFileAsk = LayerFileAsk::ExportLayer;
+      }
+      if (ImGui::Button("Import set...")) {
+        mLayerFileAsk = LayerFileAsk::ImportSet;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Export set...")) {
+        mLayerFileAsk = LayerFileAsk::ExportSet;
+      }
+      Note("FAForeverMapEditor's layer files: one layer's textures and sizes (.scmsl), or the shader and all ten layers "
+           "(.scmst). An import is one undo step; the masks stay as they are.");
+    }
     DrawTextureBrowser();
   }
 

@@ -289,6 +289,8 @@ namespace faf::editor
       int slot = 0;
       std::string albedoBefore, normalsBefore, albedoAfter, normalsAfter;
       float albedoSizeBefore = 1.0f, normalsSizeBefore = 1.0f, albedoSizeAfter = 1.0f, normalsSizeAfter = 1.0f;
+      /** Edits made together (a layer set imported) share a non-zero batch and are one undo step. */
+      int batch = 0;
     };
     [[nodiscard]] std::vector<LayerEdit>& LayerUndo() noexcept { return mLayerUndo; }
     [[nodiscard]] std::vector<LayerEdit>& LayerRedo() noexcept { return mLayerRedo; }
