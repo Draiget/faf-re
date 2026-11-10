@@ -66,6 +66,86 @@ namespace faf::editor
     return types;
   }
 
+  const char* MarkerTypeUse(const std::string& type)
+  {
+    // From FAF's Lua: who reads each type and what for (the readers are named for the curious).
+    struct Use
+    {
+      const char* type;
+      const char* use;
+    };
+    static constexpr Use kUses[] = {
+      {"Mass", "The game makes a mass deposit here at the start (when 'resource' is on), and AIs pick extractor spots from them "
+               "(ScenarioUtilities CreateResources, GridDeposits)."},
+      {"Hydrocarbon", "The game makes a hydrocarbon deposit here at the start (when 'resource' is on), and AIs pick power "
+                      "generator spots from them."},
+      {"Blank Marker", "No game code reads the type. A marker named ARMY_n is that army's start position whatever its type, and "
+                       "scripts find markers by name."},
+      {"Rally Point", "AI factories send their new units to the nearest one. FAF's skirmish AIs make their own at the start and "
+                      "drop the map's; campaign AIs use the map's (FactoryBuilderManager, base-ai)."},
+      {"Naval Rally Point", "AI naval factories send their new ships to the nearest one; the map's are used (not made again)."},
+      {"Expansion Area", "AIs send engineers to build expansion bases here and raid or guard them. FAF's skirmish AIs make their "
+                         "own from groups of 2-3 mass points and drop the map's; campaign AIs use the map's."},
+      {"Large Expansion Area", "Like Expansion Area, for large AI expansion bases; skirmish AIs make theirs from groups of more "
+                               "than 3 mass points and drop the map's."},
+      {"Naval Area", "AIs build naval bases here. FAF's skirmish AIs make their own from water near starts and expansions and "
+                     "drop the map's; campaign AIs use the map's."},
+      {"Defensive Point", "AI engineers build defences at the nearest one that has none yet."},
+      {"Naval Defensive Point", "AI engineers build naval defences at the nearest one that has none yet."},
+      {"Combat Zone", "Read only by AIGetSortedScoutingLocations (AI scouting targets), which nothing in FAF calls: in today's "
+                      "game it changes nothing. AI mods may still read it."},
+      {"Protected Experimental Construction", "AI engineers build experimentals at the nearest one (where they stand when the "
+                                              "map has none)."},
+      {"Transport Marker", "An AI transport drop-off spot, used only on a map without any Land Path Node."},
+      {"Naval Link", "No game code reads it (only the in-game debug marker list shows it)."},
+      {"Land Path Node", "Older AI code builds its pathing graph from the path nodes and their 'adjacentTo' links (threat-avoiding "
+                         "routes, path checks, transport drops); most AI movement now uses the navigation mesh. The lobby shows "
+                         "\"AI markers: yes\" when nodes are linked."},
+      {"Water Path Node", "The naval layer of the older AI pathing graph (see Land Path Node)."},
+      {"Amphibious Path Node", "The amphibious layer of the older AI pathing graph; made from land and water nodes when a map "
+                               "has none."},
+      {"Air Path Node", "The air layer of the older AI pathing graph."},
+      {"Camera Info", "No code checks the type: campaign camera moves take a marker and read its position, orientation and "
+                      "'zoom'."},
+      {"Island", "Any Island marker makes AIs treat the map as an island map: they pick other build plans."},
+    };
+    for (const Use& use : kUses) {
+      if (type == use.type) {
+        return use.use;
+      }
+    }
+    return "";
+  }
+
+  const char* MarkerFieldUse(const std::string& key)
+  {
+    struct Use
+    {
+      const char* key;
+      const char* use;
+    };
+    static constexpr Use kUses[] = {
+      {"hint", "Editor display only: no game code reads it."},
+      {"prop", "Editor display only: the marker's model in editors (a resource's prop is the game's own)."},
+      {"editorIcon", "Editor display only: no game code reads it."},
+      {"color", "Only the colour of the AI debug overlays; it changes nothing in a game."},
+      {"resource", "When on, the game makes the deposit (mass or hydrocarbon) here at the start."},
+      {"size", "The deposit's size, given to the game's CreateResourceDeposit."},
+      {"amount", "Not read by the game."},
+      {"adjacentTo", "The path nodes this one links to (names, space-separated): the AI pathing graph's edges."},
+      {"graph", "The path node's graph name (default: its type's): nodes of one graph link."},
+      {"zoom", "The camera's zoom for a campaign camera move to this marker."},
+      {"canSetCamera", "Not read by FAF's Lua."},
+      {"canSyncCamera", "Not read by FAF's Lua."},
+    };
+    for (const Use& use : kUses) {
+      if (key == use.key) {
+        return use.use;
+      }
+    }
+    return "";
+  }
+
   const MarkerType* FindMarkerType(const std::string& type)
   {
     for (const MarkerType& entry : MarkerTypes()) {

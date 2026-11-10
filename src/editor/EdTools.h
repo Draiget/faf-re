@@ -87,11 +87,8 @@ namespace faf::editor
       mReclaimSummary = std::move(summary);
       mReclaimRows = std::move(rows);
     }
-    /** The Markers tool, or the Adaptive tool (which picks and moves markers in the view the same way, but places none). */
-    [[nodiscard]] bool MarkersToolActive() const noexcept { return mTool == 6 || mTool == 8; }
-    /** The Adaptive tool: an adaptive map's armies, option groups and lobby options (EdShell::DrawAdaptivePanel). */
-    [[nodiscard]] bool AdaptiveToolActive() const noexcept { return mTool == 8; }
-    void SetAdaptiveDraw(std::function<void()> draw) { mAdaptiveDraw = std::move(draw); }
+    /** The Markers tool. */
+    [[nodiscard]] bool MarkersToolActive() const noexcept { return mTool == 6; }
     /** The Check's results on the map, for the view's pins: where, and how bad (0 error, 1 warning, 2 note). */
     struct CheckPin
     {
@@ -470,9 +467,7 @@ namespace faf::editor
       mAskSelect = std::move(names);
       mAskSelectAdd = add;
       mAskSelectSet = true;
-      if (mTool != 8) {
-        mTool = 6; // the Adaptive tool's own Select buttons keep it
-      }
+      mTool = 6;
     }
     void AskMarkerFrame(std::string name) { mAskFrame = std::move(name); }
     [[nodiscard]] bool TakeMarkerSelect(std::vector<std::string>& names, bool& add)
@@ -557,7 +552,27 @@ namespace faf::editor
       (void)std::snprintf(mPropFilter, sizeof(mPropFilter), "%s", name.c_str());
     }
     void SetTool(const int tool) noexcept { mTool = tool; }
-    /** The tool shown (0 Select ... 8 Adaptive). */
+    /** Properties: these units of `army` become wrecks from the start (its WRECKAGE group) or units again (INITIAL). */
+    struct UnitWreckAsk
+    {
+      std::string army;
+      std::vector<std::string> names;
+      bool wreck = false;
+    };
+    void AskUnitWreck(UnitWreckAsk ask)
+    {
+      mUnitWreckAsk = std::move(ask);
+      mUnitWreckAsked = true;
+    }
+    [[nodiscard]] bool TakeUnitWreck(UnitWreckAsk& ask)
+    {
+      if (!std::exchange(mUnitWreckAsked, false)) {
+        return false;
+      }
+      ask = std::move(mUnitWreckAsk);
+      return true;
+    }
+    /** The tool shown (0 Select ... 7 Units). */
     [[nodiscard]] int Tool() const noexcept { return mTool; }
 
     /** Whether the Texture tool is the chosen one (the viewport's left button paints a layer's mask). */
@@ -835,9 +850,6 @@ namespace faf::editor
 
     int mTool = 1;
 
-    /** Draws the Adaptive tool's panel (the shell's, which has the document). */
-
-    std::function<void()> mAdaptiveDraw;
     int mBrushMode = 0;
     float mRadius = 14.0f;
     float mStrength = 0.5f;
@@ -879,6 +891,8 @@ namespace faf::editor
     std::vector<std::string> mGroupPath;
     char mGroupName[64]{};
     GroupAsk mGroupAsk = GroupAsk::None;
+    UnitWreckAsk mUnitWreckAsk;
+    bool mUnitWreckAsked = false;
     void DrawUnitGroup(const UnitGroup& group, std::vector<std::string>& path);
     int mTerrainTypeCode = 81;
     bool mShowTerrainTypes = true;

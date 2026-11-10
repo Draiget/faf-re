@@ -304,6 +304,8 @@ namespace faf::editor
      * each with its file and line.
      */
     [[nodiscard]] std::vector<CheckIssue> CheckScripts() const;
+    /** One text compiled as the file `name` (`x_options.lua`): its syntax error, or an issue with an empty text. */
+    [[nodiscard]] CheckIssue CheckLuaText(const std::string& text, const std::string& name) const;
     [[nodiscard]] const std::string& Scenario() const noexcept { return mScenario; }
     /** The armies of the scenario's team list, in order (its extra armies are ExtraArmies). */
     [[nodiscard]] std::vector<std::string> Armies() const { return ScenarioArmies(mScenario); }

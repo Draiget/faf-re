@@ -219,6 +219,16 @@ namespace faf::editor
       if (ImGui::CollapsingHeader("Marker", ImGuiTreeNodeFlags_DefaultOpen)) {
         row("Type");
         ImGui::TextUnformatted(now.type.c_str());
+        if (const MarkerType* const type = FindMarkerType(now.type); type != nullptr) {
+          ImGui::SameLine();
+          ImGui::TextDisabled("(%s)", type->group);
+        }
+        // What the game does with this type (FAF's Lua), so a mapper knows what placing one changes.
+        if (const char* const use = MarkerTypeUse(now.type); use[0] != '\0') {
+          ImGui::PushTextWrapPos(0.0f);
+          ImGui::TextDisabled("In the game: %s", use);
+          ImGui::PopTextWrapPos();
+        }
         // Each field edited as its value: a number, a tick, a colour, a vector or text; written back in the save's form.
         mPropertiesFields.resize(now.fields.size());
         for (std::size_t i = 0; i < now.fields.size(); ++i) {
@@ -296,6 +306,9 @@ namespace faf::editor
             held = buffer;
           }
           active = active || ImGui::IsItemActive();
+          if (const char* const use = MarkerFieldUse(key); use[0] != '\0') {
+            ImGui::SetItemTooltip("%s", use);
+          }
           ImGui::PopID();
         }
       }
@@ -470,8 +483,9 @@ namespace faf::editor
           }
           HelpNote("Spawns with: the resource is there only when that army's player is in the game. Option: the lobby's option "
                    "of that name removes groups from its key up, so group 1 goes first. Written to _tables.lua as one undo step.");
-          if (ImGui::Button("The whole map's adaptive setup (Adaptive tool)", ImVec2(-1.0f, 0.0f))) {
-            mTools.SetTool(8);
+          if (ImGui::Button("The whole map's adaptive setup (Map panel)", ImVec2(-1.0f, 0.0f))) {
+            mShowMap = true;
+            ImGui::SetWindowFocus("Map");
           }
           ImGui::SetItemTooltip("Every army's resources, the option tables and their groups, and the lobby options in _options.lua");
         }
@@ -483,6 +497,7 @@ namespace faf::editor
         ImGui::TextUnformatted(now.type.c_str());
         row("Army");
         ImGui::TextUnformatted(now.owner.c_str());
+        DrawUnitFate(now);
       }
       break;
     case SelectionProperties::Kind::Prop:

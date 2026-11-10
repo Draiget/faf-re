@@ -125,8 +125,17 @@ namespace faf::editor
     /** The player slots and extra armies as cards, and the chosen army's settings (ui/EdArmiesPanel.cpp). */
     void DrawArmiesPanel();
     void DrawPropertiesPanel();
+    /** A selected unit's group, what becomes of it in a game, its wreck's value, and the wreck switch (ui/EdUnitFatePanel.cpp). */
+    void DrawUnitFate(const SelectionProperties& unit);
     /** The Adaptive tool's panel: armies, option groups, crazyrush lists and lobby options (ui/EdAdaptivePanel.cpp). */
     void DrawAdaptivePanel();
+    /** View > Script on one of the map's Lua files (0 script, 1 lobby options, 2 adaptive tables). */
+    void ShowLuaFile(int file)
+    {
+      mScriptFile = file;
+      mShowScript = true;
+      mFocusScript = true;
+    }
     bool mShowProperties = true;
     bool mPropertiesPlaced = false;
     /** The panel's copy of the values while a field is held or typed in; sent as one edit when it lets go. */
@@ -157,6 +166,8 @@ namespace faf::editor
     bool mFocusScript = false;
     std::string mScriptBuffer;
     std::string mScriptFor;
+    /** The Script panel's file: 0 `_script.lua`, 1 `_options.lua`, 2 `_tables.lua` (adaptive maps). */
+    int mScriptFile = 0;
     std::string mScriptMessage;
     int mScriptErrorLine = 0;
     void RunCheck();

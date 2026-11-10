@@ -126,18 +126,35 @@ namespace faf::editor
       Status(kBad, "_tables.lua doesn't read: " + error);
       return;
     }
+    HelpNote("Three files make an adaptive map. _tables.lua says which resources spawn with which army and which belong to "
+             "the lobby options' groups: this panel writes it (the tables it doesn't know are kept). _script.lua is the "
+             "\"Ultimate maps\" script that reads the tables when the game starts: it isn't made here, it comes from an "
+             "adaptive map. _options.lua holds the lobby's options: this panel writes the ones its tables need, the rest "
+             "(wreckage, reclaim...) are kept. They are written into the map's folder on Save; Edit shows a file's text.");
+    const auto editLink = [&](const char* const id, const int file) {
+      ImGui::SameLine();
+      ImGui::PushID(id);
+      if (ImGui::SmallButton("Edit")) {
+        ShowLuaFile(file);
+      }
+      ImGui::PopID();
+      ImGui::SetItemTooltip("This file's text in the Script panel");
+    };
     Status(kGood, "Tables: " + mDocument.Facts().tablesPath);
+    editLink("tables", 2);
     if (AdaptiveTablesPath(mDocument.Script()).empty()) {
       Status(kWarn, "The map's _script.lua doesn't read the tables yet: put an adaptive map's _script.lua in its folder, importing " +
                       mDocument.Facts().tablesPath + ". Until then nothing here changes the game.");
     } else {
       Status(kGood, "The script reads them.");
     }
+    editLink("script", 0);
     if (mDocument.OptionsText().empty()) {
       Status(kWarn, "No _options.lua: the lobby shows no options, so no option group below spawns (the script reads 1, none).");
     } else {
       Status(kGood, "Lobby options: " + mDocument.Facts().optionsPath);
     }
+    editLink("options", 1);
 
     // The edit: a copy of the tables changed, written into the file's text as one undo step.
     AdaptiveTables changed = tables;
@@ -160,12 +177,15 @@ namespace faf::editor
     selected.insert(selected.end(), selectedHydro.begin(), selectedHydro.end());
     ImGui::Spacing();
     if (selected.empty()) {
+      ImGui::PushTextWrapPos(0.0f);
       ImGui::TextDisabled("Select mass or hydrocarbon markers in the view (click, Ctrl+click, box) to add them below.");
+      ImGui::PopTextWrapPos();
     } else {
       ImGui::Text("Selected: %zu mass, %zu hydrocarbon", selectedMass.size(), selectedHydro.size());
     }
 
-    const float right = ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX();
+    // The rows' right edge, a frame padding short of the scrollbar so the buttons don't touch it.
+    const float right = ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - ImGui::GetStyle().FramePadding.x;
     const auto selectNames = [&](const std::vector<std::string>& names) { mTools.AskMarkerSelect(names, ImGui::GetIO().KeyCtrl); };
 
     // Players.

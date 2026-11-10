@@ -552,6 +552,7 @@ namespace faf::editor
       std::string mMarkerToolArg;
       /** `/framemarker <name>[@distance]` (test runs): the camera goes to that marker once the map is shown. */
       std::string mFrameMarkerArg;
+      bool mSelectUnitDone = false;
       bool mWaterFilesDone = false;
       bool mLightingFilesDone = false;
       bool mLightingFromDone = false;
@@ -1822,6 +1823,17 @@ namespace faf::editor
                              at == std::string::npos ? 140.0f : static_cast<float>(std::atof(mFrameMarkerArg.c_str() + at + 1)));
           mFrameMarkerArg.clear();
         }
+        // `/selectunit <army>,<unit>` (test runs), once the units are drawn.
+        if (!mSelectUnitDone && mScene.UnitsReady()) {
+          mSelectUnitDone = true;
+          if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/selectunit", 1, &value) && !value.empty()) {
+            const std::string text = value[0].c_str();
+            const std::size_t comma = text.find(',');
+            if (comma != std::string::npos) {
+              mScene.SelectUnit(text.substr(0, comma), text.substr(comma + 1));
+            }
+          }
+        }
         tools.SetMarkerSelection(mScene.SelectedMarkers());
         tools.SetArmies(mDocument.Armies(), mDocument.ExtraArmies());
         {
@@ -2550,6 +2562,10 @@ namespace faf::editor
         std::string name;
         if (const EdTools::GroupAsk ask = tools.TakeGroupAsk(path, name); ask != EdTools::GroupAsk::None && mDocument.GetState() == EdDocument::State::Open) {
           mScene.ChangeUnitGroups(tools.UnitArmy(), ask, path, name);
+          mUnitTreeFrames = 0;
+        }
+        if (EdTools::UnitWreckAsk wreck; tools.TakeUnitWreck(wreck) && mDocument.GetState() == EdDocument::State::Open) {
+          mScene.SetUnitsWreck(wreck.army, wreck.names, wreck.wreck);
           mUnitTreeFrames = 0;
         }
       }

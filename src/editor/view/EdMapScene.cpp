@@ -1993,6 +1993,27 @@ namespace faf::editor
     gpg::Logf("editor: group %s of %s %s%s%s", where.c_str(), army.c_str(), what, name.empty() ? "" : ": ", name.c_str());
   }
 
+  void EdMapScene::SetUnitsWreck(const std::string& army, const std::vector<std::string>& names, const bool wreck)
+  {
+    const std::string group = wreck ? "WRECKAGE" : "INITIAL";
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    int moved = 0;
+    (void)EditArmyUnits(army, [&](UnitGroup& root) {
+      if (GroupAt(root, {group}) == nullptr) {
+        (void)AddGroup(root, {}, group);
+      }
+      moved = MoveUnitsTo(root, names, {group});
+    });
+    if (moved == 0) {
+      mDocument.RestoreSaveData(before);
+      gpg::Warnf("editor: %s: no unit moved to %s", army.c_str(), group.c_str());
+      return;
+    }
+    mDocument.SaveDataEdited(std::move(before));
+    ReloadUnits();
+    gpg::Logf("editor: %d units of %s moved to %s (%s from the start)", moved, army.c_str(), group.c_str(), wreck ? "wrecks" : "units");
+  }
+
   void EdMapScene::CtrlKey(const char key)
   {
     if (mMap == nullptr) {
@@ -3425,10 +3446,27 @@ namespace faf::editor
         mTargetZ = z;
         mDistance = std::min(mDistance, distance);
         ApplyCamera();
+        mMarkerSelection = {name}; // and selected, so Properties shows it
         gpg::Logf("editor: the view goes to %s at %.0f, %.0f", name.c_str(), static_cast<double>(x), static_cast<double>(z));
         return;
       }
     }
+  }
+
+  void EdMapScene::SelectUnit(const std::string& army, const std::string& name)
+  {
+    for (const UnitRef& unit : mUnitRefs) {
+      if (unit.army == army && unit.name == name) {
+        mUnitSelection = {{army, name}};
+        mTargetX = unit.position.x;
+        mTargetZ = unit.position.z;
+        mDistance = std::min(mDistance, 80.0f);
+        ApplyCamera();
+        gpg::Logf("editor: %s of %s selected", name.c_str(), army.c_str());
+        return;
+      }
+    }
+    gpg::Warnf("editor: /selectunit: no unit %s in %s", name.c_str(), army.c_str());
   }
 
   bool EdMapScene::ImportMarkerFile(const std::string& text, MarkerImport& result, std::string& error)
@@ -5016,13 +5054,7 @@ namespace faf::editor
           return true;
         }
         if (hit < 0) {
-          if (mTools->AdaptiveToolActive()) {
-            if ((wParam & MK_CONTROL) == 0) {
-              mMarkerSelection.clear();
-            }
-          } else {
-            PlaceMarkers(groundX, groundZ, connect);
-          }
+          PlaceMarkers(groundX, groundZ, connect);
           return true;
         }
         const std::string& name = markers[static_cast<std::size_t>(hit)].name;

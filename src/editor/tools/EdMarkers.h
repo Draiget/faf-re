@@ -31,6 +31,14 @@ namespace faf::editor
   /** The palette entry of a `type` string, or null. */
   const MarkerType* FindMarkerType(const std::string& type);
 
+  /**
+   * What FAF's game code does with markers of `type` (its Lua as of 2026-11: lua/AI, lua/sim), one or two sentences;
+   * empty for a type it doesn't know.
+   */
+  const char* MarkerTypeUse(const std::string& type);
+  /** Whether the game reads a marker field (`hint` no, `adjacentTo` yes) and what for; empty for one it doesn't know. */
+  const char* MarkerFieldUse(const std::string& key);
+
   /** The next free name for a type among `markers` (`Mass 07`, or `ARMY_9` for a start position). */
   std::string NextMarkerName(const std::vector<SaveEntry>& markers, const MarkerType& type);
 

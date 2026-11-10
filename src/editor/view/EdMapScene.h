@@ -156,12 +156,16 @@ namespace faf::editor
     [[nodiscard]] std::string PropDetails(const std::string& blueprint) const;
     /** How many units the Units tool has selected, for its panel. */
     [[nodiscard]] int UnitSelectionCount() const noexcept { return static_cast<int>(mUnitSelection.size()); }
+    /** Whether the armies' units are drawn (test runs wait for it). */
+    [[nodiscard]] bool UnitsReady() const noexcept { return !mUnitRefs.empty(); }
     /** How many decals the Decals tool has selected, for its panel. */
     [[nodiscard]] int DecalSelectionCount() const noexcept { return static_cast<int>(mDecalSelection.size()); }
     /** Selects markers by name (`add` toggles them in the selection instead), for the Markers panel. */
     void SelectMarkers(const std::vector<std::string>& names, bool add);
     /** Moves the camera over a marker, at most `distance` away. */
     void FrameMarker(const std::string& name, float distance = 140.0f);
+    /** Test runs (`/selectunit <army>,<unit>`): that unit selected and the view on it. */
+    void SelectUnit(const std::string& army, const std::string& name);
     /** Sets the scenario's teams (the panel's slot order, the FFA repair), as one undo step. */
     void ChangeTeams(const std::vector<ScenarioTeam>& teams);
     /** Sets the scenario's extra armies (names split on spaces), as one undo step. */
@@ -504,6 +508,11 @@ namespace faf::editor
     /** An army's settings in `_save.lua`, as one undo step. */
     void ChangeArmySettings(const std::string& army, const ArmySettings& settings);
     void ChangeUnitGroups(const std::string& army, EdTools::GroupAsk ask, const std::vector<std::string>& path, const std::string& name);
+    /**
+     * Moves `names` of `army` into its WRECKAGE group (wrecks from the start) or, `wreck` false, into its INITIAL group
+     * (units from the start), each made when the army has none; one undo step.
+     */
+    void SetUnitsWreck(const std::string& army, const std::vector<std::string>& names, bool wreck);
 
   private:
     /** Whether the Markers panel hides this marker's type. */

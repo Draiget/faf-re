@@ -1,6 +1,7 @@
 // The Info panel (what the open map is) and the Markers panel (its markers as a tree), EdShell's right-hand panels.
 
 #include "editor/EdShell.h"
+#include "editor/doc/EdAdaptiveTables.h"
 
 #include <algorithm>
 #include <array>
@@ -993,46 +994,75 @@ namespace faf::editor
       ImGui::End();
       return;
     }
-    // The panel's copy follows the document until it is edited, and again after Apply or Revert.
-    const bool edited = mScriptFor == mDocument.Path() && mScriptBuffer != mDocument.Script();
-    if (mScriptFor != mDocument.Path()) {
-      mScriptFor = mDocument.Path();
-      mScriptBuffer = mDocument.Script();
-      mScriptMessage.clear();
+    // Which file: the script, the lobby options (any map may have them), an adaptive map's tables.
+    {
+      const bool tables = mDocument.Adaptive();
+      if (mScriptFile == 2 && !tables) {
+        mScriptFile = 0;
+      }
+      ImGui::RadioButton("_script.lua", &mScriptFile, 0);
+      ImGui::SameLine();
+      ImGui::RadioButton("_options.lua", &mScriptFile, 1);
+      ImGui::SetItemTooltip("The lobby's options for this map. The Adaptive tool writes the options its tables need; the "
+                            "others (wreckage, reclaim...) are edited here.");
+      if (tables) {
+        ImGui::SameLine();
+        ImGui::RadioButton("_tables.lua", &mScriptFile, 2);
+        ImGui::SetItemTooltip("The adaptive tables, which the Adaptive tool writes; the tables it doesn't know (the mapper's own) "
+                              "are edited here.");
+      }
     }
-    ImGui::TextDisabled("%s", MapDisplayName(mDocument.Facts().scriptPath).c_str());
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", mDocument.Facts().scriptPath.c_str());
+    const MapFacts& facts = mDocument.Facts();
+    const std::string& path = mScriptFile == 0 ? facts.scriptPath : mScriptFile == 1 ? facts.optionsPath : facts.tablesPath;
+    const std::string& text = mScriptFile == 0 ? mDocument.Script() : mScriptFile == 1 ? mDocument.OptionsText() : mDocument.TablesText();
+    const std::string fileName = path.empty() ? std::string(mScriptFile == 1 ? "_options.lua" : "_script.lua")
+                                              : path.substr(path.find_last_of('/') + 1);
+    // The panel's copy follows the document until it is edited, and again after Apply or Revert (and on another file).
+    const std::string key = mDocument.Path() + "#" + std::to_string(mScriptFile);
+    const bool edited = mScriptFor == key && mScriptBuffer != text;
+    if (mScriptFor != key) {
+      mScriptFor = key;
+      mScriptBuffer = text;
+      mScriptMessage.clear();
+      mScriptErrorLine = 0;
+    }
+    ImGui::TextDisabled("%s", path.empty() ? "(no such file yet: Apply makes it beside the scenario)" : path.c_str());
     ImGui::BeginDisabled(!edited);
     if (ImGui::Button("Apply")) {
-      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
-      mDocument.Script() = mScriptBuffer;
-      mDocument.SaveDataEdited(std::move(before));
+      if (mScriptFile == 0) {
+        EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+        mDocument.Script() = mScriptBuffer;
+        mDocument.SaveDataEdited(std::move(before));
+      } else if (mScriptFile == 1) {
+        mDocument.SetOptionsText(mScriptBuffer);
+      } else {
+        mDocument.SetTablesText(mScriptBuffer);
+      }
       mScriptMessage = "applied (one undo step)";
-      gpg::Logf("editor: script applied, %zu bytes", mScriptBuffer.size());
+      gpg::Logf("editor: %s applied, %zu bytes", fileName.c_str(), mScriptBuffer.size());
     }
     ImGui::SameLine();
     if (ImGui::Button("Revert")) {
-      mScriptBuffer = mDocument.Script();
+      mScriptBuffer = text;
       mScriptMessage.clear();
+      mScriptErrorLine = 0;
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
     if (ImGui::Button("Check")) {
       // The panel's text as it would be applied.
-      const std::string kept = mDocument.Script();
-      mDocument.Script() = mScriptBuffer;
-      const std::vector<CheckIssue> issues = mDocument.CheckScripts();
-      mDocument.Script() = kept;
-      mScriptMessage = "compiles";
-      mScriptErrorLine = 0;
-      for (const CheckIssue& issue : issues) {
-        if (issue.file == MapDisplayName(mDocument.Facts().scriptPath) || issue.file.find("_script.lua") != std::string::npos) {
-          mScriptMessage = "line " + std::to_string(issue.line) + ": " + issue.text;
-          mScriptErrorLine = issue.line;
+      const CheckIssue issue = mDocument.CheckLuaText(mScriptBuffer, fileName);
+      mScriptMessage = issue.text.empty() ? std::string("compiles") : "line " + std::to_string(issue.line) + ": " + issue.text;
+      mScriptErrorLine = issue.text.empty() ? 0 : std::max(issue.line, 1);
+      // The tables must also read as the Adaptive tool reads them.
+      if (issue.text.empty() && mScriptFile == 2) {
+        AdaptiveTables tables;
+        std::string error;
+        if (!ParseAdaptiveTables(mScriptBuffer, tables, error)) {
+          mScriptMessage = "compiles, but the Adaptive tool can't read it: " + error;
         }
       }
-      gpg::Logf("editor: script check: %s", mScriptMessage.c_str());
+      gpg::Logf("editor: %s check: %s", fileName.c_str(), mScriptMessage.c_str());
     }
     if (!mScriptMessage.empty()) {
       ImGui::PushTextWrapPos(0.0f);

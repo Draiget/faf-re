@@ -14,6 +14,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdNewMap.cpp
   doc/EdSaveFile.cpp
   doc/EdUnits.cpp
+  doc/EdUnitFate.cpp
   doc/EdPackage.cpp
   doc/EdWaterPreset.cpp
   doc/EdJson.cpp
@@ -43,6 +44,7 @@ set(FAF_EDITOR_SOURCES
   ui/EdArmiesPanel.cpp
   ui/EdPropertiesPanel.cpp
   ui/EdAdaptivePanel.cpp
+  ui/EdUnitFatePanel.cpp
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp

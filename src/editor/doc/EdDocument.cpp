@@ -724,6 +724,9 @@ namespace faf::editor
       {name(mPath, "_scenario.lua"), &mScenario},
       {name(mFacts.savePath, "_save.lua"), nullptr},
       {name(mFacts.scriptPath, "_script.lua"), &mScript},
+      // An adaptive map's lobby options and tables (empty when it has none: skipped).
+      {name(mFacts.optionsPath, "_options.lua"), &mOptions},
+      {name(mFacts.tablesPath, "_tables.lua"), &mTables},
     };
     const std::string save = mSave.Text();
     for (const auto& [file, text] : files) {
@@ -752,6 +755,32 @@ namespace faf::editor
       lua_settop(L, top);
     }
     return issues;
+  }
+
+  CheckIssue EdDocument::CheckLuaText(const std::string& text, const std::string& name) const
+  {
+    CheckIssue issue;
+    issue.file = name;
+    if (mLua == nullptr || text.empty()) {
+      return issue;
+    }
+    lua_State* const L = mLua->GetCState();
+    const int top = lua_gettop(L);
+    const std::string chunk = "=" + name;
+    if (luaL_loadbuffer(L, text.data(), text.size(), chunk.c_str()) != 0) {
+      const char* const message = lua_tostring(L, -1);
+      issue.level = CheckIssue::Level::Error;
+      int line = 0;
+      std::string what;
+      if (message != nullptr && ParseLuaError(message, line, what)) {
+        issue.line = line;
+        issue.text = what;
+      } else {
+        issue.text = message != nullptr ? message : "does not compile";
+      }
+    }
+    lua_settop(L, top);
+    return issue;
   }
 
   std::vector<std::string> EdDocument::ArmyNamesInUse() const

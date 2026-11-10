@@ -38,7 +38,6 @@ namespace faf::editor
     , mPlay(play)
     , mDocument(document)
   {
-    mTools.SetAdaptiveDraw([this] { DrawAdaptivePanel(); });
     gpg::gal::DeviceRuntimeInfo info;
     if (gpg::gal::Device::IsReady() && gpg::gal::Device::GetInstance()->GetRuntimeInfo(info)) {
       mApi = info.api.c_str();
