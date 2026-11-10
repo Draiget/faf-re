@@ -8,6 +8,11 @@
 #include "moho/mesh/MeshThumbnail.h"
 #include "Wm3Vector3.h"
 
+namespace gpg::gal
+{
+  class Texture;
+}
+
 namespace moho
 {
   class ID3DDepthStencil;
@@ -134,7 +139,8 @@ namespace moho
   public:
     std::uint8_t mRenderResourcesInitialized; // +0x04
     std::uint8_t mPad05_07[0x03]{};
-    boost::shared_ptr<TextureD3D9> mThumbnailTexture;  // +0x08
+    /** The read-back copy of the colour target, 512 x 512 (EnsureTargets). */
+    boost::shared_ptr<gpg::gal::Texture> mThumbnailTexture; // +0x08
     boost::shared_ptr<ID3DRenderTarget> mColorTarget;  // +0x10
     boost::shared_ptr<ID3DDepthStencil> mDepthStencil; // +0x18
     std::uint32_t mNextRequestId;                      // +0x20
@@ -158,7 +164,7 @@ namespace moho
     const gpg::Rect2f& outputRect
   );
 
-  static_assert(sizeof(boost::shared_ptr<TextureD3D9>) == 0x08, "boost::shared_ptr<TextureD3D9> size must be 0x08");
+  static_assert(sizeof(boost::shared_ptr<gpg::gal::Texture>) == 0x08, "boost::shared_ptr<gpg::gal::Texture> size must be 0x08");
   static_assert(
     sizeof(boost::shared_ptr<ID3DRenderTarget>) == 0x08, "boost::shared_ptr<ID3DRenderTarget> size must be 0x08"
   );

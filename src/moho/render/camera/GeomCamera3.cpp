@@ -259,7 +259,10 @@ namespace
     const Wm3::Vector3f& eye, const Wm3::Vector3f& target, const Wm3::Vector3f& up
   ) noexcept
   {
-    Wm3::Vector3f forward{target.x - eye.x, target.y - eye.y, target.z - eye.z};
+    // 0x004EF6E3..0x004EF71D: `[ecx] - [eax]`, and GeomCamera3::LookAt (0x00471540) hands the eye in ECX and the
+    // target in EAX (MeshThumbnailRenderer's call at 0x007EB31C..0x007EB34B): the axis points from the target back to
+    // the eye, so what the camera looks at lies along its -Z, as ViewInitOrtho's depth lane expects.
+    Wm3::Vector3f forward{eye.x - target.x, eye.y - target.y, eye.z - target.z};
     if (Wm3::Vector3f::Normalize(&forward) == 0.0f) {
       forward = {0.0f, 0.0f, 1.0f};
     }

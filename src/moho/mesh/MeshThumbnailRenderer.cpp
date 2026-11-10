@@ -6,10 +6,20 @@
 #include <stdexcept>
 
 #include "moho/mesh/Mesh.h"
+#include "gpg/core/utils/Logging.h"
+#include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/ID3DTextureSheet.h"
+#include "moho/render/ID3DRenderTarget.h"
+#include "moho/misc/ID3DDeviceResources.h"
+#include "gpg/gal/TextureContext.h"
+#include "gpg/gal/Device.hpp"
 #include "moho/render/WRenViewport.h"
 
 namespace
 {
+  /** The thumbnail surfaces' side: `mov eax, 0x200` at 0x007EAB42, `push 0x200` at 0x007EABF2 and 0x007EAC75. */
+  constexpr std::uint32_t kThumbnailSurfaceSize = 0x200;
+
   [[nodiscard]] bool Finite(const float value) noexcept
   {
     return std::isfinite(value);
@@ -313,9 +323,29 @@ namespace moho
       return;
     }
 
-    // Recovered constants: 512x512 thumbnail surface, color format=2, depth format=3.
-    // Full D3D device/resource interface lifting is still in progress, so we keep
-    // this method as the explicit initialization seam.
+    // 0x007EAB14..0x007EACF4: three 512 x 512 surfaces. The read-back texture through the gal device's CreateTexture
+    // (vtable +0x28) with a context of source 2, usage 3, format 2, one mip level; the colour target (format 2) and
+    // the depth-stencil (format 3) through the device resources' CreateRenderTarget (+0x08) and CreateDepthStencil
+    // (+0x10).
+    CD3DDevice* const device = D3D_GetDevice();
+    if (device == nullptr || device->GetResources() == nullptr || device->GetGalDevice() == nullptr) {
+      return;
+    }
+    ID3DDeviceResources* const resources = device->GetResources();
+    gpg::gal::TextureContext context;
+    context.source_ = 2;
+    context.usage_ = 3;
+    context.format_ = 2;
+    context.mipmapLevels_ = 1;
+    context.width_ = kThumbnailSurfaceSize;
+    context.height_ = kThumbnailSurfaceSize;
+    mThumbnailTexture = device->GetGalDevice()->CreateTexture(&context);
+    ID3DDeviceResources::RenderTargetHandle colorTarget;
+    (void)resources->CreateRenderTarget(colorTarget, kThumbnailSurfaceSize, kThumbnailSurfaceSize, 2);
+    mColorTarget = colorTarget;
+    ID3DDeviceResources::DepthStencilHandle depthStencil;
+    (void)resources->CreateDepthStencil(depthStencil, kThumbnailSurfaceSize, kThumbnailSurfaceSize, 3);
+    mDepthStencil = depthStencil;
     mRenderResourcesInitialized = 1;
   }
 
@@ -441,16 +471,30 @@ namespace moho
       meshRenderer->RenderThumbnail(request.camera, request.meshInstance, mColorTarget.get(), mDepthStencil.get());
     }
 
-    if (request.outputSheet) {
-      // Binary flow copies the color target into the destination texture-sheet
-      // rect using device surface updates. The typed sheet/surface interface
-      // chain is being reconstructed in a follow-up pass.
-    }
-
-    // Texture-sheet upload sequence (surface acquire + device update) is still
-    // being lifted with typed D3D interfaces.
+    // 0x007EB7ED..0x007EB800: the instance is done with.
     delete request.meshInstance;
     request.meshInstance = nullptr;
+
+    // 0x007EB806..0x007EB919: the colour target read back into the thumbnail texture (gal Device +0x44,
+    // GetRenderTargetData), then that copied into the output sheet's rectangle (+0x4C, UpdateSurface, no source
+    // rect): the rectangle is the request's 0..1 rect times the sheet's dimensions (sheet vtable +0x04).
+    const boost::shared_ptr<ID3DTextureSheet> sheet = request.outputSheet;
+    gpg::gal::Device* const gal = gpg::gal::Device::GetInstance();
+    if (sheet && mColorTarget && mThumbnailTexture && gal != nullptr) {
+      Wm3::Vector3f dimensions{};
+      (void)sheet->GetDimensions(&dimensions);
+      RECT destination{};
+      destination.left = static_cast<LONG>(request.outputRect.x0 * dimensions.x);
+      destination.top = static_cast<LONG>(request.outputRect.z0 * dimensions.y);
+      destination.right = static_cast<LONG>(request.outputRect.x1 * dimensions.x);
+      destination.bottom = static_cast<LONG>(request.outputRect.z1 * dimensions.y);
+      ID3DRenderTarget::SurfaceHandle surface;
+      (void)mColorTarget->GetSurface(surface);
+      gal->GetRenderTargetData(surface, mThumbnailTexture);
+      ID3DTextureSheet::TextureHandle texture;
+      (void)sheet->GetTexture(texture);
+      gal->UpdateSurface(mThumbnailTexture, texture, nullptr, &destination);
+    }
     return true;
   }
 
