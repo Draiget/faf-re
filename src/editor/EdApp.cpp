@@ -26,6 +26,7 @@
 #include "editor/EdPlay.h"
 #include "editor/ui/EdHelp.h"
 #include "editor/EdShell.h"
+#include <cstring>
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdRoundTrip.h"
 #include "editor/ui/EdImGuiRenderer.h"
@@ -379,6 +380,9 @@ namespace faf::editor
       WaterBodiesRead mBodiesRead;
       bool mBodiesDragging = false;
       EdDocument::SaveSnapshot mBodiesBefore;
+      bool mBrowserArg = false;
+      std::string mBrowserFilterArg;
+      std::string mVaultMapArg;
       /** `/waterbody <body>` (test runs, '+' for spaces): a body added as one edit once the map is shown. */
       std::string mWaterBodyArg;
       /** `/waterpick <n>[,seed|outline]` or `/waterpick new` (test runs): a body chosen, and what a click in the view does. */
@@ -822,6 +826,16 @@ namespace faf::editor
         ImGui_ImplWin32_NewFrame();
         FeedUiClicks();
         ImGui::NewFrame();
+        // `/browser`, `/vaultmap <name>` (test runs), with or without a map open.
+        if (mBrowserArg) {
+          mBrowserArg = false;
+          mShell->Browser().Show();
+          mShell->Browser().SetFilter(mBrowserFilterArg);
+        }
+        if (!mVaultMapArg.empty()) {
+          mShell->Browser().Download(mVaultMapArg);
+          mVaultMapArg.clear();
+        }
         mShell->Draw();
         switch (mShell->TakeCommand()) {
         case EdShell::Command::Save:
@@ -928,6 +942,17 @@ namespace faf::editor
       }
       if (fa::vector<fa::string> pick; moho::CFG_GetArgOption("/waterpick", 1, &pick) && !pick.empty()) {
         mWaterPickArg = pick[0].c_str();
+      }
+      // `/browser` shows the map browser; `/vaultmap <name>` downloads a vault map and opens it (test runs).
+      if (moho::CFG_GetArgOption("/browser", 0, nullptr)) {
+        mBrowserArg = true;
+      }
+      if (fa::vector<fa::string> filter; moho::CFG_GetArgOption("/browserfilter", 1, &filter) && !filter.empty()) {
+        mBrowserArg = true;
+        mBrowserFilterArg = filter[0].c_str();
+      }
+      if (fa::vector<fa::string> vaultMap; moho::CFG_GetArgOption("/vaultmap", 1, &vaultMap) && !vaultMap.empty()) {
+        mVaultMapArg = vaultMap[0].c_str();
       }
       if (fa::vector<fa::string> body; moho::CFG_GetArgOption("/waterbody", 1, &body) && !body.empty()) {
         mWaterBodyArg = body[0].c_str();
@@ -2391,8 +2416,9 @@ namespace faf::editor
       std::vector<RECT> holes;
       if (mImGuiReady && !modal) {
         for (const ImGuiWindow* const window : ImGui::GetCurrentContext()->Windows) {
+          const bool floating = std::strncmp(window->Name, EdMapBrowser::kWindowName, std::strlen(EdMapBrowser::kWindowName)) == 0;
           if (!window->WasActive || window->Hidden ||
-              (window->Flags & (ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_Popup | ImGuiWindowFlags_ChildMenu)) == 0 ||
+              ((window->Flags & (ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_Popup | ImGuiWindowFlags_ChildMenu)) == 0 && !floating) ||
               (window->Flags & ImGuiWindowFlags_ChildWindow) != 0) {
             continue;
           }

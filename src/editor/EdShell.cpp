@@ -36,6 +36,7 @@ namespace faf::editor
     : mLog(log)
     , mPlay(play)
     , mDocument(document)
+    , mBrowser(play, document)
   {
     gpg::gal::DeviceRuntimeInfo info;
     if (gpg::gal::Device::IsReady() && gpg::gal::Device::GetInstance()->GetRuntimeInfo(info)) {
@@ -147,6 +148,7 @@ namespace faf::editor
   {
     HandleKeys();
     UpdateTestRun();
+    mBrowser.Update();
     const bool playing = mPlay.Active();
     const bool panels = !playing || mPanelsWhilePlaying;
 
@@ -237,6 +239,7 @@ namespace faf::editor
       ImGui::ShowDemoWindow(&mShowDemo);
     }
     DrawSaveAsDialog();
+    mBrowser.Draw();
     DrawNewMapDialog();
     DrawPackageDialog();
     DrawStatusBar();
@@ -363,11 +366,11 @@ namespace faf::editor
       ImGui::SameLine();
       const std::vector<std::string>& maps = mPlay.Maps();
       ImGui::BeginDisabled(maps.empty() || mDocument.GetState() == EdDocument::State::Loading);
-      if (ImGui::Button("Open") && !maps.empty()) {
-        (void)mDocument.Open(maps[static_cast<std::size_t>(mPlay.Selected())]);
+      if (ImGui::Button("Open")) {
+        mBrowser.Show();
       }
       ImGui::EndDisabled();
-      tip("Open the map picked in the Map panel for editing (or double-click it there)");
+      tip("Browse maps: every map on this computer (the game's, FAF's folder, your vault) and maps from the FAF vault");
       ImGui::SameLine();
       ImGui::BeginDisabled(!open);
       if (ImGui::Button("Save")) {
@@ -882,10 +885,14 @@ namespace faf::editor
     ImGui::TextDisabled("%s", mPlay.StateText());
     // Open: the picked map into the editor's document (the Info panel shows what it read).
     ImGui::BeginDisabled(maps.empty() || mDocument.GetState() == EdDocument::State::Loading);
-    if (ImGui::Button("Open for editing", ImVec2(-1.0f, 0.0f)) && !maps.empty()) {
+    if (ImGui::Button("Open for editing", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f, 0.0f)) && !maps.empty()) {
       (void)mDocument.Open(maps[static_cast<std::size_t>(selected)]);
     }
     ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Browse maps...", ImVec2(-1.0f, 0.0f))) {
+      mBrowser.Show();
+    }
     ImGui::Separator();
 
     DrawPlaySetup();

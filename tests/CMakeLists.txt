@@ -356,13 +356,14 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/ArmySlotTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdArmySlots.cpp
   editor/AdaptiveTablesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdAdaptiveTables.cpp
   editor/RecentMapsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdRecentMaps.cpp
+  editor/VaultTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdVault.cpp
   editor/WaterBodiesEditTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdWaterBodies.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLuaText.cpp
   ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
 target_include_directories(faf_editor_brush_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main ole32 windowscodecs zlib123)
+target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main ole32 windowscodecs zlib123 winhttp)
 set_target_properties(faf_editor_brush_tests PROPERTIES FOLDER "Tests/Editor")
 add_test(NAME editor_height_brush COMMAND faf_editor_brush_tests)
 set_tests_properties(editor_height_brush PROPERTIES LABELS "Editor")

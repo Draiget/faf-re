@@ -9,6 +9,7 @@
 #include "editor/doc/EdNewMap.h"
 #include "editor/doc/EdPackage.h"
 #include "editor/doc/EdSaveFile.h"
+#include "editor/ui/EdMapBrowser.h"
 #include "imgui.h"
 
 namespace faf::editor
@@ -30,6 +31,8 @@ namespace faf::editor
 
     /** Builds this frame's UI. */
     void Draw();
+    /** The map browser (on this computer, and the FAF vault). */
+    [[nodiscard]] EdMapBrowser& Browser() noexcept { return mBrowser; }
 
     // What the window's menu bar shows and changes.
     bool& ShowTools() noexcept { return mShowTools; }
@@ -98,6 +101,7 @@ namespace faf::editor
   private:
     void BuildDefaultLayout(unsigned int dockspaceId);
     /** The toolbar over the panels: Play/Stop (F5) first, then New, Open, Save, Save as, Undo, Redo, and the open map. */
+    EdMapBrowser mBrowser;
     void DrawToolbar(float height);
     Command mCommand = Command::None;
     void HandleKeys();
