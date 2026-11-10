@@ -364,7 +364,15 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
 target_include_directories(faf_editor_brush_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main ole32 windowscodecs zlib123 winhttp crypt32 shell32)
+# The zlib the engine links: 1.2.3 on x64, wx's 1.1.4 on x86 (src/CMakeLists.txt); x86 has no zlib123 target.
+if(TARGET zlib123)
+  set(_faf_editor_tests_zlib zlib123)
+else()
+  set(_faf_editor_tests_zlib wx_zlib)
+  # As the engine: zlib 1.2.3's headers, wx's library (which has no include folder of its own to hand on).
+  target_include_directories(faf_editor_brush_tests PRIVATE "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
+endif()
+target_link_libraries(faf_editor_brush_tests PRIVATE gtest_main ole32 windowscodecs ${_faf_editor_tests_zlib} winhttp crypt32 shell32)
 set_target_properties(faf_editor_brush_tests PROPERTIES FOLDER "Tests/Editor")
 add_test(NAME editor_height_brush COMMAND faf_editor_brush_tests)
 set_tests_properties(editor_height_brush PROPERTIES LABELS "Editor")

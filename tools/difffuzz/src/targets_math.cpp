@@ -1785,10 +1785,10 @@ namespace difffuzz
     void BoundsOurs(const u32* in, u32* out)
     {
       Wm3::Box3f box;
-      std::memcpy(&box.Center, in, 12);
-      std::memcpy(&box.Axis[0], in + 3, 12);
-      std::memcpy(&box.Axis[1], in + 6, 12);
-      std::memcpy(&box.Axis[2], in + 9, 12);
+      std::memcpy(static_cast<void*>(&box.Center), in, 12);
+      std::memcpy(static_cast<void*>(&box.Axis[0]), in + 3, 12);
+      std::memcpy(static_cast<void*>(&box.Axis[1]), in + 6, 12);
+      std::memcpy(static_cast<void*>(&box.Axis[2]), in + 9, 12);
       std::memcpy(box.Extent, in + 12, 12);
 #if defined(DIFFFUZZ_ENGINE_LINKED)
       const Wm3::AxisAlignedBox3f bounds = moho::AxisAlignedBoundsFromBox(box);
@@ -2006,17 +2006,17 @@ namespace difffuzz
     [[nodiscard]] Wm3::Box3f LoadBox(const u32* in)
     {
       Wm3::Box3f box;
-      std::memcpy(&box.Center, in, 12);
-      std::memcpy(&box.Axis[0], in + 3, 12);
-      std::memcpy(&box.Axis[1], in + 6, 12);
-      std::memcpy(&box.Axis[2], in + 9, 12);
+      std::memcpy(static_cast<void*>(&box.Center), in, 12);
+      std::memcpy(static_cast<void*>(&box.Axis[0]), in + 3, 12);
+      std::memcpy(static_cast<void*>(&box.Axis[1]), in + 6, 12);
+      std::memcpy(static_cast<void*>(&box.Axis[2]), in + 9, 12);
       std::memcpy(box.Extent, in + 12, 12);
       return box;
     }
     [[nodiscard]] Wm3::Sphere3f LoadSphere(const u32* in)
     {
       Wm3::Sphere3f sphere;
-      std::memcpy(&sphere.Center, in, 12);
+      std::memcpy(static_cast<void*>(&sphere.Center), in, 12);
       std::memcpy(&sphere.Radius, in + 3, 4);
       return sphere;
     }
@@ -2277,13 +2277,13 @@ namespace difffuzz
     void Box2PairOurs(const u32* in, u32* out)
     {
       Wm3::Box2f box0, box1;
-      std::memcpy(&box0.Center, in, 8);
-      std::memcpy(&box0.Axis[0], in + 2, 8);
-      std::memcpy(&box0.Axis[1], in + 4, 8);
+      std::memcpy(static_cast<void*>(&box0.Center), in, 8);
+      std::memcpy(static_cast<void*>(&box0.Axis[0]), in + 2, 8);
+      std::memcpy(static_cast<void*>(&box0.Axis[1]), in + 4, 8);
       std::memcpy(box0.Extent, in + 6, 8);
-      std::memcpy(&box1.Center, in + 8, 8);
-      std::memcpy(&box1.Axis[0], in + 10, 8);
-      std::memcpy(&box1.Axis[1], in + 12, 8);
+      std::memcpy(static_cast<void*>(&box1.Center), in + 8, 8);
+      std::memcpy(static_cast<void*>(&box1.Axis[0]), in + 10, 8);
+      std::memcpy(static_cast<void*>(&box1.Axis[1]), in + 12, 8);
       std::memcpy(box1.Extent, in + 14, 8);
       out[0] = Wm3::TestBox2Box2(box0, box1) ? 1u : 0u;
     }
@@ -2443,8 +2443,8 @@ namespace difffuzz
     {
 #if defined(DIFFFUZZ_ENGINE_LINKED)
       moho::VTransform transform;
-      std::memcpy(&transform.orient_, in, 16);
-      std::memcpy(&transform.pos_, in + 4, 12);
+      std::memcpy(static_cast<void*>(&transform.orient_), in, 16);
+      std::memcpy(static_cast<void*>(&transform.pos_), in + 4, 12);
       const moho::VTransform inverted = transform.Inverse();
       PutBlock(out, 0, &inverted.orient_, 4);
       PutBlock(out, 4, &inverted.pos_, 3);
@@ -2469,23 +2469,23 @@ namespace difffuzz
     void Distance2DOurs(const u32* in, u32* out)
     {
       Wm3::Vector2f from, to;
-      std::memcpy(&from, in, 8);
-      std::memcpy(&to, in + 2, 8);
+      std::memcpy(static_cast<void*>(&from), in, 8);
+      std::memcpy(static_cast<void*>(&to), in + 2, 8);
       Put(out, 0, moho::Distance2D(from, to));
     }
     void DistanceSquared2DRetail(const u32* in, u32* out) { Put(out, 0, retail::DistanceSquared2D(in, in + 2)); }
     void DistanceSquared2DOurs(const u32* in, u32* out)
     {
       Wm3::Vector2f from, to;
-      std::memcpy(&from, in, 8);
-      std::memcpy(&to, in + 2, 8);
+      std::memcpy(static_cast<void*>(&from), in, 8);
+      std::memcpy(static_cast<void*>(&to), in + 2, 8);
       Put(out, 0, moho::DistanceSquared2D(from, to));
     }
     void Valid2Retail(const u32* in, u32* out) { out[0] = static_cast<u32>(retail::IsValidVector2f(in)); }
     void Valid2Ours(const u32* in, u32* out)
     {
       Wm3::Vector2f v;
-      std::memcpy(&v, in, 8);
+      std::memcpy(static_cast<void*>(&v), in, 8);
       out[0] = moho::IsValidVector2f(v) ? 1u : 0u;
     }
 
@@ -2541,8 +2541,8 @@ namespace difffuzz
       moho::RaySlabState state;
       Wm3::AxisAlignedBox3f box;
       std::memcpy(&state, in, sizeof(state));
-      std::memcpy(&box.Min, in + 8, 12);
-      std::memcpy(&box.Max, in + 11, 12);
+      std::memcpy(static_cast<void*>(&box.Min), in + 8, 12);
+      std::memcpy(static_cast<void*>(&box.Max), in + 11, 12);
       out[8] = moho::RayBoxSlabClip(state, box) ? 1u : 0u;
       PutBlock(out, 0, &state, 8);
     }

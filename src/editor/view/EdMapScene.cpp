@@ -631,8 +631,6 @@ namespace faf::editor
     // The Select tool: a ring around what a click would pick (Blender's hover highlight).
     if (mTools->SelectToolActive() && !mDragMarkers && !mDragUnits && !mDragDecals && !mDragSelection && mGizmoDrag == GizmoPart::None &&
         PickGizmo(mCursor) == GizmoPart::None) {
-      float gx = 0.0f;
-      float gz = 0.0f;
       float hx = 0.0f;
       float hz = 0.0f;
       float radius = 0.0f;

@@ -370,7 +370,7 @@ end
           const LuaPlus::LuaObject key = entry[keyField];
           const LuaPlus::LuaObject name = entry[nameField];
           if (key.IsString()) {
-            out.push_back({key.GetString(), WithoutLocTag(name.IsString() ? name.GetString() : key.GetString())});
+            out.push_back({key.GetString(), WithoutLocTag(name.IsString() ? name.GetString() : key.GetString()), std::string()});
           }
         }
       } catch (const std::exception& error) {

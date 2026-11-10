@@ -11,7 +11,7 @@ namespace moho
    * VFTABLE: 0x00E40584
    * COL:     0x00E985C4
    */
-  class SimpleRenderWorldView : public IRenderWorldView
+  class SimpleRenderWorldView final : public IRenderWorldView
   {
   public:
     /**

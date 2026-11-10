@@ -514,8 +514,8 @@ namespace mirror
   {
     Wm3::Quaternionf orient;
     Wm3::Vector3f pos;
-    std::memcpy(&orient, transform, sizeof(orient));
-    std::memcpy(&pos, transform + 4, sizeof(pos));
+    std::memcpy(static_cast<void*>(&orient), transform, sizeof(orient));
+    std::memcpy(static_cast<void*>(&pos), transform + 4, sizeof(pos));
 
     Wm3::Quaternionf invertedOrient;
     invertedOrient.w = orient.w;

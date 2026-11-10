@@ -1,4 +1,5 @@
 #include "editor/ui/EdMapBrowser.h"
+#include "editor/EdPath.h"
 
 #include <algorithm>
 #include <cctype>
@@ -176,17 +177,6 @@ namespace faf::editor
       ImGui::PopStyleVar(2);
     }
 
-    /** Text centred on the current line. */
-    void Centered(const char* const text, const ImVec4* const color = nullptr)
-    {
-      const float w = ImGui::CalcTextSize(text).x;
-      ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (ImGui::GetContentRegionAvail().x - w) * 0.5f));
-      if (color != nullptr) {
-        ImGui::TextColored(*color, "%s", text);
-      } else {
-        ImGui::TextUnformatted(text);
-      }
-    }
   } // namespace
 
   bool EdMapBrowser::OpenLink(const std::string& url)
@@ -683,7 +673,7 @@ namespace faf::editor
             }
             ImGui::BeginDisabled(details.disk.empty());
             if (ImGui::MenuItem("Show its folder")) {
-              const std::filesystem::path folder = std::filesystem::u8path(details.disk).parent_path();
+              const std::filesystem::path folder = PathFromUtf8(details.disk).parent_path();
               (void)::ShellExecuteW(nullptr, L"open", folder.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
             }
             ImGui::EndDisabled();

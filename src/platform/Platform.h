@@ -117,8 +117,9 @@
  * Checked with -fdump-record-layouts against /d1reportSingleClassLayout for
  * x86 and x64, and by the Win32 layout static_asserts.
  */
-#if defined(__clang__)
+#if defined(__clang__) && defined(_MSC_VER)
 #define MOHO_CLANG_EMPTY_BASE_LAYOUT __declspec(empty_bases)
 #else
+// The Itanium ABI (Linux, macOS) has no such attribute and lays empty bases out without it.
 #define MOHO_CLANG_EMPTY_BASE_LAYOUT
 #endif

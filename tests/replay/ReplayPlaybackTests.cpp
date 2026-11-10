@@ -37,8 +37,20 @@ namespace
 {
   std::string Environment(const char* const name, const char* const fallback)
   {
+#if defined(_MSC_VER)
+    // The MSVC runtime marks getenv unsafe (-Wdeprecated-declarations); _dupenv_s is its own.
+    char* value = nullptr;
+    std::size_t length = 0;
+    std::string text;
+    if (_dupenv_s(&value, &length, name) == 0 && value != nullptr) {
+      text = value;
+      std::free(value);
+    }
+    return !text.empty() ? text : std::string(fallback);
+#else
     const char* const value = std::getenv(name);
     return value != nullptr && value[0] != '\0' ? std::string(value) : std::string(fallback);
+#endif
   }
 
   std::vector<std::string> Split(const std::string& text)

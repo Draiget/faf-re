@@ -1930,9 +1930,9 @@ namespace
   void TestSoundTable()
   {
     CSoundTableWriter writer;
-    const SSoundEntry a{"UEL_Weapon", "UEL0101_MachineGun", ""};
-    const SSoundEntry b{"UEL_Weapon", "UEL0101_MachineGun", "Weapon_LodCutoff"};
-    const SSoundEntry c{"Explosions", "Explosion_Large", ""};
+    const SSoundEntry a{"UEL_Weapon", "UEL0101_MachineGun", "", ""};
+    const SSoundEntry b{"UEL_Weapon", "UEL0101_MachineGun", "Weapon_LodCutoff", ""};
+    const SSoundEntry c{"Explosions", "Explosion_Large", "", ""};
     const auto ia = writer.Intern(a);
     const auto ib = writer.Intern(b);
     const auto ia2 = writer.Intern(a);
@@ -2007,7 +2007,7 @@ namespace
     CSoundTableWriter many;
     BitWriter all;
     for (std::uint32_t i = 0; i <= CSoundTableReader::kMaxEntries; ++i) {
-      const auto interned = many.Intern({"b", std::to_string(i), ""});
+      const auto interned = many.Intern({"b", std::to_string(i), "", ""});
       many.WriteEntry(interned.id, all);
     }
     const std::vector<std::uint8_t> allBytes = Bytes(all);

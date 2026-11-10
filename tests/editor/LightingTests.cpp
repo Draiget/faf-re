@@ -2,6 +2,7 @@
 // and written.
 
 #include "editor/doc/EdLighting.h"
+#include "TestEnv.h"
 
 #include <gtest/gtest.h>
 #include <iterator>
@@ -78,7 +79,8 @@ namespace
   }
   TEST(Lighting, ReadsEveryRetailMapsLighting)
   {
-    const char* const folder = std::getenv("FAF_RETAIL_MAPS");
+    const std::string folderText = faf::editor::test::EnvText("FAF_RETAIL_MAPS");
+    const char* const folder = folderText.empty() ? nullptr : folderText.c_str();
     if (folder == nullptr) {
       GTEST_SKIP() << "FAF_RETAIL_MAPS is not set";
     }

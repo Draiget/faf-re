@@ -2,6 +2,7 @@
 // archive into the maps folder (and refusing archives that would write elsewhere).
 
 #include "editor/doc/EdVault.h"
+#include "TestEnv.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -94,7 +95,8 @@ namespace
   // A real vault archive (FAF's are written with data descriptors): FAF_VAULT_ZIP names one, its folder the file name.
   TEST(Vault, RealVaultArchiveInstalls)
   {
-    const char* const file = std::getenv("FAF_VAULT_ZIP");
+    const std::string fileText = faf::editor::test::EnvText("FAF_VAULT_ZIP");
+    const char* const file = fileText.empty() ? nullptr : fileText.c_str();
     if (file == nullptr) {
       GTEST_SKIP() << "FAF_VAULT_ZIP is not set";
     }

@@ -1001,7 +1001,6 @@ namespace faf::editor
     std::vector<ScenarioTeam> mTeamsChange;
     bool mTeamsChanged = false;
     char mExtraBuffer[256]{};
-    bool mExtraEditing = false;
     bool mExtraChanged = false;
     std::string mMarkerEditName;
     std::string mMarkerEditKey;

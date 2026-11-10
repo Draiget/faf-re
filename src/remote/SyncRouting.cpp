@@ -572,7 +572,7 @@ namespace faf::remote
      * `SyncRecallStatus()`: a lockstep client's sim keeps one thread that sends its status as its
      * cooldown runs out. Here each view has a due tick (`RunRecallStatus`).
      */
-    int RecallStatusThunk(lua_State* const state)
+    int RecallStatusThunk([[maybe_unused]] lua_State* const state)
     {
       CSyncRouter* const router = sActiveRouter;
       if (router == nullptr || router->CurrentSim() == nullptr) {

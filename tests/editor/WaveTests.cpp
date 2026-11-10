@@ -3,6 +3,7 @@
 // to the game's maps folder, every retail map's wave section reads and writes back byte for byte.
 
 #include "editor/tools/EdWaves.h"
+#include "TestEnv.h"
 
 #include <gtest/gtest.h>
 
@@ -63,7 +64,8 @@ namespace
 
   TEST(Waves, RetailMapsWaveSectionsRoundTrip)
   {
-    const char* const folder = std::getenv("FAF_RETAIL_MAPS");
+    const std::string folderText = faf::editor::test::EnvText("FAF_RETAIL_MAPS");
+    const char* const folder = folderText.empty() ? nullptr : folderText.c_str();
     if (folder == nullptr) {
       GTEST_SKIP() << "FAF_RETAIL_MAPS is not set";
     }

@@ -33,10 +33,10 @@ namespace faf::editor
   } // namespace
 
   EdShell::EdShell(EdLog& log, EdPlay& play, EdDocument& document)
-    : mLog(log)
+    : mBrowser(play, document)
+    , mLog(log)
     , mPlay(play)
     , mDocument(document)
-    , mBrowser(play, document)
   {
     gpg::gal::DeviceRuntimeInfo info;
     if (gpg::gal::Device::IsReady() && gpg::gal::Device::GetInstance()->GetRuntimeInfo(info)) {
@@ -890,10 +890,10 @@ namespace faf::editor
     if (ImGui::Button("Browse maps...", ImVec2(-1.0f, 0.0f))) {
       mBrowser.Show();
     }
+    ImGui::SetItemTooltip("Every map on this computer and the FAF vault (File > Open, Ctrl+O); recent ones are in File > Open Recent");
     ImGui::Separator();
 
     DrawPlaySetup();
-    ImGui::Separator();
 
     // The maps opened last, newest first: a click opens one (and picks it for Play).
     {
@@ -912,29 +912,18 @@ namespace faf::editor
         if (shown++ == 0) {
           ImGui::TextDisabled("RECENT");
         }
-        const std::size_t at = static_cast<std::size_t>(index);
-        ImGui::PushID(index + 100000);
-        ImGui::BeginDisabled(mPlay.Active() || mDocument.GetState() == EdDocument::State::Loading);
-        const bool current = mDocument.GetState() == EdDocument::State::Open && ImStricmp(mDocument.Path().c_str(), recent.c_str()) == 0;
-        if (ImGui::Selectable("##recent", current, ImGuiSelectableFlags_AllowOverlap) && !current) {
-          mPlay.Select(index);
-          (void)mDocument.Open(maps[at]);
+        row("Contents");
+        ImGui::Text("%d markers, %d props, %d decals", facts.markerCount, facts.props, facts.decals);
+        if (!facts.description.empty()) {
+          row("About");
+          ImGui::PushTextWrapPos(0.0f);
+          ImGui::TextUnformatted(facts.description.c_str());
+          ImGui::PopTextWrapPos();
         }
-        ImGui::EndDisabled();
-        if (ImGui::IsItemHovered()) {
-          ImGui::SetTooltip("%s\nClick to open for editing", maps[at].c_str());
+        if (ImGui::SmallButton("More in the Info panel")) {
+          mShowInfo = true;
+          ImGui::SetWindowFocus(kInfoWindow);
         }
-        ImGui::SameLine(ImGui::GetStyle().ItemSpacing.x);
-        ImGui::TextUnformatted(titles[at].c_str());
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", MapDisplayName(maps[at]).c_str());
-        ImGui::PopID();
-        if (shown >= 5) {
-          break;
-        }
-      }
-      if (shown > 0) {
-        ImGui::Separator();
       }
     }
 
@@ -968,8 +957,6 @@ namespace faf::editor
         ImGui::PopID();
       }
     }
-    ImGui::EndChild();
-    ImGui::EndDisabled();
     ImGui::End();
   }
 

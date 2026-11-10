@@ -83,7 +83,6 @@ namespace difffuzz
     using u32 = std::uint32_t;
 
     [[nodiscard]] float F(const u32* in, const int i) noexcept { return FromBits(in[i]); }
-    void Put(u32* out, const int i, const float f) noexcept { out[i] = Bits(f); }
 
     [[nodiscard]] float NearFloat(Rng& rng, const double value)
     {
@@ -527,7 +526,7 @@ namespace difffuzz
       moho::CHeightField field(static_cast<int>(in[0]), static_cast<int>(in[1]));
       BuildOurField(field, in);
       moho::GeomLine3 line{};
-      std::memcpy(&line, in + 4, sizeof(line));
+      std::memcpy(static_cast<void*>(&line), in + 4, sizeof(line));
       moho::CGeomHitResult res{};
       std::memcpy(&res, &kCanary, 4);
       std::memcpy(&res.v1, &kCanary, 4);
@@ -597,8 +596,8 @@ namespace difffuzz
       BuildOurField(field, in);
       Wm3::Vec3f pos;
       Wm3::Vec3f dir;
-      std::memcpy(&pos, in + 4, 12);
-      std::memcpy(&dir, in + 7, 12);
+      std::memcpy(static_cast<void*>(&pos), in + 4, 12);
+      std::memcpy(static_cast<void*>(&dir), in + 7, 12);
       float min = F(in, 10);
       float max = F(in, 11);
       const bool clipped = field.ClipSegmentToWorld(pos, dir, min, max);
@@ -881,14 +880,14 @@ namespace difffuzz
     {
       Wm3::Vector3f up;
       Wm3::Vector3f forward;
-      std::memcpy(&up, in, 12);
-      std::memcpy(&forward, in + 3, 12);
+      std::memcpy(static_cast<void*>(&up), in, 12);
+      std::memcpy(static_cast<void*>(&forward), in + 3, 12);
       moho::VAxes3 axes;
       u32 canary[9];
       for (u32& lane : canary) {
         lane = kCanary;
       }
-      std::memcpy(&axes, canary, sizeof(canary));
+      std::memcpy(static_cast<void*>(&axes), canary, sizeof(canary));
       moho::VEC_LookAt(up, forward, &axes);
       std::memcpy(out, &axes, sizeof(canary));
     }
@@ -918,13 +917,13 @@ namespace difffuzz
       moho::VMatrix4 lhs;
       moho::VMatrix4 rhs;
       moho::VMatrix4 result;
-      std::memcpy(&lhs, in, 64);
-      std::memcpy(&rhs, in + 16, 64);
+      std::memcpy(static_cast<void*>(&lhs), in, 64);
+      std::memcpy(static_cast<void*>(&rhs), in + 16, 64);
       u32 canary[16];
       for (u32& lane : canary) {
         lane = kCanary;
       }
-      std::memcpy(&result, canary, sizeof(canary));
+      std::memcpy(static_cast<void*>(&result), canary, sizeof(canary));
       moho::VEC_Mul4x3(lhs, result, rhs);
       std::memcpy(out, &result, sizeof(canary));
     }
@@ -1866,7 +1865,7 @@ namespace difffuzz
     void AABoxToRectOurs(const u32* in, u32* out)
     {
       Wm3::AxisAlignedBox3f box;
-      std::memcpy(&box, in, 24);
+      std::memcpy(static_cast<void*>(&box), in, 24);
       moho::CollisionDBRect rect{0x1111, 0x2222, 0x3333, 0x4444};
       moho::func_AABoxToRect(&rect, box);
       out[0] = rect.mStartX | (static_cast<u32>(rect.mStartZ) << 16);
@@ -3330,8 +3329,9 @@ namespace difffuzz
         if (p == &state->_gt) {
           return 0x201u;
         }
-        if (p >= &closure->upvalue_m1[0] && p <= &closure->upvalue_m1[8]) {
-          return 0x300u + static_cast<u32>(p - &closure->upvalue_m1[0]);
+        // upvalue_m1 is declared [1] and allocated longer (Lua's trailing array): read through a pointer.
+        if (const LuaPlus::TObject* const upvalues = closure->upvalue_m1; p >= upvalues && p <= upvalues + 8) {
+          return 0x300u + static_cast<u32>(p - upvalues);
         }
         return registry.Slot(p);
       }

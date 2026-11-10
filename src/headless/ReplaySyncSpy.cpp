@@ -51,7 +51,7 @@ namespace faf::headless
     const remote::CViewIdMap idMap;
     const std::vector<std::uint8_t>& table;
     std::size_t pos = 0;
-    std::string_view topKey;
+    std::string_view topKey{};
     bool endsLabel = false; // the id's value is a boolean: a reclaim label's end, not a new one
 
     [[nodiscard]] bool Left(const std::size_t count) const noexcept { return pos + count <= table.size(); }

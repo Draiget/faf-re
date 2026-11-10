@@ -86,7 +86,7 @@ namespace faf::editor
       }
     }
     const auto add = [&](const CheckIssue::Level level, const Point& p, const std::string& text) {
-      issues.push_back({level, p.marker->name, text, p.x, p.z});
+      issues.push_back({level, p.marker->name, text, p.x, p.z, std::string(), 0});
     };
     const auto what = [](const Point& p) { return std::string(p.type == "Blank Marker" ? "start position" : p.type == "Mass" ? "mass point" : "hydrocarbon point"); };
 

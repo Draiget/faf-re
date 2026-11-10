@@ -2,6 +2,7 @@
 // written, and turned into what the game fills.
 
 #include "editor/doc/EdLuaText.h"
+#include "TestEnv.h"
 #include "editor/doc/EdWaterBodies.h"
 
 #include <gtest/gtest.h>
@@ -249,7 +250,8 @@ string]],
 
   TEST(WaterBodiesEdit, EveryRetailScenarioReadsAndTakesABody)
   {
-    const char* const folder = std::getenv("FAF_RETAIL_MAPS");
+    const std::string folderText = faf::editor::test::EnvText("FAF_RETAIL_MAPS");
+    const char* const folder = folderText.empty() ? nullptr : folderText.c_str();
     if (folder == nullptr) {
       GTEST_SKIP() << "FAF_RETAIL_MAPS is not set";
     }

@@ -1,4 +1,5 @@
 #include "editor/EdApp.h"
+#include "editor/EdPath.h"
 #include "editor/view/EdPropThumbnails.h"
 #include "editor/doc/EdAdaptiveTables.h"
 #include <iterator>
@@ -1112,7 +1113,7 @@ namespace faf::editor
           mVaultSearchArg.clear();
         }
         if (!mOpenFolderArg.empty()) {
-          mShell->Browser().OpenFromDisk(std::filesystem::u8path(mOpenFolderArg));
+          mShell->Browser().OpenFromDisk(PathFromUtf8(mOpenFolderArg));
           mOpenFolderArg.clear();
         }
         if (mShell->Browser().TakeOpenFileAsk()) {

@@ -86,7 +86,6 @@ namespace faf::editor
     EdPlay& mPlay;
     EdDocument& mDocument;
     bool mOpen = false;
-    int mTab = 0;
     char mFilter[96]{};
     int mWhere = 0;
     char mVaultName[256]{};

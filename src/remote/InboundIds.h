@@ -139,7 +139,7 @@ namespace faf::remote
       return true;
     }
     /** Whether an unmarked Lua value is worth logging as an id (none by default). */
-    [[nodiscard]] virtual bool LooksRenumbered(std::uint32_t value) const { return false; }
+    [[nodiscard]] virtual bool LooksRenumbered([[maybe_unused]] std::uint32_t value) const { return false; }
 
   private:
     using EntitySet = moho::BVSet<moho::EntId, moho::EntIdUniverse>;

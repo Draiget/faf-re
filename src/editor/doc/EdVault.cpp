@@ -1,4 +1,5 @@
 #include "editor/doc/EdVault.h"
+#include "editor/EdPath.h"
 
 #include <algorithm>
 #include <cctype>
@@ -236,10 +237,10 @@ namespace faf::editor
       error = "the archive has no _scenario.lua in " + folder;
       return false;
     }
-    const std::filesystem::path target = mapsFolder / std::filesystem::u8path(folder);
+    const std::filesystem::path target = mapsFolder / PathFromUtf8(folder);
     std::error_code code;
     for (const auto& [path, entry] : files) {
-      const std::filesystem::path file = target / std::filesystem::u8path(path);
+      const std::filesystem::path file = target / PathFromUtf8(path);
       std::filesystem::create_directories(file.parent_path(), code);
       std::ofstream out(file, std::ios::binary | std::ios::trunc);
       out.write(entry->data.data(), static_cast<std::streamsize>(entry->data.size()));

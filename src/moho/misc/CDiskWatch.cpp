@@ -41,11 +41,12 @@ namespace
   constexpr const char* kEnablePrivilegesWarning =
     "CDiskWatch::EnablePrivileges: Unable to enable privilege: %s -- GetLastError(): %d "
     "Notifications may not work as intended due to insufficient access rights/process privileges.";
+#if FAFRE_PLATFORM_WINDOWS
   constexpr const char* kReadDirectoryChangesFailedWarning = "CDiskWatch::Read() failed: %s";
   constexpr const char* kGetOverlappedResultFailedWarning = "CDiskWatch::Check(): GetOverlappedResult() failed: %s";
+#endif
 
-  [[nodiscard]]
-  [[nodiscard]]
+#if FAFRE_PLATFORM_WINDOWS
   [[nodiscard]]
   int ComparePathViews(const std::string_view lhs, const std::string_view rhs)
   {
@@ -65,6 +66,7 @@ namespace
   {
     return ComparePathViews(lhs.view(), rhs.view());
   }
+#endif
 
   [[noreturn]] void ThrowFileWildError(const char* const message)
   {
@@ -152,12 +154,14 @@ namespace
   }
 #endif
 
+#if FAFRE_PLATFORM_WINDOWS
   void SetEventTimestampFromTimer(SDiskWatchEvent& event, const gpg::time::Timer& timer)
   {
     const std::uint64_t rawTimestamp = static_cast<std::uint64_t>(timer.mTime);
     event.mTimestampLow = static_cast<std::uint32_t>(rawTimestamp & 0xFFFFFFFFu);
     event.mTimestampHigh = static_cast<std::uint32_t>(rawTimestamp >> 32u);
   }
+#endif
 
   [[nodiscard]]
   std::uint64_t GetEventTimestamp(const SDiskWatchEvent& event)
@@ -174,6 +178,7 @@ namespace
     return gpg::time::CyclesToMilliseconds(static_cast<LONGLONG>(elapsedCycles)) >= kPendingEventDispatchDelayMs;
   }
 
+#if FAFRE_PLATFORM_WINDOWS
   [[nodiscard]]
   bool IsDuplicateEvent(
     const fa::vector<SDiskWatchEvent>& queuedEvents,
@@ -188,6 +193,7 @@ namespace
     }
     return false;
   }
+#endif
 
   [[nodiscard]]
   bool IsFileStillWriterLocked(const SDiskWatchEvent& event)

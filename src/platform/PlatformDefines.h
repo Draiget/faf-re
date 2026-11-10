@@ -39,3 +39,23 @@
 #if (FAFRE_PLATFORM_WINDOWS + FAFRE_PLATFORM_LINUX + FAFRE_PLATFORM_MACOS) != 1
   #error "platform/PlatformDefines.h: exactly one of Windows, Linux and macOS must be the target"
 #endif
+
+/**
+ * The Windows calling conventions the recovered code spells (`static void __stdcall AddBase_CTask(...)`, the
+ * binary's): only Windows has them (x86 uses them, x64 ignores them). Elsewhere clang ignored each one with a
+ * warning ("calling convention is not supported for this target"), so they are defined to nothing there.
+ */
+#if !FAFRE_PLATFORM_WINDOWS
+  #ifndef __stdcall
+    #define __stdcall
+  #endif
+  #ifndef __fastcall
+    #define __fastcall
+  #endif
+  #ifndef __thiscall
+    #define __thiscall
+  #endif
+  #ifndef __cdecl
+    #define __cdecl
+  #endif
+#endif

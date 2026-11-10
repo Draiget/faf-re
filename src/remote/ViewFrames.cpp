@@ -255,7 +255,7 @@ namespace faf::remote
     held.beat = stamp.beat;
   }
 
-  void CViewFrames::FinishHeldFrame(const std::size_t army, const moho::SSyncData& packet)
+  void CViewFrames::FinishHeldFrame(const std::size_t army, [[maybe_unused]] const moho::SSyncData& packet)
   {
     CViewFrameBuilder& builder = *mBuilders[army];
     SHeldView& held = mHeld[army];
