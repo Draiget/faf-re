@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <array>
 #include <chrono>
+#include <deque>
 #include <cstdlib>
 #include <filesystem>
 #include <string>
@@ -26,6 +27,7 @@
 #include "editor/EdPlay.h"
 #include "editor/ui/EdHelp.h"
 #include "editor/EdShell.h"
+#include "editor/ui/EdFonts.h"
 #include "moho/render/AmbientOcclusionRenderer.h"
 #include <cstring>
 #include "editor/doc/EdDocument.h"
@@ -387,6 +389,11 @@ namespace faf::editor
       bool mBodiesDragging = false;
       EdDocument::SaveSnapshot mBodiesBefore;
       bool mBrowserArg = false;
+      /** `/faflogin` and `/vaultsearch <text>` (test runs, '+' for spaces). */
+      bool mFafLoginArg = false;
+      std::string mVaultSearchArg;
+      std::string mVaultQueryArg;
+      std::filesystem::path mPendingFafTokenFile;
       /** `/thumbdump <name>,<file>` (test runs): a prop thumbnail saved once it is made. */
       std::string mThumbDumpArg;
       int mThumbDumpFrames = 0;
@@ -512,9 +519,16 @@ namespace faf::editor
       } else if (const std::filesystem::path folder = EditorSettingsFolder(); !folder.empty()) {
         mDocument.SetRecentMapsFile((folder / "recent_maps.txt").string());
       }
+      // The FAF login kept between runs (its refresh token, encrypted for this Windows user).
+      if (const std::filesystem::path folder = EditorSettingsFolder(); !folder.empty()) {
+        mPendingFafTokenFile = folder / "faf_login.bin";
+      }
       mPlay.FindMaps();
       mPlay.ReadCommandLine();
       mShell = new EdShell(mLog, mPlay, mDocument);
+      if (!mPendingFafTokenFile.empty()) {
+        mShell->Browser().Faf().SetTokenFile(mPendingFafTokenFile);
+      }
       mDocument.SetBeforeDrop([this] { mScene.Detach(); });
       // The vault, as init_faf.lua finds it without the client's custom path: Documents\My Games\...;
       // `/vault <folder>` sets another (the FAF client's custom vault, or a test folder).
@@ -578,6 +592,13 @@ namespace faf::editor
       const std::filesystem::path segoe = "C:\\Windows\\Fonts\\segoeui.ttf";
       if (std::filesystem::exists(segoe, error)) {
         (void)io.Fonts->AddFontFromFileTTF(segoe.string().c_str(), 16.0f);
+      }
+      // Headings and codes (the FAF sign-in's): Segoe UI Bold and Consolas, when Windows has them.
+      if (const std::filesystem::path bold = "C:\\Windows\\Fonts\\segoeuib.ttf"; std::filesystem::exists(bold, error)) {
+        gBoldFont = io.Fonts->AddFontFromFileTTF(bold.string().c_str(), 16.0f);
+      }
+      if (const std::filesystem::path mono = "C:\\Windows\\Fonts\\consola.ttf"; std::filesystem::exists(mono, error)) {
+        gMonoFont = io.Fonts->AddFontFromFileTTF(mono.string().c_str(), 16.0f);
       }
       ImGui_ImplWin32_Init(gPanelWindow);
     }
@@ -863,6 +884,29 @@ namespace faf::editor
             mThumbDumpArg.clear();
           }
         }
+        if (mFafLoginArg) {
+          mFafLoginArg = false;
+          mShell->Browser().ShowVault();
+          mShell->Browser().Faf().Resume();
+          if (mShell->Browser().Faf().GetState() == EdFafSession::State::LoggedOut) {
+            mShell->Browser().Faf().StartLogin();
+          }
+        }
+        if (!mVaultQueryArg.empty()) {
+          int values[4] = {0, 0, 0, 0};
+          std::size_t at = 0;
+          for (int i = 0; i < 4 && at <= mVaultQueryArg.size(); ++i) {
+            const std::size_t comma = mVaultQueryArg.find(',', at);
+            values[i] = std::atoi(mVaultQueryArg.substr(at, comma - at).c_str());
+            at = comma == std::string::npos ? mVaultQueryArg.size() + 1 : comma + 1;
+          }
+          mShell->Browser().SetFilters(values[0], values[1], values[2], values[3] != 0);
+          mVaultQueryArg.clear();
+        }
+        if (!mVaultSearchArg.empty()) {
+          mShell->Browser().AskSearch(mVaultSearchArg);
+          mVaultSearchArg.clear();
+        }
         if (!mOpenFolderArg.empty()) {
           mShell->Browser().OpenFromDisk(std::filesystem::u8path(mOpenFolderArg));
           mOpenFolderArg.clear();
@@ -984,6 +1028,14 @@ namespace faf::editor
       // `/browser` shows the map browser; `/vaultmap <name>` downloads a vault map and opens it (test runs).
       if (moho::CFG_GetArgOption("/browser", 0, nullptr)) {
         mBrowserArg = true;
+      }
+      mFafLoginArg = moho::CFG_GetArgOption("/faflogin", 0, nullptr);
+      if (fa::vector<fa::string> query; moho::CFG_GetArgOption("/vaultquery", 1, &query) && !query.empty()) {
+        mVaultQueryArg = query[0].c_str();
+      }
+      if (fa::vector<fa::string> search; moho::CFG_GetArgOption("/vaultsearch", 1, &search) && !search.empty()) {
+        mVaultSearchArg = search[0].c_str();
+        std::replace(mVaultSearchArg.begin(), mVaultSearchArg.end(), '+', ' ');
       }
       if (fa::vector<fa::string> dump; moho::CFG_GetArgOption("/thumbdump", 1, &dump) && !dump.empty()) {
         mThumbDumpArg = dump[0].c_str();

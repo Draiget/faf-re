@@ -6,8 +6,7 @@
 #include <cstring>
 #include <fstream>
 
-#include <Windows.h>
-#include <winhttp.h>
+#include "editor/doc/EdHttp.h"
 
 #include "zlib.h"
 
@@ -37,83 +36,20 @@ namespace faf::editor
       return value;
     }
 
-    std::wstring Widen(const std::string& text)
-    {
-      if (text.empty()) {
-        return {};
-      }
-      const int count = ::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
-      std::wstring out(static_cast<std::size_t>(count), L'\0');
-      (void)::MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), count);
-      return out;
-    }
-
     /** `url` (https) into `body`; false with `error`. `received` follows the bytes as they come. */
     bool HttpGet(const std::string& url, std::string& body, std::string& error, std::atomic<std::uint64_t>& received)
     {
-      const std::wstring wide = Widen(url);
-      URL_COMPONENTS parts{};
-      parts.dwStructSize = sizeof(parts);
-      wchar_t host[256]{};
-      wchar_t path[2048]{};
-      parts.lpszHostName = host;
-      parts.dwHostNameLength = static_cast<DWORD>(std::size(host));
-      parts.lpszUrlPath = path;
-      parts.dwUrlPathLength = static_cast<DWORD>(std::size(path));
-      if (!::WinHttpCrackUrl(wide.c_str(), 0, 0, &parts)) {
-        error = "not a link: " + url;
+      HttpCall call;
+      call.url = url;
+      long status = 0;
+      if (!HttpRequest(call, status, body, error, &received)) {
         return false;
       }
-      HINTERNET session = ::WinHttpOpen(L"FAF-RE map editor", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-      HINTERNET connection = session != nullptr ? ::WinHttpConnect(session, host, parts.nPort, 0) : nullptr;
-      HINTERNET request = connection != nullptr ? ::WinHttpOpenRequest(connection, L"GET", path, nullptr, WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-                                                                        parts.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0)
-                                                  : nullptr;
-      bool ok = request != nullptr && ::WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
-                ::WinHttpReceiveResponse(request, nullptr);
-      DWORD status = 0;
-      DWORD size = sizeof(status);
-      if (ok) {
-        ok = ::WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &status, &size,
-                                   WINHTTP_NO_HEADER_INDEX) != FALSE;
-      }
-      if (!ok) {
-        error = "the vault didn't answer (error " + std::to_string(::GetLastError()) + ")";
-      } else if (status != 200) {
+      if (status != 200) {
         error = status == 404 ? "the vault has no map by that name" : "the vault answered " + std::to_string(status);
-        ok = false;
+        return false;
       }
-      while (ok) {
-        DWORD available = 0;
-        if (!::WinHttpQueryDataAvailable(request, &available)) {
-          error = "the download broke off";
-          ok = false;
-          break;
-        }
-        if (available == 0) {
-          break;
-        }
-        const std::size_t at = body.size();
-        body.resize(at + available);
-        DWORD read = 0;
-        if (!::WinHttpReadData(request, body.data() + at, available, &read)) {
-          error = "the download broke off";
-          ok = false;
-          break;
-        }
-        body.resize(at + read);
-        received = body.size();
-      }
-      if (request != nullptr) {
-        ::WinHttpCloseHandle(request);
-      }
-      if (connection != nullptr) {
-        ::WinHttpCloseHandle(connection);
-      }
-      if (session != nullptr) {
-        ::WinHttpCloseHandle(session);
-      }
-      return ok;
+      return true;
     }
   } // namespace
 

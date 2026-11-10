@@ -32,6 +32,8 @@ set(FAF_EDITOR_SOURCES
   doc/EdLuaText.cpp
   doc/EdRecentMaps.cpp
   doc/EdVault.cpp
+  doc/EdHttp.cpp
+  doc/EdFafApi.cpp
   ui/EdMapBrowser.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp
