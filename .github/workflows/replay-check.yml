@@ -19,8 +19,8 @@ on:
         required: true
         default: master
       platforms:
-        description: Builds to play on (JSON list of linux-x64, windows-x64, windows-x86)
-        default: '["linux-x64", "windows-x64", "windows-x86"]'
+        description: Builds to play on (JSON list of linux-x64, windows-x64, windows-x64-server, windows-x86)
+        default: '["linux-x64", "windows-x64", "windows-x64-server", "windows-x86"]'
       flags:
         description: Engine flag sets, each played on every replay and build (JSON list of {name, simworkers, args})
         default: '[{"name": "w1", "simworkers": 1, "args": ""}, {"name": "w8", "simworkers": 8, "args": ""}]'
@@ -50,7 +50,9 @@ env:
   LLVM_VERSION: "22.1.7"
   # Part of the Linux headless build's cache key, the same as the Replay parity workflow's.
   BUILD_CACHE: "v1"
-  DEFAULT_PLATFORMS: '["linux-x64", "windows-x64", "windows-x86"]'
+  # windows-x64-server is windows-x64 built with server mode (FAF_SERVER_MODE, the -server preset): the two play the
+  # same replays on one platform, so the server's code compiled in is shown to change no game (plan WP16.2, I1).
+  DEFAULT_PLATFORMS: '["linux-x64", "windows-x64", "windows-x64-server", "windows-x86"]'
   DEFAULT_FLAGS: '[{"name": "w1", "simworkers": 1, "args": ""}, {"name": "w8", "simworkers": 8, "args": ""}]'
 
 jobs:
@@ -106,7 +108,7 @@ jobs:
           import json, os
           platforms = json.loads(os.environ["PLATFORMS"])
           flags = json.loads(os.environ["FLAGS"])
-          known = {"linux-x64", "windows-x64", "windows-x86"}
+          known = {"linux-x64", "windows-x64", "windows-x64-server", "windows-x86"}
           assert platforms and set(platforms) <= known, "platforms: %s" % platforms
           assert flags and all({"name", "simworkers"} <= set(f) for f in flags), "flags: %s" % flags
           shards = [s["shard"] for s in json.load(open("plan.json"))["shards"]]
@@ -321,11 +323,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, x86]
+        include:
+          - { platform: windows-x64, arch: x64, preset: clang-x64-release }
+          - { platform: windows-x64-server, arch: x64, preset: clang-x64-release-server }
+          - { platform: windows-x86, arch: x86, preset: clang-x86-release }
     steps:
       - id: wanted
         shell: bash
-        run: echo "build=${{ contains(fromJSON(needs.plan.outputs.platforms), format('windows-{0}', matrix.arch)) }}" >> "$GITHUB_OUTPUT"
+        run: echo "build=${{ contains(fromJSON(needs.plan.outputs.platforms), matrix.platform) }}" >> "$GITHUB_OUTPUT"
       - if: steps.wanted.outputs.build == 'true'
         uses: actions/checkout@v7
         with:
@@ -360,15 +365,15 @@ jobs:
       - if: steps.wanted.outputs.build == 'true'
         shell: pwsh
         run: |
-          cmake --preset clang-${{ matrix.arch }}-release
-          cmake --build --preset clang-${{ matrix.arch }}-release --target headless
+          cmake --preset ${{ matrix.preset }}
+          cmake --build --preset ${{ matrix.preset }} --target headless
           $name = if ("${{ matrix.arch }}" -eq "x64") { "headless_x64.exe" } else { "headless.exe" }
           New-Item -ItemType Directory -Force out | Out-Null
-          Copy-Item "build/clang-${{ matrix.arch }}-release/src/$name" out/
+          Copy-Item "build/${{ matrix.preset }}/src/$name" out/
       - if: steps.wanted.outputs.build == 'true'
         uses: actions/upload-artifact@v7
         with:
-          name: headless-windows-${{ matrix.arch }}
+          name: headless-${{ matrix.platform }}
           path: out
           retention-days: 3
 
@@ -539,7 +544,7 @@ jobs:
           rm retail.tar.xz
           case "${{ matrix.platform }}" in
             linux-x64) exe=bin/headless; chmod +x "$exe" ;;
-            windows-x64) exe=bin/headless_x64.exe ;;
+            windows-x64|windows-x64-server) exe=bin/headless_x64.exe ;;
             windows-x86) exe=bin/headless.exe ;;
           esac
           echo "EXE=$exe" >> "$GITHUB_ENV"
