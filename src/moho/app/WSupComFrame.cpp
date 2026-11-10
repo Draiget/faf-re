@@ -2,6 +2,9 @@
 
 namespace
 {
+#if defined(_WIN32)
+  // The Win32 messages MSWWindowProc handles; on Linux the window system reports the frame's
+  // size, activation and closing (issue #256).
   constexpr unsigned int kSupComFrameMessageSize = WM_SIZE;
   constexpr unsigned int kSupComFrameMessageActivateApp = WM_ACTIVATEAPP;
   constexpr unsigned int kSupComFrameMessageSysCommand = WM_SYSCOMMAND;
@@ -10,6 +13,7 @@ namespace
   constexpr unsigned int kSupComFrameSysCommandToggleLogDialog = 0x1u;
   constexpr unsigned int kSupComFrameSysCommandLuaDebugger = 0x2u;
   constexpr unsigned int kSupComFrameSysCommandKeyMenu = SC_KEYMENU;
+#endif
 
   constexpr const char* kSupComFrameXPreferenceKey = "Windows.Main.x";
   constexpr const char* kSupComFrameYPreferenceKey = "Windows.Main.y";
@@ -19,6 +23,9 @@ namespace
   constexpr const char* kSupComFrameToggleLogDialogCommand = "WIN_ToggleLogDialog";
   constexpr const char* kSupComFrameLuaDebuggerCommand = "SC_LuaDebugger";
   constexpr const char* kSupComFrameCursorLockPreferenceKey = "lock_fullscreen_cursor_to_window";
+
+#if defined(_WIN32)
+  // The two helpers below serve MSWWindowProc only.
 
   /**
    * Address: 0x008CDBE0 (FUN_008CDBE0)
@@ -115,6 +122,7 @@ namespace
 
     ::ClipCursor(clipRectPtr);
   }
+#endif // defined(_WIN32)
 }
 
 
@@ -172,6 +180,7 @@ void WSupComFrame::OnCloseWindow(
   (void)moho::ShowEscapeDialog(true);
 }
 
+#if defined(_WIN32)
 /**
  * Address: 0x008CDCD0 (FUN_008CDCD0, WSupComFrame::MSWDefWindowProc)
  *
@@ -207,6 +216,7 @@ long WSupComFrame::MSWDefWindowProc(
 
   return dispatchBase();
 }
+#endif // defined(_WIN32)
 
 /**
  * Address: 0x008CDAD0 (FUN_008CDAD0, WSupComFrame::OnMove)
@@ -236,6 +246,7 @@ void WSupComFrame::OnMove(
   preferences->SetInteger(fa::string(kSupComFrameYPreferenceKey), GetPosition().y);
 }
 
+#if defined(_WIN32)
 /**
  * Address: 0x008CDD40 (FUN_008CDD40, WSupComFrame::MSWWindowProc)
  * Mangled: ?MSWWindowProc@WSupComFrame@@UAEJIIJ@Z
@@ -345,3 +356,4 @@ long WSupComFrame::MSWWindowProc(
 
   return 0;
 }
+#endif // defined(_WIN32): MSWWindowProc

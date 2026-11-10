@@ -1183,6 +1183,10 @@ void moho::UI_DumpControls(const fa::vector<fa::string>& args)
  */
 void moho::WIN_ToggleLogDialog()
 {
+#if !defined(_WIN32)
+  // The log window is a wx dialog, which the Linux client doesn't build (issue #255).
+  gpg::Warnf("WIN_ToggleLogDialog: the log window is not available in the Linux client");
+#else
   WWinLogWindow* dialog = sLogWindowTarget.dialog;
   if (dialog == nullptr) {
     WINX_PrecreateLogWindow();
@@ -1194,6 +1198,7 @@ void moho::WIN_ToggleLogDialog()
   // the state bitfield, which wx 2.4.2 packs as `m_autoLayout:1, m_isShown:1,
   // m_isEnabled:1, ...`. `Show` is the virtual at `[vptr+0x7C]`.
   dialog->Show(!dialog->IsShown());
+#endif
 }
 
 /**
@@ -1216,6 +1221,11 @@ void moho::WIN_ShowLogDialog(const fa::vector<fa::string>& args)
 
   const bool showDialog = std::strcmp(showToken->c_str(), "true") == 0;
 
+#if !defined(_WIN32)
+  // The log window is a wx dialog, which the Linux client doesn't build (issue #255).
+  (void)showDialog;
+  gpg::Warnf("WIN_ShowLogDialog: the log window is not available in the Linux client");
+#else
   WWinLogWindow* dialog = sLogWindowTarget.dialog;
   if (dialog == nullptr) {
     WINX_PrecreateLogWindow();
@@ -1223,6 +1233,7 @@ void moho::WIN_ShowLogDialog(const fa::vector<fa::string>& args)
   }
 
   dialog->Show(showDialog);
+#endif
 }
 
 /**

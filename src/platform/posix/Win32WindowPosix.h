@@ -16,4 +16,9 @@ namespace platform::posix
   void SetKeyDown(int virtualKey, bool down);
   // Called by SetCursorPos so the window system can move the real cursor.
   extern void (*gWarpCursorHook)(int x, int y);
+  // Called by SetFocus and ShowWindow so the window system can act on the real window.
+  extern void (*gFocusHook)(void* window);
+  extern void (*gShowWindowHook)(void* window, int command);
+  // The window system has events: wakes a MsgWaitForMultipleObjectsEx in the main loop.
+  void WakeMessageWait();
 } // namespace platform::posix

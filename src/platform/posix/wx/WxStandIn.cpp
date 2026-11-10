@@ -184,6 +184,23 @@ void wxWindow::SetSize(const int width, const int height)
   m_clientHeight = height;
 }
 
+void wxWindow::SetSize(const int x, const int y, const int width, const int height, const int sizeFlags)
+{
+  (void)sizeFlags;
+  if (x != -1) {
+    m_screenX = x;
+  }
+  if (y != -1) {
+    m_screenY = y;
+  }
+  if (width != -1) {
+    m_clientWidth = width;
+  }
+  if (height != -1) {
+    m_clientHeight = height;
+  }
+}
+
 wxWindow::~wxWindow()
 {
   // wx 2.4.2 deletes the handlers still pushed onto a window it destroys.

@@ -1,5 +1,13 @@
 // Engine addition, not in the shipped binary (see FrameSampler.h).
 
+#include "gpg/core/diagnostics/FrameSampler.h"
+
+#if !defined(_WIN32)
+// The sampler suspends the main thread and walks its stack with DbgHelp: Windows only. The Linux
+// client (issue #255) marks frames for nothing.
+void gpg::diag::FrameSamplerMark() {}
+#else
+
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -380,3 +388,4 @@ namespace gpg::diag
     state.lastMark = now;
   }
 } // namespace gpg::diag
+#endif // defined(_WIN32)

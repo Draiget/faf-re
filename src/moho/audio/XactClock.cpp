@@ -13,6 +13,10 @@
 #include "moho/audio/AudioEngine.h"
 #include "moho/misc/StartupHelpers.h"
 
+#if defined(_WIN32)
+// XACT's clock is patched through the KERNEL32 imports of its DLL. The Linux client's XACT is
+// FAudio, linked in, with no import table to patch (issue #258); SND_InstallXactClock does nothing
+// there.
 namespace
 {
   /// The process clock starts here, not at 0: XACT treats a zero timestamp as
@@ -149,11 +153,16 @@ namespace
     return patched;
   }
 } // namespace
+#endif // defined(_WIN32)
 
 namespace moho
 {
   void SND_InstallXactClock(const IXACTEngine& engine)
   {
+#if !defined(_WIN32)
+    (void)engine;
+    gpg::Logf("SND: FAudio keeps its own clock; nothing to patch");
+#else
     // A COM object's first word is its interface table, which sits in the
     // image of the DLL that implements it.
     const void* const interfaceTable = *reinterpret_cast<const void* const*>(&engine);
@@ -205,5 +214,6 @@ namespace moho
       replacements[1].mPatched ? "yes" : "no",
       sOrigin.mTestOffsetDays != 0.0 ? ", system clock shifted by FAF_TEST_TICK_OFFSET_DAYS" : ""
     );
+#endif
   }
 } // namespace moho

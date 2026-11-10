@@ -84,6 +84,11 @@ set(SDL3_INCLUDE_DIRS "${FAF_DEPENDENCIES_DIR}/SDL3/include")
 set(SDL3_LIBRARIES SDL3-static)
 add_subdirectory("${FAF_DEPENDENCIES_DIR}/FAudio" "${CMAKE_BINARY_DIR}/deps/FAudio" EXCLUDE_FROM_ALL SYSTEM)
 
+# Lowercase spellings of POSIX stand-in headers the client includes (the file system is
+# case-sensitive here, and a Windows checkout can't hold both spellings), as FafLinux.cmake writes
+# <windows.h>.
+file(WRITE "${CMAKE_BINARY_DIR}/win32-alias/shlobj.h" "#pragma once\n#include <ShlObj.h>\n")
+
 # The part of wxWindows 2.4.2 the game code uses (src/platform/posix/wx/wx/defs.h).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/wx/WxStandIn.cpp")
 # The Win32 window, cursor and key-state calls the UI code makes (platform/posix/win32/Windows.h).

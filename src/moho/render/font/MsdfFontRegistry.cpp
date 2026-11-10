@@ -16,6 +16,10 @@
 #include <string>
 #include <thread>
 #include <vector>
+#if !defined(_WIN32)
+#include <cerrno>
+#include <csignal>
+#endif
 
 #include "gpg/core/algorithms/SHA256.h"
 #include "gpg/core/utils/Logging.h"
@@ -181,6 +185,11 @@ namespace moho
 
     [[nodiscard]] bool IsProcessRunning(const unsigned long processId)
     {
+#if !defined(_WIN32)
+      // The Linux client (issue #255): signal 0 only checks the process exists (EPERM: it does,
+      // under another user).
+      return ::kill(static_cast<pid_t>(processId), 0) == 0 || errno == EPERM;
+#else
       const HANDLE process = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
       if (process == nullptr) {
         return false;
@@ -189,6 +198,7 @@ namespace moho
       const bool running = ::GetExitCodeProcess(process, &exitCode) != FALSE && exitCode == STILL_ACTIVE;
       ::CloseHandle(process);
       return running;
+#endif
     }
 
     /**

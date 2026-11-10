@@ -2,6 +2,10 @@
 
 #include <algorithm>
 #include <atomic>
+#if !defined(_WIN32)
+#include <cerrno>
+#include <csignal>
+#endif
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
@@ -205,10 +209,15 @@ namespace moho
         const unsigned long owner = std::strtoul(entry.path().filename().string().c_str(), nullptr, 10);
         bool running = false;
         if (owner != 0u && owner != self) {
+#if !defined(_WIN32)
+          // The Linux client (issue #255): signal 0 only checks the process exists.
+          running = ::kill(static_cast<pid_t>(owner), 0) == 0 || errno == EPERM;
+#else
           if (HANDLE process = ::OpenProcess(SYNCHRONIZE, FALSE, owner); process != nullptr) {
             running = ::WaitForSingleObject(process, 0) == WAIT_TIMEOUT;
             ::CloseHandle(process);
           }
+#endif
         }
         if (!running) {
           leftovers.push_back(entry.path());

@@ -11,6 +11,10 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#if !defined(_WIN32)
+#include <spawn.h>
+#include <unistd.h>  // environ
+#endif
 
 #include "Common.h"
 #include "gpg/core/containers/String.h"
@@ -1968,13 +1972,30 @@ void CGpgNetInterface::ConnectThread(
     return;
   }
 
-  STARTUPINFOA startupInfo{};
-  startupInfo.cb = sizeof(startupInfo);
-  PROCESS_INFORMATION processInformation{};
-
   const u_short localPort = mTcpServer->GetLocalPort();
   const fa::string listenerAddress = gpg::STR_Printf("127.0.0.1:%d", static_cast<int>(localPort));
   const fa::string launchCommand = gpg::STR_Printf(launchCommandTemplate.c_str(), listenerAddress.c_str());
+
+#if !defined(_WIN32)
+  // The Linux client (issue #255): the command line through the shell, as CreateProcess takes one
+  // command string; the child isn't waited for, as on Windows.
+  {
+    char shell[] = "/bin/sh";
+    char dashC[] = "-c";
+    std::vector<char> commandLine(launchCommand.c_str(), launchCommand.c_str() + launchCommand.size() + 1u);
+    char* const argv[] = {shell, dashC, commandLine.data(), nullptr};
+    pid_t child = 0;
+    const int spawnError = ::posix_spawn(&child, "/bin/sh", nullptr, nullptr, argv, environ);
+    if (spawnError != 0) {
+      gpg::Logf("CreateProcess() failed: %s", std::strerror(spawnError));
+      EnqueueCommand0("LaunchFailed", kNetStateTimedOut);
+      return;
+    }
+  }
+#else
+  STARTUPINFOA startupInfo{};
+  startupInfo.cb = sizeof(startupInfo);
+  PROCESS_INFORMATION processInformation{};
 
   std::vector<char> launchCommandBuffer(launchCommand.size() + 1u, '\0');
   if (!launchCommand.empty()) {
@@ -2004,6 +2025,7 @@ void CGpgNetInterface::ConnectThread(
 
   ::CloseHandle(processInformation.hProcess);
   ::CloseHandle(processInformation.hThread);
+#endif
 
   INetTCPSocket* const acceptedSocket = mTcpServer->Accept();
   INetTCPSocket* const oldSocket = mTcpSocket;
@@ -2155,6 +2177,13 @@ int moho::cfunc_LaunchGPGNetL(LuaPlus::LuaState* const state)
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 0, kLaunchGPGNetHelpText);
 
+#if !defined(_WIN32)
+  // GPG's GPGNet client is a Windows program; the Linux client (issue #255) has none to start.
+  gpg::Warnf("LaunchGPGNet: GPGNet is not available in the Linux client");
+  lua_pushboolean(rawState, 0);
+  (void)lua_gettop(rawState);
+  return 1;
+#else
   HWND ownerWindow = nullptr;
   if (moho::sMainWindow != nullptr) {
     ownerWindow = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()));
@@ -2202,6 +2231,7 @@ int moho::cfunc_LaunchGPGNetL(LuaPlus::LuaState* const state)
   lua_pushboolean(rawState, launched ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;
+#endif
 }
 
 /**

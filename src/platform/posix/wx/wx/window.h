@@ -41,7 +41,11 @@ public:
   virtual void Refresh(bool eraseBackground = true) { (void)eraseBackground; }
   virtual void Update() {}
   void SetSize(int width, int height);
+  // wx 2.4.2: -1 keeps a coordinate or dimension as it is (with wxSIZE_USE_EXISTING).
+  void SetSize(int x, int y, int width, int height, int sizeFlags = 0);
+  void Move(int x, int y) { SetSize(x, y, -1, -1); }
   wxSize GetSize() const { return GetClientSize(); }
+  wxPoint GetPosition() const { return wxPoint(m_screenX, m_screenY); }
 
   wxEvtHandler* GetEventHandler() const { return m_eventHandler; }
   void SetEventHandler(wxEvtHandler* const handler) { m_eventHandler = handler; }

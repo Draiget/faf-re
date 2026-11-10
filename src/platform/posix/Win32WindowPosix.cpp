@@ -9,6 +9,9 @@
 #include <array>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
+
+#include <execinfo.h>
 
 #include <Windows.h>
 
@@ -20,6 +23,7 @@ namespace
     std::unordered_map<HWND, RECT> windowRects;  // screen rectangle of each window
     POINT cursor{};
     HWND capture = nullptr;
+    HWND focus = nullptr;
     HCURSOR cursorShape = nullptr;
     int cursorShowCount = 0;
     std::array<bool, 256> keysDown{};
@@ -73,6 +77,8 @@ namespace platform::posix
   }
 
   void (*gWarpCursorHook)(int x, int y) = nullptr;
+  void (*gFocusHook)(void* window) = nullptr;
+  void (*gShowWindowHook)(void* window, int command) = nullptr;
 } // namespace platform::posix
 
 BOOL GetCursorPos(POINT* const point)
@@ -212,4 +218,74 @@ int ShowCursor(const BOOL show)
   const std::lock_guard<std::mutex> lock(state.mutex);
   state.cursorShowCount += show ? 1 : -1;
   return state.cursorShowCount;
+}
+
+HWND SetFocus(const HWND window)
+{
+  WindowState& state = State();
+  const std::lock_guard<std::mutex> lock(state.mutex);
+  const HWND previous = state.focus;
+  state.focus = window;
+  if (platform::posix::gFocusHook != nullptr) {
+    platform::posix::gFocusHook(window);
+  }
+  return previous;
+}
+
+HWND GetFocus()
+{
+  WindowState& state = State();
+  const std::lock_guard<std::mutex> lock(state.mutex);
+  return state.focus;
+}
+
+BOOL ShowWindow(const HWND window, const int command)
+{
+  if (platform::posix::gShowWindowHook != nullptr) {
+    platform::posix::gShowWindowHook(window, command);
+  }
+  return TRUE;
+}
+
+namespace
+{
+  // Set when the window system has events for the main loop (WakeMessageWait).
+  HANDLE MessageWakeEvent()
+  {
+    static const HANDLE event = ::CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    return event;
+  }
+} // namespace
+
+void platform::posix::WakeMessageWait()
+{
+  (void)::SetEvent(MessageWakeEvent());
+}
+
+DWORD MsgWaitForMultipleObjectsEx(
+  const DWORD count, const HANDLE* const handles, const DWORD milliseconds, const DWORD wakeMask, const DWORD flags
+)
+{
+  (void)wakeMask;
+  (void)flags;
+  // The caller's handles, then the window system's wake event at index `count`, as Windows
+  // reports a queued message with WAIT_OBJECT_0 + count.
+  std::vector<HANDLE> all(handles, handles + count);
+  all.push_back(MessageWakeEvent());
+  return ::WaitForMultipleObjects(static_cast<DWORD>(all.size()), all.data(), FALSE, milliseconds);
+}
+
+USHORT RtlCaptureStackBackTrace(const DWORD skip, const DWORD count, void** const frames, DWORD* const hash)
+{
+  void* buffer[128];
+  const int captured = ::backtrace(buffer, 128);
+  USHORT written = 0;
+  // buffer[0] is this function.
+  for (int index = 1 + static_cast<int>(skip); index < captured && written < count; ++index) {
+    frames[written++] = buffer[index];
+  }
+  if (hash != nullptr) {
+    *hash = 0;
+  }
+  return written;
 }

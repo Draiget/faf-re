@@ -39,6 +39,8 @@ using UCHAR = unsigned char;
 using CHAR = char;
 using WCHAR = wchar_t;
 using WORD = std::uint16_t;
+using SHORT = std::int16_t;
+using USHORT = std::uint16_t;
 using DWORD = std::uint32_t;
 using UINT = unsigned int;
 using INT = int;
@@ -151,6 +153,24 @@ union LARGE_INTEGER
   };
   std::int64_t QuadPart;
 };
+
+union ULARGE_INTEGER
+{
+  struct
+  {
+    DWORD LowPart;
+    DWORD HighPart;
+  };
+  std::uint64_t QuadPart;
+};
+
+// -1, 0 or 1 as the first time is earlier than, equal to or later than the second.
+inline LONG CompareFileTime(const FILETIME* const first, const FILETIME* const second) noexcept
+{
+  const std::uint64_t a = (static_cast<std::uint64_t>(first->dwHighDateTime) << 32) | first->dwLowDateTime;
+  const std::uint64_t b = (static_cast<std::uint64_t>(second->dwHighDateTime) << 32) | second->dwLowDateTime;
+  return a < b ? -1 : (a > b ? 1 : 0);
+}
 
 struct SYSTEM_INFO
 {
@@ -391,6 +411,7 @@ HLOCAL LocalFree(HLOCAL memory);
 #define FILE_FLAG_SEQUENTIAL_SCAN 0x08000000u
 #define FILE_FLAG_RANDOM_ACCESS 0x10000000u
 #define FILE_FLAG_OVERLAPPED 0x40000000u
+#define FILE_FLAG_NO_BUFFERING 0x20000000u
 #define FILE_FLAG_BACKUP_SEMANTICS 0x02000000u
 #define FILE_BEGIN 0u
 #define FILE_CURRENT 1u
@@ -741,6 +762,10 @@ inline int* _errno() noexcept
   return &errno;
 }
 
+// The calling thread's return addresses, skipping the innermost `skip` frames (this function's
+// own frame not counted), as Windows' RtlCaptureStackBackTrace; no hash.
+USHORT RtlCaptureStackBackTrace(DWORD skip, DWORD count, void** frames, DWORD* hash);
+
 // The MSVC CRT's getenv_s: *required is the value's length with its terminator, 0 when the
 // variable is unset (the buffer then holds ""); ERANGE when the buffer is too small for it. A null
 // buffer with size 0 only asks for the length.
@@ -779,8 +804,6 @@ inline int getenv_s(std::size_t* const required, char* const buffer, const std::
 // is the window system's own (issue #256, SDL3), and src/platform/posix/Win32WindowPosix.cpp
 // answers these calls from what that system reports. Only the client links that file; the
 // simulation never calls them.
-using SHORT = std::int16_t;
-using USHORT = std::uint16_t;
 using HCURSOR = void*;
 using HICON = void*;
 using HMONITOR = void*;
@@ -795,6 +818,20 @@ BOOL ClientToScreen(HWND window, POINT* point);
 HWND SetCapture(HWND window);
 BOOL ReleaseCapture();
 HWND GetCapture();
+HWND SetFocus(HWND window);
+HWND GetFocus();
+BOOL ShowWindow(HWND window, int command);
+#define SW_HIDE 0
+#define SW_SHOWNORMAL 1
+#define SW_SHOWMINIMIZED 2
+#define SW_SHOWMAXIMIZED 3
+#define SW_SHOW 5
+#define SW_MINIMIZE 6
+#define SW_RESTORE 9
+// Waits for the handles or for window-system events, as Windows waits for them or for window
+// messages: WAIT_OBJECT_0 + count means the window system has events (it calls
+// platform::posix::WakeMessageWait, Win32WindowPosix.h). The wake and flag masks are not used.
+DWORD MsgWaitForMultipleObjectsEx(DWORD count, const HANDLE* handles, DWORD milliseconds, DWORD wakeMask, DWORD flags);
 SHORT GetKeyState(int virtualKey);
 SHORT GetAsyncKeyState(int virtualKey);
 HCURSOR SetCursor(HCURSOR cursor);
