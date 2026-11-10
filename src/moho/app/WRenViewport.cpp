@@ -1,6 +1,7 @@
 #include "moho/app/WxPrivate.h"
 #include "moho/app/NetworkPanel.h"
 #include "moho/render/AmbientOcclusionRenderer.h"
+#include "moho/render/DynamicLights.h"
 #include "moho/render/FxaaRenderer.h"
 #include "moho/render/PostRenderer.h"
 #include "moho/render/WideBloomRenderer.h"
@@ -2023,6 +2024,12 @@ void moho::WRenViewport::RenderWorldView(
                                                                                  : 0.0f;
     occlusion.Render(*mCam, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y, shadowReach,
                      shadowReach > 0.0f ? &mShadowRenderer : nullptr);
+  }
+  // Engine addition (ren_DynamicLights): light from explosions, weapons and engines on the ground and the opaque
+  // meshes, from the same depth, before effects and water draw over it.
+  if (moho::DynamicLights& lights = moho::DynamicLights::Get(); lights.IsActive()) {
+    const gpg::gal::RenderProfileScope profileLights("DynamicLights");
+    lights.Render(*mCam, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y);
   }
   {
     const gpg::gal::RenderProfileScope profileEffects("Effects");

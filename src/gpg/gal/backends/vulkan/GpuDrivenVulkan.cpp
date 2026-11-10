@@ -513,9 +513,10 @@ namespace gpg::gal
     attachment.blendEnable = (state.blend != GpuBlend::Opaque) ? VK_TRUE : VK_FALSE;
     attachment.srcColorBlendFactor = (state.blend == GpuBlend::Opaque) ? VK_BLEND_FACTOR_ONE
       : (state.blend == GpuBlend::Multiply)                                ? VK_BLEND_FACTOR_ZERO
+      : (state.blend == GpuBlend::Brighten)                                ? VK_BLEND_FACTOR_DST_COLOR
                                                                            : VK_BLEND_FACTOR_SRC_ALPHA;
     attachment.dstColorBlendFactor = (state.blend == GpuBlend::AlphaBlend) ? VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA
-      : (state.blend == GpuBlend::Additive)                                 ? VK_BLEND_FACTOR_ONE
+      : (state.blend == GpuBlend::Additive || state.blend == GpuBlend::Brighten) ? VK_BLEND_FACTOR_ONE
       : (state.blend == GpuBlend::Multiply)                                 ? VK_BLEND_FACTOR_SRC_COLOR
                                                                             : VK_BLEND_FACTOR_ZERO;
     attachment.colorBlendOp = VK_BLEND_OP_ADD;

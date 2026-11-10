@@ -6,6 +6,7 @@
 #include "moho/sim/CBackgroundTaskControl.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
+#include "moho/render/DynamicLights.h"
 #include "moho/render/WRenViewport.h"
 
 namespace moho
@@ -1792,6 +1793,9 @@ namespace
       sWorldParticles.AdvancementBeat();
     }
     if (beat.mParticleBuffer) {
+      // Engine addition (ren_DynamicLights): the beat's light sources, stamped with the beat's game tick (the clock the
+      // particle shader and DynamicLights::Render age by; the beat count runs on through pauses).
+      DynamicLights::Get().AddParticles(*static_cast<const SParticleBuffer*>(beat.mParticleBuffer.get()), beat.mCurTick);
       sWorldParticles.AddParticles(*static_cast<const SParticleBuffer*>(beat.mParticleBuffer.get()));
     }
 

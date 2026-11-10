@@ -123,6 +123,7 @@ namespace gpg::gal
     AlphaBlend, ///< src * srcAlpha + dst * (1 - srcAlpha)
     Additive,   ///< src * srcAlpha + dst
     Multiply,   ///< src * dst in colour; mask alpha off, it takes src
+    Brighten,   ///< src * dst + dst in colour: the colour times (1 + src), past the target's 0..1 output clamp
   };
 
   enum class GpuCompare : std::uint8_t

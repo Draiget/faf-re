@@ -314,6 +314,25 @@ do
                 },
             })
         end
+        if Supported('ren_DynamicLights') then
+            table.insert(video.items, math.min(position + 3, table.getn(video.items) + 1), {
+                title = 'Explosion and weapon lights',
+                key = 'dynamic_lights',
+                type = 'toggle',
+                default = 1,
+                tip = 'Direct3D 12 and Vulkan: explosions, muzzle flashes, engines, projectiles and beams light the '
+                    .. 'ground and the units around them.',
+                set = function(key, value, startup)
+                    ConExecute('ren_DynamicLights ' .. tostring(value))
+                end,
+                custom = {
+                    states = {
+                        { text = '<LOC _On>', key = 1 },
+                        { text = '<LOC _Off>', key = 0 },
+                    },
+                },
+            })
+        end
         if Supported('ren_RaySunAngle') then
             table.insert(video.items, math.min(position + 2, table.getn(video.items) + 1), {
                 title = 'Soft ray-traced shadows',
