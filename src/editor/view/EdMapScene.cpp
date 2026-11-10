@@ -3484,6 +3484,14 @@ namespace faf::editor
     }
   }
 
+  void EdMapScene::FramePoint(const float x, const float z, const float distance)
+  {
+    mTargetX = x;
+    mTargetZ = z;
+    mDistance = std::min(mDistance, distance);
+    ApplyCamera();
+  }
+
   void EdMapScene::SelectUnit(const std::string& army, const std::string& name)
   {
     for (const UnitRef& unit : mUnitRefs) {

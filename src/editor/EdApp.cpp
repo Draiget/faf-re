@@ -1545,6 +1545,9 @@ namespace faf::editor
         if (std::string name; tools.TakeMarkerFrame(name)) {
           mScene.FrameMarker(name);
         }
+        if (float x = 0.0f, z = 0.0f; tools.TakePointFrame(x, z)) {
+          mScene.FramePoint(x, z);
+        }
         tools.SetDecalSelectionCount(mScene.DecalSelectionCount());
         mPropThumbnails.Pump(3);
         // `/rdcapture <frame>`: run under RenderDoc (renderdoccmd capture ...), that frame of the editor is captured,

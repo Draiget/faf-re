@@ -495,6 +495,21 @@ namespace faf::editor
       mTool = 6;
     }
     void AskMarkerFrame(std::string name) { mAskFrame = std::move(name); }
+    /** The view to a point of the map (the Check's prop issues). */
+    void AskPointFrame(const float x, const float z)
+    {
+      mAskPoint = {x, z};
+      mAskPointSet = true;
+    }
+    [[nodiscard]] bool TakePointFrame(float& x, float& z)
+    {
+      if (!std::exchange(mAskPointSet, false)) {
+        return false;
+      }
+      x = mAskPoint[0];
+      z = mAskPoint[1];
+      return true;
+    }
     [[nodiscard]] bool TakeMarkerSelect(std::vector<std::string>& names, bool& add)
     {
       if (!mAskSelectSet) {
@@ -1046,6 +1061,8 @@ namespace faf::editor
     bool mAskSelectAdd = false;
     bool mAskSelectSet = false;
     std::string mAskFrame;
+    std::array<float, 2> mAskPoint{};
+    bool mAskPointSet = false;
     int mDetectedSymmetry = -2; // -2: no map opened yet
     float mDetectedMatch = 0.0f;
     std::vector<std::string> mArmies;

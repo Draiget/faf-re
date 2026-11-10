@@ -169,6 +169,8 @@ namespace faf::editor
     void SelectMarkers(const std::vector<std::string>& names, bool add);
     /** Moves the camera over a marker, at most `distance` away. */
     void FrameMarker(const std::string& name, float distance = 140.0f);
+    /** The view to the point (x, z) of the map, from no farther than `distance`. */
+    void FramePoint(float x, float z, float distance = 80.0f);
     /** Test runs (`/selectunit <army>,<unit>`): that unit selected and the view on it. */
     void SelectUnit(const std::string& army, const std::string& name);
     /** Sets the scenario's teams (the panel's slot order, the FFA repair), as one undo step. */

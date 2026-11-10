@@ -93,4 +93,27 @@ namespace
     EXPECT_TRUE(startWarned);
     EXPECT_TRUE(massNoted);
   }
+  TEST(Checks, PropsWithoutTheirSymmetricPartner)
+  {
+    using faf::editor::PropPoint;
+    // A 257-sample map under a left-right mirror: x and 256 - x.
+    std::vector<PropPoint> props = {
+      {"/env/rock01_prop.bp", 40.0f, 100.0f, 20.0f},  {"/env/rock01_prop.bp", 216.5f, 100.0f, 20.0f}, // a pair, 0.5 apart: matched
+      {"/env/tree01_prop.bp", 60.0f, 50.0f, 0.0f},    {"/env/tree01_prop.bp", 196.0f, 50.0f, 0.0f},    // a pair
+      {"/env/rock01_prop.bp", 10.0f, 10.0f, 30.0f},                                                    // alone
+      {"/env/tree01_prop.bp", 246.0f, 10.0f, 0.0f},                                                    // a rock's place, another blueprint
+    };
+    const std::vector<faf::editor::CheckIssue> issues =
+      faf::editor::CheckPropSymmetry(props, faf::editor::Symmetry::LeftRight, 0, 257, 257);
+    ASSERT_EQ(issues.size(), 3U); // the summary and the two unmatched
+    EXPECT_EQ(issues[0].level, faf::editor::CheckIssue::Level::Warning);
+    EXPECT_NE(issues[0].text.find("2 of 6 props"), std::string::npos);
+    EXPECT_NE(issues[0].text.find("30 of 70 reclaim mass"), std::string::npos);
+    EXPECT_EQ(issues[1].marker, "Prop rock01_prop.bp");
+    EXPECT_FLOAT_EQ(issues[1].x, 10.0f);
+    // No symmetry, or every prop matched: nothing.
+    EXPECT_TRUE(faf::editor::CheckPropSymmetry(props, faf::editor::Symmetry::None, 0, 257, 257).empty());
+    props.resize(4);
+    EXPECT_TRUE(faf::editor::CheckPropSymmetry(props, faf::editor::Symmetry::LeftRight, 0, 257, 257).empty());
+  }
 } // namespace

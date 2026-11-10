@@ -825,6 +825,32 @@ namespace faf::editor
     input.width = facts.fieldWidth;
     input.height = facts.fieldHeight;
     mCheckIssues = CheckMarkers(input);
+    // The props under the same symmetry: each one's partner of its blueprint at its copies, and the reclaim that isn't.
+    if (map->mProps != nullptr && input.symmetry != Symmetry::None) {
+      std::map<std::string, float> massOf;
+      for (const EdDocument::ReclaimRow& row : mDocument.PropReclaim().rows) {
+        std::string key = row.blueprint;
+        std::transform(key.begin(), key.end(), key.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        massOf[key] = row.mass;
+      }
+      std::vector<PropPoint> props;
+      props.reserve(map->mProps->mEntries.size());
+      for (const moho::CWldPropEntry& entry : map->mProps->mEntries) {
+        PropPoint point;
+        point.blueprint = entry.mBlueprintPath.c_str();
+        std::transform(point.blueprint.begin(), point.blueprint.end(), point.blueprint.begin(),
+                       [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        point.x = entry.mTransform.pos_.x;
+        point.z = entry.mTransform.pos_.z;
+        if (const auto found = massOf.find(point.blueprint); found != massOf.end()) {
+          point.mass = found->second;
+        }
+        props.push_back(std::move(point));
+      }
+      for (CheckIssue& issue : CheckPropSymmetry(props, input.symmetry, input.turns, input.width, input.height)) {
+        mCheckIssues.push_back(std::move(issue));
+      }
+    }
     CheckPathing(input);
     // The scripts' syntax, as the files are now (edits included).
     for (CheckIssue& issue : mDocument.CheckScripts()) {
@@ -942,6 +968,9 @@ namespace faf::editor
           mFocusScript = true;
           mScriptErrorLine = issue.line;
           mScriptMessage = issue.file + " line " + std::to_string(issue.line) + ": " + issue.text;
+        } else if (issue.marker == "Props" || issue.marker.rfind("Prop ", 0) == 0) {
+          // A prop's finding: the view to its place (props have no names to select by).
+          mTools.AskPointFrame(issue.x, issue.z);
         } else if (!issue.marker.empty()) {
           mTools.AskMarkerSelect({issue.marker}, false);
           mTools.AskMarkerFrame(issue.marker);

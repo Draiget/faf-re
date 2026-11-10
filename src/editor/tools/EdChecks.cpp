@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstdint>
+#include <unordered_map>
 
 #include "editor/tools/EdMarkers.h"
 
@@ -146,6 +148,90 @@ namespace faf::editor
         }
       }
     }
+    return issues;
+  }
+  std::vector<CheckIssue> CheckPropSymmetry(const std::vector<PropPoint>& props, const Symmetry symmetry, const int turns, const int width,
+                                            const int height, const float reach, const std::size_t listed)
+  {
+    std::vector<CheckIssue> issues;
+    if (symmetry == Symmetry::None || width <= 0 || props.empty()) {
+      return issues;
+    }
+    // Props in cells of `reach` units, by blueprint: a copy's partners are in its cell or the eight around it.
+    const float cell = std::max(reach, 0.5f);
+    const auto key = [&](const std::string& blueprint, const int cx, const int cz) {
+      return blueprint + "#" + std::to_string(cx) + "," + std::to_string(cz);
+    };
+    std::unordered_map<std::string, std::vector<std::size_t>> grid;
+    grid.reserve(props.size());
+    for (std::size_t i = 0; i < props.size(); ++i) {
+      grid[key(props[i].blueprint, static_cast<int>(std::floor(props[i].x / cell)), static_cast<int>(std::floor(props[i].z / cell)))].push_back(i);
+    }
+    const auto partnerNear = [&](const std::string& blueprint, const float x, const float z) {
+      const int cx = static_cast<int>(std::floor(x / cell));
+      const int cz = static_cast<int>(std::floor(z / cell));
+      for (int dz = -1; dz <= 1; ++dz) {
+        for (int dx = -1; dx <= 1; ++dx) {
+          const auto found = grid.find(key(blueprint, cx + dx, cz + dz));
+          if (found == grid.end()) {
+            continue;
+          }
+          for (const std::size_t j : found->second) {
+            if (std::hypot(props[j].x - x, props[j].z - z) <= reach) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    };
+    std::size_t unmatched = 0;
+    double unmatchedMass = 0.0;
+    double totalMass = 0.0;
+    std::vector<CheckIssue> examples;
+    for (const PropPoint& prop : props) {
+      totalMass += prop.mass;
+      float copyX[kMaxSymmetryCopies], copyZ[kMaxSymmetryCopies];
+      const int copies = HeightBrushCentres(width, height, prop.x, prop.z, symmetry, turns, copyX, copyZ);
+      for (int c = 1; c < copies; ++c) {
+        if (partnerNear(prop.blueprint, copyX[c], copyZ[c])) {
+          continue;
+        }
+        ++unmatched;
+        unmatchedMass += prop.mass;
+        if (examples.size() < listed) {
+          const std::string name = prop.blueprint.substr(prop.blueprint.find_last_of('/') + 1);
+          char text[240];
+          (void)std::snprintf(text, sizeof(text), "%s at (%.1f, %.1f) has no partner at its symmetric copy (%.1f, %.1f)%s", name.c_str(),
+                              static_cast<double>(prop.x), static_cast<double>(prop.z), static_cast<double>(copyX[c]), static_cast<double>(copyZ[c]),
+                              prop.mass > 0.0f ? "" : " (no reclaim)");
+          CheckIssue issue;
+          issue.level = CheckIssue::Level::Note;
+          issue.marker = "Prop " + name;
+          issue.text = text;
+          issue.x = prop.x;
+          issue.z = prop.z;
+          examples.push_back(std::move(issue));
+        }
+        break;
+      }
+    }
+    if (unmatched == 0) {
+      return issues;
+    }
+    CheckIssue summary;
+    summary.level = unmatchedMass > 0.0 ? CheckIssue::Level::Warning : CheckIssue::Level::Note;
+    summary.marker = "Props";
+    char text[240];
+    (void)std::snprintf(text, sizeof(text), "%zu of %zu props have no partner at a symmetric copy: %.0f of %.0f reclaim mass isn't mirrored%s",
+                        unmatched, props.size(), unmatchedMass, totalMass, unmatched > examples.size() ? " (the first ones listed)" : "");
+    summary.text = text;
+    if (!examples.empty()) {
+      summary.x = examples.front().x;
+      summary.z = examples.front().z;
+    }
+    issues.push_back(std::move(summary));
+    issues.insert(issues.end(), examples.begin(), examples.end());
     return issues;
   }
 } // namespace faf::editor
