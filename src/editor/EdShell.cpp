@@ -1,4 +1,5 @@
 #include "editor/EdShell.h"
+#include "editor/ui/EdIcons.h"
 #include "editor/tools/EdMarkers.h"
 
 #include <set>
@@ -458,43 +459,54 @@ namespace faf::editor
         tip("The grid's step in game units");
       }
       ImGui::SameLine();
-      // Show: kinds of things drawn or hidden in the view (Blender's object type visibility); hidden ones aren't picked.
-      if (ImGui::Button("Show")) {
-        ImGui::OpenPopup("##showmenu");
+      divider();
+      // What the view shows, one toggle per kind (Blender's object type visibility); hidden things aren't picked.
+      if (IconToggle("##showprops", EdIcon::Tree, mTools.ShowProps())) {
+        mTools.ShowProps() = !mTools.ShowProps();
       }
-      tip("Which kinds of things the view draws: models, and markers by group (path nodes, AI markers...)");
-      if (ImGui::BeginPopup("##showmenu")) {
-        ImGui::TextDisabled("Models");
-        ImGui::Checkbox("Props", &mTools.ShowProps());
-        ImGui::Checkbox("Units", &mTools.ShowUnits());
-        ImGui::Separator();
-        ImGui::TextDisabled("Markers");
-        // Each palette group: on while none of its types is hidden; a click shows or hides all of them.
-        std::vector<std::string> groups;
+      tip(mTools.ShowProps() ? "Props shown (trees, rocks, wrecks): click to hide them" : "Props hidden: click to show them");
+      ImGui::SameLine();
+      if (IconToggle("##showunits", EdIcon::Tank, mTools.ShowUnits())) {
+        mTools.ShowUnits() = !mTools.ShowUnits();
+      }
+      tip(mTools.ShowUnits() ? "Units shown (the armies' and civilians' units): click to hide them" : "Units hidden: click to show them");
+      // Markers by the palette's groups: shown while none of the group's types is hidden; a click shows or hides all of them.
+      struct MarkerGroup
+      {
+        const char* group;
+        EdIcon icon;
+        const char* what;
+      };
+      static constexpr MarkerGroup kGroups[] = {
+        {"Resources", EdIcon::Resource, "Mass and hydrocarbon markers"},
+        {"Starts", EdIcon::Flag, "Start positions"},
+        {"AI", EdIcon::Crosshair, "AI markers (expansions, rally points, defensive points...)"},
+        {"Path nodes", EdIcon::PathNodes, "Path nodes and their links (land, air, water, amphibious)"},
+        {"Other", EdIcon::Pin, "Other markers (camera, weather, effects...)"},
+      };
+      std::set<std::string>& hidden = mTools.HiddenMarkerTypes();
+      for (const MarkerGroup& group : kGroups) {
+        bool shown = true;
         for (const MarkerType& type : MarkerTypes()) {
-          if (std::find(groups.begin(), groups.end(), type.group) == groups.end()) {
-            groups.emplace_back(type.group);
-          }
+          shown = shown && (std::string(group.group) != type.group || hidden.count(type.type) == 0);
         }
-        std::set<std::string>& hidden = mTools.HiddenMarkerTypes();
-        for (const std::string& group : groups) {
-          bool shown = true;
+        ImGui::SameLine();
+        ImGui::PushID(group.group);
+        if (IconToggle("##showmarkers", group.icon, shown)) {
           for (const MarkerType& type : MarkerTypes()) {
-            shown = shown && (group != type.group || hidden.count(type.type) == 0);
-          }
-          if (ImGui::Checkbox(group.c_str(), &shown)) {
-            for (const MarkerType& type : MarkerTypes()) {
-              if (group == type.group) {
-                if (shown) {
-                  hidden.erase(type.type);
-                } else {
-                  hidden.insert(type.type);
-                }
+            if (std::string(group.group) == type.group) {
+              if (shown) {
+                hidden.insert(type.type);
+              } else {
+                hidden.erase(type.type);
               }
             }
           }
         }
-        ImGui::EndPopup();
+        ImGui::PopID();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+          ImGui::SetTooltip("%s %s: click to %s them", group.what, shown ? "shown" : "hidden", shown ? "hide" : "show");
+        }
       }
 
       // The open map, at the right: its name, its folder, and a dot while it has unsaved edits.

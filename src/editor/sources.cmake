@@ -29,6 +29,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdViewAids.cpp
   tools/EdArmySlots.cpp
   ui/EdHelp.cpp
+  ui/EdIcons.cpp
   ui/EdArmiesPanel.cpp
   ui/EdPropertiesPanel.cpp
   doc/EdRoundTrip.cpp
