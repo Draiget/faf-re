@@ -3,6 +3,7 @@
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskBrush.h"
 #include "editor/doc/EdPropPaint.h"
+#include "editor/doc/EdUnits.h"
 #include "editor/tools/EdWaves.h"
 #include "editor/tools/EdTerrainTypes.h"
 #include "editor/doc/EdWater.h"
@@ -180,6 +181,34 @@ namespace faf::editor
     /** The Units tool: Place (the chosen unit type in the chosen army, with symmetric copies) or Select. */
     [[nodiscard]] bool UnitsToolActive() const noexcept { return mTool == 7; }
     [[nodiscard]] bool UnitPlaceMode() const noexcept { return mUnitMode == 0; }
+    /** The Units tool's group tree of its army (the app gives it now and then), and what the panel asked of it. */
+    enum class GroupAsk
+    {
+      None,
+      Select,
+      Add,
+      Rename,
+      Remove,
+      MoveSelected,
+    };
+    void SetUnitTree(std::string army, UnitGroup tree)
+    {
+      mUnitTreeArmy = std::move(army);
+      mUnitTree = std::move(tree);
+    }
+    [[nodiscard]] GroupAsk TakeGroupAsk(std::vector<std::string>& path, std::string& name)
+    {
+      path = mGroupPath;
+      name = mGroupName;
+      return std::exchange(mGroupAsk, GroupAsk::None);
+    }
+    /** Test runs (`/unitgroup <ask>,<path a/b>[,<name>]`). */
+    void AskGroup(const GroupAsk ask, std::vector<std::string> path, const std::string& name)
+    {
+      mGroupPath = std::move(path);
+      (void)std::snprintf(mGroupName, sizeof(mGroupName), "%s", name.c_str());
+      mGroupAsk = ask;
+    }
     [[nodiscard]] const std::string& UnitType() const noexcept { return mUnitType; }
     [[nodiscard]] const std::string& UnitArmy() const noexcept { return mUnitArmy; }
     [[nodiscard]] bool RandomUnitTurn() const noexcept { return mUnitRandomTurn; }
@@ -688,6 +717,12 @@ namespace faf::editor
     bool mUnitFileImport = false;
     bool mUnitFileExport = false;
     int mTexturePaint = 0;
+    std::string mUnitTreeArmy;
+    UnitGroup mUnitTree;
+    std::vector<std::string> mGroupPath;
+    char mGroupName[64]{};
+    GroupAsk mGroupAsk = GroupAsk::None;
+    void DrawUnitGroup(const UnitGroup& group, std::vector<std::string>& path);
     int mTerrainTypeCode = 81;
     bool mShowTerrainTypes = true;
     bool mShowSlope = false;

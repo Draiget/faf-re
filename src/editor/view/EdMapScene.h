@@ -439,6 +439,8 @@ namespace faf::editor
     void SetRuler(float x0, float z0, float x1, float z1);
     /** Ctrl+C, Ctrl+V or Ctrl+D (`key` 'C', 'V' or 'D'), as the keyboard gives them and test runs (`/uiclicks ^D`). */
     void CtrlKey(char key);
+    /** A Units-tool group ask on `army`'s tree: select a group's units, or change the tree as one undo step. */
+    void ChangeUnitGroups(const std::string& army, EdTools::GroupAsk ask, const std::vector<std::string>& path, const std::string& name);
 
   private:
     /** Whether the Markers panel hides this marker's type. */

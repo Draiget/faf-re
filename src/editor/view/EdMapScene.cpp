@@ -1687,6 +1687,72 @@ namespace faf::editor
     return true;
   }
 
+  void EdMapScene::ChangeUnitGroups(const std::string& army, const EdTools::GroupAsk ask, const std::vector<std::string>& path,
+                                    const std::string& name)
+  {
+    std::string where;
+    for (const std::string& part : path) {
+      where += (where.empty() ? "" : "/") + part;
+    }
+    if (ask == EdTools::GroupAsk::Select) {
+      for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+        UnitGroup root;
+        std::string error;
+        if (entry.name != army || !ParseUnitGroup(entry.Get("Units"), root, error)) {
+          continue;
+        }
+        mUnitSelection.clear();
+        if (const UnitGroup* const group = GroupAt(root, path); group != nullptr) {
+          for (const std::string& unit : UnitNamesIn(*group)) {
+            mUnitSelection.emplace_back(army, unit);
+          }
+        }
+        gpg::Logf("editor: group %s of %s: %zu units selected", where.c_str(), army.c_str(), mUnitSelection.size());
+      }
+      return;
+    }
+    // The selected units of this army, for a move.
+    std::vector<std::string> selected;
+    for (const auto& [owner, unit] : mUnitSelection) {
+      if (owner == army) {
+        selected.push_back(unit);
+      }
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    bool done = false;
+    const char* what = "";
+    (void)EditArmyUnits(army, [&](UnitGroup& root) {
+      switch (ask) {
+      case EdTools::GroupAsk::Add:
+        done = AddGroup(root, path, name);
+        what = "added";
+        break;
+      case EdTools::GroupAsk::Rename:
+        done = RenameGroup(root, path, name);
+        what = "renamed";
+        break;
+      case EdTools::GroupAsk::Remove:
+        done = RemoveGroup(root, path);
+        what = "removed";
+        break;
+      case EdTools::GroupAsk::MoveSelected:
+        done = MoveUnitsTo(root, selected, path) > 0;
+        what = "given the selected units";
+        break;
+      default:
+        break;
+      }
+    });
+    if (!done) {
+      gpg::Warnf("editor: group %s of %s not %s (a name taken, or nothing to do)", where.c_str(), army.c_str(), what);
+      mDocument.RestoreSaveData(before);
+      return;
+    }
+    mDocument.SaveDataEdited(std::move(before));
+    ReloadUnits();
+    gpg::Logf("editor: group %s of %s %s%s%s", where.c_str(), army.c_str(), what, name.empty() ? "" : ": ", name.c_str());
+  }
+
   void EdMapScene::CtrlKey(const char key)
   {
     if (mMap == nullptr) {

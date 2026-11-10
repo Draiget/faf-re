@@ -1380,6 +1380,50 @@ namespace faf::editor
     Note("Place: a click puts the unit there with its symmetric copies, in the army above, in its INITIAL group (the units the "
          "army starts with); names are UNIT_n, as the game's saves name them.");
 
+    SectionHeader("GROUPS");
+    if (mUnitTreeArmy.empty() || mUnitTreeArmy != mUnitArmy) {
+      Note("The army's groups show here once its units are read.");
+    } else {
+      // The army's groups (the INITIAL group the game starts it with, and those under it), each with its units' count.
+      if (ImGui::BeginChild("##unitgroups", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 8.0f), ImGuiChildFlags_Borders)) {
+        std::vector<std::string> path;
+        DrawUnitGroup(mUnitTree, path);
+      }
+      ImGui::EndChild();
+      std::string where = mUnitTreeArmy;
+      for (const std::string& name : mGroupPath) {
+        where += " / " + name;
+      }
+      ImGui::TextDisabled("%s", where.c_str());
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::InputTextWithHint("##groupname", "group name", mGroupName, sizeof(mGroupName));
+      const bool named = mGroupName[0] != '\0';
+      ImGui::BeginDisabled(!named);
+      if (ImGui::Button("New group in it")) {
+        mGroupAsk = GroupAsk::Add;
+      }
+      ImGui::SameLine();
+      ImGui::BeginDisabled(mGroupPath.empty());
+      if (ImGui::Button("Rename")) {
+        mGroupAsk = GroupAsk::Rename;
+      }
+      ImGui::EndDisabled();
+      ImGui::EndDisabled();
+      ImGui::BeginDisabled(mGroupPath.empty());
+      if (ImGui::Button("Remove")) {
+        mGroupAsk = GroupAsk::Remove;
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      ImGui::BeginDisabled(mUnitSelectionCount == 0);
+      if (ImGui::Button("Move the selected here")) {
+        mGroupAsk = GroupAsk::MoveSelected;
+      }
+      ImGui::EndDisabled();
+      Note("A click on a group selects its units. A removed group's units and groups go up into its parent. Each change is "
+           "one undo step.");
+    }
+
     SectionHeader("UNIT FILE");
     ImGui::BeginDisabled(mUnitArmy.empty());
     if (ImGui::Button("Import...")) {
@@ -1393,6 +1437,38 @@ namespace faf::editor
     Note("FAForeverMapEditor's units file (.scunits): type, position, turn, orders and platoon. Import puts the units in the "
          "army above, on the ground, selected, as one undo step; units from a bigger map are moved together to its middle. "
          "Export writes the selected units, or all of the army's.");
+  }
+
+  void EdTools::DrawUnitGroup(const UnitGroup& group, std::vector<std::string>& path)
+  {
+    for (const UnitGroup::Member& member : group.order) {
+      if (member.group < 0 || static_cast<std::size_t>(member.group) >= group.groups.size()) {
+        continue;
+      }
+      const UnitGroup& child = group.groups[static_cast<std::size_t>(member.group)];
+      path.push_back(child.name);
+      std::vector<const SaveUnit*> units;
+      CollectUnits(child, units);
+      ImGui::PushID(child.name.c_str());
+      ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
+      if (child.groups.empty()) {
+        flags |= ImGuiTreeNodeFlags_Leaf;
+      }
+      if (path == mGroupPath) {
+        flags |= ImGuiTreeNodeFlags_Selected;
+      }
+      const bool open = ImGui::TreeNodeEx("##group", flags, "%s  (%zu)", child.name.c_str(), units.size());
+      if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+        mGroupPath = path;
+        mGroupAsk = GroupAsk::Select;
+      }
+      if (open) {
+        DrawUnitGroup(child, path);
+        ImGui::TreePop();
+      }
+      ImGui::PopID();
+      path.pop_back();
+    }
   }
 
   void EdTools::DrawPlayableArea()

@@ -349,6 +349,8 @@ namespace faf::editor
       bool mWaveSwitchesDone = false;
       bool mTerrainTypeArgDone = false;
       bool mViewAidArgsDone = false;
+      int mUnitTreeFrames = 0;
+      bool mUnitGroupArgDone = false;
       int mReclaimFrames = 0;
       bool mReclaimLogged = false;
       int mLayerFileStep = 0;
@@ -1916,6 +1918,24 @@ namespace faf::editor
           tools.SetTerrainTypes(std::move(types));
         }
       }
+      // The Units tool's group tree of its army, twice a second; its asks.
+      if (tools.UnitsToolActive() && ++mUnitTreeFrames % 30 == 1) {
+        for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+          UnitGroup root;
+          std::string error;
+          if (entry.name == tools.UnitArmy() && ParseUnitGroup(entry.Get("Units"), root, error)) {
+            tools.SetUnitTree(entry.name, std::move(root));
+          }
+        }
+      }
+      {
+        std::vector<std::string> path;
+        std::string name;
+        if (const EdTools::GroupAsk ask = tools.TakeGroupAsk(path, name); ask != EdTools::GroupAsk::None && mDocument.GetState() == EdDocument::State::Open) {
+          mScene.ChangeUnitGroups(tools.UnitArmy(), ask, path, name);
+          mUnitTreeFrames = 0;
+        }
+      }
       // `/slope`, `/kmgrid` for test runs: the view aids on.
       if (mScene.Attached() && !mViewAidArgsDone) {
         mViewAidArgsDone = true;
@@ -1930,6 +1950,32 @@ namespace faf::editor
             list = comma == std::string::npos ? std::string() : list.substr(comma + 1);
           }
           mScene.SetRuler(ends[0], ends[1], ends[2], ends[3]);
+        }
+      }
+      // `/unitgroup <add|rename|remove|move|select>,<a/b path>[,<name>]` (test runs), on the Units tool's army.
+      if (mScene.Attached() && !mUnitGroupArgDone && !tools.UnitArmy().empty()) {
+        mUnitGroupArgDone = true;
+        if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/unitgroup", 1, &value) && !value.empty()) {
+          std::vector<std::string> parts;
+          std::string list = value[0].c_str();
+          for (std::size_t at = 0; at <= list.size();) {
+            const std::size_t comma = std::min(list.find(',', at), list.size());
+            parts.push_back(list.substr(at, comma - at));
+            at = comma + 1;
+          }
+          std::vector<std::string> path;
+          if (parts.size() > 1) {
+            for (std::size_t at = 0; at <= parts[1].size() && !parts[1].empty();) {
+              const std::size_t slash = std::min(parts[1].find('/', at), parts[1].size());
+              path.push_back(parts[1].substr(at, slash - at));
+              at = slash + 1;
+            }
+          }
+          const std::string& verb = parts[0];
+          const EdTools::GroupAsk ask = verb == "add" ? EdTools::GroupAsk::Add : verb == "rename" ? EdTools::GroupAsk::Rename
+                                        : verb == "remove" ? EdTools::GroupAsk::Remove : verb == "move" ? EdTools::GroupAsk::MoveSelected
+                                                                                                         : EdTools::GroupAsk::Select;
+          tools.AskGroup(ask, path, parts.size() > 2 ? parts[2] : std::string());
         }
       }
       if (mScene.Attached() && !mTerrainTypeArgDone) {

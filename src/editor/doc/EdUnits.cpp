@@ -411,4 +411,141 @@ namespace faf::editor
     initial->order.push_back({-1, static_cast<int>(initial->units.size())});
     initial->units.push_back(std::move(unit));
   }
+  UnitGroup* GroupAt(UnitGroup& root, const std::vector<std::string>& path)
+  {
+    UnitGroup* group = &root;
+    for (const std::string& name : path) {
+      UnitGroup* next = nullptr;
+      for (UnitGroup& child : group->groups) {
+        if (child.name == name) {
+          next = &child;
+          break;
+        }
+      }
+      if (next == nullptr) {
+        return nullptr;
+      }
+      group = next;
+    }
+    return group;
+  }
+
+  namespace
+  {
+    bool HasMember(const UnitGroup& group, const std::string& name)
+    {
+      return std::any_of(group.groups.begin(), group.groups.end(), [&](const UnitGroup& child) { return child.name == name; }) ||
+             std::any_of(group.units.begin(), group.units.end(), [&](const SaveUnit& unit) { return unit.name == name; });
+    }
+  } // namespace
+
+  bool AddGroup(UnitGroup& root, const std::vector<std::string>& path, const std::string& name)
+  {
+    UnitGroup* const parent = GroupAt(root, path);
+    if (parent == nullptr || name.empty() || HasMember(*parent, name)) {
+      return false;
+    }
+    UnitGroup group;
+    group.name = name;
+    group.newline = parent->newline;
+    parent->order.push_back({static_cast<int>(parent->groups.size()), -1});
+    parent->groups.push_back(std::move(group));
+    return true;
+  }
+
+  bool RenameGroup(UnitGroup& root, const std::vector<std::string>& path, const std::string& name)
+  {
+    if (path.empty() || name.empty()) {
+      return false;
+    }
+    UnitGroup* const parent = GroupAt(root, std::vector<std::string>(path.begin(), path.end() - 1));
+    UnitGroup* const group = GroupAt(root, path);
+    if (parent == nullptr || group == nullptr || (name != group->name && HasMember(*parent, name))) {
+      return false;
+    }
+    group->name = name;
+    return true;
+  }
+
+  bool RemoveGroup(UnitGroup& root, const std::vector<std::string>& path)
+  {
+    if (path.empty()) {
+      return false;
+    }
+    UnitGroup* const parent = GroupAt(root, std::vector<std::string>(path.begin(), path.end() - 1));
+    if (parent == nullptr) {
+      return false;
+    }
+    int index = -1;
+    for (std::size_t i = 0; i < parent->groups.size(); ++i) {
+      if (parent->groups[i].name == path.back()) {
+        index = static_cast<int>(i);
+      }
+    }
+    if (index < 0) {
+      return false;
+    }
+    UnitGroup removed = std::move(parent->groups[static_cast<std::size_t>(index)]);
+    parent->groups.erase(parent->groups.begin() + index);
+    // Its place in the parent's order, and the groups after it one down.
+    std::size_t at = parent->order.size();
+    for (std::size_t i = 0; i < parent->order.size(); ++i) {
+      if (parent->order[i].group == index) {
+        at = i;
+      }
+    }
+    if (at < parent->order.size()) {
+      parent->order.erase(parent->order.begin() + static_cast<std::ptrdiff_t>(at));
+    }
+    for (UnitGroup::Member& member : parent->order) {
+      if (member.group > index) {
+        --member.group;
+      }
+    }
+    // Its members, in its order, where it was.
+    std::vector<UnitGroup::Member> moved;
+    for (const UnitGroup::Member& member : removed.order) {
+      if (member.group >= 0) {
+        moved.push_back({static_cast<int>(parent->groups.size()), -1});
+        parent->groups.push_back(std::move(removed.groups[static_cast<std::size_t>(member.group)]));
+      } else if (member.unit >= 0) {
+        moved.push_back({-1, static_cast<int>(parent->units.size())});
+        parent->units.push_back(std::move(removed.units[static_cast<std::size_t>(member.unit)]));
+      }
+    }
+    parent->order.insert(parent->order.begin() + static_cast<std::ptrdiff_t>(std::min(at, parent->order.size())), moved.begin(), moved.end());
+    return true;
+  }
+
+  int MoveUnitsTo(UnitGroup& root, const std::vector<std::string>& names, const std::vector<std::string>& path)
+  {
+    if (GroupAt(root, path) == nullptr) {
+      return 0;
+    }
+    int moved = 0;
+    for (const std::string& name : names) {
+      const SaveUnit* const found = FindUnit(root, name);
+      if (found == nullptr) {
+        continue;
+      }
+      SaveUnit unit = *found;
+      (void)RemoveUnit(root, name);
+      UnitGroup* const group = GroupAt(root, path);
+      group->order.push_back({-1, static_cast<int>(group->units.size())});
+      group->units.push_back(std::move(unit));
+      ++moved;
+    }
+    return moved;
+  }
+
+  std::vector<std::string> UnitNamesIn(const UnitGroup& group)
+  {
+    std::vector<const SaveUnit*> units;
+    CollectUnits(group, units);
+    std::vector<std::string> names;
+    for (const SaveUnit* const unit : units) {
+      names.push_back(unit->name);
+    }
+    return names;
+  }
 } // namespace faf::editor
