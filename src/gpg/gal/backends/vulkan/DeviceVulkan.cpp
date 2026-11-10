@@ -588,6 +588,9 @@ namespace gpg::gal
     if (available.features.textureCompressionBC != VK_TRUE) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "the Vulkan device has no BC texture compression");
     }
+    // A software rasterizer (llvmpipe, as in a virtual machine without 3D, issue #256) gets no ray
+    // queries below: ray-traced shadows would trace on the CPU that already rasterizes every pixel.
+    const bool softwareDevice = mProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU;
 
     const float priority = 1.0f;
     VkDeviceQueueCreateInfo queue{};
@@ -620,7 +623,7 @@ namespace gpg::gal
     accelerationFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
     accelerationFeatures.accelerationStructure = VK_TRUE;
     accelerationFeatures.pNext = &rayQueryFeatures;
-    mRayQuery = effects::RayTracedShadowsWanted() && hasExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) &&
+    mRayQuery = effects::RayTracedShadowsWanted() && !softwareDevice && hasExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) &&
       hasExtension(VK_KHR_RAY_QUERY_EXTENSION_NAME) && hasExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME) &&
       availableAcceleration.accelerationStructure == VK_TRUE && availableRayQuery.rayQuery == VK_TRUE &&
       available12.bufferDeviceAddress == VK_TRUE &&

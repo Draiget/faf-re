@@ -335,7 +335,12 @@ namespace gpg::gal
     // The GPU font cook (ren_GpuFontCook): GPU and CPU atlases compared per font, and a device reset during
     // a cook, on NVIDIA only; other vendors keep the CPU cook until it has run there (issue #309).
     const std::uint32_t fontCook = mProperties.vendorID == kPciVendorNvidia ? kGpuPathMsdfCook : 0U;
-    return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets | kGpuPathProjectileIcons |
+    // Not the icon classification on a software rasterizer (llvmpipe, a Linux VM without 3D, issue
+    // #256): its compiled code faults in that path's compute and indirect draw within a game's first
+    // frames (skirmish bisect in the linux-faf VM: ren_GpuIconClassify 0 alone avoids it, every other
+    // GPU path on). ren_GpuIconClassify 1 still turns it on there.
+    const std::uint32_t iconClassify = mProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU ? 0U : kGpuPathIconClassify;
+    return kGpuPathStrategicIcons | iconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets | kGpuPathProjectileIcons |
       // MSDF text and the interface's quads: 0 pixels differ in a same-process A/B of a panel of text.
       kGpuPathWorldShapes | kGpuPathMsdfText | fontCook;
   }
