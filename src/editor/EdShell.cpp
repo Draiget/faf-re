@@ -708,6 +708,7 @@ namespace faf::editor
       bool changed = false;
       const float roleWidth = ImGui::CalcTextSize("Empty").x + ImGui::GetFrameHeight() * 1.6f;
       const float teamWidth = ImGui::CalcTextSize("Team 4").x + ImGui::GetFrameHeight() * 1.6f;
+      const float factionWidth = ImGui::CalcTextSize("Random").x + ImGui::GetFrameHeight() * 1.6f;
       for (std::size_t i = 0; i < setup.slots.size(); ++i) {
         PlaySlot& slot = setup.slots[i];
         ImGui::PushID(static_cast<int>(i));
@@ -728,7 +729,7 @@ namespace faf::editor
           changed = true;
         }
         ImGui::SameLine();
-        const float aiWidth = ImGui::GetContentRegionAvail().x - teamWidth - ImGui::GetStyle().ItemSpacing.x;
+        const float aiWidth = ImGui::GetContentRegionAvail().x - teamWidth - factionWidth - ImGui::GetStyle().ItemSpacing.x * 2.0f;
         if (slot.role == PlaySlot::Role::Ai) {
           slot.ai = std::clamp(slot.ai, 0, static_cast<int>(aiTypes.size()) - 1);
           ImGui::SetNextItemWidth(aiWidth);
@@ -743,6 +744,26 @@ namespace faf::editor
           }
         } else {
           ImGui::Dummy(ImVec2(aiWidth, ImGui::GetFrameHeight()));
+        }
+        ImGui::SameLine();
+        // An AI's faction (yours is the setup's Faction above).
+        if (slot.role == PlaySlot::Role::Ai) {
+          slot.faction = std::clamp(slot.faction, 0, static_cast<int>(factions.size()));
+          ImGui::SetNextItemWidth(factionWidth);
+          if (ImGui::BeginCombo("##slotfaction",
+                                slot.faction == 0 ? "Random" : factions[static_cast<std::size_t>(slot.faction - 1)].name.c_str())) {
+            if (ImGui::Selectable("Random", slot.faction == 0)) {
+              slot.faction = 0;
+            }
+            for (int k = 0; k < static_cast<int>(factions.size()); ++k) {
+              if (ImGui::Selectable(factions[static_cast<std::size_t>(k)].name.c_str(), slot.faction == k + 1)) {
+                slot.faction = k + 1;
+              }
+            }
+            ImGui::EndCombo();
+          }
+        } else {
+          ImGui::Dummy(ImVec2(factionWidth, ImGui::GetFrameHeight()));
         }
         ImGui::SameLine();
         slot.team = std::clamp(slot.team, 0, 4);

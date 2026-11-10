@@ -88,10 +88,10 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
     local armies = scenario.Configurations.standard.teams[1].armies
     local numColors = table.getn(import('/lua/gamecolors.lua').GameColors.PlayerColors)
 
-    local function newAi(index, key, team)
+    local function newAi(index, key, team, aiFaction)
         local ai = GetDefaultPlayerOptions(info.playerName)
         ai.AIPersonality = key
-        ai.Faction = SPL.GetRandomFaction()
+        ai.Faction = (aiFaction and aiFaction > 0) and aiFaction or SPL.GetRandomFaction()
         ai.PlayerName = SPL.GetRandomName(ai.Faction, key)
         ai.Human = false
         ai.ArmyName = armies[index]
@@ -113,7 +113,8 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
     end
 
     if extra.slots and table.getn(extra.slots) > 0 then
-        -- A custom setup, slot by slot: you first (army 1 is the player's), then the AIs in slot order.
+        -- A custom setup, slot by slot: you first (army 1 is the player's), then the AIs in slot order. No You
+        -- row: you watch, as an observer (the session's focus army stays -1).
         local you = nil
         for index, s in extra.slots do
             if s.role == 'you' and armies[index] and not you then
@@ -121,13 +122,9 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
                 info.teamInfo[1] = newPlayer(index, s.team + 1)
             end
         end
-        if not you then
-            info.teamInfo[1] = newPlayer(1, 1)
-            you = 1
-        end
         for index, s in extra.slots do
             if s.role == 'ai' and armies[index] and index ~= you then
-                info.teamInfo[table.getn(info.teamInfo) + 1] = newAi(index, s.ai, s.team + 1)
+                info.teamInfo[table.getn(info.teamInfo) + 1] = newAi(index, s.ai, s.team + 1, s.faction)
             end
         end
     else
@@ -584,7 +581,7 @@ end
       const std::string role = slot.role == PlaySlot::Role::You ? "you" : slot.role == PlaySlot::Role::Ai ? "ai" : "empty";
       const std::string key =
         slot.role == PlaySlot::Role::Ai && slot.ai >= 0 && slot.ai < static_cast<int>(mAiTypes.size()) ? mAiTypes[static_cast<std::size_t>(slot.ai)].key : "";
-      stored.slots += (stored.slots.empty() ? "" : ",") + role + ":" + key + ":" + std::to_string(slot.team);
+      stored.slots += (stored.slots.empty() ? "" : ",") + role + ":" + key + ":" + std::to_string(slot.team) + ":" + std::to_string(slot.faction);
     }
     stored.victory = setup.victory;
     stored.unitCap = setup.unitCap;
@@ -633,6 +630,9 @@ end
         }
       }
       slot.team = std::max(0, std::atoi(item.c_str() + second + 1));
+      if (const std::size_t third = item.find(':', second + 1); third != std::string::npos) {
+        slot.faction = std::max(0, std::atoi(item.c_str() + third + 1));
+      }
       setup.slots.push_back(slot);
     }
     setup.victory = stored.victory.empty() ? "sandbox" : stored.victory;
@@ -772,7 +772,7 @@ end
   namespace
   {
     /** The built-in profiles, in the menu's order. */
-    const char* const kBuiltInProfiles[] = {"Solo sandbox", "You vs 1 AI", "2 v 2 with AI", "Free for all with AI"};
+    const char* const kBuiltInProfiles[] = {"Solo sandbox", "You vs 1 AI", "2 v 2 with AI", "Free for all with AI", "Watch 4 AI"};
   } // namespace
 
   std::vector<PlayProfile> EdPlay::Profiles() const
@@ -807,6 +807,17 @@ end
       setup.withAi = true;
       setup.aiCount = 1;
       setup.victory = "demoralization";
+    } else if (name == kBuiltInProfiles[4]) {
+      // Four AIs on slots 1-4, two teams by odd and even slots, and you watching.
+      setup.withAi = true;
+      setup.victory = "demoralization";
+      for (int i = 0; i < std::min(4, std::max(slots, 2)); ++i) {
+        PlaySlot slot;
+        slot.role = PlaySlot::Role::Ai;
+        slot.ai = setup.ai;
+        slot.team = 1 + (i % 2);
+        setup.slots.push_back(slot);
+      }
     } else if (name == kBuiltInProfiles[2] || name == kBuiltInProfiles[3]) {
       // Slots 1 and 2, 3 and 4 face each other on maps whose starts are paired (the Armies panel pairs them):
       // two v two puts the odd slots on one team and the even on the other.
@@ -917,7 +928,8 @@ end
     for (const PlaySlot& slot : mSetup.slots) {
       const std::string role = slot.role == PlaySlot::Role::You ? "you" : slot.role == PlaySlot::Role::Ai ? "ai" : "empty";
       const std::string key = slot.ai >= 0 && slot.ai < static_cast<int>(mAiTypes.size()) ? mAiTypes[static_cast<std::size_t>(slot.ai)].key : "rush";
-      extraText += "{ role = '" + role + "', ai = '" + key + "', team = " + std::to_string(slot.team) + " }, ";
+      extraText += "{ role = '" + role + "', ai = '" + key + "', team = " + std::to_string(slot.team) +
+                   ", faction = " + std::to_string(slot.faction) + " }, ";
     }
     char options[160];
     (void)std::snprintf(options, sizeof(options), "}, victory = '%s', unitCap = %d, cheatMult = '%.1f' }", mSetup.victory.c_str(), mSetup.unitCap,
@@ -931,6 +943,7 @@ end
       for (const PlaySlot& slot : mSetup.slots) {
         list += slot.role == PlaySlot::Role::You ? " you" : slot.role == PlaySlot::Role::Ai ? " ai" : " -";
         list += slot.team > 0 ? "/t" + std::to_string(slot.team) : std::string();
+        list += slot.faction > 0 ? "/f" + std::to_string(slot.faction) : std::string();
       }
       gpg::Logf("editor: play slots:%s; victory %s, unit cap %d, AI cheat %.1f", list.c_str(), mSetup.victory.c_str(), mSetup.unitCap,
                 static_cast<double>(mSetup.cheatMult));

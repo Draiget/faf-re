@@ -41,6 +41,8 @@ namespace faf::editor
     int ai = 0;
     /** 0 no team, else the team's number: armies of one team start allied (FAF's Team, this plus one). */
     int team = 0;
+    /** 0 random, else index + 1 into `EdPlay::Factions()` (an AI's; your own is the setup's faction). */
+    int faction = 0;
   };
 
   /** How Play sets the session up. */
