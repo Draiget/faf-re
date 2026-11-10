@@ -32,7 +32,8 @@ namespace gpg::gal::effects
    * [6] (direction towards the sun x, y, z, unit length; ren_RayShadowDebug);
    * [7] (the ground's bias against the traced ground along a shadow ray, world units; how far straight down
    *     the traced ground's spacing and terrain tessellation's sinking can put a drawn point under it, which
-   *     ren_RayAo reads; unused, unused).
+   *     ren_RayAo reads; tangent of the sun's angular radius, 0 for hard shadows (ren_RaySunAngle); rays per
+   *     ground point over the sun's disc (ren_RaySoftRays)).
    */
   inline constexpr std::uint32_t kRayShadowVectors = 8U;
   inline constexpr std::string_view kRayShadowParameter = "faf_RayShadows";

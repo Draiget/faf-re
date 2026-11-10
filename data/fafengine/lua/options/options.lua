@@ -314,6 +314,25 @@ do
                 },
             })
         end
+        if Supported('ren_RaySunAngle') then
+            table.insert(video.items, math.min(position + 2, table.getn(video.items) + 1), {
+                title = 'Soft ray-traced shadows',
+                key = 'ray_soft_shadows',
+                type = 'toggle',
+                default = 1,
+                tip = 'With ray-traced shadows on: the sun is a disc, not a point, so shadows are sharp where '
+                    .. 'they start and soften further from their caster.',
+                set = function(key, value, startup)
+                    ConExecute('ren_RaySunAngle ' .. ((value == 1) and '3' or '0'))
+                end,
+                custom = {
+                    states = {
+                        { text = '<LOC _On>', key = 1 },
+                        { text = '<LOC _Off>', key = 0 },
+                    },
+                },
+            })
+        end
     end
 end
 

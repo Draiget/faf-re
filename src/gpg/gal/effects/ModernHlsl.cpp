@@ -165,6 +165,55 @@ float faf_ray_under_ground(float3 p)
     query.Proceed();
     return (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT) ? query.CommittedRayT() : 0;
 }
+// Engine addition (ren_RaySunAngle): a direction towards a point of the sun's disc. `disc` lies in the unit
+// disc; faf_RayShadows[7].z is the tangent of the disc's angular radius (0: the centre only, hard shadows).
+float3 faf_ray_sun_point(float3 toSun, float2 disc)
+{
+    const float3 helper = (abs(toSun.y) < 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
+    const float3 across = normalize(cross(helper, toSun));
+    const float3 along = cross(toSun, across);
+    return normalize(toSun + faf_RayShadows[7].z * (disc.x * across + disc.y * along));
+}
+// A value in [0, 1) fixed to the world under `p`, so the spread of soft-shadow rays turns from point to point
+// without crawling when the camera moves. The cells are 1/8 unit near the camera and grow with distance, so a
+// pixel far away doesn't cover many of them (which would make it pick a new one as the view pans).
+float faf_ray_noise(float3 p)
+{
+    const float scale = 8.0 / max(1.0, distance(p, faf_RayShadows[5].xyz) * 0.025);
+    const float2 cell = floor(p.xz * scale);
+    return frac(52.9829189 * frac(dot(cell, float2(0.06711056, 0.00583715))));
+}
+// A mesh's shadow on `p` along `direction` past `tMin`. A point the drawn ground puts under the traced ground
+// could see the sunk part of a building from below: only a hit needs the check, then the ray leaves again from
+// the traced ground over the point.
+bool faf_ray_mesh_blocked(float3 p, float3 direction, float tMin, float tMax)
+{
+    if (!faf_ray_blocked(p, direction, tMin, tMax, 2)) return false;
+    const float under = faf_ray_under_ground(p);
+    return (under > 0) ? faf_ray_blocked(p + float3(0, under, 0), direction, tMin, tMax, 2) : true;
+}
+// The share of `count` rays from `origin` towards points spread over the sun's disc (a sunflower spiral,
+// turned by `spin`) that no mesh blocks past `tMin`.
+float faf_ray_mesh_share(float3 origin, float3 toSun, float tMin, float tMax, float spin, int count)
+{
+    float lit = 0;
+    [loop] for (int i = 0; i < count; ++i) {
+        const float radius = sqrt((i + 0.5) / count);
+        const float angle = (i + spin) * 2.39996323;
+        const float3 direction = faf_ray_sun_point(toSun, radius * float2(cos(angle), sin(angle)));
+        lit += faf_ray_mesh_blocked(origin, direction, tMin, tMax) ? 0 : 1;
+    }
+    return lit / count;
+}
+// The ground's shadow on `p` past `tMin` along `direction`. A point under the traced ground (see
+// faf_ray_under_ground) sees that ground above it, so only a hit needs the check: then the ray leaves again from
+// the traced ground over the point. Lit points, most of the screen, pay one ray.
+bool faf_ray_ground_blocked(float3 p, float3 direction, float tMin, float tMax)
+{
+    if (!faf_ray_blocked(p, direction, tMin, tMax, 1)) return false;
+    const float under = faf_ray_under_ground(p);
+    return (under > 0) ? faf_ray_blocked(p + float3(0, under, 0), direction, tMin, tMax, 1) : true;
+}
 // One ray against the instances in `mask` answering both readings: x lit past meshT, y lit past terrainT.
 float2 faf_ray_pair(float3 start, float3 toSun, float meshT, float terrainT, float tMax, uint mask)
 {
@@ -178,20 +227,24 @@ float2 faf_ray_pair(float3 start, float3 toSun, float meshT, float terrainT, flo
     }
     return float2(1, 1);
 }
-// x: sunlit for a mesh point at full.z; y: sunlit for a terrain point whose z is 0.01 short.
-float2 faf_ray_light(float4 full)
+static float2 faf_ray_key_tap = float2(-1e31, -1e31);
+// x: sunlit for a mesh point at full.z; y: sunlit for a terrain point whose z is 0.01 short. `tap` is the
+// lookup's offset from the point (mesh.fx's filter taps): with a sun disc each tap traces towards its own
+// point of it, and mesh.fx's average of the taps makes the soft edge.
+float2 faf_ray_light(float4 full, float2 tap)
 {
     if (faf_RayShadows[4].x <= 0 || full.z < -1e29) return float2(1, 1);
-    if (all(full == faf_ray_key)) return faf_ray_lit;
+    const bool soft = faf_RayShadows[7].z > 0;
+    if (all(full == faf_ray_key) && (!soft || all(tap == faf_ray_key_tap))) return faf_ray_lit;
     const float2 uv = full.xy;
     const float3 drawnPoint = faf_ray_point(uv, full.z + 0.01);
-    // Both readings move up onto the traced ground when the drawn surface lies under it.
-    const float3 up = float3(0, faf_ray_under_ground(drawnPoint), 0);
-    const float3 meshPoint = faf_ray_point(uv, full.z) + up;
-    const float3 terrainPoint = drawnPoint + up;
+    // A point the drawn ground puts under the traced one moves up onto it only when the ground's ray hits
+    // (faf_ray_ground_blocked).
+    const float3 meshPoint = faf_ray_point(uv, full.z);
+    const float3 terrainPoint = drawnPoint;
     const float3 toSun = faf_RayShadows[6].xyz;
     const float ahead = dot(meshPoint - terrainPoint, toSun); // the mesh reading's lead along the ray
-    const float3 start = (ahead >= 0) ? terrainPoint : meshPoint;
+    float3 start = (ahead >= 0) ? terrainPoint : meshPoint;
     const float meshT = max(ahead, 0) + faf_RayShadows[4].y;
     const float terrainT = max(-ahead, 0) + faf_RayShadows[4].z;
     const float tMax = faf_RayShadows[5].w;
@@ -204,16 +257,32 @@ float2 faf_ray_light(float4 full)
         // Red only (mesh.fx): the mesh reading, from its own point.
         // Against the traced ground with its allowance: it can lie above the drawn ground (a coarse field,
         // tessellation), up into a unit's base.
-        const bool shaded = faf_ray_blocked(meshPoint, toSun, faf_RayShadows[4].y, tMax, 2) ||
-            faf_ray_blocked(meshPoint, toSun, faf_RayShadows[4].y + faf_RayShadows[7].x, tMax, 1);
+        float3 meshRay = toSun;
+        if (soft) {
+            // This tap's point of the disc: from its offset, turned per point of the world. A single lookup (mesh.fx
+            // below its top shadow quality has no filter taps) takes a point from the noise alone, a dithered edge.
+            const float seed = any(tap != 0) ? frac(sin(dot(tap, float2(12.9898, 78.233)) * 1e4) * 43758.5453) : 0.37;
+            const float angle = (seed + faf_ray_noise(meshPoint)) * 6.2831853;
+            const float radius = sqrt(frac(seed * 7.31 + 0.5));
+            meshRay = faf_ray_sun_point(toSun, radius * float2(cos(angle), sin(angle)));
+        }
+        const bool shaded = faf_ray_mesh_blocked(meshPoint, meshRay, faf_RayShadows[4].y, tMax) ||
+            faf_ray_ground_blocked(meshPoint, toSun, faf_RayShadows[4].y + faf_RayShadows[7].x, tMax);
         lit = shaded ? float2(0, 1) : float2(1, 1);
     } else if (full.w < 2.5) {
-        // Green only (terrain.fx): the terrain reading, from its own point.
+        // Green only (terrain.fx): the terrain reading, from its own point. With a sun disc, the share of
+        // faf_RayShadows[7].w rays over it that meshes don't block; the ground's own shadow stays one ray.
         const float groundT = faf_RayShadows[4].z;
-        const bool shaded = faf_ray_blocked(terrainPoint, toSun, groundT, tMax, 2) ||
-            faf_ray_blocked(terrainPoint, toSun, terrainOnTerrainT - max(-ahead, 0), tMax, 1);
-        lit = shaded ? float2(1, 0) : float2(1, 1);
+        const int count = clamp((int)faf_RayShadows[7].w, 1, 16);
+        const float meshLit = soft
+            ? faf_ray_mesh_share(terrainPoint, toSun, groundT, tMax, faf_ray_noise(terrainPoint), count)
+            : (faf_ray_mesh_blocked(terrainPoint, toSun, groundT, tMax) ? 0 : 1);
+        const bool ground = meshLit > 0 && faf_ray_ground_blocked(terrainPoint, toSun, terrainOnTerrainT - max(-ahead, 0), tMax);
+        lit = float2(1, ground ? 0 : meshLit);
     } else {
+        // Both readings (a call site that reads the whole texel): the old way, both points lifted first.
+        const float3 up = float3(0, faf_ray_under_ground(drawnPoint), 0);
+        start += up;
         lit = faf_ray_pair(start, toSun, meshT, terrainT, tMax, 2);
         if (any(lit > 0)) {
             lit = min(lit, faf_ray_pair(start, toSun, meshT + faf_RayShadows[7].x, terrainOnTerrainT, tMax, 1));
@@ -230,13 +299,14 @@ float2 faf_ray_light(float4 full)
         lit = faf_ray_blocked(drawnPoint + float3(0, 0.02, 0), float3(0, 1, 0), 0.0, 1000.0) ? float2(0, 0) : float2(1, 1);
     }
     faf_ray_key = full;
+    faf_ray_key_tap = tap;
     faf_ray_lit = lit;
     return lit;
 }
 float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full)
 {
     float4 texel = faf_shadow_read(s, uv);
-    const float2 lit = faf_ray_light(full);
+    const float2 lit = faf_ray_light(full, uv - full.xy);
     texel.r = (lit.x > 0) ? texel.r : -1e4;
     texel.g *= lit.y;
     return texel;

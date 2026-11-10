@@ -27,6 +27,9 @@ namespace moho
   int ren_RayShadowDebug = 0;
   int ren_RayShadowTerrainStep = 0;
   int ren_RayShadowFailTest = 0;
+  // Engine addition (ren_RaySunAngle): soft shadows from a sun that is a disc, not a point.
+  float ren_RaySunAngle = 3.0f;
+  int ren_RaySoftRays = 4;
 
   namespace
   {
@@ -55,6 +58,16 @@ namespace moho
     );
     TConVar<float> gTConVar_ren_RayShadowReach(
       "ren_RayShadowReach", "Ray-traced shadows: the longest shadow ray, in world units.", &ren_RayShadowReach
+    );
+    TConVar<float> gTConVar_ren_RaySunAngle(
+      "ren_RaySunAngle",
+      "Ray-traced shadows: the sun's angular radius in degrees; rays go to points over its disc, so a shadow is "
+      "sharp where its caster touches and softer further away. 0 gives hard shadows (one ray to the centre).",
+      &ren_RaySunAngle
+    );
+    TConVar<int> gTConVar_ren_RaySoftRays(
+      "ren_RaySoftRays", "Ray-traced shadows with ren_RaySunAngle: rays per ground point (1-16); units use their own 5-tap filter.",
+      &ren_RaySoftRays
     );
     TConVar<int> gTConVar_ren_RayShadowFailTest(
       "ren_RayShadowFailTest",
@@ -508,6 +521,9 @@ namespace moho
     const float under = 0.5f * static_cast<float>(std::max(mTerrainStep, 1) - 1) + (ren_TerrainTessellation ? 0.3f : 0.0f);
     vectors[7][0] = under / std::max(vectors[6][1], 0.2f);
     vectors[7][1] = under; // ren_RayAo's rays (AmbientOcclusionRenderer)
+    const float sunAngle = std::clamp(ren_RaySunAngle, 0.0f, 20.0f);
+    vectors[7][2] = std::tan(sunAngle * 0.0174532925f);
+    vectors[7][3] = static_cast<float>(std::clamp(ren_RaySoftRays, 1, 16));
     Publish(vectors);
     gMeshDepthSkipsTraced = !mMeshesMissing;
     return true;
