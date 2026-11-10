@@ -33,8 +33,9 @@ namespace moho
         }
         session->RemoveEntity(mUserUnit);
       }
-      delete mUserUnit;
+      UserUnit* const unitToDelete = mUserUnit;
       mUserUnit = nullptr;
+      delete unitToDelete;
     }
   }
 
@@ -230,8 +231,8 @@ namespace moho
       userUnit->mVariableData.mCurTransform.pos_ = { pos.x, pos.y, pos.z };
       userUnit->mVariableData.mCurTransform.orient_ = { 0.0f, 0.0f, 0.0f, 1.0f };
       userUnit->mVariableData.mFractionComplete = 0.0f;
-      userUnit->mVariableData.mHealth = 1.0f;
-      userUnit->mVariableData.mMaxHealth = 1.0f;
+      userUnit->mVariableData.mHealth = 0.0f;
+      userUnit->mVariableData.mMaxHealth = 0.0f;
 
       const auto* unitBp = dynamic_cast<const RUnitBlueprint*>(bp);
       if (unitBp != nullptr && session->mRules != nullptr) {
@@ -263,10 +264,12 @@ namespace moho
     PlannedUnitProxy* bestProxy = nullptr;
 
     for (const auto& proxy : mProxies) {
+      if (!proxy) {
+        continue;
+      }
       const float dx = proxy->mPosition.x - pos.x;
-      const float dy = proxy->mPosition.y - pos.y;
       const float dz = proxy->mPosition.z - pos.z;
-      const float distSq = (dx * dx) + (dy * dy) + (dz * dz);
+      const float distSq = (dx * dx) + (dz * dz);
       if (distSq <= bestDistSq) {
         bestDistSq = distSq;
         bestProxy = proxy.get();
@@ -346,10 +349,27 @@ namespace moho
     return const_cast<PlannedFactoryManager*>(this)->FindByUserUnit(unit);
   }
 
+  namespace {
+    struct MutexRecursionGuard {
+      bool& mFlag;
+      MutexRecursionGuard(bool& flag) : mFlag(flag) { mFlag = true; }
+      ~MutexRecursionGuard() { mFlag = false; }
+    };
+  }
+
   void PlannedFactoryManager::RemoveByBuilder(const std::uint32_t builderId)
   {
+    if (mIsMutating) {
+      return;
+    }
+    MutexRecursionGuard guard(mIsMutating);
+
     for (auto it = mProxies.begin(); it != mProxies.end();) {
       PlannedUnitProxy* proxy = it->get();
+      if (proxy == nullptr) {
+        it = mProxies.erase(it);
+        continue;
+      }
       proxy->RemoveAllBuildersFor(builderId);
       if (proxy->mBuilders.empty()) {
         it = mProxies.erase(it);
@@ -363,9 +383,14 @@ namespace moho
 
   void PlannedFactoryManager::RemoveByBuilderAndIndex(const std::uint32_t builderId, const std::uint32_t cmdIndex)
   {
+    if (mIsMutating) {
+      return;
+    }
+    MutexRecursionGuard guard(mIsMutating);
+
     for (auto it = mProxies.begin(); it != mProxies.end(); ++it) {
       PlannedUnitProxy* proxy = it->get();
-      if (proxy->RemoveBuilder(builderId, cmdIndex)) {
+      if (proxy != nullptr && proxy->RemoveBuilder(builderId, cmdIndex)) {
         if (proxy->mBuilders.empty()) {
           mProxies.erase(it);
         } else {
@@ -379,11 +404,16 @@ namespace moho
 
   bool PlannedFactoryManager::RemoveProxy(const std::uint32_t proxyId)
   {
+    if (mIsMutating) {
+      return false;
+    }
+    MutexRecursionGuard guard(mIsMutating);
+
     const auto it = std::find_if(
       mProxies.begin(),
       mProxies.end(),
       [proxyId](const std::unique_ptr<PlannedUnitProxy>& p) {
-        return p->mProxyId == proxyId;
+        return p && p->mProxyId == proxyId;
       });
 
     if (it != mProxies.end()) {
@@ -395,6 +425,10 @@ namespace moho
 
   void PlannedFactoryManager::ClearAll()
   {
+    if (mIsMutating) {
+      return;
+    }
+    MutexRecursionGuard guard(mIsMutating);
     mProxies.clear();
   }
 
@@ -723,10 +757,11 @@ namespace moho
       }
     }
 
-    PlannedUnitProxy* proxy = FindByPosition(unitPos, 3.0f);
+    PlannedUnitProxy* proxy = FindByPosition(unitPos, 8.0f);
     if (proxy == nullptr) {
-      float bestDistSq = 9.0f; // 3.0f * 3.0f
+      float bestDistSq = 64.0f; // 8.0f * 8.0f
       for (const auto& p : mProxies) {
+        if (!p) continue;
         const float dx = p->mPosition.x - unitPos.x;
         const float dz = p->mPosition.z - unitPos.z;
         const float distSq = (dx * dx) + (dz * dz);

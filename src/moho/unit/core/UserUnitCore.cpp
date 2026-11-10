@@ -755,8 +755,9 @@ UserUnit::UserUnit(CWldSession* const session, const SCreateUnitParams& params)
   }
 
   if (mIsFactory && !mPreOrdersDispatched && mVariableData.mFractionComplete > 0.0f) {
-    mPreOrdersDispatched = true;
-    (void)PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this);
+    if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
+      mPreOrdersDispatched = true;
+    }
   }
 
   // 0x008BF7B7: a unit the blueprint gives a quick-select priority goes into
@@ -829,7 +830,7 @@ UserUnit::~UserUnit()
     }
   }
 
-  if (moho::IsFactoryPreOrdersEnabled() && !moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(this)) {
+  if (moho::IsFactoryPreOrdersEnabled() && mIsEngineer && !moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(this)) {
     moho::PlannedFactoryManager::Get().RemoveByBuilder(mParams.mEntityId);
   }
 
@@ -974,6 +975,11 @@ bool UserUnit::UnitDataUpdateRunsLua(const SSTIUnitVariableData& payload) const
 
 void UserUnit::FinishUnitDataLinks()
 {
+  if (mIsFactory && !mPreOrdersDispatched && mVariableData.mFractionComplete > 0.0f) {
+    if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
+      mPreOrdersDispatched = true;
+    }
+  }
   const EntId replicatedCreator = mUnitVarDat.mCreator;
   if ((replicatedCreator & 0xF0000000u) == 0xF0000000u) {
     // 0x008C0823: the sentinel id means "no creator"; drop whatever we held.
@@ -1239,8 +1245,9 @@ void UserUnit::Tick(const std::int32_t seqNo)
   }
 
   if (mIsFactory && !mPreOrdersDispatched && mVariableData.mFractionComplete > 0.0f) {
-    mPreOrdersDispatched = true;
-    (void)PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this);
+    if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
+      mPreOrdersDispatched = true;
+    }
   }
 
   if (IsBeingBuilt()) {
@@ -1348,8 +1355,9 @@ void UserUnit::UpdateEntityData(const SSTIEntityVariableData& variableData)
   UserEntity::UpdateEntityData(variableData);
 
   if (mIsFactory && !mPreOrdersDispatched && mVariableData.mFractionComplete > 0.0f) {
-    mPreOrdersDispatched = true;
-    (void)PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this);
+    if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
+      mPreOrdersDispatched = true;
+    }
   }
 }
 

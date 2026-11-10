@@ -682,7 +682,7 @@ TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersForUnitWithHookAndOnceOnlySup
   std::size_t receivedOrdersCount = 0;
   bool receivedRepeat = false;
 
-  mgr.SetDispatchHook([&](moho::UserUnit* unit, const moho::PlannedUnitProxy& p) {
+  mgr.SetDispatchHook([&](moho::UserUnit* /*unit*/, const moho::PlannedUnitProxy& p) {
     hookInvoked = true;
     receivedUnit = unit;
     receivedOrdersCount = p.mPreOrders.size();
@@ -804,4 +804,44 @@ TEST(PlannedFactoryPreOrdersTest, BuilderQueueRemovalAndDeathCleanup)
   EXPECT_EQ(mgr.FindByPosition({20.0f, 0.0f, 30.0f}, 1.0f), nullptr);
 
   mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, FindByPositionIgnoresElevationOffset)
+{
+  moho::PlannedFactoryManager mgr;
+  moho::Vector3f pos{100.0f, 15.0f, 200.0f};
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(1, 0, nullptr, pos);
+  ASSERT_NE(proxy, nullptr);
+
+  // Exact XZ, but different terrain height Y (e.g. terrain flattened by construction)
+  moho::Vector3f queryPosDifferentY{100.2f, 25.0f, 200.1f};
+  EXPECT_EQ(mgr.FindByPosition(queryPosDifferentY, 1.0f), proxy);
+
+  // Position too far in XZ plane
+  moho::Vector3f queryPosFar{105.0f, 15.0f, 200.0f};
+  EXPECT_EQ(mgr.FindByPosition(queryPosFar, 1.0f), nullptr);
+}
+
+TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersMatchesWithinFoundationRadius)
+{
+  moho::PlannedFactoryManager mgr;
+  moho::Vector3f pos{300.0f, 10.0f, 400.0f};
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(2, 0, nullptr, pos);
+  ASSERT_NE(proxy, nullptr);
+  proxy->AddPreOrder("uel0201", 5);
+
+  bool dispatched = false;
+  mgr.SetDispatchHook([&](moho::UserUnit* /*unit*/, const moho::PlannedUnitProxy& p) {
+    EXPECT_EQ(p.mProxyId, proxy->mProxyId);
+    ASSERT_EQ(p.mPreOrders.size(), 1u);
+    EXPECT_EQ(p.mPreOrders[0].blueprintId, "uel0201");
+    EXPECT_EQ(p.mPreOrders[0].count, 5);
+    dispatched = true;
+  });
+
+  // Construction starts 4 units away in XZ and with Y terrain leveling
+  moho::Vector3f actualUnitPos{303.0f, 15.0f, 402.0f};
+  EXPECT_TRUE(mgr.DispatchPreOrdersForUnit(reinterpret_cast<moho::UserUnit*>(0x1000), actualUnitPos));
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(mgr.GetCount(), 0u);
 }

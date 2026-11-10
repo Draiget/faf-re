@@ -237,5 +237,6 @@ namespace moho
     std::vector<std::unique_ptr<PlannedUnitProxy>> mProxies;
     DispatchHook mDispatchHook{nullptr};
     bool mBufferingSuppressed{false};
+    bool mIsMutating{false};
   };
 }

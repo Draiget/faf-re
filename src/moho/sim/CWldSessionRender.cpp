@@ -1,4 +1,5 @@
 #include "moho/sim/CWldSessionPrivate.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 
 
   /**
@@ -2382,6 +2383,11 @@ namespace
           return;
         }
       } else if (asUnit != nullptr && asUnit->mUnitVarDat.mIsBusy && asUnit->GetBlueprint()->Air.CanFly) {
+        return;
+      }
+
+      // Planned factory proxies skip lifebars and strategic icons:
+      if (asUnit != nullptr && IsFactoryPreOrdersEnabled() && PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
         return;
       }
 
