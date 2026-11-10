@@ -27,6 +27,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdWaves.cpp
   tools/EdTerrainTypes.cpp
   tools/EdViewAids.cpp
+  tools/EdArmySlots.cpp
   ui/EdHelp.cpp
   ui/EdArmiesPanel.cpp
   ui/EdPropertiesPanel.cpp

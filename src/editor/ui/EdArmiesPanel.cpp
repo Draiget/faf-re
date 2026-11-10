@@ -8,6 +8,7 @@
 #include "editor/EdShell.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdUnits.h"
+#include "editor/tools/EdArmySlots.h"
 #include "editor/tools/EdMarkers.h"
 #include "editor/ui/EdHelp.h"
 #include "gpg/core/utils/Logging.h"
@@ -99,7 +100,8 @@ namespace faf::editor
     // One card: the slot number or a tag, the name, where it starts; its units, faction and resources under it.
     const float line = ImGui::GetTextLineHeight();
     // Draws the card; its buttons go at the cursor it leaves, the caller then calls EndCard.
-    const auto card = [&](const ArmyCard& army, const char* const badge, const bool civilian, const int buttonCount) {
+    const auto card = [&](const ArmyCard& army, const char* const badge, const bool civilian, const int buttonCount,
+                          const std::string& mirror = std::string()) {
       ImGui::PushID(army.name.c_str());
       const float pad = ImGui::GetStyle().FramePadding.x;
       const bool chosen = army.name == mArmySelected;
@@ -134,6 +136,11 @@ namespace faf::editor
       const float whereWidth = ImGui::CalcTextSize(where).x;
       draw->AddText(ImVec2(at.x + width - buttons - pad - whereWidth, badgeAt.y),
                     army.start || civilian ? ImGui::GetColorU32(ImGuiCol_TextDisabled) : IM_COL32(240, 180, 70, 255), where);
+      // Its mirror's slot beside its name, in the accent colour.
+      if (!mirror.empty()) {
+        const std::string tag = "<> " + mirror;
+        draw->AddText(ImVec2(textX + ImGui::CalcTextSize(army.name.c_str()).x + pad * 2.0f, badgeAt.y), kAccentBorder, tag.c_str());
+      }
       char detail[160];
       (void)std::snprintf(detail, sizeof(detail), "%d units  |  %s  |  mass %.0f, energy %.0f", army.units,
                           kFactions[std::clamp(army.settings.faction, 0, 3)], army.settings.mass, army.settings.energy);
@@ -164,9 +171,49 @@ namespace faf::editor
       }
     }
     const std::vector<std::string> slots = teams.empty() ? std::vector<std::string>() : teams.front().armies;
+    // Each slot's mirror under the map's symmetry (the Tools panel's), and the order that pairs them.
+    std::vector<ArmyCard> cards;
+    std::vector<std::optional<std::array<float, 2>>> starts;
+    for (const std::string& slot : slots) {
+      cards.push_back(CardOf(mDocument, slot));
+      starts.push_back(cards.back().start ? std::optional<std::array<float, 2>>(std::array<float, 2>{cards.back().x, cards.back().z})
+                                          : std::nullopt);
+    }
+    const HeightBrush brush = mTools.CurrentHeightBrush();
+    const std::vector<int> partners = mTools.MapWidth() > 0 ? MirrorPartners(starts, mTools.MapWidth() + 1, mTools.MapHeight() + 1,
+                                                                             brush.symmetry, brush.turns)
+                                                            : std::vector<int>(slots.size(), -1);
+    const std::vector<int> paired = PairMirroredSlots(partners);
+    bool alreadyPaired = true;
+    for (std::size_t i = 0; i < paired.size(); ++i) {
+      alreadyPaired = alreadyPaired && paired[i] == static_cast<int>(i);
+    }
+    bool anyPair = false;
+    for (const int partner : partners) {
+      anyPair = anyPair || partner >= 0;
+    }
+    if (anyPair) {
+      ImGui::BeginDisabled(alreadyPaired);
+      if (ImGui::Button(alreadyPaired ? "Mirrored starts are paired" : "Pair mirrored starts", ImVec2(-1.0f, 0.0f))) {
+        std::vector<ScenarioTeam> change = teams;
+        change.front().armies.clear();
+        for (const int index : paired) {
+          change.front().armies.push_back(slots[static_cast<std::size_t>(index)]);
+        }
+        mTools.AskTeamsChange(change);
+      }
+      ImGui::EndDisabled();
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip("Orders the slots so each start is followed by its mirror under the map's symmetry (the Tools\n"
+                          "panel's): slots 1 and 2, 3 and 4... face each other, so the lobby's \"odd vs even\" auto teams\n"
+                          "are fair. Players then pick slots knowing which start faces which.");
+      }
+    }
     for (std::size_t i = 0; i < slots.size(); ++i) {
       ImGui::PushID(static_cast<int>(i));
-      const ImVec2 next = card(CardOf(mDocument, slots[i]), std::to_string(i + 1).c_str(), false, 2);
+      const int partner = partners[i];
+      const std::string mirror = partner >= 0 ? std::to_string(partner + 1) : std::string();
+      const ImVec2 next = card(cards[i], std::to_string(i + 1).c_str(), false, 2, mirror);
       ImGui::BeginDisabled(i == 0);
       if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
         std::vector<ScenarioTeam> change = teams;
@@ -209,8 +256,37 @@ namespace faf::editor
       endCard(next);
       ImGui::PopID();
     }
+    {
+      std::vector<std::string> names = players;
+      names.insert(names.end(), extra.begin(), extra.end());
+      std::vector<std::string> offers;
+      for (const char* const usual : {"NEUTRAL_CIVILIAN", "ARMY_17"}) {
+        if (std::find(names.begin(), names.end(), usual) == names.end()) {
+          offers.emplace_back(usual);
+        }
+      }
+      const std::string next = NextArmyName(names);
+      if (std::find(offers.begin(), offers.end(), next) == offers.end()) {
+        offers.push_back(next);
+      }
+      for (std::size_t i = 0; i < offers.size(); ++i) {
+        if (i > 0) {
+          ImGui::SameLine();
+        }
+        if (ImGui::Button(("+ " + offers[i]).c_str())) {
+          std::string list;
+          for (const std::string& army : extra) {
+            list += army + " ";
+          }
+          mTools.AskExtraArmiesChange(list + offers[i]);
+        }
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip("Add %s as an extra army: an owner for neutral or civilian units, not a lobby slot", offers[i].c_str());
+        }
+      }
+    }
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Add").x - ImGui::GetStyle().FramePadding.x * 4.0f);
-    ImGui::InputTextWithHint("##newextra", "NEUTRAL_CIVILIAN, ARMY_17...", mNewExtraArmy, sizeof(mNewExtraArmy));
+    ImGui::InputTextWithHint("##newextra", "Another name", mNewExtraArmy, sizeof(mNewExtraArmy));
     ImGui::SameLine();
     const std::string wantedExtra = mNewExtraArmy;
     const bool known = std::find(extra.begin(), extra.end(), wantedExtra) != extra.end() ||

@@ -284,6 +284,9 @@ namespace faf::editor
       mMapWidth = width;
       mMapHeight = height;
     }
+    /** The map's size in units (its height field's samples less one), as the app last gave it. */
+    [[nodiscard]] int MapWidth() const noexcept { return mMapWidth; }
+    [[nodiscard]] int MapHeight() const noexcept { return mMapHeight; }
     /** A change the panel asked for: the new area, or none to remove it. */
     [[nodiscard]] bool TakePlayableAreaChange(std::optional<std::array<int, 4>>& area)
     {

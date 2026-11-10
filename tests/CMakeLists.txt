@@ -353,6 +353,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/TerrainTypeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdTerrainTypes.cpp
   editor/ImageChunkTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdImageChunks.cpp
   editor/ViewAidTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdViewAids.cpp
+  editor/ArmySlotTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdArmySlots.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)
