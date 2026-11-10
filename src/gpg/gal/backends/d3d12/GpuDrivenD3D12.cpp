@@ -210,7 +210,7 @@ namespace gpg::gal
     D3D12_DESCRIPTOR_RANGE writes{};
     writes.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
     writes.NumDescriptors = kGpuMaxWriteBuffers;
-    D3D12_ROOT_PARAMETER parameters[4]{};
+    D3D12_ROOT_PARAMETER parameters[7]{};
     // Engine addition (ren_RayTracedShadows): the ray-traced scene at t0, space1, as for the effects.
     parameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
     parameters[3].Descriptor.ShaderRegister = 0U;
@@ -243,11 +243,14 @@ namespace gpg::gal
       sampler.ShaderRegister = 0U;
       sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
+      D3D12_DESCRIPTOR_RANGE rayTextures{};
+      D3D12_STATIC_SAMPLER_DESC samplers[2]{sampler, {}};
+      const std::uint32_t rayParameters = AppendRayRootParameters(parameters, 4U, rayTextures, samplers[1]);
       D3D12_ROOT_SIGNATURE_DESC desc{};
-      desc.NumParameters = mRayQuery ? 4U : 3U;
+      desc.NumParameters = mRayQuery ? 4U + rayParameters : 3U;
       desc.pParameters = parameters;
-      desc.NumStaticSamplers = 1U;
-      desc.pStaticSamplers = &sampler;
+      desc.NumStaticSamplers = mRayQuery ? 2U : 1U;
+      desc.pStaticSamplers = samplers;
       ComPtr<ID3DBlob> serialized;
       ComPtr<ID3DBlob> errors;
       if (FAILED(mLibrary.serializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &serialized, &errors))) {
@@ -561,7 +564,14 @@ namespace gpg::gal
     // commands to the GPU, waits, and starts the heap over, which would free
     // constants already uploaded and a read table already allocated.
     D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
-    readTable = AllocateTable(kReadSlots + kGpuMaxWriteBuffers, cpu);
+    for (int attempt = 0; attempt < 3; ++attempt) {
+      readTable = AllocateTable(kReadSlots + kGpuMaxWriteBuffers, cpu);
+      const std::uint64_t epoch = mArenaEpoch;
+      EnsureRayTables();
+      if (epoch == mArenaEpoch) {
+        break; // the ray table didn't start the view heap over: the read table still stands
+      }
+    }
     const UINT increment = mFrames[mFrameIndex].views.Increment();
     D3D12_CPU_DESCRIPTOR_HANDLE writeCpu = cpu;
     writeCpu.ptr += static_cast<SIZE_T>(kReadSlots) * increment;
@@ -674,9 +684,7 @@ namespace gpg::gal
     mList->SetGraphicsRootConstantBufferView(0U, constants);
     mList->SetGraphicsRootDescriptorTable(1U, readTable);
     mList->SetGraphicsRootDescriptorTable(2U, writeTable);
-    if (mRayQuery) {
-      mList->SetGraphicsRootShaderResourceView(3U, mTlasAddress);
-    }
+    BindRayRoot(false);
     mList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     mList->OMSetStencilRef(program->mDesc.inheritDepthStencil ? mCurrent.stencilRef : program->mDesc.stencil.reference);
     RecordStateChange();
@@ -722,9 +730,7 @@ namespace gpg::gal
     mList->SetComputeRootConstantBufferView(0U, constants);
     mList->SetComputeRootDescriptorTable(1U, readTable);
     mList->SetComputeRootDescriptorTable(2U, writeTable);
-    if (mRayQuery) {
-      mList->SetComputeRootShaderResourceView(3U, mTlasAddress);
-    }
+    BindRayRoot(true);
     MarkDraw(program->mName.c_str());
     mList->Dispatch(dispatch.groupsX, dispatch.groupsY, dispatch.groupsZ);
     FinishDraw();

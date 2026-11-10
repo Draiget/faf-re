@@ -618,12 +618,15 @@ namespace gpg::gal
     mRayQuery = effects::RayTracedShadowsWanted() && hasExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) &&
       hasExtension(VK_KHR_RAY_QUERY_EXTENSION_NAME) && hasExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME) &&
       availableAcceleration.accelerationStructure == VK_TRUE && availableRayQuery.rayQuery == VK_TRUE &&
-      available12.bufferDeviceAddress == VK_TRUE;
+      available12.bufferDeviceAddress == VK_TRUE &&
+      // ren_RayAlphaShadows: the lookups index the alpha textures per hit (NonUniformResourceIndex).
+      available12.shaderSampledImageArrayNonUniformIndexing == VK_TRUE;
     if (mRayQuery) {
       extensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
       extensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
       extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
       features12.bufferDeviceAddress = VK_TRUE;
+      features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
       features13.pNext = &accelerationFeatures;
     }
     VkDeviceCreateInfo info{};
@@ -717,15 +720,29 @@ namespace gpg::gal
 
     // Engine addition (ren_RayTracedShadows): the ray-traced scene is set 2 (RayTracingVulkan.cpp).
     if (mRayQuery) {
-      VkDescriptorSetLayoutBinding scene{};
-      scene.binding = 0U;
-      scene.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-      scene.descriptorCount = 1U;
+      // Engine addition (ren_RayAlphaShadows): the alpha-tested pieces' resources (RayTracingVulkan.cpp WriteRaySet).
+      VkSamplerCreateInfo sampler{};
+      sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+      sampler.magFilter = VK_FILTER_LINEAR;
+      sampler.minFilter = VK_FILTER_LINEAR;
+      sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+      sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+      sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+      sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+      sampler.maxLod = VK_LOD_CLAMP_NONE;
+      CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateSampler(mDevice, &sampler, nullptr, &mRaySampler));
       // Compute too: ren_RayAo's dispatch reads the scene (GpuDrivenVulkan.cpp's layouts share this set layout).
-      scene.stageFlags = stages | VK_SHADER_STAGE_COMPUTE_BIT;
-      layout.bindingCount = 1U;
-      layout.pBindings = &scene;
+      const VkShaderStageFlags rayStages = stages | VK_SHADER_STAGE_COMPUTE_BIT;
+      VkDescriptorSetLayoutBinding scene[5]{};
+      scene[0] = {0U, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1U, rayStages, nullptr};
+      scene[1] = {1U, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1U, rayStages, nullptr};
+      scene[2] = {2U, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1U, rayStages, nullptr};
+      scene[3] = {3U, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kRayTextureSlots, rayStages, nullptr};
+      scene[4] = {4U, VK_DESCRIPTOR_TYPE_SAMPLER, 1U, rayStages, &mRaySampler};
+      layout.bindingCount = 5U;
+      layout.pBindings = scene;
       CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mRayLayout));
+      layout.bindingCount = 1U;
       layout.pBindings = &constants;
     }
     const std::uint32_t setCount = mRayQuery ? 3U : 2U;
@@ -3443,6 +3460,9 @@ namespace gpg::gal
     );
     if (mRaySet != VK_NULL_HANDLE) {
       Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, EffectPipelineLayout(), 2U, 1U, &mRaySet, 0U, nullptr);
+      if (mRayRecordsChunk != nullptr) {
+        mRayRecordsChunk->serial = RecordingSerial();
+      }
     }
     if (mPass.constants != VK_NULL_HANDLE) {
       BindConstantSet(mPass.constants, mPass.constantsOffset);

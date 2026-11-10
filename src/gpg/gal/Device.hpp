@@ -695,7 +695,9 @@ namespace gpg::gal
      * False when the scene could not be built (out of memory): the draws then have no scene to trace.
      * Nothing here (false).
      */
-    virtual bool SetRayInstances(const RayInstance* instances, std::uint32_t count);
+    virtual bool SetRayInstances(
+      const RayInstance* instances, std::uint32_t count, const boost::shared_ptr<Texture>* textures = nullptr, std::uint32_t textureCount = 0U
+    );
 
   protected:
     OutputContext outputContext_{}; // +0x04 the bound targets (`ClearTarget` / `GetContext`)

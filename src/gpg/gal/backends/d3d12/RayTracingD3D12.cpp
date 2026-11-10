@@ -145,6 +145,15 @@ namespace gpg::gal
     mTlasBytes = 0U;
     mTlasAddress = 0U;
     mRayInstanceDescs.clear();
+    mRayAttributes = d3d12::TrackedResource{};
+    mRayAttributesBytes = 0U;
+    mRayAttributesUsed = 0U;
+    mRayRecords.clear();
+    mRayTextures.clear();
+    mRayRecordsBuffer = d3d12::TrackedResource{};
+    mRayRecordsBytes = 0U;
+    mRayRecordsAddress = 0U;
+    mRayTablesFrame = ~0ULL;
     mList4.Reset();
     mDevice5.Reset();
     mRayQuery = false;
@@ -214,7 +223,10 @@ namespace gpg::gal
 
     D3D12_RAYTRACING_GEOMETRY_DESC geometry{};
     geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-    geometry.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+    // Engine addition (ren_RayAlphaShadows): a piece with texture coordinates is cut out by its texture's alpha, so
+    // rays get to test its triangles (not opaque).
+    const bool alphaTested = desc.uvs != nullptr && desc.uvStride >= 8U;
+    geometry.Flags = alphaTested ? D3D12_RAYTRACING_GEOMETRY_FLAG_NONE : D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
     geometry.Triangles.VertexBuffer.StartAddress = vertices.gpu;
     geometry.Triangles.VertexBuffer.StrideInBytes = 12U;
     geometry.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
@@ -250,6 +262,23 @@ namespace gpg::gal
     RayBuildBarrier(mRayArena.chunks[piece.range.chunk].buffer.Get());
     FlushBarriers();
     piece.triangles = triangles;
+    if (alphaTested) {
+      std::vector<float> uvs(static_cast<std::size_t>(desc.vertexCount) * 2U);
+      const auto* uvSource = reinterpret_cast<const std::uint8_t*>(desc.uvs);
+      for (std::uint32_t vertex = 0U; vertex < desc.vertexCount; ++vertex) {
+        std::memcpy(&uvs[static_cast<std::size_t>(vertex) * 2U], uvSource + (static_cast<std::size_t>(vertex) * desc.uvStride), 8U);
+      }
+      std::uint64_t indexOffset = 0U;
+      std::uint64_t uvOffset = 0U;
+      if (!AppendRayAttributes(desc.indices, indexBytes, indexOffset) ||
+          !AppendRayAttributes(uvs.data(), static_cast<std::uint64_t>(uvs.size()) * sizeof(float), uvOffset)) {
+        // Traced as opaque it would cast its cards' whole outline: no piece instead, once the GPU is past the build.
+        mRayFrees.push_back(RayFree{RecordingSerial(), piece.range});
+        return 0U;
+      }
+      piece.indexOffset = indexOffset;
+      piece.uvOffset = uvOffset;
+    }
     const RayGeometryId id = mNextRayGeometry++;
     mRayGeometries.emplace(id, piece);
     mRayGeometryBytes += piece.range.bytes;
@@ -269,7 +298,10 @@ namespace gpg::gal
     mRayGeometries.erase(found);
   }
 
-  bool DeviceD3D12::SetRayInstances(const RayInstance* const instances, const std::uint32_t count)
+  bool DeviceD3D12::SetRayInstances(
+    const RayInstance* const instances, const std::uint32_t count, const boost::shared_ptr<Texture>* const textures,
+    const std::uint32_t textureCount
+  )
   {
     if (!mRayQuery) {
       return false;
@@ -277,21 +309,183 @@ namespace gpg::gal
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     mRayInstanceDescs.clear();
     mRayInstanceDescs.reserve(count);
+    mRayRecords.clear();
+    mRayTextures.clear();
+    // Slots of the frame's texture table, by the caller's texture index (0: none yet).
+    std::vector<std::uint32_t> slots(textureCount, 0U);
     for (std::uint32_t index = 0U; index < count; ++index) {
       const RayInstance& instance = instances[index];
       const auto found = mRayGeometries.find(instance.geometry);
       if (found == mRayGeometries.end()) {
         continue;
       }
+      // An alpha-tested piece needs its texture in the table; past the table's size it is left out (the caller
+      // keeps such meshes in the shadow map, RayScene.cpp).
+      std::uint32_t slot = 0U;
+      const bool alphaTested = found->second.indexOffset != ~0ULL && instance.texture != 0U && instance.texture <= textureCount &&
+        textures[instance.texture - 1U] != nullptr;
+      if (found->second.indexOffset != ~0ULL && !alphaTested) {
+        continue;
+      }
+      if (alphaTested) {
+        std::uint32_t& known = slots[instance.texture - 1U];
+        if (known == 0U) {
+          if (mRayTextures.size() >= kRayTextureSlots) {
+            continue;
+          }
+          mRayTextures.push_back(textures[instance.texture - 1U]);
+          known = static_cast<std::uint32_t>(mRayTextures.size());
+        }
+        slot = known - 1U;
+      }
       D3D12_RAYTRACING_INSTANCE_DESC desc{};
       std::memcpy(desc.Transform, instance.transform, sizeof(desc.Transform));
       desc.InstanceID = 0U;
       desc.InstanceMask = instance.mask;
-      desc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE | D3D12_RAYTRACING_INSTANCE_FLAG_FORCE_OPAQUE;
+      desc.Flags = alphaTested ? D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE
+                               : (D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE | D3D12_RAYTRACING_INSTANCE_FLAG_FORCE_OPAQUE);
       desc.AccelerationStructure = found->second.range.address;
       mRayInstanceDescs.push_back(desc);
+      mRayRecords.push_back(alphaTested ? static_cast<std::uint32_t>(found->second.indexOffset) : 0U);
+      mRayRecords.push_back(alphaTested ? static_cast<std::uint32_t>(found->second.uvOffset) : 0U);
+      mRayRecords.push_back(slot);
+      mRayRecords.push_back(alphaTested ? 1U : 0U);
     }
+    WriteRayRecords();
+    mRayTablesFrame = ~0ULL; // the table changes with the list
     return BuildRayScene();
+  }
+
+  bool DeviceD3D12::AppendRayAttributes(const void* const data, const std::uint64_t bytes, std::uint64_t& offset)
+  {
+    const std::uint64_t needed = AlignUp(mRayAttributesUsed, 16U) + bytes;
+    if (mRayAttributes.resource == nullptr || needed > mRayAttributesBytes) {
+      // Grow: a new buffer, the old contents copied over, the old one retired once the GPU is past it.
+      const std::uint64_t capacity = AlignUp(std::max<std::uint64_t>({needed, mRayAttributesBytes * 2U, 1ULL << 20U}), 65536U);
+      d3d12::TrackedResource grown;
+      grown.resource = CreateRayBuffer(mDevice.Get(), capacity, D3D12_RESOURCE_STATE_COPY_DEST, L"ray attributes");
+      if (grown.resource == nullptr) {
+        return false;
+      }
+      grown.state = D3D12_RESOURCE_STATE_COPY_DEST;
+      if (mRayAttributes.resource != nullptr && mRayAttributesUsed != 0U) {
+        Transition(mRayAttributes, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        FlushBarriers();
+        MarkDraw("ray attributes grow");
+        mList->CopyBufferRegion(grown.resource.Get(), 0U, mRayAttributes.resource.Get(), 0U, mRayAttributesUsed);
+        FinishDraw();
+      }
+      if (mRayAttributes.resource != nullptr) {
+        Retire(mRayAttributes.resource);
+      }
+      mRayAttributes = std::move(grown);
+      mRayAttributesBytes = capacity;
+    }
+    offset = AlignUp(mRayAttributesUsed, 16U);
+    UploadBuffer(mRayAttributes, offset, data, bytes);
+    mRayAttributesUsed = offset + bytes;
+    Transition(mRayAttributes, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+    FlushBarriers();
+    return true;
+  }
+
+  void DeviceD3D12::WriteRayRecords()
+  {
+    if (mRayAttributes.resource == nullptr) {
+      // The shaders' attribute buffer must exist even before any alpha-tested piece.
+      const std::uint32_t zero[4]{};
+      std::uint64_t unused = 0U;
+      static_cast<void>(AppendRayAttributes(zero, sizeof(zero), unused));
+    }
+    // One record per scene instance (an empty scene still gets one), in a buffer that outlives submissions: the copy
+    // runs in queue order after the draws that read the previous records (the state change waits for them).
+    const std::uint64_t bytes = std::max<std::uint64_t>(16U, static_cast<std::uint64_t>(mRayRecords.size()) * 4U);
+    if (mRayRecordsBuffer.resource == nullptr || bytes > mRayRecordsBytes) {
+      const std::uint64_t capacity = AlignUp(std::max<std::uint64_t>(bytes * 2U, 65536U), 65536U);
+      d3d12::TrackedResource grown;
+      grown.resource = CreateRayBuffer(mDevice.Get(), capacity, D3D12_RESOURCE_STATE_COPY_DEST, L"ray records");
+      if (grown.resource == nullptr) {
+        return;
+      }
+      grown.state = D3D12_RESOURCE_STATE_COPY_DEST;
+      if (mRayRecordsBuffer.resource != nullptr) {
+        Retire(mRayRecordsBuffer.resource);
+      }
+      mRayRecordsBuffer = std::move(grown);
+      mRayRecordsBytes = capacity;
+    }
+    std::vector<std::uint32_t> records(static_cast<std::size_t>(bytes / 4U), 0U);
+    std::copy(mRayRecords.begin(), mRayRecords.end(), records.begin());
+    UploadBuffer(mRayRecordsBuffer, 0U, records.data(), bytes);
+    Transition(mRayRecordsBuffer, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE);
+    FlushBarriers();
+    mRayRecordsAddress = mRayRecordsBuffer.resource->GetGPUVirtualAddress();
+  }
+
+  void DeviceD3D12::EnsureRayTables()
+  {
+    if (!mRayQuery) {
+      return;
+    }
+    const std::lock_guard<std::recursive_mutex> lock(mMutex);
+    // The textures in the read state (a new one, or one a mip update put back into copy-dest).
+    bool moved = false;
+    for (const boost::shared_ptr<Texture>& texture : mRayTextures) {
+      d3d12::TrackedResource& resource = static_cast<TextureD3D12*>(texture.get())->Resource();
+      constexpr D3D12_RESOURCE_STATES kRead = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+      if ((resource.state & kRead) != kRead) {
+        Transition(resource, kRead);
+        moved = true;
+      }
+    }
+    if (moved) {
+      FlushBarriers();
+    }
+    if (mRayTablesFrame == mFrameCount && mRayTablesEpoch == mArenaEpoch) {
+      return;
+    }
+    if (mRayRecordsAddress == 0U) {
+      WriteRayRecords();
+    }
+    // The texture table: the scene's textures, the rest null views.
+    D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
+    mRayTextureTable = AllocateTable(kRayTextureSlots, cpu);
+    const UINT increment = mDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    std::uint32_t written = 0U;
+    for (const boost::shared_ptr<Texture>& texture : mRayTextures) {
+      D3D12_CPU_DESCRIPTOR_HANDLE destination = cpu;
+      destination.ptr += static_cast<SIZE_T>(written) * increment;
+      const auto* const texture12 = static_cast<const TextureD3D12*>(texture.get());
+      const bool flat = !texture12->IsCube() && !texture12->IsVolume();
+      mDevice->CopyDescriptorsSimple(1U, destination, flat ? texture12->View() : mNullViews[0], D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+      ++written;
+    }
+    if (written < kRayTextureSlots) {
+      D3D12_CPU_DESCRIPTOR_HANDLE rest = cpu;
+      rest.ptr += static_cast<SIZE_T>(written) * increment;
+      mDevice->CopyDescriptorsSimple(kRayTextureSlots - written, rest, mNullViewRun, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    }
+    mRayTablesFrame = mFrameCount;
+    mRayTablesEpoch = mArenaEpoch;
+  }
+
+  void DeviceD3D12::BindRayRoot(const bool compute)
+  {
+    if (!mRayQuery) {
+      return;
+    }
+    const D3D12_GPU_VIRTUAL_ADDRESS attributes = (mRayAttributes.resource != nullptr) ? mRayAttributes.resource->GetGPUVirtualAddress() : 0U;
+    if (compute) {
+      mList->SetComputeRootShaderResourceView(3U, mTlasAddress);
+      mList->SetComputeRootDescriptorTable(4U, mRayTextureTable);
+      mList->SetComputeRootShaderResourceView(5U, attributes);
+      mList->SetComputeRootShaderResourceView(6U, mRayRecordsAddress);
+    } else {
+      mList->SetGraphicsRootShaderResourceView(3U, mTlasAddress);
+      mList->SetGraphicsRootDescriptorTable(4U, mRayTextureTable);
+      mList->SetGraphicsRootShaderResourceView(5U, attributes);
+      mList->SetGraphicsRootShaderResourceView(6U, mRayRecordsAddress);
+    }
   }
 
   bool DeviceD3D12::BuildRayScene()

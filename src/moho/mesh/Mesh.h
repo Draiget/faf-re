@@ -1078,8 +1078,15 @@ namespace moho
    * depth technique is plain "Depth" out of the map, because rays shadow them.
    */
   extern bool gMeshDepthSkipsTraced;
+  /**
+   * FAF addition (ren_RayAlphaShadows): true while the shadow pass also leaves the alpha-tested materials ("DepthClip",
+   * "UndulatingDepthClip": trees) out of the map, because rays shadow them too.
+   */
+  extern bool gMeshDepthSkipsAlpha;
   /** FAF addition: the material takes part in the depth pass with the plain "Depth" technique (opaque). */
   bool MeshMaterialTraced(MeshMaterial& material);
+  /** FAF addition: the material's depth technique cuts it out by its albedo's alpha ("DepthClip", "UndulatingDepthClip"). */
+  bool MeshMaterialAlphaTraced(MeshMaterial& material);
 
   class MeshRenderer
   {

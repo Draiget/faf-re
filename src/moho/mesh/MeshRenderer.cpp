@@ -1202,6 +1202,7 @@ namespace
    * = mMat+0x8D.
    */
   bool gMeshDepthSkipsTraced = false;
+  bool gMeshDepthSkipsAlpha = false;
 
   bool MeshMaterialTraced(MeshMaterial& material)
   {
@@ -1217,6 +1218,16 @@ namespace
       material.mDepthTechnique.assign_owned(depthTechnique.view());
     }
     return std::string_view(material.mDepthTechnique.c_str()) == "Depth";
+  }
+
+  bool MeshMaterialAlphaTraced(MeshMaterial& material)
+  {
+    // MeshMaterialTraced resolves the depth technique (and says no for materials outside the depth pass).
+    if (MeshMaterialTraced(material) || material.mDepthTechnique.empty()) {
+      return false;
+    }
+    const std::string_view technique(material.mDepthTechnique.c_str());
+    return technique == "DepthClip" || technique == "UndulatingDepthClip";
   }
 
   void MeshRenderer::RenderDepth(const GeomCamera3& camera, MeshBatchBucketTree& meshMap)
@@ -1304,6 +1315,12 @@ namespace
       // and the map keeps only what the scene lacks.
       if (gMeshDepthSkipsTraced && std::string_view(material.mDepthTechnique.c_str()) == "Depth") {
         continue;
+      }
+      if (gMeshDepthSkipsAlpha) {
+        const std::string_view technique(material.mDepthTechnique.c_str());
+        if (technique == "DepthClip" || technique == "UndulatingDepthClip") {
+          continue;
+        }
       }
 
       // Only draw when a depth technique is defined for the material

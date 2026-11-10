@@ -1115,6 +1115,7 @@ namespace moho
     restoreViewport();
     // Engine addition (ren_RayTracedShadows): only the shadow pass leaves the traced meshes out.
     gMeshDepthSkipsTraced = false;
+    gMeshDepthSkipsAlpha = false;
 
     const auto dumpShadowTargets = [&](const bool includeBlur) {
 #if defined(_WIN32)

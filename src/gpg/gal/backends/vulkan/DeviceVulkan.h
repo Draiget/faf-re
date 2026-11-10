@@ -151,7 +151,9 @@ namespace gpg::gal
     // Ray tracing (RayTracingVulkan.cpp)
     RayGeometryId CreateRayGeometry(const RayGeometryDesc& desc) override;
     void DestroyRayGeometry(RayGeometryId geometry) override;
-    bool SetRayInstances(const RayInstance* instances, std::uint32_t count) override;
+    bool SetRayInstances(
+      const RayInstance* instances, std::uint32_t count, const boost::shared_ptr<Texture>* textures, std::uint32_t textureCount
+    ) override;
 
     // effects::PassBinder
     void BindPass(effects::EffectProgram& program, std::uint32_t technique, std::uint32_t pass) override;
@@ -471,6 +473,10 @@ namespace gpg::gal
       VkAccelerationStructureKHR structure = VK_NULL_HANDLE;
       VkDeviceAddress address = 0U;
       RayRange range;
+      // Engine addition (ren_RayAlphaShadows): where an alpha-tested piece's indices and texture coordinates sit in
+      // mRayAttributes; ~0 for an opaque piece.
+      VkDeviceSize indexOffset = ~0ULL;
+      VkDeviceSize uvOffset = ~0ULL;
     };
     struct RayGarbage
     {
@@ -479,6 +485,7 @@ namespace gpg::gal
       RayBuffer buffer;
       RayRange range;
       VkDescriptorSet set = VK_NULL_HANDLE;
+      std::vector<boost::shared_ptr<Texture>> textures; // a retired set's alpha textures
     };
     [[nodiscard]] bool CreateRayBuffer(VkDeviceSize bytes, VkBufferUsageFlags usage, bool host, RayBuffer& out);
     void DestroyRayBuffer(RayBuffer& buffer) noexcept;
@@ -486,7 +493,7 @@ namespace gpg::gal
     void CollectRayGarbage(bool all);
     [[nodiscard]] bool RayArenaAllocate(VkDeviceSize bytes, RayRange& out);
     void RayArenaFree(const RayRange& range);
-    [[nodiscard]] std::uint8_t* RayInput(VkDeviceSize bytes, VkDeviceAddress& address);
+    [[nodiscard]] std::uint8_t* RayInput(VkDeviceSize bytes, VkDeviceAddress& address, VkBuffer* buffer = nullptr, VkDeviceSize* offset = nullptr);
     [[nodiscard]] bool EnsureRayScratch(VkDeviceSize bytes);
     void RayBarrier(VkPipelineStageFlags2 sourceStages, VkAccessFlags2 sourceAccess, VkPipelineStageFlags2 destinationStages,
                     VkAccessFlags2 destinationAccess);
@@ -498,6 +505,20 @@ namespace gpg::gal
     VkDescriptorSetLayout mRayLayout = VK_NULL_HANDLE;
     VkDescriptorPool mRayPool = VK_NULL_HANDLE;
     VkDescriptorSet mRaySet = VK_NULL_HANDLE;
+    // Engine addition (ren_RayAlphaShadows): set 2's bindings 1-4 (RayTracingVulkan.cpp WriteRaySet): the alpha-tested
+    // pieces' indices and texture coordinates (host-visible storage buffer), one record per scene instance (index
+    // offset, uv offset, texture slot, 1 when alpha-tested), their textures, a linear wrapping sampler.
+    RayBuffer mRayAttributes;
+    std::vector<RayBuffer> mRayAttributesOld; // grown out of; retired once set 2 no longer points at them
+    VkDeviceSize mRayAttributesUsed = 0U;
+    std::vector<std::uint32_t> mRayRecords;
+    std::vector<boost::shared_ptr<Texture>> mRayTextures;
+    std::vector<boost::shared_ptr<Texture>> mRaySetTextures;
+    VkSampler mRaySampler = VK_NULL_HANDLE;
+    RayInputChunk* mRayRecordsChunk = nullptr;
+    bool AppendRayAttributes(const void* data, VkDeviceSize bytes, VkDeviceSize& offset);
+    /** A new set 2 for the current scene, records and textures; the previous one is retired. */
+    bool WriteRaySet();
     VkAccelerationStructureKHR mTlas = VK_NULL_HANDLE;
     RayBuffer mTlasBuffer;
     RayBuffer mRayScratch;

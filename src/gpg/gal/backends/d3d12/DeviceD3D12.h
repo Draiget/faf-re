@@ -163,7 +163,9 @@ namespace gpg::gal
     // Ray tracing (RayTracingD3D12.cpp)
     RayGeometryId CreateRayGeometry(const RayGeometryDesc& desc) override;
     void DestroyRayGeometry(RayGeometryId geometry) override;
-    bool SetRayInstances(const RayInstance* instances, std::uint32_t count) override;
+    bool SetRayInstances(
+      const RayInstance* instances, std::uint32_t count, const boost::shared_ptr<Texture>* textures, std::uint32_t textureCount
+    ) override;
 
     // effects::PassBinder
     void BindPass(effects::EffectProgram& program, std::uint32_t technique, std::uint32_t pass) override;
@@ -457,6 +459,10 @@ namespace gpg::gal
     {
       RayRange range;
       std::uint32_t triangles = 0U;
+      // Engine addition (ren_RayAlphaShadows): where its triangle indices and texture coordinates sit in
+      // mRayAttributes (indices first, three per triangle, then two floats per vertex); ~0 for an opaque piece.
+      std::uint64_t indexOffset = ~0ULL;
+      std::uint64_t uvOffset = ~0ULL;
     };
     struct RayFree
     {
@@ -477,6 +483,35 @@ namespace gpg::gal
     std::uint64_t mTlasBytes = 0U;
     D3D12_GPU_VIRTUAL_ADDRESS mTlasAddress = 0U;
     std::uint32_t mRayInstanceCount = 0U;
+    // Engine addition (ren_RayAlphaShadows): alpha-tested pieces. Their indices and texture coordinates (t1,
+    // space1, ByteAddressBuffer), one record per scene instance (t2, space1: index offset, uv offset, texture
+    // slot, 1 when alpha-tested) and a table of their textures (t0..63, space2), rebuilt in the frame's heap
+    // whenever the frame or the heap changes.
+    d3d12::TrackedResource mRayAttributes;
+    std::uint64_t mRayAttributesBytes = 0U;
+    std::uint64_t mRayAttributesUsed = 0U;
+    std::vector<std::uint32_t> mRayRecords; // four per instance
+    std::vector<boost::shared_ptr<Texture>> mRayTextures;
+    d3d12::TrackedResource mRayRecordsBuffer; // default heap, rewritten by each SetRayInstances
+    std::uint64_t mRayRecordsBytes = 0U;
+    D3D12_GPU_VIRTUAL_ADDRESS mRayRecordsAddress = 0U;
+    D3D12_GPU_DESCRIPTOR_HANDLE mRayTextureTable{};
+    std::uint64_t mRayTablesFrame = ~0ULL;
+    std::uint64_t mRayTablesEpoch = ~0ULL;
+    bool AppendRayAttributes(const void* data, std::uint64_t bytes, std::uint64_t& offset);
+    /** Writes the scene's records into mRayRecordsBuffer (in queue order after the draws that read the old ones). */
+    void WriteRayRecords();
+    /**
+     * The frame's texture table (rebuilt when the frame or the view heap changed) and the textures in the read
+     * state; after the caller's own tables and before any root binding (it can start the view heap over: the caller
+     * then allocates its tables again, see DrawIndexedPrimitive).
+     */
+    void EnsureRayTables();
+    void BindRayRoot(bool compute);
+    /** Fills the alpha-test root parameters from `first` and the sampler; returns how many parameters. */
+    std::uint32_t AppendRayRootParameters(
+      D3D12_ROOT_PARAMETER* parameters, std::uint32_t first, D3D12_DESCRIPTOR_RANGE& textures, D3D12_STATIC_SAMPLER_DESC& sampler
+    );
     std::vector<D3D12_RAYTRACING_INSTANCE_DESC> mRayInstanceDescs;
 
     // ---- GPU-driven programs -------------------------------------------------

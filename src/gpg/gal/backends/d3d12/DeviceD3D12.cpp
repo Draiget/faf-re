@@ -606,6 +606,42 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
   }
 
+  std::uint32_t DeviceD3D12::AppendRayRootParameters(
+    D3D12_ROOT_PARAMETER* const parameters, const std::uint32_t first, D3D12_DESCRIPTOR_RANGE& textures, D3D12_STATIC_SAMPLER_DESC& sampler
+  )
+  {
+    // Engine addition (ren_RayAlphaShadows): the alpha-tested pieces' textures (t0.., space2), their indices and
+    // texture coordinates (t1, space1) and the scene's per-instance records (t2, space1), with a linear wrapping
+    // sampler (s0, space1) for the alpha (RayTracingD3D12.cpp).
+    textures.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    textures.NumDescriptors = kRayTextureSlots;
+    textures.BaseShaderRegister = 0U;
+    textures.RegisterSpace = 2U;
+    textures.OffsetInDescriptorsFromTableStart = 0U;
+    parameters[first].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+    parameters[first].DescriptorTable.NumDescriptorRanges = 1U;
+    parameters[first].DescriptorTable.pDescriptorRanges = &textures;
+    parameters[first].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    for (std::uint32_t buffer = 0U; buffer < 2U; ++buffer) {
+      D3D12_ROOT_PARAMETER& parameter = parameters[first + 1U + buffer];
+      parameter.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+      parameter.Descriptor.ShaderRegister = 1U + buffer;
+      parameter.Descriptor.RegisterSpace = 1U;
+      parameter.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    }
+    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
+    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    sampler.MaxAnisotropy = 1U;
+    sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    sampler.MaxLOD = D3D12_FLOAT32_MAX;
+    sampler.ShaderRegister = 0U;
+    sampler.RegisterSpace = 1U;
+    sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    return 3U;
+  }
+
   void DeviceD3D12::CreateRootSignature()
   {
     D3D12_DESCRIPTOR_RANGE textures{};
@@ -617,7 +653,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     samplers.NumDescriptors = effects::kMaxSamplerSlots;
     samplers.OffsetInDescriptorsFromTableStart = 0U;
 
-    D3D12_ROOT_PARAMETER parameters[4]{};
+    D3D12_ROOT_PARAMETER parameters[7]{};
     parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
     parameters[0].Descriptor.ShaderRegister = 0U;
     parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -635,10 +671,15 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     parameters[3].Descriptor.ShaderRegister = 0U;
     parameters[3].Descriptor.RegisterSpace = 1U;
     parameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+    D3D12_DESCRIPTOR_RANGE rayTextures{};
+    D3D12_STATIC_SAMPLER_DESC raySampler{};
+    const std::uint32_t rayParameters = AppendRayRootParameters(parameters, 4U, rayTextures, raySampler);
 
     D3D12_ROOT_SIGNATURE_DESC desc{};
-    desc.NumParameters = mRayQuery ? 4U : 3U;
+    desc.NumParameters = mRayQuery ? 4U + rayParameters : 3U;
     desc.pParameters = parameters;
+    desc.NumStaticSamplers = mRayQuery ? 1U : 0U;
+    desc.pStaticSamplers = &raySampler;
     desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 
     ComPtr<ID3DBlob> serialized;
@@ -2240,7 +2281,15 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     // The upload next, before any barrier: it may submit too, but leaves the
     // view heap alone.
     D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
-    const D3D12_GPU_DESCRIPTOR_HANDLE table = AllocateTable(effects::kMaxTextureSlots, cpu);
+    D3D12_GPU_DESCRIPTOR_HANDLE table{};
+    for (int attempt = 0; attempt < 3; ++attempt) {
+      table = AllocateTable(effects::kMaxTextureSlots, cpu);
+      const std::uint64_t epoch = mArenaEpoch;
+      EnsureRayTables();
+      if (epoch == mArenaEpoch) {
+        break; // the ray table didn't start the heap over: the blit's table still stands
+      }
+    }
     const float sourceUv[4] = {
       static_cast<float>(sourceRect.left) / static_cast<float>(sourceWidth),
       static_cast<float>(sourceRect.top) / static_cast<float>(sourceHeight),
@@ -2275,9 +2324,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mList->SetGraphicsRootConstantBufferView(0U, constants.gpu);
     mList->SetGraphicsRootDescriptorTable(1U, table);
     mList->SetGraphicsRootDescriptorTable(2U, mBlitSamplers);
-    if (mRayQuery) {
-      mList->SetGraphicsRootShaderResourceView(3U, mTlasAddress);
-    }
+    BindRayRoot(false);
     mList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     MarkDraw("StretchRect blit");
     mList->DrawInstanced(3U, 1U, 0U, 0U);
@@ -3266,7 +3313,8 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     cacheKey.Add(key.Key().data(), key.Key().size());
     // Engine addition (ren_RayTracedShadows): with ray queries the root signature has the scene's parameter,
     // and a stored pipeline only loads with the root signature it was made with.
-    const std::uint8_t rootSignature = mRayQuery ? 1U : 0U;
+    // 2: the ray root signature with the alpha-test parameters (ren_RayAlphaShadows); bump on any layout change.
+    const std::uint8_t rootSignature = mRayQuery ? 2U : 0U;
     cacheKey.Add(&rootSignature, sizeof(rootSignature));
     ComPtr<ID3D12PipelineState> pipeline = mPipelineCache.Load(cacheKey.Value(), desc);
     if (pipeline != nullptr) {
@@ -3354,9 +3402,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mList->SetGraphicsRootConstantBufferView(0U, mPass.constants);
     mList->SetGraphicsRootDescriptorTable(1U, mPass.textures);
     mList->SetGraphicsRootDescriptorTable(2U, mPass.samplers);
-    if (mRayQuery) {
-      mList->SetGraphicsRootShaderResourceView(3U, mTlasAddress);
-    }
+    BindRayRoot(false);
     mList->IASetPrimitiveTopology(topology);
     mList->OMSetBlendFactor(mPass.state.blendFactor);
     mList->OMSetStencilRef(mPass.state.stencilRef);
@@ -3372,7 +3418,14 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (mIndexBuffer == nullptr) {
       return;
     }
-    RefreshStalePass(); // before anything is prepared: binding may submit
+    for (int attempt = 0; attempt < 3; ++attempt) {
+      RefreshStalePass(); // before anything is prepared: binding may submit
+      const std::uint64_t epoch = mArenaEpoch;
+      EnsureRayTables();
+      if (epoch == mArenaEpoch) {
+        break; // the ray table didn't start the view heap over: the pass's table still stands
+      }
+    }
     const DrawPreparation preparing(mPreparingDraw);
     auto* const indexBuffer = static_cast<IndexBufferD3D12*>(mIndexBuffer.get());
     const D3D12_GPU_VIRTUAL_ADDRESS indexAddress = indexBuffer->Storage().PrepareForDraw(*this);
@@ -3391,7 +3444,14 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
   void DeviceD3D12::DrawPrimitive(const DrawContext* const context)
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
-    RefreshStalePass(); // before anything is prepared: binding may submit
+    for (int attempt = 0; attempt < 3; ++attempt) {
+      RefreshStalePass(); // before anything is prepared: binding may submit
+      const std::uint64_t epoch = mArenaEpoch;
+      EnsureRayTables();
+      if (epoch == mArenaEpoch) {
+        break; // the ray table didn't start the view heap over: the pass's table still stands
+      }
+    }
     const DrawPreparation preparing(mPreparingDraw);
     if (!PrepareDraw(static_cast<std::uint32_t>(context->topology_))) {
       return;

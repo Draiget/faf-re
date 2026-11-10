@@ -124,6 +124,26 @@ float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full) { return faf_shadow_r
     // the answer is kept for the next call.
     constexpr const char* kRayShadowHelpers = R"hlsl(
 [[vk::binding(0, 2)]] RaytracingAccelerationStructure faf_RayScene : register(t0, space1);
+// Engine addition (ren_RayAlphaShadows): alpha-tested pieces (trees). Per scene instance a record (index offset,
+// texture-coordinate offset, texture slot, 1 when alpha-tested); the pieces' indices and texture coordinates;
+// their textures (RayTracingD3D12.cpp / RayTracingVulkan.cpp).
+[[vk::binding(1, 2)]] ByteAddressBuffer faf_RayAttributes : register(t1, space1);
+[[vk::binding(2, 2)]] StructuredBuffer<uint4> faf_RayRecords : register(t2, space1);
+[[vk::binding(3, 2)]] Texture2D faf_RayTextures[64] : register(t0, space2);
+[[vk::binding(4, 2)]] SamplerState faf_RaySampler : register(s0, space1);
+// Whether a ray meets solid surface at this point of an alpha-tested triangle: mesh.fx's DepthClip test (the
+// albedo's alpha at least 0.5). `bary` weighs the triangle's second and third corners.
+bool faf_ray_solid(uint instance, uint primitive, float2 bary)
+{
+    const uint4 record = faf_RayRecords[instance];
+    if (record.w == 0) return true;
+    const uint3 corner = faf_RayAttributes.Load3(record.x + primitive * 12);
+    const float2 uv0 = asfloat(faf_RayAttributes.Load2(record.y + corner.x * 8));
+    const float2 uv1 = asfloat(faf_RayAttributes.Load2(record.y + corner.y * 8));
+    const float2 uv2 = asfloat(faf_RayAttributes.Load2(record.y + corner.z * 8));
+    const float2 uv = uv0 + bary.x * (uv1 - uv0) + bary.y * (uv2 - uv0);
+    return faf_RayTextures[NonUniformResourceIndex(record.z)].SampleLevel(faf_RaySampler, uv, 1).a >= 0.5;
+}
 static float4 faf_ray_key = float4(-1e31, -1e31, -1e31, -1e31);
 static float2 faf_ray_lit = float2(1, 1);
 float3 faf_ray_point(float2 uv, float z)
@@ -140,9 +160,15 @@ bool faf_ray_blocked(float3 origin, float3 direction, float tMin, float tMax, ui
     ray.Direction = direction;
     ray.TMin = tMin;
     ray.TMax = tMax;
-    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_FORCE_OPAQUE> query;
+    // Opaque pieces commit by themselves; an alpha-tested one only where its texture is solid.
+    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
     query.TraceRayInline(faf_RayScene, RAY_FLAG_NONE, mask, ray);
-    query.Proceed();
+    while (query.Proceed()) {
+        if (query.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE &&
+            faf_ray_solid(query.CandidateInstanceIndex(), query.CandidatePrimitiveIndex(), query.CandidateTriangleBarycentrics())) {
+            query.CommitNonOpaqueTriangleHit();
+        }
+    }
     return query.CommittedStatus() == COMMITTED_TRIANGLE_HIT;
 }
 bool faf_ray_blocked(float3 origin, float3 direction, float tMin, float tMax)

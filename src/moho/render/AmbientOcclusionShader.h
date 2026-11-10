@@ -67,6 +67,36 @@ Texture2D<float4> ShadowMap : register(t4);
 [[vk::binding(0, 2)]]
 #endif
 RaytracingAccelerationStructure RayScene : register(t0, space1);
+// Alpha-tested pieces (trees): as ModernHlsl.cpp's faf_ray_solid.
+#ifdef __spirv__
+[[vk::binding(1, 2)]]
+#endif
+ByteAddressBuffer RayAttributes : register(t1, space1);
+#ifdef __spirv__
+[[vk::binding(2, 2)]]
+#endif
+StructuredBuffer<uint4> RayRecords : register(t2, space1);
+#ifdef __spirv__
+[[vk::binding(3, 2)]]
+#endif
+Texture2D RayTextures[64] : register(t0, space2);
+#ifdef __spirv__
+[[vk::binding(4, 2)]]
+#endif
+SamplerState RaySampler : register(s0, space1);
+bool TracedSolid(uint instance, uint primitive, float2 bary)
+{
+    const uint4 record = RayRecords[instance];
+    if (record.w == 0) {
+        return true;
+    }
+    const uint3 corner = RayAttributes.Load3(record.x + primitive * 12);
+    const float2 uv0 = asfloat(RayAttributes.Load2(record.y + corner.x * 8));
+    const float2 uv1 = asfloat(RayAttributes.Load2(record.y + corner.y * 8));
+    const float2 uv2 = asfloat(RayAttributes.Load2(record.y + corner.z * 8));
+    const float2 uv = uv0 + bary.x * (uv1 - uv0) + bary.y * (uv2 - uv0);
+    return RayTextures[NonUniformResourceIndex(record.z)].SampleLevel(RaySampler, uv, 1).a >= 0.5;
+}
 
 // Ambient light that reaches `center` by rays: RayParams.y rays spread over the hemisphere around `normal`
 // (cosine-weighted, turned per point by `spin`), each up to Radius long; a hit takes more of the light the
@@ -83,9 +113,14 @@ float TracedHit(float3 origin, float3 direction, float tMin, uint mask)
     ray.Direction = direction;
     ray.TMin = tMin;
     ray.TMax = Radius;
-    RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_FORCE_OPAQUE> query;
+    RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
     query.TraceRayInline(RayScene, RAY_FLAG_NONE, mask, ray);
-    query.Proceed();
+    while (query.Proceed()) {
+        if (query.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE &&
+            TracedSolid(query.CandidateInstanceIndex(), query.CandidatePrimitiveIndex(), query.CandidateTriangleBarycentrics())) {
+            query.CommitNonOpaqueTriangleHit();
+        }
+    }
     return (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT) ? query.CommittedRayT() : -1.0;
 }
 

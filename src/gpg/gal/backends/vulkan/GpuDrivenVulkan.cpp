@@ -716,6 +716,9 @@ namespace gpg::gal
     Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, mGpuPipelineLayout, 0U, 1U, &set, 0U, nullptr);
     if (mRaySet != VK_NULL_HANDLE) {
       Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, mGpuPipelineLayout, 2U, 1U, &mRaySet, 0U, nullptr);
+      if (mRayRecordsChunk != nullptr) {
+        mRayRecordsChunk->serial = RecordingSerial();
+      }
     }
     // The engine's viewport with Direct3D 9's pixel centres, clipped as an effect draw is.
     VkViewport viewport{
@@ -769,6 +772,9 @@ namespace gpg::gal
     Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_COMPUTE, mGpuPipelineLayout, 0U, 1U, &set, 0U, nullptr);
     if (mRaySet != VK_NULL_HANDLE) {
       Vk().vkCmdBindDescriptorSets(mCommands, VK_PIPELINE_BIND_POINT_COMPUTE, mGpuPipelineLayout, 2U, 1U, &mRaySet, 0U, nullptr);
+      if (mRayRecordsChunk != nullptr) {
+        mRayRecordsChunk->serial = RecordingSerial();
+      }
     }
     Vk().vkCmdDispatch(mCommands, dispatch.groupsX, dispatch.groupsY, dispatch.groupsZ);
     RecordStateChange();

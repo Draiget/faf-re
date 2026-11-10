@@ -466,5 +466,5 @@ namespace gpg::gal
     bool Device::CopyVertexBufferRegion(VertexBuffer&, std::uint32_t, VertexBuffer&, std::uint32_t, std::uint32_t) { return false; }
     RayGeometryId Device::CreateRayGeometry(const RayGeometryDesc&) { return 0U; }
     void Device::DestroyRayGeometry(RayGeometryId) {}
-    bool Device::SetRayInstances(const RayInstance*, std::uint32_t) { return false; }
+    bool Device::SetRayInstances(const RayInstance*, std::uint32_t, const boost::shared_ptr<Texture>*, std::uint32_t) { return false; }
 }
