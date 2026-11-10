@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <utility>
 
@@ -1030,10 +1031,10 @@ namespace faf::remote
       getVersion.PushStack(state);
       lua_call(state, 0, 1);
       const char* const version = lua_isstring(state, -1) ? lua_tostring(state, -1) : nullptr;
-      if (version == nullptr || kSyncPolicyGameVersion != version) {
+      if (version == nullptr || !SyncPolicyValidatedFor(std::atoi(version))) {
         gpg::Warnf(
-          "sync routing: the policy was audited on FAF game version %.*s, not %s: keys new since then go to observers only",
-          static_cast<int>(kSyncPolicyGameVersion.size()), kSyncPolicyGameVersion.data(), version != nullptr ? version : "(none)"
+          "sync routing: the policy was validated on FAF game versions %s, not %s: keys new since then go to observers only",
+          SyncPolicyGameVersionsText().c_str(), version != nullptr ? version : "(none)"
         );
       }
       lua_settop(state, top);
@@ -1446,6 +1447,15 @@ namespace faf::remote
       }
     }
     CloseKey(key, "NukeLaunchData");
+  }
+
+  std::string SyncPolicyGameVersionsText()
+  {
+    std::string text;
+    for (const int version : kSyncPolicyGameVersions) {
+      text += (text.empty() ? "" : ", ") + std::to_string(version);
+    }
+    return text;
   }
 
   void CSyncRouter::RouteChat(moho::Sim& sim, LuaPlus::LuaObject& key, LuaPlus::LuaObject& value)

@@ -72,10 +72,23 @@ namespace faf::remote
   };
 
   /**
-   * The FAF game version `SyncKeyRoutes` was audited on; running on another one is logged. 3840 writes the keys 3835
-   * does and one more, `ChatMessages` (`ESyncRoute::Chat`).
+   * The FAF game versions `SyncKeyRoutes` was validated on (plan WPR.5: their Lua's `Sync` keys audited, then the spy
+   * over fresh replays of the version). 3835 was the first; 3840 writes its keys and one more, `ChatMessages`
+   * (`ESyncRoute::Chat`), checked on 20 of its replays. On any other version a key the table doesn't know goes to
+   * observers only, so the dedicated server refuses one (plan WPR.32) unless told otherwise.
    */
-  inline constexpr std::string_view kSyncPolicyGameVersion = "3840";
+  inline constexpr int kSyncPolicyGameVersions[] = {3835, 3840};
+  [[nodiscard]] constexpr bool SyncPolicyValidatedFor(const int gameVersion) noexcept
+  {
+    for (const int version : kSyncPolicyGameVersions) {
+      if (version == gameVersion) {
+        return true;
+      }
+    }
+    return false;
+  }
+  /** "3835, 3840": the validated versions, for messages. */
+  [[nodiscard]] std::string SyncPolicyGameVersionsText();
   /** That version's keys (`.plans/dedicated-server/research/WP6.1-sync-keys.md`), sorted. */
   [[nodiscard]] std::span<const SSyncKeyRoute> SyncKeyRoutes() noexcept;
   /** The route of `key`, or `ESyncRoute::Observers` with `known` false. */

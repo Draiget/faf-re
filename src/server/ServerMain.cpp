@@ -84,6 +84,7 @@
 #include "server/ServerNet.h"
 #include "server/ServerViews.h"
 #include "remote/SpeedLimit.h"
+#include "remote/SyncRouting.h"
 #include "server/LinkSpeed.h"
 #include "server/SpeedWatch.h"
 
@@ -102,7 +103,7 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
   // Plan WP13.7: how long a defeated player keeps their view with `DefeatedPlayerView = "disconnect"`: the defeat banner
@@ -1658,6 +1659,19 @@ namespace
       Say("Can't host: %s", end.error.c_str());
       WriteResult(resultPath, end);
       return kExitBadInput;
+    }
+    // Plan WPR.32: each player's Lua `Sync` is routed by a table validated per FAF version (remote/SyncRouting.h); on
+    // another version a new key would reach observers only, and the players' UI would miss it without a sign.
+    if (const int dataVersion = moho::FAF_GetSessionGameVersion(); !faf::remote::SyncPolicyValidatedFor(dataVersion)) {
+      if (!moho::CFG_GetArgOption("--unvalidated-policy", 0, nullptr)) {
+        end.error = "the game data is FAF game version " + std::to_string(dataVersion) + ", and the Sync routing policy is validated on " +
+                    faf::remote::SyncPolicyGameVersionsText() + " only (plan WPR.5); --unvalidated-policy hosts anyway";
+        Say("Can't host: %s", end.error.c_str());
+        WriteResult(resultPath, end);
+        return kExitBadInput;
+      }
+      Say("Hosting on FAF game version %d, which the Sync routing policy is not validated on (%s): keys new since then reach observers only",
+          dataVersion, faf::remote::SyncPolicyGameVersionsText().c_str());
     }
 
     std::unique_ptr<LuaPlus::LuaState> sessionState(gameData.mState);
