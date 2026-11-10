@@ -349,6 +349,8 @@ namespace faf::editor
       bool mViewStepsAside = false;
       /** The popups' rectangles (view pixels) the view's window region leaves out, as last set. */
       std::vector<RECT> mViewHoles;
+      /** The holes of the last frames, newest first (FitGameView). */
+      std::deque<std::vector<RECT>> mHoleHistory;
       int mBrowseArg = -1;
       // `/shader <name>` with `/open` (test runs): the map's terrain shader changed once it is shown.
       std::string mShaderArg;
@@ -2509,7 +2511,9 @@ namespace faf::editor
       // over it would be hidden: while a modal dialog (New map, Save as, the texture browser) is open the view's
       // window region is empty, and a tooltip, menu or drop-down list over it is cut out of the region, so they
       // show through. Hiding the window instead would stop its paint, and the panels' head is presented with it.
-      const bool modal = mImGuiReady && ImGui::GetTopMostPopupModal() != nullptr;
+      // The Maps window too: a window the panels draw over the view can't move smoothly through a cut-out, as
+      // the view's picture reaches the screen a frame or two apart from the panels' (user report: it lagged).
+      const bool modal = mImGuiReady && (ImGui::GetTopMostPopupModal() != nullptr || (mShell != nullptr && mShell->Browser().Open()));
       std::vector<RECT> holes;
       if (mImGuiReady && !modal) {
         for (const ImGuiWindow* const window : ImGui::GetCurrentContext()->Windows) {
@@ -2525,6 +2529,18 @@ namespace faf::editor
             holes.push_back(hole);
           }
         }
+      }
+      // The panels' picture reaches the screen with the game's next present, a frame or two after this region
+      // does, so a popup or window that moves (a tooltip following the cursor, the Maps window dragged) keeps the
+      // holes of the frames before too: the hole never runs ahead of what is drawn in it, which showed as the
+      // picture lagging and tooltips flickering (user report).
+      mHoleHistory.push_front(holes);
+      while (mHoleHistory.size() > 3) {
+        mHoleHistory.pop_back();
+      }
+      holes.clear();
+      for (const std::vector<RECT>& frameHoles : mHoleHistory) {
+        holes.insert(holes.end(), frameHoles.begin(), frameHoles.end());
       }
       const auto sameHoles = [&] {
         if (holes.size() != mViewHoles.size()) {
