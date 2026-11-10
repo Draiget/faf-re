@@ -41,6 +41,8 @@ namespace faf::editor
     bool& ShowLighting() noexcept { return mShowLighting; }
     /** The Armies panel; the Markers tool's "Open the Armies panel" also brings it to the front. */
     bool& ShowArmies() noexcept { return mShowArmies; }
+    /** The Properties panel: the selected marker, unit, prop or decal, by kind (ui/EdPropertiesPanel.cpp). */
+    bool& ShowProperties() noexcept { return mShowProperties; }
     /** The Lighting panel's Import / Export buttons, taken by the app (it asks for the file). */
     [[nodiscard]] bool TakeLightingImport() noexcept { return std::exchange(mLightingImport, false); }
     [[nodiscard]] bool TakeLightingExport() noexcept { return std::exchange(mLightingExport, false); }
@@ -117,6 +119,14 @@ namespace faf::editor
     void DrawChains();
     /** The player slots and extra armies as cards, and the chosen army's settings (ui/EdArmiesPanel.cpp). */
     void DrawArmiesPanel();
+    void DrawPropertiesPanel();
+    bool mShowProperties = true;
+    bool mPropertiesPlaced = false;
+    /** The panel's copy of the values while a field is held or typed in; sent as one edit when it lets go. */
+    SelectionProperties mPropertiesEdit;
+    bool mPropertiesEditing = false;
+    char mPropertiesName[128]{};
+    std::vector<std::string> mPropertiesFields;
     bool mShowArmies = false;
     bool mFocusArmies = false;
     std::string mArmySelected;

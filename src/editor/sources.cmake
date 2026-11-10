@@ -29,6 +29,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdViewAids.cpp
   ui/EdHelp.cpp
   ui/EdArmiesPanel.cpp
+  ui/EdPropertiesPanel.cpp
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp

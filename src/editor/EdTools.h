@@ -1,5 +1,6 @@
 #pragma once
 
+#include "editor/ui/EdProperties.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskBrush.h"
 #include "editor/doc/EdPropPaint.h"
@@ -411,6 +412,18 @@ namespace faf::editor
     }
 
     /** How many objects the view has selected, for the Select tool's panel. */
+    /** The Properties panel: the selection's active item (the view gives it each frame), and an edit it asks for. */
+    void SetSelectionProperties(SelectionProperties properties) { mSelectionProperties = std::move(properties); }
+    [[nodiscard]] const SelectionProperties& SelectionPropertiesNow() const noexcept { return mSelectionProperties; }
+    void AskPropertyEdit(PropertyEdit edit) { mPropertyEdit = std::move(edit); }
+    [[nodiscard]] bool TakePropertyEdit(PropertyEdit& edit)
+    {
+      if (mPropertyEdit.what == PropertyEdit::What::None) {
+        return false;
+      }
+      edit = std::exchange(mPropertyEdit, PropertyEdit{});
+      return true;
+    }
     /** The Select tool's panel: what is selected and what a click would pick, in words (the view gives them). */
     void SetSelectInfo(std::string selected, std::string hover)
     {
@@ -789,6 +802,8 @@ namespace faf::editor
     std::string mReclaimSummary;
     std::vector<std::string> mReclaimRows;
     char mPropFilter[64]{};
+    SelectionProperties mSelectionProperties;
+    PropertyEdit mPropertyEdit;
     std::string mSelectSelected;
     std::string mSelectHover;
     std::vector<SaveEntry> mMarkerSelection;

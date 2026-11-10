@@ -544,7 +544,7 @@ namespace faf::editor
       float hx = 0.0f;
       float hz = 0.0f;
       float radius = 0.0f;
-      const PickHit hover = GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz) ? PickAnything(gx, gz) : PickHit{};
+      const PickHit hover = PickAnything(mCursor);
       constexpr std::uint32_t kHover = 0xE0FFFFFFu;
       const moho::CWldTerrainDecal* const hoverDecal =
         hover.kind == PickKind::Decal && mDocument.Decals() != nullptr ? FindDecal(*mDocument.Decals(), hover.index) : nullptr;
@@ -2738,36 +2738,52 @@ namespace faf::editor
     return std::floor(value / step) * step + step * 0.5f;
   }
 
-  EdMapScene::PickHit EdMapScene::PickAnything(const float x, const float z) const
+  EdMapScene::PickHit EdMapScene::PickAnything(const POINT at) const
   {
     PickHit best;
+    if (mMap == nullptr || mCamera == nullptr) {
+      return best;
+    }
+    // On screen: each thing as a short upright line from its base, so a click on a tree's crown or a unit's body
+    // picks it from any angle; its distance in pixels as a share of its kind's reach, the nearest winning.
+    const Wm3::Vector2f cursor(static_cast<float>(at.x), static_cast<float>(at.y));
     float bestScore = 1.0f;
-    // Each kind's distance as a share of its own reach, so a marker and a tree compete fairly.
-    const auto consider = [&](const PickKind kind, const int index, const float px, const float pz, const float reach) {
-      if (index < 0) {
-        return;
+    const auto consider = [&](const PickKind kind, const int index, const Wm3::Vec3f& base, const float height, const float reach) {
+      const Wm3::Vector2f a = mCamera->Project(base);
+      if (std::fabs(a.x - cursor.x) > 400.0f || std::fabs(a.y - cursor.y) > 400.0f) {
+        return; // far off: not worth the second projection
       }
-      const float score = std::hypot(px - x, pz - z) / reach;
+      const Wm3::Vector2f b = mCamera->Project(Wm3::Vec3f{base.x, base.y + height, base.z});
+      // The reach in pixels, or a unit and a half of the ground when the camera is closer than that.
+      const Wm3::Vector2f side = mCamera->Project(Wm3::Vec3f{base.x + 1.5f, base.y, base.z});
+      const float pixels = std::max(reach, std::hypot(side.x - a.x, side.y - a.y));
+      const float score = SegmentDistance(cursor, a, b) / pixels;
       if (score < bestScore) {
         bestScore = score;
         best = PickHit{kind, index};
       }
     };
-    if (const int marker = PickMarker(x, z); marker >= 0) {
-      float mx = 0.0f, my = 0.0f, mz = 0.0f;
-      (void)MarkerPosition(mDocument.SaveData().Markers()[static_cast<std::size_t>(marker)], mx, my, mz);
-      consider(PickKind::Marker, marker, mx, mz, std::max(2.5f, mDistance * 0.006f));
+    const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    for (std::size_t i = 0; i < markers.size(); ++i) {
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (!MarkerHidden(markers[i]) && MarkerPosition(markers[i], x, y, z)) {
+        consider(PickKind::Marker, static_cast<int>(i), Wm3::Vec3f{x, y, z}, 4.0f, 14.0f);
+      }
     }
-    if (const int unit = PickUnit(x, z); unit >= 0) {
-      const Wm3::Vec3f& p = mUnitRefs[static_cast<std::size_t>(unit)].position;
-      consider(PickKind::Unit, unit, p.x, p.z, std::max(3.0f, mDistance * 0.01f));
+    for (std::size_t i = 0; i < mUnitRefs.size(); ++i) {
+      consider(PickKind::Unit, static_cast<int>(i), mUnitRefs[i].position, 2.5f, 16.0f);
     }
-    if (const int prop = PickProp(x, z); prop >= 0) {
-      const Wm3::Vec3f& p = mMap->mProps->mEntries[static_cast<std::size_t>(prop)].mTransform.pos_;
-      consider(PickKind::Prop, prop, p.x, p.z, std::max(2.5f, mDistance * 0.012f));
+    if (mMap->mProps != nullptr) {
+      const auto& entries = mMap->mProps->mEntries;
+      for (std::size_t i = 0; i < entries.size(); ++i) {
+        consider(PickKind::Prop, static_cast<int>(i), entries[i].mTransform.pos_, 3.0f, 12.0f);
+      }
     }
-    if (best.kind == PickKind::None) {
-      if (const int decal = PickDecal(x, z); decal >= 0) {
+    // Nothing near: the decal under the cursor.
+    float gx = 0.0f;
+    float gz = 0.0f;
+    if (best.kind == PickKind::None && GroundAt(cursor.x, cursor.y, gx, gz)) {
+      if (const int decal = PickDecal(gx, gz); decal >= 0) {
         best = PickHit{PickKind::Decal, decal};
       }
     }
@@ -2948,6 +2964,213 @@ namespace faf::editor
     }
   }
 
+  SelectionProperties EdMapScene::SelectionPropertiesNow() const
+  {
+    SelectionProperties out;
+    if (mMap == nullptr) {
+      return out;
+    }
+    switch (SelectedKind()) {
+    case PickKind::Marker:
+      for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+        if (marker.name != mMarkerSelection.front()) {
+          continue;
+        }
+        out.kind = SelectionProperties::Kind::Marker;
+        out.count = static_cast<int>(mMarkerSelection.size());
+        out.name = marker.name;
+        out.type = MarkerTypeOf(marker);
+        (void)MarkerPosition(marker, out.position[0], out.position[1], out.position[2]);
+        const std::vector<double> turn = ValueNumbers(marker.Get("orientation"));
+        out.heading = turn.size() >= 2 ? static_cast<float>(turn[1]) * 180.0f / kPi : 0.0f;
+        for (const auto& [key, value] : marker.properties) {
+          if (key != "position" && key != "orientation" && key != "type") {
+            out.fields.emplace_back(key, value);
+          }
+        }
+      }
+      break;
+    case PickKind::Unit: {
+      const int index = UnitRefIndex(mUnitSelection.front().first, mUnitSelection.front().second);
+      if (index < 0) {
+        break;
+      }
+      const UnitRef& ref = mUnitRefs[static_cast<std::size_t>(index)];
+      out.kind = SelectionProperties::Kind::Unit;
+      out.count = static_cast<int>(mUnitSelection.size());
+      out.name = ref.name;
+      out.owner = ref.army;
+      out.position[0] = ref.position.x;
+      out.position[1] = ref.position.y;
+      out.position[2] = ref.position.z;
+      out.heading = ref.orientation[1] * 180.0f / kPi;
+      for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+        UnitGroup group;
+        std::string error;
+        if (entry.name == ref.army && ParseUnitGroup(entry.Get("Units"), group, error)) {
+          if (const SaveUnit* const unit = FindUnit(group, ref.name); unit != nullptr) {
+            out.type = unit->type;
+          }
+        }
+      }
+      break;
+    }
+    case PickKind::Prop: {
+      const moho::CWldPropEntry& entry = mMap->mProps->mEntries[static_cast<std::size_t>(mSelection.front())];
+      out.kind = SelectionProperties::Kind::Prop;
+      out.count = static_cast<int>(mSelection.size());
+      out.type = entry.mBlueprintPath.c_str();
+      const std::size_t slash = out.type.find_last_of('/');
+      out.name = slash == std::string::npos ? out.type : out.type.substr(slash + 1);
+      out.position[0] = entry.mTransform.pos_.x;
+      out.position[1] = entry.mTransform.pos_.y;
+      out.position[2] = entry.mTransform.pos_.z;
+      out.heading = 2.0f * std::atan2(entry.mTransform.orient_.y, entry.mTransform.orient_.w) * 180.0f / kPi;
+      out.details = PropDetails(out.type);
+      break;
+    }
+    case PickKind::Decal:
+      if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr) {
+        if (const moho::CWldTerrainDecal* const decal = FindDecal(*decals, mDecalSelection.front()); decal != nullptr) {
+          const DecalState state = CaptureDecal(*decal);
+          const DecalFootprint footprint = FootprintOf(*decal);
+          out.kind = SelectionProperties::Kind::Decal;
+          out.count = static_cast<int>(mDecalSelection.size());
+          out.name = "decal " + std::to_string(mDecalSelection.front());
+          out.type = state.names[0];
+          DecalCentre(footprint, out.position[0], out.position[2]);
+          out.position[1] = state.position[1];
+          out.heading = footprint.yaw * 180.0f / kPi;
+          out.size[0] = footprint.sizeX;
+          out.size[1] = footprint.sizeZ;
+        }
+      }
+      break;
+    default:
+      break;
+    }
+    // A heading in -180..180.
+    while (out.heading > 180.0f) {
+      out.heading -= 360.0f;
+    }
+    while (out.heading <= -180.0f) {
+      out.heading += 360.0f;
+    }
+    return out;
+  }
+
+  void EdMapScene::ApplyPropertyEdit(const PropertyEdit& edit)
+  {
+    const SelectionProperties now = SelectionPropertiesNow();
+    const float* const v = edit.values;
+    const float radians = v[0] * kPi / 180.0f;
+    switch (now.kind) {
+    case SelectionProperties::Kind::Marker:
+      if (edit.what == PropertyEdit::What::Position) {
+        EditMarker(now.name, "position", Vector3Value(v[0], v[1], v[2]));
+      } else if (edit.what == PropertyEdit::What::Heading) {
+        EditMarker(now.name, "orientation", Vector3Value(0.0, radians, 0.0));
+      } else if (edit.what == PropertyEdit::What::Name) {
+        EditMarker(now.name, "name", edit.value);
+      } else if (edit.what == PropertyEdit::What::Field) {
+        EditMarker(now.name, edit.key, edit.value);
+      }
+      break;
+    case SelectionProperties::Kind::Unit: {
+      if (edit.what != PropertyEdit::What::Position && edit.what != PropertyEdit::What::Heading) {
+        break;
+      }
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      const bool changed = EditArmyUnits(now.owner, [&](UnitGroup& group) {
+        if (SaveUnit* const unit = FindUnit(group, now.name); unit != nullptr) {
+          if (edit.what == PropertyEdit::What::Position) {
+            unit->position[0] = v[0];
+            unit->position[1] = v[1];
+            unit->position[2] = v[2];
+          } else {
+            unit->orientation[1] = radians;
+          }
+        }
+      });
+      if (changed && !(before.armies == mDocument.SaveData().Armies())) {
+        mDocument.SaveDataEdited(std::move(before));
+        ReloadUnits();
+        gpg::Logf("editor: unit %s: %s", now.name.c_str(), edit.what == PropertyEdit::What::Position ? "moved" : "turned");
+      }
+      break;
+    }
+    case SelectionProperties::Kind::Prop: {
+      if (edit.what != PropertyEdit::What::Position && edit.what != PropertyEdit::What::Heading) {
+        break;
+      }
+      const int index = mSelection.front();
+      BeginObjectStroke();
+      if (edit.what == PropertyEdit::What::Position) {
+        MovePropTo(index, Wm3::Vec3f{v[0], v[1], v[2]});
+      } else {
+        moho::CWldPropEntry& entry = mMap->mProps->mEntries[static_cast<std::size_t>(index)];
+        entry.mTransform.orient_ = Wm3::Quatf(std::cos(radians * 0.5f), 0.0f, std::sin(radians * 0.5f), 0.0f);
+        const PropRecord record = PropRecordFor(entry.mBlueprintPath.c_str(), entry.mTransform);
+        entry.mTransform = record.loaded;
+        mDocument.SetPropRecord(static_cast<std::size_t>(index), record);
+        if (static_cast<std::size_t>(index) < mProps.size() && mProps[static_cast<std::size_t>(index)] != nullptr) {
+          mProps[static_cast<std::size_t>(index)]->SetStance(entry.mTransform, entry.mTransform);
+        }
+        mObjectsChanged = true;
+        mDocument.SetModified(true);
+      }
+      EndObjectStroke();
+      gpg::Logf("editor: prop %d: %s", index, edit.what == PropertyEdit::What::Position ? "moved" : "turned");
+      break;
+    }
+    case SelectionProperties::Kind::Decal: {
+      moho::IDecalManager* const decals = mDocument.Decals();
+      if (decals == nullptr || (edit.what != PropertyEdit::What::Position && edit.what != PropertyEdit::What::Heading &&
+                                edit.what != PropertyEdit::What::Size)) {
+        break;
+      }
+      EdDocument::DecalSnapshot before = mDocument.DecalsNow();
+      std::vector<DecalState> states = before;
+      for (DecalState& state : states) {
+        if (state.index != mDecalSelection.front()) {
+          continue;
+        }
+        // Kept about its middle: the decal's corner follows from the middle, size and heading.
+        float cx = now.position[0];
+        float cz = now.position[2];
+        float sizeX = now.size[0];
+        float sizeZ = now.size[1];
+        float yaw = now.heading * kPi / 180.0f;
+        if (edit.what == PropertyEdit::What::Position) {
+          cx = v[0];
+          cz = v[2];
+          state.position[1] = v[1];
+        } else if (edit.what == PropertyEdit::What::Heading) {
+          yaw = radians;
+        } else {
+          sizeX = std::max(0.1f, v[0]);
+          sizeZ = std::max(0.1f, v[1]);
+        }
+        const DecalFootprint footprint = DecalAround(cx, cz, sizeX, sizeZ, yaw);
+        state.position[0] = footprint.x;
+        state.position[2] = footprint.z;
+        state.scale[0] = footprint.sizeX;
+        state.scale[1] = std::max(footprint.sizeX, footprint.sizeZ);
+        state.scale[2] = footprint.sizeZ;
+        state.orientation[1] = yaw;
+      }
+      RestoreDecals(*decals, states);
+      if (!(mDocument.DecalsNow() == before)) {
+        mDocument.DecalsEdited(std::move(before));
+        gpg::Logf("editor: decal %d edited", mDecalSelection.front());
+      }
+      break;
+    }
+    default:
+      break;
+    }
+  }
+
   std::string EdMapScene::HoverText() const
   {
     float gx = 0.0f;
@@ -2955,7 +3178,7 @@ namespace faf::editor
     if (mMap == nullptr || !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz)) {
       return {};
     }
-    const PickHit hit = PickAnything(gx, gz);
+    const PickHit hit = PickAnything(mCursor);
     switch (hit.kind) {
     case PickKind::Marker: {
       const SaveEntry& marker = mDocument.SaveData().Markers()[static_cast<std::size_t>(hit.index)];
@@ -4726,7 +4949,7 @@ namespace faf::editor
         if (!GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
           return true;
         }
-        const PickHit hit = PickAnything(groundX, groundZ);
+        const PickHit hit = PickAnything(at);
         const bool add = (wParam & MK_CONTROL) != 0;
         if (hit.kind == PickKind::None) {
           if (!add) {

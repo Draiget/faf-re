@@ -173,6 +173,19 @@ namespace faf::editor
       mResetLayout = false;
     }
     ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+    // A layout saved before the Properties panel existed: the panel goes under the Tools panel, once.
+    if (!mPropertiesPlaced) {
+      if (const ImGuiWindow* const tools = ImGui::FindWindowByName(kToolsWindow); tools != nullptr) {
+        mPropertiesPlaced = true;
+        if (ImGui::FindWindowSettingsByID(ImHashStr("Properties")) == nullptr && tools->DockId != 0) {
+          ImGuiID top = 0;
+          ImGuiID bottom = 0;
+          ImGui::DockBuilderSplitNode(tools->DockId, ImGuiDir_Down, 0.42f, &bottom, &top);
+          ImGui::DockBuilderDockWindow("Properties", bottom);
+          ImGui::DockBuilderFinish(dockspaceId);
+        }
+      }
+    }
     if (const ImGuiDockNode* const middle = ImGui::DockBuilderGetCentralNode(dockspaceId); middle != nullptr) {
       mGameView = ImVec4(middle->Pos.x - viewport->Pos.x, middle->Pos.y - viewport->Pos.y, middle->Size.x, middle->Size.y);
     }
@@ -207,6 +220,9 @@ namespace faf::editor
       if (mShowArmies) {
         DrawArmiesPanel();
       }
+      if (mShowProperties) {
+        DrawPropertiesPanel();
+      }
       if (mShowLog) {
         if (ImGui::Begin(kLogWindow, &mShowLog)) {
           mLog.Draw();
@@ -230,7 +246,10 @@ namespace faf::editor
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
     ImGuiID center = dockspaceId;
-    const ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.21f, nullptr, &center);
+    ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.21f, nullptr, &center);
+    // The Properties panel under the Tools panel.
+    const ImGuiID leftBottom = ImGui::DockBuilderSplitNode(left, ImGuiDir_Down, 0.42f, nullptr, &left);
+    ImGui::DockBuilderDockWindow("Properties", leftBottom);
     const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.22f, nullptr, &center);
     const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.22f, nullptr, &center);
     ImGui::DockBuilderDockWindow(kToolsWindow, left);

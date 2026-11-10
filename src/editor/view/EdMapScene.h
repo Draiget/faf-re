@@ -133,6 +133,9 @@ namespace faf::editor
     };
     /** The Select tool's panel: what is selected and what is under the cursor, in words. */
     [[nodiscard]] std::string SelectionText() const;
+    /** The selection's active (first) item for the Properties panel, and an edit of it as one undo step. */
+    [[nodiscard]] SelectionProperties SelectionPropertiesNow() const;
+    void ApplyPropertyEdit(const PropertyEdit& edit);
     [[nodiscard]] std::string HoverText() const;
     /** The Decals tool's path: its points, and how many decals it would place (the cursor as its next point). */
     [[nodiscard]] int DecalPathPointCount() const noexcept { return static_cast<int>(mDecalPath.size()); }
@@ -389,8 +392,8 @@ namespace faf::editor
       PickKind kind = PickKind::None;
       int index = -1;
     };
-    /** The nearest marker, unit or prop to a ground point, each within its own reach; a decal under it when none is. */
-    [[nodiscard]] PickHit PickAnything(float x, float z) const;
+    /** The marker, unit or prop nearest the cursor on screen, each within its own reach; the decal under it when none is. */
+    [[nodiscard]] PickHit PickAnything(POINT at) const;
     /** The kind the Select tool works on: the last one clicked while it has a selection, else the first that has one. */
     [[nodiscard]] PickKind SelectedKind() const;
     void ClearAllSelections();

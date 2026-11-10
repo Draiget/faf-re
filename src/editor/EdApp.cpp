@@ -100,6 +100,7 @@ namespace faf::editor
       kMenuLighting = 1111,
       kMenuFullHelp = 1112,
       kMenuArmies = 1113,
+      kMenuProperties = 1114,
       kMenuPanelsWhilePlaying = 1104,
       kMenuResetLayout = 1105,
       kMenuImGuiDemo = 1106,
@@ -357,6 +358,7 @@ namespace faf::editor
       int mUnitTreeFrames = 0;
       bool mUnitGroupArgDone = false;
       bool mArmyEconomyArgDone = false;
+      bool mPropEditArgDone = false;
       int mReclaimFrames = 0;
       bool mReclaimLogged = false;
       int mLayerFileStep = 0;
@@ -555,6 +557,7 @@ namespace faf::editor
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuScript, L"&Script");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLighting, L"&Lighting");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuArmies, L"&Armies");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuProperties, L"P&roperties");
       ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuFullHelp, L"&Full help text");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLog, L"&Log");
@@ -601,6 +604,7 @@ namespace faf::editor
       check(kMenuScript, mShell->ShowScript());
       check(kMenuLighting, mShell->ShowLighting());
       check(kMenuArmies, mShell->ShowArmies());
+      check(kMenuProperties, mShell->ShowProperties());
       check(kMenuFullHelp, FullHelpText());
       check(kMenuLog, mShell->ShowLog());
       check(kMenuPanelsWhilePlaying, mShell->PanelsWhilePlaying());
@@ -672,6 +676,9 @@ namespace faf::editor
         break;
       case kMenuArmies:
         mShell->ShowArmies() = !mShell->ShowArmies();
+        break;
+      case kMenuProperties:
+        mShell->ShowProperties() = !mShell->ShowProperties();
         break;
       case kMenuLighting:
         mShell->ShowLighting() = !mShell->ShowLighting();
@@ -1095,6 +1102,28 @@ namespace faf::editor
           mScene.FrameMarker(name);
         }
         tools.SetDecalSelectionCount(mScene.DecalSelectionCount());
+        tools.SetSelectionProperties(mScene.SelectionPropertiesNow());
+        // `/propedit <position|heading|size>,<a>[,<b>,<c>]` (test runs): one edit of the selection, once it has one.
+        if (!mPropEditArgDone && tools.SelectionPropertiesNow().kind != SelectionProperties::Kind::None) {
+          mPropEditArgDone = true;
+          if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/propedit", 1, &value) && !value.empty()) {
+            const std::string text = value[0].c_str();
+            PropertyEdit asked;
+            asked.what = text.rfind("position", 0) == 0 ? PropertyEdit::What::Position
+                         : text.rfind("heading", 0) == 0 ? PropertyEdit::What::Heading
+                         : text.rfind("size", 0) == 0    ? PropertyEdit::What::Size
+                                                         : PropertyEdit::What::None;
+            std::size_t at = text.find(',');
+            for (int i = 0; i < 3 && at != std::string::npos; ++i) {
+              asked.values[i] = static_cast<float>(std::atof(text.c_str() + at + 1));
+              at = text.find(',', at + 1);
+            }
+            tools.AskPropertyEdit(asked);
+          }
+        }
+        if (PropertyEdit edit; tools.TakePropertyEdit(edit)) {
+          mScene.ApplyPropertyEdit(edit);
+        }
         // The Water panel: its change on the map at once, one undo step when the drag ends.
         tools.SetWater(mDocument.WaterNow());
         if (WaterState water; true) {
