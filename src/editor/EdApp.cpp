@@ -491,6 +491,12 @@ namespace faf::editor
       } else if (const std::filesystem::path folder = EditorSettingsFolder(); !folder.empty()) {
         mPlay.SetSetupsFile((folder / "play_setups.ini").string());
       }
+      // `/recentmaps <file>` (test runs) keeps the recent maps there instead.
+      if (fa::vector<fa::string> args; moho::CFG_GetArgOption("/recentmaps", 1, &args) && !args.empty()) {
+        mDocument.SetRecentMapsFile(args[0].c_str());
+      } else if (const std::filesystem::path folder = EditorSettingsFolder(); !folder.empty()) {
+        mDocument.SetRecentMapsFile((folder / "recent_maps.txt").string());
+      }
       mPlay.FindMaps();
       mPlay.ReadCommandLine();
       mShell = new EdShell(mLog, mPlay, mDocument);

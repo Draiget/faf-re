@@ -891,6 +891,49 @@ namespace faf::editor
     DrawPlaySetup();
     ImGui::Separator();
 
+    // The maps opened last, newest first: a click opens one (and picks it for Play).
+    {
+      int shown = 0;
+      for (const std::string& recent : mDocument.RecentMaps()) {
+        int index = -1;
+        for (int i = 0; i < static_cast<int>(maps.size()); ++i) {
+          if (ImStricmp(maps[static_cast<std::size_t>(i)].c_str(), recent.c_str()) == 0) {
+            index = i;
+            break;
+          }
+        }
+        if (index < 0) {
+          continue; // no longer in the game's /maps
+        }
+        if (shown++ == 0) {
+          ImGui::TextDisabled("RECENT");
+        }
+        const std::size_t at = static_cast<std::size_t>(index);
+        ImGui::PushID(index + 100000);
+        ImGui::BeginDisabled(mPlay.Active() || mDocument.GetState() == EdDocument::State::Loading);
+        const bool current = mDocument.GetState() == EdDocument::State::Open && ImStricmp(mDocument.Path().c_str(), recent.c_str()) == 0;
+        if (ImGui::Selectable("##recent", current, ImGuiSelectableFlags_AllowOverlap) && !current) {
+          mPlay.Select(index);
+          (void)mDocument.Open(maps[at]);
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip("%s\nClick to open for editing", maps[at].c_str());
+        }
+        ImGui::SameLine(ImGui::GetStyle().ItemSpacing.x);
+        ImGui::TextUnformatted(titles[at].c_str());
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", MapDisplayName(maps[at]).c_str());
+        ImGui::PopID();
+        if (shown >= 5) {
+          break;
+        }
+      }
+      if (shown > 0) {
+        ImGui::Separator();
+      }
+    }
+
     // Each map by its title, then its folder name; the filter matches either.
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputTextWithHint("##mapfilter", "Filter maps", mMapFilter, sizeof(mMapFilter));

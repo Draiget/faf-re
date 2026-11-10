@@ -30,6 +30,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdArmySlots.cpp
   doc/EdAdaptiveTables.cpp
   doc/EdLuaText.cpp
+  doc/EdRecentMaps.cpp
   doc/EdWaterBodies.cpp
   view/EdWaterBodyView.cpp
   ui/EdHelp.cpp

@@ -288,6 +288,9 @@ namespace faf::editor
      * own: the caller takes SaveDataNow before and gives it to SaveDataEdited after.
      */
     void ApplyWaterBodies(const std::vector<WaterBody>& bodies);
+    /** The maps opened last, newest first (their scenario paths), kept in `file`; each map that opens goes first. */
+    void SetRecentMapsFile(std::string file);
+    [[nodiscard]] const std::vector<std::string>& RecentMaps() const noexcept { return mRecentMaps; }
     /**
      * Compiles the scenario, save and script texts as they are now (edits included) and returns their syntax errors,
      * each with its file and line.
@@ -419,6 +422,8 @@ namespace faf::editor
     std::string mTables;
     std::string mTablesRead;
     std::string mScenario;
+    std::string mRecentMapsFile;
+    std::vector<std::string> mRecentMaps;
     std::string mScenarioRead;
     std::vector<std::pair<SaveSnapshot, SaveSnapshot>> mSaveUndo;
     std::vector<std::pair<SaveSnapshot, SaveSnapshot>> mSaveRedo;

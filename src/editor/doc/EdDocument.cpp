@@ -1,4 +1,5 @@
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdRecentMaps.h"
 #include "editor/doc/EdAdaptiveTables.h"
 
 #include <algorithm>
@@ -558,6 +559,12 @@ namespace faf::editor
     mSave.Chains() = snapshot.chains;
     mFacts.armies = Armies();
     mModified = true;
+  }
+
+  void EdDocument::SetRecentMapsFile(std::string file)
+  {
+    mRecentMapsFile = std::move(file);
+    mRecentMaps = ReadRecentMaps(mRecentMapsFile);
   }
 
   void EdDocument::ApplyWaterBodies(const std::vector<WaterBody>& bodies)
@@ -1339,6 +1346,10 @@ namespace faf::editor
                 static_cast<double>(mFacts.waterElevation), static_cast<double>(mFacts.waterDeep), static_cast<double>(mFacts.waterAbyss));
       gpg::Logf("editor: symmetry from the heights: mode %d, %d turns (%.1f%% of points match)", static_cast<int>(mFacts.symmetry.symmetry),
                 mFacts.symmetry.turns, static_cast<double>(mFacts.symmetry.matched) * 100.0);
+      mRecentMaps = WithRecentMap(mRecentMaps, mPath);
+      if (!mRecentMapsFile.empty() && !WriteRecentMaps(mRecentMapsFile, mRecentMaps)) {
+        gpg::Warnf("editor: the recent maps list %s could not be written", mRecentMapsFile.c_str());
+      }
     } else {
       gpg::Warnf("editor: %s did not open: %s", mPath.c_str(), mError.c_str());
     }
