@@ -77,7 +77,8 @@ namespace faf::editor
   {
     const std::optional<EdDocument::PlayableRect> area = mMap != nullptr ? mDocument.PlayableArea() : std::nullopt;
     if (mMap == nullptr || mCamera == nullptr || mTools == nullptr ||
-        (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty() && !area &&
+        (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && !mTools->SelectToolActive() &&
+         mSelection.empty() && !area &&
          mDocument.SaveData().Markers().empty() && mDocument.SaveData().Chains().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() && !mTools->UnitsToolActive() &&
          mTools->CheckPins().empty() && !mTools->ShowingPathing() && !mTools->ShowSlope() && !mTools->ShowKmGrid() && !mRulerShown && !mBoxing) ||
         moho::ren_Viewport == nullptr) {
@@ -265,7 +266,7 @@ namespace faf::editor
     // Resource splats under the markers, then the markers: all of them with the Markers tool, the start positions
     // and resources otherwise.
     DrawResourceSplats(*batcher, *field);
-    DrawMarkers(*batcher, mTools->MarkersToolActive());
+    DrawMarkers(*batcher, mTools->MarkersToolActive() || mTools->SelectToolActive());
 
     // The selected props, ringed in yellow.
     if (!mSelection.empty() && mMap->mProps != nullptr) {
@@ -280,11 +281,11 @@ namespace faf::editor
         }
       }
     }
-    if (mTools->DecalsToolActive()) {
+    if (mTools->DecalsToolActive() || (mTools->SelectToolActive() && !mDecalSelection.empty())) {
       DrawDecalOutlines(*batcher, *field);
     }
     // The selected units, ringed in yellow.
-    if (mTools->UnitsToolActive()) {
+    if (mTools->UnitsToolActive() || mTools->SelectToolActive()) {
       for (const auto& [army, name] : mUnitSelection) {
         const int index = UnitRefIndex(army, name);
         if (index < 0) {
@@ -484,6 +485,91 @@ namespace faf::editor
       moho::CD3DPrimBatcher::Vertex bottom = top;
       top.mY += r * 3.0f;
       batcher->DrawLine(bottom, top);
+    }
+    // While a move is under way: where each moved thing started, dim, and a line to where it is now.
+    {
+      std::vector<std::pair<Wm3::Vec3f, Wm3::Vec3f>> moved;
+      if (mDragMarkers && mMarkersMoved) {
+        for (std::size_t i = 0; i < mMarkerSelection.size() && i < mMarkerDragStart.size(); ++i) {
+          for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+            float x = 0.0f, y = 0.0f, z = 0.0f;
+            if (marker.name == mMarkerSelection[i] && MarkerPosition(marker, x, y, z)) {
+              moved.push_back({Wm3::Vec3f{mMarkerDragStart[i][0], mMarkerDragStart[i][1], mMarkerDragStart[i][2]}, Wm3::Vec3f{x, y, z}});
+            }
+          }
+        }
+      } else if (mDragUnits && mUnitsMoved) {
+        for (std::size_t i = 0; i < mUnitSelection.size() && i < mUnitDragStart.size(); ++i) {
+          if (const int index = UnitRefIndex(mUnitSelection[i].first, mUnitSelection[i].second); index >= 0) {
+            moved.push_back({mUnitDragStart[i], mUnitRefs[static_cast<std::size_t>(index)].position});
+          }
+        }
+      } else if (mDragDecals && mDecalsMoved && mDocument.Decals() != nullptr) {
+        for (std::size_t i = 0; i < mDecalSelection.size() && i < mDecalDragStart.size(); ++i) {
+          if (const moho::CWldTerrainDecal* const decal = FindDecal(*mDocument.Decals(), mDecalSelection[i]); decal != nullptr) {
+            moved.push_back({Wm3::Vec3f{mDecalDragStart[i][0], mDecalDragStart[i][1], mDecalDragStart[i][2]}, decal->mPosition});
+          }
+        }
+      } else if (mDragSelection && mObjectStroke && mMap->mProps != nullptr) {
+        for (std::size_t i = 0; i < mSelection.size() && i < mDragStart.size(); ++i) {
+          const Wm3::Vec3f& now = mMap->mProps->mEntries[static_cast<std::size_t>(mSelection[i])].mTransform.pos_;
+          if (std::fabs(now.x - mDragStart[i].x) + std::fabs(now.z - mDragStart[i].z) > 0.01f) {
+            moved.push_back({mDragStart[i], now});
+          }
+        }
+      }
+      constexpr std::uint32_t kGhost = 0x90FFFFFFu;
+      for (const auto& [from, to] : moved) {
+        const float r = 1.5f;
+        batcher->DrawLine(groundVertex(from.x - r, from.z - r, kGhost, 0.6f), groundVertex(from.x + r, from.z - r, kGhost, 0.6f));
+        batcher->DrawLine(groundVertex(from.x + r, from.z - r, kGhost, 0.6f), groundVertex(from.x + r, from.z + r, kGhost, 0.6f));
+        batcher->DrawLine(groundVertex(from.x + r, from.z + r, kGhost, 0.6f), groundVertex(from.x - r, from.z + r, kGhost, 0.6f));
+        batcher->DrawLine(groundVertex(from.x - r, from.z + r, kGhost, 0.6f), groundVertex(from.x - r, from.z - r, kGhost, 0.6f));
+        // Dashed, start to now.
+        const float length = std::hypot(to.x - from.x, to.z - from.z);
+        const int dashes = std::clamp(static_cast<int>(length / 1.5f), 1, 400);
+        for (int d = 0; d < dashes; d += 2) {
+          const float t0 = static_cast<float>(d) / dashes;
+          const float t1 = static_cast<float>(d + 1) / dashes;
+          batcher->DrawLine(groundVertex(from.x + (to.x - from.x) * t0, from.z + (to.z - from.z) * t0, kGhost, 0.6f),
+                            groundVertex(from.x + (to.x - from.x) * t1, from.z + (to.z - from.z) * t1, kGhost, 0.6f));
+        }
+      }
+    }
+    // The Select tool: a ring around what a click would pick (Blender's hover highlight).
+    if (mTools->SelectToolActive() && !mDragMarkers && !mDragUnits && !mDragDecals && !mDragSelection && mGizmoDrag == GizmoPart::None &&
+        PickGizmo(mCursor) == GizmoPart::None) {
+      float gx = 0.0f;
+      float gz = 0.0f;
+      float hx = 0.0f;
+      float hz = 0.0f;
+      float radius = 0.0f;
+      const PickHit hover = GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz) ? PickAnything(gx, gz) : PickHit{};
+      constexpr std::uint32_t kHover = 0xE0FFFFFFu;
+      const moho::CWldTerrainDecal* const hoverDecal =
+        hover.kind == PickKind::Decal && mDocument.Decals() != nullptr ? FindDecal(*mDocument.Decals(), hover.index) : nullptr;
+      if (hoverDecal != nullptr) {
+        // A decal: its own outline, along the ground.
+        float cx[4], cz[4];
+        DecalCorners(FootprintOf(*hoverDecal), cx, cz);
+        for (int side = 0; side < 4; ++side) {
+          const int next = (side + 1) % 4;
+          const int steps = std::clamp(static_cast<int>(std::hypot(cx[next] - cx[side], cz[next] - cz[side]) / 2.0f), 1, 64);
+          for (int s = 0; s < steps; ++s) {
+            const float t0 = static_cast<float>(s) / steps;
+            const float t1 = static_cast<float>(s + 1) / steps;
+            batcher->DrawLine(groundVertex(cx[side] + (cx[next] - cx[side]) * t0, cz[side] + (cz[next] - cz[side]) * t0, kHover, 0.8f),
+                              groundVertex(cx[side] + (cx[next] - cx[side]) * t1, cz[side] + (cz[next] - cz[side]) * t1, kHover, 0.8f));
+          }
+        }
+      } else if (PickPlace(hover, hx, hz, radius)) {
+        for (int s = 0; s < 32; ++s) {
+          const float a0 = 2.0f * kPi * static_cast<float>(s) / 32.0f;
+          const float a1 = 2.0f * kPi * static_cast<float>(s + 1) / 32.0f;
+          batcher->DrawLine(groundVertex(hx + std::cos(a0) * radius, hz + std::sin(a0) * radius, kHover, 0.8f),
+                            groundVertex(hx + std::cos(a1) * radius, hz + std::sin(a1) * radius, kHover, 0.8f));
+        }
+      }
     }
     DrawGizmo(*batcher);
     if (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive()) {
@@ -1524,8 +1610,8 @@ namespace faf::editor
         }
       }
     }
-    if (mTools != nullptr) {
-      mTools->SetSelectionCount(static_cast<int>(mSelection.size()));
+    if (mTools != nullptr && mTools->SelectToolActive()) {
+      mTools->SetSelectInfo(SelectionText(), HoverText());
     }
     if (mTools != nullptr && mTools->TextureToolActive()) {
       LoadMasks();
@@ -2358,7 +2444,17 @@ namespace faf::editor
     }
     float sx = 0.0f, sy = 0.0f, sz = 0.0f;
     int count = 0;
+    PickKind kind = PickKind::None;
     if (mTools->MarkersToolActive()) {
+      kind = PickKind::Marker;
+    } else if (mTools->UnitsToolActive() && !mTools->UnitPlaceMode()) {
+      kind = PickKind::Unit;
+    } else if (mTools->DecalsToolActive() && !mTools->DecalPlaceMode() && !mTools->DecalPathMode()) {
+      kind = PickKind::Decal;
+    } else if (mTools->SelectToolActive()) {
+      kind = SelectedKind();
+    }
+    if (kind == PickKind::Marker) {
       for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
         float x = 0.0f, y = 0.0f, z = 0.0f;
         if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end() &&
@@ -2369,7 +2465,7 @@ namespace faf::editor
           ++count;
         }
       }
-    } else if (mTools->UnitsToolActive() && !mTools->UnitPlaceMode()) {
+    } else if (kind == PickKind::Unit) {
       for (const auto& [army, name] : mUnitSelection) {
         const int index = UnitRefIndex(army, name);
         if (index >= 0) {
@@ -2380,7 +2476,7 @@ namespace faf::editor
           ++count;
         }
       }
-    } else if (mTools->DecalsToolActive() && !mTools->DecalPlaceMode() && !mTools->DecalPathMode()) {
+    } else if (kind == PickKind::Decal) {
       if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr) {
         for (const int index : mDecalSelection) {
           if (const moho::CWldTerrainDecal* const decal = FindDecal(*decals, index); decal != nullptr) {
@@ -2393,7 +2489,7 @@ namespace faf::editor
           }
         }
       }
-    } else if (mTools->SelectToolActive() && mMap->mProps != nullptr) {
+    } else if (kind == PickKind::Prop && mMap->mProps != nullptr) {
       for (const int index : mSelection) {
         const Wm3::Vec3f& p = mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_;
         sx += p.x;
@@ -2448,6 +2544,27 @@ namespace faf::editor
     if (std::hypot(cursor.x - centre.x, cursor.y - centre.y) < 12.0f) {
       return GizmoPart::Free;
     }
+    // Inside the plane square between the X and Z arms (convex: the cursor on the same side of each edge).
+    {
+      const float p0 = length * 0.22f;
+      const float p1 = length * 0.42f;
+      const Wm3::Vector2f q[4] = {mCamera->Project(Wm3::Vec3f{origin.x + p0, origin.y, origin.z + p0}),
+                                  mCamera->Project(Wm3::Vec3f{origin.x + p1, origin.y, origin.z + p0}),
+                                  mCamera->Project(Wm3::Vec3f{origin.x + p1, origin.y, origin.z + p1}),
+                                  mCamera->Project(Wm3::Vec3f{origin.x + p0, origin.y, origin.z + p1})};
+      int positive = 0;
+      int negative = 0;
+      for (int i = 0; i < 4; ++i) {
+        const Wm3::Vector2f& e0 = q[i];
+        const Wm3::Vector2f& e1 = q[(i + 1) % 4];
+        const float cross = (e1.x - e0.x) * (cursor.y - e0.y) - (e1.y - e0.y) * (cursor.x - e0.x);
+        positive += cross > 0.0f ? 1 : 0;
+        negative += cross < 0.0f ? 1 : 0;
+      }
+      if (positive == 4 || negative == 4) {
+        return GizmoPart::Free;
+      }
+    }
     GizmoPart best = GizmoPart::None;
     float bestDistance = 9.0f;
     for (const GizmoPart part : {GizmoPart::X, GizmoPart::Y, GizmoPart::Z}) {
@@ -2483,23 +2600,50 @@ namespace faf::editor
     const auto add = [](const Wm3::Vec3f& a, const Wm3::Vec3f& d, const float s) { return Wm3::Vec3f{a.x + d.x * s, a.y + d.y * s, a.z + d.z * s}; };
     constexpr std::uint32_t kHot = 0xFFFFE040u;
     const std::pair<GizmoPart, std::uint32_t> arms[] = {{GizmoPart::X, 0xFFFF4848u}, {GizmoPart::Y, 0xFF48E048u}, {GizmoPart::Z, 0xFF4880FFu}};
+    // Each arm as a bundle of lines around its axis (the batcher draws one-pixel lines), so it reads thick from any side.
+    const float thick = length * 0.012f;
     for (const auto& [part, color] : arms) {
       const std::uint32_t c = part == hot ? kHot : color;
       const Wm3::Vec3f axis = GizmoAxis(part);
-      const Wm3::Vec3f tip = add(origin, axis, length);
-      batcher.DrawLine(vertex(add(origin, axis, length * 0.15f), c), vertex(tip, c));
-      // The arrow's head: four lines back from the tip, around the arm.
       const Wm3::Vec3f across1 = part == GizmoPart::Y ? Wm3::Vec3f{1.0f, 0.0f, 0.0f} : Wm3::Vec3f{0.0f, 1.0f, 0.0f};
-      const Wm3::Vec3f across2 = part == GizmoPart::Z ? Wm3::Vec3f{1.0f, 0.0f, 0.0f} : Wm3::Vec3f{0.0f, 0.0f, part == GizmoPart::X ? 1.0f : 1.0f};
+      const Wm3::Vec3f across2 = part == GizmoPart::Z ? Wm3::Vec3f{1.0f, 0.0f, 0.0f} : Wm3::Vec3f{0.0f, 0.0f, 1.0f};
+      const Wm3::Vec3f tip = add(origin, axis, length);
+      const Wm3::Vec3f from = add(origin, axis, length * 0.15f);
       const Wm3::Vec3f back = add(origin, axis, length * 0.78f);
-      for (const Wm3::Vec3f& side : {across1, across2}) {
-        batcher.DrawLine(vertex(tip, c), vertex(add(back, side, length * 0.07f), c));
-        batcher.DrawLine(vertex(tip, c), vertex(add(back, side, -length * 0.07f), c));
+      for (int k = 0; k < 5; ++k) {
+        const float u = k == 1 ? thick : k == 2 ? -thick : 0.0f;
+        const float v = k == 3 ? thick : k == 4 ? -thick : 0.0f;
+        const Wm3::Vec3f offset{across1.x * u + across2.x * v, across1.y * u + across2.y * v, across1.z * u + across2.z * v};
+        batcher.DrawLine(vertex(add(from, offset, 1.0f), c), vertex(add(back, offset, 1.0f), c));
+      }
+      // The head: a cone of lines from the tip back around the arm.
+      for (int s = 0; s < 12; ++s) {
+        const float angle = 2.0f * kPi * static_cast<float>(s) / 12.0f;
+        const float u = std::cos(angle) * length * 0.07f;
+        const float v = std::sin(angle) * length * 0.07f;
+        const Wm3::Vec3f rim{back.x + across1.x * u + across2.x * v, back.y + across1.y * u + across2.y * v, back.z + across1.z * u + across2.z * v};
+        batcher.DrawLine(vertex(tip, c), vertex(rim, c));
       }
     }
+    // The plane square between the X and Z arms (Blender's plane handle): a drag on it moves over the ground. Its sides
+    // along each arm in that arm's colour, so it reads as the right angle between them.
+    const bool planeHot = hot == GizmoPart::Free;
+    const float p0 = length * 0.22f;
+    const float p1 = length * 0.42f;
+    const Wm3::Vec3f q[4] = {{origin.x + p0, origin.y, origin.z + p0}, {origin.x + p1, origin.y, origin.z + p0},
+                             {origin.x + p1, origin.y, origin.z + p1}, {origin.x + p0, origin.y, origin.z + p1}};
+    const std::uint32_t fill = planeHot ? 0x90FFE040u : 0x50F0F0F0u;
+    moho::CD3DPrimBatcher::Vertex quad[4] = {vertex(q[0], fill), vertex(q[1], fill), vertex(q[2], fill), vertex(q[3], fill)};
+    batcher.DrawQuads(quad, 1);
+    const std::uint32_t xSide = planeHot ? kHot : 0xFFFF4848u;
+    const std::uint32_t zSide = planeHot ? kHot : 0xFF4880FFu;
+    batcher.DrawLine(vertex(q[0], xSide), vertex(q[1], xSide));
+    batcher.DrawLine(vertex(q[3], xSide), vertex(q[2], xSide));
+    batcher.DrawLine(vertex(q[0], zSide), vertex(q[3], zSide));
+    batcher.DrawLine(vertex(q[1], zSide), vertex(q[2], zSide));
     // The free square, on the ground plane through the middle.
-    const std::uint32_t free = hot == GizmoPart::Free ? kHot : 0xFFF0F0F0u;
-    const float s = length * 0.1f;
+    const std::uint32_t free = planeHot ? kHot : 0xFFF0F0F0u;
+    const float s = length * 0.08f;
     const Wm3::Vec3f corners[4] = {{origin.x - s, origin.y, origin.z - s}, {origin.x + s, origin.y, origin.z - s},
                                    {origin.x + s, origin.y, origin.z + s}, {origin.x - s, origin.y, origin.z + s}};
     for (int i = 0; i < 4; ++i) {
@@ -2592,6 +2736,243 @@ namespace faf::editor
     }
     const float step = mTools->GridStep();
     return std::floor(value / step) * step + step * 0.5f;
+  }
+
+  EdMapScene::PickHit EdMapScene::PickAnything(const float x, const float z) const
+  {
+    PickHit best;
+    float bestScore = 1.0f;
+    // Each kind's distance as a share of its own reach, so a marker and a tree compete fairly.
+    const auto consider = [&](const PickKind kind, const int index, const float px, const float pz, const float reach) {
+      if (index < 0) {
+        return;
+      }
+      const float score = std::hypot(px - x, pz - z) / reach;
+      if (score < bestScore) {
+        bestScore = score;
+        best = PickHit{kind, index};
+      }
+    };
+    if (const int marker = PickMarker(x, z); marker >= 0) {
+      float mx = 0.0f, my = 0.0f, mz = 0.0f;
+      (void)MarkerPosition(mDocument.SaveData().Markers()[static_cast<std::size_t>(marker)], mx, my, mz);
+      consider(PickKind::Marker, marker, mx, mz, std::max(2.5f, mDistance * 0.006f));
+    }
+    if (const int unit = PickUnit(x, z); unit >= 0) {
+      const Wm3::Vec3f& p = mUnitRefs[static_cast<std::size_t>(unit)].position;
+      consider(PickKind::Unit, unit, p.x, p.z, std::max(3.0f, mDistance * 0.01f));
+    }
+    if (const int prop = PickProp(x, z); prop >= 0) {
+      const Wm3::Vec3f& p = mMap->mProps->mEntries[static_cast<std::size_t>(prop)].mTransform.pos_;
+      consider(PickKind::Prop, prop, p.x, p.z, std::max(2.5f, mDistance * 0.012f));
+    }
+    if (best.kind == PickKind::None) {
+      if (const int decal = PickDecal(x, z); decal >= 0) {
+        best = PickHit{PickKind::Decal, decal};
+      }
+    }
+    return best;
+  }
+
+  bool EdMapScene::PickPlace(const PickHit& hit, float& x, float& z, float& radius) const
+  {
+    switch (hit.kind) {
+    case PickKind::Marker: {
+      const SaveEntry& marker = mDocument.SaveData().Markers()[static_cast<std::size_t>(hit.index)];
+      float y = 0.0f;
+      const std::string type = MarkerTypeOf(marker);
+      radius = type == "Blank Marker" ? 7.0f : type == "Hydrocarbon" ? 4.5f : 3.0f;
+      return MarkerPosition(marker, x, y, z);
+    }
+    case PickKind::Unit:
+      x = mUnitRefs[static_cast<std::size_t>(hit.index)].position.x;
+      z = mUnitRefs[static_cast<std::size_t>(hit.index)].position.z;
+      radius = 2.2f;
+      return true;
+    case PickKind::Prop:
+      x = mMap->mProps->mEntries[static_cast<std::size_t>(hit.index)].mTransform.pos_.x;
+      z = mMap->mProps->mEntries[static_cast<std::size_t>(hit.index)].mTransform.pos_.z;
+      radius = 2.6f;
+      return true;
+    case PickKind::Decal:
+      if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr) {
+        if (const moho::CWldTerrainDecal* const decal = FindDecal(*decals, hit.index); decal != nullptr) {
+          const DecalFootprint footprint = FootprintOf(*decal);
+          DecalCentre(footprint, x, z);
+          radius = 0.5f * std::hypot(footprint.sizeX, footprint.sizeZ);
+          return true;
+        }
+      }
+      return false;
+    default:
+      return false;
+    }
+  }
+
+  EdMapScene::PickKind EdMapScene::SelectedKind() const
+  {
+    const auto has = [&](const PickKind kind) {
+      switch (kind) {
+      case PickKind::Prop:
+        return !mSelection.empty();
+      case PickKind::Marker:
+        return !mMarkerSelection.empty();
+      case PickKind::Unit:
+        return !mUnitSelection.empty();
+      case PickKind::Decal:
+        return !mDecalSelection.empty();
+      default:
+        return false;
+      }
+    };
+    if (has(mSelectKind)) {
+      return mSelectKind;
+    }
+    for (const PickKind kind : {PickKind::Marker, PickKind::Unit, PickKind::Prop, PickKind::Decal}) {
+      if (has(kind)) {
+        return kind;
+      }
+    }
+    return PickKind::None;
+  }
+
+  void EdMapScene::ClearAllSelections()
+  {
+    mSelection.clear();
+    mMarkerSelection.clear();
+    mUnitSelection.clear();
+    mDecalSelection.clear();
+  }
+
+  void EdMapScene::BeginSelectionDrag(const HWND window, const PickKind kind, const GizmoPart part, const POINT at, const float groundX,
+                                      const float groundZ)
+  {
+    if (part != GizmoPart::None) {
+      BeginGizmoDrag(part, at);
+    }
+    switch (kind) {
+    case PickKind::Prop:
+      if (mMap->mProps == nullptr) {
+        return;
+      }
+      BeginObjectStroke();
+      mDragSelection = true;
+      mDragFromX = groundX;
+      mDragFromZ = groundZ;
+      mDragStart.clear();
+      for (const int index : mSelection) {
+        mDragStart.push_back(mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_);
+      }
+      break;
+    case PickKind::Marker:
+      mDragMarkers = true;
+      mMarkersMoved = false;
+      mMarkerDragFromX = groundX;
+      mMarkerDragFromZ = groundZ;
+      mMarkerBefore = mDocument.SaveDataNow();
+      mMarkerDragStart.clear();
+      for (const std::string& selected : mMarkerSelection) {
+        std::array<float, 3> start{};
+        for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+          if (marker.name == selected) {
+            (void)MarkerPosition(marker, start[0], start[1], start[2]);
+          }
+        }
+        mMarkerDragStart.push_back(start);
+      }
+      break;
+    case PickKind::Unit:
+      mDragUnits = true;
+      mUnitsMoved = false;
+      mUnitDragFromX = groundX;
+      mUnitDragFromZ = groundZ;
+      mUnitBefore = mDocument.SaveDataNow();
+      mUnitDragStart.clear();
+      for (const auto& [army, name] : mUnitSelection) {
+        const int index = UnitRefIndex(army, name);
+        mUnitDragStart.push_back(index >= 0 ? mUnitRefs[static_cast<std::size_t>(index)].position : Wm3::Vec3f{0.0f, 0.0f, 0.0f});
+      }
+      break;
+    case PickKind::Decal: {
+      moho::IDecalManager* const decals = mDocument.Decals();
+      if (decals == nullptr) {
+        return;
+      }
+      mDragDecals = true;
+      mDecalsMoved = false;
+      mDecalDragFromX = groundX;
+      mDecalDragFromZ = groundZ;
+      mDecalBefore = mDocument.DecalsNow();
+      mDecalDragStart.clear();
+      for (const int index : mDecalSelection) {
+        std::array<float, 3> start{};
+        if (const moho::CWldTerrainDecal* const decal = FindDecal(*decals, index); decal != nullptr) {
+          start = {decal->mPosition.x, decal->mPosition.y, decal->mPosition.z};
+        }
+        mDecalDragStart.push_back(start);
+      }
+      break;
+    }
+    default:
+      mGizmoDrag = GizmoPart::None;
+      return;
+    }
+    ::SetCapture(window);
+    ::SetFocus(window);
+  }
+
+  std::string EdMapScene::SelectionText() const
+  {
+    char text[160];
+    switch (SelectedKind()) {
+    case PickKind::Marker:
+      (void)std::snprintf(text, sizeof(text), "%zu marker%s: %s%s", mMarkerSelection.size(), mMarkerSelection.size() == 1 ? "" : "s",
+                          mMarkerSelection.front().c_str(), mMarkerSelection.size() > 1 ? ", ..." : "");
+      return text;
+    case PickKind::Unit:
+      (void)std::snprintf(text, sizeof(text), "%zu unit%s: %s (%s)%s", mUnitSelection.size(), mUnitSelection.size() == 1 ? "" : "s",
+                          mUnitSelection.front().second.c_str(), mUnitSelection.front().first.c_str(), mUnitSelection.size() > 1 ? ", ..." : "");
+      return text;
+    case PickKind::Prop: {
+      const std::string blueprint = mMap->mProps->mEntries[static_cast<std::size_t>(mSelection.front())].mBlueprintPath.c_str();
+      const std::size_t slash = blueprint.find_last_of('/');
+      (void)std::snprintf(text, sizeof(text), "%zu prop%s: %s%s", mSelection.size(), mSelection.size() == 1 ? "" : "s",
+                          slash == std::string::npos ? blueprint.c_str() : blueprint.c_str() + slash + 1, mSelection.size() > 1 ? ", ..." : "");
+      return text;
+    }
+    case PickKind::Decal:
+      (void)std::snprintf(text, sizeof(text), "%zu decal%s", mDecalSelection.size(), mDecalSelection.size() == 1 ? "" : "s");
+      return text;
+    default:
+      return "Nothing selected";
+    }
+  }
+
+  std::string EdMapScene::HoverText() const
+  {
+    float gx = 0.0f;
+    float gz = 0.0f;
+    if (mMap == nullptr || !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), gx, gz)) {
+      return {};
+    }
+    const PickHit hit = PickAnything(gx, gz);
+    switch (hit.kind) {
+    case PickKind::Marker: {
+      const SaveEntry& marker = mDocument.SaveData().Markers()[static_cast<std::size_t>(hit.index)];
+      return marker.name + " (" + MarkerTypeOf(marker) + ")";
+    }
+    case PickKind::Unit:
+      return mUnitRefs[static_cast<std::size_t>(hit.index)].name + " (" + mUnitRefs[static_cast<std::size_t>(hit.index)].army + ")";
+    case PickKind::Prop: {
+      const std::string blueprint = mMap->mProps->mEntries[static_cast<std::size_t>(hit.index)].mBlueprintPath.c_str();
+      const std::size_t slash = blueprint.find_last_of('/');
+      return "prop " + (slash == std::string::npos ? blueprint : blueprint.substr(slash + 1));
+    }
+    case PickKind::Decal:
+      return "decal " + std::to_string(hit.index);
+    default:
+      return {};
+    }
   }
 
   int EdMapScene::PickMarker(const float x, const float z) const
@@ -3324,6 +3705,9 @@ namespace faf::editor
       if (const moho::CWldTerrainDecal* const decal = FindDecal(*decals, index); decal != nullptr) {
         outline(FootprintOf(*decal), 0xF0FFE040u);
       }
+    }
+    if (!mTools->DecalsToolActive()) {
+      return;
     }
     float gx = 0.0f;
     float gz = 0.0f;
@@ -4330,21 +4714,90 @@ namespace faf::editor
         ::SetFocus(window);
         return true;
       }
-      if (mTools != nullptr && mTools->SelectToolActive() && mMap->mProps != nullptr) {
+      if (mTools != nullptr && mTools->SelectToolActive()) {
+        // The gizmo moves what is selected; else a click picks the nearest marker, unit, prop or decal (Ctrl adds or
+        // takes one out; another kind starts a new selection), and a drag moves the selection.
         if (const GizmoPart part = PickGizmo(at); part != GizmoPart::None) {
-          BeginObjectStroke();
-          BeginGizmoDrag(part, at);
-          mDragSelection = true;
-          mDragStart.clear();
-          for (const int index : mSelection) {
-            mDragStart.push_back(mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_);
-          }
-          ::SetCapture(window);
-          ::SetFocus(window);
+          BeginSelectionDrag(window, SelectedKind(), part, at, 0.0f, 0.0f);
           return true;
         }
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (!GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          return true;
+        }
+        const PickHit hit = PickAnything(groundX, groundZ);
+        const bool add = (wParam & MK_CONTROL) != 0;
+        if (hit.kind == PickKind::None) {
+          if (!add) {
+            ClearAllSelections();
+          }
+          return true;
+        }
+        if (!add || hit.kind != SelectedKind()) {
+          // A click on what is already selected keeps the selection, so the drag moves all of it.
+          bool already = false;
+          switch (hit.kind) {
+          case PickKind::Prop:
+            already = std::find(mSelection.begin(), mSelection.end(), hit.index) != mSelection.end();
+            break;
+          case PickKind::Marker:
+            already = std::find(mMarkerSelection.begin(), mMarkerSelection.end(),
+                                mDocument.SaveData().Markers()[static_cast<std::size_t>(hit.index)].name) != mMarkerSelection.end();
+            break;
+          case PickKind::Unit:
+            already = std::find(mUnitSelection.begin(), mUnitSelection.end(),
+                                std::pair<std::string, std::string>{mUnitRefs[static_cast<std::size_t>(hit.index)].army,
+                                                                    mUnitRefs[static_cast<std::size_t>(hit.index)].name}) != mUnitSelection.end();
+            break;
+          case PickKind::Decal:
+            already = std::find(mDecalSelection.begin(), mDecalSelection.end(), hit.index) != mDecalSelection.end();
+            break;
+          default:
+            break;
+          }
+          if (!already || hit.kind != SelectedKind()) {
+            ClearAllSelections();
+          }
+        }
+        mSelectKind = hit.kind;
+        // Ctrl on a selected one takes it out; otherwise it joins.
+        const auto toggle = [add](auto& list, const auto& key) {
+          const auto found = std::find(list.begin(), list.end(), key);
+          if (found != list.end()) {
+            if (add) {
+              list.erase(found);
+              return false;
+            }
+            return true;
+          }
+          list.push_back(key);
+          return true;
+        };
+        bool kept = true;
+        switch (hit.kind) {
+        case PickKind::Prop:
+          kept = toggle(mSelection, hit.index);
+          break;
+        case PickKind::Marker:
+          kept = toggle(mMarkerSelection, mDocument.SaveData().Markers()[static_cast<std::size_t>(hit.index)].name);
+          break;
+        case PickKind::Unit:
+          kept = toggle(mUnitSelection, std::pair<std::string, std::string>{mUnitRefs[static_cast<std::size_t>(hit.index)].army,
+                                                                            mUnitRefs[static_cast<std::size_t>(hit.index)].name});
+          break;
+        case PickKind::Decal:
+          kept = toggle(mDecalSelection, hit.index);
+          break;
+        default:
+          break;
+        }
+        if (kept) {
+          BeginSelectionDrag(window, hit.kind, GizmoPart::None, at, groundX, groundZ);
+        }
+        return true;
       }
-      if (mTools != nullptr && (mTools->SelectToolActive() || mTools->PropsToolActive())) {
+      if (mTools != nullptr && mTools->PropsToolActive()) {
         float groundX = 0.0f;
         float groundZ = 0.0f;
         if (!GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ) || mMap->mProps == nullptr) {
@@ -4353,29 +4806,6 @@ namespace faf::editor
         BeginObjectStroke();
         ::SetCapture(window);
         ::SetFocus(window);
-        if (mTools->SelectToolActive()) {
-          const int hit = PickProp(groundX, groundZ);
-          const bool add = (wParam & MK_CONTROL) != 0;
-          if (hit < 0) {
-            if (!add) {
-              mSelection.clear();
-            }
-          } else if (std::find(mSelection.begin(), mSelection.end(), hit) == mSelection.end()) {
-            if (!add) {
-              mSelection.clear();
-            }
-            mSelection.push_back(hit);
-          }
-          // A drag moves the selection over the ground.
-          mDragSelection = hit >= 0;
-          mDragFromX = groundX;
-          mDragFromZ = groundZ;
-          mDragStart.clear();
-          for (const int index : mSelection) {
-            mDragStart.push_back(mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_);
-          }
-          return true;
-        }
         mScatterDue = 0.0f;
         if ((wParam & MK_SHIFT) != 0 || mTools->CurrentPropMode() == EdTools::PropMode::Erase) {
           EraseProps(groundX, groundZ);
@@ -4792,7 +5222,23 @@ namespace faf::editor
         DeleteSelectedMarkers();
         return true;
       }
-      if (down && mTools != nullptr && mTools->SelectToolActive() && !mSelection.empty()) {
+      // The Select tool's Delete: what it has selected, of whichever kind.
+      if (down && wParam == VK_DELETE && mTools != nullptr && mTools->SelectToolActive()) {
+        switch (SelectedKind()) {
+        case PickKind::Marker:
+          DeleteSelectedMarkers();
+          return true;
+        case PickKind::Unit:
+          DeleteSelectedUnits();
+          return true;
+        case PickKind::Decal:
+          DeleteSelectedDecals();
+          return true;
+        default:
+          break;
+        }
+      }
+      if (down && mTools != nullptr && mTools->SelectToolActive() && !mSelection.empty() && SelectedKind() == PickKind::Prop) {
         if (wParam == VK_DELETE) {
           DeleteSelection();
           return true;

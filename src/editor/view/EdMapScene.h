@@ -122,6 +122,18 @@ namespace faf::editor
       Z,
       Free,
     };
+    /** What the Select tool picks: one kind of thing at a time, the kind last clicked. */
+    enum class PickKind
+    {
+      None,
+      Prop,
+      Marker,
+      Unit,
+      Decal,
+    };
+    /** The Select tool's panel: what is selected and what is under the cursor, in words. */
+    [[nodiscard]] std::string SelectionText() const;
+    [[nodiscard]] std::string HoverText() const;
     /** The Decals tool's path: its points, and how many decals it would place (the cursor as its next point). */
     [[nodiscard]] int DecalPathPointCount() const noexcept { return static_cast<int>(mDecalPath.size()); }
     [[nodiscard]] int DecalPathDecalCount() const noexcept { return mDecalPathPreview; }
@@ -371,6 +383,22 @@ namespace faf::editor
     int mBorderEdges = 0;
     /** The Markers tool: selected markers by name, a drag of them, and its start positions. */
     std::vector<std::string> mMarkerSelection;
+    /** One thing the Select tool can pick: its kind and its index (a prop's, a marker's, a unit ref's, a decal's mIndex). */
+    struct PickHit
+    {
+      PickKind kind = PickKind::None;
+      int index = -1;
+    };
+    /** The nearest marker, unit or prop to a ground point, each within its own reach; a decal under it when none is. */
+    [[nodiscard]] PickHit PickAnything(float x, float z) const;
+    /** The kind the Select tool works on: the last one clicked while it has a selection, else the first that has one. */
+    [[nodiscard]] PickKind SelectedKind() const;
+    void ClearAllSelections();
+    /** Starts moving the selection of a kind: along the gizmo's part, or over the ground from (groundX, groundZ). */
+    void BeginSelectionDrag(HWND window, PickKind kind, GizmoPart part, POINT at, float groundX, float groundZ);
+    /** Where a pick sits and how big its ring is, for the hover ring. */
+    [[nodiscard]] bool PickPlace(const PickHit& hit, float& x, float& z, float& radius) const;
+    PickKind mSelectKind = PickKind::None;
     bool mDragMarkers = false;
     bool mMarkersMoved = false;
     float mMarkerDragFromX = 0.0f;

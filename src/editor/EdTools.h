@@ -411,7 +411,12 @@ namespace faf::editor
     }
 
     /** How many objects the view has selected, for the Select tool's panel. */
-    void SetSelectionCount(const int count) noexcept { mSelectionCount = count; }
+    /** The Select tool's panel: what is selected and what a click would pick, in words (the view gives them). */
+    void SetSelectInfo(std::string selected, std::string hover)
+    {
+      mSelectSelected = std::move(selected);
+      mSelectHover = std::move(hover);
+    }
     /** Test runs (`/proptool`): the Props tool with this blueprint and mode. */
     void SetPropTool(std::string blueprint, const int mode) noexcept
     {
@@ -784,7 +789,8 @@ namespace faf::editor
     std::string mReclaimSummary;
     std::vector<std::string> mReclaimRows;
     char mPropFilter[64]{};
-    int mSelectionCount = 0;
+    std::string mSelectSelected;
+    std::string mSelectHover;
     std::vector<SaveEntry> mMarkerSelection;
     bool mConnectNodes = false;
     std::vector<CheckPin> mCheckPins;

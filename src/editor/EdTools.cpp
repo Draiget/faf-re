@@ -411,11 +411,11 @@ namespace faf::editor
 
   void EdTools::DrawSelect()
   {
-    Note("Click a prop to select it (Ctrl adds), drag to move the selection over the ground, Q and E turn it by 15 degrees, "
-         "Delete removes it. Each is one undo step.");
-    char count[64];
-    (void)std::snprintf(count, sizeof(count), "%d selected", mSelectionCount);
-    ImGui::TextUnformatted(count);
+    // What is selected, and what a click would pick (the white ring in the view).
+    ImGui::TextUnformatted(mSelectSelected.empty() ? "Nothing selected" : mSelectSelected.c_str());
+    ImGui::TextDisabled("Under the cursor: %s", mSelectHover.empty() ? "-" : mSelectHover.c_str());
+    Note("Click a marker, unit, prop or decal to select it; the white ring shows what a click picks. Ctrl adds or takes one out, "
+         "a drag or the arrows move the selection, Delete removes it, Q and E turn props by 15 degrees. Each is one undo step.");
   }
 
   void EdTools::DrawTerrain()
