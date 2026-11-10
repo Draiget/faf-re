@@ -23,7 +23,8 @@ namespace faf::editor
     }
   } // namespace
 
-  bool HttpRequest(const HttpCall& call, long& status, std::string& body, std::string& error, std::atomic<std::uint64_t>* const received)
+  bool HttpRequest(const HttpCall& call, long& status, std::string& body, std::string& error, std::atomic<std::uint64_t>* const received,
+                   std::atomic<std::uint64_t>* const total)
   {
     status = 0;
     body.clear();
@@ -62,6 +63,16 @@ namespace faf::editor
       ok = ::WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &code, &size,
                                  WINHTTP_NO_HEADER_INDEX) != FALSE;
       status = static_cast<long>(code);
+      // The body's size, when the server says it (for a progress bar).
+      DWORD64 length = 0;
+      wchar_t lengthText[32]{};
+      DWORD lengthSize = sizeof(lengthText);
+      if (total != nullptr && ::WinHttpQueryHeaders(request, WINHTTP_QUERY_CONTENT_LENGTH, WINHTTP_HEADER_NAME_BY_INDEX, lengthText, &lengthSize,
+                                                    WINHTTP_NO_HEADER_INDEX)) {
+        length = _wcstoui64(lengthText, nullptr, 10);
+        *total = length;
+        body.reserve(static_cast<std::size_t>(length));
+      }
     }
     if (!ok) {
       error = "no answer from " + std::string(call.url.substr(0, call.url.find('/', 8))) + " (error " + std::to_string(::GetLastError()) + ")";

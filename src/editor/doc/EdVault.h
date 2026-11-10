@@ -66,6 +66,8 @@ namespace faf::editor
     [[nodiscard]] std::filesystem::path Folder() const { return mMapsFolder / mMap.folder; }
     /** Bytes received so far. */
     [[nodiscard]] std::uint64_t Received() const noexcept { return mReceived.load(); }
+    /** The archive's size as the vault announced it, 0 until known. */
+    [[nodiscard]] std::uint64_t Total() const noexcept { return mTotal.load(); }
     /** Back to Idle once the caller has taken the result. */
     void Reset();
 
@@ -76,6 +78,7 @@ namespace faf::editor
     std::thread mThread;
     std::atomic<State> mState{State::Idle};
     std::atomic<std::uint64_t> mReceived{0};
+    std::atomic<std::uint64_t> mTotal{0};
     mutable std::mutex mLock;
     std::string mMessage;
     VaultMapName mMap;

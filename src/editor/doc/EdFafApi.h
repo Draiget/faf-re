@@ -130,8 +130,15 @@ namespace faf::editor
     void Search(const VaultQuery& query, int page);
     /** A finished search's maps (once each search). */
     bool TakeResults(std::vector<VaultMap>& maps, int& pages);
-    /** The bytes behind a link (a thumbnail), fetched once; empty until they are here. */
+    /**
+     * The bytes behind a link (a map's picture): from the FAF client's preview cache (`%ProgramData%\FAForever\cache\
+     * maps\large` or `small`, named after the link's last part, as its AssetService keeps them), else the editor's own
+     * cache, else downloaded on a worker thread and kept in the editor's cache. Empty until here; one byte when the
+     * picture can't be had.
+     */
     std::string Picture(const std::string& url);
+    /** Where the editor keeps the pictures it downloads. */
+    void SetPictureCache(std::filesystem::path folder) { mPictureCache = std::move(folder); }
 
     [[nodiscard]] State GetState() const noexcept { return mState.load(); }
     [[nodiscard]] std::string Message() const;
@@ -169,5 +176,6 @@ namespace faf::editor
     std::map<std::string, std::string> mPictures;
     std::vector<std::string> mPictureQueue;
     bool mPictureWorker = false;
+    std::filesystem::path mPictureCache;
   };
 } // namespace faf::editor

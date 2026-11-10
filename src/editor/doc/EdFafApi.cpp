@@ -818,12 +818,33 @@ namespace faf::editor
             next = mPictureQueue.front();
             mPictureQueue.erase(mPictureQueue.begin());
           }
-          HttpCall call;
-          call.url = next;
-          long status = 0;
+          // The link's last part is the file's name in both caches ("maps/previews/large/x.png" -> "large/x.png").
+          const std::string file = next.substr(next.find_last_of('/') + 1);
+          const std::string size = next.find("/small/") != std::string::npos ? "small" : "large";
           std::string body;
-          std::string error;
-          const bool ok = HttpRequest(call, status, body, error) && status == 200;
+          const auto readFile = [&](const std::filesystem::path& path) {
+            std::ifstream in(path, std::ios::binary);
+            body.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+            return !body.empty();
+          };
+          char programData[MAX_PATH] = "";
+          (void)::GetEnvironmentVariableA("ProgramData", programData, MAX_PATH);
+          const std::filesystem::path client = std::filesystem::path(programData) / "FAForever" / "cache" / "maps" / size / file;
+          const std::filesystem::path own = mPictureCache.empty() ? std::filesystem::path() : mPictureCache / size / file;
+          bool ok = (programData[0] != '\0' && readFile(client)) || (!own.empty() && readFile(own));
+          if (!ok) {
+            HttpCall call;
+            call.url = next;
+            long status = 0;
+            std::string error;
+            ok = HttpRequest(call, status, body, error) && status == 200 && !body.empty();
+            if (ok && !own.empty()) {
+              std::error_code code;
+              std::filesystem::create_directories(own.parent_path(), code);
+              std::ofstream out(own, std::ios::binary | std::ios::trunc);
+              out.write(body.data(), static_cast<std::streamsize>(body.size()));
+            }
+          }
           std::lock_guard<std::mutex> guard(mLock);
           mPictures[next] = ok ? body : std::string("\0", 1); // one byte: tried and failed
         }

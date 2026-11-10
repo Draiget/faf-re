@@ -530,6 +530,7 @@ namespace faf::editor
       mShell = new EdShell(mLog, mPlay, mDocument);
       if (!mPendingFafTokenFile.empty()) {
         mShell->Browser().Faf().SetTokenFile(mPendingFafTokenFile);
+        mShell->Browser().Faf().SetPictureCache(mPendingFafTokenFile.parent_path() / "cache" / "maps");
       }
       mDocument.SetBeforeDrop([this] { mScene.Detach(); });
       // The vault, as init_faf.lua finds it without the client's custom path: Documents\My Games\...;

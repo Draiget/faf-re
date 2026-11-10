@@ -21,7 +21,7 @@ namespace faf::editor
    * answer at all (no network, a broken link). `received`, when given, follows the body's bytes as they come.
    */
   bool HttpRequest(const HttpCall& call, long& status, std::string& body, std::string& error,
-                   std::atomic<std::uint64_t>* received = nullptr);
+                   std::atomic<std::uint64_t>* received = nullptr, std::atomic<std::uint64_t>* total = nullptr);
 
   /** `text` as an `application/x-www-form-urlencoded` or query value. */
   std::string UrlEncode(const std::string& text);

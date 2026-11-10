@@ -37,12 +37,13 @@ namespace faf::editor
     }
 
     /** `url` (https) into `body`; false with `error`. `received` follows the bytes as they come. */
-    bool HttpGet(const std::string& url, std::string& body, std::string& error, std::atomic<std::uint64_t>& received)
+    bool HttpGet(const std::string& url, std::string& body, std::string& error, std::atomic<std::uint64_t>& received,
+                 std::atomic<std::uint64_t>& total)
     {
       HttpCall call;
       call.url = url;
       long status = 0;
-      if (!HttpRequest(call, status, body, error, &received)) {
+      if (!HttpRequest(call, status, body, error, &received, &total)) {
         return false;
       }
       if (status != 200) {
@@ -268,6 +269,7 @@ namespace faf::editor
     mMap = map;
     mMapsFolder = mapsFolder;
     mReceived = 0;
+    mTotal = 0;
     SetMessage("Downloading " + map.folder);
     mState = State::Working;
     mThread = std::thread([this] { Run(); });
@@ -278,7 +280,7 @@ namespace faf::editor
   {
     std::string zip;
     std::string error;
-    if (!HttpGet(mMap.url, zip, error, mReceived)) {
+    if (!HttpGet(mMap.url, zip, error, mReceived, mTotal)) {
       SetMessage(error);
       mState = State::Failed;
       return;

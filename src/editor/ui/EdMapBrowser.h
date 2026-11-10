@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <map>
+#include <set>
 #include <filesystem>
 #include <string>
 #include <utility>
@@ -119,5 +120,9 @@ namespace faf::editor
     bool mSearchedOnce = false;
     std::string mAskedSearch;
     std::map<std::string, std::uint64_t> mVaultPictures;
+    /** The links whose picture can't be had (shown as such, not as loading). */
+    std::set<std::string> mVaultNoPicture;
+    /** A progress bar of the download under way (`width` -1 for the available width). */
+    void DrawDownloadProgress(float width);
   };
 } // namespace faf::editor
