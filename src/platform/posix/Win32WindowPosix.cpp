@@ -7,7 +7,10 @@
 #include "platform/posix/Win32WindowPosix.h"
 
 #include <array>
+#include <atomic>
+#include <cstdint>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -29,6 +32,7 @@ namespace
     HWND capture = nullptr;
     HWND focus = nullptr;
     std::unordered_set<HWND> hidden;  // windows ShowWindow hid or minimized
+    std::unordered_set<HWND> minimized;  // windows minimized by ShowWindow or the window system
     HCURSOR cursorShape = nullptr;
     int cursorShowCount = 0;
     std::array<bool, 256> keysDown{};
@@ -81,6 +85,19 @@ namespace platform::posix
     state.keysDown[static_cast<std::size_t>(virtualKey)] = down;
   }
 
+  void SetWindowMinimized(void* const window, const bool minimized)
+  {
+    WindowState& state = State();
+    const std::lock_guard<std::mutex> lock(state.mutex);
+    if (minimized) {
+      state.minimized.insert(window);
+    } else {
+      state.minimized.erase(window);
+    }
+  }
+
+  void (*gSetWindowTitleHook)(void* window, const char* utf8Title) = nullptr;
+  void (*gScreenSaverHook)(bool allowed) = nullptr;
   void (*gWarpCursorHook)(int x, int y) = nullptr;
   void (*gFocusHook)(void* window) = nullptr;
   void (*gShowWindowHook)(void* window, int command) = nullptr;
@@ -368,11 +385,107 @@ BOOL ShowWindow(const HWND window, const int command)
     } else {
       state.hidden.erase(window);
     }
+    if (command == SW_MINIMIZE || command == SW_SHOWMINIMIZED) {
+      state.minimized.insert(window);
+    } else if (command != SW_HIDE) {
+      state.minimized.erase(window);
+    }
   }
   if (platform::posix::gShowWindowHook != nullptr) {
     platform::posix::gShowWindowHook(window, command);
   }
   return TRUE;
+}
+
+BOOL IsIconic(const HWND window)
+{
+  if (window == nullptr) {
+    return FALSE;
+  }
+  WindowState& state = State();
+  const std::lock_guard<std::mutex> lock(state.mutex);
+  return state.minimized.count(window) != 0 ? TRUE : FALSE;
+}
+
+HWND GetAncestor(const HWND window, const UINT flags)
+{
+  (void)flags;
+  return window;
+}
+
+BOOL SetWindowTextA(const HWND window, const char* const text)
+{
+  if (window == nullptr || text == nullptr) {
+    return FALSE;
+  }
+  if (platform::posix::gSetWindowTitleHook != nullptr) {
+    platform::posix::gSetWindowTitleHook(window, text);
+  }
+  return TRUE;
+}
+
+BOOL SetWindowTextW(const HWND window, const wchar_t* const text)
+{
+  if (text == nullptr) {
+    return FALSE;
+  }
+  // The window system takes UTF-8.
+  std::string utf8;
+  for (const wchar_t* character = text; *character != L'\0'; ++character) {
+    const std::uint32_t code = static_cast<std::uint32_t>(*character);
+    if (code < 0x80u) {
+      utf8 += static_cast<char>(code);
+    } else if (code < 0x800u) {
+      utf8 += static_cast<char>(0xC0u | (code >> 6));
+      utf8 += static_cast<char>(0x80u | (code & 0x3Fu));
+    } else if (code < 0x10000u) {
+      utf8 += static_cast<char>(0xE0u | (code >> 12));
+      utf8 += static_cast<char>(0x80u | ((code >> 6) & 0x3Fu));
+      utf8 += static_cast<char>(0x80u | (code & 0x3Fu));
+    } else {
+      utf8 += static_cast<char>(0xF0u | (code >> 18));
+      utf8 += static_cast<char>(0x80u | ((code >> 12) & 0x3Fu));
+      utf8 += static_cast<char>(0x80u | ((code >> 6) & 0x3Fu));
+      utf8 += static_cast<char>(0x80u | (code & 0x3Fu));
+    }
+  }
+  return SetWindowTextA(window, utf8.c_str());
+}
+
+namespace
+{
+  std::atomic<bool> gScreenSaverActive{true};
+} // namespace
+
+BOOL SystemParametersInfoW(const UINT action, const UINT parameter, void* const data, const UINT winIni)
+{
+  (void)winIni;
+  switch (action) {
+    case SPI_GETSCREENSAVEACTIVE:
+      if (data == nullptr) {
+        return FALSE;
+      }
+      *static_cast<BOOL*>(data) = gScreenSaverActive.load() ? TRUE : FALSE;
+      return TRUE;
+    case SPI_SETSCREENSAVEACTIVE:
+      gScreenSaverActive.store(parameter != 0u);
+      if (platform::posix::gScreenSaverHook != nullptr) {
+        platform::posix::gScreenSaverHook(parameter != 0u);
+      }
+      return TRUE;
+    case SPI_GETFONTSMOOTHING:
+    case SPI_GETFONTSMOOTHINGTYPE:
+    case SPI_GETFONTSMOOTHINGCONTRAST:
+    case SPI_GETFONTSMOOTHINGORIENTATION:
+      // Glyphs come from FreeType (GdiOverFreeType.cpp), which these settings don't change.
+      if (data == nullptr) {
+        return FALSE;
+      }
+      *static_cast<UINT*>(data) = 0u;
+      return TRUE;
+    default:
+      return FALSE;
+  }
 }
 
 BOOL IsWindowVisible(const HWND window)

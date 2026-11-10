@@ -19,6 +19,9 @@ public:
   virtual bool Pending();
   // Delivers one queued event.
   virtual void Dispatch();
+  // wx's idle pass: true while more idle work is wanted. Nothing here waits for idle time (the
+  // stand-in's windows are deleted by Destroy at once), so it returns false.
+  virtual bool ProcessIdle() { return false; }
   // Asks the main loop to return: clears m_keepGoing, as wx 2.4.2 does.
   virtual void ExitMainLoop();
 

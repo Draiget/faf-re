@@ -1875,14 +1875,11 @@ namespace moho
         continue;
       }
 
-      const DWORD byteSize = static_cast<DWORD>(fontBytes.mEnd - fontBytes.mBegin);
-#if FAFRE_PLATFORM_WINDOWS
-      // GDI's copy, for the glyphs CD3DFont rasterizes with it; other platforms draw through MSDF only.
       DWORD loadedFontCount = 0;
+      const DWORD byteSize = static_cast<DWORD>(fontBytes.mEnd - fontBytes.mBegin);
       if (::AddFontMemResourceEx(fontBytes.mBegin, byteSize, nullptr, &loadedFontCount) == 0) {
         gpg::Warnf("D3D_InitFonts: Error loading font %s", mountedPath.c_str());
       }
-#endif
       // FAF addition: the same file can also draw through an MSDF atlas (issue #306).
       MSDF_RegisterFontFile(fontFile.c_str(), fontBytes.mBegin, byteSize);
     }

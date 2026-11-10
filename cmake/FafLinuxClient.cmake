@@ -113,6 +113,8 @@ list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/wx/WxSta
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32WindowPosix.cpp")
 # The XACT engine on FAudio's FACT (issue #258).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/XactOverFact.cpp")
+# CD3DFont's GDI text calls on FreeType.
+list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/GdiOverFreeType.cpp")
 
 # DXC's Linux headers bring their own Win32 types, which clash with the POSIX <Windows.h> the
 # client's files are compiled with (platform/PosixCompat.h), so the one file that includes them is
@@ -175,14 +177,66 @@ target_link_libraries(faf_client_imaging PUBLIC faf_directxtex_linux)
 target_compile_options(faf_client_imaging PRIVATE -pthread -Wall "SHELL:-include platform/PlatformDefines.h"
   -Wundef-prefix=FAFRE_PLATFORM_ -Werror=undef-prefix)
 
+# Movies (moho/movie/sfd): FFmpeg 7.1.3 from the dependencies/ffmpeg submodule Windows compiles.
+# Its faf/ CMake build holds clang-cl configurations only, so here FFmpeg's own configure and make
+# build the same components (FAF_CONFIGURE_OPTIONS in dependencies/ffmpeg/faf/generate.sh) as static
+# libraries, with the pinned compiler, position-independent code for the executable, and no
+# autodetection, so no library of the build machine is picked up.
+include(ExternalProject)
+include(ProcessorCount)
+set(_faf_ffmpeg "${FAF_DEPENDENCIES_DIR}/ffmpeg")
+if(NOT EXISTS "${_faf_ffmpeg}/configure")
+  message(FATAL_ERROR "FFmpeg sources not found in ${_faf_ffmpeg} (git submodule update --init dependencies/ffmpeg)")
+endif()
+find_program(FAF_MAKE make REQUIRED)
+ProcessorCount(_faf_ffmpeg_jobs)
+if(_faf_ffmpeg_jobs EQUAL 0)
+  set(_faf_ffmpeg_jobs 2)
+endif()
+set(_faf_ffmpeg_prefix "${CMAKE_BINARY_DIR}/deps/ffmpeg")
+set(_faf_ffmpeg_libs avformat avcodec swscale swresample avutil)
+set(_faf_ffmpeg_archives "")
+foreach(_lib IN LISTS _faf_ffmpeg_libs)
+  list(APPEND _faf_ffmpeg_archives "${_faf_ffmpeg_prefix}/lib/lib${_lib}.a")
+endforeach()
+ExternalProject_Add(faf_ffmpeg_build
+  SOURCE_DIR "${_faf_ffmpeg}"
+  BINARY_DIR "${_faf_ffmpeg_prefix}/build"
+  INSTALL_DIR "${_faf_ffmpeg_prefix}"
+  DOWNLOAD_COMMAND ""
+  UPDATE_COMMAND ""
+  CONFIGURE_COMMAND "${_faf_ffmpeg}/configure" --prefix=<INSTALL_DIR>
+    "--cc=${CMAKE_C_COMPILER}" "--ar=${CMAKE_AR}" "--ranlib=${CMAKE_RANLIB}" "--nm=${CMAKE_NM}"
+    --enable-pic --disable-autodetect --pkg-config=false
+    --disable-x86asm --disable-everything --disable-programs --disable-doc --disable-network
+    --enable-static --disable-shared
+    --enable-avcodec --enable-avformat --enable-avutil --enable-swscale --enable-swresample
+    --enable-decoder=mpeg1video,mpeg2video,adpcm_adx,mp1,mp2,mp3
+    --enable-parser=mpegvideo,mpegaudio,adx
+    --enable-demuxer=mpegps,mpegvideo,adx,mp3
+    --enable-protocol=file
+  BUILD_COMMAND "${FAF_MAKE}" -j${_faf_ffmpeg_jobs}
+  INSTALL_COMMAND "${FAF_MAKE}" install-headers install-libs
+  BUILD_BYPRODUCTS ${_faf_ffmpeg_archives})
+file(MAKE_DIRECTORY "${_faf_ffmpeg_prefix}/include")
+add_library(faf_ffmpeg INTERFACE)
+foreach(_lib IN LISTS _faf_ffmpeg_libs)
+  add_library(faf_ffmpeg_${_lib} STATIC IMPORTED)
+  set_target_properties(faf_ffmpeg_${_lib} PROPERTIES IMPORTED_LOCATION "${_faf_ffmpeg_prefix}/lib/lib${_lib}.a")
+  add_dependencies(faf_ffmpeg_${_lib} faf_ffmpeg_build)
+  target_link_libraries(faf_ffmpeg INTERFACE faf_ffmpeg_${_lib})
+endforeach()
+target_include_directories(faf_ffmpeg SYSTEM INTERFACE "${_faf_ffmpeg_prefix}/include")
+target_link_libraries(faf_ffmpeg INTERFACE m)
+
 add_library(faf_client_objs OBJECT ${_faf_client_files})
-add_dependencies(faf_client_objs faf_client_dxc faf_client_imaging)
+add_dependencies(faf_client_objs faf_client_dxc faf_client_imaging faf_ffmpeg_build)
 # boost 1.34's string algorithms (the lobby) derive from std::unary_function, which libc++ keeps
 # behind this opt-in since C++17, as boost.thread's std::auto_ptr (cmake/FafLinux.cmake).
 target_compile_definitions(faf_client_objs PRIVATE _LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1)
 target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd
   FAudio-static SDL3::SDL3-static  # FAudio names its static target FAudio-static, with no alias
-  faf_freetype faf_msdfgen)
+  faf_freetype faf_msdfgen faf_ffmpeg)
 target_include_directories(faf_client_objs PRIVATE
   "${PROJECT_SOURCE_DIR}/src/platform/posix/wx"
   "${FAF_DEPENDENCIES_DIR}/vulkan/include"

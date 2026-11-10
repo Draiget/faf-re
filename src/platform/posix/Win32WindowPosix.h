@@ -14,6 +14,12 @@ namespace platform::posix
   void SetCursorScreenPos(int x, int y);
   // A Windows virtual-key code went down or up, for GetKeyState.
   void SetKeyDown(int virtualKey, bool down);
+  // The window was minimized or restored, for IsIconic.
+  void SetWindowMinimized(void* window, bool minimized);
+  // Called by SetWindowTextA/W with the new title in UTF-8.
+  extern void (*gSetWindowTitleHook)(void* window, const char* utf8Title);
+  // Called by SystemParametersInfoW(SPI_SETSCREENSAVEACTIVE): may the screensaver start.
+  extern void (*gScreenSaverHook)(bool allowed);
   // Called by SetCursorPos so the window system can move the real cursor.
   extern void (*gWarpCursorHook)(int x, int y);
   // Called by SetFocus and ShowWindow so the window system can act on the real window.

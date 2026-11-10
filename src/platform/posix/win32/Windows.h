@@ -299,6 +299,7 @@ HMODULE LoadLibraryA(const char* fileName);
 void* GetProcAddress(HMODULE module, const char* procName);
 BOOL FreeLibrary(HMODULE module);
 DWORD GetTickCount();
+ULONGLONG GetTickCount64();
 BOOL QueryPerformanceCounter(LARGE_INTEGER* count);
 BOOL QueryPerformanceFrequency(LARGE_INTEGER* frequency);
 void GetSystemInfo(SYSTEM_INFO* info);
@@ -983,6 +984,113 @@ struct MONITORINFO
 #define MONITORINFOF_PRIMARY 0x1u
 HMONITOR MonitorFromPoint(POINT point, DWORD flags);
 BOOL GetMonitorInfoW(HMONITOR monitor, MONITORINFO* info);
+// Window state the main loop and the title bar use, answered from the window system's reports.
+BOOL IsIconic(HWND window);
+#define GA_PARENT 1u
+#define GA_ROOT 2u
+#define GA_ROOTOWNER 3u
+// The window system's windows are top-level: the root of a window is the window itself.
+HWND GetAncestor(HWND window, UINT flags);
+BOOL SetWindowTextA(HWND window, const char* text);
+BOOL SetWindowTextW(HWND window, const wchar_t* text);
+// System settings: the screensaver switch goes to the window system; font smoothing reads 0.
+#define SPI_GETSCREENSAVEACTIVE 0x0010u
+#define SPI_SETSCREENSAVEACTIVE 0x0011u
+#define SPI_GETFONTSMOOTHING 0x004Au
+#define SPI_GETFONTSMOOTHINGTYPE 0x200Au
+#define SPI_GETFONTSMOOTHINGCONTRAST 0x200Cu
+#define SPI_GETFONTSMOOTHINGORIENTATION 0x2012u
+BOOL SystemParametersInfoW(UINT action, UINT parameter, void* data, UINT winIni);
+
+// --- GDI text (WinGDI.h) for the Linux client (issue #255) ------------------------------------
+// CD3DFont rasterizes a character's glyph with GDI into a 32-bit scratch bitmap and reads its
+// metrics and kerning pairs. src/platform/posix/GdiOverFreeType.cpp answers the same calls with
+// FreeType, from the font files the game registers with AddFontMemResourceEx. Only the client
+// links that file.
+using HGDIOBJ = void*;
+using HBRUSH = void*;
+using COLORREF = DWORD;
+#define RGB(r, g, b) \
+  (static_cast<COLORREF>( \
+    static_cast<BYTE>(r) | (static_cast<WORD>(static_cast<BYTE>(g)) << 8) | (static_cast<DWORD>(static_cast<BYTE>(b)) << 16) \
+  ))
+#define GDI_ERROR 0xFFFFFFFFu
+#define LF_FACESIZE 32
+#define TMPF_FIXED_PITCH 0x01u
+#define TMPF_VECTOR 0x02u
+#define TMPF_TRUETYPE 0x04u
+#define BLACK_BRUSH 4
+#define TA_BASELINE 24u
+#define DT_SINGLELINE 0x0020u
+#define DT_NOCLIP 0x0100u
+#define DT_CALCRECT 0x0400u
+#define DT_NOPREFIX 0x0800u
+#define FW_NORMAL 400
+#define FW_BOLD 700
+struct TEXTMETRICW
+{
+  LONG tmHeight;
+  LONG tmAscent;
+  LONG tmDescent;
+  LONG tmInternalLeading;
+  LONG tmExternalLeading;
+  LONG tmAveCharWidth;
+  LONG tmMaxCharWidth;
+  LONG tmWeight;
+  LONG tmOverhang;
+  LONG tmDigitizedAspectX;
+  LONG tmDigitizedAspectY;
+  WCHAR tmFirstChar;
+  WCHAR tmLastChar;
+  WCHAR tmDefaultChar;
+  WCHAR tmBreakChar;
+  BYTE tmItalic;
+  BYTE tmUnderlined;
+  BYTE tmStruckOut;
+  BYTE tmPitchAndFamily;
+  BYTE tmCharSet;
+};
+struct KERNINGPAIR
+{
+  WORD wFirst;
+  WORD wSecond;
+  int iKernAmount;
+};
+struct BITMAP
+{
+  LONG bmType;
+  LONG bmWidth;
+  LONG bmHeight;
+  LONG bmWidthBytes;
+  WORD bmPlanes;
+  WORD bmBitsPixel;
+  LPVOID bmBits;
+};
+HANDLE AddFontMemResourceEx(void* fontData, DWORD size, void* reserved, DWORD* fontCount);
+BOOL RemoveFontMemResourceEx(HANDLE fontHandle);
+HFONT CreateFontA(
+  int height, int width, int escapement, int orientation, int weight, DWORD italic, DWORD underline, DWORD strikeOut,
+  DWORD charSet, DWORD outPrecision, DWORD clipPrecision, DWORD quality, DWORD pitchAndFamily, const char* faceName
+);
+HDC CreateCompatibleDC(HDC dc);
+HBITMAP CreateBitmap(int width, int height, UINT planes, UINT bitsPerPixel, const void* bits);
+HGDIOBJ SelectObject(HDC dc, HGDIOBJ object);
+BOOL DeleteObject(HGDIOBJ object);
+BOOL DeleteDC(HDC dc);
+HGDIOBJ GetStockObject(int object);
+int GetObjectW(HGDIOBJ object, int size, void* out);
+BOOL GetTextMetricsW(HDC dc, TEXTMETRICW* metrics);
+int GetTextFaceW(HDC dc, int count, wchar_t* face);
+DWORD GetFontData(HDC dc, DWORD table, DWORD offset, void* buffer, DWORD size);
+DWORD GetKerningPairsW(HDC dc, DWORD count, KERNINGPAIR* pairs);
+UINT SetTextAlign(HDC dc, UINT align);
+COLORREF SetTextColor(HDC dc, COLORREF color);
+COLORREF SetBkColor(HDC dc, COLORREF color);
+int FillRect(HDC dc, const RECT* rect, HBRUSH brush);
+int DrawTextW(HDC dc, const wchar_t* text, int count, RECT* rect, UINT format);
+COLORREF GetPixel(HDC dc, int x, int y);
+LONG GetBitmapBits(HBITMAP bitmap, LONG size, void* bits);
+BOOL GdiFlush();
 
 // Virtual-key codes (WinUser.h), with their Windows values: the client's key bindings
 // convert wx key codes to and from them (wxCharCodeWXToMSW, issue #255).

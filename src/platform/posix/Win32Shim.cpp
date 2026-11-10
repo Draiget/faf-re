@@ -936,6 +936,13 @@ DWORD GetTickCount()
   );
 }
 
+ULONGLONG GetTickCount64()
+{
+  timespec now{};
+  ::clock_gettime(CLOCK_MONOTONIC, &now);
+  return static_cast<ULONGLONG>(now.tv_sec) * 1000u + static_cast<ULONGLONG>(now.tv_nsec) / 1000000u;
+}
+
 BOOL QueryPerformanceCounter(LARGE_INTEGER* const count)
 {
   timespec now{};
