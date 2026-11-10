@@ -327,6 +327,7 @@ Server-authoritative sessions are being built: one server runs the only sim, and
 | `/loopbackarmy n` | none | command line | each session | With `/loopback`: the stand-in server fixes the view to army `n` (0-based) and refuses a focus change to any other, as a tournament server will (logged as `loopback: the server refused the view of army`) |
 | `/loopbackcameras ms` | 0 | command line | each session | With `/loopback`: the cameras go to the stand-in server at most once in `ms` milliseconds, the latest ones (0: every frame, as the lockstep driver takes them) |
 | `/sessionsummary` | off | command line | each session | Logs `session summary beat N:` once a minute of game time and at game over: the session's entities, units per army, orphaned entities and the units' summed health, to compare a `/loopback` run with a normal one |
+| `/oraclegolden <file>` | off | command line | each session | Plan WP4.4, the visibility oracle's golden test in the game client (`src/remote/client/OracleGolden.h`): in a lockstep game (a replay, its focus army set from the UI) every beat compares the entities the client draws with the oracle's `ViewShowsMesh` for the same beat and army; one line per beat to the file, running totals every 500 compared beats and the first 30 differences to the log as `ORACLEGOLDEN` lines |
 
 ## headless
 
