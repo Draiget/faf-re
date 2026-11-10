@@ -1211,6 +1211,11 @@ void moho::CMovieManager::CreateDirectSound()
     return;
   }
 
+#if !defined(_WIN32)
+  // The Linux client (issue #255) has no DirectSound: the movie middleware runs without sound, as
+  // when DirectSound fails on Windows. Movie sound there is the FFmpeg path's.
+  gpg::Logf("Movies: no DirectSound on this platform.");
+#else
   if (FAILED(::DirectSoundCreate(nullptr, &mDirectSound, nullptr))) {
     gpg::Logf("Failed to create DirectSound.");
     return;
@@ -1242,6 +1247,7 @@ void moho::CMovieManager::CreateDirectSound()
     mDirectSound->Release();
     mDirectSound = nullptr;
   }
+#endif
 }
 
 /**
@@ -1272,6 +1278,7 @@ moho::CMovieManager::~CMovieManager()
 void moho::CMovieManager::ReleaseDirectSound()
 {
   ::ADXPC_SetupSoundDirectSound8(nullptr);
+#if defined(_WIN32)
   if (mPrimaryBuffer != nullptr) {
     mPrimaryBuffer->Release();
     mPrimaryBuffer = nullptr;
@@ -1280,6 +1287,7 @@ void moho::CMovieManager::ReleaseDirectSound()
     mDirectSound->Release();
     mDirectSound = nullptr;
   }
+#endif
 }
 
 /**

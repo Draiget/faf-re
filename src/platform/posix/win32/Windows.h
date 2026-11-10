@@ -416,6 +416,20 @@ HLOCAL LocalFree(HLOCAL memory);
 #define FILE_FLAG_OVERLAPPED 0x40000000u
 #define FILE_FLAG_NO_BUFFERING 0x20000000u
 
+// The multimedia timer's resolution (timeapi.h): Linux timers and sleeps are already fine-grained,
+// so raising it always succeeds and changes nothing.
+#define TIMERR_NOERROR 0u
+inline UINT timeBeginPeriod(const UINT period) noexcept
+{
+  (void)period;
+  return TIMERR_NOERROR;
+}
+inline UINT timeEndPeriod(const UINT period) noexcept
+{
+  (void)period;
+  return TIMERR_NOERROR;
+}
+
 // A Win32 error as an HRESULT (FACILITY_WIN32).
 inline HRESULT HRESULT_FROM_WIN32(const unsigned long error) noexcept
 {

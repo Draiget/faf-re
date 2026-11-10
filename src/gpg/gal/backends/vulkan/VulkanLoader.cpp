@@ -15,7 +15,12 @@ namespace gpg::gal::vulkan
     if (module != nullptr) {
       return true;
     }
+#if defined(_WIN32)
     module = ::LoadLibraryA("vulkan-1.dll");
+#else
+    // The Linux client (issue #255): the Vulkan loader's soname; LoadLibraryA is dlopen there.
+    module = ::LoadLibraryA("libvulkan.so.1");
+#endif
     if (module == nullptr) {
       return false;
     }
