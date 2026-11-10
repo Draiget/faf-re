@@ -1533,20 +1533,11 @@
 				const TObject* const b = rkb();
 				const TObject* const c = rkc();
 				int equal = 0;
+				// As 0x0092B0EA..0x0092B12A: the tags compared, then luaV_equalval for every pair of one tag, also
+				// with lua_ThreadedDispatch (#376: answering numbers, nil, booleans and strings here skipped calls the
+				// original makes).
 				if (b->tt == c->tt) {
-					// luaV_equalval's answer for the tags that never reach __eq (lua_ThreadedDispatch).
-					const int tag = b->tt;
-					if (kThreaded && tag == LUA_TNUMBER) {
-						equal = (b->value.n == c->value.n) ? 1 : 0;
-					} else if (kThreaded && (tag == LUA_TNIL)) {
-						equal = 1;
-					} else if (kThreaded && tag == LUA_TBOOLEAN) {
-						equal = (b->value.b == c->value.b) ? 1 : 0;
-					} else if (kThreaded && tag == LUA_TSTRING) {
-						equal = (b->value.p == c->value.p) ? 1 : 0;
-					} else {
-						equal = luaV_equalval(L, rkb(), rkc()) ? 1 : 0;
-					}
+					equal = luaV_equalval(L, b, c) ? 1 : 0;
 				}
 				if (equal == LuaGetArgA(i)) {
 					pc += LuaGetArgSBx(*pc) + 1;
@@ -1557,9 +1548,8 @@
 			}
 
 			case kOpLt: op_Lt:
-				if ((kThreaded && rkb()->tt == LUA_TNUMBER && rkc()->tt == LUA_TNUMBER
-				       ? (rkc()->value.n > rkb()->value.n ? 1 : 0) // luaV_lessthan's number case (lua_ThreadedDispatch)
-				       : luaV_lessthan(L, rkb(), rkc())) == LuaGetArgA(i)) {
+				// As 0x0092B1AA: luaV_lessthan for every comparison, numbers too (#376).
+				if (luaV_lessthan(L, rkb(), rkc()) == LuaGetArgA(i)) {
 					pc += LuaGetArgSBx(*pc) + 1;
 				} else {
 					++pc;
@@ -1567,9 +1557,8 @@
 				break;
 
 			case kOpLe: op_Le:
-				if ((kThreaded && rkb()->tt == LUA_TNUMBER && rkc()->tt == LUA_TNUMBER
-				       ? (rkc()->value.n >= rkb()->value.n ? 1 : 0) // luaV_lessequal's number case (lua_ThreadedDispatch)
-				       : luaV_lessequal(L, rkb(), rkc())) == LuaGetArgA(i)) {
+				// As 0x0092B21D: luaV_lessequal for every comparison, numbers too (#376).
+				if (luaV_lessequal(L, rkb(), rkc()) == LuaGetArgA(i)) {
 					pc += LuaGetArgSBx(*pc) + 1;
 				} else {
 					++pc;
