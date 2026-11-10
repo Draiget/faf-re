@@ -139,11 +139,11 @@ namespace moho
      * Initializes handler/socket/event fields for datagram-socket objects.
      * The same field-init lane is also emitted inline in `NET_OpenDatagramSocket`.
      */
-    CNetDatagramSocketImpl(INetDatagramHandler* handler, SOCKET sock);
+    CNetDatagramSocketImpl(INetDatagramHandler* handler, platform::net::Socket sock);
 
   private:
     INetDatagramHandler* mDatagramHandler{nullptr}; // +0x04
-    SOCKET mSocket{INVALID_SOCKET};                 // +0x08
+    platform::net::Socket mSocket{platform::net::kInvalidSocket};                 // +0x08
     HANDLE mEvent{nullptr};                         // +0x0C
   };
   static_assert(sizeof(CNetDatagramSocketImpl) == 0x10, "CNetDatagramSocketImpl must be 0x10");

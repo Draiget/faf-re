@@ -18,9 +18,9 @@ using namespace moho;
  */
 CNetDatagramSocketImpl::~CNetDatagramSocketImpl()
 {
-  closesocket(mSocket);
+  platform::net::CloseSocket(mSocket);
   if (mEvent != nullptr) {
-    WSACloseEvent(mEvent);
+    platform::net::CloseSocketEvent(mEvent);
   }
 }
 
@@ -53,8 +53,7 @@ void CNetDatagramSocketImpl::Send(CMessage* msg, const u_long address, const u_s
   const char* const payloadStart = msg->mBuff.start_;
   const int payloadSize = static_cast<int>(msg->mBuff.end_ - payloadStart);
 
-  const int sent =
-    sendto(mSocket, payloadStart, payloadSize, 0, reinterpret_cast<const sockaddr*>(&to), static_cast<int>(sizeof(to)));
+  const int sent = platform::net::SendTo(mSocket, payloadStart, payloadSize, to);
   if (sent >= 0) {
     if (sent < payloadSize) {
       gpg::Logf("CNetDatagramSocketImpl::Send: msg truncated, only %d of %d bytes sent.", sent, payloadSize);
@@ -75,15 +74,14 @@ void CNetDatagramSocketImpl::Send(CMessage* msg, const u_long address, const u_s
 void CNetDatagramSocketImpl::Pull()
 {
   if (mEvent != nullptr) {
-    WSAResetEvent(mEvent);
+    platform::net::ResetSocketEvent(mEvent);
   }
 
   static constexpr int kRecvCapacity = static_cast<int>(kNetIoBufferSize);
   char recvBuffer[kNetIoBufferSize];
 
   sockaddr_in from{};
-  int fromLen = static_cast<int>(sizeof(from));
-  int bytesRead = recvfrom(mSocket, recvBuffer, kRecvCapacity, 0, reinterpret_cast<sockaddr*>(&from), &fromLen);
+  int bytesRead = platform::net::RecvFrom(mSocket, recvBuffer, kRecvCapacity, &from);
 
   // The socket is open to anyone on the network. Handling a datagram runs
   // script, so stop after a batch rather than chase a flood: the rest stays
@@ -130,12 +128,11 @@ void CNetDatagramSocketImpl::Pull()
       }
 
       std::memset(&from, 0, sizeof(from));
-      fromLen = static_cast<int>(sizeof(from));
-      bytesRead = recvfrom(mSocket, recvBuffer, kRecvCapacity, 0, reinterpret_cast<sockaddr*>(&from), &fromLen);
+      bytesRead = platform::net::RecvFrom(mSocket, recvBuffer, kRecvCapacity, &from);
     } while (bytesRead >= 0);
   }
 
-  if (WSAGetLastError() != WSAEWOULDBLOCK) {
+  if (platform::net::LastError() != platform::net::error::kWouldBlock) {
     gpg::Logf("CNetBroadcastSocketImpl::Pull: recv() failed: %s", NET_GetWinsockErrorString());
   }
 }
@@ -150,9 +147,9 @@ void CNetDatagramSocketImpl::Pull()
 HANDLE CNetDatagramSocketImpl::CreateEvent()
 {
   if (mEvent == nullptr) {
-    const HANDLE h = WSACreateEvent();
+    const HANDLE h = platform::net::CreateSocketEvent();
     mEvent = h;
-    WSAEventSelect(mSocket, h, FD_READ);
+    platform::net::SelectSocketEvents(mSocket, h, platform::net::kEventRead);
   }
   return mEvent;
 }
@@ -170,7 +167,7 @@ HANDLE CNetDatagramSocketImpl::CreateEvent()
  * Initializes datagram socket object fields; this same field-init lane is also
  * emitted inline inside `NET_OpenDatagramSocket`.
  */
-CNetDatagramSocketImpl::CNetDatagramSocketImpl(INetDatagramHandler* handler, const SOCKET sock)
+CNetDatagramSocketImpl::CNetDatagramSocketImpl(INetDatagramHandler* handler, const platform::net::Socket sock)
   : mDatagramHandler(handler)
   , mSocket(sock)
   , mEvent(nullptr)

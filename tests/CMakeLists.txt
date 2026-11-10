@@ -21,6 +21,14 @@ set_target_properties(faf_peer_transport_tests PROPERTIES FOLDER "Tests/Existing
 add_test(NAME net_peer_transport COMMAND faf_peer_transport_tests)
 set_tests_properties(net_peer_transport PROPERTIES LABELS "Existing")
 
+# platform::net (issue #259): loopback sockets and the socket events the lockstep transport
+# waits on; Linux runs the same file on NetPosix.cpp (cmake/FafLinux.cmake).
+add_executable(faf_platform_net_tests EXCLUDE_FROM_ALL net/PlatformNetTests.cpp)
+target_link_libraries(faf_platform_net_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_platform_net_tests PROPERTIES FOLDER "Tests/Net")
+add_test(NAME platform_net COMMAND faf_platform_net_tests)
+set_tests_properties(platform_net PROPERTIES LABELS "Net")
+
 # net_FastRetransmit (issue #237): a lost DATA packet's recovery with the
 # switch off and on, at a fast rate and at the game's rate.
 add_executable(faf_fast_retransmit_tests EXCLUDE_FROM_ALL net/FastRetransmitTests.cpp)

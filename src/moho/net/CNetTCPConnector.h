@@ -6,6 +6,7 @@
 #include "INetConnector.h"
 #include "moho/containers/TDatList.h"
 #include "moho/misc/WeakObject.h"
+#include "platform/Net.h"
 #include "platform/Platform.h"
 
 namespace gpg
@@ -159,7 +160,7 @@ namespace moho
      * What it does:
      * Initializes TCP connector around already-open listening socket.
      */
-    explicit CNetTCPConnector(SOCKET socket) noexcept;
+    explicit CNetTCPConnector(platform::net::Socket socket) noexcept;
 
     /**
      * Address: 0x004853D0 (FUN_004853D0)
@@ -167,7 +168,7 @@ namespace moho
      * What it does:
      * Binds accepted partial socket stream to a TCP connection.
      */
-    void ReadFromStream(SOCKET socket, u_long address, u_short port, gpg::PipeStream& stream);
+    void ReadFromStream(platform::net::Socket socket, u_long address, u_short port, gpg::PipeStream& stream);
 
     /**
      * Address: 0x004835F0 (FUN_004835F0)
@@ -181,7 +182,7 @@ namespace moho
     friend class CNetTCPConnection;
     friend struct SPartialConnection;
 
-    SOCKET mSocket{INVALID_SOCKET};               // +0x08
+    platform::net::Socket mSocket{platform::net::kInvalidSocket};               // +0x08
     gpg::DList<CNetTCPConnection> mConnections;   // +0x0C
     TDatList<SPartialConnection, void> mPartials; // +0x14
     HANDLE mHandle{nullptr};                      // +0x1C

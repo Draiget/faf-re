@@ -58,11 +58,7 @@ ENetProtocolType CNetUDPConnector::GetProtocol()
  */
 bool CNetUDPConnector::SignalSocketEvent() noexcept
 {
-#if defined(_WIN32)
-  return ::WSASetEvent(event_) != FALSE;
-#else
-  return false;
-#endif
+  return platform::net::SignalSocketEvent(event_);
 }
 
 /**
@@ -99,10 +95,8 @@ CNetUDPConnector::~CNetUDPConnector()
     delete static_cast<SNetPacket*>(mPacketList.mNext);
   }
 
-#if defined(_WIN32)
-  if (socket_ != INVALID_SOCKET)
-    closesocket(socket_);
-#endif
+  if (socket_ != platform::net::kInvalidSocket)
+    platform::net::CloseSocket(socket_);
 
   if (mPacketLogFile) {
     fclose(mPacketLogFile);
@@ -129,10 +123,10 @@ CNetUDPConnector::~CNetUDPConnector()
  * Initializes UDP connector runtime state, arms socket events, starts worker
  * thread (`Entry`), and registers NAT traversal handler with provider.
  */
-CNetUDPConnector::CNetUDPConnector(SOCKET sock, boost::weak_ptr<INetNATTraversalProvider>& prov)
+CNetUDPConnector::CNetUDPConnector(platform::net::Socket sock, boost::weak_ptr<INetNATTraversalProvider>& prov)
   : lock_{}
   , socket_{sock}
-  , event_{::WSACreateEvent()}
+  , event_{platform::net::CreateSocketEvent()}
   , mNatTraversalProvider{prov}
   , mConnections{}
   , mPacketList{}
@@ -162,8 +156,8 @@ CNetUDPConnector::CNetUDPConnector(SOCKET sock, boost::weak_ptr<INetNATTraversal
   {
     boost::recursive_mutex::scoped_lock lock{lock_};
 
-    if (event_ != WSA_INVALID_EVENT) {
-      ::WSAEventSelect(socket_, event_, FD_READ | FD_WRITE);
+    if (event_ != nullptr) { // WSA_INVALID_EVENT
+      platform::net::SelectSocketEvents(socket_, event_, platform::net::kEventRead | platform::net::kEventWrite);
     }
 
     boost::thread([selfOwner]() {
@@ -204,9 +198,7 @@ void CNetUDPConnector::Destroy()
   }
 
   mClosed = true;
-#if defined(_WIN32)
   SignalSocketEvent();
-#endif
 }
 
 /**
@@ -220,8 +212,7 @@ u_short CNetUDPConnector::GetLocalPort()
 {
   boost::recursive_mutex::scoped_lock lock{lock_};
   sockaddr_in sa{};
-  int nameLen = sizeof(sa);
-  getsockname(socket_, reinterpret_cast<sockaddr*>(&sa), &nameLen);
+  platform::net::GetLocalAddress(socket_, &sa);
   return ntohs(sa.sin_port);
 }
 
@@ -236,9 +227,7 @@ u_short CNetUDPConnector::GetLocalPort()
 CNetUDPConnection* CNetUDPConnector::Connect(const u_long address, const u_short port)
 {
   boost::recursive_mutex::scoped_lock lock{lock_};
-#if defined(_WIN32)
   SignalSocketEvent();
-#endif
 
   for (auto* conn : mConnections.owners()) {
     // Match by address/port
@@ -382,9 +371,7 @@ void CNetUDPConnector::Pull()
 
   mIsPulling = false;
   if (mClosed) {
-#if defined(_WIN32)
     SignalSocketEvent();
-#endif
   }
 }
 
@@ -407,9 +394,7 @@ void CNetUDPConnector::Push()
   }
 
   if (didFlush) {
-#if defined(_WIN32)
     SignalSocketEvent();
-#endif
   }
 }
 
@@ -424,9 +409,7 @@ void CNetUDPConnector::SelectEvent(const HANDLE ev)
 {
   boost::recursive_mutex::scoped_lock lock{lock_};
   mSelectedEvent = ev;
-#if defined(_WIN32)
   SignalSocketEvent();
-#endif
 }
 
 /**
@@ -520,22 +503,14 @@ void CNetUDPConnector::ReceiveData()
     packet->ListLinkBefore(&acquiredPackets);
 
     sockaddr_in from{};
-    int fromLen = sizeof(from);
-    const int n =
-      recvfrom(socket_, static_cast<char*>(packet->GetPayload()), 512, 0, reinterpret_cast<sockaddr*>(&from), &fromLen);
+    const int n = platform::net::RecvFrom(socket_, static_cast<char*>(packet->GetPayload()), 512, &from);
 
     if (n < 0) {
-#if defined(_WIN32)
-      const int lastErr = WSAGetLastError();
-      if (lastErr != WSAEWOULDBLOCK && net_DebugLevel) {
+      const int lastErr = platform::net::LastError();
+      if (lastErr != platform::net::error::kWouldBlock && net_DebugLevel) {
         const char* es = NET_GetWinsockErrorString();
         gpg::Logf("CNetUDPConnector<%hu>::ReceiveData(): recvfrom() failed: %s", GetLocalPort(), es);
       }
-#else
-      if (errno != EWOULDBLOCK && errno != EAGAIN && net_DebugLevel) {
-        gpg::Logf("CNetUDPConnector<%hu>::ReceiveData(): recvfrom() failed: errno=%d", GetLocalPort(), errno);
-      }
-#endif
       break;
     }
 
@@ -608,11 +583,9 @@ void CNetUDPConnector::HandleReceivedDatagram(
     ) {
       packet->ListUnlink();
       mInboundTraversalPackets.push_back({packet, addrHost, portHost});
-#if defined(_WIN32)
       if (mSelectedEvent) {
         SetEvent(mSelectedEvent);
       }
-#endif
     }
     return;
   }
@@ -812,11 +785,9 @@ void CNetUDPConnector::ProcessConnect(const SNetPacket* packet, const u_long add
   }
 
   newConnection->ProcessConnect(packet);
-#if defined(_WIN32)
   if (mSelectedEvent) {
     SetEvent(mSelectedEvent);
   }
-#endif
 }
 
 /**
@@ -841,6 +812,7 @@ void CNetUDPConnector::LogPacket(
 
   // Lazy open
   if (!mPacketLogFile) {
+#if FAFRE_PLATFORM_WINDOWS
     char* temp = nullptr;
     size_t tempLen = 0;
     if (_dupenv_s(&temp, &tempLen, "TEMP") != 0 || temp == nullptr) {
@@ -848,6 +820,15 @@ void CNetUDPConnector::LogPacket(
       gpg::Logf("NET: Can't find a place for the packet log -- %%TEMP%% not set!");
       return;
     }
+#else
+    // Engine addition (issue #259): POSIX has no %TEMP%; the log goes to $TMPDIR, or /tmp.
+    const char* const tmpDir = std::getenv("TMPDIR");
+    char* temp = ::strdup(tmpDir != nullptr && tmpDir[0] != '\0' ? tmpDir : "/tmp");
+    if (temp == nullptr) {
+      net_LogPackets = 0;
+      return;
+    }
+#endif
 
     char host[260] = {};
     if (gethostname(host, sizeof(host) - 1) == -1) {
@@ -858,9 +839,13 @@ void CNetUDPConnector::LogPacket(
     }
 
     const unsigned localPort = GetLocalPort();
+#if FAFRE_PLATFORM_WINDOWS
     const fa::string path = gpg::STR_Printf("%s\\%s-%u.pktlog", temp, host, localPort);
+#else
+    const fa::string path = gpg::STR_Printf("%s/%s-%u.pktlog", temp, host, localPort);
+#endif
 
-    const errno_t openError = fopen_s(&mPacketLogFile, path.c_str(), "ab");
+    const int openError = fopen_s(&mPacketLogFile, path.c_str(), "ab"); // errno_t
     if (openError != 0 || !mPacketLogFile) {
       free(temp);
       net_LogPackets = 0;
@@ -954,9 +939,7 @@ void CNetUDPConnector::ReceivePacket(const u_long address, const u_short port, c
   const SReceivePacket r{packet, address, port};
   mOutboundPackets.push_back(r);
 
-#if defined(_WIN32)
   SignalSocketEvent();
-#endif
 }
 
 /**
@@ -989,9 +972,7 @@ void CNetUDPConnector::Entry()
   const fa::string name = gpg::STR_Printf("CNetUDPConnector for port %d", GetLocalPort());
   gpg::SetThreadName(0xFFFFFFFF, name.c_str());
   THREAD_SetAffinity(false);
-#if defined(_WIN32)
   ::SetThreadPriority(::GetCurrentThread(), 2);
-#endif
   boost::recursive_mutex::scoped_lock lock{lock_};
   while (true) {
     if (!net_LogPackets && mPacketLogFile != nullptr) {
@@ -1024,7 +1005,7 @@ void CNetUDPConnector::Entry()
       const auto timeStr = gpg::FileTimeToString(startTime);
       gpg::Debugf("%s: waiting, timeout=%dms", timeStr.c_str(), timeout);
     }
-    ::WSAWaitForMultipleEvents(1, &event_, false, static_cast<DWORD>(timeout), true);
+    platform::net::WaitSocketEvent(event_, static_cast<std::uint32_t>(timeout));
 
     if (startTime != 0) {
       const auto time = GetTime();
@@ -1032,7 +1013,7 @@ void CNetUDPConnector::Entry()
       gpg::Debugf("%s: wait finished, elapsed=%dms", timeStr.c_str(), (time - startTime) / 1000);
     }
     lock.lock();
-    ::WSAResetEvent(event_);
+    platform::net::ResetSocketEvent(event_);
   }
 }
 
@@ -1056,7 +1037,7 @@ int32_t CNetUDPConnector::SendData()
     sockaddr_in name;
     name.sin_family = AF_INET;
     name.sin_port = ::htons(packet.mPort);
-    name.sin_addr.S_un.S_addr = ::htonl(packet.mAddr);
+    name.sin_addr.s_addr = ::htonl(packet.mAddr);
 
     const auto payload = packet.mPacket->GetPayload();
     const auto payloadSize = packet.mPacket->GetPayloadSize();
@@ -1064,14 +1045,7 @@ int32_t CNetUDPConnector::SendData()
     // Engine addition (issue #232): an in-process transport for this address.
     if (!NET_PeerTransportsActive() ||
         !NET_SendThroughPeerTransport(this, packet.mAddr, packet.mPort, payload, payloadSize)) {
-      ::sendto(
-        socket_,
-        static_cast<const char*>(payload),
-        static_cast<int32_t>(payloadSize),
-        0,
-        reinterpret_cast<SOCKADDR*>(&name),
-        16
-      );
+      platform::net::SendTo(socket_, static_cast<const char*>(payload), static_cast<int32_t>(payloadSize), name);
     }
 
     if (net_LogPackets) {

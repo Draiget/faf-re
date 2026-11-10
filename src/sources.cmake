@@ -236,6 +236,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/textures/SBatchTextureDataFactory.cpp
   moho/misc/FileWaitHandleSet.cpp
   moho/net/Common.cpp
+  platform/windows/NetWindows.cpp
   moho/net/NetConVars.cpp
   moho/net/NetPeerTransport.cpp
   moho/net/NetlinkPeers.cpp

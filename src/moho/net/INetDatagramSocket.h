@@ -1,5 +1,6 @@
 #pragma once
 
+#include "platform/Net.h"
 #include "platform/Platform.h"
 
 namespace moho

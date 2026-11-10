@@ -822,13 +822,9 @@ namespace
   /// Only for a link whose far end runs this build: see `CNetUDPConnection::SetWindow`.
   void WidenRejoinLink(INetConnection* const link)
   {
-#if defined(_WIN32)
     if (auto* const udp = dynamic_cast<CNetUDPConnection*>(link)) {
       udp->SetWindow(static_cast<std::uint16_t>(std::clamp(net_RejoinWindow, 32, 4096)));
     }
-#else
-    (void)link;
-#endif
   }
 
   /// What one peer has said before there is a session to tell.

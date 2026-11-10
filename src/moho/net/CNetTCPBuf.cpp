@@ -30,13 +30,12 @@ CNetTCPBuf::~CNetTCPBuf()
  */
 u_short CNetTCPBuf::GetPort()
 {
-  if (mSocket == INVALID_SOCKET) {
+  if (mSocket == platform::net::kInvalidSocket) {
     ThrowSocketClosed();
   }
 
   sockaddr_in name{};
-  int nameLen = static_cast<int>(sizeof(name));
-  getsockname(mSocket, reinterpret_cast<sockaddr*>(&name), &nameLen);
+  platform::net::GetLocalAddress(mSocket, &name);
   return ntohs(name.sin_port);
 }
 
@@ -49,13 +48,12 @@ u_short CNetTCPBuf::GetPort()
  */
 u_long CNetTCPBuf::GetPeerAddr()
 {
-  if (mSocket == INVALID_SOCKET) {
+  if (mSocket == platform::net::kInvalidSocket) {
     ThrowSocketClosed();
   }
 
   sockaddr_in name{};
-  int nameLen = static_cast<int>(sizeof(name));
-  getpeername(mSocket, reinterpret_cast<sockaddr*>(&name), &nameLen);
+  platform::net::GetPeerAddress(mSocket, &name);
   return ntohl(name.sin_addr.s_addr);
 }
 
@@ -68,13 +66,12 @@ u_long CNetTCPBuf::GetPeerAddr()
  */
 u_short CNetTCPBuf::GetPeerPort()
 {
-  if (mSocket == INVALID_SOCKET) {
+  if (mSocket == platform::net::kInvalidSocket) {
     ThrowSocketClosed();
   }
 
   sockaddr_in name{};
-  int nameLen = static_cast<int>(sizeof(name));
-  getpeername(mSocket, reinterpret_cast<sockaddr*>(&name), &nameLen);
+  platform::net::GetPeerAddress(mSocket, &name);
   return ntohs(name.sin_port);
 }
 
@@ -111,7 +108,7 @@ size_t CNetTCPBuf::VirtReadNonBlocking(char* const buf, const size_t len)
  */
 bool CNetTCPBuf::VirtAtEnd()
 {
-  if (mSocket == INVALID_SOCKET) {
+  if (mSocket == platform::net::kInvalidSocket) {
     ThrowSocketClosed();
   }
   return mFailed != 0;
@@ -126,7 +123,7 @@ bool CNetTCPBuf::VirtAtEnd()
  */
 void CNetTCPBuf::VirtWrite(const char* data, size_t size)
 {
-  if (mSocket == INVALID_SOCKET) {
+  if (mSocket == platform::net::kInvalidSocket) {
     ThrowSocketClosed();
   }
 
@@ -155,7 +152,7 @@ void CNetTCPBuf::VirtWrite(const char* data, size_t size)
       // Raw TCP send-buffer blob copy.
       std::copy_n(data, size, mBuffer + kChunkSize);
       mWriteHead = mBuffer + kChunkSize + size;
-    } else if (send(mSocket, data, static_cast<int>(size), 0) == SOCKET_ERROR) {
+    } else if (platform::net::Send(mSocket, data, static_cast<int>(size)) == platform::net::kSocketError) {
       gpg::Logf("CNetTCPBuf::Write(): send() failed: %s", NET_GetWinsockErrorString());
     }
   } else {
@@ -174,7 +171,7 @@ void CNetTCPBuf::VirtWrite(const char* data, size_t size)
  */
 void CNetTCPBuf::VirtFlush()
 {
-  if (mSocket == INVALID_SOCKET) {
+  if (mSocket == platform::net::kInvalidSocket) {
     ThrowSocketClosed();
   }
 
@@ -183,7 +180,7 @@ void CNetTCPBuf::VirtFlush()
     return;
   }
 
-  if (send(mSocket, mBuffer + kChunkSize, pendingSize, 0) == SOCKET_ERROR) {
+  if (platform::net::Send(mSocket, mBuffer + kChunkSize, pendingSize) == platform::net::kSocketError) {
     gpg::Logf("CNetTCPBuf::Flush(): send() failed: %s", NET_GetWinsockErrorString());
   }
   mWriteHead = mBuffer + kChunkSize;
@@ -198,13 +195,13 @@ void CNetTCPBuf::VirtFlush()
  */
 void CNetTCPBuf::VirtClose(const Mode mode)
 {
-  if (mSocket == INVALID_SOCKET) {
+  if (mSocket == platform::net::kInvalidSocket) {
     return;
   }
 
   if ((mMode & static_cast<std::uint32_t>(mode) & static_cast<std::uint32_t>(ModeSend)) != 0) {
     VirtFlush();
-    shutdown(mSocket, SD_SEND);
+    platform::net::Shutdown(mSocket, platform::net::ShutdownHow::kSend);
     mMode &= ~static_cast<std::uint32_t>(ModeSend);
     mWriteStart = nullptr;
     mWriteHead = nullptr;
@@ -212,7 +209,7 @@ void CNetTCPBuf::VirtClose(const Mode mode)
   }
 
   if ((mMode & static_cast<std::uint32_t>(mode) & static_cast<std::uint32_t>(ModeReceive)) != 0) {
-    shutdown(mSocket, SD_RECEIVE);
+    platform::net::Shutdown(mSocket, platform::net::ShutdownHow::kReceive);
     mMode &= ~static_cast<std::uint32_t>(ModeReceive);
     mReadStart = nullptr;
     mReadHead = nullptr;
@@ -220,8 +217,8 @@ void CNetTCPBuf::VirtClose(const Mode mode)
   }
 
   if (mMode == static_cast<std::uint32_t>(ModeNone)) {
-    closesocket(mSocket);
-    mSocket = INVALID_SOCKET;
+    platform::net::CloseSocket(mSocket);
+    mSocket = platform::net::kInvalidSocket;
   }
 }
 
@@ -232,7 +229,7 @@ void CNetTCPBuf::VirtClose(const Mode mode)
  * What it does:
  * Initializes stream pointers/mode around an already-connected socket.
  */
-CNetTCPBuf::CNetTCPBuf(const SOCKET socket) noexcept
+CNetTCPBuf::CNetTCPBuf(const platform::net::Socket socket) noexcept
   : INetTCPSocket()
   , mSocket(socket)
   , mMode(static_cast<std::uint32_t>(ModeBoth))
@@ -256,7 +253,7 @@ CNetTCPBuf::CNetTCPBuf(const SOCKET socket) noexcept
  */
 size_t CNetTCPBuf::Read(char* buf, size_t len, const bool isBlocking)
 {
-  if (mSocket == INVALID_SOCKET) {
+  if (mSocket == platform::net::kInvalidSocket) {
     ThrowSocketClosed();
   }
 
@@ -283,20 +280,14 @@ size_t CNetTCPBuf::Read(char* buf, size_t len, const bool isBlocking)
       if (buf != nullptr) {
         while (len >= kChunkSize) {
           if (!isBlocking) {
-            fd_set readFds{};
-            readFds.fd_count = 1;
-            readFds.fd_array[0] = mSocket;
-            timeval timeout{};
-            timeout.tv_sec = 0;
-            timeout.tv_usec = 0;
-            const int selectRes = select(1, &readFds, nullptr, nullptr, &timeout);
-            if (selectRes != SOCKET_ERROR && selectRes <= 0) {
+            const int selectRes = platform::net::PollReadable(mSocket);
+            if (selectRes != platform::net::kSocketError && selectRes <= 0) {
               return copiedFromBuffer;
             }
           }
 
-          const int received = recv(mSocket, buf, static_cast<int>(len), 0);
-          if (received == SOCKET_ERROR) {
+          const int received = platform::net::Recv(mSocket, buf, static_cast<int>(len));
+          if (received == platform::net::kSocketError) {
             gpg::Logf("CNetTCPBuf::Read(): recv() failed: %s", NET_GetWinsockErrorString());
             mFailed = 1;
             return copiedFromBuffer;
@@ -323,7 +314,7 @@ size_t CNetTCPBuf::Read(char* buf, size_t len, const bool isBlocking)
         return copiedFromBuffer;
       }
 
-      const int received = recv(mSocket, mBuffer, static_cast<int>(kChunkSize), 0);
+      const int received = platform::net::Recv(mSocket, mBuffer, static_cast<int>(kChunkSize));
       if (received < 0) {
         gpg::Logf("CNetTCPBuf::Read(): recv() failed: %s", NET_GetWinsockErrorString());
         mFailed = 1;
@@ -360,16 +351,8 @@ size_t CNetTCPBuf::Read(char* buf, size_t len, const bool isBlocking)
  */
 bool CNetTCPBuf::Select() const
 {
-  fd_set readFds{};
-  readFds.fd_count = 1;
-  readFds.fd_array[0] = mSocket;
-
-  timeval timeout{};
-  timeout.tv_sec = 0;
-  timeout.tv_usec = 0;
-
-  const int selected = select(1, &readFds, nullptr, nullptr, &timeout);
-  return selected == SOCKET_ERROR || selected > 0;
+  const int selected = platform::net::PollReadable(mSocket);
+  return selected == platform::net::kSocketError || selected > 0;
 }
 
 /**

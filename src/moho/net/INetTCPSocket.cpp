@@ -38,8 +38,8 @@ INetTCPSocket* moho::NET_TCPConnect(const u_long address, const u_short port)
     return nullptr;
   }
 
-  const SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (sock == INVALID_SOCKET) {
+  const platform::net::Socket sock = platform::net::OpenSocket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (sock == platform::net::kInvalidSocket) {
     const fa::string hostName = NET_GetHostName(address);
     gpg::Logf(
       "NET_TCPConnect(%s:%d): socket() failed: %s",
@@ -55,7 +55,7 @@ INetTCPSocket* moho::NET_TCPConnect(const u_long address, const u_short port)
   name.sin_port = htons(port);
   name.sin_addr.s_addr = htonl(address);
 
-  if (connect(sock, reinterpret_cast<const sockaddr*>(&name), static_cast<int>(sizeof(name))) == SOCKET_ERROR) {
+  if (platform::net::Connect(sock, name) == platform::net::kSocketError) {
     const fa::string hostName = NET_GetHostName(address);
     gpg::Logf(
       "NET_TCPConnect(%s:%d): connect() failed: %s",
@@ -63,7 +63,7 @@ INetTCPSocket* moho::NET_TCPConnect(const u_long address, const u_short port)
       static_cast<int>(port),
       NET_GetWinsockErrorString()
     );
-    closesocket(sock);
+    platform::net::CloseSocket(sock);
     return nullptr;
   }
 

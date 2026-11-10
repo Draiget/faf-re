@@ -11,6 +11,7 @@
 #include "NetConstants.h"
 #include "NetMessageRanges.h"
 #include "NetTransportEnums.h"
+#include "platform/Net.h"
 #include "platform/Platform.h"
 
 namespace gpg

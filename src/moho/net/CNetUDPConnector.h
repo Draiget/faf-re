@@ -93,7 +93,7 @@ namespace moho
      * Initializes connector runtime state, starts worker `Entry` thread, and
      * registers NAT traversal callback with provider.
      */
-    CNetUDPConnector(SOCKET sock, boost::weak_ptr<INetNATTraversalProvider>& prov);
+    CNetUDPConnector(platform::net::Socket sock, boost::weak_ptr<INetNATTraversalProvider>& prov);
 
     /**
      * In binary this does:
@@ -341,7 +341,7 @@ namespace moho
     // +0x04  vptr(INetNATTraversalHandler)
 
     boost::recursive_mutex lock_;
-    SOCKET socket_{INVALID_SOCKET};
+    platform::net::Socket socket_{platform::net::kInvalidSocket};
     HANDLE event_{nullptr};
     boost::weak_ptr<INetNATTraversalProvider> mNatTraversalProvider;
     gpg::DList<CNetUDPConnection> mConnections;

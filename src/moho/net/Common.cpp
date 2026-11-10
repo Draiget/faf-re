@@ -12,12 +12,8 @@
 #include "CHostManager.h"
 #include "CGpgNetInterface.h"
 #include "CNetNullConnector.h"
-#if defined(_WIN32)
 #include "CNetTCPConnector.h"
 #include "CNetUDPConnector.h"
-#else
-#include "INetTCPSocket.h"
-#endif
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/utils/Global.h"
@@ -719,20 +715,15 @@ SNetCommandArg moho::NET_DecodeSocketArg(gpg::BinaryReader& reader)
  */
 bool moho::NET_Init()
 {
-#if defined(_WIN32)
   static bool sWinsockInitialized = false;
   if (!sWinsockInitialized) {
-    WSAData wsaData;
-    if (::WSAStartup(MAKEWORD(1, 1), &wsaData)) {
+    if (platform::net::Startup()) {
       gpg::Logf("Net_Init(): WSAStartup failed: %s", NET_GetWinsockErrorString());
     } else {
       sWinsockInitialized = true;
     }
   }
   return sWinsockInitialized;
-#else
-  return false;
-#endif
 }
 
 /**
@@ -781,7 +772,6 @@ INetConnector* moho::NET_MakeConnector(
  */
 INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<INetNATTraversalProvider> prov)
 {
-#if defined(_WIN32)
   if (!NET_Init()) {
     return nullptr;
   }
@@ -789,24 +779,23 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
   // binary logs them only above 0, as the TCP connector does always). A game
   // port that cannot be bound makes InternalCreateLobby return nil, and without
   // these lines nothing said why the lobby never opened.
-  SOCKET sock = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  if (sock == INVALID_SOCKET) {
+  platform::net::Socket sock = platform::net::OpenSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (sock == platform::net::kInvalidSocket) {
     gpg::Logf("NET_MakeUDPConnector: socket() failed: %s", NET_GetWinsockErrorString());
     return nullptr;
   }
-  u_long argp = 1;
-  if (::ioctlsocket(sock, FIONBIO, &argp) == SOCKET_ERROR) {
+  if (platform::net::SetNonBlocking(sock) == platform::net::kSocketError) {
     gpg::Logf("NET_MakeUDPConnector: ioctlsocket(FIONBIO) failed: %s", NET_GetWinsockErrorString());
-    ::closesocket(sock);
+    platform::net::CloseSocket(sock);
     return nullptr;
   }
   sockaddr_in name;
   name.sin_family = AF_INET;
   name.sin_port = ::htons(port);
-  name.sin_addr.S_un.S_addr = ::htonl(0);
-  if (::bind(sock, (SOCKADDR*)&name, sizeof(name)) == SOCKET_ERROR) {
+  name.sin_addr.s_addr = ::htonl(0);
+  if (platform::net::Bind(sock, name) == platform::net::kSocketError) {
     gpg::Logf("NET_MakeUDPConnector: bind(%d) failed: %s", port, NET_GetWinsockErrorString());
-    ::closesocket(sock);
+    platform::net::CloseSocket(sock);
     return nullptr;
   }
   // Engine addition (issue #236): socket buffer sizes, off (0) by default.
@@ -816,7 +805,7 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
                                              std::tuple{SO_SNDBUF, net_SocketSendBuffer, "SO_SNDBUF"}}) {
     if (bytes > 0) {
       const int value = bytes;
-      if (::setsockopt(sock, SOL_SOCKET, option, reinterpret_cast<const char*>(&value), sizeof(value)) == SOCKET_ERROR) {
+      if (platform::net::SetOption(sock, SOL_SOCKET, option, &value, sizeof(value)) == platform::net::kSocketError) {
         gpg::Logf("NET_MakeUDPConnector: setsockopt(%s, %d) failed: %s", label, value, NET_GetWinsockErrorString());
       } else {
         gpg::Logf("NET_MakeUDPConnector: %s %d", label, value);
@@ -824,14 +813,6 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
     }
   }
   return new CNetUDPConnector{sock, prov};
-#else
-  // Engine addition (dedicated-server plan WPL.5): the lockstep transport (the WSAEventSelect
-  // connectors and their sockets) is Windows only; NET_Init fails here, so this fails as the
-  // Windows function does when Winsock cannot start.
-  (void)port;
-  (void)prov;
-  return nullptr;
-#endif
 }
 
 /**
@@ -842,21 +823,19 @@ INetConnector* moho::NET_MakeUDPConnector(const u_short port, boost::weak_ptr<IN
  */
 INetConnector* moho::NET_MakeTCPConnector(const u_short port)
 {
-#if defined(_WIN32)
   if (!NET_Init()) {
     return nullptr;
   }
 
-  const SOCKET sock = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (sock == INVALID_SOCKET) {
+  const platform::net::Socket sock = platform::net::OpenSocket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (sock == platform::net::kInvalidSocket) {
     gpg::Logf("NET_MakeConnector: socket() failed: %s", NET_GetWinsockErrorString());
     return nullptr;
   }
 
-  u_long nonBlocking = 1;
-  if (::ioctlsocket(sock, FIONBIO, &nonBlocking) == SOCKET_ERROR) {
+  if (platform::net::SetNonBlocking(sock) == platform::net::kSocketError) {
     gpg::Logf("NET_MakeConnector: ioctlsocket(FIONBIO) failed: %s", NET_GetWinsockErrorString());
-    ::closesocket(sock);
+    platform::net::CloseSocket(sock);
     return nullptr;
   }
 
@@ -864,15 +843,15 @@ INetConnector* moho::NET_MakeTCPConnector(const u_short port)
   name.sin_family = AF_INET;
   name.sin_port = ::htons(port);
   name.sin_addr.s_addr = ::htonl(0);
-  if (::bind(sock, reinterpret_cast<const sockaddr*>(&name), sizeof(name)) == SOCKET_ERROR) {
+  if (platform::net::Bind(sock, name) == platform::net::kSocketError) {
     gpg::Logf("NET_MakeConnector: bind(%d) failed: %s", port, NET_GetWinsockErrorString());
-    ::closesocket(sock);
+    platform::net::CloseSocket(sock);
     return nullptr;
   }
 
-  if (::listen(sock, SOMAXCONN) == SOCKET_ERROR) {
+  if (platform::net::Listen(sock, SOMAXCONN) == platform::net::kSocketError) {
     gpg::Logf("NET_MakeConnector: listen() failed: %s", NET_GetWinsockErrorString());
-    ::closesocket(sock);
+    platform::net::CloseSocket(sock);
     return nullptr;
   }
 
@@ -882,26 +861,7 @@ INetConnector* moho::NET_MakeTCPConnector(const u_short port)
     return nullptr;
   }
   return connector;
-#else
-  // Engine addition (dedicated-server plan WPL.5): see NET_MakeUDPConnector.
-  (void)port;
-  return nullptr;
-#endif
 }
-
-#if !defined(_WIN32)
-/**
- * Engine addition (dedicated-server plan WPL.5): moho/net/INetTCPSocket.cpp (the Winsock TCP
- * socket) is Windows only. NET_Init fails here, and NET_TCPConnect fails as the Windows
- * function does then.
- */
-moho::INetTCPSocket* moho::NET_TCPConnect(const u_long address, const u_short port)
-{
-  (void)address;
-  (void)port;
-  return nullptr;
-}
-#endif
 
 /**
  * Address: 0x0047F990 (FUN_0047F990)
@@ -937,127 +897,124 @@ fa::string moho::NET_GetHostName(const u_long address)
  */
 const char* moho::NET_GetWinsockErrorString() noexcept
 {
-#if defined(_WIN32)
-  const int e = ::WSAGetLastError();
+  // platform::net reports Winsock's numbers on every platform.
+  namespace error = platform::net::error;
+  const int e = platform::net::LastError();
   if (e == 0) {
     return "NOERROR";
   }
 
   // DNS/host resolution extended codes first (match original control flow)
   switch (e) {
-  case WSAHOST_NOT_FOUND:
+  case error::kHostNotFound:
     return "WSAHOST_NOT_FOUND"; // 11001
-  case WSATRY_AGAIN:
+  case error::kTryAgain:
     return "WSATRY_AGAIN"; // 11002
-  case WSANO_RECOVERY:
+  case error::kNoRecovery:
     return "WSANO_RECOVERY"; // 11003
-  case WSANO_DATA:
+  case error::kNoData:
     return "WSANO_DATA"; // 11004
   }
 
   // Core Winsock error set mirrored from the original switch
   switch (e) {
-  case WSAEINTR:
+  case error::kInterrupted:
     return "WSAEINTR"; // 10004 (0x2714)
-  case WSAEBADF:
+  case error::kBadFile:
     return "WSAEBADF"; // 10009 (0x2719)
-  case WSAEACCES:
+  case error::kAccess:
     return "WSAEACCES"; // 10013 (0x271D)
-  case WSAEFAULT:
+  case error::kFault:
     return "WSAEFAULT"; // 10014 (0x271E)
-  case WSAEINVAL:
+  case error::kInvalid:
     return "WSAEINVAL"; // 10022 (0x2726)
-  case WSAEMFILE:
+  case error::kTooManyFiles:
     return "WSAEMFILE"; // 10024 (0x2728)
-  case WSAEWOULDBLOCK:
+  case error::kWouldBlock:
     return "WSAEWOULDBLOCK"; // 10035 (0x2733)
-  case WSAEINPROGRESS:
+  case error::kInProgress:
     return "WSAEINPROGRESS"; // 10036 (0x2734)
-  case WSAEALREADY:
+  case error::kAlready:
     return "WSAEALREADY"; // 10037 (0x2735)
-  case WSAENOTSOCK:
+  case error::kNotSocket:
     return "WSAENOTSOCK"; // 10038 (0x2736)
-  case WSAEDESTADDRREQ:
+  case error::kDestinationRequired:
     return "WSAEDESTADDRREQ"; // 10039 (0x2737)
-  case WSAEMSGSIZE:
+  case error::kMessageSize:
     return "WSAEMSGSIZE"; // 10040 (0x2738)
-  case WSAEPROTOTYPE:
+  case error::kProtocolType:
     return "WSAEPROTOTYPE"; // 10041 (0x2739)
-  case WSAENOPROTOOPT:
+  case error::kNoProtocolOption:
     return "WSAENOPROTOOPT"; // 10042 (0x273A)
-  case WSAEPROTONOSUPPORT:
+  case error::kProtocolNotSupported:
     return "WSAEPROTONOSUPPORT"; // 10043 (0x273B)
-  case WSAESOCKTNOSUPPORT:
+  case error::kSocketTypeNotSupported:
     return "WSAESOCKTNOSUPPORT"; // 10044 (0x273C)
-  case WSAEOPNOTSUPP:
+  case error::kOperationNotSupported:
     return "WSAEOPNOTSUPP"; // 10045 (0x273D)
-  case WSAEPFNOSUPPORT:
+  case error::kFamilyNotSupported:
     return "WSAEPFNOSUPPORT"; // 10046 (0x273E)
-  case WSAEAFNOSUPPORT:
+  case error::kAddressFamily:
     return "WSAEAFNOSUPPORT"; // 10047 (0x273F)
-  case WSAEADDRINUSE:
+  case error::kAddressInUse:
     return "WSAEADDRINUSE"; // 10048 (0x2740)
-  case WSAEADDRNOTAVAIL:
+  case error::kAddressNotAvailable:
     return "WSAEADDRNOTAVAIL"; // 10049 (0x2741)
-  case WSAENETDOWN:
+  case error::kNetworkDown:
     return "WSAENETDOWN"; // 10050 (0x2742)
-  case WSAENETUNREACH:
+  case error::kNetworkUnreachable:
     return "WSAENETUNREACH"; // 10051 (0x2743)
-  case WSAENETRESET:
+  case error::kNetworkReset:
     return "WSAENETRESET"; // 10052 (0x2744)
-  case WSAECONNABORTED:
+  case error::kConnectionAborted:
     return "WSAECONNABORTED"; // 10053 (0x2745)
-  case WSAECONNRESET:
+  case error::kConnectionReset:
     return "WSAECONNRESET"; // 10054 (0x2746)
-  case WSAENOBUFS:
+  case error::kNoBuffers:
     return "WSAENOBUFS"; // 10055 (0x2747)
-  case WSAEISCONN:
+  case error::kIsConnected:
     return "WSAEISCONN"; // 10056 (0x2748)
-  case WSAENOTCONN:
+  case error::kNotConnected:
     return "WSAENOTCONN"; // 10057 (0x2749)
-  case WSAESHUTDOWN:
+  case error::kShutdown:
     return "WSAESHUTDOWN"; // 10058 (0x274A)
-  case WSAETOOMANYREFS:
+  case error::kTooManyReferences:
     return "WSAETOOMANYREFS"; // 10059 (0x274B)
-  case WSAETIMEDOUT:
+  case error::kTimedOut:
     return "WSAETIMEDOUT"; // 10060 (0x274C)
-  case WSAECONNREFUSED:
+  case error::kConnectionRefused:
     return "WSAECONNREFUSED"; // 10061 (0x274D)
-  case WSAELOOP:
+  case error::kLoop:
     return "WSAELOOP"; // 10062 (0x274E)
-  case WSAENAMETOOLONG:
+  case error::kNameTooLong:
     return "WSAENAMETOOLONG"; // 10063 (0x274F)
-  case WSAEHOSTDOWN:
+  case error::kHostDown:
     return "WSAEHOSTDOWN"; // 10064 (0x2750)
-  case WSAEHOSTUNREACH:
+  case error::kHostUnreachable:
     return "WSAEHOSTUNREACH"; // 10065 (0x2751)
-  case WSAENOTEMPTY:
+  case error::kNotEmpty:
     return "WSAENOTEMPTY"; // 10066 (0x2752)
-  case WSAEPROCLIM:
+  case error::kProcessLimit:
     return "WSAEPROCLIM"; // 10067 (0x2753)
-  case WSAEUSERS:
+  case error::kUsers:
     return "WSAEUSERS"; // 10068 (0x2754)
-  case WSAEDQUOT:
+  case error::kDiskQuota:
     return "WSAEDQUOT"; // 10069 (0x2755)
-  case WSAESTALE:
+  case error::kStale:
     return "WSAESTALE"; // 10070 (0x2756)
-  case WSAEREMOTE:
+  case error::kRemote:
     return "WSAEREMOTE"; // 10071 (0x2757)
-  case WSASYSNOTREADY:
+  case error::kSystemNotReady:
     return "WSASYSNOTREADY"; // 10091 (0x276B)
-  case WSAVERNOTSUPPORTED:
+  case error::kVersionNotSupported:
     return "WSAVERNOTSUPPORTED"; // 10092 (0x276C)
-  case WSANOTINITIALISED:
+  case error::kNotInitialised:
     return "WSANOTINITIALISED"; // 10093 (0x276D)
-  case WSAEDISCON:
+  case error::kDisconnected:
     return "WSAEDISCON"; // 10101 (0x2775)
   default:
     return "UNKNOWN";
   }
-#else
-  // Non-Windows build: no Winsock -> stable stub.
-  return "NO_WINSOCK";
-#endif
 }
 
 /**

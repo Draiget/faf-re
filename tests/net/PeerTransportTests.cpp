@@ -15,7 +15,7 @@
 #include "moho/net/INetConnector.h"
 #include "moho/net/NetPeerTransport.h"
 
-#include <WS2tcpip.h>
+#include "platform/Net.h"
 
 #include <chrono>
 #include <cstdio>

@@ -39,8 +39,8 @@ INetTCPServer* moho::NET_CreateTCPServer(const u_long hostAddress, const u_short
     return nullptr;
   }
 
-  const SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (sock == INVALID_SOCKET) {
+  const platform::net::Socket sock = platform::net::OpenSocket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (sock == platform::net::kInvalidSocket) {
     gpg::Logf("NET_CreateTCPServer(%d): socket() failed: %s", static_cast<int>(port), NET_GetWinsockErrorString());
     return nullptr;
   }
@@ -50,15 +50,15 @@ INetTCPServer* moho::NET_CreateTCPServer(const u_long hostAddress, const u_short
   name.sin_port = htons(port);
   name.sin_addr.s_addr = htonl(hostAddress);
 
-  if (bind(sock, reinterpret_cast<const sockaddr*>(&name), static_cast<int>(sizeof(name))) == SOCKET_ERROR) {
+  if (platform::net::Bind(sock, name) == platform::net::kSocketError) {
     gpg::Logf("NET_CreateTCPServer(%d): bind() failed: %s", static_cast<int>(port), NET_GetWinsockErrorString());
-    closesocket(sock);
+    platform::net::CloseSocket(sock);
     return nullptr;
   }
 
-  if (listen(sock, 5) == SOCKET_ERROR) {
+  if (platform::net::Listen(sock, 5) == platform::net::kSocketError) {
     gpg::Logf("NET_CreateTCPServer(%d): listen() failed: %s", static_cast<int>(port), NET_GetWinsockErrorString());
-    closesocket(sock);
+    platform::net::CloseSocket(sock);
     return nullptr;
   }
 

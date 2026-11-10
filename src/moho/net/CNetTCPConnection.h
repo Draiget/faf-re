@@ -9,6 +9,7 @@
 #include "gpg/core/containers/DList.h"
 #include "NetConstants.h"
 #include "NetTransportEnums.h"
+#include "platform/Net.h"
 #include "platform/Platform.h"
 
 namespace moho
@@ -51,7 +52,7 @@ namespace moho
      * What it does:
      * Returns the owned WinSock socket handle.
      */
-    [[nodiscard]] SOCKET GetSocket() const noexcept;
+    [[nodiscard]] platform::net::Socket GetSocket() const noexcept;
 
     /**
      * Address: 0x00483590 (FUN_00483590, Moho::CNetTCPConnection::GetState)
@@ -67,7 +68,7 @@ namespace moho
      * What it does:
      * Attaches an accepted socket and transitions state to establishing.
      */
-    void AdoptSocketAndSetEstablishing(SOCKET socket) noexcept;
+    void AdoptSocketAndSetEstablishing(platform::net::Socket socket) noexcept;
 
     /**
      * Address: 0x004835D0 (FUN_004835D0)
@@ -136,7 +137,7 @@ namespace moho
      * Initializes TCP connection object and links it into connector list.
      */
     CNetTCPConnection(
-      CNetTCPConnector* connector, SOCKET socket, u_long address, u_short port, ENetConnectionState state
+      CNetTCPConnector* connector, platform::net::Socket socket, u_long address, u_short port, ENetConnectionState state
     );
 
     /**
@@ -174,7 +175,7 @@ namespace moho
 
   public:
     CNetTCPConnector* mConnector{nullptr};        // +0x418
-    SOCKET mSocket{INVALID_SOCKET};               // +0x41C
+    platform::net::Socket mSocket{platform::net::kInvalidSocket};               // +0x41C
     u_long mAddr{0};                              // +0x420
     u_short mPort{0};                             // +0x424
     std::uint16_t mPad0x426{0};                   // +0x426

@@ -60,10 +60,10 @@ namespace moho
      * What it does:
      * Initializes CNetTCPServerImpl around already-open listening socket.
      */
-    explicit CNetTCPServerImpl(SOCKET socket) noexcept;
+    explicit CNetTCPServerImpl(platform::net::Socket socket) noexcept;
 
   private:
-    SOCKET mSocket{INVALID_SOCKET}; // +0x04
+    platform::net::Socket mSocket{platform::net::kInvalidSocket}; // +0x04
   };
   static_assert(sizeof(CNetTCPServerImpl) == 0x8, "CNetTCPServerImpl size must be 0x8");
 } // namespace moho

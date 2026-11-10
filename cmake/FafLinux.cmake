@@ -135,11 +135,9 @@ list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/misc/WinPlatform\\.cpp$")
 # The crash diagnostics on dbghelp, vectored exception handlers, minidumps and debug
 # registers; gpg/core/diagnostics/posix/DiagnosticsPosix.cpp implements their headers.
 list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^gpg/core/diagnostics/(CrashHooks|CrashReport|ProbeWatch)\\.cpp$")
-# The lockstep transport: Winsock sockets driven by WSAEventSelect. Linux replays and
-# serves games without it (the server has its own channel, plan D3); moho/net/Common.cpp's
-# connector factories fail here as on a Windows host without Winsock.
-# NetPeerTransport (issue #232) belongs to CNetUDPConnector and goes with it.
-list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/net/(CNetDatagramSocketImpl|CNetTCPBuf|CNetTCPConnection|CNetTCPConnector|CNetTCPServerImpl|CNetUDPConnection|CNetUDPConnector|NetPeerTransport|INetDatagramSocket|INetTCPServer|INetTCPSocket)\\.cpp$")
+# The lockstep transport (moho/net's connectors and sockets) calls platform::net (issue #259):
+# the Winsock implementation is left out here, and the POSIX one is added to faf_sim below.
+list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^platform/windows/")
 
 set(_faf_sim_files "")
 foreach(_src IN LISTS FAF_SIM_SOURCES)
@@ -182,6 +180,8 @@ target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/gal/MatrixPortable.cpp")
 # The Win32 calls the shared code makes, on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32Shim.cpp")
+# platform::net (src/platform/Net.h) on BSD sockets, for moho/net's lockstep transport (issue #259).
+target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/NetPosix.cpp")
 # The crash diagnostics' headers on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/core/diagnostics/posix/DiagnosticsPosix.cpp")
 # moho/misc/WinPlatform.cpp's platform services (call stacks, error text, message boxes) and
@@ -383,6 +383,24 @@ target_link_libraries(faf_remote_tests PRIVATE faf_sim gtest_main)
 target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_remote_tests PRIVATE -Wl,--error-limit=0)
 add_test(NAME remote_wire COMMAND faf_remote_tests)
+
+# platform::net on BSD sockets (issue #259): loopback sockets and the socket events moho/net's
+# lockstep transport waits on.
+add_executable(faf_platform_net_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/PlatformNetTests.cpp")
+target_link_libraries(faf_platform_net_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_platform_net_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME platform_net COMMAND faf_platform_net_tests)
+# Two CNetUDPConnectors in one process over loopback sockets and through peer transports, as
+# Windows runs them (tests/CMakeLists.txt).
+add_executable(faf_peer_transport_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/PeerTransportTests.cpp")
+target_link_libraries(faf_peer_transport_tests PRIVATE faf_sim gtest)
+target_link_options(faf_peer_transport_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME net_peer_transport COMMAND faf_peer_transport_tests)
+# A lost DATA packet's recovery over two connectors (issue #237), as Windows runs it.
+add_executable(faf_fast_retransmit_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/FastRetransmitTests.cpp")
+target_link_libraries(faf_fast_retransmit_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_fast_retransmit_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME net_fast_retransmit COMMAND faf_fast_retransmit_tests)
 
 # The libm gate (plan WPL.13): the faf_sim objects call no host libm transcendental outside
 # tests/linux/libm_allowlist.txt; headless is not built while one does.

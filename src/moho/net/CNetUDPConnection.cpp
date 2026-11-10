@@ -196,9 +196,7 @@ void CNetUDPConnection::Write(NetDataSpan* data)
     );
   }
 
-#if defined(_WIN32)
   mConnector->SignalSocketEvent();
-#endif
 }
 
 /**
@@ -226,9 +224,7 @@ void CNetUDPConnection::Close()
   mOutputShutdown = true;
   mOutputFlushPending = false;
 
-#if defined(_WIN32)
   mConnector->SignalSocketEvent();
-#endif
 }
 
 /**
@@ -255,9 +251,7 @@ void CNetUDPConnection::ScheduleDestroy()
   Close();
   mScheduleDestroy = true;
 
-#if defined(_WIN32)
   mConnector->SignalSocketEvent();
-#endif
 }
 
 void CNetUDPConnection::SetWindow(const uint16_t window)
@@ -555,9 +549,7 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet)
     mInputBuffer.Close(gpg::Stream::ModeBoth);
 
     if (mConnector->mSelectedEvent) {
-#if defined(_WIN32)
       SetEvent(mConnector->mSelectedEvent);
-#endif
     }
     return false;
   }
@@ -667,11 +659,9 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet)
   // Binary rebinds/repurposes packet memory to this connection.
   AdoptPacket(packet);
 
-#if defined(_WIN32)
   if (mConnector->mSelectedEvent) {
     SetEvent(mConnector->mSelectedEvent);
   }
-#endif
 }
 
 /**
@@ -937,11 +927,9 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet)
   EarlyRebuildAckMask(mExpectedSequenceNumber, mMask);
 
   // Signal connector event if progressed (matches SetEvent path in asm)
-#if defined(_WIN32)
   if (progressed && mConnector && mConnector->mSelectedEvent) {
     SetEvent(mConnector->mSelectedEvent);
   }
-#endif
 }
 
 /**
@@ -1010,11 +998,9 @@ bool CNetUDPConnection::ProcessGoodbye(const SNetPacket* packet)
     }
 
     mInputBuffer.Close(gpg::Stream::ModeBoth);
-#if defined(_WIN32)
     if (mConnector && mConnector->mSelectedEvent) {
       SetEvent(mConnector->mSelectedEvent);
     }
-#endif
   }
 
   return true;
@@ -1494,21 +1480,17 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
   packet->header.mSerialNumber = mNextSerialNumber;
   packet->header.mInResponseTo = mInResponseTo;
 
-#if defined(_WIN32)
   sockaddr_in to{};
   to.sin_family = AF_INET;
   to.sin_port = htons(mPort);
   to.sin_addr.s_addr = htonl(mAddr);
-#else
-#error "Implement me on non-Windows platform!"
-#endif
 
   const auto payloadLen = static_cast<int>(packet->GetPayloadSize());
   const auto payload = static_cast<const char*>(packet->GetPayload());
   // Engine addition (issue #232): an in-process transport for this address.
   if (!NET_PeerTransportsActive() ||
       !NET_SendThroughPeerTransport(mConnector, mAddr, mPort, payload, static_cast<std::size_t>(payloadLen))) {
-    sendto(mConnector->socket_, payload, payloadLen, 0, reinterpret_cast<const sockaddr*>(&to), sizeof(to));
+    platform::net::SendTo(mConnector->socket_, payload, payloadLen, to);
   }
 
   const int64_t nowUs = mConnector->GetTime();
