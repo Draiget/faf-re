@@ -619,6 +619,7 @@ namespace faf::editor
         for (int i = 0; i < static_cast<int>(aiTypes.size()); ++i) {
           if (ImGui::Selectable(aiTypes[static_cast<std::size_t>(i)].name.c_str(), i == setup.ai)) {
             setup.ai = i;
+            mPlay.PrepareRules(); // an AI mod's type brings its mod
           }
         }
         ImGui::EndCombo();
@@ -639,6 +640,33 @@ namespace faf::editor
       }
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
         ImGui::SetTooltip("How many slots get an AI, taken in slot order; the rest stay empty");
+      }
+    }
+    // The sim mods played with; an AI mod's AI types are in the AI list, and its mod comes along when one is chosen.
+    if (!mPlay.Mods().empty()) {
+      const std::size_t on = setup.mods.size();
+      char header[64];
+      (void)std::snprintf(header, sizeof(header), "Mods (%zu of %zu)###playmods", on, mPlay.Mods().size());
+      if (ImGui::TreeNodeEx(header, ImGuiTreeNodeFlags_SpanAvailWidth)) {
+        bool changed = false;
+        for (const PlayMod& mod : mPlay.Mods()) {
+          bool enabled = std::find(setup.mods.begin(), setup.mods.end(), mod.uid) != setup.mods.end();
+          const std::string label = mod.name + (mod.aiTypes.empty() ? "" : "  (AI)");
+          ImGui::PushID(mod.uid.c_str());
+          if (ImGui::Checkbox(label.c_str(), &enabled)) {
+            if (enabled) {
+              setup.mods.push_back(mod.uid);
+            } else {
+              setup.mods.erase(std::remove(setup.mods.begin(), setup.mods.end(), mod.uid), setup.mods.end());
+            }
+            changed = true;
+          }
+          ImGui::PopID();
+        }
+        if (changed) {
+          mPlay.PrepareRules();
+        }
+        ImGui::TreePop();
       }
     }
     ImGui::Checkbox("Fog of war", &setup.fog);

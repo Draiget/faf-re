@@ -30,7 +30,7 @@
 
 namespace moho
 {
-  extern bool ren_FogOfWar;
+  extern bool ren_FogOfWarHidden;
 }
 
 namespace faf::editor
@@ -63,6 +63,9 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
         DoNotShareUnitCap = true, Timeouts = -1, GameSpeed = 'normal', UnitCap = '500',
         Victory = 'sandbox', CheatsEnabled = 'true', CivilianAlliance = 'enemy',
         TeamShareOverflow = 'enabled', Share = 'ShareUntilDeath',
+        -- As FAF's lobby has them (lobbyOptions.lua defaults, lobby.lua fills Ratings and ClanTags): AI mods
+        -- read them (M28AI writes its AIs' ratings into Ratings, cheating AIs read the multipliers).
+        CheatMult = '1.5', BuildMult = '1.5', Ratings = {}, ClanTags = {},
     }
     if faction < 1 then
         faction = SPL.GetRandomFaction()
@@ -74,7 +77,12 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
     info.createReplay = false
     info.scenarioInfo = scenario
     info.teamInfo = {}
-    info.scenarioMods = import('/lua/mods.lua').GetCampaignMods(scenario)
+    -- The setup's mods (a uid set), as a lobby game passes the chosen ones; a campaign map keeps FAF's own.
+    if scenario.type == 'campaign' then
+        info.scenarioMods = import('/lua/mods.lua').GetCampaignMods(scenario)
+    else
+        info.scenarioMods = import('/lua/mods.lua').GetGameMods(extra.mods or {})
+    end
 
     local GetDefaultPlayerOptions = import('/lua/ui/lobby/lobbycomm.lua').GetDefaultPlayerOptions
     local armies = scenario.Configurations.standard.teams[1].armies
@@ -131,6 +139,11 @@ function EditorStartPlay(mapPath, aiKey, faction, fog)
         info.teamInfo[index].Human = false
     end
 
+    for _, player in info.teamInfo do
+        if player.PlayerName then
+            scenario.Options.Ratings[player.PlayerName] = 0
+        end
+    end
     Prefs.SetToCurrentProfile('LoadingFaction', faction)
     LaunchSinglePlayerSession(info)
 end
@@ -340,6 +353,75 @@ end
     };
     read("/lua/ui/lobby/aitypes.lua", "aitypes", "key", "name", mAiTypes);
     read("/lua/factions.lua", "Factions", "Key", "DisplayName", mFactions);
+    // The sim mods, as FAF's lobby lists them (AllSelectableMods, not ui_only), and the AI types of the AI
+    // mods: the files of a mod's lua/AI/CustomAIs_v2 folder, their AI.AIList and AI.CheatAIList (FAF's
+    // aitypes.lua GetAItypes reads the same for the mods a lobby selected).
+    mMods.clear();
+    static constexpr char kListMods[] = R"lua(
+function EditorListMods()
+    local out = {}
+    for uid, mod in import('/lua/mods.lua').AllSelectableMods() do
+        if not mod.ui_only then
+            local entry = { uid = uid, name = mod.name or uid, ai = {} }
+            local folder = mod.location .. '/lua/AI/CustomAIs_v2'
+            if exists(folder) then
+                for _, file in DiskFindFiles(folder, '*.lua') do
+                    local ok, data = pcall(import, file)
+                    if ok and data.AI then
+                        for _, list in { data.AI.AIList or {}, data.AI.CheatAIList or {} } do
+                            for _, t in list do
+                                table.insert(entry.ai, { key = t.key, name = t.name })
+                            end
+                        end
+                    end
+                end
+            end
+            table.insert(out, entry)
+        end
+    end
+    return out
+end
+)lua";
+    try {
+      if (moho::SCR_LuaDoString(kListMods, state)) {
+        LuaPlus::LuaFunction<LuaPlus::LuaObject> listMods(state->GetGlobal("EditorListMods"));
+        const LuaPlus::LuaObject list = listMods();
+        for (int32_t i = 1; list.IsTable() && i <= list.GetN(); ++i) {
+          const LuaPlus::LuaObject entry = list[i];
+          if (!entry.IsTable() || !entry["uid"].IsString()) {
+            continue;
+          }
+          PlayMod mod;
+          mod.uid = entry["uid"].GetString();
+          mod.name = entry["name"].IsString() ? WithoutLocTag(entry["name"].GetString()) : mod.uid;
+          const LuaPlus::LuaObject ai = entry["ai"];
+          for (int32_t k = 1; ai.IsTable() && k <= ai.GetN(); ++k) {
+            const LuaPlus::LuaObject type = ai[k];
+            if (type.IsTable() && type["key"].IsString()) {
+              mod.aiTypes.push_back({type["key"].GetString(),
+                                     WithoutLocTag(type["name"].IsString() ? type["name"].GetString() : type["key"].GetString()), mod.uid});
+            }
+          }
+          mMods.push_back(std::move(mod));
+        }
+      }
+    } catch (const std::exception& error) {
+      gpg::Warnf("editor: the mod list: %s", error.what());
+    }
+    std::sort(mMods.begin(), mMods.end(), [](const PlayMod& a, const PlayMod& b) { return a.name < b.name; });
+    // The AI mods' types after the game's, named with their mod.
+    for (const PlayMod& mod : mMods) {
+      for (PlayChoice type : mod.aiTypes) {
+        // An AI mod may also list the game's own types: those stay the game's.
+        if (std::any_of(mAiTypes.begin(), mAiTypes.end(), [&](const PlayChoice& known) { return known.key == type.key; })) {
+          continue;
+        }
+        type.name = mod.name + ": " + type.name;
+        mAiTypes.push_back(std::move(type));
+      }
+    }
+    gpg::Logf("editor: %zu sim mods, %zu of them with AI types", mMods.size(),
+              static_cast<std::size_t>(std::count_if(mMods.begin(), mMods.end(), [](const PlayMod& mod) { return !mod.aiTypes.empty(); })));
     // FAF's quick start plays against "rush".
     mSetup.ai = 0;
     for (std::size_t i = 0; i < mAiTypes.size(); ++i) {
@@ -351,14 +433,50 @@ end
     ReadSetups();
     Select(mSelected);
 
-    // The game rules for the mods a skirmish play uses (FAF's GetCampaignMods: GetGameMods for any
-    // non-campaign map), built now on a thread so that the first Play takes them too. The session
-    // receives the same table as scenarioMods and the loader keys the rules by its SCR_ToString.
+    PrepareRules();
+  }
+
+  std::vector<std::string> EdPlay::PlayedMods() const
+  {
+    std::vector<std::string> mods = mSetup.mods;
+    if (mSetup.withAi && mSetup.ai >= 0 && mSetup.ai < static_cast<int>(mAiTypes.size())) {
+      const std::string& aiMod = mAiTypes[static_cast<std::size_t>(mSetup.ai)].mod;
+      if (!aiMod.empty() && std::find(mods.begin(), mods.end(), aiMod) == mods.end()) {
+        mods.push_back(aiMod);
+      }
+    }
+    // Only mods the game data still has.
+    mods.erase(std::remove_if(mods.begin(), mods.end(),
+                              [&](const std::string& uid) {
+                                return std::none_of(mMods.begin(), mMods.end(), [&](const PlayMod& mod) { return mod.uid == uid; });
+                              }),
+               mods.end());
+    std::sort(mods.begin(), mods.end());
+    return mods;
+  }
+
+  void EdPlay::PrepareRules()
+  {
+    // The game rules for the mods a skirmish play uses (GetGameMods of the setup's set), built now on a
+    // thread so that the next Play takes them. The session receives the same table as scenarioMods and
+    // the loader keys the rules by its SCR_ToString.
+    LuaPlus::LuaState* const state = moho::USER_GetLuaState();
+    const std::vector<std::string> mods = PlayedMods();
+    if (state == nullptr || (mods == mPreparedMods && !mPreparedMods.empty())) {
+      return;
+    }
+    mPreparedMods = mods;
+    std::string set = "__EditorPlayMods = {";
+    for (const std::string& uid : mods) {
+      set += "['" + uid + "'] = true, ";
+    }
+    (void)moho::SCR_LuaDoString((set + "}").c_str(), state);
     try {
       const LuaPlus::LuaObject getGameMods = moho::SCR_Import(state, "/lua/mods.lua")["GetGameMods"];
       if (getGameMods.IsFunction()) {
         LuaPlus::LuaFunction<LuaPlus::LuaObject> call(getGameMods);
-        moho::RULE_PrepareKept(moho::SCR_ToString(call()));
+        moho::RULE_PrepareKept(moho::SCR_ToString(call(state->GetGlobal("__EditorPlayMods"))));
+        gpg::Logf("editor: rules built ahead for %zu mod%s", mods.size(), mods.size() == 1 ? "" : "s");
       }
     } catch (const std::exception& error) {
       gpg::Warnf("editor: the game's mods for the rules built ahead: %s", error.what());
@@ -422,6 +540,7 @@ end
     stored.slot = setup.slot;
     stored.aiCount = setup.aiCount;
     stored.prebuilt = setup.prebuilt;
+    stored.mods = setup.mods;
     return stored;
   }
 
@@ -444,6 +563,7 @@ end
     setup.slot = stored.slot;
     setup.aiCount = stored.aiCount;
     setup.prebuilt = stored.prebuilt;
+    setup.mods = stored.mods;
     return setup;
   }
 
@@ -508,6 +628,15 @@ end
         current->aiCount = std::max(0, std::atoi(value.c_str()));
       } else if (key == "prebuilt") {
         current->prebuilt = value == "1";
+      } else if (key == "mods") {
+        current->mods.clear();
+        for (std::size_t at = 0; at < value.size();) {
+          const std::size_t comma = std::min(value.find(',', at), value.size());
+          if (comma > at) {
+            current->mods.push_back(value.substr(at, comma - at));
+          }
+          at = comma + 1;
+        }
       }
     }
     gpg::Logf("editor: play setups from %s (%s last, %zu maps of their own)", mSetupsFile.c_str(),
@@ -532,7 +661,12 @@ end
           << "fog=" << (setup.fog ? 1 : 0) << '\n'
           << "slot=" << setup.slot + 1 << '\n'
           << "aicount=" << setup.aiCount << '\n'
-          << "prebuilt=" << (setup.prebuilt ? 1 : 0) << "\n\n";
+          << "prebuilt=" << (setup.prebuilt ? 1 : 0) << '\n'
+          << "mods=";
+      for (std::size_t i = 0; i < setup.mods.size(); ++i) {
+        out << (i > 0 ? "," : "") << setup.mods[i];
+      }
+      out << "\n\n";
     };
     out << "; FAF Map Editor: the last play setup, and the maps that keep their own (written by the editor)\n\n";
     if (mHaveLastSetup) {
@@ -577,7 +711,8 @@ end
       return;
     }
     mFogHidden = hidden;
-    moho::ren_FogOfWar = !hidden;
+    // Not `ren_FogOfWar`: each beat sets that one from the sim (CWldSession::DoBeat).
+    moho::ren_FogOfWarHidden = hidden;
     gpg::Logf("editor: the view %s the fog", hidden ? "leaves out" : "shows");
   }
 
@@ -609,9 +744,17 @@ end
               faction > 0 ? mFactions[static_cast<std::size_t>(faction - 1)].key.c_str() : "random", fog, mSetup.slot + 1,
               mSetup.aiCount, mSetup.prebuilt ? "on" : "off");
     char extra[160];
-    (void)std::snprintf(extra, sizeof(extra), "__EditorPlayExtra = { slot = %d, aiCount = %d, prebuilt = %s }", mSetup.slot + 1,
+    (void)std::snprintf(extra, sizeof(extra), "__EditorPlayExtra = { slot = %d, aiCount = %d, prebuilt = %s, mods = {", mSetup.slot + 1,
                         mSetup.aiCount, mSetup.prebuilt ? "true" : "false");
-    (void)moho::SCR_LuaDoString(extra, state);
+    std::string extraText = extra;
+    const std::vector<std::string> playedMods = PlayedMods();
+    for (const std::string& uid : playedMods) {
+      extraText += "['" + uid + "'] = true, ";
+    }
+    (void)moho::SCR_LuaDoString((extraText + "} }").c_str(), state);
+    if (!playedMods.empty()) {
+      gpg::Logf("editor: play with %zu mod%s", playedMods.size(), playedMods.size() == 1 ? "" : "s");
+    }
     try {
       const LuaPlus::LuaObject start = state->GetGlobal("EditorStartPlay");
       if (start.IsNil()) {
@@ -719,6 +862,7 @@ end
       }
     }
     mAutoWholeMap = moho::CFG_GetArgOption("/playwholemap", 0, nullptr);
+    mAutoNoFog = moho::CFG_GetArgOption("/playnofog", 0, nullptr);
     if (moho::CFG_GetArgOption("/playafter", 1, &args) && !args.empty()) {
       mAutoDelay = static_cast<float>(std::atof(args[0].c_str()));
     }
@@ -765,6 +909,9 @@ end
         gpg::Logf("editor: playing");
         if (mAutoWholeMap) {
           SetSeesWholeMap(true);
+        }
+        if (mAutoNoFog) {
+          SetFogHidden(true);
         }
       } else if (mAutoWholeMap && mWholeMap && now - mPlayingSince >= static_cast<double>(mAutoSeconds) * 0.5) {
         if (const moho::CWldSession* const session = moho::WLD_GetActiveSession()) {

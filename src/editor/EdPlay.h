@@ -15,6 +15,16 @@ namespace faf::editor
   {
     std::string key;
     std::string name;
+    /** An AI mod's AI type: the mod's uid (the mod is loaded with it); empty for the game's own. */
+    std::string mod;
+  };
+
+  /** A sim mod the game data has (FAF's AllSelectableMods, not ui_only), and the AI types it brings. */
+  struct PlayMod
+  {
+    std::string uid;
+    std::string name;
+    std::vector<PlayChoice> aiTypes;
   };
 
   /** How Play sets the session up. */
@@ -34,6 +44,8 @@ namespace faf::editor
     int aiCount = 0;
     /** The game's "Prebuilt units" option: each army starts with a base. */
     bool prebuilt = false;
+    /** The sim mods played with (uids); the chosen AI's own mod comes along anyway. */
+    std::vector<std::string> mods;
   };
 
   /**
@@ -81,6 +93,12 @@ namespace faf::editor
 
     /** The game's AI types (FAF's /lua/ui/lobby/aitypes.lua) and factions (/lua/factions.lua). */
     [[nodiscard]] const std::vector<PlayChoice>& AiTypes() const noexcept { return mAiTypes; }
+    /** The sim mods the game data has, AI mods among them (their AI types are in AiTypes, after the game's). */
+    [[nodiscard]] const std::vector<PlayMod>& Mods() const noexcept { return mMods; }
+    /** The mods the setup plays with: its own and the chosen AI's; a uid set as Lua text (`{ ['uid'] = true }`). */
+    [[nodiscard]] std::vector<std::string> PlayedMods() const;
+    /** After the setup's mods change: the game's rules for them built ahead on a thread, so the next Play is quick. */
+    void PrepareRules();
     [[nodiscard]] const std::vector<PlayChoice>& Factions() const noexcept { return mFactions; }
     [[nodiscard]] PlaySetup& Setup() noexcept { return mSetup; }
 
@@ -93,7 +111,7 @@ namespace faf::editor
     [[nodiscard]] bool SeesWholeMap() const;
     void SetSeesWholeMap(bool wholeMap);
     /**
-     * During play: the view leaves out the fog's shading (the game's `ren_FogOfWar`, WRenViewport) while the
+     * During play: the view leaves out the fog's shading (`ren_FogOfWarHidden`, WRenViewport) while the
      * player keeps their army; units the army has no intel on stay unseen. Put back when the play ends.
      */
     [[nodiscard]] bool FogHidden() const;
@@ -131,6 +149,7 @@ namespace faf::editor
       int slot = 0;
       int aiCount = 0;
       bool prebuilt = false;
+      std::vector<std::string> mods;
     };
 
     void FindChoices();
@@ -161,6 +180,8 @@ namespace faf::editor
     std::vector<std::string> mTitles;
     std::vector<PlayChoice> mAiTypes;
     std::vector<PlayChoice> mFactions;
+    std::vector<PlayMod> mMods;
+    std::vector<std::string> mPreparedMods;
     PlaySetup mSetup;
     std::string mSetupsFile;
     StoredSetup mLastSetup;
@@ -182,6 +203,7 @@ namespace faf::editor
     int mAutoCyclesLeft = 0;
     bool mAutoQuit = false;
     bool mAutoWholeMap = false;
+    bool mAutoNoFog = false; // `/playnofog`: Hide the fog once play starts
     float mAutoDelay = 0.0f;
     int mAutoAi = -1; // `/playai`: this AI for every test play, over the map's remembered setup
     double mAutoStartAt = -1.0;
