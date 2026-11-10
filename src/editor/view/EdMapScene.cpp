@@ -3611,6 +3611,47 @@ namespace faf::editor
     }
   }
 
+  void EdMapScene::FillAirGrid(const int count, const bool replace)
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr) {
+      return;
+    }
+    float x0 = 0.0f;
+    float z0 = 0.0f;
+    float x1 = static_cast<float>(field->width - 1);
+    float z1 = static_cast<float>(field->height - 1);
+    if (const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea()) {
+      x0 = static_cast<float>(area->x0);
+      z0 = static_cast<float>(area->z0);
+      x1 = static_cast<float>(area->x1);
+      z1 = static_cast<float>(area->z1);
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    std::size_t removed = 0;
+    if (replace) {
+      const std::size_t count0 = markers.size();
+      markers.erase(std::remove_if(markers.begin(), markers.end(), [](const SaveEntry& marker) { return MarkerTypeOf(marker) == "Air Path Node"; }),
+                    markers.end());
+      removed = count0 - markers.size();
+    }
+    std::vector<SaveEntry> grid = AirNodeGrid(markers, count, x0, z0, x1, z1, [&](const float x, const float z) {
+      return mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z));
+    });
+    if (grid.empty()) {
+      return;
+    }
+    mMarkerSelection.clear();
+    for (SaveEntry& node : grid) {
+      mMarkerSelection.push_back(node.name);
+      markers.push_back(std::move(node));
+    }
+    mDocument.SaveDataEdited(std::move(before));
+    gpg::Logf("editor: air node grid %d x %d over %.0f, %.0f to %.0f, %.0f (%zu air nodes removed), %zu markers now", count, count,
+              static_cast<double>(x0), static_cast<double>(z0), static_cast<double>(x1), static_cast<double>(z1), removed, markers.size());
+  }
+
   void EdMapScene::DeleteSelectedMarkers()
   {
     if (mMarkerSelection.empty()) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -54,6 +55,14 @@ namespace faf::editor
    * (land and water) aren't linked. Returns whether anything changed.
    */
   bool SetMarkerLink(std::vector<SaveEntry>& markers, const std::string& a, const std::string& b, bool linked);
+
+  /**
+   * An N x N grid of air path nodes over the rectangle (x0, z0)-(x1, z1), each a cell's middle and linked to its 8
+   * neighbours, as FAForeverMapEditor's air presets lay them (16 x 16 over the map, a sixteenth apart, half a step in).
+   * Named after `existing` (AirPN<nn> not yet taken); heights from `height`. Returned in rows, the links set.
+   */
+  std::vector<SaveEntry> AirNodeGrid(const std::vector<SaveEntry>& existing, int count, float x0, float z0, float x1, float z1,
+                                     const std::function<float(float, float)>& height);
   /** Drops every link naming `name` (the marker is being deleted); returns how many markers changed. */
   int RemoveLinksTo(std::vector<SaveEntry>& markers, const std::string& name);
   /** The marker tree's groups, in the order the panel lists them. */

@@ -1575,6 +1575,16 @@ namespace faf::editor
       }
     }
 
+    SectionHeader("AIR PATH NODES");
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::SliderInt("##airgrid", &mAirGridCount, 4, 32, "%d nodes a side");
+    ImGui::Checkbox("Replace the map's air nodes", &mAirGridReplace);
+    if (ImGui::Button("Fill the map with an air node grid", ImVec2(-1.0f, 0.0f))) {
+      mAirGridAsked = true;
+    }
+    Note("A grid of air path nodes over the playable area (the whole map without one), each linked to its 8 neighbours, as "
+         "FAForeverMapEditor's air presets lay them: 16 a side on any map size. AI air units path along them. One undo step.");
+
     SectionHeader("MARKER FILE");
     if (ImGui::Button("Import...")) {
       mMarkerFileImport = true;

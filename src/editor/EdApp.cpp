@@ -361,6 +361,7 @@ namespace faf::editor
       bool mArmyEconomyArgDone = false;
       bool mPropEditArgDone = false;
       bool mAdaptiveArgDone = false;
+      bool mAirGridArgDone = false;
       int mReclaimFrames = 0;
       bool mReclaimLogged = false;
       int mLayerFileStep = 0;
@@ -1106,6 +1107,20 @@ namespace faf::editor
         }
         tools.SetDecalSelectionCount(mScene.DecalSelectionCount());
         tools.SetSelectionProperties(mScene.SelectionPropertiesNow());
+        // The Markers tool's air node grid; `/airgrid <n>[,keep]` for test runs.
+        if (!mAirGridArgDone) {
+          mAirGridArgDone = true;
+          if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/airgrid", 1, &value) && !value.empty()) {
+            const std::string text = value[0].c_str();
+            tools.AskAirGrid(std::atoi(text.c_str()), text.find("keep") == std::string::npos);
+          }
+        }
+        if (int count = 0; true) {
+          bool replace = true;
+          if (tools.TakeAirGrid(count, replace)) {
+            mScene.FillAirGrid(count, replace);
+          }
+        }
         // `/adaptive <marker>,<army>` (test runs): ties a mass or hydrocarbon marker to an army in the adaptive tables, once
         // (the map becomes adaptive first when it isn't).
         if (!mAdaptiveArgDone) {

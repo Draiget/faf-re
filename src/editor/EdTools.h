@@ -310,6 +310,19 @@ namespace faf::editor
       return true;
     }
 
+    /** The Markers tool's air node grid: its size and whether it replaces the map's air nodes, asked once. */
+    void AskAirGrid(const int count, const bool replace) noexcept
+    {
+      mAirGridCount = count;
+      mAirGridReplace = replace;
+      mAirGridAsked = true;
+    }
+    [[nodiscard]] bool TakeAirGrid(int& count, bool& replace) noexcept
+    {
+      count = mAirGridCount;
+      replace = mAirGridReplace;
+      return std::exchange(mAirGridAsked, false);
+    }
     /** The Markers tool's type to place (an entry of MarkerTypes()). */
     [[nodiscard]] const MarkerType& PlaceMarkerType() const noexcept { return MarkerTypes()[static_cast<std::size_t>(mMarkerType)]; }
     /** The markers the view has selected (copies of their entries), for the properties panel. */
@@ -820,6 +833,9 @@ namespace faf::editor
     std::string mReclaimSummary;
     std::vector<std::string> mReclaimRows;
     char mPropFilter[64]{};
+    int mAirGridCount = 16;
+    bool mAirGridReplace = true;
+    bool mAirGridAsked = false;
     bool mShowProps = true;
     bool mShowUnits = true;
     SelectionProperties mSelectionProperties;

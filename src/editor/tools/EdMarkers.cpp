@@ -281,4 +281,41 @@ namespace faf::editor
     }
     return best;
   }
+  std::vector<SaveEntry> AirNodeGrid(const std::vector<SaveEntry>& existing, const int count, const float x0, const float z0,
+                                     const float x1, const float z1, const std::function<float(float, float)>& height)
+  {
+    std::vector<SaveEntry> grid;
+    const MarkerType* const type = FindMarkerType("Air Path Node");
+    if (type == nullptr || count < 2 || x1 <= x0 || z1 <= z0) {
+      return grid;
+    }
+    std::vector<SaveEntry> taken = existing;
+    const float stepX = (x1 - x0) / static_cast<float>(count);
+    const float stepZ = (z1 - z0) / static_cast<float>(count);
+    for (int row = 0; row < count; ++row) {
+      for (int column = 0; column < count; ++column) {
+        // Each node on the half unit, as the game's saves place markers.
+        const float x = std::floor(x0 + stepX * (static_cast<float>(column) + 0.5f)) + 0.5f;
+        const float z = std::floor(z0 + stepZ * (static_cast<float>(row) + 0.5f)) + 0.5f;
+        SaveEntry node = NewMarker(*type, NextMarkerName(taken, *type), x, height(x, z), z);
+        taken.push_back({node.name, {}});
+        grid.push_back(std::move(node));
+      }
+    }
+    // Each to its 8 neighbours (each pair once; SetMarkerLink writes both ends).
+    for (int row = 0; row < count; ++row) {
+      for (int column = 0; column < count; ++column) {
+        const std::string& name = grid[static_cast<std::size_t>(row * count + column)].name;
+        for (const auto& [dr, dc] : {std::pair{0, 1}, std::pair{1, -1}, std::pair{1, 0}, std::pair{1, 1}}) {
+          const int r = row + dr;
+          const int c = column + dc;
+          if (r < count && c >= 0 && c < count) {
+            const std::string other = grid[static_cast<std::size_t>(r * count + c)].name;
+            (void)SetMarkerLink(grid, name, other, true);
+          }
+        }
+      }
+    }
+    return grid;
+  }
 } // namespace faf::editor

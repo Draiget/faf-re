@@ -3,6 +3,8 @@
 
 #include "editor/tools/EdMarkers.h"
 
+#include <algorithm>
+
 #include <gtest/gtest.h>
 
 namespace
@@ -105,5 +107,32 @@ namespace
     EXPECT_EQ(faf::editor::MarkerNear(markers, "Land Path Node", 10.5f, 10.5f, 1.5f), 1);
     EXPECT_EQ(faf::editor::MarkerNear(markers, "Mass", 11.5f, 10.5f, 1.5f), 0);
     EXPECT_EQ(faf::editor::MarkerNear(markers, "Land Path Node", 20.5f, 10.5f, 1.5f), -1);
+  }
+  TEST(Markers, AirNodeGridAsFafmeLaysIt)
+  {
+    // FAForeverMapEditor's 10 km preset: 16 x 16 nodes over a 512 map, 32 apart from 16.5, 3 to 8 links each.
+    const std::vector<SaveEntry> existing = {{"AirPN00", {}}, {"Mass 01", {}}};
+    const std::vector<SaveEntry> grid = faf::editor::AirNodeGrid(existing, 16, 0.0f, 0.0f, 512.0f, 512.0f, [](float, float) { return 20.0f; });
+    ASSERT_EQ(grid.size(), 256U);
+    float x = 0.0f, y = 0.0f, z = 0.0f;
+    ASSERT_TRUE(faf::editor::MarkerPosition(grid[0], x, y, z));
+    EXPECT_FLOAT_EQ(x, 16.5f);
+    EXPECT_FLOAT_EQ(z, 16.5f);
+    EXPECT_FLOAT_EQ(y, 20.0f);
+    ASSERT_TRUE(faf::editor::MarkerPosition(grid[17], x, y, z));
+    EXPECT_FLOAT_EQ(x, 48.5f);
+    EXPECT_FLOAT_EQ(z, 48.5f);
+    EXPECT_EQ(faf::editor::MarkerTypeOf(grid[0]), "Air Path Node");
+    // Names skip the taken one.
+    EXPECT_EQ(grid[0].name, "AirPN01");
+    // A corner has 3 neighbours, an edge 5, the inside 8.
+    EXPECT_EQ(faf::editor::MarkerLinks(grid[0]).size(), 3U);
+    EXPECT_EQ(faf::editor::MarkerLinks(grid[5]).size(), 5U);
+    EXPECT_EQ(faf::editor::MarkerLinks(grid[17]).size(), 8U);
+    // Links go both ways.
+    const std::vector<std::string> links = faf::editor::MarkerLinks(grid[17]);
+    EXPECT_NE(std::find(links.begin(), links.end(), grid[0].name), links.end());
+    const std::vector<std::string> back = faf::editor::MarkerLinks(grid[0]);
+    EXPECT_NE(std::find(back.begin(), back.end(), grid[17].name), back.end());
   }
 } // namespace

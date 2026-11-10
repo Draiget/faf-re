@@ -114,6 +114,8 @@ namespace faf::editor
     bool ImportUnitFile(const std::string& text, const std::string& army, std::vector<std::string>& names, bool& moved, std::string& error);
     /** Changes a property of a marker ("name" renames it), as one undo step. */
     void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
+    /** An air path node grid `count` a side over the playable area (or the map), as one undo step; `replace` removes the air nodes there were. */
+    void FillAirGrid(int count, bool replace);
     /** The move gizmo's parts: an arrow per axis and the free square in its middle. */
     enum class GizmoPart
     {
