@@ -374,6 +374,8 @@ namespace faf::editor
         float x;
         float y;
         bool doubleClick;
+        /** `^D`: a Ctrl+<key> for the view instead of a click. */
+        char key = 0;
       };
       std::vector<UiClick> mUiClicks;
       int mUiClickFrame = 0;
@@ -618,6 +620,13 @@ namespace faf::editor
       }
       const UiClick& click = mUiClicks[index];
       const int step = frame % kEach;
+      if (click.key != 0) {
+        if (step == 1) {
+          gpg::Logf("editor: test key Ctrl+%c", click.key);
+          mScene.CtrlKey(click.key);
+        }
+        return;
+      }
       if (click.x < 0.0f) {
         return;
       }
@@ -840,6 +849,10 @@ namespace faf::editor
           // "w": a slot with no click, to wait half a second.
           if (point == "w") {
             mUiClicks.push_back({-1.0f, -1.0f, false});
+            continue;
+          }
+          if (point.size() == 2 && point[0] == '^') {
+            mUiClicks.push_back({-1.0f, -1.0f, false, static_cast<char>(std::toupper(static_cast<unsigned char>(point[1])))});
             continue;
           }
           const bool twice = !point.empty() && point[0] == 'd';

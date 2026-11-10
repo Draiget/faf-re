@@ -306,6 +306,32 @@ namespace faf::editor
     bool mRuling = false;
     /** Box select (Shift + right drag): its corners on the screen while it is drawn. */
     bool mBoxing = false;
+    /**
+     * The clipboard (Ctrl+C, Ctrl+V at the cursor, Ctrl+D a copy beside): the copied selection of one kind, and the middle
+     * of its places, from which a paste offsets each.
+     */
+    struct Clipboard
+    {
+      enum class Kind
+      {
+        None,
+        Markers,
+        Props,
+        Units,
+        Decals,
+      };
+      Kind kind = Kind::None;
+      std::vector<SaveEntry> markers;
+      std::vector<std::pair<moho::CWldPropEntry, PropRecord>> props;
+      std::vector<std::pair<std::string, SaveUnit>> units;
+      std::vector<DecalState> decals;
+      float centre[2] = {0.0f, 0.0f};
+    };
+    Clipboard mClipboard;
+    /** Copies the active tool's selection; returns how many. */
+    std::size_t CopySelection();
+    /** Puts the clipboard down with its middle at (x, z), as one undo step, and selects what it put. */
+    void PasteAt(float x, float z);
     POINT mBoxFrom{};
     POINT mBoxTo{};
     [[nodiscard]] bool BoxSelectable() const;
@@ -411,6 +437,8 @@ namespace faf::editor
   public:
     /** The ruler between two points (test runs, `/ruler`). */
     void SetRuler(float x0, float z0, float x1, float z1);
+    /** Ctrl+C, Ctrl+V or Ctrl+D (`key` 'C', 'V' or 'D'), as the keyboard gives them and test runs (`/uiclicks ^D`). */
+    void CtrlKey(char key);
 
   private:
     /** Whether the Markers panel hides this marker's type. */
