@@ -10,6 +10,7 @@
 #include <map>
 
 #include "editor/EdPlay.h"
+#include "editor/ui/EdHelp.h"
 #include "moho/terrain/CWldTerrainRes.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -152,9 +153,7 @@ namespace faf::editor
     }
     switch (mDocument.GetState()) {
     case EdDocument::State::Empty:
-      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-      ImGui::TextWrapped("No map open. Double-click one in the Map panel, or pick it and press Open.");
-      ImGui::PopStyleColor();
+      HelpNote("No map open. Double-click one in the Map panel, or pick it and press Open.");
       ImGui::End();
       return;
     case EdDocument::State::Loading:
@@ -585,10 +584,8 @@ namespace faf::editor
       mNewChainName[0] = '\0';
     }
     ImGui::EndDisabled();
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("A chain is a route scripts and the AI follow (Naval_Chain_Left on Seton's Clutch). A new one takes the selected "
+    HelpNote("A chain is a route scripts and the AI follow (Naval_Chain_Left on Seton's Clutch). A new one takes the selected "
                        "markers; a click on a chain selects its markers. Renaming or deleting a marker updates the chains.");
-    ImGui::PopStyleColor();
     ImGui::Separator();
   }
 
@@ -903,11 +900,9 @@ namespace faf::editor
     ImGui::RadioButton("Land", &mTools.PathingLayer(), 0);
     ImGui::SameLine();
     ImGui::RadioButton("Ships", &mTools.PathingLayer(), 1);
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("The scripts' syntax (_scenario.lua, _save.lua, _script.lua as edited), then start positions and mass and "
+    HelpNote("The scripts' syntax (_scenario.lua, _save.lua, _script.lua as edited), then start positions and mass and "
                        "hydrocarbon points: off the playable area, under water, without a partner at their symmetric copies (the Tools "
                        "panel's symmetry), or overlapping; then pathing for a T1 tank: what each start reaches by land.");
-    ImGui::PopStyleColor();
     if (mTestRunDone && !mTestRunIssues.empty()) {
       // The test run's findings at the top of the list (merged once).
       for (CheckIssue& issue : mTestRunIssues) {
@@ -1162,9 +1157,7 @@ namespace faf::editor
         }
       }
       ImGui::EndChild();
-      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-      ImGui::TextWrapped("A click takes that map's sun, ambience, shadow, specular, bloom and fog, as one undo step.");
-      ImGui::PopStyleColor();
+      HelpNote("A click takes that map's sun, ambience, shadow, specular, bloom and fog, as one undo step.");
     }
     ImGui::SeparatorText("Settings file");
     if (ImGui::Button("Import .scmlighting...")) {
@@ -1174,9 +1167,7 @@ namespace faf::editor
     if (ImGui::Button("Export...")) {
       mLightingExport = true;
     }
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("FAForeverMapEditor's lighting settings file: the sun, ambience, shadow, specular, bloom and fog.");
-    ImGui::PopStyleColor();
+    HelpNote("FAForeverMapEditor's lighting settings file: the sun, ambience, shadow, specular, bloom and fog.");
     ImGui::SeparatorText("Sky");
     {
       const SkyboxState sky = mDocument.SkyboxNow();
@@ -1198,10 +1189,8 @@ namespace faf::editor
     if (ImGui::Button("Export##sky")) {
       mSkyboxExport = true;
     }
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("FAForeverMapEditor's sky file: the dome, horizon and zenith colours, planets and cirrus. An import is one "
+    HelpNote("FAForeverMapEditor's sky file: the dome, horizon and zenith colours, planets and cirrus. An import is one "
                        "undo step and is saved with the map.");
-    ImGui::PopStyleColor();
     ImGui::End();
   }
 } // namespace faf::editor

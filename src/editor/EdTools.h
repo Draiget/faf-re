@@ -191,23 +191,6 @@ namespace faf::editor
       Remove,
       MoveSelected,
     };
-    /** Each army's settings in `_save.lua` (the app gives them while the Markers tool shows); a change the panel made. */
-    void SetArmySettings(std::vector<std::pair<std::string, ArmySettings>> armies)
-    {
-      if (!mArmyEditing) {
-        mArmySettings = std::move(armies);
-      }
-    }
-    [[nodiscard]] bool TakeArmySettingsChange(std::string& army, ArmySettings& settings)
-    {
-      if (!mArmySettingsChanged) {
-        return false;
-      }
-      mArmySettingsChanged = false;
-      army = mArmySettingsName;
-      settings = mArmySettingsEdit;
-      return true;
-    }
     void SetUnitTree(std::string army, UnitGroup tree)
     {
       mUnitTreeArmy = std::move(army);
@@ -343,6 +326,19 @@ namespace faf::editor
       teams = mTeamsChange;
       return true;
     }
+    /** The Armies panel's slot order and extra armies (one space-separated list), taken like the tool's own. */
+    void AskTeamsChange(std::vector<ScenarioTeam> teams)
+    {
+      mTeamsChange = std::move(teams);
+      mTeamsChanged = true;
+    }
+    void AskExtraArmiesChange(const std::string& extra)
+    {
+      (void)std::snprintf(mExtraBuffer, sizeof(mExtraBuffer), "%s", extra.c_str());
+      mExtraChanged = true;
+    }
+    /** The Markers tool's "Open the Armies panel", taken by the shell. */
+    [[nodiscard]] bool TakeOpenArmies() noexcept { return std::exchange(mOpenArmies, false); }
     [[nodiscard]] bool TakeExtraArmiesChange(std::string& extra)
     {
       if (!mExtraChanged) {
@@ -734,13 +730,7 @@ namespace faf::editor
     bool mUnitFileImport = false;
     bool mUnitFileExport = false;
     int mTexturePaint = 0;
-    std::vector<std::pair<std::string, ArmySettings>> mArmySettings;
-    int mArmySettingsIndex = 0;
-    bool mArmyEditing = false;
-    bool mArmySettingsChanged = false;
-    std::string mArmySettingsName;
-    ArmySettings mArmySettingsEdit;
-    void DrawArmySettings();
+    bool mOpenArmies = false;
     std::string mUnitTreeArmy;
     UnitGroup mUnitTree;
     std::vector<std::string> mGroupPath;

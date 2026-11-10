@@ -1,4 +1,5 @@
 #include "editor/EdTools.h"
+#include "editor/ui/EdHelp.h"
 
 #include <cmath>
 #include <string>
@@ -146,11 +147,10 @@ namespace faf::editor
       }
     }
 
+    /** The panel's help: one line with the rest on hover (ui/EdHelp.cpp). */
     void Note(const char* const text)
     {
-      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-      ImGui::TextWrapped("%s", text);
-      ImGui::PopStyleColor();
+      HelpNote(text);
     }
 
     void SectionHeader(const char* const text)
@@ -1588,174 +1588,21 @@ namespace faf::editor
 
     SectionHeader("ARMIES");
     {
-      // The game reads the first team, which must be named FFA (SinglePlayerLaunch.lua, VerifyScenarioConfiguration);
-      // its order is the lobby's slot order. Teams themselves are set in the lobby.
       const bool oneFfa = mTeams.size() == 1 && mTeams.front().name == "FFA";
+      const std::size_t slots = mTeams.empty() ? 0 : mTeams.front().armies.size();
+      ImGui::Text("%zu player slot%s, %zu extra arm%s", slots, slots == 1 ? "" : "s", mExtraArmies.size(),
+                  mExtraArmies.size() == 1 ? "y" : "ies");
       if (!oneFfa && !mTeams.empty()) {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
-        ImGui::TextWrapped("The scenario has %zu team%s%s. The game needs one team named FFA with every player army: the lobby "
-                           "takes its slots from the first team only.",
-                           mTeams.size(), mTeams.size() == 1 ? "" : "s", mTeams.front().name == "FFA" ? "" : ", the first not named FFA");
-        ImGui::PopStyleColor();
-        if (ImGui::Button("Make one FFA team")) {
-          ScenarioTeam all{"FFA", {}};
-          for (const ScenarioTeam& team : mTeams) {
-            all.armies.insert(all.armies.end(), team.armies.begin(), team.armies.end());
-          }
-          mTeamsChange = {all};
-          mTeamsChanged = true;
-        }
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "(not one FFA team)");
       }
-      if (!mTeams.empty()) {
-        const std::vector<std::string>& slots = mTeams.front().armies;
-        ImGui::TextDisabled("Lobby slots, in order (%zu)", slots.size());
-        for (std::size_t i = 0; i < slots.size(); ++i) {
-          ImGui::PushID(static_cast<int>(i));
-          ImGui::Text("%zu", i + 1);
-          ImGui::SameLine(28.0f);
-          ImGui::TextUnformatted(slots[i].c_str());
-          const float buttons = ImGui::GetFrameHeight() * 2.0f + ImGui::GetStyle().ItemSpacing.x;
-          ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - buttons);
-          ImGui::BeginDisabled(i == 0);
-          if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
-            mTeamsChange = mTeams;
-            std::swap(mTeamsChange.front().armies[i], mTeamsChange.front().armies[i - 1]);
-            mTeamsChanged = true;
-          }
-          ImGui::EndDisabled();
-          ImGui::SameLine();
-          ImGui::BeginDisabled(i + 1 == slots.size());
-          if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
-            mTeamsChange = mTeams;
-            std::swap(mTeamsChange.front().armies[i], mTeamsChange.front().armies[i + 1]);
-            mTeamsChanged = true;
-          }
-          ImGui::EndDisabled();
-          ImGui::PopID();
-        }
+      if (ImGui::Button("Open the Armies panel", ImVec2(-1.0f, 0.0f))) {
+        mOpenArmies = true;
       }
-      if (!mExtraEditing) {
-        std::string extra;
-        for (const std::string& army : mExtraArmies) {
-          extra += (extra.empty() ? "" : " ") + army;
-        }
-        (void)std::snprintf(mExtraBuffer, sizeof(mExtraBuffer), "%s", extra.c_str());
-      }
-      ImGui::TextDisabled("Extra armies");
-      ImGui::SetNextItemWidth(-1.0f);
-      if (ImGui::InputText("##extra", mExtraBuffer, sizeof(mExtraBuffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
-        mExtraChanged = true;
-        mExtraEditing = false;
-      } else {
-        mExtraEditing = ImGui::IsItemActive();
-      }
-      Note("Placing a start position adds its army (ARMY_n) to the scenario's team list and to _save.lua's armies; deleting or "
-           "renaming it follows. The order is the lobby's slot order; teams are chosen in the lobby. Extra armies (ARMY_17, "
-           "NEUTRAL_CIVILIAN...) hold the map's neutral and civilian units.");
+      Note("Slot order, extra armies, starting resources, faction and alliances are edited in the Armies panel (View > Armies). "
+           "Placing a start position adds its army (ARMY_n) to the scenario's team and _save.lua; deleting or renaming it follows.");
     }
-    DrawArmySettings();
     DrawPlayableArea();
   }
 
-  void EdTools::DrawArmySettings()
-  {
-    SectionHeader("ARMY SETTINGS");
-    if (mArmySettings.empty()) {
-      Note("No armies in _save.lua.");
-      return;
-    }
-    mArmySettingsIndex = std::clamp(mArmySettingsIndex, 0, static_cast<int>(mArmySettings.size()) - 1);
-    ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::BeginCombo("##armysettings", mArmySettings[static_cast<std::size_t>(mArmySettingsIndex)].first.c_str())) {
-      for (std::size_t i = 0; i < mArmySettings.size(); ++i) {
-        if (ImGui::Selectable(mArmySettings[i].first.c_str(), static_cast<int>(i) == mArmySettingsIndex)) {
-          mArmySettingsIndex = static_cast<int>(i);
-        }
-      }
-      ImGui::EndCombo();
-    }
-    auto& [name, settings] = mArmySettings[static_cast<std::size_t>(mArmySettingsIndex)];
-    ArmySettings edit = settings;
-    bool active = false;
-    bool finished = false;
-    const auto watch = [&](const bool) {
-      active = active || ImGui::IsItemActive();
-      finished = finished || ImGui::IsItemDeactivatedAfterEdit();
-    };
-    float mass = static_cast<float>(edit.mass);
-    float energy = static_cast<float>(edit.energy);
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::DragFloat("##mass", &mass, 10.0f, 0.0f, 1000000.0f, "Starting mass %.0f"));
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::DragFloat("##energy", &energy, 10.0f, 0.0f, 1000000.0f, "Starting energy %.0f"));
-    edit.mass = mass;
-    edit.energy = energy;
-    static const char* const kFactions[4] = {"0 (UEF)", "1 (Aeon)", "2 (Cybran)", "3 (Seraphim)"};
-    int faction = std::clamp(edit.faction, 0, 3);
-    ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::Combo("##faction", &faction, kFactions, 4)) {
-      edit.faction = faction;
-      finished = true;
-    }
-    ImGui::SetNextItemWidth(-1.0f);
-    watch(ImGui::DragInt("##color", &edit.color, 0.1f, 0, 32, "Colour %d"));
-    char plans[256];
-    (void)std::snprintf(plans, sizeof(plans), "%s", edit.plans.c_str());
-    ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::InputTextWithHint("##plans", "plans (an AI plan file)", plans, sizeof(plans), ImGuiInputTextFlags_EnterReturnsTrue)) {
-      edit.plans = plans;
-      finished = true;
-    }
-    active = active || ImGui::IsItemActive();
-    char personality[128];
-    (void)std::snprintf(personality, sizeof(personality), "%s", edit.personality.c_str());
-    ImGui::SetNextItemWidth(-1.0f);
-    if (ImGui::InputTextWithHint("##personality", "personality", personality, sizeof(personality), ImGuiInputTextFlags_EnterReturnsTrue)) {
-      edit.personality = personality;
-      finished = true;
-    }
-    active = active || ImGui::IsItemActive();
-    // Its stance toward each other army: none (the entry left out), Enemy, Ally, Neutral.
-    if (ImGui::TreeNodeEx("##alliances", ImGuiTreeNodeFlags_SpanAvailWidth, "Alliances (%zu)", edit.alliances.size())) {
-      static const char* const kStances[4] = {"-", "Enemy", "Ally", "Neutral"};
-      for (const auto& [other, ignored] : mArmySettings) {
-        if (other == name) {
-          continue;
-        }
-        const auto found = std::find_if(edit.alliances.begin(), edit.alliances.end(), [&](const auto& pair) { return pair.first == other; });
-        int stance = 0;
-        for (int s = 1; s < 4 && found != edit.alliances.end(); ++s) {
-          stance = found->second == kStances[s] ? s : stance;
-        }
-        ImGui::PushID(other.c_str());
-        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 6.0f);
-        if (ImGui::Combo("##stance", &stance, kStances, 4)) {
-          if (stance == 0 && found != edit.alliances.end()) {
-            edit.alliances.erase(found);
-          } else if (stance > 0 && found != edit.alliances.end()) {
-            found->second = kStances[stance];
-          } else if (stance > 0) {
-            edit.alliances.emplace_back(other, kStances[stance]);
-          }
-          finished = true;
-        }
-        ImGui::SameLine();
-        ImGui::TextUnformatted(other.c_str());
-        ImGui::PopID();
-      }
-      ImGui::TreePop();
-    }
-    mArmyEditing = active;
-    if (!(edit == settings)) {
-      settings = edit;
-    }
-    if (finished) {
-      mArmySettingsChanged = true;
-      mArmySettingsName = name;
-      mArmySettingsEdit = settings;
-    }
-    Note("FAF's skirmish start (InitializeArmies) gives each army its starting mass and energy here; its faction and colour "
-         "come from the lobby and its alliances from the teams, so those matter to scripted maps. The retail maps leave mass "
-         "and energy at 0. Each change is one undo step.");
-  }
 } // namespace faf::editor

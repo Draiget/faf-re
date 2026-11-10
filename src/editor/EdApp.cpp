@@ -22,6 +22,7 @@
 #include "editor/doc/EdWaterPreset.h"
 #include "editor/EdMemTrace.h"
 #include "editor/EdPlay.h"
+#include "editor/ui/EdHelp.h"
 #include "editor/EdShell.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdRoundTrip.h"
@@ -97,6 +98,8 @@ namespace faf::editor
       kMenuCheck = 1109,
       kMenuScript = 1110,
       kMenuLighting = 1111,
+      kMenuFullHelp = 1112,
+      kMenuArmies = 1113,
       kMenuPanelsWhilePlaying = 1104,
       kMenuResetLayout = 1105,
       kMenuImGuiDemo = 1106,
@@ -547,6 +550,9 @@ namespace faf::editor
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuCheck, L"&Check");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuScript, L"&Script");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLighting, L"&Lighting");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuArmies, L"&Armies");
+      ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuFullHelp, L"&Full help text");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLog, L"&Log");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuPanelsWhilePlaying, L"&Panels while playing");
       ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
@@ -590,6 +596,8 @@ namespace faf::editor
       check(kMenuCheck, mShell->ShowCheck());
       check(kMenuScript, mShell->ShowScript());
       check(kMenuLighting, mShell->ShowLighting());
+      check(kMenuArmies, mShell->ShowArmies());
+      check(kMenuFullHelp, FullHelpText());
       check(kMenuLog, mShell->ShowLog());
       check(kMenuPanelsWhilePlaying, mShell->PanelsWhilePlaying());
       check(kMenuImGuiDemo, mShell->ShowDemo());
@@ -655,6 +663,12 @@ namespace faf::editor
       case kMenuMap:
         mShell->ShowMap() = !mShell->ShowMap();
         return;
+      case kMenuFullHelp:
+        FullHelpText() = !FullHelpText();
+        break;
+      case kMenuArmies:
+        mShell->ShowArmies() = !mShell->ShowArmies();
+        break;
       case kMenuLighting:
         mShell->ShowLighting() = !mShell->ShowLighting();
         break;
@@ -1229,15 +1243,6 @@ namespace faf::editor
         tools.SetMarkerSelection(mScene.SelectedMarkers());
         tools.SetArmies(mDocument.Armies(), mDocument.ExtraArmies());
         {
-          std::vector<std::pair<std::string, ArmySettings>> armies;
-          for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
-            armies.emplace_back(entry.name, ReadArmySettings(entry));
-          }
-          tools.SetArmySettings(std::move(armies));
-          std::string army;
-          if (ArmySettings settings; tools.TakeArmySettingsChange(army, settings)) {
-            mScene.ChangeArmySettings(army, settings);
-          }
           // `/armyeconomy <army>,<mass>,<energy>` (test runs): that army's starting resources, once.
           if (!mArmyEconomyArgDone) {
             mArmyEconomyArgDone = true;

@@ -8,6 +8,7 @@
 #include "editor/doc/EdLighting.h"
 #include "editor/doc/EdNewMap.h"
 #include "editor/doc/EdPackage.h"
+#include "editor/doc/EdSaveFile.h"
 #include "imgui.h"
 
 namespace faf::editor
@@ -38,6 +39,8 @@ namespace faf::editor
     bool& ShowCheck() noexcept { return mShowCheck; }
     bool& ShowScript() noexcept { return mShowScript; }
     bool& ShowLighting() noexcept { return mShowLighting; }
+    /** The Armies panel; the Markers tool's "Open the Armies panel" also brings it to the front. */
+    bool& ShowArmies() noexcept { return mShowArmies; }
     /** The Lighting panel's Import / Export buttons, taken by the app (it asks for the file). */
     [[nodiscard]] bool TakeLightingImport() noexcept { return std::exchange(mLightingImport, false); }
     [[nodiscard]] bool TakeLightingExport() noexcept { return std::exchange(mLightingExport, false); }
@@ -110,6 +113,15 @@ namespace faf::editor
     void DrawLightingPanel();
     /** The Markers panel's chains: made, renamed, deleted, their markers added, ordered, taken out (ui/EdInfoPanels.cpp). */
     void DrawChains();
+    /** The player slots and extra armies as cards, and the chosen army's settings (ui/EdArmiesPanel.cpp). */
+    void DrawArmiesPanel();
+    bool mShowArmies = false;
+    bool mFocusArmies = false;
+    std::string mArmySelected;
+    char mNewExtraArmy[64]{};
+    ArmySettings mArmyEdit;
+    std::string mArmyEditName;
+    bool mArmyEditing = false;
     char mNewChainName[128]{};
     bool mShowLighting = false;
     LightingState mLighting;

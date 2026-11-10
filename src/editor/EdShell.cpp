@@ -200,6 +200,13 @@ namespace faf::editor
       if (mShowLighting) {
         DrawLightingPanel();
       }
+      if (mTools.TakeOpenArmies()) {
+        mShowArmies = true;
+        mFocusArmies = true;
+      }
+      if (mShowArmies) {
+        DrawArmiesPanel();
+      }
       if (mShowLog) {
         if (ImGui::Begin(kLogWindow, &mShowLog)) {
           mLog.Draw();

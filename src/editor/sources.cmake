@@ -27,6 +27,8 @@ set(FAF_EDITOR_SOURCES
   tools/EdWaves.cpp
   tools/EdTerrainTypes.cpp
   tools/EdViewAids.cpp
+  ui/EdHelp.cpp
+  ui/EdArmiesPanel.cpp
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp
