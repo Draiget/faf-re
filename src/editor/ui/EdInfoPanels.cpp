@@ -1020,6 +1020,42 @@ namespace faf::editor
                   static_cast<double>(mLighting.bloom), static_cast<double>(mLighting.fogStart), static_cast<double>(mLighting.fogEnd));
       }
     }
+    ImGui::SeparatorText("From another map");
+    {
+      // Any map the game lists: its lighting read from its .scmap, as FAForeverMapEditor's retail presets are.
+      const std::vector<std::string>& maps = mPlay.Maps();
+      const std::vector<std::string>& titles = mPlay.Titles();
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::InputTextWithHint("##lightingfromfilter", "search maps", mLightingFromFilter, sizeof(mLightingFromFilter));
+      std::string filter = mLightingFromFilter;
+      for (char& c : filter) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      }
+      if (ImGui::BeginChild("##lightingfrom", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 6.0f), ImGuiChildFlags_Borders)) {
+        for (std::size_t i = 0; i < maps.size(); ++i) {
+          const std::string folder = MapDisplayName(maps[i]);
+          const std::string title = i < titles.size() && !titles[i].empty() ? titles[i] : folder;
+          std::string key = folder + " " + title;
+          for (char& c : key) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          if (!filter.empty() && key.find(filter) == std::string::npos) {
+            continue;
+          }
+          ImGui::PushID(static_cast<int>(i));
+          if (ImGui::Selectable(title.c_str())) {
+            mLightingFromMap = maps[i];
+          }
+          ImGui::SameLine();
+          ImGui::TextDisabled("%s", folder.c_str());
+          ImGui::PopID();
+        }
+      }
+      ImGui::EndChild();
+      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+      ImGui::TextWrapped("A click takes that map's sun, ambience, shadow, specular, bloom and fog, as one undo step.");
+      ImGui::PopStyleColor();
+    }
     ImGui::SeparatorText("Settings file");
     if (ImGui::Button("Import .scmlighting...")) {
       mLightingImport = true;

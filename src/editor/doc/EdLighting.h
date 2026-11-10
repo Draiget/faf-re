@@ -31,4 +31,12 @@ namespace faf::editor
   std::string LightingToScmlighting(const LightingState& lighting);
   /** Reads a `.scmlighting` into `lighting` (every field it has); false with `error`. */
   bool LightingFromScmlighting(const std::string& text, LightingState& lighting, std::string& error);
+
+  /**
+   * A map's lighting from its `.scmap` bytes: the header, preview and height field skipped, then the shader, background,
+   * sky cubemap and environment cubemaps (one name below version 0x37, else a count of name pairs, as
+   * CWldTerrainRes::LoadEnvironmentLookups reads them), then CWldTerrainRes::LoadLightingAndFog's 23 floats. False with
+   * `error` for a file it can't follow.
+   */
+  bool LightingFromScmap(const std::string& bytes, LightingState& lighting, std::string& error);
 } // namespace faf::editor

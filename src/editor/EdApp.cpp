@@ -1,6 +1,7 @@
 #include "editor/EdApp.h"
 #include <iterator>
 #include <fstream>
+#include <regex>
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 
 #include <Windows.h>
@@ -340,6 +341,7 @@ namespace faf::editor
       std::string mFrameMarkerArg;
       bool mWaterFilesDone = false;
       bool mLightingFilesDone = false;
+      bool mLightingFromDone = false;
       bool mMarkerFilesDone = false;
       bool mUnitFilesDone = false;
       bool mPaintSetDone = false;
@@ -1407,6 +1409,44 @@ namespace faf::editor
             gpg::Logf("editor: water settings exported to %s", exportFile.string().c_str());
           } else {
             gpg::Warnf("editor: can't write %s", exportFile.string().c_str());
+          }
+        }
+      }
+      // The Lighting panel's "from another map", or `/lightingfrom <map folder>` for test runs: that map's lighting, read
+      // from its .scmap.
+      {
+        std::string scenario = mShell->TakeLightingFromMap();
+        if (mScene.Attached() && !mLightingFromDone) {
+          mLightingFromDone = true;
+          if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/lightingfrom", 1, &value) && !value.empty()) {
+            std::string wanted = value[0].c_str();
+            std::transform(wanted.begin(), wanted.end(), wanted.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            for (const std::string& map : mPlay.Maps()) {
+              std::string folder = MapDisplayName(map);
+              std::transform(folder.begin(), folder.end(), folder.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+              if (folder == wanted) {
+                scenario = map;
+              }
+            }
+          }
+        }
+        if (!scenario.empty() && mDocument.GetState() == EdDocument::State::Open) {
+          std::string text;
+          std::string bytes;
+          std::smatch path;
+          LightingState lighting = mDocument.LightingNow();
+          std::string error;
+          if (!ReadGameFile(scenario, text) || !std::regex_search(text, path, std::regex(R"(\bmap\s*=\s*['"]([^'"]+\.scmap)['"])"))) {
+            gpg::Warnf("editor: %s names no map file", scenario.c_str());
+          } else if (!ReadGameFile(path[1].str(), bytes) || !LightingFromScmap(bytes, lighting, error)) {
+            gpg::Warnf("editor: %s: %s", path[1].str().c_str(), error.empty() ? "can't read it" : error.c_str());
+          } else {
+            const LightingState before = mDocument.LightingNow();
+            mDocument.ApplyLighting(lighting);
+            mDocument.LightingEdited(before);
+            gpg::Logf("editor: lighting from %s: multiplier %.2f, sun colour %.2f %.2f %.2f, fog %.0f to %.0f", path[1].str().c_str(),
+                      static_cast<double>(lighting.multiplier), static_cast<double>(lighting.sunColor[0]), static_cast<double>(lighting.sunColor[1]),
+                      static_cast<double>(lighting.sunColor[2]), static_cast<double>(lighting.fogStart), static_cast<double>(lighting.fogEnd));
           }
         }
       }
