@@ -3035,13 +3035,15 @@ namespace faf::editor
         continue;
       }
       const std::uint32_t color = MarkerColor(marker);
-      const float r = start ? 5.0f : (type == "Hydrocarbon" ? 3.0f : 1.6f);
+      // Half a size of n + 0.5: a marker in a cell's middle (where Snap and the game's resources put it) has its
+      // square's edges on the grid's lines.
+      const float r = start ? 4.5f : (type == "Hydrocarbon" ? 2.5f : 1.5f);
       const float base = y + 0.5f;
-      // A diamond on the ground and a post above it.
-      batcher.DrawLine(vertex(x - r, base, z, color), vertex(x, base, z - r, color));
-      batcher.DrawLine(vertex(x, base, z - r, color), vertex(x + r, base, z, color));
-      batcher.DrawLine(vertex(x + r, base, z, color), vertex(x, base, z + r, color));
-      batcher.DrawLine(vertex(x, base, z + r, color), vertex(x - r, base, z, color));
+      // A square on the ground, square to the grid, and a post above it.
+      batcher.DrawLine(vertex(x - r, base, z - r, color), vertex(x + r, base, z - r, color));
+      batcher.DrawLine(vertex(x + r, base, z - r, color), vertex(x + r, base, z + r, color));
+      batcher.DrawLine(vertex(x + r, base, z + r, color), vertex(x - r, base, z + r, color));
+      batcher.DrawLine(vertex(x - r, base, z + r, color), vertex(x - r, base, z - r, color));
       batcher.DrawLine(vertex(x, base, z, color), vertex(x, base + (start ? 10.0f : 4.0f), z, color));
       if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end()) {
         constexpr std::uint32_t kSelected = 0xF0FFE040u;
@@ -3551,13 +3553,14 @@ namespace faf::editor
     // Each copy's heading is the cursor's heading carried through the symmetry (the copies of a point one unit ahead).
     float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies], aheadZ[kMaxSymmetryCopies];
     const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
-    (void)HeightBrushCentres(field->width, field->height, x + std::cos(yaw), z + std::sin(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
+    // The model's front (+Z) under the turn is (sin, cos) on the ground.
+    (void)HeightBrushCentres(field->width, field->height, x + std::sin(yaw), z + std::cos(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
     for (int c = 0; c < copies; ++c) {
       if (centreX[c] < 0.0f || centreZ[c] < 0.0f || centreX[c] > static_cast<float>(field->width - 1) ||
           centreZ[c] > static_cast<float>(field->height - 1)) {
         continue;
       }
-      const float heading = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
+      const float heading = std::atan2(aheadX[c] - centreX[c], aheadZ[c] - centreZ[c]);
       centreX[c] = SnapToGrid(centreX[c]);
       centreZ[c] = SnapToGrid(centreZ[c]);
       moho::CWldPropEntry entry;
@@ -3651,9 +3654,9 @@ namespace faf::editor
     const float yaw = mTools->RandomPropTurn() ? mNextPropYaw : 0.0f;
     float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies], aheadZ[kMaxSymmetryCopies];
     const int copies = HeightBrushCentres(field->width, field->height, gx, gz, brush.symmetry, brush.turns, centreX, centreZ);
-    (void)HeightBrushCentres(field->width, field->height, gx + std::cos(yaw), gz + std::sin(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
+    (void)HeightBrushCentres(field->width, field->height, gx + std::sin(yaw), gz + std::cos(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
     const auto transformOf = [&](const int c) {
-      const float heading = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
+      const float heading = std::atan2(aheadX[c] - centreX[c], aheadZ[c] - centreZ[c]);
       const float x = SnapToGrid(centreX[c]);
       const float z = SnapToGrid(centreZ[c]);
       moho::CWldPropEntry entry;
@@ -3829,7 +3832,8 @@ namespace faf::editor
     }
     float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies], aheadZ[kMaxSymmetryCopies];
     const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
-    (void)HeightBrushCentres(field->width, field->height, x + std::cos(yaw), z + std::sin(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
+    // A unit's front (+Z) under its turn is (sin, cos) on the ground, as for props.
+    (void)HeightBrushCentres(field->width, field->height, x + std::sin(yaw), z + std::cos(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
     // Each copy's army: a player army's copy goes to the army whose start position is nearest its start's copy (the
     // symmetric player); an army without a start position (civilians) keeps its copies.
     std::string armyOf[kMaxSymmetryCopies];
@@ -3876,7 +3880,7 @@ namespace faf::editor
       unit.position[2] = SnapToGrid(centreZ[c]);
       unit.position[1] = UnitRestHeight(unit.position[0], unit.position[2]);
       // The saves keep a unit's turn in Orientation's second value.
-      unit.orientation[1] = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
+      unit.orientation[1] = std::atan2(aheadX[c] - centreX[c], aheadZ[c] - centreZ[c]);
       const std::string name = unit.name;
       if (EditArmyUnits(armyOf[c], [&](UnitGroup& group) { AddUnit(group, unit); })) {
         placed.emplace_back(armyOf[c], name);
