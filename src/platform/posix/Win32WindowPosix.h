@@ -19,6 +19,10 @@ namespace platform::posix
   // SetCursor's new cursor (null: none), and ShowCursor crossing between shown and hidden.
   extern void (*gSetCursorHook)(void* cursor);
   extern void (*gShowCursorHook)(bool shown);
+  // Opens a URL the engine already checked (moho::OpenAllowedUrlByWx) with the desktop's handler:
+  // gOpenUrlHook when the window system set one, else `xdg-open <url>` in the background.
+  extern bool (*gOpenUrlHook)(const char* utf8Url);
+  void OpenUrl(const char* utf8Url);
   // The clipboard's text in UTF-8 (WIN_CopyToClipboard, WIN_GetClipboardText).
   extern bool (*gSetClipboardTextHook)(const char* utf8Text);
   extern std::string (*gGetClipboardTextHook)();

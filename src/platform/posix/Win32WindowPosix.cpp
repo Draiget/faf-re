@@ -19,6 +19,8 @@
 #include <cstdio>
 
 #include <execinfo.h>
+#include <spawn.h>
+#include <unistd.h> // environ
 
 #include <Windows.h>
 
@@ -100,6 +102,28 @@ namespace platform::posix
   void (*gDestroyCursorHook)(void* cursor) = nullptr;
   void (*gSetCursorHook)(void* cursor) = nullptr;
   void (*gShowCursorHook)(bool shown) = nullptr;
+  bool (*gOpenUrlHook)(const char* utf8Url) = nullptr;
+
+  void OpenUrl(const char* const utf8Url)
+  {
+    if (utf8Url == nullptr || utf8Url[0] == '\0') {
+      return;
+    }
+    if (gOpenUrlHook != nullptr && gOpenUrlHook(utf8Url)) {
+      return;
+    }
+    // The URL is one argument of its own: no shell sees it.
+    char program[] = "xdg-open";
+    std::string url = utf8Url;
+    char* const arguments[] = {program, url.data(), nullptr};
+    pid_t child = 0;
+    if (::posix_spawnp(&child, program, nullptr, nullptr, arguments, environ) != 0) {
+      std::fprintf(stderr, "OpenUrl: could not start xdg-open\n");
+    }
+    // The child is not waited for; SIGCHLD's default disposition leaves a zombie until exit,
+    // which is harmless for the few links a session opens.
+  }
+
   bool (*gMessageBoxHook)(void* window, const char* utf8Text, const char* utf8Caption, bool yesNo) = nullptr;
   bool (*gSetClipboardTextHook)(const char* utf8Text) = nullptr;
   std::string (*gGetClipboardTextHook)() = nullptr;

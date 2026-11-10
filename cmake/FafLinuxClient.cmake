@@ -28,9 +28,8 @@ set(_faf_client_windows_only
   "^moho/app/WinMain\\.cpp$"
   #   the wx script debugger (issue #260);
   "^moho/misc/(ScrDebugWindow|ScrFileCtrl|ScrSourceCtrl|ScrWatchCtrl|ScrGotoDialog|ScrPauseEvent|TreeData)\\.cpp$"
-  #   the developer windows and Windows desktop features: emitter editor, log window,
-  #   reference editor, snapshot folder dialog, network panel and tray icon, wxURL.
-  "^moho/app/(WEmitterWx|WWinLogWindow|WRefEditDialog|SnapshotDirectoryDialog|NetworkPanel|NetworkTray|WxUrl)\\.cpp$")
+  #   the developer windows: emitter editor, log window, reference editor, snapshot folder dialog.
+  "^moho/app/(WEmitterWx|WWinLogWindow|WRefEditDialog|SnapshotDirectoryDialog)\\.cpp$")
 
 # Portable files in the Windows backends' folders that the Vulkan backend shares: the DXGI format
 # tables, the Direct3D 11 vertex layouts (D3D11_INPUT_ELEMENT_DESC from the POSIX <d3d11.h>) and
@@ -115,6 +114,8 @@ list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/wx/WxSta
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32WindowPosix.cpp")
 # The XACT engine on FAudio's FACT (issue #258).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/XactOverFact.cpp")
+# Movie sound on an SDL3 audio stream (moho::sfd::AudioSink; DirectSoundMovieSink.cpp on Windows).
+list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/SdlMovieSink.cpp")
 # CD3DFont's GDI text calls on FreeType.
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/GdiOverFreeType.cpp")
 

@@ -504,7 +504,9 @@ namespace
   constexpr const char* kConsoleStartupRenShorelineDescription = "Render shoreline";
   constexpr const char* kConsoleStartupRenShowSkeletonsDescription = "Show mesh skeletons";
   constexpr const char* kConsoleStartupRenUnitSelectionScaleDescription = "How much unit selection box extents are scaled (multiplier)";
+#if FAFRE_PLATFORM_WINDOWS // the reference editor is a developer window (WRefEditDialog.cpp)
   constexpr const char* kConsoleStartupSCCreateEntityDialogDescription = "Create object editing box for the primary selected unit";
+#endif
   constexpr const char* kConsoleStartupSetFocusArmyDescription = "Pass in army index or -1";
   constexpr const char* kConsoleStartupShadowFidelityDescription = "current shadow fidelity setting";
   constexpr const char* kConsoleStartupShadowFidelitySupportedDescription = "maximum shadow fidelity supported";
@@ -3745,7 +3747,9 @@ namespace moho
    * Address: 0x00BE9640 (FUN_00BE9640, dynamic initializer for `gCConFunc_SC_CreateEntityDialog`)
    * Address: 0x00C08E80 (FUN_00C08E80, dynamic atexit destructor for `gCConFunc_SC_CreateEntityDialog`)
    */
+#if FAFRE_PLATFORM_WINDOWS // the reference editor is a developer window, Windows only (the Linux client, issue #255)
   CConFunc gCConFunc_SC_CreateEntityDialog("SC_CreateEntityDialog", kConsoleStartupSCCreateEntityDialogDescription, reinterpret_cast<CConFunc::Callback>(&moho::funcl_SC_CreateEntityDialog));
+#endif
 
   /**
    * Address: 0x00BE7550 (FUN_00BE7550, dynamic initializer for `gCConFunc_quit`)

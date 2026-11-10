@@ -47,6 +47,9 @@
 #if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #endif
+#if FAFRE_PLATFORM_POSIX
+#include "platform/posix/SdlMovieSink.h" // movie sound on SDL3 (issue #255)
+#endif
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Error.hpp"
@@ -1212,9 +1215,9 @@ void moho::CMovieManager::CreateDirectSound()
   }
 
 #if !FAFRE_PLATFORM_WINDOWS
-  // The Linux client (issue #255) has no DirectSound: the movie middleware runs without sound, as
-  // when DirectSound fails on Windows. Movie sound there is the FFmpeg path's.
-  gpg::Logf("Movies: no DirectSound on this platform.");
+  // The Linux client (issue #255) has no DirectSound: the movie player's sound goes to an SDL3
+  // audio stream (platform/posix/SdlMovieSink.cpp), and the device it is handed only says so.
+  mDirectSound = platform::posix::MovieSoundDevice();
 #else
   if (FAILED(::DirectSoundCreate(nullptr, &mDirectSound, nullptr))) {
     gpg::Logf("Failed to create DirectSound.");
@@ -1287,6 +1290,8 @@ void moho::CMovieManager::ReleaseDirectSound()
     mDirectSound->Release();
     mDirectSound = nullptr;
   }
+#else
+  mDirectSound = nullptr; // the movie sound token (platform/posix/SdlMovieSink.h) owns nothing
 #endif
 }
 
