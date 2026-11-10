@@ -101,7 +101,7 @@ namespace
   constexpr const char* kServerName = "server";
 
   constexpr const char* kUsage =
-    "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
+    "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
     "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
@@ -2383,6 +2383,10 @@ namespace
   }
 } // namespace
 
+// The command line as the engine reads it (src/platform/posix/Win32Shim.cpp sets them before main).
+extern int __argc;
+extern char** __argv;
+
 int main(int, char**)
 {
   for (const int signalNumber : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT}) {
@@ -2405,6 +2409,28 @@ int main(int, char**)
   if (!ReadOption("--match", matchPath) || !ReadOption("--out", outDir)) {
     std::printf("%s", kUsage);
     return kExitBadInput;
+  }
+  // Plan WP0.7: `--data <dir>`, the game data a deployment ships in one folder (fa/, faf/, vault/, as the server's
+  // images and runs lay it out): without `/init`, its `faf/bin/init_replay.lua` is the init file. The engine reads
+  // the command line from `__argv` on every lookup (`CFG_GetArgOption`), so the option joins it before anything reads it.
+  if (std::string dataDir; ReadOption("--data", dataDir) && !moho::CFG_GetArgOption("/init", 1, nullptr)) {
+    const std::filesystem::path init = std::filesystem::path(dataDir) / "faf" / "bin" / "init_replay.lua";
+    std::error_code initError;
+    if (!std::filesystem::is_regular_file(init, initError)) {
+      std::printf("--data %s: no %s\n", dataDir.c_str(), init.string().c_str());
+      return kExitBadInput;
+    }
+    static std::vector<std::string> sDataArgs{"/init", init.string()};
+    static std::vector<char*> sArgv;
+    for (int i = 0; i < __argc; ++i) {
+      sArgv.push_back(__argv[i]);
+    }
+    for (std::string& arg : sDataArgs) {
+      sArgv.push_back(arg.data());
+    }
+    sArgv.push_back(nullptr);
+    __argv = sArgv.data();
+    __argc = static_cast<int>(sArgv.size()) - 1;
   }
   std::error_code directoryError;
   std::filesystem::create_directories(outDir, directoryError);
