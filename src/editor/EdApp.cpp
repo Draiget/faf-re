@@ -120,6 +120,10 @@ namespace faf::editor
       kMenuSaveAs = 1003,
       kMenuNew = 1004,
       kMenuPackage = 1005,
+      kMenuOpen = 1006,
+      kMenuClearRecent = 1007,
+      /** File > Open Recent's maps (EdDocument::RecentMaps, at most kRecentMapsKept). */
+      kMenuFirstRecent = 3000,
       kMenuUndo = 1301,
       kMenuRedo = 1302,
       kMenuDelete = 1303,
@@ -446,6 +450,10 @@ namespace faf::editor
           mShell->OpenNewMap();
           return true;
         }
+        if (message == WM_KEYDOWN && wParam == 'O' && (::GetKeyState(VK_CONTROL) & 0x8000) != 0) {
+          mShell->Browser().Show();
+          return true;
+        }
         return mScene.OnWindowMessage(window, message, wParam, lParam);
       }
       [[nodiscard]] bool SessionActive() const { return mPlay.Active(); }
@@ -465,6 +473,9 @@ namespace faf::editor
       HMENU mFileMenu = nullptr;
       HMENU mPlayMenu = nullptr;
       HMENU mMapMenu = nullptr;
+      HMENU mRecentMenu = nullptr;
+      /** The scenario path of each item File > Open Recent shows, by its place. */
+      std::vector<std::string> mRecentShown;
       std::wstring mBaseTitle;
       std::wstring mShownTitle;
 
@@ -806,7 +817,11 @@ namespace faf::editor
     {
       HMENU file = ::CreatePopupMenu();
       ::AppendMenuW(file, MF_STRING, kMenuNew, L"&New map...\tCtrl+N");
-      ::AppendMenuW(file, MF_STRING | MF_GRAYED, 0, L"&Open map...\tCtrl+O");
+      ::AppendMenuW(file, MF_STRING, kMenuOpen, L"&Open map...\tCtrl+O");
+      // Open Recent, as VS Code has it: the maps opened last, newest first; filled each time File opens.
+      mRecentMenu = ::CreatePopupMenu();
+      ::AppendMenuW(file, MF_POPUP, reinterpret_cast<UINT_PTR>(mRecentMenu), L"Open &Recent");
+      ::AppendMenuW(file, MF_SEPARATOR, 0, nullptr);
       ::AppendMenuW(file, MF_STRING, kMenuSave, L"&Save\tCtrl+S");
       ::AppendMenuW(file, MF_STRING, kMenuSaveAs, L"Save as new map &folder...");
       ::AppendMenuW(file, MF_STRING, kMenuPackage, L"&Package for the FAF vault...");
@@ -877,6 +892,35 @@ namespace faf::editor
       check(kMenuImGuiDemo, mShell->ShowDemo());
 
       const bool active = mPlay.Active();
+      // Open Recent: the recent maps the game still lists, with their titles.
+      while (::GetMenuItemCount(mRecentMenu) > 0) {
+        (void)::DeleteMenu(mRecentMenu, 0, MF_BYPOSITION);
+      }
+      mRecentShown.clear();
+      const bool busy = active || mDocument.GetState() == EdDocument::State::Loading;
+      for (const std::string& recent : mDocument.RecentMaps()) {
+        const std::vector<std::string>& maps = mPlay.Maps();
+        for (std::size_t i = 0; i < maps.size(); ++i) {
+          if (_stricmp(maps[i].c_str(), recent.c_str()) != 0) {
+            continue;
+          }
+          const UINT id = kMenuFirstRecent + static_cast<UINT>(mRecentShown.size());
+          const bool current = mDocument.GetState() == EdDocument::State::Open && _stricmp(mDocument.Path().c_str(), recent.c_str()) == 0;
+          std::wstring label = Widen(mPlay.Titles()[i]) + L"  (" + Widen(MapDisplayName(maps[i])) + L")";
+          if (mRecentShown.size() < 9) {
+            label = L"&" + std::to_wstring(mRecentShown.size() + 1) + L"  " + label;
+          }
+          ::AppendMenuW(mRecentMenu, MF_STRING | (busy ? MF_GRAYED : 0U) | (current ? MF_CHECKED : 0U), id, label.c_str());
+          mRecentShown.push_back(maps[i]);
+          break;
+        }
+      }
+      if (mRecentShown.empty()) {
+        ::AppendMenuW(mRecentMenu, MF_STRING | MF_GRAYED, 0, L"(no maps opened yet)");
+      } else {
+        ::AppendMenuW(mRecentMenu, MF_SEPARATOR, 0, nullptr);
+        ::AppendMenuW(mRecentMenu, MF_STRING, kMenuClearRecent, L"&Clear recently opened");
+      }
       ::ModifyMenuW(mPlayMenu, kMenuPlayStop, MF_BYCOMMAND | MF_STRING | ((active || mPlay.CanPlay()) ? MF_ENABLED : MF_GRAYED),
                     kMenuPlayStop, active ? L"&Stop\tF5" : L"&Play\tF5");
       const int count = static_cast<int>(mPlay.Maps().size());
@@ -967,6 +1011,12 @@ namespace faf::editor
       case kMenuNew:
         mShell->OpenNewMap();
         break;
+      case kMenuOpen:
+        mShell->Browser().Show();
+        break;
+      case kMenuClearRecent:
+        mDocument.ClearRecentMaps();
+        break;
       case kMenuSaveAs:
         mShell->OpenSaveAs();
         break;
@@ -1002,6 +1052,19 @@ namespace faf::editor
         }
         return;
       default:
+        if (command >= kMenuFirstRecent && command < kMenuFirstRecent + mRecentShown.size() && !mPlay.Active() &&
+            mDocument.GetState() != EdDocument::State::Loading) {
+          const std::string scenario = mRecentShown[command - kMenuFirstRecent];
+          const std::vector<std::string>& maps = mPlay.Maps();
+          for (std::size_t i = 0; i < maps.size(); ++i) {
+            if (maps[i] == scenario) {
+              mPlay.Select(static_cast<int>(i));
+              (void)mDocument.Open(scenario);
+              gpg::Logf("editor: File > Open Recent: %s", scenario.c_str());
+            }
+          }
+          return;
+        }
         if (command >= kMenuFirstMap && command < kMenuFirstMap + mPlay.Maps().size() && !mPlay.Active()) {
           mPlay.Select(static_cast<int>(command - kMenuFirstMap));
         }

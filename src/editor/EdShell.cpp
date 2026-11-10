@@ -870,7 +870,7 @@ namespace faf::editor
       ImGui::End();
       return;
     }
-    // Play: the picked map, Play or Stop, and what the session is doing.
+    // Play: the picked map (the one open, or Play > Map), and what the session is doing.
     const std::vector<std::string>& maps = mPlay.Maps();
     const int selected = mPlay.Selected();
     const std::vector<std::string>& titles = mPlay.Titles();
@@ -881,14 +881,7 @@ namespace faf::editor
       ImGui::TextDisabled("%s", MapDisplayName(maps[at]).c_str());
     }
     ImGui::TextDisabled("%s", mPlay.StateText());
-    // Open: the picked map into the editor's document (the Info panel shows what it read).
-    ImGui::BeginDisabled(maps.empty() || mDocument.GetState() == EdDocument::State::Loading);
-    if (ImGui::Button("Open for editing", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f, 0.0f)) && !maps.empty()) {
-      (void)mDocument.Open(maps[static_cast<std::size_t>(selected)]);
-    }
-    ImGui::EndDisabled();
-    ImGui::SameLine();
-    if (ImGui::Button("Browse maps...", ImVec2(-1.0f, 0.0f))) {
+    if (ImGui::Button("Open a map...", ImVec2(-1.0f, 0.0f))) {
       mBrowser.Show();
     }
     ImGui::SetItemTooltip("Every map on this computer and the FAF vault (File > Open, Ctrl+O); recent ones are in File > Open Recent");
@@ -940,35 +933,9 @@ namespace faf::editor
           ImGui::SetWindowFocus(kInfoWindow);
         }
       }
-    }
-
-    // Each map by its title, then its folder name; the filter matches either.
-    ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputTextWithHint("##mapfilter", "Filter maps", mMapFilter, sizeof(mMapFilter));
-    ImGui::BeginDisabled(mPlay.Active());
-    if (ImGui::BeginChild("##maps", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
-      for (int i = 0; i < static_cast<int>(maps.size()); ++i) {
-        const std::size_t at = static_cast<std::size_t>(i);
-        const std::string folder = MapDisplayName(maps[at]);
-        if (mMapFilter[0] != '\0' && ImStristr(titles[at].c_str(), nullptr, mMapFilter, nullptr) == nullptr &&
-            ImStristr(folder.c_str(), nullptr, mMapFilter, nullptr) == nullptr) {
-          continue;
-        }
-        ImGui::PushID(i);
-        if (ImGui::Selectable("##map", i == selected, ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_AllowOverlap)) {
-          mPlay.Select(i);
-          // A double-click opens the map for editing; Play (F5) plays it.
-          if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && mDocument.GetState() != EdDocument::State::Loading) {
-            (void)mDocument.Open(maps[at]);
-          }
-        }
-        if (ImGui::IsItemHovered()) {
-          ImGui::SetTooltip("%s\n%s\nDouble-click to open for editing; Play (F5) plays it", titles[at].c_str(), maps[at].c_str());
-        }
-        ImGui::SameLine(ImGui::GetStyle().ItemSpacing.x);
-        ImGui::TextUnformatted(titles[at].c_str());
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", folder.c_str());
+      if (ImGui::CollapsingHeader("Adaptive map", mDocument.Adaptive() ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None)) {
+        ImGui::PushID("adaptive");
+        DrawAdaptivePanel();
         ImGui::PopID();
       }
     }

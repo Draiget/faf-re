@@ -578,6 +578,14 @@ namespace faf::editor
     mRecentMaps = ReadRecentMaps(mRecentMapsFile);
   }
 
+  void EdDocument::ClearRecentMaps()
+  {
+    mRecentMaps.clear();
+    if (!mRecentMapsFile.empty() && !WriteRecentMaps(mRecentMapsFile, mRecentMaps)) {
+      gpg::Warnf("editor: the recent maps list %s could not be written", mRecentMapsFile.c_str());
+    }
+  }
+
   void EdDocument::ApplyWaterBodies(const std::vector<WaterBody>& bodies)
   {
     const std::string scenario = WithWaterBodies(mScenario, bodies);

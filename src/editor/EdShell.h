@@ -200,7 +200,6 @@ namespace faf::editor
     std::string mAdapter;
     EdTools mTools;
     ImVec4 mGameView{0.0f, 0.0f, 0.0f, 0.0f};
-    char mMapFilter[64]{};
     /** The document path the Info tab was last brought to the front for. */
     std::string mInfoShownFor;
     bool mExit = false;

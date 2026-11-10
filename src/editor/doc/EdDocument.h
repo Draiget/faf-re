@@ -297,6 +297,8 @@ namespace faf::editor
     /** The maps opened last, newest first (their scenario paths), kept in `file`; each map that opens goes first. */
     void SetRecentMapsFile(std::string file);
     [[nodiscard]] const std::vector<std::string>& RecentMaps() const noexcept { return mRecentMaps; }
+    /** File > Open Recent > Clear: the list emptied, and its file with it. */
+    void ClearRecentMaps();
     /**
      * Compiles the scenario, save and script texts as they are now (edits included) and returns their syntax errors,
      * each with its file and line.
