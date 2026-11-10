@@ -2679,7 +2679,15 @@ namespace faf::editor
       const std::size_t before = mObjectBefore.entries.size();
       mDocument.PropsEdited(std::move(mObjectBefore));
       gpg::Logf("editor: prop edit: %zu props before, %zu now", before, mMap != nullptr && mMap->mProps != nullptr ? mMap->mProps->mEntries.size() : 0U);
+      if (!mPaintCounts.empty()) {
+        std::string painted;
+        for (const auto& [path, count] : mPaintCounts) {
+          painted += (painted.empty() ? "" : ", ") + std::to_string(count) + " " + path.substr(path.find_last_of('/') + 1);
+        }
+        gpg::Logf("editor: painted from the list (before symmetry copies): %s", painted.c_str());
+      }
     }
+    mPaintCounts.clear();
     mObjectBefore = {};
     mObjectStroke = false;
     mObjectsChanged = false;
@@ -2753,16 +2761,43 @@ namespace faf::editor
   void EdMapScene::PlaceProps(const float x, const float z, const float fixedYaw)
   {
     const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
-    if (mTools == nullptr || field == nullptr || mTools->PropBlueprint().empty()) {
+    if (mTools == nullptr || field == nullptr) {
+      return;
+    }
+    const auto roll = [this] {
+      mScatterSeed = mScatterSeed * 1664525U + 1013904223U;
+      return static_cast<float>(mScatterSeed >> 8) / 16777216.0f;
+    };
+    // Scatter with a paint list: a prop of it by chance, its turn and scale between its own; else the chosen prop.
+    std::string blueprint = mTools->PropBlueprint();
+    float scale = 1.0f;
+    float yaw = 0.0f;
+    const std::vector<PropPaintEntry>& list = mTools->PaintList();
+    if (fixedYaw <= -100.0f && mTools->CurrentPropMode() == EdTools::PropMode::Scatter && !list.empty()) {
+      const int pick = PickPaintEntry(list, roll());
+      if (pick < 0) {
+        return;
+      }
+      const PropPaintEntry& entry = list[static_cast<std::size_t>(pick)];
+      // A blueprint the game hasn't got (a set from another mod) is skipped, not placed as a missing prop.
+      if (mTools->HasPropBlueprints() && mTools->PropBlueprintNamed(entry.blueprint).empty()) {
+        return;
+      }
+      blueprint = entry.blueprint;
+      const float degrees = static_cast<float>(entry.rotationMin) + roll() * static_cast<float>(entry.rotationMax - entry.rotationMin);
+      yaw = degrees * (kPi / 180.0f);
+      scale = entry.scaleMin + roll() * (entry.scaleMax - entry.scaleMin);
+      ++mPaintCounts[blueprint];
+    } else {
+      // The turn: random or none.
+      const float random = roll() * 6.2831853f;
+      yaw = fixedYaw > -100.0f ? fixedYaw : mTools->RandomPropTurn() ? random : 0.0f;
+    }
+    if (blueprint.empty()) {
       return;
     }
     const HeightBrush brush = mTools->CurrentHeightBrush();
-    // The turn: random or none; each copy's heading is the cursor's heading carried through the symmetry
-    // (the copies of a point one unit ahead).
-    mScatterSeed = mScatterSeed * 1664525U + 1013904223U;
-    const float yaw = fixedYaw > -100.0f            ? fixedYaw
-                      : mTools->RandomPropTurn() ? static_cast<float>(mScatterSeed >> 8) / 16777216.0f * 6.2831853f
-                                                 : 0.0f;
+    // Each copy's heading is the cursor's heading carried through the symmetry (the copies of a point one unit ahead).
     float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies], aheadX[kMaxSymmetryCopies], aheadZ[kMaxSymmetryCopies];
     const int copies = HeightBrushCentres(field->width, field->height, x, z, brush.symmetry, brush.turns, centreX, centreZ);
     (void)HeightBrushCentres(field->width, field->height, x + std::cos(yaw), z + std::sin(yaw), brush.symmetry, brush.turns, aheadX, aheadZ);
@@ -2775,14 +2810,16 @@ namespace faf::editor
       centreX[c] = SnapToGrid(centreX[c]);
       centreZ[c] = SnapToGrid(centreZ[c]);
       moho::CWldPropEntry entry;
-      entry.mBlueprintPath.assign(mTools->PropBlueprint().c_str());
+      entry.mBlueprintPath.assign(blueprint.c_str());
       entry.mTransform.pos_ = Wm3::Vec3f{centreX[c],
                                          mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(centreX[c])),
                                                                         static_cast<std::int32_t>(std::lround(centreZ[c]))),
                                          centreZ[c]};
       entry.mTransform.orient_ = Wm3::Quatf(std::cos(heading * 0.5f), 0.0f, std::sin(heading * 0.5f), 0.0f);
       // The prop as the file will give it back (its record is what gets saved).
-      const PropRecord record = PropRecordFor(mTools->PropBlueprint(), entry.mTransform);
+      PropRecord record = PropRecordFor(blueprint, entry.mTransform);
+      // The file's scale (the game's loader reads and drops it, CWldProps::Load 0x008918E0).
+      record.values[12] = record.values[13] = record.values[14] = scale;
       entry.mTransform = record.loaded;
       mDocument.AddProp(entry, record);
       mProps.push_back(MakePropInstance(entry));

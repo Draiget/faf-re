@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <map>
 #include <vector>
 
 #include <Windows.h>
@@ -264,6 +265,8 @@ namespace faf::editor
     std::vector<Wm3::Vec3f> mDragStart;
     float mScatterDue = 0.0f;
     std::uint32_t mScatterSeed = 12345U;
+    /** A stroke's props painted from the paint list, by blueprint (for the log). */
+    std::map<std::string, int> mPaintCounts;
     void BeginObjectStroke();
     void EndObjectStroke();
 

@@ -2,6 +2,7 @@
 
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskBrush.h"
+#include "editor/doc/EdPropPaint.h"
 #include "editor/doc/EdWater.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdMarkers.h"
@@ -46,6 +47,25 @@ namespace faf::editor
     [[nodiscard]] PropMode CurrentPropMode() const noexcept { return static_cast<PropMode>(mPropMode); }
     [[nodiscard]] float PropDensity() const noexcept { return mPropDensity; }
     [[nodiscard]] bool RandomPropTurn() const noexcept { return mPropRandomTurn; }
+    /** Scatter's paint list (FAFME's): when it has props, Scatter picks one of them by chance for each prop. */
+    [[nodiscard]] const std::vector<PropPaintEntry>& PaintList() const noexcept { return mPaintList; }
+    /** The palette's spelling of this prop blueprint (case aside), or empty when it hasn't it. */
+    [[nodiscard]] std::string PropBlueprintNamed(const std::string& path) const
+    {
+      const auto lower = [](std::string text) {
+        for (char& c : text) {
+          c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        }
+        return text;
+      };
+      const std::string wanted = lower(path);
+      const auto at = std::find_if(mPropBlueprints.begin(), mPropBlueprints.end(), [&](const std::string& known) { return lower(known) == wanted; });
+      return at != mPropBlueprints.end() ? *at : std::string();
+    }
+    void SetPaintList(std::vector<PropPaintEntry> list) { mPaintList = std::move(list); }
+    /** The paint list's Import / Export of a `.proppaintset`, taken by the app. */
+    [[nodiscard]] bool TakePaintSetImport() noexcept { return std::exchange(mPaintSetImport, false); }
+    [[nodiscard]] bool TakePaintSetExport() noexcept { return std::exchange(mPaintSetExport, false); }
     /** The chosen prop's reclaim, scale and LODs, for the panel. */
     void SetPropDetails(std::string details) { mPropDetails = std::move(details); }
     /** The prop blueprints the rules have (their ids), for the palette. */
@@ -609,6 +629,9 @@ namespace faf::editor
     int mPropMode = 0;
     float mPropDensity = 8.0f;
     bool mPropRandomTurn = true;
+    std::vector<PropPaintEntry> mPaintList;
+    bool mPaintSetImport = false;
+    bool mPaintSetExport = false;
     std::string mPropDetails;
     char mPropFilter[64]{};
     int mSelectionCount = 0;

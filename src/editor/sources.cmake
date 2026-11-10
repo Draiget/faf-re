@@ -21,6 +21,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdMarkerPreset.cpp
   doc/EdUnitPreset.cpp
   doc/EdLayerPreset.cpp
+  doc/EdPropPaint.cpp
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp

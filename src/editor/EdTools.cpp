@@ -941,7 +941,67 @@ namespace faf::editor
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::SliderFloat("##density", &mPropDensity, 0.5f, 60.0f, "%.1f props a second");
     }
-    ImGui::Checkbox("Random turn", &mPropRandomTurn);
+    if (mPropMode != 1 || mPaintList.empty()) {
+      ImGui::Checkbox("Random turn", &mPropRandomTurn);
+    }
+    if (mPropMode == 1) {
+      SectionHeader("PAINT LIST");
+      int remove = -1;
+      for (std::size_t i = 0; i < mPaintList.size(); ++i) {
+        PropPaintEntry& entry = mPaintList[i];
+        ImGui::PushID(static_cast<int>(i));
+        std::string label = entry.blueprint;
+        if (const std::size_t props = label.find("/props/"); props != std::string::npos) {
+          label = label.substr(props + 7);
+        }
+        if (label.size() > 8 && label.compare(label.size() - 8, 8, "_prop.bp") == 0) {
+          label.resize(label.size() - 8);
+        }
+        ImGui::TextUnformatted(label.c_str());
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip("%s", entry.blueprint.c_str());
+        }
+        ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - ImGui::GetFrameHeight());
+        if (ImGui::SmallButton("x")) {
+          remove = static_cast<int>(i);
+        }
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragInt("##chance", &entry.chance, 1.0f, 0, 1000, "Chance %d");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragIntRange2("##turn", &entry.rotationMin, &entry.rotationMax, 1.0f, 0, 360, "Turn %d", "to %d");
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::DragFloatRange2("##scale", &entry.scaleMin, &entry.scaleMax, 0.01f, 0.05f, 10.0f, "Scale %.2f", "to %.2f");
+        ImGui::PopID();
+      }
+      if (remove >= 0) {
+        mPaintList.erase(mPaintList.begin() + remove);
+      }
+      ImGui::BeginDisabled(mPropBlueprint.empty());
+      if (ImGui::Button("Add the chosen prop")) {
+        PropPaintEntry entry;
+        entry.blueprint = mPropBlueprint;
+        mPaintList.push_back(entry);
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      ImGui::BeginDisabled(mPaintList.empty());
+      if (ImGui::Button("Clear##paintlist")) {
+        mPaintList.clear();
+      }
+      ImGui::EndDisabled();
+      if (ImGui::Button("Import set...")) {
+        mPaintSetImport = true;
+      }
+      ImGui::SameLine();
+      ImGui::BeginDisabled(mPaintList.empty());
+      if (ImGui::Button("Export set...")) {
+        mPaintSetExport = true;
+      }
+      ImGui::EndDisabled();
+      Note("With props in the list, Scatter picks one for each prop by its chance, turned between its two angles. The scale "
+           "is saved to the map but the game draws props at their own size (it reads and drops it), so the view does too. "
+           "Sets are FAForeverMapEditor's .proppaintset.");
+    }
     DrawBrush(false);
     DrawSymmetry(false);
     Note("Single shows the prop under the cursor and places it at a click, Scatter while the button is held, inside the brush; Erase removes those inside it. "

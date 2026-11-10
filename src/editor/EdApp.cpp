@@ -342,6 +342,7 @@ namespace faf::editor
       bool mLightingFilesDone = false;
       bool mMarkerFilesDone = false;
       bool mUnitFilesDone = false;
+      bool mPaintSetDone = false;
       int mLayerFileStep = 0;
       /** `/waterset <on>,<level>,<deep>,<abyss>` (test runs): the sea set as one edit once the map is shown. */
       std::string mWaterSetArg;
@@ -1593,6 +1594,55 @@ namespace faf::editor
                         changed, changed == 1 ? "" : "s");
             }
           }
+        }
+      }
+      // The Props tool's paint list, or `/paintset <file>` (into the list) and `/paintsetexport <file>` for test runs.
+      {
+        std::filesystem::path importFile;
+        std::filesystem::path exportFile;
+        if (tools.TakePaintSetImport()) {
+          importFile = AskFile(HandleOf(mGame.supcomFrame), false, L"Prop paint sets (*.proppaintset)\0*.proppaintset\0All files\0*.*\0",
+                               L"proppaintset", L"Import a prop paint set");
+        }
+        if (tools.TakePaintSetExport()) {
+          exportFile = AskFile(HandleOf(mGame.supcomFrame), true, L"Prop paint sets (*.proppaintset)\0*.proppaintset\0", L"proppaintset",
+                               L"Export the paint list");
+        }
+        if (mScene.Attached() && !mPaintSetDone && tools.HasPropBlueprints()) {
+          mPaintSetDone = true;
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/paintset", 1, &file) && !file.empty()) {
+            importFile = file[0].c_str();
+          }
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/paintsetexport", 1, &file) && !file.empty()) {
+            exportFile = file[0].c_str();
+          }
+        }
+        if (!importFile.empty()) {
+          std::ifstream in(importFile, std::ios::binary);
+          const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+          std::vector<PropPaintEntry> entries;
+          std::string error;
+          if (!in || !PaintSetFromProppaintset(text, entries, error)) {
+            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
+          } else {
+            int unknown = 0;
+            for (PropPaintEntry& entry : entries) {
+              if (const std::string known = tools.PropBlueprintNamed(entry.blueprint); !known.empty()) {
+                entry.blueprint = known;
+              } else if (tools.HasPropBlueprints()) {
+                gpg::Warnf("editor: %s: no prop blueprint %s; Scatter skips it until it is there", importFile.string().c_str(), entry.blueprint.c_str());
+                ++unknown;
+              }
+            }
+            gpg::Logf("editor: paint list from %s: %zu props (%d unknown)", importFile.string().c_str(), entries.size(), unknown);
+            tools.SetPaintList(std::move(entries));
+          }
+        }
+        if (!exportFile.empty()) {
+          const std::string text = PaintSetToProppaintset(tools.PaintList());
+          std::ofstream out(exportFile, std::ios::binary | std::ios::trunc);
+          out.write(text.data(), static_cast<std::streamsize>(text.size()));
+          (out ? gpg::Logf : gpg::Warnf)("editor: paint list (%zu props) exported to %s", tools.PaintList().size(), exportFile.string().c_str());
         }
       }
       const bool importAsked = tools.TakeImportRequest();
