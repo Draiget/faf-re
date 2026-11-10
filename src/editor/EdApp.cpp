@@ -26,6 +26,7 @@
 #include "editor/EdPlay.h"
 #include "editor/ui/EdHelp.h"
 #include "editor/EdShell.h"
+#include "moho/render/AmbientOcclusionRenderer.h"
 #include <cstring>
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdRoundTrip.h"
@@ -529,6 +530,13 @@ namespace faf::editor
       ReadOpenCommandLine();
       gEditorApp = this;
       BuildMenu(frame);
+      // The game view's ambient occlusion makes its GPU programs on first use, which the editor's own view never
+      // is: made now, so the first Play's first frame doesn't wait for them (WPE.15).
+      const auto warmStart = std::chrono::steady_clock::now();
+      if (moho::AmbientOcclusionRenderer::Get().IsActive()) {
+        gpg::Logf("editor: game view's ambient occlusion made ahead in %.2f s",
+                  std::chrono::duration<double>(std::chrono::steady_clock::now() - warmStart).count());
+      }
       gpg::Logf("editor: ready on %s", api);
       return true;
     }
