@@ -355,6 +355,8 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/ViewAidTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdViewAids.cpp
   editor/ArmySlotTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdArmySlots.cpp
   editor/AdaptiveTablesTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdAdaptiveTables.cpp
+  editor/WaterBodiesEditTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdWaterBodies.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLuaText.cpp
+  ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)

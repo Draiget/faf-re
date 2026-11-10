@@ -902,6 +902,9 @@ end
     if (state == nullptr) {
       return false;
     }
+    // A map's water bodies (ScenarioInfo.WaterBodies) are in no game release yet: the switch puts them in this session,
+    // as the editor's view shows them. A map without any is played as before.
+    moho::CON_Execute("sim_FixWaterBodies 1");
     // Defined again whenever the state lacks it (a new UI Lua state has none).
     if (state->GetGlobal("EditorStartPlay").IsNil() && !moho::SCR_LuaDoString(kLauncher, state)) {
       gpg::Warnf("editor: the session launcher did not load; playing with FAF's quick start");

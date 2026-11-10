@@ -29,6 +29,9 @@ set(FAF_EDITOR_SOURCES
   tools/EdViewAids.cpp
   tools/EdArmySlots.cpp
   doc/EdAdaptiveTables.cpp
+  doc/EdLuaText.cpp
+  doc/EdWaterBodies.cpp
+  view/EdWaterBodyView.cpp
   ui/EdHelp.cpp
   ui/EdIcons.cpp
   view/EdPropThumbnails.cpp

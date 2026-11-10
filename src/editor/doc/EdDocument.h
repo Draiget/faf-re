@@ -14,6 +14,7 @@
 #include "editor/doc/EdSkybox.h"
 #include "editor/tools/EdWaves.h"
 #include "editor/doc/EdWater.h"
+#include "editor/doc/EdWaterBodies.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdSymmetryCheck.h"
@@ -282,6 +283,11 @@ namespace faf::editor
      * `<base>_tables.lua` beside the scenario and the scenario gets `AdaptiveMap = true`.
      */
     void SetTablesText(const std::string& text);
+    /**
+     * Sets the scenario's water bodies (`ScenarioInfo.WaterBodies`, its text rewritten in place). No undo step of its
+     * own: the caller takes SaveDataNow before and gives it to SaveDataEdited after.
+     */
+    void ApplyWaterBodies(const std::vector<WaterBody>& bodies);
     /**
      * Compiles the scenario, save and script texts as they are now (edits included) and returns their syntax errors,
      * each with its file and line.

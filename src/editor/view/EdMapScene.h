@@ -410,6 +410,18 @@ namespace faf::editor
     /** The stroke under way was started with the right button: the brush's opposite (Raise/Lower, Paint/Erase). */
     bool mPaintInverted = false;
     float mStrokeStartHeight = 0.0f;
+    /** The scenario's water bodies filled over the heights and put on the map, as the game's session does (EdWaterBodyView.cpp). */
+    void RefreshWaterBodies();
+    void DrawWaterBodyGuides(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field);
+    /** The chosen body's handle under the cursor: an outline point's index, -1 the seed, -2 none. */
+    [[nodiscard]] int WaterBodyHandleAt(POINT at) const;
+    /** A press with the Water tool: a seed or an outline point placed, or a drag of one started; true when it took it. */
+    bool WaterBodyPress(HWND window, POINT at);
+    void WaterBodyDrag(POINT at);
+    void WaterBodyRelease();
+    std::string mWaterBodiesScenario;
+    bool mWaterBodiesStale = true;
+    int mWaterBodyHandle = -2;
     /** The adaptive tables as last read, for the ties drawn from resources to their armies. */
     std::string mAdaptiveText;
     AdaptiveTables mAdaptive;

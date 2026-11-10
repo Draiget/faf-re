@@ -8,6 +8,7 @@
 #include "editor/tools/EdWaves.h"
 #include "editor/tools/EdTerrainTypes.h"
 #include "editor/doc/EdWater.h"
+#include "editor/doc/EdWaterBodies.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdMarkers.h"
 #include "editor/tools/EdTextureLibrary.h"
@@ -182,6 +183,68 @@ namespace faf::editor
       mWaterChanged = false;
       mWaterFinal = false;
       return true;
+    }
+    /**
+     * The Water panel's water bodies (`ScenarioInfo.WaterBodies`): the scenario's, given each frame and kept while the
+     * panel or the view is changing them; a change either made (`final` when a drag or a click ended).
+     */
+    void SetWaterBodies(const std::vector<WaterBody>& bodies, std::string error)
+    {
+      if (!mBodiesEditing && !mBodiesChanged) {
+        mBodies = bodies;
+      }
+      mBodiesError = std::move(error);
+      mBody = std::clamp(mBody, -1, static_cast<int>(mBodies.size()) - 1);
+    }
+    [[nodiscard]] bool TakeWaterBodiesChange(std::vector<WaterBody>& bodies, bool& final)
+    {
+      if (!mBodiesChanged) {
+        return false;
+      }
+      bodies = mBodies;
+      final = mBodiesFinal;
+      mBodiesChanged = false;
+      mBodiesFinal = false;
+      return true;
+    }
+    /** For the view: the bodies as the panel has them, the one chosen (-1 none), and a change it made to them. */
+    [[nodiscard]] std::vector<WaterBody>& EditedWaterBodies() noexcept { return mBodies; }
+    [[nodiscard]] int SelectedWaterBody() const noexcept { return mBody; }
+    void SelectWaterBody(const int body) noexcept { mBody = body; }
+    void WaterBodiesChanged(const bool final) noexcept
+    {
+      mBodiesChanged = true;
+      mBodiesFinal = mBodiesFinal || final;
+    }
+    /** What a click in the view does to the chosen body: nothing, put its seed there, or add an outline point. */
+    enum class WaterPick
+    {
+      None,
+      Seed,
+      Outline,
+    };
+    [[nodiscard]] WaterPick& WaterBodyPick() noexcept { return mWaterPick; }
+    /** The panel's Add: a new body, chosen, waiting for its seed to be clicked on the map. */
+    void AddWaterBody()
+    {
+      WaterBody body;
+      body.elevation = mWater.enabled ? mWater.elevation : 0.0f;
+      mBodies.push_back(body);
+      mBody = static_cast<int>(mBodies.size()) - 1;
+      mWaterPick = WaterPick::Seed;
+      mBodyIsNew = true;
+      mBodiesChanged = true;
+      mBodiesFinal = true;
+    }
+    /** A new body waits for its seed: the click also sets its level a little above the ground there. */
+    [[nodiscard]] bool& WaterBodyIsNew() noexcept { return mBodyIsNew; }
+    /** The view is dragging a seed or an outline point (the panel keeps its copy). */
+    void SetWaterBodyDragging(const bool dragging) noexcept { mBodyDragging = dragging; }
+    /** What the fill made of the bodies: a line for each (cells, or why the game skips it), and the game's other lines. */
+    void SetWaterBodyReport(std::vector<std::string> perBody, std::vector<std::string> log)
+    {
+      mBodyReport = std::move(perBody);
+      mBodyLog = std::move(log);
     }
     /** The Units tool: Place (the chosen unit type in the chosen army, with symmetric copies) or Select. */
     [[nodiscard]] bool UnitsToolActive() const noexcept { return mTool == 7; }
@@ -880,6 +943,18 @@ namespace faf::editor
     bool mWaterFinal = false;
     bool mWaterImport = false;
     bool mWaterExport = false;
+    void DrawWaterBodies();
+    std::vector<WaterBody> mBodies;
+    std::string mBodiesError;
+    int mBody = -1;
+    bool mBodiesEditing = false;
+    bool mBodyDragging = false;
+    bool mBodiesChanged = false;
+    bool mBodiesFinal = false;
+    bool mBodyIsNew = false;
+    WaterPick mWaterPick = WaterPick::None;
+    std::vector<std::string> mBodyReport;
+    std::vector<std::string> mBodyLog;
     std::vector<std::pair<std::string, std::string>> mUnitTypes;
     std::string mUnitType;
     std::string mUnitArmy;

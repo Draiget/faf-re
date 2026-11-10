@@ -560,6 +560,15 @@ namespace faf::editor
     mModified = true;
   }
 
+  void EdDocument::ApplyWaterBodies(const std::vector<WaterBody>& bodies)
+  {
+    const std::string scenario = WithWaterBodies(mScenario, bodies);
+    if (scenario != mScenario) {
+      mScenario = scenario;
+      mModified = true;
+    }
+  }
+
   void EdDocument::SetTablesText(const std::string& text)
   {
     SaveSnapshot before = SaveDataNow();

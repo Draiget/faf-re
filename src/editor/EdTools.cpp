@@ -901,6 +901,9 @@ namespace faf::editor
     }
     Note("The level is where the sea's surface is; deep and abyss are the heights the water's colour darkens towards. "
          "Units, the shore and the minimap all follow the level.");
+    ImGui::EndDisabled();
+    DrawWaterBodies();
+    ImGui::BeginDisabled(!mWater.enabled);
 
     SectionHeader("LOOK");
     WaterNumbers& s = mWater.shader;
@@ -1035,7 +1038,251 @@ namespace faf::editor
            "waves do; the built-in patterns are SCMP_001's. Patterns load from a wavepatterns.lua (FAForeverMapEditor's); "
            "Import and Export are its .scmwaves. Each change is one undo step.");
     }
-    Note("Water bodies at their own levels come with the water-levels work (docs/WATER_BODIES.md on feat/water-levels).");
+  }
+
+  void EdTools::DrawWaterBodies()
+  {
+    SectionHeader("WATER BODIES");
+    if (!mBodiesError.empty()) {
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
+      ImGui::TextWrapped("The scenario doesn't read: %s", mBodiesError.c_str());
+      ImGui::PopStyleColor();
+      return;
+    }
+    bool active = mBodyDragging;
+    const auto changed = [&](const bool edited) {
+      active = active || ImGui::IsItemActive();
+      if (edited) {
+        mBodiesChanged = true;
+      }
+      if (ImGui::IsItemDeactivatedAfterEdit()) {
+        mBodiesChanged = true;
+        mBodiesFinal = true;
+      }
+    };
+    const auto clicked = [&]() {
+      mBodiesChanged = true;
+      mBodiesFinal = true;
+    };
+    const auto title = [&](const std::size_t i) {
+      const WaterBody& body = mBodies[i];
+      char text[96];
+      if (!body.raw.empty()) {
+        (void)std::snprintf(text, sizeof(text), "%zu  (as written)", i + 1);
+      } else if (body.dry) {
+        (void)std::snprintf(text, sizeof(text), "%zu  Dry below %.1f", i + 1, static_cast<double>(body.hasFillTo ? body.fillTo : 0.0f));
+      } else {
+        (void)std::snprintf(text, sizeof(text), "%zu  Water at %.1f", i + 1, static_cast<double>(body.elevation));
+      }
+      return std::string(text);
+    };
+    const auto report = [&](const std::size_t i) { return i < mBodyReport.size() ? mBodyReport[i] : std::string(); };
+    const auto skipped = [](const std::string& line) { return line.find("skipped") != std::string::npos || line.find("can't") != std::string::npos; };
+
+    // The list: each body, what the fill made of it.
+    if (!mBodies.empty()) {
+      const float rows = static_cast<float>(std::min<std::size_t>(mBodies.size(), 6));
+      if (ImGui::BeginChild("##bodies", ImVec2(0.0f, rows * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().WindowPadding.y * 2.0f),
+                            ImGuiChildFlags_Borders)) {
+        for (std::size_t i = 0; i < mBodies.size(); ++i) {
+          ImGui::PushID(static_cast<int>(i));
+          if (ImGui::Selectable(title(i).c_str(), mBody == static_cast<int>(i), ImGuiSelectableFlags_AllowOverlap)) {
+            mBody = static_cast<int>(i);
+            mWaterPick = WaterPick::None;
+          }
+          const std::string line = report(i);
+          if (!line.empty()) {
+            ImGui::SameLine(ImGui::GetContentRegionAvail().x * 0.55f);
+            if (skipped(line)) {
+              ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.30f, 1.0f), "skipped");
+            } else {
+              ImGui::TextDisabled("%s", line.c_str());
+            }
+            if (ImGui::IsItemHovered()) {
+              ImGui::SetTooltip("%s", line.c_str());
+            }
+          }
+          ImGui::PopID();
+        }
+      }
+      ImGui::EndChild();
+    }
+    if (ImGui::Button("Add")) {
+      AddWaterBody();
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Then click the map where the water goes: its level starts a little above the ground there.");
+    }
+    const bool chosen = mBody >= 0 && mBody < static_cast<int>(mBodies.size());
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!chosen);
+    if (ImGui::Button("Remove")) {
+      mBodies.erase(mBodies.begin() + mBody);
+      mBody = std::min(mBody, static_cast<int>(mBodies.size()) - 1);
+      mWaterPick = WaterPick::None;
+      mBodyIsNew = false;
+      clicked();
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!chosen || mBody == 0);
+    if (ImGui::ArrowButton("##bodyup", ImGuiDir_Up)) {
+      std::swap(mBodies[static_cast<std::size_t>(mBody)], mBodies[static_cast<std::size_t>(mBody - 1)]);
+      --mBody;
+      clicked();
+    }
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("Earlier bodies fill first: where two meet, ground goes to the earlier one.");
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!chosen || mBody + 1 >= static_cast<int>(mBodies.size()));
+    if (ImGui::ArrowButton("##bodydown", ImGuiDir_Down)) {
+      std::swap(mBodies[static_cast<std::size_t>(mBody)], mBodies[static_cast<std::size_t>(mBody + 1)]);
+      ++mBody;
+      clicked();
+    }
+    ImGui::EndDisabled();
+
+    if (mWaterPick != WaterPick::None) {
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.80f, 1.0f, 1.0f));
+      ImGui::TextWrapped("%s", mWaterPick == WaterPick::Seed ? "Click the map where the water starts filling. Esc cancels."
+                                                             : "Click the map to add outline points; Enter or a right click ends.");
+      ImGui::PopStyleColor();
+    }
+
+    if (chosen) {
+      WaterBody& body = mBodies[static_cast<std::size_t>(mBody)];
+      ImGui::PushID(mBody);
+      if (!body.raw.empty()) {
+        ImGui::TextWrapped("The editor can't edit this one (%s); it is kept as written:", body.unreadable.c_str());
+        ImGui::TextDisabled("%s", body.raw.c_str());
+      } else {
+        int kind = body.dry ? 1 : 0;
+        bool kindChanged = ImGui::RadioButton("Water", &kind, 0);
+        ImGui::SameLine();
+        kindChanged = ImGui::RadioButton("Dry", &kind, 1) || kindChanged;
+        if (kindChanged) {
+          body.dry = kind == 1;
+          if (body.dry && !body.hasFillTo) {
+            body.hasFillTo = true;
+            body.fillTo = body.elevation;
+          }
+          clicked();
+        }
+        if (!body.dry) {
+          ImGui::SetNextItemWidth(-1.0f);
+          changed(ImGui::DragFloat("##elevation", &body.elevation, 0.05f, -100.0f, 512.0f, "Level %.2f"));
+          body.hasElevation = true;
+        }
+        // The fill takes ground below this; the level by default (a dry body needs it).
+        bool ownFill = body.hasFillTo || body.dry;
+        ImGui::BeginDisabled(body.dry);
+        if (ImGui::Checkbox("Fills ground below", &ownFill)) {
+          body.hasFillTo = ownFill;
+          body.fillTo = body.elevation;
+          clicked();
+        }
+        ImGui::EndDisabled();
+        if (ownFill) {
+          ImGui::SetNextItemWidth(-1.0f);
+          changed(ImGui::DragFloat("##fillto", &body.fillTo, 0.05f, -100.0f, 512.0f, "Fill below %.2f"));
+        }
+        if (!body.dry) {
+          bool ownShade = body.hasDeep || body.hasAbyss;
+          if (ImGui::Checkbox("Own deep and abyss", &ownShade)) {
+            body.hasDeep = body.hasAbyss = ownShade;
+            body.deep = body.elevation - 2.5f;
+            body.abyss = body.elevation - 15.0f;
+            clicked();
+          }
+          if (ownShade) {
+            ImGui::SetNextItemWidth(-1.0f);
+            changed(ImGui::DragFloat("##deep", &body.deep, 0.05f, -100.0f, 512.0f, "Deep %.2f"));
+            ImGui::SetNextItemWidth(-1.0f);
+            changed(ImGui::DragFloat("##abyss", &body.abyss, 0.05f, -100.0f, 512.0f, "Abyss %.2f"));
+            body.hasDeep = body.hasAbyss = true;
+          }
+        }
+        // Seed: where the fill starts.
+        if (ImGui::Checkbox("Seed", &body.hasSeed)) {
+          clicked();
+        }
+        if (ImGui::IsItemHovered()) {
+          ImGui::SetTooltip("The fill spreads from here over all connected ground below its level. An outline alone (no seed) "
+                            "takes every low point inside it.");
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(mWaterPick == WaterPick::Seed ? "Placing...##seed" : "Place##seed")) {
+          mWaterPick = mWaterPick == WaterPick::Seed ? WaterPick::None : WaterPick::Seed;
+          mBodyIsNew = false;
+        }
+        if (body.hasSeed) {
+          float seed[2] = {body.seedX, body.seedZ};
+          ImGui::SetNextItemWidth(-1.0f);
+          changed(ImGui::DragFloat2("##seed", seed, 0.5f, 0.0f, 4096.0f, "%.1f"));
+          body.seedX = seed[0];
+          body.seedZ = seed[1];
+        }
+        // Outline: a closed curve the fill stays inside.
+        ImGui::Text("Outline: %zu point%s", body.outline.size(), body.outline.size() == 1 ? "" : "s");
+        ImGui::SameLine();
+        if (ImGui::Button(mWaterPick == WaterPick::Outline ? "Done##outline" : (body.outline.empty() ? "Draw##outline" : "Add points##outline"))) {
+          mWaterPick = mWaterPick == WaterPick::Outline ? WaterPick::None : WaterPick::Outline;
+          mBodyIsNew = false;
+        }
+        ImGui::SameLine();
+        ImGui::BeginDisabled(body.outline.empty());
+        if (ImGui::Button("Clear##outline")) {
+          body.outline.clear();
+          clicked();
+        }
+        ImGui::EndDisabled();
+        if (!body.outline.empty() && body.outline.size() < 3) {
+          ImGui::TextColored(ImVec4(0.95f, 0.65f, 0.30f, 1.0f), "An outline needs 3 points or more.");
+        }
+        // Bounds: a rectangle of height-field vertices the fill stays inside.
+        if (ImGui::Checkbox("Bounds", &body.hasBounds)) {
+          if (body.hasBounds && body.x1 <= body.x0) {
+            const int reach = 32;
+            body.x0 = std::max(0, static_cast<int>(body.seedX) - reach);
+            body.z0 = std::max(0, static_cast<int>(body.seedZ) - reach);
+            body.x1 = static_cast<int>(body.seedX) + reach;
+            body.z1 = static_cast<int>(body.seedZ) + reach;
+          }
+          clicked();
+        }
+        if (body.hasBounds) {
+          int rect[4] = {body.x0, body.z0, body.x1, body.z1};
+          ImGui::SetNextItemWidth(-1.0f);
+          changed(ImGui::DragInt4("##bounds", rect, 0.5f, 0, 4096));
+          body.x0 = rect[0];
+          body.z0 = rect[1];
+          body.x1 = rect[2];
+          body.z1 = rect[3];
+        }
+        const std::string line = report(static_cast<std::size_t>(mBody));
+        if (!line.empty()) {
+          if (skipped(line)) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.65f, 0.30f, 1.0f));
+            ImGui::TextWrapped("%s", line.c_str());
+            ImGui::PopStyleColor();
+          } else {
+            ImGui::TextDisabled("%s", line.c_str());
+          }
+        }
+      }
+      ImGui::PopID();
+    }
+    for (const std::string& line : mBodyLog) {
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
+      ImGui::TextWrapped("%s", line.c_str());
+      ImGui::PopStyleColor();
+    }
+    mBodiesEditing = active;
+    Note("Lakes and pools at their own levels, besides the sea (docs/WATER_BODIES.md). Each fills the ground below its level "
+         "that its seed reaches, inside its outline and bounds; a dry body keeps low ground dry (a polder). The game draws "
+         "them when sim_FixWaterBodies is on, which Play sets.");
   }
 
   void EdTools::DrawProps()

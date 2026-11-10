@@ -374,6 +374,15 @@ namespace faf::editor
       std::string mWaterSetArg;
       bool mWaterDragging = false;
       WaterState mWaterBefore;
+      /** The scenario's water bodies as last read, and the undo step of an edit under way. */
+      std::string mBodiesScenario;
+      WaterBodiesRead mBodiesRead;
+      bool mBodiesDragging = false;
+      EdDocument::SaveSnapshot mBodiesBefore;
+      /** `/waterbody <body>` (test runs, '+' for spaces): a body added as one edit once the map is shown. */
+      std::string mWaterBodyArg;
+      /** `/waterpick <n>[,seed|outline]` or `/waterpick new` (test runs): a body chosen, and what a click in the view does. */
+      std::string mWaterPickArg;
       /** `/unittool <type>,<army>[,select]` (test runs). */
       std::string mUnitToolArg;
       /** `/decaltool <texture>[,select]` (test runs): the Decals tool with this texture. */
@@ -911,6 +920,13 @@ namespace faf::editor
       if (fa::vector<fa::string> water; moho::CFG_GetArgOption("/waterset", 1, &water) && !water.empty()) {
         mWaterSetArg = water[0].c_str();
       }
+      if (fa::vector<fa::string> pick; moho::CFG_GetArgOption("/waterpick", 1, &pick) && !pick.empty()) {
+        mWaterPickArg = pick[0].c_str();
+      }
+      if (fa::vector<fa::string> body; moho::CFG_GetArgOption("/waterbody", 1, &body) && !body.empty()) {
+        mWaterBodyArg = body[0].c_str();
+        std::replace(mWaterBodyArg.begin(), mWaterBodyArg.end(), '+', ' ');
+      }
       if (fa::vector<fa::string> marker; moho::CFG_GetArgOption("/framemarker", 1, &marker) && !marker.empty()) {
         mFrameMarkerArg = marker[0].c_str();
         std::replace(mFrameMarkerArg.begin(), mFrameMarkerArg.end(), '+', ' '); // "Mass+08" for "Mass 08"
@@ -1219,6 +1235,55 @@ namespace faf::editor
               }
             }
           }
+        }
+        // Its water bodies: the scenario's text changed at once, one undo step when the edit ends.
+        if (std::vector<WaterBody> bodies; true) {
+          bool final = false;
+          if (tools.TakeWaterBodiesChange(bodies, final)) {
+            if (!mBodiesDragging) {
+              mBodiesBefore = mDocument.SaveDataNow();
+              mBodiesDragging = true;
+            }
+            mDocument.ApplyWaterBodies(bodies);
+            if (final) {
+              mBodiesDragging = false;
+              if (mBodiesBefore.scenario != mDocument.Scenario()) {
+                mDocument.SaveDataEdited(std::move(mBodiesBefore));
+                gpg::Logf("editor: water bodies: %zu", bodies.size());
+              }
+            }
+          }
+        }
+        if (!mWaterBodyArg.empty() && mScene.Attached()) {
+          const WaterBodiesRead asked = ReadWaterBodies("ScenarioInfo = { WaterBodies = { " + mWaterBodyArg + " } }");
+          if (asked.bodies.empty()) {
+            gpg::Warnf("editor: /waterbody %s doesn't read", mWaterBodyArg.c_str());
+          } else {
+            std::vector<WaterBody> bodies = ReadWaterBodies(mDocument.Scenario()).bodies;
+            bodies.insert(bodies.end(), asked.bodies.begin(), asked.bodies.end());
+            EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+            mDocument.ApplyWaterBodies(bodies);
+            mDocument.SaveDataEdited(std::move(before));
+            gpg::Logf("editor: water bodies: %zu (added %s)", bodies.size(), mWaterBodyArg.c_str());
+          }
+          mWaterBodyArg.clear();
+        }
+        if (mBodiesScenario != mDocument.Scenario()) {
+          mBodiesScenario = mDocument.Scenario();
+          mBodiesRead = ReadWaterBodies(mBodiesScenario);
+        }
+        tools.SetWaterBodies(mBodiesRead.bodies, mBodiesRead.error);
+        if (!mWaterPickArg.empty() && mScene.Attached()) {
+          if (mWaterPickArg == "new") {
+            tools.AddWaterBody();
+          } else {
+            tools.SelectWaterBody(std::atoi(mWaterPickArg.c_str()) - 1);
+            const std::size_t comma = mWaterPickArg.find(',');
+            const std::string mode = comma == std::string::npos ? std::string() : mWaterPickArg.substr(comma + 1);
+            tools.WaterBodyPick() = mode == "seed" ? EdTools::WaterPick::Seed : mode == "outline" ? EdTools::WaterPick::Outline : EdTools::WaterPick::None;
+          }
+          gpg::Logf("editor: /waterpick %s", mWaterPickArg.c_str());
+          mWaterPickArg.clear();
         }
         if (!mWaterSetArg.empty()) {
           WaterState water = mDocument.WaterNow();

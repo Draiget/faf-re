@@ -80,7 +80,7 @@ namespace faf::editor
         (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && !mTools->SelectToolActive() &&
          mSelection.empty() && !area &&
          mDocument.SaveData().Markers().empty() && mDocument.SaveData().Chains().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() && !mTools->UnitsToolActive() &&
-         !mTools->EditingBorder() &&
+         !mTools->EditingBorder() && !mTools->WaterToolActive() &&
          mTools->CheckPins().empty() && !mTools->ShowingPathing() && !mTools->ShowSlope() && !mTools->ShowKmGrid() && !mRulerShown && !mBoxing) ||
         moho::ren_Viewport == nullptr) {
       return;
@@ -314,6 +314,7 @@ namespace faf::editor
 
     // Resource splats under the markers, then the markers: all of them with the Markers tool, the start positions
     // and resources otherwise.
+    DrawWaterBodyGuides(*batcher, *field);
     DrawResourceSplats(*batcher, *field);
     DrawMarkers(*batcher, mTools->MarkersToolActive() || mTools->SelectToolActive());
     // An adaptive map: each resource tied to an army, a dashed line to that army's start (FAForeverMapEditor draws the same).
@@ -796,6 +797,8 @@ namespace faf::editor
     mMap = nullptr;
     mDrag = Drag::None;
     mPainting = false;
+    mWaterBodiesStale = true;
+    mWaterBodyHandle = -2;
   }
 
   void EdMapScene::PaintStroke(const float frameSeconds)
@@ -1605,6 +1608,7 @@ namespace faf::editor
   {
     mWeightStale = true; // the overlays lie on the ground
     mOutsideStale = true;
+    mWaterBodiesStale = true;
     moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
     // The samples are written in place; the field's own setter, given them back, refreshes its tiers of
     // min/max heights and its revision (the shadow and vision passes watch it). Then the terrain redraws
@@ -1660,6 +1664,7 @@ namespace faf::editor
     if (mPaintingTypes) {
       PaintTypes();
     }
+    RefreshWaterBodies();
     // The ruler's far end, and the status bar's cursor: where it is on the ground, how high, how steep.
     if (mTools != nullptr) {
       float groundX = 0.0f;
@@ -4923,6 +4928,9 @@ namespace faf::editor
           mTools->SetRulerText({});
         }
       }
+      if (WaterBodyPress(window, at)) {
+        return true;
+      }
       // The map border, edited from any tool: a press on an edge (or a corner, two of them) drags it.
       if (mTools != nullptr && mTools->EditingBorder()) {
         float groundX = 0.0f;
@@ -5287,6 +5295,10 @@ namespace faf::editor
     }
     case WM_LBUTTONUP:
       mGizmoDrag = GizmoPart::None;
+      if (mWaterBodyHandle != -2) {
+        WaterBodyRelease();
+        return true;
+      }
       if (mDragUnits) {
         mDragUnits = false;
         ::ReleaseCapture();
@@ -5379,6 +5391,10 @@ namespace faf::editor
       return false;
     case WM_RBUTTONDOWN:
     case WM_MBUTTONDOWN:
+      if (message == WM_RBUTTONDOWN && mTools != nullptr && mTools->WaterToolActive() && mTools->WaterBodyPick() == EdTools::WaterPick::Outline) {
+        mTools->WaterBodyPick() = EdTools::WaterPick::None;
+        return true;
+      }
       // The right button with a brush that has an opposite (Raise and Lower, Paint and Erase): the opposite
       // stroke, as image editors do. Shift + right still box-selects; other brushes' right drag pans.
       if (message == WM_RBUTTONDOWN && (wParam & MK_SHIFT) == 0 && mTools != nullptr && !mPainting && !mPaintingMask) {
@@ -5451,6 +5467,10 @@ namespace faf::editor
       }
       return true;
     case WM_MOUSEMOVE: {
+      if (mWaterBodyHandle != -2) {
+        WaterBodyDrag(at);
+        return true;
+      }
       if (mBoxing) {
         mBoxTo = at;
         return true;
@@ -5685,6 +5705,27 @@ namespace faf::editor
         } else {
           ClearDecalPath();
         }
+        return true;
+      }
+      if (down && mTools != nullptr && mTools->WaterToolActive() && mTools->WaterBodyPick() != EdTools::WaterPick::None &&
+          (wParam == VK_RETURN || wParam == VK_ESCAPE || wParam == VK_BACK)) {
+        std::vector<WaterBody>& bodies = mTools->EditedWaterBodies();
+        const int chosen = mTools->SelectedWaterBody();
+        if (wParam == VK_BACK) {
+          if (mTools->WaterBodyPick() == EdTools::WaterPick::Outline && chosen >= 0 && chosen < static_cast<int>(bodies.size()) &&
+              !bodies[static_cast<std::size_t>(chosen)].outline.empty()) {
+            bodies[static_cast<std::size_t>(chosen)].outline.pop_back();
+            mTools->WaterBodiesChanged(true);
+          }
+          return true;
+        }
+        if (wParam == VK_ESCAPE && mTools->WaterBodyIsNew() && chosen >= 0 && chosen < static_cast<int>(bodies.size())) {
+          bodies.erase(bodies.begin() + chosen);
+          mTools->SelectWaterBody(chosen - 1);
+          mTools->WaterBodiesChanged(true);
+        }
+        mTools->WaterBodyIsNew() = false;
+        mTools->WaterBodyPick() = EdTools::WaterPick::None;
         return true;
       }
       if (down && wParam == VK_DELETE && mTools != nullptr && mTools->UnitsToolActive() && !mUnitSelection.empty()) {
