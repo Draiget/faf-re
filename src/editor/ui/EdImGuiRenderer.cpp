@@ -16,6 +16,16 @@ namespace faf::editor
 {
   namespace
   {
+    gpg::gal::RenderTarget* (*sGameViewSource)() = nullptr;
+  } // namespace
+
+  void EdImGuiRenderer::SetGameViewSource(gpg::gal::RenderTarget* (*source)())
+  {
+    sGameViewSource = source;
+  }
+
+  namespace
+  {
     // gal's 32-bit BGRA texture format (DXGI_FORMAT_B8G8R8A8_UNORM, backends/dxgi/DxgiFormats.cpp).
     constexpr std::uint32_t kTextureFormatBgra8 = 2U;
 
@@ -28,7 +38,8 @@ cbuffer ImGuiConstants : register(b0)
     float4 ClipRect;       // the command's clip rectangle in ImGui pixels: min xy, max zw
     uint IndexOffset;      // the command's first index in Indices
     uint VertexOffset;     // added to each index
-    uint2 Unused;
+    uint Opaque;           // 1: the image is a colour target (the game's view), its alpha not a coverage
+    uint Unused;
 };
 
 struct ImGuiVertex
@@ -68,7 +79,12 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
     {
         discard;
     }
-    return input.color * Atlas.Sample(LinearSampler, input.uv);
+    float4 colour = input.color * Atlas.Sample(LinearSampler, input.uv);
+    if (Opaque != 0)
+    {
+        colour.a = input.color.a;
+    }
+    return colour;
 }
 )hlsl";
 
@@ -324,7 +340,18 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
         constants.clipRect[3] = command.ClipRect.w;
         constants.indexOffset = listIndexBase + command.IdxOffset;
         constants.vertexOffset = listVertexBase + command.VtxOffset;
-        call.bindings.textures[0] = reinterpret_cast<gpg::gal::Texture*>(static_cast<std::uintptr_t>(command.GetTexID()));
+        // A render target (TargetImage, the low bit set) is read through the targets slot; anything else is a texture.
+        // The game's view is looked up now; without one this frame its image is left out.
+        const std::uintptr_t id = static_cast<std::uintptr_t>(command.GetTexID());
+        call.bindings.textures[0] = (id & 1U) == 0U ? reinterpret_cast<gpg::gal::Texture*>(id) : nullptr;
+        call.bindings.targets[0] = (id & 1U) != 0U ? reinterpret_cast<gpg::gal::RenderTarget*>(id & ~static_cast<std::uintptr_t>(1U)) : nullptr;
+        if (id == kGameViewImage) {
+          call.bindings.targets[0] = sGameViewSource != nullptr ? sGameViewSource() : nullptr;
+          if (call.bindings.targets[0] == nullptr) {
+            continue;
+          }
+        }
+        constants.unused[0] = (id & 1U) != 0U ? 1U : 0U;
         call.vertexCountPerInstance = command.ElemCount;
         device->DrawGpuProgram(call);
       }

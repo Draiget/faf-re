@@ -7,6 +7,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 
 #include <Windows.h>
+#include <windowsx.h>
 #include <ShlObj.h>
 #include <commdlg.h>
 
@@ -52,6 +53,8 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/WRenViewport.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/CD3DRenderTarget.h"
+#include "moho/misc/ID3DDeviceResources.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/sim/CVFSImpl.h"
@@ -123,6 +126,35 @@ namespace faf::editor
 
     class EditorApp;
     EditorApp* gEditorApp = nullptr;
+    /**
+     * The 3D view drawn into the panels' own picture (its head copied each frame, its window's region left empty)
+     * rather than shown through holes in the view's window, which lagged behind moving popups (WPE.2). The view's
+     * window keeps its place and gets the input over its area from the panels' window. `/nocomposite` turns it off.
+     */
+    bool gComposite = true;
+    HWND gViewWindow = nullptr;
+    /** This frame's copy of the game's view (CopyGameView), for the panels' renderer; null when there is none. */
+    gpg::gal::RenderTarget* gViewSurface = nullptr;
+    /** The view's rectangle in the panels' window, and the panels' popups and floating windows over it. */
+    RECT gViewRect{};
+    std::vector<RECT> gOverView;
+
+    /** Whether a mouse message at `at` (the panels' window's client point) belongs to the 3D view under the panels. */
+    [[nodiscard]] bool MouseIsTheViews(const POINT at)
+    {
+      if (!gComposite || gViewWindow == nullptr || ::PtInRect(&gViewRect, at) == FALSE) {
+        return false;
+      }
+      if (ImGui::GetCurrentContext() != nullptr && (ImGui::GetCurrentContext()->ActiveId != 0 || ImGui::GetTopMostPopupModal() != nullptr)) {
+        return false; // a drag that began on a panel, or a dialog
+      }
+      for (const RECT& over : gOverView) {
+        if (::PtInRect(&over, at) != FALSE) {
+          return false;
+        }
+      }
+      return true;
+    }
     void OnMenuCommand(UINT command);
     bool OnViewportMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
     void OnMenuOpening(HMENU menu);
@@ -150,6 +182,34 @@ namespace faf::editor
     /** The panels' window: its input is ImGui's; a click takes the keyboard focus from the game. */
     LRESULT CALLBACK PanelWindowProc(const HWND window, const UINT message, const WPARAM wParam, const LPARAM lParam)
     {
+      // Over the composited 3D view: the mouse is the view's (in its own client coordinates), and a click gives it
+      // the keyboard. ImGui still sees the moves, so a panel under the cursor before stops being hovered.
+      if (gComposite && gViewWindow != nullptr) {
+        const bool wheel = message == WM_MOUSEWHEEL || message == WM_MOUSEHWHEEL;
+        const bool mouse = (message >= WM_MOUSEFIRST && message <= WM_MOUSELAST) || wheel;
+        if (mouse || message == WM_SETCURSOR) {
+          POINT at{};
+          if (mouse && !wheel) {
+            at = POINT{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+          } else {
+            (void)::GetCursorPos(&at);
+            (void)::ScreenToClient(window, &at);
+          }
+          if (MouseIsTheViews(at)) {
+            if (message == WM_SETCURSOR) {
+              return ::SendMessageW(gViewWindow, WM_SETCURSOR, reinterpret_cast<WPARAM>(gViewWindow), lParam);
+            }
+            if (message == WM_MOUSEMOVE && ImGui::GetCurrentContext() != nullptr) {
+              (void)ImGui_ImplWin32_WndProcHandler(window, message, wParam, lParam);
+            }
+            if (message == WM_LBUTTONDOWN || message == WM_RBUTTONDOWN || message == WM_MBUTTONDOWN) {
+              ::SetFocus(gViewWindow);
+            }
+            const LPARAM viewPoint = wheel ? lParam : MAKELPARAM(at.x - gViewRect.left, at.y - gViewRect.top);
+            return ::SendMessageW(gViewWindow, message, wParam, viewPoint);
+          }
+        }
+      }
       if (message == WM_LBUTTONDOWN || message == WM_RBUTTONDOWN || message == WM_MBUTTONDOWN) {
         ::SetFocus(window);
       }
@@ -349,6 +409,17 @@ namespace faf::editor
       bool mViewStepsAside = false;
       /** The popups' rectangles (view pixels) the view's window region leaves out, as last set. */
       std::vector<RECT> mViewHoles;
+      /** The game's head copied for the panels (CopyGameView), and its image for the draw lists. */
+      void CopyGameView();
+      [[nodiscard]] bool mViewStepsAsideForDialog() const
+      {
+        return mImGuiReady && ImGui::GetTopMostPopupModal() != nullptr;
+      }
+      moho::ID3DDeviceResources::RenderTargetHandle mViewCopy;
+      moho::ID3DRenderTarget::SurfaceHandle mViewSurface;
+      std::uint32_t mViewCopyWidth = 0;
+      std::uint32_t mViewCopyHeight = 0;
+      std::uint64_t mViewImage = 0;
       /** The holes of the last frames, newest first (FitGameView). */
       std::deque<std::vector<RECT>> mHoleHistory;
       int mBrowseArg = -1;
@@ -509,6 +580,7 @@ namespace faf::editor
         return false;
       }
       mImGuiReady = true;
+      EdImGuiRenderer::SetGameViewSource([]() { return gViewSurface; });
       // `/playsetups <file>` (test runs) reads and writes the play setups there instead.
       if (fa::vector<fa::string> args; moho::CFG_GetArgOption("/playsetups", 1, &args) && !args.empty()) {
         mPlay.SetSetupsFile(args[0].c_str());
@@ -947,6 +1019,11 @@ namespace faf::editor
             (void)mScene.Redo();
           }
         }
+        if (gComposite && mViewImage != 0 && !mViewStepsAsideForDialog()) {
+          const ImVec2 from(static_cast<float>(gViewRect.left), static_cast<float>(gViewRect.top));
+          const ImVec2 to(static_cast<float>(gViewRect.right), static_cast<float>(gViewRect.bottom));
+          ImGui::GetBackgroundDrawList()->AddImage(static_cast<ImTextureID>(EdImGuiRenderer::kGameViewImage), from, to);
+        }
         ImGui::Render();
         FitGameView();
         RenderPanels();
@@ -1031,6 +1108,10 @@ namespace faf::editor
       // `/browser` shows the map browser; `/vaultmap <name>` downloads a vault map and opens it (test runs).
       if (moho::CFG_GetArgOption("/browser", 0, nullptr)) {
         mBrowserArg = true;
+      }
+      if (moho::CFG_GetArgOption("/nocomposite", 0, nullptr)) {
+        gComposite = false;
+        gpg::Logf("editor: /nocomposite: the 3D view shows through its own window");
       }
       mFafLoginArg = moho::CFG_GetArgOption("/faflogin", 0, nullptr);
       if (fa::vector<fa::string> query; moho::CFG_GetArgOption("/vaultquery", 1, &query) && !query.empty()) {
@@ -2469,6 +2550,7 @@ namespace faf::editor
       // The panels' head, drawn now and presented with the game's head at the game's next paint
       // (CD3DDevice::Paint presents every head).
       const gpg::gal::Head& head = context->GetHead(kPanelHead);
+      CopyGameView();
       device->ClearTarget(device->GetHeadOutputContext(kPanelHead));
       device->BeginScene();
       D3DVIEWPORT9 viewport{};
@@ -2479,6 +2561,47 @@ namespace faf::editor
       device->Clear(true, false, false, 0xFF1C1F25U, 1.0f, 0);
       mRenderer.Render(ImGui::GetDrawData());
       device->EndScene();
+    }
+
+    void EditorApp::CopyGameView()
+    {
+      // The game's head holds the frame it drew last (CD3DDevice::Paint presents, then draws the next one), not yet
+      // presented: copied into a target the panels draw under themselves. Not while a dialog hides the view.
+      mViewImage = 0;
+      gViewSurface = nullptr;
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+      moho::CD3DDevice* const d3d = moho::D3D_GetDevice();
+      const gpg::gal::DeviceContext* const context = device != nullptr ? device->GetDeviceContext() : nullptr;
+      if (!gComposite || d3d == nullptr || context == nullptr || context->GetHeadCount() < 1 || d3d->GetResources() == nullptr ||
+          (mImGuiReady && ImGui::GetTopMostPopupModal() != nullptr)) {
+        return;
+      }
+      const gpg::gal::Head& game = context->GetHead(0);
+      if (game.mWidth == 0 || game.mHeight == 0) {
+        return;
+      }
+      if (!mViewCopy || mViewCopyWidth != game.mWidth || mViewCopyHeight != game.mHeight) {
+        mViewCopy.reset();
+        moho::ID3DDeviceResources::RenderTargetHandle target;
+        (void)d3d->GetResources()->CreateRenderTarget(target, static_cast<int>(game.mWidth), static_cast<int>(game.mHeight), 2);
+        mViewCopy = target;
+        mViewCopyWidth = game.mWidth;
+        mViewCopyHeight = game.mHeight;
+        gpg::Logf("editor: the 3D view composited into the panels (%ux%u)", game.mWidth, game.mHeight);
+      }
+      const gpg::gal::OutputContext* const output = device->GetHeadOutputContext(0);
+      if (!mViewCopy || output == nullptr || !output->surface) {
+        return;
+      }
+      moho::ID3DRenderTarget::SurfaceHandle copy;
+      (void)mViewCopy->GetSurface(copy);
+      if (!copy) {
+        return;
+      }
+      device->StretchRect(output->surface, copy, nullptr, nullptr);
+      mViewImage = EdImGuiRenderer::TargetImage(copy.get());
+      mViewSurface = copy;
+      gViewSurface = copy.get();
     }
 
     void EditorApp::FitGameView()
@@ -2514,7 +2637,7 @@ namespace faf::editor
       // show through. Hiding the window instead would stop its paint, and the panels' head is presented with it.
       // The Maps window too: a window the panels draw over the view can't move smoothly through a cut-out, as
       // the view's picture reaches the screen a frame or two apart from the panels' (user report: it lagged).
-      const bool modal = mImGuiReady && (ImGui::GetTopMostPopupModal() != nullptr || (mShell != nullptr && mShell->Browser().Open()));
+      const bool modal = mImGuiReady && (ImGui::GetTopMostPopupModal() != nullptr || (!gComposite && mShell != nullptr && mShell->Browser().Open()));
       std::vector<RECT> holes;
       if (mImGuiReady && !modal) {
         for (const ImGuiWindow* const window : ImGui::GetCurrentContext()->Windows) {
@@ -2535,6 +2658,12 @@ namespace faf::editor
       // does, so a popup or window that moves (a tooltip following the cursor, the Maps window dragged) keeps the
       // holes of the frames before too: the hole never runs ahead of what is drawn in it, which showed as the
       // picture lagging and tooltips flickering (user report).
+      gViewWindow = view;
+      gViewRect = RECT{x, y, x + width, y + height};
+      gOverView.clear();
+      for (const RECT& hole : holes) {
+        gOverView.push_back(RECT{hole.left + x, hole.top + y, hole.right + x, hole.bottom + y});
+      }
       mHoleHistory.push_front(holes);
       while (mHoleHistory.size() > 3) {
         mHoleHistory.pop_back();
@@ -2554,11 +2683,13 @@ namespace faf::editor
         }
         return true;
       };
-      if (modal != mViewStepsAside || !sameHoles()) {
-        mViewStepsAside = modal;
+      // Composited, the view's window shows nothing of its own: an empty region, as while a dialog is open.
+      const bool emptyRegion = modal || gComposite;
+      if (emptyRegion != mViewStepsAside || (!emptyRegion && !sameHoles())) {
+        mViewStepsAside = emptyRegion;
         mViewHoles = holes;
         HRGN region = nullptr;
-        if (modal) {
+        if (emptyRegion) {
           region = ::CreateRectRgn(0, 0, 0, 0);
         } else if (!holes.empty()) {
           region = ::CreateRectRgn(0, 0, width, height);
