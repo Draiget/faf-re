@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace faf::editor
 {
@@ -20,4 +21,15 @@ namespace faf::editor
   std::string JsonQuoted(const std::string& text);
   /** An {x, y, z, w} object of `n` axes, its closing brace at `indent`. */
   std::string JsonVectorText(const float* value, int n, const std::string& indent);
+  /** The [ {...}, {...} ] array's objects, each with its braces. */
+  std::vector<std::string> JsonObjects(const std::string& array);
+
+  // FAFME's Unity conventions.
+
+  /** A game position in FAFME's world units (a tenth, z flipped: ScmapEditor.ScmapPosToWorld), and back. */
+  void GameToFafme(const float (&game)[3], float (&fafme)[3]);
+  void FafmeToGame(const float (&fafme)[3], float (&game)[3]);
+  /** Unity's Quaternion.Euler (degrees; z, then x, then y) and its eulerAngles back (degrees in [0, 360)). */
+  void UnityEulerToQuaternion(const float (&degrees)[3], float (&quaternion)[4]);
+  void UnityQuaternionToEuler(const float (&quaternion)[4], float (&degrees)[3]);
 } // namespace faf::editor

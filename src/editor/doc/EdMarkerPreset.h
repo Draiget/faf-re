@@ -34,7 +34,4 @@ namespace faf::editor
   bool MarkersFromFafmapmarkers(const std::string& text, std::vector<SaveEntry>& markers, MarkerImport& result, std::string& error,
                                 const std::vector<std::string>& reserved = {});
 
-  /** Unity's Quaternion.Euler (degrees; z, then x, then y) and its eulerAngles back (degrees in [0, 360)). */
-  void UnityEulerToQuaternion(const float (&degrees)[3], float (&quaternion)[4]);
-  void UnityQuaternionToEuler(const float (&quaternion)[4], float (&degrees)[3]);
 } // namespace faf::editor

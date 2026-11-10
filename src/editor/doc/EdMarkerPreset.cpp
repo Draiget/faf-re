@@ -58,12 +58,6 @@ namespace faf::editor
       return 0;
     }
 
-    float Wrap360(float degrees)
-    {
-      degrees = std::fmod(degrees, 360.0f);
-      return degrees < 0.0f ? degrees + 360.0f : degrees;
-    }
-
     // MarkerObject.ScmapRotToMarkerRot: the save's orientation (radians) to the marker's rotation. A camera's is its
     // pitch from straight down and its heading; every other marker's is the orientation as Euler angles.
     void OrientationToRotation(const std::vector<double>& orientation, const bool camera, float (&quaternion)[4])
@@ -110,24 +104,6 @@ namespace faf::editor
       orientation[2] = 0.0;
     }
 
-    // The [ {...}, {...} ] array's objects, each with its braces.
-    std::vector<std::string> JsonObjects(const std::string& array)
-    {
-      std::vector<std::string> objects;
-      int depth = 0;
-      std::size_t open = 0;
-      for (std::size_t i = 0; i < array.size(); ++i) {
-        if (array[i] == '{') {
-          if (depth++ == 0) {
-            open = i;
-          }
-        } else if (array[i] == '}' && depth > 0 && --depth == 0) {
-          objects.push_back(array.substr(open, i - open + 1));
-        }
-      }
-      return objects;
-    }
-
     std::vector<int> JsonInts(const std::string& array)
     {
       std::vector<int> numbers;
@@ -145,36 +121,6 @@ namespace faf::editor
     }
   } // namespace
 
-  void UnityEulerToQuaternion(const float (&degrees)[3], float (&quaternion)[4])
-  {
-    const float hx = degrees[0] * kDegToRad * 0.5f;
-    const float hy = degrees[1] * kDegToRad * 0.5f;
-    const float hz = degrees[2] * kDegToRad * 0.5f;
-    const float sx = std::sin(hx), cx = std::cos(hx);
-    const float sy = std::sin(hy), cy = std::cos(hy);
-    const float sz = std::sin(hz), cz = std::cos(hz);
-    // Qy * Qx * Qz.
-    quaternion[0] = cy * sx * cz + sy * cx * sz;
-    quaternion[1] = sy * cx * cz - cy * sx * sz;
-    quaternion[2] = cy * cx * sz - sy * sx * cz;
-    quaternion[3] = cy * cx * cz + sy * sx * sz;
-  }
-
-  void UnityQuaternionToEuler(const float (&quaternion)[4], float (&degrees)[3])
-  {
-    const float x = quaternion[0], y = quaternion[1], z = quaternion[2], w = quaternion[3];
-    // The rotation matrix's entries a Y * X * Z rotation reads its angles from.
-    const float m12 = 2.0f * (y * z - w * x);
-    const float m02 = 2.0f * (x * z + w * y);
-    const float m22 = 1.0f - 2.0f * (x * x + y * y);
-    const float m10 = 2.0f * (x * y + w * z);
-    const float m11 = 1.0f - 2.0f * (x * x + z * z);
-    const float pitch = std::asin(std::clamp(-m12, -1.0f, 1.0f));
-    degrees[0] = Wrap360(pitch * kRadToDeg);
-    degrees[1] = Wrap360(std::atan2(m02, m22) * kRadToDeg);
-    degrees[2] = Wrap360(std::atan2(m10, m11) * kRadToDeg);
-  }
-
   std::string MarkersToFafmapmarkers(const std::vector<SaveEntry>& markers, const std::vector<std::string>& names, const int mapWidth,
                                      const int mapHeight)
   {
@@ -190,7 +136,9 @@ namespace faf::editor
       const std::string type = MarkerTypeOf(marker);
       float x = 0.0f, y = 0.0f, z = 0.0f;
       (void)MarkerPosition(marker, x, y, z);
-      const float pos[3] = {x / 10.0f, y / 10.0f, -z / 10.0f};
+      const float game[3] = {x, y, z};
+      float pos[3];
+      GameToFafme(game, pos);
       float rot[4];
       OrientationToRotation(ValueNumbers(marker.Get("orientation")), type == "Camera Info", rot);
       std::string connected;
@@ -247,8 +195,9 @@ namespace faf::editor
       float rot[4] = {0.0f, 0.0f, 0.0f, 1.0f};
       JsonVector(object, "Pos", pos, 3);
       JsonVector(object, "Rot", rot, 4);
-      // ScmapEditor.WorldPosToScmap.
-      SaveEntry marker = NewMarker(*type, NextMarkerName(taken, *type), pos[0] * 10.0f, pos[1] * 10.0f, -pos[2] * 10.0f);
+      float game[3];
+      FafmeToGame(pos, game);
+      SaveEntry marker = NewMarker(*type, NextMarkerName(taken, *type), game[0], game[1], game[2]);
       taken.push_back({marker.name, {}});
       double orientation[3];
       RotationToOrientation(rot, std::string(typeName) == "Camera Info", orientation);

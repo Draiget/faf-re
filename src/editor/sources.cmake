@@ -19,6 +19,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdJson.cpp
   doc/EdLighting.cpp
   doc/EdMarkerPreset.cpp
+  doc/EdUnitPreset.cpp
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp

@@ -10,6 +10,7 @@
 
 #include <Windows.h>
 
+#include "editor/doc/EdUnitPreset.h"
 #include "editor/doc/EdMarkerPreset.h"
 #include "editor/EdTools.h"
 #include "editor/doc/EdDocument.h"
@@ -92,6 +93,13 @@ namespace faf::editor
     [[nodiscard]] const std::vector<std::string>& SelectedMarkerNames() const noexcept { return mMarkerSelection; }
     /** Adds a `.fafmapmarkers` file's markers as one undo step and selects them; false with `error`. */
     bool ImportMarkerFile(const std::string& text, MarkerImport& result, std::string& error);
+    /** The units an export writes: the selected ones, or every unit of `army` when none is selected. */
+    [[nodiscard]] std::vector<SaveUnit> UnitsToExport(const std::string& army) const;
+    /**
+     * Adds a `.scunits` file's units to `army` (its INITIAL group) under new UNIT_n names, on the ground, as one undo
+     * step, and selects them; `moved` when they came from off this map. False with `error`.
+     */
+    bool ImportUnitFile(const std::string& text, const std::string& army, std::vector<std::string>& names, bool& moved, std::string& error);
     /** Changes a property of a marker ("name" renames it), as one undo step. */
     void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
     /** The move gizmo's parts: an arrow per axis and the free square in its middle. */
@@ -327,7 +335,9 @@ namespace faf::editor
     /** The drag's move so far, as a displacement in the world. */
     [[nodiscard]] Wm3::Vec3f GizmoDisplacement(POINT at) const;
     /** Where an object that started at `start` goes for `move`: snapped, on or above the ground. */
-    [[nodiscard]] Wm3::Vec3f GizmoPlace(const Wm3::Vec3f& start, const Wm3::Vec3f& move, bool resource) const;
+    [[nodiscard]] Wm3::Vec3f GizmoPlace(const Wm3::Vec3f& start, const Wm3::Vec3f& move, bool resource, bool unit = false) const;
+    /** Where a unit rests at (x, z): the ground, or the sea's surface over it (the game's saves keep ships there). */
+    [[nodiscard]] float UnitRestHeight(float x, float z) const;
     GizmoPart mGizmoDrag = GizmoPart::None;
     POINT mGizmoFrom{};
     Wm3::Vec3f mGizmoStart{};

@@ -341,6 +341,7 @@ namespace faf::editor
       bool mWaterFilesDone = false;
       bool mLightingFilesDone = false;
       bool mMarkerFilesDone = false;
+      bool mUnitFilesDone = false;
       /** `/waterset <on>,<level>,<deep>,<abyss>` (test runs): the sea set as one edit once the map is shown. */
       std::string mWaterSetArg;
       bool mWaterDragging = false;
@@ -1464,6 +1465,49 @@ namespace faf::editor
             gpg::Logf("editor: %zu markers imported from %s (%s to %s), %d path links, %d of a type the editor doesn't place left out",
                       result.names.size(), importFile.string().c_str(), result.names.empty() ? "-" : result.names.front().c_str(),
                       result.names.empty() ? "-" : result.names.back().c_str(), result.links, result.skipped);
+          }
+        }
+      }
+      // The Units tool's units file, or `/unitsimport <file>`, `/unitsexport <file>` for test runs (the Units tool's army).
+      {
+        std::filesystem::path importFile;
+        std::filesystem::path exportFile;
+        if (tools.TakeUnitFileImport()) {
+          importFile = AskFile(HandleOf(mGame.supcomFrame), false, L"Units (*.scunits)\0*.scunits\0All files\0*.*\0", L"scunits",
+                               L"Import units");
+        }
+        if (tools.TakeUnitFileExport()) {
+          exportFile = AskFile(HandleOf(mGame.supcomFrame), true, L"Units (*.scunits)\0*.scunits\0", L"scunits", L"Export units");
+        }
+        if (mScene.Attached() && !mUnitFilesDone && !tools.UnitArmy().empty()) {
+          mUnitFilesDone = true;
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/unitsexport", 1, &file) && !file.empty()) {
+            exportFile = file[0].c_str();
+          }
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/unitsimport", 1, &file) && !file.empty()) {
+            importFile = file[0].c_str();
+          }
+        }
+        // Export first, so a test run can write units and read them back in one go.
+        if (!exportFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
+          const std::vector<SaveUnit> units = mScene.UnitsToExport(tools.UnitArmy());
+          const std::string text = UnitsToScunits(units);
+          std::ofstream out(exportFile, std::ios::binary | std::ios::trunc);
+          out.write(text.data(), static_cast<std::streamsize>(text.size()));
+          (out ? gpg::Logf : gpg::Warnf)("editor: %zu units (%s) exported to %s", units.size(),
+                                        mScene.UnitSelectionCount() > 0 ? "the selected" : tools.UnitArmy().c_str(), exportFile.string().c_str());
+        }
+        if (!importFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
+          std::ifstream in(importFile, std::ios::binary);
+          const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+          std::vector<std::string> names;
+          bool moved = false;
+          std::string error;
+          if (!in || !mScene.ImportUnitFile(text, tools.UnitArmy(), names, moved, error)) {
+            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
+          } else {
+            gpg::Logf("editor: %zu units imported from %s into %s (%s to %s)%s", names.size(), importFile.string().c_str(),
+                      tools.UnitArmy().c_str(), names.front().c_str(), names.back().c_str(), moved ? ", moved onto this map" : "");
           }
         }
       }

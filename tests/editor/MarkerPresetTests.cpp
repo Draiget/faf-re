@@ -7,6 +7,7 @@
 
 #include <gtest/gtest.h>
 
+#include "editor/doc/EdJson.h"
 #include "editor/tools/EdMarkers.h"
 
 namespace

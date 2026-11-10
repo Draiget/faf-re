@@ -483,6 +483,9 @@ namespace faf::editor
     /** The Markers tool's Import / Export of FAForeverMapEditor's `.fafmapmarkers`, taken by the app (it asks for the file). */
     [[nodiscard]] bool TakeMarkerFileImport() noexcept { return std::exchange(mMarkerFileImport, false); }
     [[nodiscard]] bool TakeMarkerFileExport() noexcept { return std::exchange(mMarkerFileExport, false); }
+    /** The Units tool's Import / Export of FAForeverMapEditor's `.scunits`, taken by the app. */
+    [[nodiscard]] bool TakeUnitFileImport() noexcept { return std::exchange(mUnitFileImport, false); }
+    [[nodiscard]] bool TakeUnitFileExport() noexcept { return std::exchange(mUnitFileExport, false); }
     [[nodiscard]] bool TakeExportRequest() noexcept { return std::exchange(mExportRequested, false); }
     /** Heights times this on import and export. */
     [[nodiscard]] float HeightScale() const noexcept { return mHeightScale; }
@@ -559,6 +562,8 @@ namespace faf::editor
     bool mImportRequested = false;
     bool mMarkerFileImport = false;
     bool mMarkerFileExport = false;
+    bool mUnitFileImport = false;
+    bool mUnitFileExport = false;
     bool mExportRequested = false;
     float mHeightScale = 1.0f;
     int mExportSize = 0;

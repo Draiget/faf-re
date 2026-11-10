@@ -1736,7 +1736,14 @@ namespace faf::editor
     return Wm3::Vec3f{axis.x * t, axis.y * t, axis.z * t};
   }
 
-  Wm3::Vec3f EdMapScene::GizmoPlace(const Wm3::Vec3f& start, const Wm3::Vec3f& move, const bool resource) const
+  float EdMapScene::UnitRestHeight(const float x, const float z) const
+  {
+    const float ground = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z)));
+    const WaterState water = mDocument.WaterNow();
+    return water.enabled ? std::max(ground, water.elevation) : ground;
+  }
+
+  Wm3::Vec3f EdMapScene::GizmoPlace(const Wm3::Vec3f& start, const Wm3::Vec3f& move, const bool resource, const bool unit) const
   {
     float x = start.x + move.x;
     float z = start.z + move.z;
@@ -1752,7 +1759,8 @@ namespace faf::editor
     const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
     x = std::clamp(x, 0.0f, static_cast<float>(field->width - 1));
     z = std::clamp(z, 0.0f, static_cast<float>(field->height - 1));
-    const float ground = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z)));
+    const float ground = unit ? UnitRestHeight(x, z)
+                              : mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z)));
     float y = 0.0f;
     if (mGizmoDrag == GizmoPart::Y) {
       y = std::max(start.y + move.y, ground);
@@ -3009,8 +3017,7 @@ namespace faf::editor
       unit.type = type;
       unit.position[0] = SnapToGrid(centreX[c]);
       unit.position[2] = SnapToGrid(centreZ[c]);
-      unit.position[1] = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(unit.position[0])),
-                                                        static_cast<std::int32_t>(std::lround(unit.position[2])));
+      unit.position[1] = UnitRestHeight(unit.position[0], unit.position[2]);
       // The saves keep a unit's turn in Orientation's second value.
       unit.orientation[1] = std::atan2(aheadZ[c] - centreZ[c], aheadX[c] - centreX[c]);
       const std::string name = unit.name;
@@ -3028,6 +3035,85 @@ namespace faf::editor
       }
       gpg::Logf("editor: %zu %s units placed (%s), %zu units now", placed.size(), type.c_str(), where.c_str(), mUnitRefs.size());
     }
+  }
+
+  std::vector<SaveUnit> EdMapScene::UnitsToExport(const std::string& army) const
+  {
+    std::vector<SaveUnit> units;
+    for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+      UnitGroup group;
+      std::string error;
+      if (!ParseUnitGroup(entry.Get("Units"), group, error)) {
+        continue;
+      }
+      std::vector<const SaveUnit*> all;
+      CollectUnits(group, all);
+      for (const SaveUnit* const unit : all) {
+        const bool chosen = mUnitSelection.empty()
+                                ? entry.name == army
+                                : std::find(mUnitSelection.begin(), mUnitSelection.end(), std::pair{entry.name, unit->name}) != mUnitSelection.end();
+        if (chosen) {
+          units.push_back(*unit);
+        }
+      }
+    }
+    return units;
+  }
+
+  bool EdMapScene::ImportUnitFile(const std::string& text, const std::string& army, std::vector<std::string>& names, bool& moved,
+                                  std::string& error)
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr) {
+      error = "no map shown";
+      return false;
+    }
+    std::vector<SaveUnit> units;
+    float centre[3];
+    if (!UnitsFromScunits(text, units, centre, error)) {
+      return false;
+    }
+    if (units.empty()) {
+      error = "the file has no units";
+      return false;
+    }
+    const float width = static_cast<float>(field->width - 1);
+    const float height = static_cast<float>(field->height - 1);
+    moved = FitUnitsOnMap(units, centre, width, height);
+    // The next free UNIT_n over every army, as placing does.
+    int highest = 0;
+    for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+      UnitGroup group;
+      std::string parseError;
+      if (ParseUnitGroup(entry.Get("Units"), group, parseError)) {
+        highest = std::max(highest, HighestUnitNumber(group));
+      }
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    names.clear();
+    const bool added = EditArmyUnits(army, [&](UnitGroup& group) {
+      for (SaveUnit& unit : units) {
+        unit.name = "UNIT_" + std::to_string(++highest);
+        unit.position[0] = std::clamp(unit.position[0], 0.0f, width);
+        unit.position[2] = std::clamp(unit.position[2], 0.0f, height);
+        // On the ground (or the sea over it), as FAFME's import snaps them.
+        unit.position[1] = UnitRestHeight(unit.position[0], unit.position[2]);
+        names.push_back(unit.name);
+        AddUnit(group, unit);
+      }
+    });
+    if (!added) {
+      error = "the army's units can't be changed";
+      names.clear();
+      return false;
+    }
+    mDocument.SaveDataEdited(std::move(before));
+    ReloadUnits();
+    mUnitSelection.clear();
+    for (const std::string& name : names) {
+      mUnitSelection.emplace_back(army, name);
+    }
+    return true;
   }
 
   void EdMapScene::DeleteSelectedUnits()
@@ -3572,7 +3658,7 @@ namespace faf::editor
                 continue;
               }
               UnitRef& ref = mUnitRefs[static_cast<std::size_t>(index)];
-              ref.position = GizmoPlace(mUnitDragStart[i], move, false);
+              ref.position = GizmoPlace(mUnitDragStart[i], move, false, true);
               if (moho::MeshInstance* const instance = mUnits[static_cast<std::size_t>(index)]; instance != nullptr) {
                 const moho::VTransform transform = UnitTransform(ref.position, ref.orientation);
                 instance->SetStance(transform, transform);

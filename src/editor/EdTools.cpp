@@ -1116,6 +1116,20 @@ namespace faf::editor
     DrawSymmetry(false);
     Note("Place: a click puts the unit there with its symmetric copies, in the army above, in its INITIAL group (the units the "
          "army starts with); names are UNIT_n, as the game's saves name them.");
+
+    SectionHeader("UNIT FILE");
+    ImGui::BeginDisabled(mUnitArmy.empty());
+    if (ImGui::Button("Import...")) {
+      mUnitFileImport = true;
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button(mUnitSelectionCount > 0 ? "Export selected..." : "Export the army's...")) {
+      mUnitFileExport = true;
+    }
+    Note("FAForeverMapEditor's units file (.scunits): type, position, turn, orders and platoon. Import puts the units in the "
+         "army above, on the ground, selected, as one undo step; units from a bigger map are moved together to its middle. "
+         "Export writes the selected units, or all of the army's.");
   }
 
   void EdTools::DrawPlayableArea()
