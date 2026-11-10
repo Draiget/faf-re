@@ -252,6 +252,62 @@ TEST(GalEffectSourceD3D11, AStructNamedLikeATechniqueIsRenamed)
   EXPECT_EQ(description.FindStruct("Cirrus"), nullptr);
 }
 
+// The original water2.fx (effects.scd, line 448) and FAF's copies before fa #6452: a local named like an effect
+// parameter reads the parameter in its own initializer, which only D3D9's compiler accepts.
+TEST(GalEffectSourceD3D11, ALocalReadingTheParameterItShadowsIsRenamed)
+{
+  const char* const source = R"fx(
+float2 waterLerp = 0.3;
+struct Flow { float waterLerp; };
+float4 WaterPS( float waterDepth : TEXCOORD0 ) : COLOR0
+{
+    float4 colour = float4( 1, 1, 1, 1 );
+    float waterLerp = clamp( waterDepth, waterLerp.x, waterLerp.y );
+    Flow flow = (Flow)0;
+    flow.waterLerp = waterLerp;
+    colour.xyz = lerp( colour.xyz, float3( 0, 0, 0 ), waterLerp );
+    return colour * flow.waterLerp;
+}
+float4 OtherPS( float waterDepth : TEXCOORD0 ) : COLOR0
+{
+    float other = waterLerp.x;
+    return float4( other, waterLerp.y, waterDepth, 1 );
+}
+technique10 Water { pass P0 { PixelShader = compile ps_4_0 WaterPS(); } }
+technique10 Other { pass P0 { PixelShader = compile ps_4_0 OtherPS(); } }
+)fx";
+  const TranslatedEffectSource translated = TranslateEffectSource(source, false, {});
+  EXPECT_TRUE(Contains(translated.source, "float2 waterLerp = 0.3;"));
+  EXPECT_TRUE(Contains(translated.source, "float faf_local_waterLerp = clamp( waterDepth, waterLerp.x, waterLerp.y );"));
+  EXPECT_TRUE(Contains(translated.source, "flow.waterLerp = faf_local_waterLerp;"));
+  EXPECT_TRUE(Contains(translated.source, "lerp( colour.xyz, float3( 0, 0, 0 ), faf_local_waterLerp )"));
+  EXPECT_TRUE(Contains(translated.source, "return colour * flow.waterLerp;"));
+  EXPECT_TRUE(Contains(translated.source, "struct Flow { float waterLerp; };"));
+  EXPECT_TRUE(Contains(translated.source, "float other = waterLerp.x;"));
+  EXPECT_TRUE(Contains(translated.source, "return float4( other, waterLerp.y, waterDepth, 1 );"));
+  EXPECT_TRUE(HasNote(translated, "local waterLerp renamed: it reads the effect parameter of the same name"));
+
+  const EffectDescription description = ParseEffect(translated.source);
+  EXPECT_NE(description.FindTechnique("Water"), nullptr);
+  EXPECT_NE(description.FindTechnique("Other"), nullptr);
+}
+
+TEST(GalEffectSourceD3D11, ALocalNotReadingTheParameterIsKept)
+{
+  const char* const source = R"fx(
+float2 waterLerp = 0.3;
+float4 WaterPS( float waterDepth : TEXCOORD0 ) : COLOR0
+{
+    float2 waterLerp = float2( waterDepth, 1 );
+    return float4( waterLerp, 0, 1 );
+}
+technique10 Water { pass P0 { PixelShader = compile ps_4_0 WaterPS(); } }
+)fx";
+  const TranslatedEffectSource translated = TranslateEffectSource(source, false, {});
+  EXPECT_TRUE(Contains(translated.source, "float2 waterLerp = float2( waterDepth, 1 );"));
+  EXPECT_FALSE(Contains(translated.source, "faf_local_"));
+}
+
 TEST(GalEffectSourceD3D11, PixelShadersAreRelinkedBySemantic)
 {
   const TranslatedEffectSource translated = TranslateEffectSource(kMixed, false, {});

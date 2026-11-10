@@ -283,6 +283,7 @@ namespace gpg::gal::d3d11
         RaiseShaderModel();
         RewriteOneDimensionalSamplers();
         RenameTypesShadowingTechniques();
+        RenameLocalsShadowingParameters();
         CollectStateObjects();
         DropUndefinedFixedFunctionTechniques();
         CollectStructsAndFunctions();
@@ -432,6 +433,178 @@ namespace gpg::gal::d3d11
             mText = std::regex_replace(mText, renamedTechnique, "$1" + name);
           }
           mNotes.push_back("struct " + name + " renamed: a technique has the same name");
+        }
+      }
+
+      /** float, half, int, uint, bool, double, with an optional N or NxM (N, M 1-4). */
+      [[nodiscard]] static bool IsNumericTypeName(const std::string_view word)
+      {
+        for (const std::string_view base : {"float", "half", "int", "uint", "bool", "double"}) {
+          if (word.substr(0U, base.size()) != base) {
+            continue;
+          }
+          const std::string_view rest = word.substr(base.size());
+          const auto dimension = [](const char c) { return c >= '1' && c <= '4'; };
+          return rest.empty() || (rest.size() == 1U && dimension(rest[0])) ||
+            (rest.size() == 3U && dimension(rest[0]) && rest[1] == 'x' && dimension(rest[2]));
+        }
+        return false;
+      }
+
+      /** A local declared like an effect parameter that reads the parameter in its own initializer. */
+      struct ShadowingLocal
+      {
+        std::string name;
+        std::size_t namePosition = 0U; // the local's name in its declaration
+        std::size_t declarationEnd = 0U; // its ';'
+        std::size_t blockEnd = 0U; // the '}' closing its block
+      };
+
+      [[nodiscard]] std::optional<ShadowingLocal> FindLocalShadowingParameter() const
+      {
+        struct Declaration
+        {
+          std::string name;
+          std::size_t namePosition;
+          std::size_t equals;
+        };
+        std::vector<std::string> parameters;
+        std::vector<Declaration> locals;
+        const std::string& text = mText;
+        const auto skipSpace = [&](std::size_t at) {
+          while (at < text.size() && std::isspace(static_cast<unsigned char>(text[at])) != 0) {
+            ++at;
+          }
+          return at;
+        };
+        int depth = 0;
+        for (std::size_t at = 0U; at < text.size();) {
+          const char c = text[at];
+          if (c == '/' && at + 1U < text.size() && text[at + 1U] == '/') {
+            at = text.find('\n', at);
+            continue;
+          }
+          if (c == '/' && at + 1U < text.size() && text[at + 1U] == '*') {
+            const std::size_t close = text.find("*/", at + 2U);
+            at = close == std::string::npos ? text.size() : close + 2U;
+            continue;
+          }
+          if (c == '"') {
+            const std::size_t close = text.find('"', at + 1U);
+            at = close == std::string::npos ? text.size() : close + 1U;
+            continue;
+          }
+          if (c == '{' || c == '}') {
+            depth += c == '{' ? 1 : -1;
+            ++at;
+            continue;
+          }
+          if (!IsIdentifierChar(c) || (at > 0U && IsIdentifierChar(text[at - 1U]))) {
+            ++at;
+            continue;
+          }
+          std::size_t end = at;
+          while (end < text.size() && IsIdentifierChar(text[end])) {
+            ++end;
+          }
+          const std::string_view word(text.data() + at, end - at);
+          if (IsNumericTypeName(word) && (at == 0U || text[at - 1U] != '.')) {
+            const std::size_t nameStart = skipSpace(end);
+            std::size_t nameEnd = nameStart;
+            while (nameEnd < text.size() && IsIdentifierChar(text[nameEnd])) {
+              ++nameEnd;
+            }
+            if (nameEnd > nameStart && std::isdigit(static_cast<unsigned char>(text[nameStart])) == 0) {
+              const std::size_t next = skipSpace(nameEnd);
+              const char follow = next < text.size() ? text[next] : '\0';
+              std::string name = text.substr(nameStart, nameEnd - nameStart);
+              if (depth == 0 && (follow == '=' || follow == ';' || follow == ':' || follow == '[' || follow == '<')) {
+                parameters.push_back(std::move(name));
+              } else if (depth > 0 && follow == '=' && (next + 1U >= text.size() || text[next + 1U] != '=')) {
+                locals.push_back(Declaration{std::move(name), nameStart, next});
+              }
+            }
+          }
+          at = end;
+        }
+
+        for (const Declaration& local : locals) {
+          if (std::find(parameters.begin(), parameters.end(), local.name) == parameters.end()) {
+            continue;
+          }
+          // The initializer runs to the ';' outside parentheses.
+          int parens = 0;
+          std::size_t semicolon = std::string::npos;
+          for (std::size_t at = local.equals + 1U; at < text.size(); ++at) {
+            if (text[at] == '(') {
+              ++parens;
+            } else if (text[at] == ')') {
+              --parens;
+            } else if (text[at] == ';' && parens == 0) {
+              semicolon = at;
+              break;
+            } else if (text[at] == '{' || text[at] == '}') {
+              break;
+            }
+          }
+          if (semicolon == std::string::npos) {
+            continue;
+          }
+          std::string initializer = text.substr(local.equals + 1U, semicolon - local.equals - 1U);
+          if (ReplaceIdentifier(initializer, local.name, local.name) == 0U) {
+            continue;
+          }
+          int blockDepth = 0;
+          for (std::size_t at = semicolon; at < text.size(); ++at) {
+            if (text[at] == '{') {
+              ++blockDepth;
+            } else if (text[at] == '}' && --blockDepth < 0) {
+              return ShadowingLocal{local.name, local.namePosition, semicolon, at};
+            }
+          }
+        }
+        return std::nullopt;
+      }
+
+      /**
+       * D3D9's compiler lets a local take an effect parameter's name and still read the parameter in its own
+       * initializer: the original water2.fx has `float2 waterLerp` and, in a pixel shader,
+       * `float waterLerp = clamp(waterDepth, waterLerp.x, waterLerp.y);`. Shader model 4 and later already see the
+       * local there and reject `.y` on a float. The local is renamed for the rest of its block, so the initializer
+       * reads the parameter and the later uses read the local, as in D3D9. FAF's own copy of water2.fx renamed the
+       * local in 2024 (fa #6452); the original game's and older FAF copies still have it.
+       */
+      void RenameLocalsShadowingParameters()
+      {
+        for (std::size_t guard = 0U; guard < 64U; ++guard) {
+          const std::optional<ShadowingLocal> shadow = FindLocalShadowingParameter();
+          if (!shadow) {
+            return;
+          }
+          const std::string renamed = "faf_local_" + shadow->name;
+          std::string rest = mText.substr(shadow->declarationEnd, shadow->blockEnd - shadow->declarationEnd);
+          // Whole identifiers only, and not a member of the same name (`v.waterLerp`).
+          std::string replaced;
+          std::size_t from = 0U;
+          for (std::size_t at = rest.find(shadow->name); at != std::string::npos; at = rest.find(shadow->name, at + 1U)) {
+            const std::size_t end = at + shadow->name.size();
+            const bool whole =
+              (at == 0U || !IsIdentifierChar(rest[at - 1U])) && (end >= rest.size() || !IsIdentifierChar(rest[end]));
+            std::size_t before = at;
+            while (before > 0U && std::isspace(static_cast<unsigned char>(rest[before - 1U])) != 0) {
+              --before;
+            }
+            const bool member = before > 0U && rest[before - 1U] == '.';
+            if (whole && !member) {
+              replaced += rest.substr(from, at - from) + renamed;
+              from = end;
+            }
+          }
+          replaced += rest.substr(from);
+          const std::size_t nameEnd = shadow->namePosition + shadow->name.size();
+          mText = mText.substr(0U, shadow->namePosition) + renamed +
+            mText.substr(nameEnd, shadow->declarationEnd - nameEnd) + replaced + mText.substr(shadow->blockEnd);
+          mNotes.push_back("local " + shadow->name + " renamed: it reads the effect parameter of the same name");
         }
       }
 
