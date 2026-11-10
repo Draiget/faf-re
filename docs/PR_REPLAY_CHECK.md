@@ -36,6 +36,7 @@ Every replay here plays back on master with every recorded checksum matching, so
 | 28005584 | SCMP_021 | 2, with the built-in AI | 47 min | |
 | 28052742 | SCMP_026 | 2 | 48 min | |
 | 28072694 | Azalea Gardens | 2 | 48 min | |
+| 28010105 | SCMP_022 | 2 + M28AI | 44 min | v327 |
 | 28072023 | Seton's Clutch | 4, with the built-in AI | 70 min | |
 
 ### Game version 3835's core set (tests/replay_sets)
