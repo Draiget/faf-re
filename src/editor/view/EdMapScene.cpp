@@ -1828,6 +1828,28 @@ namespace faf::editor
     }
   }
 
+  bool EdMapScene::ImportMarkerFile(const std::string& text, MarkerImport& result, std::string& error)
+  {
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    std::vector<SaveEntry> markers = mDocument.SaveData().Markers();
+    if (!MarkersFromFafmapmarkers(text, markers, result, error, mDocument.ArmyNamesInUse())) {
+      return false;
+    }
+    if (!result.names.empty()) {
+      // A start position is an army, as when one is placed: the scenario's list and the save's Armies get it.
+      for (const SaveEntry& marker : markers) {
+        if (MarkerTypeOf(marker) == "Blank Marker" && std::find(result.names.begin(), result.names.end(), marker.name) != result.names.end()) {
+          mDocument.AddArmy(marker.name);
+        }
+      }
+      mDocument.SaveData().Markers() = std::move(markers);
+      mDocument.SaveDataEdited(std::move(before));
+      mMarkerSelection = result.names;
+      mOutsideStale = true;
+    }
+    return true;
+  }
+
   std::vector<SaveEntry> EdMapScene::SelectedMarkers() const
   {
     std::vector<SaveEntry> selected;
@@ -1854,6 +1876,12 @@ namespace faf::editor
             gpg::Warnf("editor: a marker named %s already exists", value.c_str());
             return;
           }
+        }
+        // A start position names its army: not one the scenario already has (an extra army has no marker).
+        if (const std::vector<std::string> armies = mDocument.ArmyNamesInUse();
+            MarkerTypeOf(marker) == "Blank Marker" && std::find(armies.begin(), armies.end(), value) != armies.end()) {
+          gpg::Warnf("editor: an army named %s already exists", value.c_str());
+          return;
         }
         for (SaveEntry& other : markers) {
           std::vector<std::string> links = MarkerLinks(other);
@@ -2050,7 +2078,7 @@ namespace faf::editor
       // such as ARMY_9 has no marker but its name is taken).
       std::vector<SaveEntry> taken = markers;
       if (std::string(type.type) == "Blank Marker") {
-        for (const std::string& army : mDocument.Armies()) {
+        for (const std::string& army : mDocument.ArmyNamesInUse()) {
           taken.push_back({army, {}});
         }
         for (const std::string& army : mDocument.ExtraArmies()) {

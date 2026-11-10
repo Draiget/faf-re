@@ -340,6 +340,7 @@ namespace faf::editor
       std::string mFrameMarkerArg;
       bool mWaterFilesDone = false;
       bool mLightingFilesDone = false;
+      bool mMarkerFilesDone = false;
       /** `/waterset <on>,<level>,<deep>,<abyss>` (test runs): the sea set as one edit once the map is shown. */
       std::string mWaterSetArg;
       bool mWaterDragging = false;
@@ -915,7 +916,8 @@ namespace faf::editor
         std::transform(folder.begin(), folder.end(), folder.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
         if (folder == wanted) {
           mPlay.Select(static_cast<int>(i));
-          (void)mDocument.Open(maps[i]);
+          const bool started = mDocument.Open(maps[i]);
+          (started ? gpg::Logf : gpg::Warnf)("editor: /open %s: %s %s", args[0].c_str(), started ? "opening" : "can't open", maps[i].c_str());
           return;
         }
       }
@@ -1417,6 +1419,52 @@ namespace faf::editor
           const std::string text = LightingToScmlighting(mDocument.LightingNow());
           out.write(text.data(), static_cast<std::streamsize>(text.size()));
           (out ? gpg::Logf : gpg::Warnf)("editor: lighting exported to %s", exportFile.string().c_str());
+        }
+      }
+      // The Markers tool's marker file, or `/markersimport <file>`, `/markersexport <file>` for test runs.
+      {
+        std::filesystem::path importFile;
+        std::filesystem::path exportFile;
+        if (tools.TakeMarkerFileImport()) {
+          importFile = AskFile(HandleOf(mGame.supcomFrame), false, L"Markers (*.fafmapmarkers)\0*.fafmapmarkers\0All files\0*.*\0",
+                               L"fafmapmarkers", L"Import markers");
+        }
+        if (tools.TakeMarkerFileExport()) {
+          exportFile = AskFile(HandleOf(mGame.supcomFrame), true, L"Markers (*.fafmapmarkers)\0*.fafmapmarkers\0", L"fafmapmarkers",
+                               L"Export markers");
+        }
+        if (mScene.Attached() && !mMarkerFilesDone) {
+          mMarkerFilesDone = true;
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/markersexport", 1, &file) && !file.empty()) {
+            exportFile = file[0].c_str();
+          }
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/markersimport", 1, &file) && !file.empty()) {
+            importFile = file[0].c_str();
+          }
+        }
+        // Export first, so a test run can write the map's markers and read them back in one go.
+        if (!exportFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
+          const std::vector<std::string>& names = mScene.SelectedMarkerNames();
+          const int size = std::max(mDocument.Facts().fieldWidth - 1, 0);
+          const std::string text = MarkersToFafmapmarkers(mDocument.SaveData().Markers(), names, size, std::max(mDocument.Facts().fieldHeight - 1, 0));
+          std::ofstream out(exportFile, std::ios::binary | std::ios::trunc);
+          out.write(text.data(), static_cast<std::streamsize>(text.size()));
+          const std::size_t count = names.empty() ? mDocument.SaveData().Markers().size() : names.size();
+          (out ? gpg::Logf : gpg::Warnf)("editor: %zu markers (%s) exported to %s", count, names.empty() ? "all" : "the selected",
+                                        exportFile.string().c_str());
+        }
+        if (!importFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
+          std::ifstream in(importFile, std::ios::binary);
+          const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+          MarkerImport result;
+          std::string error;
+          if (!in || !mScene.ImportMarkerFile(text, result, error)) {
+            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
+          } else {
+            gpg::Logf("editor: %zu markers imported from %s (%s to %s), %d path links, %d of a type the editor doesn't place left out",
+                      result.names.size(), importFile.string().c_str(), result.names.empty() ? "-" : result.names.front().c_str(),
+                      result.names.empty() ? "-" : result.names.back().c_str(), result.links, result.skipped);
+          }
         }
       }
       const bool importAsked = tools.TakeImportRequest();

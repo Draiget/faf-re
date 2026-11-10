@@ -1222,6 +1222,17 @@ namespace faf::editor
       }
     }
 
+    SectionHeader("MARKER FILE");
+    if (ImGui::Button("Import...")) {
+      mMarkerFileImport = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(mMarkerSelection.empty() ? "Export all..." : "Export selected...")) {
+      mMarkerFileExport = true;
+    }
+    Note("FAForeverMapEditor's marker file (.fafmapmarkers): types, positions and path links. Imported markers get new "
+         "names, are selected, and are one undo step; weather, effect and objective markers are left out.");
+
     SectionHeader("ARMIES");
     {
       // The game reads the first team, which must be named FFA (SinglePlayerLaunch.lua, VerifyScenarioConfiguration);

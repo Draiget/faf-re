@@ -10,6 +10,7 @@
 
 #include <Windows.h>
 
+#include "editor/doc/EdMarkerPreset.h"
 #include "editor/EdTools.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdUnits.h"
@@ -87,6 +88,10 @@ namespace faf::editor
 
     /** The selected markers' entries, for the panel. */
     [[nodiscard]] std::vector<SaveEntry> SelectedMarkers() const;
+    /** The selected markers' names (empty when none). */
+    [[nodiscard]] const std::vector<std::string>& SelectedMarkerNames() const noexcept { return mMarkerSelection; }
+    /** Adds a `.fafmapmarkers` file's markers as one undo step and selects them; false with `error`. */
+    bool ImportMarkerFile(const std::string& text, MarkerImport& result, std::string& error);
     /** Changes a property of a marker ("name" renames it), as one undo step. */
     void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
     /** The move gizmo's parts: an arrow per axis and the free square in its middle. */

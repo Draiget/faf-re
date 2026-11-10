@@ -18,6 +18,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdWaterPreset.cpp
   doc/EdJson.cpp
   doc/EdLighting.cpp
+  doc/EdMarkerPreset.cpp
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp

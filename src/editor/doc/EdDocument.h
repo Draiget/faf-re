@@ -222,8 +222,13 @@ namespace faf::editor
      */
     [[nodiscard]] std::vector<CheckIssue> CheckScripts() const;
     [[nodiscard]] const std::string& Scenario() const noexcept { return mScenario; }
-    /** The armies of the scenario's team list, in order, and its extra armies. */
+    /** The armies of the scenario's team list, in order (its extra armies are ExtraArmies). */
     [[nodiscard]] std::vector<std::string> Armies() const { return ScenarioArmies(mScenario); }
+    /**
+     * Every army name taken, which a new start position can't have: the team list's, the extra armies (SCMP_009's
+     * ARMY_9) and `_save.lua`'s Armies table.
+     */
+    [[nodiscard]] std::vector<std::string> ArmyNamesInUse() const;
     /** The scenario's teams; setting them rewrites its `teams` block. */
     [[nodiscard]] std::vector<ScenarioTeam> Teams() const { return ScenarioTeams(mScenario); }
     void SetTeams(const std::vector<ScenarioTeam>& teams);

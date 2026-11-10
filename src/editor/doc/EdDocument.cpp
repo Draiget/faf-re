@@ -655,6 +655,23 @@ namespace faf::editor
     return issues;
   }
 
+  std::vector<std::string> EdDocument::ArmyNamesInUse() const
+  {
+    std::vector<std::string> names = Armies();
+    const auto add = [&names](const std::string& name) {
+      if (std::find(names.begin(), names.end(), name) == names.end()) {
+        names.push_back(name);
+      }
+    };
+    for (const std::string& army : ExtraArmies()) {
+      add(army);
+    }
+    for (const SaveEntry& army : mSave.Armies()) {
+      add(army.name);
+    }
+    return names;
+  }
+
   LightingState EdDocument::LightingNow() const
   {
     LightingState lighting;

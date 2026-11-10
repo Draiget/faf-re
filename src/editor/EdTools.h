@@ -7,6 +7,7 @@
 #include "editor/tools/EdMarkers.h"
 #include "editor/tools/EdTextureLibrary.h"
 
+#include <algorithm>
 #include <cmath>
 #include <array>
 #include <memory>
@@ -281,9 +282,11 @@ namespace faf::editor
     [[nodiscard]] bool ConnectPathNodes() const noexcept { return mConnectNodes; }
     void SetConnectPathNodes(const bool connect) noexcept { mConnectNodes = connect; }
     /** Test runs (`/markertool`): the Markers tool placing this type. */
-    void SetMarkerTool(const std::string& type) noexcept
+    void SetMarkerTool(std::string type) noexcept
     {
       mTool = 6;
+      // `_` for a space, as a command line option is one word (`Blank_Marker`).
+      std::replace(type.begin(), type.end(), '_', ' ');
       for (std::size_t i = 0; i < MarkerTypes().size(); ++i) {
         if (type == MarkerTypes()[i].type) {
           mMarkerType = static_cast<int>(i);
@@ -477,6 +480,9 @@ namespace faf::editor
 
     /** The height field's Import and Export buttons, taken by the app each frame (it asks for the file). */
     [[nodiscard]] bool TakeImportRequest() noexcept { return std::exchange(mImportRequested, false); }
+    /** The Markers tool's Import / Export of FAForeverMapEditor's `.fafmapmarkers`, taken by the app (it asks for the file). */
+    [[nodiscard]] bool TakeMarkerFileImport() noexcept { return std::exchange(mMarkerFileImport, false); }
+    [[nodiscard]] bool TakeMarkerFileExport() noexcept { return std::exchange(mMarkerFileExport, false); }
     [[nodiscard]] bool TakeExportRequest() noexcept { return std::exchange(mExportRequested, false); }
     /** Heights times this on import and export. */
     [[nodiscard]] float HeightScale() const noexcept { return mHeightScale; }
@@ -551,6 +557,8 @@ namespace faf::editor
 
     static constexpr int kExportWidths[] = {0, 257, 513, 1025, 2049, 4097};
     bool mImportRequested = false;
+    bool mMarkerFileImport = false;
+    bool mMarkerFileExport = false;
     bool mExportRequested = false;
     float mHeightScale = 1.0f;
     int mExportSize = 0;
