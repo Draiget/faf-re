@@ -34,6 +34,9 @@ namespace platform::posix
   void SetCursorScreenPos(int x, int y);
   // A Windows virtual-key code went down or up, for GetKeyState.
   void SetKeyDown(int virtualKey, bool down);
+  // The window the desktop gave the keyboard to (null: none of ours), for GetFocus and
+  // GetForegroundWindow. Unlike SetFocus it doesn't ask the window system for anything.
+  void SetFocusedWindow(void* window);
   // The window was minimized or restored, for IsIconic.
   void SetWindowMinimized(void* window, bool minimized);
   // Called by SetWindowTextA/W with the new title in UTF-8.
@@ -51,6 +54,9 @@ namespace platform::posix
   extern void (*gClipCursorHook)(bool clip, int left, int top, int right, int bottom);
   // The window system has events: wakes a MsgWaitForMultipleObjectsEx in the main loop.
   void WakeMessageWait();
+  // Reads the window system's input and says whether events are queued: with it set,
+  // MsgWaitForMultipleObjectsEx looks every few milliseconds and ends its wait for them.
+  extern bool (*gWindowEventsPendingHook)();
   // The monitors, `count` rectangles of four ints each (left, top, right, bottom, screen
   // coordinates), the primary first: MonitorFromPoint and GetMonitorInfoW answer from them.
   void SetMonitors(const int* rects, int count);

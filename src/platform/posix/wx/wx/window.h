@@ -8,9 +8,12 @@
 #include <wx/gdicmn.h>
 
 #include <cstdint>
+#include <vector>
 
-// The native window behind a wxWindow: the window system's handle (issue #256), 0 until then. An
-// integer, as wx 2.4.2's WXWidget (WXHWND) is: the engine casts it with static_cast<uintptr_t>.
+// The native window behind a wxWindow: the window system's handle (platform/Window.h, an
+// SDL_Window* on Linux). A top-level window has its own; a child window shares its top-level
+// window's, which it fills. An integer, as wx 2.4.2's WXWidget (WXHWND) is: the engine casts it
+// with static_cast<uintptr_t>.
 typedef std::uintptr_t WXWidget;
 
 class wxWindow : public wxEvtHandler
@@ -37,7 +40,11 @@ public:
   // wx 2.4.2 deletes a window at once unless it is a top-level one; nothing here defers.
   virtual bool Destroy();
   bool IsShown() const { return m_shown; }
-  virtual void SetFocus() {}
+  // The window that gets the keyboard and mouse events of its top-level window.
+  virtual void SetFocus();
+  static wxWindow* FindFocus();
+  const std::vector<wxWindow*>& GetChildren() const { return m_children; }
+  bool IsTopLevel() const { return m_topLevel; }
   virtual void Refresh(bool eraseBackground = true, const wxRect* rect = nullptr)
   {
     (void)eraseBackground;
@@ -66,8 +73,14 @@ public:
   // Set by the window system (issue #256).
   void SetClientArea(int screenX, int screenY, int width, int height);
 
+protected:
+  // A top-level window with its own native window (wxTopLevelWindow's constructor).
+  void SetTopLevel(WXWidget handle);
+
 private:
   wxWindow* m_parent = nullptr;
+  std::vector<wxWindow*> m_children;
+  bool m_topLevel = false;
   WXWidget m_handle = 0;
   bool m_shown = false;
   wxEvtHandler* m_eventHandler = this;

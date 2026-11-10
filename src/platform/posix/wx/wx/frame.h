@@ -36,38 +36,35 @@ public:
   }
 };
 
+// A window of its own on the desktop: the window system (platform/Window.h) makes its native
+// window, hidden until Show, and reports its moves, sizes and state back.
 class wxTopLevelWindow : public wxWindow
 {
 public:
   wxTopLevelWindow() = default;
   wxTopLevelWindow(
-    wxWindow* const parent,
-    const wxWindowID id,
+    wxWindow* parent,
+    wxWindowID id,
     const wxString& title,
     const wxPoint& pos = wxDefaultPosition,
     const wxSize& size = wxDefaultSize,
-    const long style = wxDEFAULT_FRAME_STYLE,
-    const wchar_t* const name = wxFrameNameStr
-  )
-    : wxWindow(parent, id, pos, size, style, name)
-    , m_title(title)
-    , m_windowStyle(style)
-  {}
+    long style = wxDEFAULT_FRAME_STYLE,
+    const wchar_t* name = wxFrameNameStr
+  );
 
-  virtual void Maximize(const bool maximize = true) { m_maximized = maximize; }
+  virtual void Maximize(bool maximize = true);
   virtual bool IsMaximized() const { return m_maximized; }
-  virtual void Iconize(const bool iconize = true) { m_iconized = iconize; }
+  virtual void Iconize(bool iconize = true);
   virtual bool IsIconized() const { return m_iconized; }
-  virtual bool ShowFullScreen(const bool show, const long style = 0)
-  {
-    (void)style;
-    m_fullScreen = show;
-    return true;
-  }
+  virtual bool ShowFullScreen(bool show, long style = 0);
   virtual bool IsFullScreen() const { return m_fullScreen; }
   virtual void SetIcon(const wxIcon& icon) { (void)icon; }
-  virtual void SetTitle(const wxString& title) { m_title = title; }
+  virtual void SetTitle(const wxString& title);
   virtual wxString GetTitle() const { return m_title; }
+
+  // What the window system reports (WxStandIn.cpp's event delivery).
+  void NoteMaximized(const bool maximized) { m_maximized = maximized; }
+  void NoteIconized(const bool iconized) { m_iconized = iconized; }
 
   void SetSizeHints(const int minWidth, const int minHeight, const int maxWidth = -1, const int maxHeight = -1)
   {

@@ -4,6 +4,7 @@
 // fatal-error report for an exception nothing caught. WinMain's Windows-only switches (the
 // crash tests, hardware watches, accessibility keys, Media Center) have no Linux counterpart yet.
 
+#include <cstdio>
 #include <exception>
 
 #include "gpg/core/utils/Global.h"
@@ -11,10 +12,17 @@
 #include "gpg/gal/Error.hpp"
 #include "moho/app/CScApp.h"
 #include "moho/app/WinApp.h"
+#include "platform/Window.h"
 
 int main()
 {
   gpg::SetThreadName(0xFFFFFFFFu, "Main");
+
+  // The window system (platform/Window.h, SDL3) before anything makes a window.
+  if (!platform::window::Init()) {
+    std::fprintf(stderr, "No window system (is DISPLAY or WAYLAND_DISPLAY set?); see the log for the reason.\n");
+    return 1;
+  }
 
   int exitCode = 0;
   try {
@@ -26,5 +34,6 @@ int main()
   } catch (const std::exception& exception) {
     gpg::Die("Unhandled exception:\n\n%s", exception.what());
   }
+  platform::window::Shutdown();
   return exitCode;
 }

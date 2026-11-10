@@ -6,6 +6,7 @@
 
 #include "platform/posix/Win32WindowPosix.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -87,6 +88,13 @@ namespace platform::posix
     state.keysDown[static_cast<std::size_t>(virtualKey)] = down;
   }
 
+  void SetFocusedWindow(void* const window)
+  {
+    WindowState& state = State();
+    const std::lock_guard<std::mutex> lock(state.mutex);
+    state.focus = static_cast<HWND>(window);
+  }
+
   void SetWindowMinimized(void* const window, const bool minimized)
   {
     WindowState& state = State();
@@ -103,6 +111,7 @@ namespace platform::posix
   void (*gSetCursorHook)(void* cursor) = nullptr;
   void (*gShowCursorHook)(bool shown) = nullptr;
   bool (*gOpenUrlHook)(const char* utf8Url) = nullptr;
+  bool (*gWindowEventsPendingHook)() = nullptr;
 
   void OpenUrl(const char* const utf8Url)
   {
@@ -641,7 +650,33 @@ DWORD MsgWaitForMultipleObjectsEx(
   // reports a queued message with WAIT_OBJECT_0 + count.
   std::vector<HANDLE> all(handles, handles + count);
   all.push_back(MessageWakeEvent());
-  return ::WaitForMultipleObjects(static_cast<DWORD>(all.size()), all.data(), FALSE, milliseconds);
+  const DWORD all_count = static_cast<DWORD>(all.size());
+  if (platform::posix::gWindowEventsPendingHook == nullptr) {
+    return ::WaitForMultipleObjects(all_count, all.data(), FALSE, milliseconds);
+  }
+  // The window system reads its input only when asked (SDL pumps on the main thread), so the
+  // wait looks for window events every few milliseconds, as a queued message ends it on Windows.
+  constexpr DWORD kSliceMs = 4;
+  if (platform::posix::gWindowEventsPendingHook()) {
+    return WAIT_OBJECT_0 + count;
+  }
+  DWORD waited = 0;
+  for (;;) {
+    const DWORD slice = milliseconds == INFINITE ? kSliceMs : (std::min)(kSliceMs, milliseconds - waited);
+    const DWORD result = ::WaitForMultipleObjects(all_count, all.data(), FALSE, slice);
+    if (result != WAIT_TIMEOUT) {
+      return result;
+    }
+    if (platform::posix::gWindowEventsPendingHook()) {
+      return WAIT_OBJECT_0 + count;
+    }
+    if (milliseconds != INFINITE) {
+      waited += slice;
+      if (waited >= milliseconds) {
+        return WAIT_TIMEOUT;
+      }
+    }
+  }
 }
 
 USHORT RtlCaptureStackBackTrace(const DWORD skip, const DWORD count, void** const frames, DWORD* const hash)

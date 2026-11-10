@@ -115,6 +115,8 @@ list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/wx/WxSta
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32WindowPosix.cpp")
 # The XACT engine on FAudio's FACT (issue #258).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/XactOverFact.cpp")
+# The native windows and their input on SDL3 (platform/Window.h, issue #256).
+list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/WindowSdl.cpp")
 # Movie sound on an SDL3 audio stream (moho::sfd::AudioSink; DirectSoundMovieSink.cpp on Windows).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/SdlMovieSink.cpp")
 # CD3DFont's GDI text calls on FreeType.
