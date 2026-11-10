@@ -1,4 +1,5 @@
 #include "editor/doc/EdMapFile.h"
+#include "editor/doc/EdImageChunks.h"
 
 #include <cmath>
 #include <cstdint>
@@ -71,6 +72,19 @@ namespace faf::editor
       return bytes;
     }
   } // namespace
+
+  std::vector<std::string> ReadImageRecords(const std::string& file, const std::size_t previewBytes)
+  {
+    std::vector<std::string> images;
+    std::string bytes;
+    if (previewBytes == 0 || !ReadGameFile(file, bytes)) {
+      return images;
+    }
+    for (const ImageChunk& chunk : FindImageChunks(bytes, 8 + previewBytes)) {
+      images.push_back(bytes.substr(chunk.at, chunk.size));
+    }
+    return images;
+  }
 
   std::vector<char> ReadPreviewRecord(const std::string& file)
   {
@@ -186,7 +200,29 @@ namespace faf::editor
         preview = map.mMapPreviewChunk->Save(writer);
       }
       const std::vector<PropRecord>& props = records.props;
-      const bool terrain = map.mTerrainRes->Save(writer);
+      // The terrain into memory first: its images the file had, where nothing they are made from changed, go back
+      // as they were (FindImageChunks finds them in the same order as the file's).
+      bool terrain = false;
+      {
+        gpg::PipeStream pipe;
+        {
+          gpg::BinaryWriter memory(&pipe);
+          terrain = map.mTerrainRes->Save(memory);
+        }
+        pipe.VirtFlush();
+        std::string bytes;
+        char block[65536];
+        for (std::size_t got = 0; (got = pipe.VirtReadNonBlocking(block, sizeof(block))) != 0;) {
+          bytes.append(block, got);
+        }
+        if (!records.images.empty()) {
+          const std::vector<ImageChunk> chunks = FindImageChunks(bytes, 0);
+          if (chunks.size() == records.images.size() && records.keepImages.size() == chunks.size()) {
+            bytes = WithOriginalImages(bytes, chunks, records.images, records.keepImages);
+          }
+        }
+        writer.Write(bytes.data(), bytes.size());
+      }
 
       // The props, in CWldProps::Save's layout (0x00891D50): count, then each path with its NUL and 15
       // floats. An unchanged prop gets its stored record back, so saving leaves it bit for bit as it was.

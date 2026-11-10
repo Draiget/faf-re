@@ -163,6 +163,10 @@ namespace faf::editor
 
     /** What the map file stored that a save writes back as it was (the preview, unchanged props). */
     [[nodiscard]] const MapFileRecords& FileRecords() const noexcept { return mFileRecords; }
+    /** Marks which of the file's images a save keeps: those whose sources are as they were at load. */
+    void MarkKeptImages();
+    /** The masks were read from the terrain (once): what they were then, to tell an edit from none. */
+    void MasksRead();
 
     /** The height field's undo history, reset when a map opens. */
     [[nodiscard]] HeightHistory& Heights() noexcept { return mHeights; }
@@ -419,6 +423,12 @@ namespace faf::editor
     std::vector<EditKind> mUndoOrder;
     std::vector<EditKind> mRedoOrder;
     MapFileRecords mFileRecords;
+    std::uint64_t mHeightsAtLoad = 0;
+    std::uint64_t mMasksAtRead = 0;
+    bool mMasksReadSet = false;
+    WaterState mWaterAtLoad;
+    [[nodiscard]] std::uint64_t HeightsHash() const;
+    [[nodiscard]] std::uint64_t MasksHash() const;
     bool mModified = false;
     bool mBackedUp = false;
     std::filesystem::path mVault;

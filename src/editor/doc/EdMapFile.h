@@ -42,7 +42,18 @@ namespace faf::editor
   {
     std::vector<char> preview;
     std::vector<PropRecord> props;
+    /**
+     * The terrain's images as the file has them (the normal maps, the two stratum masks, the water map), each a whole
+     * chunk, length first; and which of them a save writes back as they were, because what they are made from didn't
+     * change (the engine would encode them again into other bytes: the normal map from the heights, the water map from
+     * the heights and levels, the masks with another header flag).
+     */
+    std::vector<std::string> images;
+    std::vector<bool> keepImages;
   };
+
+  /** The terrain's image chunks of a `.scmap` (after its preview, `previewBytes` long), as the file has them. */
+  std::vector<std::string> ReadImageRecords(const std::string& file, std::size_t previewBytes);
 
   /** The preview chunk's bytes from the start of a `.scmap` (after the 8-byte file header), or empty. */
   std::vector<char> ReadPreviewRecord(const std::string& file);

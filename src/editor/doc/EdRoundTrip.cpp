@@ -136,6 +136,7 @@ namespace faf::editor
     const std::filesystem::path second = folder / (name + ".2.scmap");
 
     std::string error;
+    document.MarkKeptImages();
     if (!WriteMapFile(*map, document.FileRecords(), first, error)) {
       result.differences = "save: " + error;
       return result;

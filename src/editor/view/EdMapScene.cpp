@@ -822,6 +822,7 @@ namespace faf::editor
       }
     }
     mDocument.MaskUndo().Reset(masks.width, masks.height);
+    mDocument.MasksRead();
     UpdateCoverage();
     // How much of the map each layer covers (the share of full weight), for the log.
     std::string cover;

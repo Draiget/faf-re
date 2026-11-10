@@ -325,6 +325,7 @@ namespace faf::editor
       // Each prop as the file stores it (the game keeps only a quaternion of its rotation).
       load.records.preview = ReadPreviewRecord(facts.mapPath);
       load.records.props = ReadPropRecords(facts.mapPath, *load.map);
+      load.records.images = ReadImageRecords(facts.mapPath, load.records.preview.size());
 
       // The save's and script's text, for the markers, areas and playable area the editor changes.
       if (std::string text; !facts.savePath.empty() && ReadGameFile(facts.savePath, text)) {
@@ -801,6 +802,57 @@ namespace faf::editor
     mModified = true;
   }
 
+  namespace
+  {
+    std::uint64_t Fnv(const void* const data, const std::size_t size, std::uint64_t hash = 1469598103934665603ULL)
+    {
+      const auto* const bytes = static_cast<const unsigned char*>(data);
+      for (std::size_t i = 0; i < size; ++i) {
+        hash = (hash ^ bytes[i]) * 1099511628211ULL;
+      }
+      return hash;
+    }
+  } // namespace
+
+  std::uint64_t EdDocument::HeightsHash() const
+  {
+    const moho::CHeightField* const field = mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    return field != nullptr && field->data != nullptr
+             ? Fnv(field->data, static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height) * sizeof(field->data[0]))
+             : 0U;
+  }
+
+  std::uint64_t EdDocument::MasksHash() const
+  {
+    return mMasks.texels.empty() ? 0U : Fnv(mMasks.texels.data(), mMasks.texels.size() * sizeof(mMasks.texels[0]));
+  }
+
+  void EdDocument::MasksRead()
+  {
+    if (!mMasksReadSet) {
+      mMasksAtRead = MasksHash();
+      mMasksReadSet = true;
+    }
+  }
+
+  void EdDocument::MarkKeptImages()
+  {
+    // The images in the file's order: the normal maps, then the two stratum masks, then the water map.
+    const std::size_t count = mFileRecords.images.size();
+    mFileRecords.keepImages.assign(count, false);
+    if (count < 3) {
+      return;
+    }
+    const bool heights = HeightsHash() == mHeightsAtLoad;
+    const WaterState water = WaterNow();
+    const bool levels = water.enabled == mWaterAtLoad.enabled && water.elevation == mWaterAtLoad.elevation &&
+                        water.deep == mWaterAtLoad.deep && water.abyss == mWaterAtLoad.abyss;
+    const bool masks = !mMasksReadSet || MasksHash() == mMasksAtRead;
+    for (std::size_t i = 0; i < count; ++i) {
+      mFileRecords.keepImages[i] = i + 1 == count ? heights && levels : i + 3 >= count ? masks : heights;
+    }
+  }
+
   int EdDocument::WaveCount() const
   {
     moho::WaveSystem* const system = mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetWaveSystem() : nullptr;
@@ -1210,6 +1262,9 @@ namespace faf::editor
     mError = std::move(load->error);
     mMap = std::move(load->map);
     mFileRecords = std::move(load->records);
+    mHeightsAtLoad = HeightsHash();
+    mWaterAtLoad = WaterNow();
+    mMasksReadSet = false;
     mSave = std::move(load->save);
     mScript = std::move(load->script);
     mScriptRead = mScript;
@@ -1433,6 +1488,7 @@ namespace faf::editor
       return false;
     }
     std::string failure;
+    MarkKeptImages();
     if (!WriteMapFile(*mMap, mFileRecords, newMapFile, failure)) {
       message = "Saving " + newMapFile.string() + " failed: " + failure;
       return false;
@@ -1558,6 +1614,7 @@ namespace faf::editor
       mBackedUp = true;
     }
     std::string failure;
+    MarkKeptImages();
     if (!WriteMapFile(*mMap, mFileRecords, file, failure)) {
       message = "Saving " + file.string() + " failed: " + failure;
       return false;
