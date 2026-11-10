@@ -149,6 +149,22 @@ bool faf_ray_blocked(float3 origin, float3 direction, float tMin, float tMax)
 {
     return faf_ray_blocked(origin, direction, tMin, tMax, 0xFF);
 }
+// How far under the traced ground `p` lies, 0 when it doesn't: the drawn ground is coarser than the traced
+// height field with camera distance (terrain level of detail), so a drawn point can lie under it by more than
+// any fixed bias, and a ray towards a low sun from there is shaded by the ground itself. A height field has one
+// surface over each point, so a ray straight up hits the ground only from under it.
+float faf_ray_under_ground(float3 p)
+{
+    RayDesc ray;
+    ray.Origin = p;
+    ray.Direction = float3(0, 1, 0);
+    ray.TMin = 0;
+    ray.TMax = 200;
+    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_FORCE_OPAQUE> query;
+    query.TraceRayInline(faf_RayScene, RAY_FLAG_NONE, 1, ray);
+    query.Proceed();
+    return (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT) ? query.CommittedRayT() : 0;
+}
 // One ray against the instances in `mask` answering both readings: x lit past meshT, y lit past terrainT.
 float2 faf_ray_pair(float3 start, float3 toSun, float meshT, float terrainT, float tMax, uint mask)
 {
@@ -168,8 +184,11 @@ float2 faf_ray_light(float4 full)
     if (faf_RayShadows[4].x <= 0 || full.z < -1e29) return float2(1, 1);
     if (all(full == faf_ray_key)) return faf_ray_lit;
     const float2 uv = full.xy;
-    const float3 meshPoint = faf_ray_point(uv, full.z);
-    const float3 terrainPoint = faf_ray_point(uv, full.z + 0.01);
+    const float3 drawnPoint = faf_ray_point(uv, full.z + 0.01);
+    // Both readings move up onto the traced ground when the drawn surface lies under it.
+    const float3 up = float3(0, faf_ray_under_ground(drawnPoint), 0);
+    const float3 meshPoint = faf_ray_point(uv, full.z) + up;
+    const float3 terrainPoint = drawnPoint + up;
     const float3 toSun = faf_RayShadows[6].xyz;
     const float ahead = dot(meshPoint - terrainPoint, toSun); // the mesh reading's lead along the ray
     const float3 start = (ahead >= 0) ? terrainPoint : meshPoint;
@@ -208,7 +227,7 @@ float2 faf_ray_light(float4 full)
     } else if (debugMode > 1.5 && debugMode < 2.5) {
         lit = (frac(terrainPoint.z * 0.05) > 0.5) ? float2(1, 1) : float2(0, 0);
     } else if (debugMode > 2.5) {
-        lit = faf_ray_blocked(terrainPoint + float3(0, 0.02, 0), float3(0, 1, 0), 0.0, 1000.0) ? float2(0, 0) : float2(1, 1);
+        lit = faf_ray_blocked(drawnPoint + float3(0, 0.02, 0), float3(0, 1, 0), 0.0, 1000.0) ? float2(0, 0) : float2(1, 1);
     }
     faf_ray_key = full;
     faf_ray_lit = lit;

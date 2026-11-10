@@ -89,9 +89,24 @@ float TracedHit(float3 origin, float3 direction, float tMin, uint mask)
     return (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT) ? query.CommittedRayT() : -1.0;
 }
 
+// How far under the traced ground `p` lies, 0 when it doesn't (ModernHlsl.cpp's faf_ray_under_ground): the
+// drawn ground is coarser than the traced height field with camera distance, by more than any fixed lift.
+float TracedUnderGround(float3 p)
+{
+    RayDesc ray;
+    ray.Origin = p;
+    ray.Direction = float3(0, 1, 0);
+    ray.TMin = 0;
+    ray.TMax = 200;
+    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_FORCE_OPAQUE> query;
+    query.TraceRayInline(RayScene, RAY_FLAG_NONE, 1, ray);
+    query.Proceed();
+    return (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT) ? query.CommittedRayT() : 0.0;
+}
+
 // `center` is rebuilt from the depth buffer, whose error grows with camera distance; the rays leave from
 // above the surface by more than that error (RayParams.z per unit of distance), or they would start under
-// the ground and hit it from below.
+// the ground and hit it from below. A point under the traced ground moves up onto it first.
 float TracedOcclusion(float3 center, float3 normal, float spin, float distance)
 {
     const float3 helper = (abs(normal.y) < 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
@@ -99,7 +114,7 @@ float TracedOcclusion(float3 center, float3 normal, float spin, float distance)
     const float3 bitangent = cross(normal, tangent);
     const int count = clamp((int)RayParams.y, 1, 16);
     const float lift = 0.05 + RayParams.z * distance;
-    const float3 origin = center + normal * lift;
+    const float3 origin = center + float3(0, TracedUnderGround(center), 0) + normal * lift;
     float blocked = 0.0;
     const float under = RayParams.w;
     for (int i = 0; i < count; ++i) {
