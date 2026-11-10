@@ -41,7 +41,9 @@ set(_faf_client_shared_backend_files
   "^gpg/gal/backends/d3d11/(D3D11VertexLayouts|EffectSourceD3D11)\\.cpp$")
 list(APPEND _faf_client_windows_only
   # The Direct3D 9 state manager's caches.
-  "^gpg/gal/StateCache\\.cpp$")
+  "^gpg/gal/StateCache\\.cpp$"
+  # Built in faf_client_imaging below, with DirectX-Headers' Win32 adapter.
+  "^gpg/gal/backends/common/ImageCodecDirectXTex\\.cpp$")
 
 set(_faf_client_files "")
 foreach(_src IN LISTS FAF_ENGINE_SOURCES)
@@ -81,7 +83,7 @@ message(STATUS "faf_client: ${_faf_client_count} client translation units")
 # the Vulkan backend and the texture code use (<dxgiformat.h>); SDL3 for the window, input and
 # audio output; FAudio for XACT and X3DAudio (issue #258).
 if(FAF_FETCH_DEPENDENCIES)
-  set(FAF_DEPENDENCIES_ONLY DirectX-Headers SDL3 FAudio dxc-linux)
+  set(FAF_DEPENDENCIES_ONLY DirectX-Headers SDL3 FAudio dxc-linux DirectXTex DirectXMath stb)
   include(FafDependencies)
 endif()
 
@@ -121,8 +123,52 @@ target_include_directories(faf_client_dxc PRIVATE
   "${FAF_DEPENDENCIES_DIR}/dxc-linux/include")
 target_compile_options(faf_client_dxc PRIVATE -pthread -Wall)
 
+# Textures (issue #255): DirectXTex's CPU code, as Windows builds it (cmake/deps/directxtex) minus
+# its WIC codec, on DirectXMath and DirectX-Headers, with empty SAL annotations
+# (src/platform/posix/sal). DirectXTex brings DirectX-Headers' Win32 adapter, which can't meet the
+# POSIX <Windows.h>, so ImageCodecDirectXTex.cpp (the engine's side of it) and stb, which reads and
+# writes PNG, BMP and JPG there in WIC's place, are built apart too.
+set(_faf_dxtex "${FAF_DEPENDENCIES_DIR}/DirectXTex/DirectXTex")
+set(_faf_dx_headers "${FAF_DEPENDENCIES_DIR}/DirectX-Headers/include")
+set(_faf_imaging_includes
+  "${PROJECT_SOURCE_DIR}/src/platform/posix/sal"
+  "${_faf_dxtex}"
+  "${FAF_DEPENDENCIES_DIR}/DirectXMath/Inc"
+  "${_faf_dx_headers}"
+  "${_faf_dx_headers}/directx"
+  "${_faf_dx_headers}/wsl/stubs")
+add_library(faf_directxtex_linux STATIC
+  "${_faf_dxtex}/BC.cpp"
+  "${_faf_dxtex}/BC4BC5.cpp"
+  "${_faf_dxtex}/BC6HBC7.cpp"
+  "${_faf_dxtex}/DirectXTexCompress.cpp"
+  "${_faf_dxtex}/DirectXTexConvert.cpp"
+  "${_faf_dxtex}/DirectXTexDDS.cpp"
+  # DirectXTexFlipRotate.cpp is WIC's, Windows only in DirectXTex's own build; the engine doesn't use it.
+  "${_faf_dxtex}/DirectXTexHDR.cpp"
+  "${_faf_dxtex}/DirectXTexImage.cpp"
+  "${_faf_dxtex}/DirectXTexMipmaps.cpp"
+  "${_faf_dxtex}/DirectXTexMisc.cpp"
+  "${_faf_dxtex}/DirectXTexNormalMaps.cpp"
+  "${_faf_dxtex}/DirectXTexPMAlpha.cpp"
+  "${_faf_dxtex}/DirectXTexResize.cpp"
+  "${_faf_dxtex}/DirectXTexTGA.cpp"
+  "${_faf_dxtex}/DirectXTexUtil.cpp")
+target_include_directories(faf_directxtex_linux SYSTEM PUBLIC ${_faf_imaging_includes})
+target_compile_options(faf_directxtex_linux PRIVATE -w -pthread)
+
+add_library(faf_client_imaging OBJECT
+  "${PROJECT_SOURCE_DIR}/src/gpg/gal/backends/common/ImageCodecDirectXTex.cpp"
+  "${PROJECT_SOURCE_DIR}/src/platform/posix/imaging/StbImage.cpp")
+target_include_directories(faf_client_imaging PRIVATE
+  "${PROJECT_SOURCE_DIR}/src/platform/posix/winadapter"
+  "${PROJECT_SOURCE_DIR}/src"
+  "${FAF_DEPENDENCIES_DIR}/stb")
+target_link_libraries(faf_client_imaging PUBLIC faf_directxtex_linux)
+target_compile_options(faf_client_imaging PRIVATE -pthread -Wall)
+
 add_library(faf_client_objs OBJECT ${_faf_client_files})
-add_dependencies(faf_client_objs faf_client_dxc)
+add_dependencies(faf_client_objs faf_client_dxc faf_client_imaging)
 target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd
   FAudio-static SDL3::SDL3-static)  # FAudio names its static target FAudio-static, with no alias
 target_include_directories(faf_client_objs PRIVATE

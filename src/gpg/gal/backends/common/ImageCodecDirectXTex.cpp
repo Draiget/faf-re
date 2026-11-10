@@ -6,9 +6,18 @@
 #include <algorithm>
 #include <cstring>
 
+#if defined(_WIN32)
 #include <objbase.h>
+#endif
 
 #include "DirectXTex.h"
+
+#if !defined(_WIN32)
+// The Linux client (issue #255) has no WIC: stb reads and writes PNG, BMP and JPG
+// (platform/posix/imaging/StbImage.cpp holds the implementations).
+#include "stb_image.h"
+#include "stb_image_write.h"
+#endif
 
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
 
@@ -21,6 +30,7 @@ namespace gpg::gal::imaging
       return bytes >= 4U && std::memcmp(data, "DDS ", 4U) == 0;
     }
 
+#if defined(_WIN32)
     /** WIC needs COM on the calling thread; the loader threads may not have it. */
     class ComScope
     {
@@ -38,6 +48,50 @@ namespace gpg::gal::imaging
     private:
       HRESULT mResult;
     };
+#else
+    /**
+     * The files WIC decodes for the game: PNG, BMP, JPG, by their signatures. D3DX11 and WIC refuse
+     * TGA, so stb isn't asked for it either.
+     */
+    [[nodiscard]] bool IsWicFile(const std::uint8_t* const data, const std::size_t bytes) noexcept
+    {
+      static constexpr std::uint8_t kPng[4] = {0x89U, 'P', 'N', 'G'};
+      return bytes >= 4U &&
+        (std::memcmp(data, kPng, 4U) == 0 || (data[0] == 'B' && data[1] == 'M') || (data[0] == 0xFFU && data[1] == 0xD8U));
+    }
+
+    /** RGBA8, as WIC decodes these files for the engine. */
+    HRESULT LoadWithStb(const std::uint8_t* const data, const std::size_t bytes, DirectX::ScratchImage& outImage)
+    {
+      if (!IsWicFile(data, bytes)) {
+        return E_FAIL;
+      }
+      int width = 0;
+      int height = 0;
+      int channels = 0;
+      stbi_uc* const pixels = stbi_load_from_memory(data, static_cast<int>(bytes), &width, &height, &channels, 4);
+      if (pixels == nullptr) {
+        return E_FAIL;
+      }
+      HRESULT result = outImage.Initialize2D(DXGI_FORMAT_R8G8B8A8_UNORM, static_cast<std::size_t>(width), static_cast<std::size_t>(height), 1U, 1U);
+      if (SUCCEEDED(result)) {
+        const DirectX::Image& image = *outImage.GetImage(0U, 0U, 0U);
+        const std::size_t rowBytes = static_cast<std::size_t>(width) * 4U;
+        for (int row = 0; row < height; ++row) {
+          std::memcpy(image.pixels + static_cast<std::size_t>(row) * image.rowPitch, pixels + static_cast<std::size_t>(row) * rowBytes, rowBytes);
+        }
+      }
+      stbi_image_free(pixels);
+      return result;
+    }
+
+    void AppendBytes(void* const context, void* const data, const int size)
+    {
+      auto& out = *static_cast<std::vector<std::uint8_t>*>(context);
+      const auto* const begin = static_cast<const std::uint8_t*>(data);
+      out.insert(out.end(), begin, begin + size);
+    }
+#endif
 
     // Luminance expands to grey RGBA as D3DX11 does (a plain R8 would read as red).
     constexpr DirectX::DDS_FLAGS kDdsFlags = DirectX::DDS_FLAGS_EXPAND_LUMINANCE;
@@ -49,8 +103,12 @@ namespace gpg::gal::imaging
         return DirectX::LoadFromDDSMemory(source, bytes, kDdsFlags, nullptr, outImage);
       }
       // PNG, BMP, JPG. D3DX11 refuses TGA files, and so does WIC.
+#if !defined(_WIN32)
+      return LoadWithStb(source, bytes, outImage);
+#else
       const ComScope com;
       return DirectX::LoadFromWICMemory(source, bytes, DirectX::WIC_FLAGS_NONE, nullptr, outImage);
+#endif
     }
 
     [[nodiscard]] std::uint32_t FullChain(const std::size_t width, const std::size_t height) noexcept
@@ -317,8 +375,19 @@ namespace gpg::gal::imaging
     if (IsDds(data, bytes)) {
       result = DirectX::GetMetadataFromDDSMemory(source, bytes, kDdsFlags, meta);
     } else {
+#if !defined(_WIN32)
+      int width = 0;
+      int height = 0;
+      int channels = 0;
+      result = (IsWicFile(source, bytes) && stbi_info_from_memory(source, static_cast<int>(bytes), &width, &height, &channels) != 0)
+        ? S_OK
+        : E_FAIL;
+      meta.width = static_cast<std::size_t>(width);
+      meta.height = static_cast<std::size_t>(height);
+#else
       const ComScope com;
       result = DirectX::GetMetadataFromWICMemory(source, bytes, DirectX::WIC_FLAGS_NONE, meta);
+#endif
     }
     if (SUCCEEDED(result)) {
       outWidth = static_cast<std::uint32_t>(meta.width);
@@ -351,6 +420,37 @@ namespace gpg::gal::imaging
       }
       level = *plain.GetImage(0U, 0U, 0U);
     }
+#if !defined(_WIN32)
+    // stb writes 8-bit RGBA rows.
+    DirectX::ScratchImage rgba;
+    if (level.format != DXGI_FORMAT_R8G8B8A8_UNORM) {
+      const HRESULT converted = DirectX::Convert(
+        level, DXGI_FORMAT_R8G8B8A8_UNORM, DirectX::TEX_FILTER_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT, rgba
+      );
+      if (FAILED(converted)) {
+        return converted;
+      }
+      level = *rgba.GetImage(0U, 0U, 0U);
+    }
+    outBytes.clear();
+    const int width = static_cast<int>(level.width);
+    const int height = static_cast<int>(level.height);
+    int written = 0;
+    if (format == FileFormat::Jpg) {
+      written = stbi_write_jpg_to_func(&AppendBytes, &outBytes, width, height, 4, level.pixels, 90);
+    } else if (format == FileFormat::Bmp) {
+      // stbi's BMP writer takes tightly packed rows.
+      std::vector<std::uint8_t> packed(static_cast<std::size_t>(width) * height * 4U);
+      for (int row = 0; row < height; ++row) {
+        std::memcpy(packed.data() + static_cast<std::size_t>(row) * width * 4U, level.pixels + static_cast<std::size_t>(row) * level.rowPitch,
+                    static_cast<std::size_t>(width) * 4U);
+      }
+      written = stbi_write_bmp_to_func(&AppendBytes, &outBytes, width, height, 4, packed.data());
+    } else {
+      written = stbi_write_png_to_func(&AppendBytes, &outBytes, width, height, 4, level.pixels, static_cast<int>(level.rowPitch));
+    }
+    return written != 0 ? S_OK : E_FAIL;
+#else
     DirectX::WICCodecs codec = DirectX::WIC_CODEC_PNG;
     if (format == FileFormat::Bmp) {
       codec = DirectX::WIC_CODEC_BMP;
@@ -366,5 +466,6 @@ namespace gpg::gal::imaging
     const auto* const begin = blob.GetConstBufferPointer();
     outBytes.assign(begin, begin + blob.GetBufferSize());
     return S_OK;
+#endif
   }
 } // namespace gpg::gal::imaging

@@ -14,11 +14,15 @@
 #include <thread>
 #include <unordered_set>
 
+#if defined(_WIN32)
 #include <d3d11.h>
 #include <wrl/client.h>
 // D3DX11 (DirectX SDK, June 2010): only the declarations come from the
 // header; the exports are linked at run time from d3dx11_43.dll.
 #include <d3dx11tex.h>
+#endif
+// The Linux client (issue #255) has no D3DX11: DirectXTex decodes and encodes, as on a Windows
+// machine without d3dx11_43.dll.
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
@@ -26,6 +30,11 @@
 
 namespace gpg::gal::imaging
 {
+#if !defined(_WIN32)
+  struct ImageCodec::State
+  {
+  };
+#else
   using Microsoft::WRL::ComPtr;
 
   struct ImageCodec::State
@@ -47,6 +56,7 @@ namespace gpg::gal::imaging
       }
     }
   };
+#endif
 
   void Image::Allocate(
     const DXGI_FORMAT imageFormat,
@@ -109,6 +119,9 @@ namespace gpg::gal::imaging
 
   std::unique_ptr<ImageCodec::State> ImageCodec::LoadD3dx()
   {
+#if !defined(_WIN32)
+    return nullptr;
+#else
     char forced[8]{};
     std::size_t forcedLength = 0U;
     if (::getenv_s(&forcedLength, forced, sizeof(forced), "FAF_IMAGECODEC_DIRECTXTEX") == 0 && forcedLength != 0U && forced[0] == '1') {
@@ -141,11 +154,16 @@ namespace gpg::gal::imaging
       return nullptr;
     }
     return state;
+#endif
   }
 
   bool ImageCodec::UsesD3dx() const noexcept
   {
+#if !defined(_WIN32)
+    return false;
+#else
     return mState->createTexture != nullptr;
+#endif
   }
 
   HRESULT ImageCodec::DecodeFull(const void* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage)
@@ -643,6 +661,9 @@ namespace gpg::gal::imaging
     if (!UsesD3dx()) {
       return GetImageSizeWithDirectXTex(data, bytes, outWidth, outHeight);
     }
+#if !defined(_WIN32)
+    return E_NOTIMPL;
+#else
     const std::lock_guard<std::mutex> lock(mMutex);
     D3DX11_IMAGE_INFO info{};
     const HRESULT result = mState->getImageInfo(data, bytes, nullptr, &info, nullptr);
@@ -651,8 +672,19 @@ namespace gpg::gal::imaging
       outHeight = info.Height;
     }
     return result;
+#endif
   }
 
+#if !defined(_WIN32)
+  HRESULT ImageCodec::DecodeWithD3dx(const void* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage)
+  {
+    (void)data;
+    (void)bytes;
+    (void)options;
+    (void)outImage;
+    return E_NOTIMPL;
+  }
+#else
   HRESULT ImageCodec::DecodeWithD3dx(const void* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage)
   {
     const std::lock_guard<std::mutex> lock(mMutex);
@@ -781,9 +813,11 @@ namespace gpg::gal::imaging
     }
     return E_NOINTERFACE;
   }
+#endif
 
   namespace
   {
+#if defined(_WIN32)
     HRESULT CreateEncodable(ID3D11Device* const device, const Image& image, ComPtr<ID3D11Texture2D>& outTexture)
     {
       D3D11_TEXTURE2D_DESC desc{};
@@ -810,6 +844,7 @@ namespace gpg::gal::imaging
       }
       return device->CreateTexture2D(&desc, initial.data(), &outTexture);
     }
+#endif
 
     struct DdsPixelFormat
     {
@@ -958,6 +993,9 @@ namespace gpg::gal::imaging
     if (!UsesD3dx()) {
       return EncodeWithDirectXTex(image, format, outBytes);
     }
+#if !defined(_WIN32)
+    return E_NOTIMPL;
+#else
     const std::lock_guard<std::mutex> lock(mMutex);
     ComPtr<ID3D11Texture2D> texture;
     HRESULT result = CreateEncodable(mState->device.Get(), image, texture);
@@ -982,6 +1020,7 @@ namespace gpg::gal::imaging
     const auto* const begin = static_cast<const std::uint8_t*>(blob->GetBufferPointer());
     outBytes.assign(begin, begin + blob->GetBufferSize());
     return S_OK;
+#endif
   }
 
   namespace
@@ -1065,6 +1104,9 @@ namespace gpg::gal::imaging
       }
       return result;
     }
+#if !defined(_WIN32)
+    return E_NOTIMPL;
+#else
     const std::lock_guard<std::mutex> lock(mMutex);
     ComPtr<ID3D11Texture2D> texture;
     HRESULT result = CreateEncodable(mState->device.Get(), image, texture);
@@ -1079,6 +1121,7 @@ namespace gpg::gal::imaging
                  image.width, image.height, static_cast<unsigned long>(result));
     }
     return result;
+#endif
   }
 
   FileFormat ImageCodec::FromGalFormat(const int galFormat) noexcept

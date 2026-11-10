@@ -89,6 +89,8 @@ using LONGLONG = std::int64_t;
 #define S_OK (static_cast<HRESULT>(0))
 #define E_FAIL (static_cast<HRESULT>(0x80004005u))
 #define E_INVALIDARG (static_cast<HRESULT>(0x80070057u))
+#define E_NOTIMPL (static_cast<HRESULT>(0x80004001u))
+#define E_NOINTERFACE (static_cast<HRESULT>(0x80004002u))
 #define SUCCEEDED(hr) (static_cast<HRESULT>(hr) >= 0)
 #define FAILED(hr) (static_cast<HRESULT>(hr) < 0)
 
@@ -414,6 +416,42 @@ HLOCAL LocalFree(HLOCAL memory);
 #define FILE_FLAG_OVERLAPPED 0x40000000u
 #define FILE_FLAG_NO_BUFFERING 0x20000000u
 
+// A Win32 error as an HRESULT (FACILITY_WIN32).
+inline HRESULT HRESULT_FROM_WIN32(const unsigned long error) noexcept
+{
+  return static_cast<HRESULT>(error) <= 0 ? static_cast<HRESULT>(error)
+                                          : static_cast<HRESULT>((error & 0x0000FFFFu) | (7u << 16) | 0x80000000u);
+}
+
+// BMP file headers (wingdi.h), with the Windows layout: the frame and texture dumps write them.
+#pragma pack(push, 2)
+struct BITMAPFILEHEADER
+{
+  WORD bfType;
+  DWORD bfSize;
+  WORD bfReserved1;
+  WORD bfReserved2;
+  DWORD bfOffBits;
+};
+#pragma pack(pop)
+struct BITMAPINFOHEADER
+{
+  DWORD biSize;
+  LONG biWidth;
+  LONG biHeight;
+  WORD biPlanes;
+  WORD biBitCount;
+  DWORD biCompression;
+  DWORD biSizeImage;
+  LONG biXPelsPerMeter;
+  LONG biYPelsPerMeter;
+  DWORD biClrUsed;
+  DWORD biClrImportant;
+};
+#define BI_RGB 0u
+static_assert(sizeof(BITMAPFILEHEADER) == 14, "BITMAPFILEHEADER has its Windows size");
+static_assert(sizeof(BITMAPINFOHEADER) == 40, "BITMAPINFOHEADER has its Windows size");
+
 // GetFileInformationByHandleEx(FileStorageInfo): the sector sizes unbuffered reads align to. The
 // POSIX files read through the page cache, so there is no sector size to report: it fails, and
 // callers keep their defaults.
@@ -710,6 +748,26 @@ struct WIN32_FILE_ATTRIBUTE_DATA
 };
 BOOL GetFileAttributesExW(const wchar_t* path, GET_FILEEX_INFO_LEVELS level, void* information);
 BOOL GetFileAttributesExA(const char* path, GET_FILEEX_INFO_LEVELS level, void* information);
+
+// Directory search: the last component of the name is a '*'/'?' wildcard, matched without regard
+// to case as on Windows; the folder part goes through the shim's case resolution.
+struct WIN32_FIND_DATAA
+{
+  DWORD dwFileAttributes;
+  FILETIME ftCreationTime;
+  FILETIME ftLastAccessTime;
+  FILETIME ftLastWriteTime;
+  DWORD nFileSizeHigh;
+  DWORD nFileSizeLow;
+  DWORD dwReserved0;
+  DWORD dwReserved1;
+  char cFileName[MAX_PATH];
+  char cAlternateFileName[14];
+};
+HANDLE FindFirstFileA(const char* fileName, WIN32_FIND_DATAA* found);
+BOOL FindNextFileA(HANDLE search, WIN32_FIND_DATAA* found);
+BOOL FindClose(HANDLE search);
+#define ERROR_NO_MORE_FILES 18u
 
 using KAFFINITY = std::uintptr_t;
 struct GROUP_AFFINITY

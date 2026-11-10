@@ -293,6 +293,23 @@ set(_faf_download_dxc-linux
     "96faadc7f5c282d2ffda49804beb4c3ee38127bc252b723234e3c5cdf7aa39a1"
     "")
 
+# DirectXMath jun2026 (MIT): the math library DirectXTex needs off Windows, where the Windows SDK
+# doesn't provide it (the Linux client's textures, issue #255). The tag's source archive; headers
+# only. Linux only.
+set(_faf_download_DirectXMath
+    "https://github.com/microsoft/DirectXMath/archive/refs/tags/jun2026.tar.gz"
+    "cb46002679b16a25fd11d0a2a13f6a7c7bf9c51bf04258fb5485e5b839da8474"
+    "DirectXMath-jun2026"
+    "DirectXMath-jun2026.tar.gz")
+# stb at 003501f6 (public domain or MIT): stb_image and stb_image_write read and write the PNG, BMP
+# and JPG files WIC handles on Windows, for the Linux client (gpg/gal/backends/common/
+# ImageCodecDirectXTex.cpp). stb has no releases; a commit's archive. Linux only.
+set(_faf_download_stb
+    "https://github.com/nothings/stb/archive/003501f6d7a8668ce8b6d875e34dd97ad0d5d5b5.tar.gz"
+    "a6c31950b3bdf05eb92258768ba2a11bd44449490574b1aac67028452288c40d"
+    "stb-003501f6d7a8668ce8b6d875e34dd97ad0d5d5b5"
+    "stb-003501f6.tar.gz")
+
 # Dear ImGui 1.92.4, docking branch (MIT): the map editor's panels (src/editor, .plans/map-editor).
 # The tag's source archive; cmake/deps/imgui builds the core and the Win32 platform backend.
 set(_faf_download_imgui
@@ -476,6 +493,8 @@ if(FAF_DEPENDENCIES_ONLY)
   faf_dependency_download(SDL3)
   faf_dependency_download(FAudio)
   faf_dependency_download(dxc-linux)
+  faf_dependency_download(DirectXMath)
+  faf_dependency_download(stb)
 endif()
 if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
   faf_dependency_download(freetype)

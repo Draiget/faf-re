@@ -2108,6 +2108,92 @@ BOOL GetFileAttributesExW(const wchar_t* const path, const GET_FILEEX_INFO_LEVEL
   return GetFileAttributesExA(NarrowPath(path).c_str(), level, information);
 }
 
+namespace
+{
+  // One FindFirstFileA search: the folder and the wildcard its entries are matched against.
+  struct Win32FindSearch
+  {
+    DIR* directory = nullptr;
+    std::string folder;   // with a trailing '/'
+    std::string pattern;  // the last component of the request, '*' and '?' wildcards
+  };
+
+  // The next entry of `search` that matches its pattern, case-insensitively as on Windows.
+  [[nodiscard]] bool NextMatch(Win32FindSearch& search, WIN32_FIND_DATAA* const found)
+  {
+    while (dirent* const entry = ::readdir(search.directory)) {
+      if (::fnmatch(search.pattern.c_str(), entry->d_name, FNM_CASEFOLD) != 0) {
+        continue;
+      }
+      WIN32_FILE_ATTRIBUTE_DATA attributes{};
+      if (!GetFileAttributesExA((search.folder + entry->d_name).c_str(), GetFileExInfoStandard, &attributes)) {
+        continue;  // gone since the listing
+      }
+      *found = WIN32_FIND_DATAA{};
+      found->dwFileAttributes = attributes.dwFileAttributes;
+      found->ftCreationTime = attributes.ftCreationTime;
+      found->ftLastAccessTime = attributes.ftLastAccessTime;
+      found->ftLastWriteTime = attributes.ftLastWriteTime;
+      found->nFileSizeHigh = attributes.nFileSizeHigh;
+      found->nFileSizeLow = attributes.nFileSizeLow;
+      std::snprintf(found->cFileName, sizeof(found->cFileName), "%s", entry->d_name);
+      return true;
+    }
+    return false;
+  }
+} // namespace
+
+HANDLE FindFirstFileA(const char* const fileName, WIN32_FIND_DATAA* const found)
+{
+  if (fileName == nullptr || found == nullptr) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return INVALID_HANDLE_VALUE;
+  }
+  std::string request(fileName);
+  std::replace(request.begin(), request.end(), '\\', '/');
+  const std::size_t slash = request.find_last_of('/');
+  auto search = std::make_unique<Win32FindSearch>();
+  // Only the folder part is a path to resolve; the last part is the wildcard.
+  search->folder = (slash == std::string::npos) ? std::string(".") : SlashPath(request.substr(0, slash).c_str());
+  search->pattern = (slash == std::string::npos) ? request : request.substr(slash + 1);
+  search->directory = ::opendir(search->folder.c_str());
+  if (search->directory == nullptr) {
+    SetErrnoError();
+    return INVALID_HANDLE_VALUE;
+  }
+  search->folder += '/';
+  if (!NextMatch(*search, found)) {
+    ::closedir(search->directory);
+    tLastError = ERROR_FILE_NOT_FOUND;
+    return INVALID_HANDLE_VALUE;
+  }
+  return search.release();
+}
+
+BOOL FindNextFileA(const HANDLE handle, WIN32_FIND_DATAA* const found)
+{
+  if (handle == nullptr || handle == INVALID_HANDLE_VALUE || found == nullptr) {
+    tLastError = ERROR_INVALID_HANDLE;
+    return FALSE;
+  }
+  if (!NextMatch(*static_cast<Win32FindSearch*>(handle), found)) {
+    tLastError = ERROR_NO_MORE_FILES;
+    return FALSE;
+  }
+  return TRUE;
+}
+
+BOOL FindClose(const HANDLE handle)
+{
+  if (handle == nullptr || handle == INVALID_HANDLE_VALUE) {
+    return FALSE;
+  }
+  auto* const search = static_cast<Win32FindSearch*>(handle);
+  ::closedir(search->directory);
+  delete search;
+  return TRUE;
+}
+
 void GetCurrentProcessorNumberEx(PROCESSOR_NUMBER* const number)
 {
   const int cpu = ::sched_getcpu();
