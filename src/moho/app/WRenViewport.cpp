@@ -93,6 +93,7 @@ namespace moho
   extern float fog_OffsetMultiplier;
   extern bool ren_PlayableBoundary;
   extern bool ren_FogOfWar;
+  extern bool ren_FogOfWarHidden;
 
   // Save/restore triple read and cleared by WRenViewport::RenderPreviewImage
   // (0x007F7590-0x007F75FB) around the strategic-map preview render pass,
@@ -1226,7 +1227,7 @@ unsigned int moho::WRenViewport::RenderCartographic(
 
   moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
   VisionRenderer* const visionRenderer =
-    (moho::ren_FogOfWar && activeSession != nullptr && activeSession->FocusArmy != -1)
+    (moho::ren_FogOfWar && !moho::ren_FogOfWarHidden && activeSession != nullptr && activeSession->FocusArmy != -1)
       ? &mVisionRenderer
       : nullptr;
 
@@ -2124,7 +2125,8 @@ void moho::WRenViewport::RenderWorldView(
   //   0x007F958E  Clear(false, false, true, 0xFFFFFFFF, 1.0f, 0) through
   //               device slot +0x98: wipe the vision stencil again so it
   //               does not mask anything drawn after the fog pass.
-  if (moho::ren_FogOfWar && renderSession != nullptr &&
+  // `ren_FogOfWarHidden` (engine addition): the map editor's "Hide the fog" leaves the overlay out.
+  if (moho::ren_FogOfWar && !moho::ren_FogOfWarHidden && renderSession != nullptr &&
       renderSession->FocusArmy != -1) {
     const gpg::gal::RenderProfileScope profileFog("FogOfWar");
     moho::RenderFogOfWar(

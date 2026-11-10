@@ -89,6 +89,9 @@ namespace moho
   // `ren_FogOfWar` is the only one with a byte in the image (0x00F57DC3 = 1);
   // the other two sit in the zero-fill tail of .data and therefore start false.
   bool ren_FogOfWar = true;               // 0x00F57DC3 = 0x01
+  /// Engine addition (not in the binary): the map editor's "Hide the fog". The renderer leaves the fog-of-war
+  /// overlay out while it is set; `ren_FogOfWar` itself is the sim's, rewritten from each beat.
+  bool ren_FogOfWarHidden = false;
   /// Gates the playable-boundary pass in WRenViewport::Render, read at
   /// 0x007F94D2 (`cmp ?ren_PlayableBoundary@Moho@@3_NA, 0`).
   bool ren_PlayableBoundary = true;       // 0x00F57E4E = 0x01
