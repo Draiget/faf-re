@@ -4367,6 +4367,17 @@ std::filesystem::path moho::DISK_GetDataPathScriptFile()
   return gDataPathScriptFile;
 }
 
+namespace
+{
+  // The separator USER_LoadPreferences joins its path with: the binary's backslash on Windows; '/'
+  // elsewhere, where a backslash is part of a file name (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
+  constexpr wchar_t kPreferencePathSeparator = L'\\';
+#else
+  constexpr wchar_t kPreferencePathSeparator = L'/';
+#endif
+} // namespace
+
 
 /**
  * Address: 0x008C89D0 (FUN_008C89D0, USER_LoadPreferences)
@@ -4393,14 +4404,14 @@ void moho::USER_LoadPreferences(const fa::string& preferenceFileName)
     gpg::Warnf("unable to find user's application data directory");
   } else {
     std::wstring preferenceDirectory = appDataPath;
-    preferenceDirectory.push_back(L'\\');
+    preferenceDirectory.push_back(kPreferencePathSeparator);
     preferenceDirectory.append(gpg::STR_Utf8ToWide(APP_GetCompanyName().c_str()));
 
     if (::CreateDirectoryW(preferenceDirectory.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
       gpg::Warnf("Unable to create preferences path: %s", preferenceFileName.c_str());
     }
 
-    preferenceDirectory.push_back(L'\\');
+    preferenceDirectory.push_back(kPreferencePathSeparator);
     preferenceDirectory.append(gpg::STR_Utf8ToWide(APP_GetProductName().c_str()));
 
     if (::CreateDirectoryW(preferenceDirectory.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
@@ -4410,7 +4421,7 @@ void moho::USER_LoadPreferences(const fa::string& preferenceFileName)
     PLAT_InitErrorReportOutputDir(preferenceDirectory.c_str());
 
     std::wstring preferencePathWide = preferenceDirectory;
-    preferencePathWide.push_back(L'\\');
+    preferencePathWide.push_back(kPreferencePathSeparator);
     preferencePathWide.append(gpg::STR_Utf8ToWide(preferenceFileName.c_str()));
 
     preferences->GetStr1()->assign(preferenceFileName, 0, fa::string::npos);

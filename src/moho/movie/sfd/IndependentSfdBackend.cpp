@@ -16,6 +16,9 @@
 #include <stdexcept>
 #include <thread>
 #include <windows.h>
+#if FAFRE_PLATFORM_POSIX
+#include "platform/posix/NativePath.h"
+#endif
 
 namespace moho::sfd
 {
@@ -246,6 +249,12 @@ namespace moho::sfd
     const char* filename
   )
   {
+#if FAFRE_PLATFORM_POSIX
+    // The engine's native paths keep Windows' backslashes and case-insensitive spelling; the header
+    // reader and FFmpeg open the file directly (the Linux client, issue #255).
+    const std::string posixFilename = platform::posix::NativePath(filename);
+    filename = posixFilename.c_str();
+#endif
     Close();
     IDirectSound* device{};
     long attenuation{};

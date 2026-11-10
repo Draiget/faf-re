@@ -127,8 +127,10 @@ endif()
 include("${PROJECT_SOURCE_DIR}/src/sources.cmake")
 include("${PROJECT_SOURCE_DIR}/src/sim_sources.cmake")
 
-# boost.thread 1.34.1 on pthreads: the Win32 TLS hooks are left out.
-list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "/libs/thread/src/tss_(dll|hooks|pe)\\.cpp$")
+# boost.thread 1.34.1 on pthreads: the Win32 TLS hooks are left out, and mutex.cpp is compiled by
+# src/platform/posix/BoostMutexPosix.cpp with recursive pthread mutexes, as Windows' critical
+# sections are (the engine takes some locks again on the thread that holds them).
+list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "/libs/thread/src/(tss_(dll|hooks|pe)|mutex)\\.cpp$")
 # The Windows platform services (call stacks, crash-report paths, message
 # boxes); the POSIX implementation of the same functions is plan WPL.5.
 list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/misc/WinPlatform\\.cpp$")
@@ -180,6 +182,11 @@ target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/gal/MatrixPortable.cpp")
 # The Win32 calls the shared code makes, on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32Shim.cpp")
+# boost.thread's mutex.cpp with recursive pthread mutexes (see the FILTER above).
+target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/BoostMutexPosix.cpp")
+set_property(SOURCE "${PROJECT_SOURCE_DIR}/src/platform/posix/BoostMutexPosix.cpp" APPEND PROPERTY
+  COMPILE_DEFINITIONS BOOST_THREAD_BUILD_LIB=1)
+set_property(SOURCE "${PROJECT_SOURCE_DIR}/src/platform/posix/BoostMutexPosix.cpp" APPEND PROPERTY COMPILE_OPTIONS -w)
 # platform::net (src/platform/Net.h) on BSD sockets, for moho/net's lockstep transport (issue #259).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/NetPosix.cpp")
 # The crash diagnostics' headers on POSIX (plan WPL.5).

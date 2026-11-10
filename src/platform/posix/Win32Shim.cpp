@@ -7,6 +7,7 @@
 #include "platform/posix/win32/Windows.h"
 #include "platform/posix/win32/io.h"
 #include "gpg/core/containers/String.h"
+#include "platform/posix/NativePath.h"
 
 #include <algorithm>
 #include <atomic>
@@ -439,6 +440,11 @@ namespace
     return reinterpret_cast<pthread_mutex_t*>(section->storage);
   }
 } // namespace
+
+std::string platform::posix::NativePath(const char* const path)
+{
+  return SlashPath(path);
+}
 
 // --- Synchronisation ---------------------------------------------------------------------
 
