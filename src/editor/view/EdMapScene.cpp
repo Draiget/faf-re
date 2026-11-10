@@ -79,7 +79,7 @@ namespace faf::editor
     if (mMap == nullptr || mCamera == nullptr || mTools == nullptr ||
         (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty() && !area &&
          mDocument.SaveData().Markers().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() && !mTools->UnitsToolActive() &&
-         mTools->CheckPins().empty() && !mTools->ShowingPathing() && !mTools->ShowSlope() && !mTools->ShowKmGrid() && !mRulerShown) ||
+         mTools->CheckPins().empty() && !mTools->ShowingPathing() && !mTools->ShowSlope() && !mTools->ShowKmGrid() && !mRulerShown && !mBoxing) ||
         moho::ren_Viewport == nullptr) {
       return;
     }
@@ -354,6 +354,33 @@ namespace faf::editor
       }
       line(mapW * 0.5f, 0.0f, mapW * 0.5f, mapH, 0xE040C0FFu);
       line(0.0f, mapH * 0.5f, mapW, mapH * 0.5f, 0xE040C0FFu);
+    }
+    // Box select: the rectangle's edges where they meet the ground.
+    if (mBoxing) {
+      constexpr std::uint32_t kBox = 0xF0FFFFFFu;
+      const POINT corners[5] = {mBoxFrom, {mBoxTo.x, mBoxFrom.y}, mBoxTo, {mBoxFrom.x, mBoxTo.y}, mBoxFrom};
+      for (int edge = 0; edge < 4; ++edge) {
+        constexpr int kSamples = 32;
+        bool havePrevious = false;
+        moho::CD3DPrimBatcher::Vertex previous{};
+        for (int s = 0; s <= kSamples; ++s) {
+          const float t = static_cast<float>(s) / static_cast<float>(kSamples);
+          const float sx = static_cast<float>(corners[edge].x) + static_cast<float>(corners[edge + 1].x - corners[edge].x) * t;
+          const float sy = static_cast<float>(corners[edge].y) + static_cast<float>(corners[edge + 1].y - corners[edge].y) * t;
+          float gx = 0.0f;
+          float gz = 0.0f;
+          if (!GroundAt(sx, sy, gx, gz)) {
+            havePrevious = false;
+            continue;
+          }
+          const moho::CD3DPrimBatcher::Vertex vertex = groundVertex(gx, gz, kBox, 0.8f);
+          if (havePrevious) {
+            batcher->DrawLine(previous, vertex);
+          }
+          previous = vertex;
+          havePrevious = true;
+        }
+      }
     }
     // The ruler: a line on the ground between its ends, with posts at them.
     if (mRulerShown) {
@@ -1627,6 +1654,104 @@ namespace faf::editor
     to.push_back(std::move(step));
     gpg::Logf("editor: %s a terrain type stroke", redo ? "redid" : "undid");
     return true;
+  }
+
+  bool EdMapScene::BoxSelectable() const
+  {
+    return mTools != nullptr && mMap != nullptr &&
+           (mTools->SelectToolActive() || mTools->MarkersToolActive() || (mTools->UnitsToolActive() && !mTools->UnitPlaceMode()) ||
+            (mTools->DecalsToolActive() && !mTools->DecalPlaceMode() && !mTools->DecalPathMode()));
+  }
+
+  void EdMapScene::FinishBoxSelect(const bool add)
+  {
+    if (!BoxSelectable() || mCamera == nullptr) {
+      return;
+    }
+    const float x0 = static_cast<float>(std::min(mBoxFrom.x, mBoxTo.x));
+    const float x1 = static_cast<float>(std::max(mBoxFrom.x, mBoxTo.x));
+    const float y0 = static_cast<float>(std::min(mBoxFrom.y, mBoxTo.y));
+    const float y1 = static_cast<float>(std::max(mBoxFrom.y, mBoxTo.y));
+    // Where a point of the world is on the screen, as the gizmo's arms are picked.
+    const auto inside = [&](const Wm3::Vec3f& point) {
+      const Wm3::Vector2f screen = mCamera->Project(point);
+      return screen.x >= x0 && screen.x <= x1 && screen.y >= y0 && screen.y <= y1;
+    };
+    const auto groundY = [this](const float x, const float z) {
+      return mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z));
+    };
+    std::size_t count = 0;
+    const char* kind = "";
+    if (mTools->MarkersToolActive()) {
+      kind = "markers";
+      if (!add) {
+        mMarkerSelection.clear();
+      }
+      for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        if (MarkerHidden(marker) || !MarkerPosition(marker, x, y, z) || !inside(Wm3::Vec3f{x, y, z})) {
+          continue;
+        }
+        if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) == mMarkerSelection.end()) {
+          mMarkerSelection.push_back(marker.name);
+        }
+        ++count;
+      }
+    } else if (mTools->UnitsToolActive()) {
+      kind = "units";
+      if (!add) {
+        mUnitSelection.clear();
+      }
+      for (const UnitRef& unit : mUnitRefs) {
+        if (!inside(unit.position)) {
+          continue;
+        }
+        const std::pair<std::string, std::string> key{unit.army, unit.name};
+        if (std::find(mUnitSelection.begin(), mUnitSelection.end(), key) == mUnitSelection.end()) {
+          mUnitSelection.push_back(key);
+        }
+        ++count;
+      }
+    } else if (mTools->DecalsToolActive()) {
+      kind = "decals";
+      if (!add) {
+        mDecalSelection.clear();
+      }
+      if (moho::IDecalManager* const decals = mDocument.Decals(); decals != nullptr) {
+        for (std::int32_t i = 0; i < decals->GetDecalCount(); ++i) {
+          const moho::CWldTerrainDecal* const decal = decals->GetDecal(i);
+          if (decal == nullptr) {
+            continue;
+          }
+          float cx = 0.0f, cz = 0.0f;
+          DecalCentre(FootprintOf(*decal), cx, cz);
+          if (!inside(Wm3::Vec3f{cx, groundY(cx, cz), cz})) {
+            continue;
+          }
+          if (std::find(mDecalSelection.begin(), mDecalSelection.end(), decal->mIndex) == mDecalSelection.end()) {
+            mDecalSelection.push_back(decal->mIndex);
+          }
+          ++count;
+        }
+      }
+    } else if (mTools->SelectToolActive() && mMap->mProps != nullptr) {
+      kind = "props";
+      if (!add) {
+        mSelection.clear();
+      }
+      const auto& entries = mMap->mProps->mEntries;
+      for (std::size_t i = 0; i < entries.size(); ++i) {
+        if (!inside(entries[i].mTransform.pos_)) {
+          continue;
+        }
+        if (std::find(mSelection.begin(), mSelection.end(), static_cast<int>(i)) == mSelection.end()) {
+          mSelection.push_back(static_cast<int>(i));
+        }
+        ++count;
+      }
+    }
+    gpg::Logf("editor: box select (%.0f, %.0f to %.0f, %.0f): %zu %s%s", static_cast<double>(x0), static_cast<double>(y0), static_cast<double>(x1),
+              static_cast<double>(y1), count, kind, add ? ", added" : "");
   }
 
   void EdMapScene::SetRuler(const float x0, const float z0, const float x1, const float z1)
@@ -4024,6 +4149,15 @@ namespace faf::editor
       return false;
     case WM_RBUTTONDOWN:
     case WM_MBUTTONDOWN:
+      // Shift + right drag draws a selection box where the tool selects (markers, props, decals, units).
+      if (message == WM_RBUTTONDOWN && (wParam & MK_SHIFT) != 0 && BoxSelectable()) {
+        mBoxing = true;
+        mBoxFrom = at;
+        mBoxTo = at;
+        ::SetCapture(window);
+        ::SetFocus(window);
+        return true;
+      }
       // Middle drag orbits, Shift + middle drag pans; the right button pans.
       mDrag = (message == WM_MBUTTONDOWN && (wParam & MK_SHIFT) == 0) ? Drag::Orbit : Drag::Pan;
       mDragFrom = at;
@@ -4032,12 +4166,23 @@ namespace faf::editor
       return true;
     case WM_RBUTTONUP:
     case WM_MBUTTONUP:
+      if (message == WM_RBUTTONUP && mBoxing) {
+        mBoxTo = at;
+        mBoxing = false;
+        ::ReleaseCapture();
+        FinishBoxSelect((wParam & MK_CONTROL) != 0);
+        return true;
+      }
       if (mDrag != Drag::None) {
         mDrag = Drag::None;
         ::ReleaseCapture();
       }
       return true;
     case WM_MOUSEMOVE: {
+      if (mBoxing) {
+        mBoxTo = at;
+        return true;
+      }
       if (mDrag == Drag::None) {
         if (mDragUnits) {
           Wm3::Vec3f move{0.0f, 0.0f, 0.0f};

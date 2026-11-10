@@ -304,6 +304,12 @@ namespace faf::editor
     std::uint64_t mSlopeHeights = 0;
     int mSlopeFrames = 0;
     bool mRuling = false;
+    /** Box select (Shift + right drag): its corners on the screen while it is drawn. */
+    bool mBoxing = false;
+    POINT mBoxFrom{};
+    POINT mBoxTo{};
+    [[nodiscard]] bool BoxSelectable() const;
+    void FinishBoxSelect(bool add);
     bool mRulerShown = false;
     float mRulerFrom[2] = {0.0f, 0.0f};
     float mRulerTo[2] = {0.0f, 0.0f};
