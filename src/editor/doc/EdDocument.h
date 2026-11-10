@@ -45,6 +45,8 @@ namespace faf::editor
     std::string scriptPath;
     /** An adaptive map's `_tables.lua` (the script's import), or empty. */
     std::string tablesPath;
+    /** The map's `_options.lua` (its lobby options), beside the scenario; empty until it has one. */
+    std::string optionsPath;
     std::string name;
     std::string description;
     std::string type;
@@ -283,6 +285,10 @@ namespace faf::editor
      * `<base>_tables.lua` beside the scenario and the scenario gets `AdaptiveMap = true`.
      */
     void SetTablesText(const std::string& text);
+    /** The map's `_options.lua` as the editor keeps it (empty when it has none). */
+    [[nodiscard]] const std::string& OptionsText() const noexcept { return mOptions; }
+    /** Sets it as one undo step; a map without one gets `<base>_options.lua` beside the scenario. */
+    void SetOptionsText(const std::string& text);
     /**
      * Sets the scenario's water bodies (`ScenarioInfo.WaterBodies`, its text rewritten in place). No undo step of its
      * own: the caller takes SaveDataNow before and gives it to SaveDataEdited after.
@@ -337,6 +343,8 @@ namespace faf::editor
       std::string tablesPath;
       std::string scenario;
       std::vector<MarkerChain> chains;
+      std::string options;
+      std::string optionsPath;
     };
     [[nodiscard]] SaveSnapshot SaveDataNow() const;
     void RestoreSaveData(const SaveSnapshot& snapshot);
@@ -421,6 +429,8 @@ namespace faf::editor
     std::string mScriptRead;
     std::string mTables;
     std::string mTablesRead;
+    std::string mOptions;
+    std::string mOptionsRead;
     std::string mScenario;
     std::string mRecentMapsFile;
     std::vector<std::string> mRecentMaps;

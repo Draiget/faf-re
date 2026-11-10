@@ -5016,7 +5016,13 @@ namespace faf::editor
           return true;
         }
         if (hit < 0) {
-          PlaceMarkers(groundX, groundZ, connect);
+          if (mTools->AdaptiveToolActive()) {
+            if ((wParam & MK_CONTROL) == 0) {
+              mMarkerSelection.clear();
+            }
+          } else {
+            PlaceMarkers(groundX, groundZ, connect);
+          }
           return true;
         }
         const std::string& name = markers[static_cast<std::size_t>(hit)].name;

@@ -58,4 +58,29 @@ namespace faf::editor
   std::string AdaptiveEntry(const std::string& markerName, bool hydro);
   /** The marker an entry names ("7" gives "Mass 07", "'7'" gives "Mass 7"). */
   std::string AdaptiveMarkerName(const std::string& entry, bool hydro);
+
+  /** The lobby option's key the script reads for an option table: `middleMexes` is `middle_mexes`. */
+  std::string AdaptiveOptionKey(const std::string& tableName);
+
+  /** One option of `_options.lua` as far as the editor uses it. */
+  struct LobbyOption
+  {
+    bool found = false;
+    /** Its `values` entries (a value k removes the table's groups k and above, so k = 1 is none). */
+    int values = 0;
+    /** Its `default` key, or 0 when it has none that reads as a number. */
+    int defaultKey = 0;
+  };
+  /** The option `key` in an `_options.lua`'s text. */
+  LobbyOption FindLobbyOption(const std::string& text, const std::string& key);
+
+  /**
+   * The text with option `key` written for a table of `groups` groups (their resource counts in `groupSizes`): values
+   * 1 (none) to groups + 1 (all of them). An option already there is replaced where it is, keeping its default when it
+   * is still one of the values; else it is added at the end of `options`. An empty `text` gives a new file.
+   */
+  std::string WithLobbyOption(const std::string& text, const std::string& key, const std::string& label, bool hydro,
+                              const std::vector<int>& groupSizes);
+  /** The text without option `key` (unchanged when it has none). */
+  std::string WithoutLobbyOption(const std::string& text, const std::string& key);
 } // namespace faf::editor

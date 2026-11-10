@@ -38,6 +38,7 @@ namespace faf::editor
     , mPlay(play)
     , mDocument(document)
   {
+    mTools.SetAdaptiveDraw([this] { DrawAdaptivePanel(); });
     gpg::gal::DeviceRuntimeInfo info;
     if (gpg::gal::Device::IsReady() && gpg::gal::Device::GetInstance()->GetRuntimeInfo(info)) {
       mApi = info.api.c_str();
@@ -895,22 +896,36 @@ namespace faf::editor
 
     DrawPlaySetup();
 
-    // The maps opened last, newest first: a click opens one (and picks it for Play).
-    {
-      int shown = 0;
-      for (const std::string& recent : mDocument.RecentMaps()) {
-        int index = -1;
-        for (int i = 0; i < static_cast<int>(maps.size()); ++i) {
-          if (ImStricmp(maps[static_cast<std::size_t>(i)].c_str(), recent.c_str()) == 0) {
-            index = i;
-            break;
-          }
+    // The open map: what it is, and its adaptive setup when it has one.
+    if (mDocument.GetState() == EdDocument::State::Open) {
+      const MapFacts& facts = mDocument.Facts();
+      ImGui::Separator();
+      if (ImGui::CollapsingHeader("Map", ImGuiTreeNodeFlags_DefaultOpen)) {
+        const auto row = [](const char* const label) {
+          ImGui::AlignTextToFramePadding();
+          ImGui::TextDisabled("%s", label);
+          ImGui::SameLine(ImGui::GetFontSize() * 6.5f);
+        };
+        row("Name");
+        ImGui::TextUnformatted(facts.name.empty() ? MapDisplayName(facts.scenarioPath).c_str() : facts.name.c_str());
+        row("Folder");
+        ImGui::TextUnformatted(MapDisplayName(facts.scenarioPath).c_str());
+        if (facts.mapVersion > 0) {
+          ImGui::SameLine();
+          ImGui::TextDisabled("version %d", facts.mapVersion);
         }
-        if (index < 0) {
-          continue; // no longer in the game's /maps
-        }
-        if (shown++ == 0) {
-          ImGui::TextDisabled("RECENT");
+        row("Type");
+        ImGui::Text("%s%s", facts.type.empty() ? "skirmish" : facts.type.c_str(), mDocument.Adaptive() ? ", adaptive" : "");
+        row("Size");
+        ImGui::Text("%.0f x %.0f km (%d x %d)", static_cast<double>(facts.sizeX) / 51.2, static_cast<double>(facts.sizeZ) / 51.2, facts.sizeX, facts.sizeZ);
+        row("Players");
+        ImGui::Text("%zu", mDocument.Teams().empty() ? facts.armies.size() : mDocument.Teams().front().armies.size());
+        row("Water");
+        if (facts.water) {
+          ImGui::Text("at %.1f (deep %.1f, abyss %.1f)", static_cast<double>(facts.waterElevation), static_cast<double>(facts.waterDeep),
+                      static_cast<double>(facts.waterAbyss));
+        } else {
+          ImGui::TextUnformatted("none");
         }
         row("Contents");
         ImGui::Text("%d markers, %d props, %d decals", facts.markerCount, facts.props, facts.decals);

@@ -57,6 +57,7 @@ namespace faf::editor
     SaveFile save;
     std::string script;
     std::string tables;
+    std::string options;
     std::string scenario;
     /** CreateNew: what to make and where; the scenario's game path once made. */
     bool create = false;
@@ -351,6 +352,13 @@ namespace faf::editor
           facts.tablesPath = beside;
         }
       }
+      // The lobby options beside the scenario (the game reads `<base>_options.lua` there).
+      if (load.scenarioPath.size() > std::string("_scenario.lua").size()) {
+        const std::string beside = load.scenarioPath.substr(0, load.scenarioPath.size() - std::string("_scenario.lua").size()) + "_options.lua";
+        if (ReadGameFile(beside, load.options)) {
+          facts.optionsPath = beside;
+        }
+      }
       (void)ReadGameFile(load.scenarioPath, load.scenario);
       if (!facts.savePath.empty()) {
         const LuaPlus::LuaObject save = RunInTable(state, facts.savePath);
@@ -544,7 +552,8 @@ namespace faf::editor
 
   EdDocument::SaveSnapshot EdDocument::SaveDataNow() const
   {
-    return {mSave.Markers(), mSave.Areas(), mScript, mSave.Armies(), mTables, mFacts.tablesPath, mScenario, mSave.Chains()};
+    return {mSave.Markers(), mSave.Areas(), mScript,   mSave.Armies(), mTables, mFacts.tablesPath, mScenario, mSave.Chains(),
+            mOptions,         mFacts.optionsPath};
   }
 
   void EdDocument::RestoreSaveData(const SaveSnapshot& snapshot)
@@ -557,6 +566,8 @@ namespace faf::editor
     mFacts.tablesPath = snapshot.tablesPath;
     mScenario = snapshot.scenario;
     mSave.Chains() = snapshot.chains;
+    mOptions = snapshot.options;
+    mFacts.optionsPath = snapshot.optionsPath;
     mFacts.armies = Armies();
     mModified = true;
   }
@@ -586,6 +597,17 @@ namespace faf::editor
       mScenario = WithScenarioAdaptive(mScenario);
     }
     mTables = text;
+    SaveDataEdited(std::move(before));
+  }
+
+  void EdDocument::SetOptionsText(const std::string& text)
+  {
+    SaveSnapshot before = SaveDataNow();
+    if (mFacts.optionsPath.empty()) {
+      const std::size_t cut = mFacts.scenarioPath.size() - std::min(mFacts.scenarioPath.size(), std::string("_scenario.lua").size());
+      mFacts.optionsPath = mFacts.scenarioPath.substr(0, cut) + "_options.lua";
+    }
+    mOptions = text;
     SaveDataEdited(std::move(before));
   }
 
@@ -625,6 +647,12 @@ namespace faf::editor
         return false;
       }
       mTablesRead = mTables;
+    }
+    if (mOptions != mOptionsRead && !mFacts.optionsPath.empty()) {
+      if (!write(mFacts.optionsPath, mOptions)) {
+        return false;
+      }
+      mOptionsRead = mOptions;
     }
     // A scenario that keeps the map's reclaim (FAForeverMapEditor's `reclaim`) gets the props' totals.
     if (const ReclaimTotals reclaim = PropReclaim(); reclaim.props > 0) {
@@ -1321,6 +1349,8 @@ namespace faf::editor
     mScriptRead = mScript;
     mTables = std::move(load->tables);
     mTablesRead = mTables;
+    mOptions = std::move(load->options);
+    mOptionsRead = mOptions;
     mScenario = std::move(load->scenario);
     mScenarioRead = mScenario;
     // The markers the save's text gives, against those its Lua gave (every map should agree).
@@ -1485,6 +1515,10 @@ namespace faf::editor
         std::none_of(files.begin(), files.end(), [&](const fa::string& file) { return Lower(file.c_str()) == Lower(mFacts.tablesPath); })) {
       files.push_back(fa::string(mFacts.tablesPath.c_str()));
     }
+    if (!mFacts.optionsPath.empty() && !mOptions.empty() &&
+        std::none_of(files.begin(), files.end(), [&](const fa::string& file) { return Lower(file.c_str()) == Lower(mFacts.optionsPath); })) {
+      files.push_back(fa::string(mFacts.optionsPath.c_str()));
+    }
     std::filesystem::create_directories(target, error);
     if (error) {
       message = "Can't make " + target.string() + ": " + error.message();
@@ -1518,6 +1552,8 @@ namespace faf::editor
         bytes = mScript; // the edited script (its playable area)
       } else if (Lower(source) == Lower(mFacts.tablesPath) && !mTables.empty()) {
         bytes = mTables; // the adaptive tables as edited (maybe not on disk yet)
+      } else if (Lower(source) == Lower(mFacts.optionsPath) && !mOptions.empty()) {
+        bytes = mOptions; // the lobby options as edited
       } else if (Lower(source) == Lower(mFacts.scenarioPath) && mScenario != mScenarioRead) {
         bytes = mScenario; // the edited army list (its paths are moved below, as the copy's)
       } else if (!ReadGameFile(source, bytes)) {
@@ -1565,7 +1601,9 @@ namespace faf::editor
     mScriptRead = mScript;
     mScenarioRead = mScenario;
     mTablesRead = mTables;
-    for (std::string* const path : {&mFacts.mapPath, &mFacts.savePath, &mFacts.scriptPath, &mFacts.scenarioPath, &mFacts.tablesPath}) {
+    mOptionsRead = mOptions;
+    for (std::string* const path :
+         {&mFacts.mapPath, &mFacts.savePath, &mFacts.scriptPath, &mFacts.scenarioPath, &mFacts.tablesPath, &mFacts.optionsPath}) {
       *path = ReplaceNoCase(ReplaceNoCase(*path, oldPrefix + oldBase, newPrefix + newBase), oldPrefix, newPrefix);
     }
     message = "Saved as " + target.string() + " (" + std::to_string(copied + 1) + " files); the game lists it from its next start";
@@ -1716,6 +1754,8 @@ namespace faf::editor
     mScriptRead.clear();
     mTables.clear();
     mTablesRead.clear();
+    mOptions.clear();
+    mOptionsRead.clear();
     mScenario.clear();
     mScenarioRead.clear();
     mSaveUndo.clear();

@@ -152,4 +152,99 @@ crazyrushOneMexes = {}
     EXPECT_FALSE(faf::editor::ParseAdaptiveTables("spwnMexArmy = {{1,2}", tables, error));
     EXPECT_FALSE(error.empty());
   }
+
+  // An `_options.lua` in the shape FAF's adaptive maps have: a comment, an option with a brace in its help, ours after it.
+  const char* const kOptions = R"lua(options ={
+
+{
+	default = 1,
+	label = "Audio lines",
+	help = "Audio lines {disabled}/enabled.",
+	key = 'optional_replicas',
+	pref = 'optional_replicas',
+	values = {
+		{ text = "disabled", help = "No Audio lines.", key = 1, },
+		{ text = "enabled", help = "Yes Audio lines.", key = 2, },
+	},
+},
+-- key = 'middle_mexes' in a comment is not the option
+{
+    default = 2,
+    label = "Middle Mexes",
+    help = "Configure the amount of mexes at the middle of the map.",
+    key = 'middle_mexes',
+    pref = 'middle_mexes',
+    values = {
+        { text = "disabled", help = "No additional mexes in the middle.", key = 1, },
+        { text = "enabled", help = "Spawn 4 mexes in the middle.", key = 2, },
+    },
+},
+
+}
+)lua";
+
+  TEST(AdaptiveTables, OptionKeyIsTheTablesNameInSnakeCase)
+  {
+    EXPECT_EQ(faf::editor::AdaptiveOptionKey("middleMexes"), "middle_mexes");
+    EXPECT_EQ(faf::editor::AdaptiveOptionKey("extraBaseMexes"), "extra_base_mexes");
+    EXPECT_EQ(faf::editor::AdaptiveOptionKey("extraHydros"), "extra_hydros");
+  }
+
+  TEST(AdaptiveTables, FindsALobbyOptionAndItsValues)
+  {
+    const faf::editor::LobbyOption middle = faf::editor::FindLobbyOption(kOptions, "middle_mexes");
+    EXPECT_TRUE(middle.found);
+    EXPECT_EQ(middle.values, 2);
+    EXPECT_EQ(middle.defaultKey, 2);
+    EXPECT_FALSE(faf::editor::FindLobbyOption(kOptions, "side_mexes").found);
+    // A value's own `key = 1` is not an option.
+    EXPECT_FALSE(faf::editor::FindLobbyOption(kOptions, "1").found);
+  }
+
+  TEST(AdaptiveTables, RewritesALobbyOptionWhereItIs)
+  {
+    const std::string out = faf::editor::WithLobbyOption(kOptions, "middle_mexes", "Middle mexes", false, {2, 3});
+    const faf::editor::LobbyOption middle = faf::editor::FindLobbyOption(out, "middle_mexes");
+    EXPECT_TRUE(middle.found);
+    EXPECT_EQ(middle.values, 3); // none, group 1, groups 1-2
+    EXPECT_EQ(middle.defaultKey, 2); // kept: still one of the values
+    EXPECT_NE(out.find("Groups 1 to 2 spawn (5 mexes)"), std::string::npos);
+    // The other option and the comment are kept, and the option isn't written twice.
+    EXPECT_NE(out.find("Audio lines {disabled}/enabled."), std::string::npos);
+    EXPECT_NE(out.find("-- key = 'middle_mexes' in a comment"), std::string::npos);
+    EXPECT_EQ(out.find("key = 'middle_mexes'", out.find("key = 'middle_mexes',") + 1), std::string::npos);
+  }
+
+  TEST(AdaptiveTables, AddsALobbyOptionAtTheEnd)
+  {
+    const std::string out = faf::editor::WithLobbyOption(kOptions, "side_mexes", "Side mexes", false, {4});
+    const faf::editor::LobbyOption side = faf::editor::FindLobbyOption(out, "side_mexes");
+    EXPECT_TRUE(side.found);
+    EXPECT_EQ(side.values, 2);
+    EXPECT_EQ(side.defaultKey, 1);
+    EXPECT_GT(out.find("key = 'side_mexes'"), out.find("key = 'middle_mexes'"));
+    EXPECT_TRUE(faf::editor::FindLobbyOption(out, "middle_mexes").found);
+    EXPECT_TRUE(faf::editor::FindLobbyOption(out, "optional_replicas").found);
+  }
+
+  TEST(AdaptiveTables, RemovesALobbyOption)
+  {
+    const std::string out = faf::editor::WithoutLobbyOption(kOptions, "middle_mexes");
+    EXPECT_FALSE(faf::editor::FindLobbyOption(out, "middle_mexes").found);
+    EXPECT_TRUE(faf::editor::FindLobbyOption(out, "optional_replicas").found);
+    EXPECT_EQ(faf::editor::WithoutLobbyOption(kOptions, "side_mexes"), kOptions);
+    // Taken out and written again, it reads as before.
+    const std::string again = faf::editor::WithLobbyOption(out, "middle_mexes", "Middle mexes", false, {4});
+    EXPECT_EQ(faf::editor::FindLobbyOption(again, "middle_mexes").values, 2);
+  }
+
+  TEST(AdaptiveTables, MakesAnOptionsFileWhenThereIsNone)
+  {
+    const std::string out = faf::editor::WithLobbyOption("", "extra_hydros", "Extra hydrocarbons", true, {1, 1});
+    EXPECT_EQ(out.rfind("options = {", 0), 0U);
+    const faf::editor::LobbyOption hydros = faf::editor::FindLobbyOption(out, "extra_hydros");
+    EXPECT_TRUE(hydros.found);
+    EXPECT_EQ(hydros.values, 3);
+    EXPECT_NE(out.find("(2 hydrocarbons)"), std::string::npos);
+  }
 } // namespace

@@ -196,6 +196,221 @@ namespace faf::editor
     }
   } // namespace
 
+  namespace
+  {
+    /**
+     * Where an `_options.lua` entry with `key = '<key>'` (in `options = { ... }`) starts and ends: from its `{` to past
+     * its `}`, its comma and the rest of that line. Strings and comments are skipped; `close` is where `options`' own
+     * table ends (the last `}` at the outermost level), or npos.
+     */
+    struct OptionSpan
+    {
+      std::size_t from = std::string::npos;
+      std::size_t to = std::string::npos;
+      std::size_t close = std::string::npos;
+    };
+
+    OptionSpan FindOptionSpan(const std::string& text, const std::string& key)
+    {
+      OptionSpan span;
+      std::vector<std::size_t> opens;
+      std::size_t entry = std::string::npos;
+      const auto longClose = [&](const std::size_t at) {
+        // A long bracket [[ ... ]] or [=[ ... ]=]: its end, or the text's end.
+        std::size_t level = 0;
+        while (at + 1 + level < text.size() && text[at + 1 + level] == '=') {
+          ++level;
+        }
+        const std::string end = "]" + std::string(level, '=') + "]";
+        const std::size_t found = text.find(end, at);
+        return found == std::string::npos ? text.size() : found + end.size();
+      };
+      for (std::size_t i = 0; i < text.size();) {
+        const char c = text[i];
+        if (c == '-' && i + 1 < text.size() && text[i + 1] == '-') {
+          if (i + 2 < text.size() && text[i + 2] == '[' && i + 3 < text.size() && (text[i + 3] == '[' || text[i + 3] == '=')) {
+            i = longClose(i + 2);
+          } else {
+            const std::size_t line = text.find('\n', i);
+            i = line == std::string::npos ? text.size() : line;
+          }
+          continue;
+        }
+        if (c == '"' || c == '\'') {
+          std::size_t j = i + 1;
+          while (j < text.size() && text[j] != c && text[j] != '\n') {
+            j += text[j] == '\\' ? 2 : 1;
+          }
+          // `key = '<key>'` one level into options' table: that entry.
+          if (opens.size() == 2 && entry == std::string::npos && j < text.size() && text.compare(i + 1, j - i - 1, key) == 0 &&
+              j - i - 1 == key.size()) {
+            std::size_t back = i;
+            while (back > 0 && std::isspace(static_cast<unsigned char>(text[back - 1])) != 0) {
+              --back;
+            }
+            if (back > 0 && text[back - 1] == '=') {
+              --back;
+              while (back > 0 && std::isspace(static_cast<unsigned char>(text[back - 1])) != 0) {
+                --back;
+              }
+              if (back >= 3 && text.compare(back - 3, 3, "key") == 0 &&
+                  (back == 3 || (std::isalnum(static_cast<unsigned char>(text[back - 4])) == 0 && text[back - 4] != '_'))) {
+                entry = opens.back();
+              }
+            }
+          }
+          i = j + 1;
+          continue;
+        }
+        if (c == '[' && i + 1 < text.size() && (text[i + 1] == '[' || text[i + 1] == '=')) {
+          i = longClose(i);
+          continue;
+        }
+        if (c == '{') {
+          opens.push_back(i);
+        } else if (c == '}' && !opens.empty()) {
+          const std::size_t open = opens.back();
+          opens.pop_back();
+          if (open == entry && span.from == std::string::npos) {
+            span.from = open;
+            std::size_t end = i + 1;
+            while (end < text.size() && (text[end] == ' ' || text[end] == '\t')) {
+              ++end;
+            }
+            if (end < text.size() && (text[end] == ',' || text[end] == ';')) {
+              ++end;
+            }
+            while (end < text.size() && (text[end] == ' ' || text[end] == '\t' || text[end] == '\r')) {
+              ++end;
+            }
+            if (end < text.size() && text[end] == '\n') {
+              ++end;
+            }
+            span.to = end;
+          }
+          if (opens.empty()) {
+            span.close = i;
+          }
+        }
+        ++i;
+      }
+      return span;
+    }
+
+    /** A number after `name =` inside text[from, to), or `otherwise`. */
+    int NumberAfter(const std::string& text, const std::size_t from, const std::size_t to, const std::string& name, const int otherwise)
+    {
+      for (std::size_t at = text.find(name, from); at != std::string::npos && at < to; at = text.find(name, at + 1)) {
+        std::size_t i = at + name.size();
+        while (i < to && std::isspace(static_cast<unsigned char>(text[i])) != 0) {
+          ++i;
+        }
+        if (i < to && text[i] == '=') {
+          ++i;
+          while (i < to && std::isspace(static_cast<unsigned char>(text[i])) != 0) {
+            ++i;
+          }
+          if (i < to && std::isdigit(static_cast<unsigned char>(text[i])) != 0) {
+            return std::atoi(text.c_str() + i);
+          }
+        }
+      }
+      return otherwise;
+    }
+  } // namespace
+
+  std::string AdaptiveOptionKey(const std::string& tableName)
+  {
+    std::string key;
+    for (const char c : tableName) {
+      if (std::isupper(static_cast<unsigned char>(c)) != 0) {
+        key += '_';
+        key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      } else {
+        key += c;
+      }
+    }
+    return key;
+  }
+
+  LobbyOption FindLobbyOption(const std::string& text, const std::string& key)
+  {
+    LobbyOption option;
+    const OptionSpan span = FindOptionSpan(text, key);
+    if (span.from == std::string::npos) {
+      return option;
+    }
+    option.found = true;
+    option.defaultKey = NumberAfter(text, span.from, span.to, "default", 0);
+    // The values: one `text =` each (the option's own label and help are `label =` and `help =`).
+    const std::size_t values = text.find("values", span.from);
+    for (std::size_t at = values; at != std::string::npos && at < span.to; at = text.find("text", at + 4)) {
+      std::size_t i = at + 4;
+      while (i < span.to && std::isspace(static_cast<unsigned char>(text[i])) != 0) {
+        ++i;
+      }
+      const bool word = at == 0 || (std::isalnum(static_cast<unsigned char>(text[at - 1])) == 0 && text[at - 1] != '_');
+      if (word && i < span.to && text[i] == '=') {
+        ++option.values;
+      }
+    }
+    return option;
+  }
+
+  std::string WithLobbyOption(const std::string& text, const std::string& key, const std::string& label, const bool hydro,
+                              const std::vector<int>& groupSizes)
+  {
+    const OptionSpan span = FindOptionSpan(text, key);
+    const int groups = static_cast<int>(groupSizes.size());
+    int defaultKey = 1;
+    if (span.from != std::string::npos) {
+      const int kept = NumberAfter(text, span.from, span.to, "default", 1);
+      defaultKey = kept >= 1 && kept <= groups + 1 ? kept : 1;
+    }
+    const std::string what = hydro ? "hydrocarbons" : "mexes";
+    std::string lower = label;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::string entry = "{\n    default = " + std::to_string(defaultKey) + ",\n    label = \"" + label + "\",\n    help = \"Which of the " + lower +
+                        " spawn.\",\n    key = '" + key + "',\n    pref = '" + key + "',\n    values = {\n";
+    entry += "        { text = \"none\", help = \"No " + lower + ".\", key = 1, },\n";
+    int count = 0;
+    for (int g = 1; g <= groups; ++g) {
+      count += groupSizes[static_cast<std::size_t>(g - 1)];
+      const std::string name = g == 1 ? "group 1" : "groups 1-" + std::to_string(g);
+      entry += "        { text = \"" + name + "\", help = \"" + (g == 1 ? std::string("Group 1 spawns") : "Groups 1 to " + std::to_string(g) + " spawn") +
+               " (" + std::to_string(count) + " " + what + ").\", key = " + std::to_string(g + 1) + ", },\n";
+    }
+    entry += "    },\n},\n";
+    if (span.from != std::string::npos) {
+      return text.substr(0, span.from) + entry + text.substr(span.to);
+    }
+    if (span.close == std::string::npos) {
+      // No options table to add it to: a new file (an existing text that isn't one is kept above it).
+      return (text.empty() ? std::string() : text + "\n") + "options = {\n\n" + entry + "\n}\n";
+    }
+    // Before options' closing brace, after a comma for the entry before it.
+    std::size_t before = span.close;
+    while (before > 0 && std::isspace(static_cast<unsigned char>(text[before - 1])) != 0) {
+      --before;
+    }
+    const bool needComma = before > 0 && text[before - 1] == '}';
+    return text.substr(0, before) + (needComma ? "," : "") + "\n\n" + entry + text.substr(span.close);
+  }
+
+  std::string WithoutLobbyOption(const std::string& text, const std::string& key)
+  {
+    const OptionSpan span = FindOptionSpan(text, key);
+    if (span.from == std::string::npos) {
+      return text;
+    }
+    // The entry and its line's indentation.
+    std::size_t from = span.from;
+    while (from > 0 && (text[from - 1] == ' ' || text[from - 1] == '\t')) {
+      --from;
+    }
+    return text.substr(0, from) + text.substr(span.to);
+  }
+
   const std::vector<OptionTable>& KnownOptionTables()
   {
     static const std::vector<OptionTable> tables = {

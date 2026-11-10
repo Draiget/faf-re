@@ -470,6 +470,10 @@ namespace faf::editor
           }
           HelpNote("Spawns with: the resource is there only when that army's player is in the game. Option: the lobby's option "
                    "of that name removes groups from its key up, so group 1 goes first. Written to _tables.lua as one undo step.");
+          if (ImGui::Button("The whole map's adaptive setup (Adaptive tool)", ImVec2(-1.0f, 0.0f))) {
+            mTools.SetTool(8);
+          }
+          ImGui::SetItemTooltip("Every army's resources, the option tables and their groups, and the lobby options in _options.lua");
         }
       }
       break;

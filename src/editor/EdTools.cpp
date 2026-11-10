@@ -27,7 +27,7 @@ namespace faf::editor
     };
     constexpr ToolInfo kTools[] = {
       {"Select", "S"}, {"Terrain", "T"}, {"Texture", "P"}, {"Water", "W"}, {"Props", "O"}, {"Decals", "D"}, {"Markers", "M"},
-      {"Units", "U"},
+      {"Units", "U"},  {"Adaptive", "J"},
     };
 
     /** Draws tool `index`'s icon in the square at `p`, `s` wide. */
@@ -72,10 +72,16 @@ namespace faf::editor
         draw->AddTriangleFilled(at(0.25f, 0.5f), at(0.75f, 0.5f), at(0.5f, 0.94f), color);
         draw->AddCircleFilled(at(0.5f, 0.38f), s * 0.11f, kCellBack);
         break;
-      default: // a tank: hull, turret, barrel
+      case 7: // a tank: hull, turret, barrel
         draw->AddRectFilled(at(0.1f, 0.55f), at(0.9f, 0.85f), color, s * 0.06f);
         draw->AddCircleFilled(at(0.45f, 0.48f), s * 0.16f, color);
         draw->AddLine(at(0.5f, 0.45f), at(0.92f, 0.3f), color, s * 0.08f);
+        break;
+      default: // adaptive: a mass point's rings with a player's figure, the resource tied to its player
+        draw->AddCircle(at(0.36f, 0.6f), s * 0.28f, color, 20, s * 0.08f);
+        draw->AddCircleFilled(at(0.36f, 0.6f), s * 0.1f, color);
+        draw->AddCircleFilled(at(0.76f, 0.2f), s * 0.11f, color);
+        draw->AddRectFilled(at(0.62f, 0.36f), at(0.9f, 0.62f), color, s * 0.08f);
         break;
       }
     }
@@ -205,7 +211,12 @@ namespace faf::editor
       case 4: DrawProps(); break;
       case 5: DrawDecals(); break;
       case 6: DrawMarkers(); break;
-      default: DrawUnits(); break;
+      case 7: DrawUnits(); break;
+      default:
+        if (mAdaptiveDraw) {
+          mAdaptiveDraw();
+        }
+        break;
       }
     }
     ImGui::EndChild();

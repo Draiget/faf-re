@@ -87,8 +87,11 @@ namespace faf::editor
       mReclaimSummary = std::move(summary);
       mReclaimRows = std::move(rows);
     }
-    /** The Markers tool. */
-    [[nodiscard]] bool MarkersToolActive() const noexcept { return mTool == 6; }
+    /** The Markers tool, or the Adaptive tool (which picks and moves markers in the view the same way, but places none). */
+    [[nodiscard]] bool MarkersToolActive() const noexcept { return mTool == 6 || mTool == 8; }
+    /** The Adaptive tool: an adaptive map's armies, option groups and lobby options (EdShell::DrawAdaptivePanel). */
+    [[nodiscard]] bool AdaptiveToolActive() const noexcept { return mTool == 8; }
+    void SetAdaptiveDraw(std::function<void()> draw) { mAdaptiveDraw = std::move(draw); }
     /** The Check's results on the map, for the view's pins: where, and how bad (0 error, 1 warning, 2 note). */
     struct CheckPin
     {
@@ -467,7 +470,9 @@ namespace faf::editor
       mAskSelect = std::move(names);
       mAskSelectAdd = add;
       mAskSelectSet = true;
-      mTool = 6;
+      if (mTool != 8) {
+        mTool = 6; // the Adaptive tool's own Select buttons keep it
+      }
     }
     void AskMarkerFrame(std::string name) { mAskFrame = std::move(name); }
     [[nodiscard]] bool TakeMarkerSelect(std::vector<std::string>& names, bool& add)
@@ -552,6 +557,8 @@ namespace faf::editor
       (void)std::snprintf(mPropFilter, sizeof(mPropFilter), "%s", name.c_str());
     }
     void SetTool(const int tool) noexcept { mTool = tool; }
+    /** The tool shown (0 Select ... 8 Adaptive). */
+    [[nodiscard]] int Tool() const noexcept { return mTool; }
 
     /** Whether the Texture tool is the chosen one (the viewport's left button paints a layer's mask). */
     [[nodiscard]] bool TextureToolActive() const noexcept { return mTool == 2; }
@@ -827,6 +834,10 @@ namespace faf::editor
     void DrawLimits();
 
     int mTool = 1;
+
+    /** Draws the Adaptive tool's panel (the shell's, which has the document). */
+
+    std::function<void()> mAdaptiveDraw;
     int mBrushMode = 0;
     float mRadius = 14.0f;
     float mStrength = 0.5f;

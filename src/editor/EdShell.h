@@ -125,6 +125,8 @@ namespace faf::editor
     /** The player slots and extra armies as cards, and the chosen army's settings (ui/EdArmiesPanel.cpp). */
     void DrawArmiesPanel();
     void DrawPropertiesPanel();
+    /** The Adaptive tool's panel: armies, option groups, crazyrush lists and lobby options (ui/EdAdaptivePanel.cpp). */
+    void DrawAdaptivePanel();
     bool mShowProperties = true;
     bool mPropertiesPlaced = false;
     /** The panel's copy of the values while a field is held or typed in; sent as one edit when it lets go. */
