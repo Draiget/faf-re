@@ -1255,7 +1255,11 @@ namespace faf::editor
     }
     if (mUnitTypes.empty()) {
       Note("The unit list comes once the game's rules are built after startup.");
-    } else if (ImGui::BeginChild("##unittypes", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 12.0f), ImGuiChildFlags_Borders)) {
+    } else if (ImGui::BeginChild("##unittypes", ImVec2(0.0f, ImGui::GetFrameHeight() * 1.6f * 9.0f), ImGuiChildFlags_Borders)) {
+      // Each unit with its build icon, as the game's build menus show it (/textures/ui/common/icons/units/<id>_icon.dds);
+      // only the rows in view ask for theirs.
+      mLibrary.Pump(4);
+      const float icon = ImGui::GetFrameHeight() * 1.5f;
       for (const auto& [id, name] : mUnitTypes) {
         std::string lower = id + " " + name;
         for (char& c : lower) {
@@ -1264,12 +1268,30 @@ namespace faf::editor
         if (!filter.empty() && lower.find(filter) == std::string::npos) {
           continue;
         }
-        if (ImGui::Selectable(id.c_str(), id == mUnitType)) {
+        ImGui::PushID(id.c_str());
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        if (ImGui::Selectable("##unit", id == mUnitType, 0, ImVec2(0.0f, icon))) {
           mUnitType = id;
           mUnitMode = 0;
         }
-        ImGui::SameLine(ImGui::GetFontSize() * 5.5f);
-        ImGui::TextDisabled("%s", name.c_str());
+        if (ImGui::IsItemVisible()) {
+          std::string idLower = id;
+          for (char& c : idLower) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          ImDrawList* const draw = ImGui::GetWindowDrawList();
+          const std::uint64_t image = mLibrary.Thumbnail("/textures/ui/common/icons/units/" + idLower + "_icon.dds", true);
+          if (image != 0U) {
+            draw->AddImage(static_cast<ImTextureID>(image), at, ImVec2(at.x + icon, at.y + icon));
+          } else {
+            draw->AddRect(at, ImVec2(at.x + icon, at.y + icon), IM_COL32(58, 65, 75, 255));
+          }
+          const float textY = at.y + (icon - ImGui::GetTextLineHeight()) * 0.5f;
+          draw->AddText(ImVec2(at.x + icon + 6.0f, textY), ImGui::GetColorU32(ImGuiCol_Text), id.c_str());
+          draw->AddText(ImVec2(at.x + icon + 6.0f + ImGui::GetFontSize() * 4.5f, textY), ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                        name.c_str());
+        }
+        ImGui::PopID();
       }
     }
     if (!mUnitTypes.empty()) {
