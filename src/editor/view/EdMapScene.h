@@ -226,6 +226,13 @@ namespace faf::editor
 
     /** One mesh per prop entry, at the entry's index (null when its blueprint or mesh is missing). */
     std::vector<moho::MeshInstance*> mProps;
+    /**
+     * The deposit props the game puts at each resource marker with `resource` on (ScenarioUtilities.lua CreateResources:
+     * massDeposit01_prop.bp, hydrocarbonDeposit01_prop.bp), by marker name; kept at the markers each frame.
+     */
+    std::map<std::string, moho::MeshInstance*> mDeposits;
+    void UpdateDeposits();
+    void DeleteDeposits();
     bool mPropsDone = false;
     /** The armies' units from `_save.lua` (every group's), drawn as the game places them, and which unit each is. */
     struct UnitRef

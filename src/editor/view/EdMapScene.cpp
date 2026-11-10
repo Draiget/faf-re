@@ -1637,6 +1637,7 @@ namespace faf::editor
     if (mMap == nullptr) {
       return;
     }
+    UpdateDeposits();
     if (moho::CD3DDevice* const device = moho::D3D_GetDevice(); device != nullptr) {
       const int width = device->GetHeadWidth(0);
       const int height = device->GetHeadHeight(0);
@@ -3948,6 +3949,90 @@ namespace faf::editor
     }
   }
 
+  void EdMapScene::DeleteDeposits()
+  {
+    if (moho::MeshRenderer::GetInstance() != nullptr) {
+      for (const auto& [name, instance] : mDeposits) {
+        delete instance;
+      }
+    }
+    mDeposits.clear();
+  }
+
+  void EdMapScene::UpdateDeposits()
+  {
+    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
+    if (rules == nullptr || renderer == nullptr || mMap == nullptr) {
+      return;
+    }
+    // The two deposit props' meshes, found once.
+    struct Deposit
+    {
+      moho::RMeshBlueprint* mesh = nullptr;
+      float scale = 1.0f;
+    };
+    static Deposit mass;
+    static Deposit hydro;
+    static bool looked = false;
+    if (!looked) {
+      looked = true;
+      for (auto [path, deposit] : {std::pair<const char*, Deposit*>{"/env/common/props/massDeposit01_prop.bp", &mass},
+                                   std::pair<const char*, Deposit*>{"/env/common/props/hydrocarbonDeposit01_prop.bp", &hydro}}) {
+        moho::RResId id{};
+        const fa::string file(path);
+        gpg::STR_CopyFilename(&id.name, &file);
+        if (moho::RPropBlueprint* const blueprint = rules->GetPropBlueprint(id); blueprint != nullptr) {
+          deposit->mesh = rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint);
+          deposit->scale = blueprint->Display.UniformScale;
+        }
+        gpg::Logf("editor: deposit prop %s: %s", path, deposit->mesh != nullptr ? "found" : "missing");
+      }
+    }
+    // The markers that have one now: a resource marker with `resource` on, shown (the game places it on the ground).
+    std::map<std::string, std::pair<const Deposit*, Wm3::Vec3f>> wanted;
+    for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+      const std::string type = MarkerTypeOf(marker);
+      if (type != "Mass" && type != "Hydrocarbon") {
+        continue;
+      }
+      float x = 0.0f, y = 0.0f, z = 0.0f;
+      if (marker.Get("resource").find("true") == std::string::npos || MarkerHidden(marker) || !ShownMarkerPosition(marker, x, y, z)) {
+        continue;
+      }
+      const Deposit* const deposit = type == "Mass" ? &mass : &hydro;
+      if (deposit->mesh != nullptr) {
+        wanted[marker.name] = {deposit, Wm3::Vec3f{x, y, z}};
+      }
+    }
+    for (auto it = mDeposits.begin(); it != mDeposits.end();) {
+      if (wanted.count(it->first) == 0) {
+        delete it->second;
+        it = mDeposits.erase(it);
+      } else {
+        ++it;
+      }
+    }
+    for (const auto& [name, place] : wanted) {
+      moho::MeshInstance*& instance = mDeposits[name];
+      if (instance == nullptr) {
+        const float scale = place.first->scale;
+        instance = renderer->CreateMeshInstance(0, -1, place.first->mesh, Wm3::Vec3f{scale, scale, scale}, false,
+                                                boost::shared_ptr<moho::MeshMaterial>());
+        if (instance == nullptr) {
+          mDeposits.erase(name);
+          continue;
+        }
+        instance->isHidden = 0;
+      }
+      // The game turns each at random (CreatePropHPR with Random(0, 360)); here they keep the file's heading, none.
+      moho::VTransform transform{};
+      transform.pos_ = place.second;
+      transform.orient_ = Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f};
+      instance->SetStance(transform, transform);
+    }
+  }
+
   void EdMapScene::DrawResourceSplats(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field)
   {
     if (!mSplatsLoaded) {
@@ -4896,6 +4981,7 @@ namespace faf::editor
   {
     DeletePropPreview();
     DeleteUnits();
+    DeleteDeposits();
     if (moho::MeshRenderer::GetInstance() != nullptr) {
       for (moho::MeshInstance* const instance : mProps) {
         delete instance;
