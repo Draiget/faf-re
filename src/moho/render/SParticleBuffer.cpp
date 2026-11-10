@@ -285,6 +285,11 @@ namespace moho
     boost::shared_ptr<gpg::gal::VertexBuffer> instanceVertexBuffer;
     instanceVertexBuffer = device->CreateVertexBuffer(&instanceVertexContext);
     mInstanceVertexBuffer = instanceVertexBuffer;
+    // Engine change (ren_CopyWrittenOnly): each particle is written once at its birth, after the last
+    // Lock(count) discard, and every draw reads ranges written since; a new recording copies only those.
+    if (instanceVertexBuffer) {
+      device->CopyWrittenOnly(*instanceVertexBuffer);
+    }
 
     gpg::gal::IndexBufferContext indexContext{};
     indexContext.type_ = 1U;

@@ -16,6 +16,7 @@ namespace gpg::gal
 {
   bool gReleaseBufferCopies = true;
   bool gLockedRangeOnly = true;
+  bool gCopyWrittenOnly = true;
   int gUploadIdleMB = 32;
   bool gVulkanScaledPresent = true;
   bool gVulkanPreciseBarriers = true;

@@ -677,6 +677,13 @@ namespace gpg::gal
     virtual void CopyLockedRangeOnly(IndexBuffer& buffer);
 
     /**
+     * Engine addition (ren_CopyWrittenOnly): draws of this dynamic buffer only read bytes written since
+     * its last discard lock, which may be several frames old, so a backend needing a fresh copy for a new
+     * recording copies only those. Nothing here.
+     */
+    virtual void CopyWrittenOnly(VertexBuffer& buffer);
+
+    /**
      * Engine addition (ren_RayTracedShadows, RayTracing.h; GpuDrivenFeature::kGpuFeatureRayQuery): builds the
      * ray-tracing structure of one piece of geometry and returns its handle, or 0 (here, and when it fails).
      */

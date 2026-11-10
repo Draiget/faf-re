@@ -147,6 +147,10 @@ namespace gpg::gal
     /** The buffer and offset draws read from. */
     void PrepareForDraw(DeviceVulkan& device, VkBuffer& outBuffer, VkDeviceSize& outOffset);
     [[nodiscard]] std::uint32_t ByteWidth() const noexcept { return mByteWidth; }
+    /** Device::CopyWrittenOnly (ren_CopyWrittenOnly). */
+    void MarkWrittenOnly() noexcept { mCopyWrittenOnly = true; }
+    /** How many leading bytes a fresh copy needs: those written since the last discard for a marked buffer, else all. */
+    [[nodiscard]] std::uint32_t WrittenCopyBytes() const noexcept;
     /** A static buffer, for a GPU copy into it; nullptr for a dynamic buffer (upload memory). */
     [[nodiscard]] vulkan::TrackedBuffer* CopyDestination() noexcept { return mDynamic ? nullptr : &mBuffer; }
 
@@ -165,6 +169,8 @@ namespace gpg::gal
     std::uint32_t mLockOffset = 0;
     std::uint32_t mLockSize = 0;
     std::uint32_t mLockFlags = 0;
+    bool mCopyWrittenOnly = false;  // Device::CopyWrittenOnly
+    std::uint32_t mWrittenEnd = 0;  // end of the bytes written since the last discard lock
   };
 
   class VertexBufferVulkan final : public VertexBuffer

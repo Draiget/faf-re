@@ -409,6 +409,10 @@ namespace gpg::gal
     mLockSize = (size == 0U || offset + size > mByteWidth) ? (mByteWidth - offset) : size;
     mLockFlags = static_cast<std::uint32_t>(flags);
     mLocked = true;
+    if (!HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly)) {
+      const std::uint32_t end = mLockOffset + mLockSize;
+      mWrittenEnd = HasFlag(mLockFlags, MohoD3DLockFlags::Discard) ? end : std::max(mWrittenEnd, end);
+    }
     if (mShadow.Released()) {
       if (HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly)) {
         gpg::Warnf("gal: %s read lock after its CPU copy was released reads zeros", mKind);
@@ -465,9 +469,15 @@ namespace gpg::gal
     if (mLockedRangeOnly && gLockedRangeOnly) {
       std::memcpy(chunk.cpu + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
     } else {
-      std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+      // Engine change (ren_CopyWrittenOnly): a marked buffer's draws read only what was written since its last discard.
+      std::memcpy(chunk.cpu, mShadow.data(), WrittenCopyBytes());
     }
     TakeChunk(device, chunk);
+  }
+
+  std::uint32_t BufferStorageD3D12::WrittenCopyBytes() const noexcept
+  {
+    return (mCopyWrittenOnly && gCopyWrittenOnly && mWrittenEnd < mByteWidth) ? mWrittenEnd : mByteWidth;
   }
 
   void BufferStorageD3D12::TakeChunk(DeviceD3D12& device, const d3d12::UploadAllocation& chunk)
@@ -489,7 +499,7 @@ namespace gpg::gal
     if (mChunkCpu == nullptr || mChunkSerial != device.RecordingSerial()) {
       // The copy a previous submission read may be recycled; take a fresh one.
       const d3d12::UploadAllocation chunk = device.AllocateUpload(mByteWidth, 256U);
-      std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+      std::memcpy(chunk.cpu, mShadow.data(), WrittenCopyBytes()); // ren_CopyWrittenOnly
       TakeChunk(device, chunk);
     }
     return mChunk;

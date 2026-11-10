@@ -1493,6 +1493,11 @@ namespace gpg::gal
     static_cast<IndexBufferVulkan&>(buffer).Storage().ReleaseCopy();
   }
 
+  void DeviceVulkan::CopyWrittenOnly(VertexBuffer& buffer)
+  {
+    static_cast<VertexBufferVulkan&>(buffer).Storage().MarkWrittenOnly();
+  }
+
   void DeviceVulkan::CopyLockedRangeOnly(VertexBuffer& buffer)
   {
     static_cast<VertexBufferVulkan&>(buffer).Storage().CopyLockedRangeOnly();

@@ -175,6 +175,10 @@ namespace gpg::gal
     [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS PrepareForDraw(DeviceD3D12& device);
     [[nodiscard]] std::uint32_t ByteWidth() const noexcept { return mByteWidth; }
     [[nodiscard]] bool IsDynamic() const noexcept { return mDynamic; }
+    /** Device::CopyWrittenOnly (ren_CopyWrittenOnly). */
+    void MarkWrittenOnly() noexcept { mCopyWrittenOnly = true; }
+    /** How many leading bytes a fresh copy needs: those written since the last discard for a marked buffer, else all. */
+    [[nodiscard]] std::uint32_t WrittenCopyBytes() const noexcept;
 
     /**
      * Where a GPU copy reads this buffer: the default-heap resource, moved to
@@ -211,6 +215,8 @@ namespace gpg::gal
     std::uint32_t mLockOffset = 0;
     std::uint32_t mLockSize = 0;
     std::uint32_t mLockFlags = 0;
+    bool mCopyWrittenOnly = false;  // Device::CopyWrittenOnly
+    std::uint32_t mWrittenEnd = 0;  // end of the bytes written since the last discard lock
   };
 
   class VertexBufferD3D12 final : public VertexBuffer

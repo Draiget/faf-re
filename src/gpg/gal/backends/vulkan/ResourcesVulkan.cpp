@@ -302,6 +302,10 @@ namespace gpg::gal
     mLockSize = (size == 0U || offset + size > mByteWidth) ? (mByteWidth - offset) : size;
     mLockFlags = static_cast<std::uint32_t>(flags);
     mLocked = true;
+    if (!HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly)) {
+      const std::uint32_t end = mLockOffset + mLockSize;
+      mWrittenEnd = HasFlag(mLockFlags, MohoD3DLockFlags::Discard) ? end : std::max(mWrittenEnd, end);
+    }
     if (mShadow.Released()) {
       if (HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly)) {
         gpg::Warnf("gal: %s read lock after its CPU copy was released reads zeros", mKind);
@@ -345,12 +349,18 @@ namespace gpg::gal
     if (mLockedRangeOnly && gLockedRangeOnly) {
       std::memcpy(chunk.cpu + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
     } else {
-      std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+      // Engine change (ren_CopyWrittenOnly): a marked buffer's draws read only what was written since its last discard.
+      std::memcpy(chunk.cpu, mShadow.data(), WrittenCopyBytes());
     }
     mChunkBuffer = chunk.buffer;
     mChunkOffset = chunk.offset;
     mChunkCpu = chunk.cpu;
     mChunkSerial = device.RecordingSerial();
+  }
+
+  std::uint32_t BufferStorageVulkan::WrittenCopyBytes() const noexcept
+  {
+    return (mCopyWrittenOnly && gCopyWrittenOnly && mWrittenEnd < mByteWidth) ? mWrittenEnd : mByteWidth;
   }
 
   void BufferStorageVulkan::PrepareForDraw(DeviceVulkan& device, VkBuffer& outBuffer, VkDeviceSize& outOffset)
@@ -362,7 +372,7 @@ namespace gpg::gal
     }
     if (mChunkCpu == nullptr || mChunkSerial != device.RecordingSerial()) {
       const vulkan::UploadAllocation chunk = device.AllocateUpload(mByteWidth, 256U);
-      std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+      std::memcpy(chunk.cpu, mShadow.data(), WrittenCopyBytes()); // ren_CopyWrittenOnly
       mChunkBuffer = chunk.buffer;
       mChunkOffset = chunk.offset;
       mChunkCpu = chunk.cpu;

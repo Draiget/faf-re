@@ -84,6 +84,14 @@ namespace moho
       &gpg::gal::gLockedRangeOnly
     );
 
+    /** Engine change: `ren_CopyWrittenOnly` (see gpg/gal/PlacedResources.h). */
+    TConVar<bool> gTConVar_ren_CopyWrittenOnly(
+      "ren_CopyWrittenOnly",
+      "Direct3D 12 / Vulkan: a dynamic buffer drawn reading only what was written since its last discard, such as the "
+      "particle instances, copies only those bytes when a new recording needs it (1, the default), or all of it (0).",
+      &gpg::gal::gCopyWrittenOnly
+    );
+
     /** Engine addition: `ren_ReleaseBufferCopies` (see gpg/gal/PlacedResources.h). */
     TConVar<bool> gTConVar_ren_ReleaseBufferCopies(
       "ren_ReleaseBufferCopies",

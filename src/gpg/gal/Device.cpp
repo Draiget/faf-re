@@ -462,6 +462,7 @@ namespace gpg::gal
     void Device::ReleaseBufferCopy(IndexBuffer&) {}
     void Device::CopyLockedRangeOnly(VertexBuffer&) {}
     void Device::CopyLockedRangeOnly(IndexBuffer&) {}
+    void Device::CopyWrittenOnly(VertexBuffer&) {}
     bool Device::CopyVertexBufferRegion(VertexBuffer&, std::uint32_t, VertexBuffer&, std::uint32_t, std::uint32_t) { return false; }
     RayGeometryId Device::CreateRayGeometry(const RayGeometryDesc&) { return 0U; }
     void Device::DestroyRayGeometry(RayGeometryId) {}
