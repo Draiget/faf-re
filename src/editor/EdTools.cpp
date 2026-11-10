@@ -1045,7 +1045,9 @@ namespace faf::editor
     }
     if (mPropBlueprints.empty()) {
       Note("The prop list comes once the game's rules are built after startup.");
-    } else if (ImGui::BeginChild("##props", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 12.0f), ImGuiChildFlags_Borders)) {
+    } else if (ImGui::BeginChild("##props", ImVec2(0.0f, ImGui::GetFrameHeight() * 1.8f * 8.0f), ImGuiChildFlags_Borders)) {
+      // Each prop with a picture of its model (only the rows in view ask for theirs).
+      const float picture = ImGui::GetFrameHeight() * 1.8f;
       for (const std::string& blueprint : mPropBlueprints) {
         if (!filter.empty() && blueprint.find(filter) == std::string::npos) {
           continue;
@@ -1058,8 +1060,21 @@ namespace faf::editor
         if (label.size() > 8 && label.compare(label.size() - 8, 8, "_prop.bp") == 0) {
           label.resize(label.size() - 8);
         }
-        if (ImGui::Selectable(label.c_str(), blueprint == mPropBlueprint)) {
+        ImGui::PushID(blueprint.c_str());
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        if (ImGui::Selectable("##prop", blueprint == mPropBlueprint, 0, ImVec2(0.0f, picture))) {
           mPropBlueprint = blueprint;
+        }
+        ImGui::PopID();
+        if (ImGui::IsItemVisible()) {
+          ImDrawList* const draw = ImGui::GetWindowDrawList();
+          if (const std::uint64_t image = PropPicture(blueprint); image != 0U) {
+            draw->AddImage(static_cast<ImTextureID>(image), at, ImVec2(at.x + picture, at.y + picture));
+          } else {
+            draw->AddRect(at, ImVec2(at.x + picture, at.y + picture), IM_COL32(58, 65, 75, 255));
+          }
+          draw->AddText(ImVec2(at.x + picture + 6.0f, at.y + (picture - ImGui::GetTextLineHeight()) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text),
+                        label.c_str());
         }
         if (ImGui::IsItemHovered()) {
           ImGui::SetTooltip("%s", blueprint.c_str());

@@ -1,4 +1,5 @@
 #include "editor/EdApp.h"
+#include "editor/view/EdPropThumbnails.h"
 #include "editor/doc/EdAdaptiveTables.h"
 #include <iterator>
 #include <fstream>
@@ -362,6 +363,10 @@ namespace faf::editor
       bool mPropEditArgDone = false;
       bool mAdaptiveArgDone = false;
       bool mAirGridArgDone = false;
+      /** Pictures of prop models for the Props list and the Properties panel. */
+      EdPropThumbnails mPropThumbnails;
+      int mRdCaptureFrame = -1;
+      int mRdFrames = 0;
       int mReclaimFrames = 0;
       bool mReclaimLogged = false;
       int mLayerFileStep = 0;
@@ -491,6 +496,7 @@ namespace faf::editor
       }
       gpg::Logf("editor: the vault is %s", mDocument.VaultFolder().string().c_str());
       mScene.SetTools(&mShell->Tools());
+      mShell->Tools().SetPropPictures([this](const std::string& blueprint) { return mPropThumbnails.Get(blueprint); });
       ReadOpenCommandLine();
       gEditorApp = this;
       BuildMenu(frame);
@@ -1106,6 +1112,31 @@ namespace faf::editor
           mScene.FrameMarker(name);
         }
         tools.SetDecalSelectionCount(mScene.DecalSelectionCount());
+        mPropThumbnails.Pump(3);
+        // `/rdcapture <frame>`: run under RenderDoc (renderdoccmd capture ...), that frame of the editor is captured,
+        // through RenderDoc's in-app API (RENDERDOC_GetAPI, version 1.0.0; TriggerCapture is its table's 16th entry).
+        if (mRdCaptureFrame < 0) {
+          fa::vector<fa::string> value;
+          mRdCaptureFrame = moho::CFG_GetArgOption("/rdcapture", 1, &value) && !value.empty() ? std::atoi(value[0].c_str()) : 0;
+        }
+        if (mRdCaptureFrame > 0 && ++mRdFrames == mRdCaptureFrame) {
+          if (const HMODULE renderDoc = ::GetModuleHandleA("renderdoc.dll"); renderDoc != nullptr) {
+            using GetApi = int(__cdecl*)(int, void**);
+            if (const auto getApi = reinterpret_cast<GetApi>(::GetProcAddress(renderDoc, "RENDERDOC_GetAPI")); getApi != nullptr) {
+              void** api = nullptr;
+              // Version 1.1.0 for TriggerMultiFrameCapture (the table's 23rd entry): three frames, and the prop
+              // pictures asked for again, so the frames hold thumbnail passes.
+              if (getApi(10100, reinterpret_cast<void**>(&api)) == 1 && api != nullptr) {
+                using TriggerFrames = void(__cdecl*)(std::uint32_t);
+                reinterpret_cast<TriggerFrames>(api[22])(3U);
+                mPropThumbnails.Clear();
+                gpg::Logf("editor: RenderDoc capture of 3 frames asked at frame %d", mRdFrames);
+              }
+            }
+          } else {
+            gpg::Warnf("editor: /rdcapture: not running under RenderDoc");
+          }
+        }
         tools.SetSelectionProperties(mScene.SelectionPropertiesNow());
         // The Markers tool's air node grid; `/airgrid <n>[,keep]` for test runs.
         if (!mAirGridArgDone) {

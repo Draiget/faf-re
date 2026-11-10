@@ -98,11 +98,14 @@ namespace faf::editor
         picture = "/textures/ui/common/icons/units/" + id + "_icon.dds";
       } else if (now.kind == SelectionProperties::Kind::Decal && !now.type.empty()) {
         picture = now.type;
+      } else if (now.kind == SelectionProperties::Kind::Prop && !now.type.empty()) {
+        picture = now.type;
       }
       if (!picture.empty()) {
         mTools.Library().Pump(2);
         const float side = ImGui::GetFrameHeight() * 2.6f;
-        const std::uint64_t image = mTools.Library().Thumbnail(picture, true);
+        const std::uint64_t image = now.kind == SelectionProperties::Kind::Prop ? mTools.PropPicture(picture)
+                                                                                 : mTools.Library().Thumbnail(picture, true);
         const ImVec2 at = ImGui::GetCursorScreenPos();
         if (image != 0U) {
           ImGui::Image(static_cast<ImTextureID>(image), ImVec2(side, side));
@@ -116,6 +119,9 @@ namespace faf::editor
           const std::string title = mTools.UnitTypeName(now.type);
           ImGui::TextUnformatted(title.empty() ? now.type.c_str() : title.c_str());
           ImGui::TextDisabled("%s  |  %s", now.type.c_str(), now.owner.c_str());
+        } else if (now.kind == SelectionProperties::Kind::Prop) {
+          ImGui::TextUnformatted(now.name.c_str());
+          ImGui::TextDisabled("prop");
         } else {
           const std::size_t slash = now.type.find_last_of('/');
           ImGui::TextUnformatted(slash == std::string::npos ? now.type.c_str() : now.type.c_str() + slash + 1);

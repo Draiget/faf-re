@@ -13,6 +13,7 @@
 #include "editor/tools/EdTextureLibrary.h"
 
 #include <algorithm>
+#include <functional>
 #include <cmath>
 #include <array>
 #include <memory>
@@ -74,6 +75,9 @@ namespace faf::editor
     void SetPropDetails(std::string details) { mPropDetails = std::move(details); }
     /** The prop blueprints the rules have (their ids), for the palette. */
     void SetPropBlueprints(std::vector<std::string> blueprints) { mPropBlueprints = std::move(blueprints); }
+    /** Where the panels get a prop blueprint's picture (an ImTextureID, 0 until made): the app's thumbnail cache. */
+    void SetPropPictures(std::function<std::uint64_t(const std::string&)> source) { mPropPictures = std::move(source); }
+    [[nodiscard]] std::uint64_t PropPicture(const std::string& blueprint) const { return mPropPictures ? mPropPictures(blueprint) : 0U; }
     [[nodiscard]] bool HasPropBlueprints() const noexcept { return !mPropBlueprints.empty(); }
     /** The map's prop reclaim for the panel (the app counts it now and then while the Props tool shows). */
     void SetPropReclaim(std::string summary, std::vector<std::string> rows)
@@ -822,6 +826,7 @@ namespace faf::editor
     bool mHasCoverage = false;
     bool mShowWeight = false;
     std::vector<std::string> mPropBlueprints;
+    std::function<std::uint64_t(const std::string&)> mPropPictures;
     std::string mPropBlueprint;
     int mPropMode = 0;
     float mPropDensity = 8.0f;

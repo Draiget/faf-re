@@ -31,6 +31,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdAdaptiveTables.cpp
   ui/EdHelp.cpp
   ui/EdIcons.cpp
+  view/EdPropThumbnails.cpp
   ui/EdArmiesPanel.cpp
   ui/EdPropertiesPanel.cpp
   doc/EdRoundTrip.cpp
