@@ -46,6 +46,7 @@
 #include "remote/ViewLanes.h"
 #include "remote/net/GameLinks.h"
 #include "remote/wire/EntityFrame.h"
+#include "remote/wire/LuaSyncLane.h"
 #include "remote/net/LobbySignals.h"
 #include "server/LobbyScriptData.h"
 
@@ -213,6 +214,7 @@ namespace
 
     double beatMs = 0.0; // the game's beat, to tell how late views come; 0: no telling
     bool noDecode = false; // the channel's limit alone, as decoding takes a while
+    bool luaKeys = false;  // plan WP14.1: each `Sync` key of the Lua lane the first time it comes (again after a partition)
     // Plan WP11 step 1: rebuild each beat's game data from the views alone, with this match file's rules.
     std::string rebuild;
     std::string saveViews; // every message from the server's views, each as a 32-bit size and its bytes, to measure compression
@@ -299,6 +301,10 @@ namespace
       }
       if (name == "--no-decode") {
         out.noDecode = true;
+        continue;
+      }
+      if (name == "--lua-keys") {
+        out.luaKeys = true;
         continue;
       }
       if (name == "--chat") {
@@ -940,7 +946,7 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>]] [--speed-limit <step> --speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s>] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>]] [--speed-limit <step> --speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s>] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--lua-keys] [--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua>]\n"
     );
     return 3;
   }
@@ -981,6 +987,8 @@ int main(const int argc, char** const argv)
   bool vanished = false;
   double returnAt = -1.0;
   std::uint64_t beatMessages = 0;
+  std::vector<std::string> luaKeysSeen; // `--lua-keys`
+  bool luaKeysAfterPartition = false;
   std::uint64_t lastBeat = 0;
   std::uint64_t joins = 0;
   SLobbySeen lobby;
@@ -1273,9 +1281,58 @@ int main(const int argc, char** const argv)
       }
       std::printf("probe %d: %.1f s: chat sent to %llu clients\n", options.uid, elapsed, static_cast<unsigned long long>(rosterSeen.chatSent));
     }
+    if (options.luaKeys && !luaKeysAfterPartition && options.path.partitionAt >= 0.0 && elapsed >= options.path.partitionAt + options.path.partitionFor) {
+      luaKeysAfterPartition = true; // what comes after the return is listed afresh
+      luaKeysSeen.clear();
+    }
     while (link.TakeReliable(message)) {
       if (!message.empty() && message[0] == static_cast<std::uint8_t>(ESeatMessage::Lobby)) {
         TakeLobby(options.uid, elapsed, message, lobby);
+        continue;
+      }
+      if (!message.empty() && message[0] == static_cast<std::uint8_t>(ESeatMessage::LuaSync) && options.luaKeys) {
+        ByteReader reader(message.data() + 1, message.size() - 1u);
+        const std::uint64_t beat = reader.Varint();
+        const std::uint64_t size = reader.Varint();
+        const std::uint8_t* const bytes = reader.Bytes(static_cast<std::size_t>(size));
+        std::vector<std::uint8_t> table;
+        std::vector<std::string> prints;
+        faf::server::SLuaBytesValue sync;
+        if (reader.Ok()) {
+          faf::remote::wire::BitReader lane(std::span<const std::uint8_t>(bytes, static_cast<std::size_t>(size)));
+          const bool decoded = faf::remote::wire::DecodeLuaSyncLane(lane, table, prints) && !table.empty();
+          if (!decoded && !table.empty()) {
+            std::printf("probe %d: %.1f s: lua lane at beat %llu not decoded\n", options.uid, elapsed, static_cast<unsigned long long>(beat));
+          }
+          if (decoded && !faf::server::ParseLuaBytes(table, sync)) {
+            // A value the lobby's reader doesn't take (it reads lobby messages): name the keys a saved game's load sends.
+            std::string named;
+            for (const std::string_view key : {"FocusArmyChanged", "UserUnitEnhancements", "CampaignMode", "EnhanceRestrict", "MaxPingMarkers", "AddTransmissions", "Ping"}) {
+              if (std::search(table.begin(), table.end(), key.begin(), key.end()) != table.end()) {
+                named += (named.empty() ? "" : ", ") + std::string(key);
+              }
+            }
+            std::printf(
+              "probe %d: %.1f s: lua table at beat %llu (%zu bytes) not read; it names: %s\n", options.uid, elapsed, static_cast<unsigned long long>(beat),
+              table.size(), named.empty() ? "none of the resync keys" : named.c_str()
+            );
+          } else if (decoded) {
+            std::string fresh;
+            for (const faf::server::SLuaBytesValue& key : sync.keys) {
+              if (key.kind == faf::server::SLuaBytesValue::EKind::String
+                  && std::find(luaKeysSeen.begin(), luaKeysSeen.end(), key.text) == luaKeysSeen.end()) {
+                luaKeysSeen.push_back(key.text);
+                fresh += (fresh.empty() ? "" : ", ") + key.text;
+              }
+            }
+            if (!fresh.empty()) {
+              std::printf(
+                "probe %d: %.1f s: lua keys first%s at beat %llu: %s\n", options.uid, elapsed, luaKeysAfterPartition ? " after the partition" : "",
+                static_cast<unsigned long long>(beat), fresh.c_str()
+              );
+            }
+          }
+        }
         continue;
       }
       if (!message.empty() && message[0] == static_cast<std::uint8_t>(ESeatMessage::FocusArmy)) {

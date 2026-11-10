@@ -101,6 +101,7 @@ namespace faf::server
     void OnLanesEncoded(std::size_t army, const SLanes& lanes) override;
     /** Plan WP11: each beat's Lua lane goes as its own `LuaSync` message once `Sim::Sync` has routed the beat's table. */
     void OnLuaRouterMade(remote::CSyncRouter& router) override;
+    void OnLuaRouterBeat(moho::Sim& sim, remote::CSyncRouter& router) override;
     /** Plan WP11 step 4: the beat's new session-table entries go to every player before the beat's views. */
     void OnViewFrames(moho::Sim& sim) override;
     void OnViewsFinished() override;
@@ -113,6 +114,7 @@ namespace faf::server
     moho::RRuleGameRules& mRules;
     CServerNet& mNet;
     std::map<std::size_t, std::int32_t> mPlayers;
+    std::vector<std::size_t> mLuaResyncs; // plan WP14.1: returning players' views, for the next `OnLuaRouterBeat`
     std::uint32_t mViewMask = 0u;
     std::uint64_t mFailures = 0;
     std::atomic<std::uint64_t> mFrameBytes{0};

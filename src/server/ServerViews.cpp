@@ -107,11 +107,13 @@ namespace faf::server
         }
       }
     }
-    // Plan WP14.1: a returning player's client holds nothing, so this beat's view goes to them whole.
+    // Plan WP14.1: a returning player's client holds nothing, so this beat's view goes to them whole, and its Lua
+    // lane gets what loading a saved game sends for the UI's state (WP6.8, `OnLuaRouterBeat`).
     for (const std::int32_t uid : mNet.TakeReturned()) {
       for (const auto& [army, player] : mPlayers) {
         if (player == uid) {
           RequestFresh(army);
+          mLuaResyncs.push_back(army);
         }
       }
     }
@@ -196,6 +198,21 @@ namespace faf::server
       }
     }
     CViewLanes::OnViewFrames(sim);
+  }
+
+  void CServerViews::OnLuaRouterBeat(moho::Sim& sim, remote::CSyncRouter& router)
+  {
+    (void)sim;
+    // The same beat's `Sync` (`CSyncRouter::OnSyncTable` applies the request before it routes the table).
+    for (const std::size_t view : mLuaResyncs) {
+      if (view < router.ViewCount()) {
+        router.RequestResync(view);
+        if (const auto player = mPlayers.find(view); player != mPlayers.end()) {
+          gpg::Logf("views: uid %d is back; the UI's state goes to them again (army index %zu)", player->second, view);
+        }
+      }
+    }
+    mLuaResyncs.clear();
   }
 
   void CServerViews::OnLuaRouterMade(remote::CSyncRouter& router)

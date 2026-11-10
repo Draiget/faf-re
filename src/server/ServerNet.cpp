@@ -132,6 +132,20 @@ namespace faf::server
     }
   }
 
+  namespace
+  {
+    /** A `View` or `LuaSync` message's beat (the varint after its type); 0 for anything shorter. */
+    [[nodiscard]] std::uint64_t MessageBeat(const std::vector<std::uint8_t>& message)
+    {
+      if (message.size() < 2u) {
+        return 0u;
+      }
+      remote::net::ByteReader reader(message.data() + 1, message.size() - 1u);
+      const std::uint64_t beat = reader.Varint();
+      return reader.Ok() ? beat : 0u;
+    }
+  } // namespace
+
   void CServerNet::QueueView(const std::int32_t uid, std::vector<std::uint8_t> message, const bool fresh)
   {
     const std::scoped_lock lock(mViewLock);
@@ -186,11 +200,32 @@ namespace faf::server
           ++first;
         }
         if (first == mViewSending.size()) {
+          // Plan WP14.1: no fresh view yet. A `LuaSync` may come ahead of its beat's view when the views' pipeline is
+          // late; those wait for the next pass, where the ones older than the fresh view are dropped.
+          const std::scoped_lock lock(mViewLock);
+          std::vector<SQueuedMessage>& queue = mViewQueue[uid];
+          std::vector<SQueuedMessage> kept;
+          for (SQueuedMessage& message : mViewSending) {
+            if (!message.bytes.empty() && message.bytes[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::LuaSync)) {
+              kept.push_back(std::move(message));
+            }
+          }
+          queue.insert(queue.begin(), std::make_move_iterator(kept.begin()), std::make_move_iterator(kept.end()));
           continue;
         }
         seat.viewBroken = false;
         for (const std::vector<std::uint8_t>& message : startMessages) {
           (void)mLinks.SendReliable(uid, message.data(), message.size());
+        }
+        // Plan WP14.1: the fresh view's beat's `LuaSync` (with the UI's state sent again) and later ones may be queued
+        // ahead of it when the views' pipeline is late; they aren't deltas, and the client holds a beat's Lua lane
+        // until its view comes (`CNetworkSimDriver`'s early lanes), so they go, ahead of the view, as queued.
+        const std::uint64_t freshBeat = MessageBeat(mViewSending[first].bytes);
+        for (std::size_t i = 0; i < first; ++i) {
+          const std::vector<std::uint8_t>& bytes = mViewSending[i].bytes;
+          if (!bytes.empty() && bytes[0] == static_cast<std::uint8_t>(remote::net::ESeatMessage::LuaSync) && MessageBeat(bytes) >= freshBeat) {
+            (void)mLinks.SendReliable(uid, bytes.data(), bytes.size());
+          }
         }
         if (!startMessages.empty()) {
           seat.startSent = true;
