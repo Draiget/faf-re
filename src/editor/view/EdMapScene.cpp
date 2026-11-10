@@ -330,7 +330,7 @@ namespace faf::editor
       const auto position = [&](const std::string& name, float& x, float& z) {
         for (const SaveEntry& marker : markers) {
           float y = 0.0f;
-          if (marker.name == name && !MarkerHidden(marker) && MarkerPosition(marker, x, y, z)) {
+          if (marker.name == name && !MarkerHidden(marker) && ShownMarkerPosition(marker, x, y, z)) {
             return true;
           }
         }
@@ -457,7 +457,7 @@ namespace faf::editor
           const auto found = std::find_if(mDocument.SaveData().Markers().begin(), mDocument.SaveData().Markers().end(),
                                           [&](const SaveEntry& marker) { return marker.name == chain.markers[i]; });
           float x = 0.0f, y = 0.0f, z = 0.0f;
-          if (found == mDocument.SaveData().Markers().end() || !MarkerPosition(*found, x, y, z)) {
+          if (found == mDocument.SaveData().Markers().end() || !ShownMarkerPosition(*found, x, y, z)) {
             continue;
           }
           // Pink, doubled a little above: apart from the path nodes' blue, green and white links.
@@ -585,7 +585,7 @@ namespace faf::editor
         for (std::size_t i = 0; i < mMarkerSelection.size() && i < mMarkerDragStart.size(); ++i) {
           for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
             float x = 0.0f, y = 0.0f, z = 0.0f;
-            if (marker.name == mMarkerSelection[i] && MarkerPosition(marker, x, y, z)) {
+            if (marker.name == mMarkerSelection[i] && ShownMarkerPosition(marker, x, y, z)) {
               moved.push_back({Wm3::Vec3f{mMarkerDragStart[i][0], mMarkerDragStart[i][1], mMarkerDragStart[i][2]}, Wm3::Vec3f{x, y, z}});
             }
           }
@@ -2030,7 +2030,7 @@ namespace faf::editor
       copied.kind = Clipboard::Kind::Markers;
       for (const SaveEntry& marker : SelectedMarkers()) {
         float x = 0.0f, y = 0.0f, z = 0.0f;
-        if (MarkerPosition(marker, x, y, z)) {
+        if (ShownMarkerPosition(marker, x, y, z)) {
           copied.markers.push_back(marker);
           add(x, z);
         }
@@ -2110,7 +2110,7 @@ namespace faf::editor
       mMarkerSelection.clear();
       for (SaveEntry marker : mClipboard.markers) {
         float mx = 0.0f, my = 0.0f, mz = 0.0f;
-        (void)MarkerPosition(marker, mx, my, mz);
+        (void)ShownMarkerPosition(marker, mx, my, mz);
         const float px = mx + dx;
         const float pz = mz + dz;
         const MarkerType* const type = FindMarkerType(MarkerTypeOf(marker));
@@ -2279,7 +2279,7 @@ namespace faf::editor
       }
       for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
         float x = 0.0f, y = 0.0f, z = 0.0f;
-        if (MarkerHidden(marker) || !MarkerPosition(marker, x, y, z) || !inside(Wm3::Vec3f{x, y, z})) {
+        if (MarkerHidden(marker) || !ShownMarkerPosition(marker, x, y, z) || !inside(Wm3::Vec3f{x, y, z})) {
           continue;
         }
         if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) == mMarkerSelection.end()) {
@@ -2598,7 +2598,7 @@ namespace faf::editor
       for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
         float x = 0.0f, y = 0.0f, z = 0.0f;
         if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end() &&
-            MarkerPosition(marker, x, y, z)) {
+            ShownMarkerPosition(marker, x, y, z)) {
           sx += x;
           sy += y;
           sz += z;
@@ -2895,6 +2895,29 @@ namespace faf::editor
     return edges;
   }
 
+  bool EdMapScene::ShownMarkerPosition(const SaveEntry& marker, float& x, float& y, float& z) const
+  {
+    if (!MarkerPosition(marker, x, y, z)) {
+      return false;
+    }
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || MarkerTypeOf(marker) == "Camera Info") {
+      return true;
+    }
+    // Between the four samples around it, as the ground is drawn.
+    const float gx = std::clamp(x, 0.0f, static_cast<float>(field->width - 1));
+    const float gz = std::clamp(z, 0.0f, static_cast<float>(field->height - 1));
+    const int x0 = std::min(static_cast<int>(gx), field->width - 2);
+    const int z0 = std::min(static_cast<int>(gz), field->height - 2);
+    const float fx = gx - static_cast<float>(x0);
+    const float fz = gz - static_cast<float>(z0);
+    const auto at = [field](const int sx, const int sz) { return static_cast<float>(field->data[sz * field->width + sx]) / 128.0f; };
+    const float top = at(x0, z0) + (at(x0 + 1, z0) - at(x0, z0)) * fx;
+    const float bottom = at(x0, z0 + 1) + (at(x0 + 1, z0 + 1) - at(x0, z0 + 1)) * fx;
+    y = top + (bottom - top) * fz;
+    return true;
+  }
+
   EdMapScene::PickHit EdMapScene::PickAnything(const POINT at) const
   {
     PickHit best;
@@ -2923,7 +2946,7 @@ namespace faf::editor
     const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
     for (std::size_t i = 0; i < markers.size(); ++i) {
       float x = 0.0f, y = 0.0f, z = 0.0f;
-      if (!MarkerHidden(markers[i]) && MarkerPosition(markers[i], x, y, z)) {
+      if (!MarkerHidden(markers[i]) && ShownMarkerPosition(markers[i], x, y, z)) {
         consider(PickKind::Marker, static_cast<int>(i), Wm3::Vec3f{x, y, z}, 4.0f, 14.0f);
       }
     }
@@ -2955,7 +2978,7 @@ namespace faf::editor
       float y = 0.0f;
       const std::string type = MarkerTypeOf(marker);
       radius = type == "Blank Marker" ? 7.0f : type == "Hydrocarbon" ? 4.5f : 3.0f;
-      return MarkerPosition(marker, x, y, z);
+      return ShownMarkerPosition(marker, x, y, z);
     }
     case PickKind::Unit:
       x = mUnitRefs[static_cast<std::size_t>(hit.index)].position.x;
@@ -3048,7 +3071,7 @@ namespace faf::editor
         std::array<float, 3> start{};
         for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
           if (marker.name == selected) {
-            (void)MarkerPosition(marker, start[0], start[1], start[2]);
+            (void)ShownMarkerPosition(marker, start[0], start[1], start[2]);
           }
         }
         mMarkerDragStart.push_back(start);
@@ -3363,7 +3386,7 @@ namespace faf::editor
     float bestDistance = reach;
     for (std::size_t i = 0; i < markers.size(); ++i) {
       float mx = 0.0f, my = 0.0f, mz = 0.0f;
-      if (!MarkerPosition(markers[i], mx, my, mz) || MarkerHidden(markers[i])) {
+      if (!ShownMarkerPosition(markers[i], mx, my, mz) || MarkerHidden(markers[i])) {
         continue;
       }
       const float d = std::hypot(mx - x, mz - z);
@@ -3399,7 +3422,7 @@ namespace faf::editor
   {
     for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
       float x = 0.0f, y = 0.0f, z = 0.0f;
-      if (marker.name == name && MarkerPosition(marker, x, y, z)) {
+      if (marker.name == name && ShownMarkerPosition(marker, x, y, z)) {
         mTargetX = x;
         mTargetZ = z;
         mDistance = std::min(mDistance, distance);
@@ -3500,7 +3523,7 @@ namespace faf::editor
     const auto position = [&](const std::string& name, float& x, float& z, std::string& type) {
       for (const SaveEntry& marker : markers) {
         float y = 0.0f;
-        if (marker.name == name && IsPathNode(marker) && MarkerPosition(marker, x, y, z)) {
+        if (marker.name == name && IsPathNode(marker) && ShownMarkerPosition(marker, x, y, z)) {
           type = MarkerTypeOf(marker);
           return true;
         }
@@ -3634,7 +3657,7 @@ namespace faf::editor
       float nearest = 0.0f;
       for (const SaveEntry& marker : markers) {
         float px = 0.0f, py = 0.0f, pz = 0.0f;
-        if (!IsPathNode(marker) || MarkerTypeOf(marker) != type.type || !MarkerPosition(marker, px, py, pz) ||
+        if (!IsPathNode(marker) || MarkerTypeOf(marker) != type.type || !ShownMarkerPosition(marker, px, py, pz) ||
             std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) == mMarkerSelection.end()) {
           continue;
         }
@@ -3695,7 +3718,7 @@ namespace faf::editor
       float fx = 0.0f, fy = 0.0f, fz = 0.0f;
       for (const SaveEntry& marker : markers) {
         if (marker.name == mMarkerSelection.front()) {
-          (void)MarkerPosition(marker, fx, fy, fz);
+          (void)ShownMarkerPosition(marker, fx, fy, fz);
         }
       }
       gpg::Logf("editor: %zu %s markers placed (the first at %.2f, %.2f), %zu markers now", mMarkerSelection.size(), type.type,
@@ -3800,7 +3823,7 @@ namespace faf::editor
       std::map<std::string, std::array<float, 3>> positions;
       for (const SaveEntry& marker : markers) {
         float x = 0.0f, y = 0.0f, z = 0.0f;
-        if (!MarkerHidden(marker) && MarkerPosition(marker, x, y, z)) {
+        if (!MarkerHidden(marker) && ShownMarkerPosition(marker, x, y, z)) {
           positions[marker.name] = {x, y, z};
         }
       }
@@ -3833,7 +3856,7 @@ namespace faf::editor
         continue;
       }
       float x = 0.0f, y = 0.0f, z = 0.0f;
-      if (!MarkerPosition(marker, x, y, z)) {
+      if (!ShownMarkerPosition(marker, x, y, z)) {
         continue;
       }
       const std::uint32_t color = MarkerColor(marker);
@@ -3886,7 +3909,7 @@ namespace faf::editor
       const std::string type = MarkerTypeOf(marker);
       const bool isMass = type == "Mass";
       float x = 0.0f, y = 0.0f, z = 0.0f;
-      if ((!isMass && type != "Hydrocarbon") || MarkerHidden(marker) || !MarkerPosition(marker, x, y, z)) {
+      if ((!isMass && type != "Hydrocarbon") || MarkerHidden(marker) || !ShownMarkerPosition(marker, x, y, z)) {
         continue;
       }
       // A grid of one-unit cells, so the splat follows the ground's shape.
@@ -4649,7 +4672,7 @@ namespace faf::editor
       std::vector<std::pair<std::string, std::array<float, 2>>> starts;
       for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
         float mx = 0.0f, my = 0.0f, mz = 0.0f;
-        if (MarkerTypeOf(marker) == "Blank Marker" && MarkerPosition(marker, mx, my, mz)) {
+        if (MarkerTypeOf(marker) == "Blank Marker" && ShownMarkerPosition(marker, mx, my, mz)) {
           starts.push_back({marker.name, {mx, mz}});
         }
       }
@@ -4964,7 +4987,7 @@ namespace faf::editor
             std::array<float, 3> start{};
             for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
               if (marker.name == selected) {
-                (void)MarkerPosition(marker, start[0], start[1], start[2]);
+                (void)ShownMarkerPosition(marker, start[0], start[1], start[2]);
               }
             }
             mMarkerDragStart.push_back(start);
@@ -5015,7 +5038,7 @@ namespace faf::editor
           std::array<float, 3> start{};
           for (const SaveEntry& marker : markers) {
             if (marker.name == selected) {
-              (void)MarkerPosition(marker, start[0], start[1], start[2]);
+              (void)ShownMarkerPosition(marker, start[0], start[1], start[2]);
             }
           }
           mMarkerDragStart.push_back(start);
@@ -5347,7 +5370,7 @@ namespace faf::editor
           mDocument.SaveDataEdited(std::move(mMarkerBefore));
           for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
             float x = 0.0f, y = 0.0f, z = 0.0f;
-            if (!mMarkerSelection.empty() && marker.name == mMarkerSelection.front() && MarkerPosition(marker, x, y, z)) {
+            if (!mMarkerSelection.empty() && marker.name == mMarkerSelection.front() && ShownMarkerPosition(marker, x, y, z)) {
               gpg::Logf("editor: %zu markers moved, %s to %.2f, %.2f (height %.2f)", mMarkerSelection.size(), marker.name.c_str(),
                         static_cast<double>(x), static_cast<double>(z), static_cast<double>(y));
             }

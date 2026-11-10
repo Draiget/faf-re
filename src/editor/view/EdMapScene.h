@@ -404,6 +404,11 @@ namespace faf::editor
     void ClearAllSelections();
     /** Starts moving the selection of a kind: along the gizmo's part, or over the ground from (groundX, groundZ). */
     void BeginSelectionDrag(HWND window, PickKind kind, GizmoPart part, POINT at, float groundX, float groundZ);
+    /**
+     * A marker where the view shows it: on the ground under its x and z (the file's height can be stale after the
+     * terrain changed, and the game places resources and armies on the ground), except a Camera Info, whose height counts.
+     */
+    bool ShownMarkerPosition(const SaveEntry& marker, float& x, float& y, float& z) const;
     /** Where a pick sits and how big its ring is, for the hover ring. */
     [[nodiscard]] bool PickPlace(const PickHit& hit, float& x, float& z, float& radius) const;
     PickKind mSelectKind = PickKind::None;
