@@ -262,6 +262,10 @@ namespace faf::editor
         }
       }
       switch (static_cast<HeightBrushMode>(mBrushMode)) {
+      case HeightBrushMode::Raise:
+      case HeightBrushMode::Lower:
+        Note("Left-drag raises or lowers as chosen; right-drag does the opposite.");
+        break;
       case HeightBrushMode::Flatten:
         Note("Flattens to the height under the stroke's first point.");
         break;

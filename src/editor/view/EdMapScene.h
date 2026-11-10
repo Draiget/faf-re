@@ -407,6 +407,9 @@ namespace faf::editor
     /** Where a pick sits and how big its ring is, for the hover ring. */
     [[nodiscard]] bool PickPlace(const PickHit& hit, float& x, float& z, float& radius) const;
     PickKind mSelectKind = PickKind::None;
+    /** The stroke under way was started with the right button: the brush's opposite (Raise/Lower, Paint/Erase). */
+    bool mPaintInverted = false;
+    float mStrokeStartHeight = 0.0f;
     /** The adaptive tables as last read, for the ties drawn from resources to their armies. */
     std::string mAdaptiveText;
     AdaptiveTables mAdaptive;

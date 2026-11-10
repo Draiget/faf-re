@@ -809,6 +809,12 @@ namespace faf::editor
     }
     HeightBrush brush = mTools->CurrentHeightBrush();
     brush.flattenTo = mFlattenTo;
+    // A right-button stroke does the opposite: Raise lowers, Lower raises.
+    if (mPaintInverted) {
+      brush.mode = brush.mode == HeightBrushMode::Raise ? HeightBrushMode::Lower
+                   : brush.mode == HeightBrushMode::Lower ? HeightBrushMode::Raise
+                                                          : brush.mode;
+    }
     // A stamp goes down once per click.
     if (brush.mode == HeightBrushMode::Stamp) {
       if (mStamped || brush.stamp == nullptr) {
@@ -830,6 +836,17 @@ namespace faf::editor
 
   void EdMapScene::EndStroke()
   {
+    // The ground under the cursor before and after, so a log shows which way a stroke went.
+    if (mMap != nullptr && mDocument.Heights().Stroking()) {
+      float groundX = 0.0f;
+      float groundZ = 0.0f;
+      if (GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)) {
+        const float now =
+          mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(groundX)), static_cast<std::int32_t>(std::lround(groundZ)));
+        gpg::Logf("editor: height stroke%s: %.2f to %.2f under the cursor", mPaintInverted ? " (right button, inverted)" : "",
+                  static_cast<double>(mStrokeStartHeight), static_cast<double>(now));
+      }
+    }
     if (mMap != nullptr && mDocument.Heights().Stroking()) {
       if (const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField()) {
         const std::size_t before = mDocument.Heights().UndoCount();
@@ -1393,6 +1410,12 @@ namespace faf::editor
     }
     MaskBrush brush = mTools->CurrentMaskBrush();
     brush.step = ++mMaskSteps;
+    // A right-button stroke does the opposite: Paint erases, Erase paints.
+    if (mPaintInverted) {
+      brush.mode = brush.mode == MaskBrushMode::Paint ? MaskBrushMode::Erase
+                   : brush.mode == MaskBrushMode::Erase ? MaskBrushMode::Paint
+                                                        : brush.mode;
+    }
     const MaskTerrain terrain{field->data, field->width, field->height};
     for (const SampleRect& rect : MaskBrushRects(masks.width, masks.height, terrain, groundX, groundZ, brush)) {
       mDocument.MaskUndo().BeforeWrite(masks.texels.data(), rect);
@@ -4872,7 +4895,7 @@ namespace faf::editor
       return false;
     }
     const POINT at{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-    if (message == WM_MOUSEMOVE || message == WM_LBUTTONDOWN) {
+    if (message == WM_MOUSEMOVE || message == WM_LBUTTONDOWN || message == WM_RBUTTONDOWN) {
       mCursor = at;
     }
     switch (message) {
@@ -5228,6 +5251,7 @@ namespace faf::editor
       if (mTools != nullptr && mTools->TextureToolActive()) {
         LoadMasks();
         if (!mDocument.Masks().texels.empty()) {
+          mPaintInverted = false;
           mPaintingMask = true;
           mDocument.MaskUndo().BeginStroke();
           ::SetCapture(window);
@@ -5253,6 +5277,8 @@ namespace faf::editor
       // Flatten keeps the height under the stroke's first point.
       mFlattenTo = groundHeight * 128.0f;
       mStamped = false;
+      mPaintInverted = false;
+      mStrokeStartHeight = groundHeight;
       mPainting = true;
       mDocument.Heights().BeginStroke();
       ::SetCapture(window);
@@ -5353,6 +5379,37 @@ namespace faf::editor
       return false;
     case WM_RBUTTONDOWN:
     case WM_MBUTTONDOWN:
+      // The right button with a brush that has an opposite (Raise and Lower, Paint and Erase): the opposite
+      // stroke, as image editors do. Shift + right still box-selects; other brushes' right drag pans.
+      if (message == WM_RBUTTONDOWN && (wParam & MK_SHIFT) == 0 && mTools != nullptr && !mPainting && !mPaintingMask) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        const HeightBrushMode height = mTools->CurrentHeightBrush().mode;
+        const MaskBrushMode mask = mTools->CurrentMaskBrush().mode;
+        if (mTools->TerrainToolActive() && (height == HeightBrushMode::Raise || height == HeightBrushMode::Lower) &&
+            GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          mPaintInverted = true;
+          mStamped = false;
+          mStrokeStartHeight =
+            mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(groundX)), static_cast<std::int32_t>(std::lround(groundZ)));
+          mPainting = true;
+          mDocument.Heights().BeginStroke();
+          ::SetCapture(window);
+          ::SetFocus(window);
+          return true;
+        }
+        if (mTools->TextureToolActive() && (mask == MaskBrushMode::Paint || mask == MaskBrushMode::Erase)) {
+          LoadMasks();
+          if (!mDocument.Masks().texels.empty()) {
+            mPaintInverted = true;
+            mPaintingMask = true;
+            mDocument.MaskUndo().BeginStroke();
+            ::SetCapture(window);
+            ::SetFocus(window);
+            return true;
+          }
+        }
+      }
       // Shift + right drag draws a selection box where the tool selects (markers, props, decals, units).
       if (message == WM_RBUTTONDOWN && (wParam & MK_SHIFT) != 0 && BoxSelectable()) {
         mBoxing = true;
@@ -5370,6 +5427,17 @@ namespace faf::editor
       return true;
     case WM_RBUTTONUP:
     case WM_MBUTTONUP:
+      // The end of a right-button (inverted) stroke.
+      if (message == WM_RBUTTONUP && mPaintInverted && (mPainting || mPaintingMask)) {
+        if (mPainting) {
+          EndStroke();
+        } else {
+          EndMaskStroke();
+        }
+        mPaintInverted = false;
+        ::ReleaseCapture();
+        return true;
+      }
       if (message == WM_RBUTTONUP && mBoxing) {
         mBoxTo = at;
         mBoxing = false;
