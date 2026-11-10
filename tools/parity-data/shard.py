@@ -397,7 +397,7 @@ def main():
     parser.add_argument("--simworkers", type=int, default=1)
     parser.add_argument("--engine-args", default="",
                         help="more engine switches for every replay, e.g. \"/con sim_ParallelPose=0\" (docs/SWITCHES.md)")
-    parser.add_argument("--game-version", type=int, default=3835)
+    parser.add_argument("--game-version", type=int, default=3840)
     parser.add_argument("--oracle-check", action="store_true",
                         help="play unfocused with headless --oracle-check; a difference is the verdict oracle")
     parser.add_argument("--delay", type=float, default=1.0, help="seconds between requests to FAF")

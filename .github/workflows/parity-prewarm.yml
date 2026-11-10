@@ -14,7 +14,7 @@ on:
       game_version:
         description: FAF game version (tools/parity-data/corpus/<version>.tsv.gz must exist)
         required: true
-        default: "3835"
+        default: "3840"
       replay_minutes:
         description: Minutes per replay bucket spent fetching new replays from FAF (0 fetches none)
         default: "20"
@@ -24,8 +24,11 @@ on:
       parallel:
         description: Replay buckets fetched at once (each one request a second to FAF)
         default: "4"
+  # Mondays the current game version, Thursdays 3835, whose caches the replay check's stored call hashes
+  # (tests/replay_sets, recorded on 3835 replays) still read: a cache unused for 7 days is dropped.
   schedule:
     - cron: "23 4 * * 1"
+    - cron: "53 4 * * 4"
 
 permissions:
   contents: read
@@ -36,7 +39,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GAME_VERSION: ${{ inputs.game_version || '3835' }}
+  GAME_VERSION: ${{ inputs.game_version || (github.event.schedule == '53 4 * * 4' && '3835') || '3840' }}
   PYTHON_VERSION: "3.14"
 
 jobs:

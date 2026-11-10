@@ -59,7 +59,7 @@ def parity_line():
         text += " on Linux x64: " + ", ".join("%d %s" % (n, k.replace("expected-", "expected ")) for n, k in shown if n)
         if new:
             text += ". New failures: " + ", ".join(str(i) for i in new)
-        text += ". What is expected is [listed with why](%s/blob/%s/tools/parity-data/expected/3835.json)" % (REPO, os.environ["SHA"])
+        text += ". What is expected is [listed with why](%s/tree/%s/tools/parity-data/expected), one file per game version" % (REPO, os.environ["SHA"])
     return text + "."
 
 

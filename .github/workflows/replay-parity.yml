@@ -32,7 +32,7 @@ on:
         default: "1"
       game_version:
         description: FAF game version of the replays
-        default: "3835"
+        default: "3840"
       after_run:
         description: An earlier run's id; play only what it did not (no time left, not got ready) or what crashed, and report both
         default: ""
@@ -60,7 +60,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GAME_VERSION: ${{ inputs.game_version || '3835' }}
+  GAME_VERSION: ${{ inputs.game_version || '3840' }}
   PYTHON_VERSION: "3.14"
   # Jobs play for this long; plan.py packs shards to it, shard.py starts nothing that would not
   # end by then. A job may run 360 minutes in all.
