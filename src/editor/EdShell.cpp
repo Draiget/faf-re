@@ -359,26 +359,26 @@ namespace faf::editor
 
       // File.
       ImGui::BeginDisabled(playing);
-      if (ImGui::Button("New")) {
+      if (EdToolButton("##new", EdIcon::NewFile, "New", false, false)) {
         mOpenNewMap = true;
       }
       tip("A new map: size, players, height and sea (Ctrl+N)");
       ImGui::SameLine();
       const std::vector<std::string>& maps = mPlay.Maps();
       ImGui::BeginDisabled(maps.empty() || mDocument.GetState() == EdDocument::State::Loading);
-      if (ImGui::Button("Open")) {
+      if (EdToolButton("##open", EdIcon::Folder, "Open", false, false)) {
         mBrowser.Show();
       }
       ImGui::EndDisabled();
       tip("Browse maps: every map on this computer (the game's, FAF's folder, your vault) and maps from the FAF vault");
       ImGui::SameLine();
       ImGui::BeginDisabled(!open);
-      if (ImGui::Button("Save")) {
+      if (EdToolButton("##save", EdIcon::Save, "Save", false, false)) {
         mCommand = Command::Save;
       }
       tip("Save the map into its folder (Ctrl+S)");
       ImGui::SameLine();
-      if (ImGui::Button("Save as")) {
+      if (EdToolButton("##saveas", EdIcon::SaveAs, "Save as", false, false)) {
         mOpenSaveAs = true;
       }
       tip("Save the map as a new folder in your vault");
@@ -387,14 +387,14 @@ namespace faf::editor
 
       // Edit.
       ImGui::BeginDisabled(!open || !mDocument.CanUndo());
-      if (ImGui::Button("Undo")) {
+      if (EdToolButton("##undo", EdIcon::Undo, "Undo", false, false, EdSegment::First)) {
         mCommand = Command::Undo;
       }
       ImGui::EndDisabled();
       tip("Undo the last edit (Ctrl+Z)");
-      ImGui::SameLine();
+      ImGui::SameLine(0.0f, 1.0f);
       ImGui::BeginDisabled(!open || !mDocument.CanRedo());
-      if (ImGui::Button("Redo")) {
+      if (EdToolButton("##redo", EdIcon::Redo, "Redo", false, false, EdSegment::Last)) {
         mCommand = Command::Redo;
       }
       ImGui::EndDisabled();
@@ -403,40 +403,35 @@ namespace faf::editor
       divider();
 
       // The build grid and snapping.
-      const auto toggle = [](const char* const label, const bool on) {
-        if (on) {
-          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.55f, 0.36f, 0.16f, 1.0f));
-          ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.66f, 0.44f, 0.20f, 1.0f));
-        }
-        const bool clicked = ImGui::Button(label);
-        if (on) {
-          ImGui::PopStyleColor(2);
-        }
+      const auto toggle = [](const char* const label, const EdIcon icon, const bool on) {
+        ImGui::PushID(label);
+        const bool clicked = EdToolButton("##toggle", icon, label, true, on);
+        ImGui::PopID();
         return clicked;
       };
-      if (toggle("Grid", mTools.ShowGrid())) {
+      if (toggle("Grid", EdIcon::Grid, mTools.ShowGrid())) {
         mTools.SetShowGrid(!mTools.ShowGrid());
       }
       tip("The build grid on the ground around the cursor: cells of the step's size, one unit being the cell units are built on");
       ImGui::SameLine();
-      if (toggle("Snap", mTools.SnapToGrid())) {
+      if (toggle("Snap", EdIcon::Magnet, mTools.SnapToGrid())) {
         mTools.SetSnapToGrid(!mTools.SnapToGrid());
       }
       tip("Markers and props placed or dragged go to the middle of a grid cell (mass and hydrocarbon points always sit on half units, as the game's saves place them)");
       ImGui::SameLine();
-      if (toggle("On ground", mTools.KeepOnGround())) {
+      if (toggle("On ground", EdIcon::OnGround, mTools.KeepOnGround())) {
         mTools.SetKeepOnGround(!mTools.KeepOnGround());
       }
       tip("The move arrows keep markers and props on the ground when they move across it; off, they keep their height. "
           "Nothing is moved under the ground either way.");
       ImGui::SameLine();
-      if (toggle("Slope", mTools.ShowSlope())) {
+      if (toggle("Slope", EdIcon::Slope, mTools.ShowSlope())) {
         mTools.SetShowSlope(!mTools.ShowSlope());
       }
       tip("Each cell's slope as the game's pathing reads it (its steepest edge): yellow above 0.25 (too steep to build on), orange "
           "above 0.5, red above 0.75 (steeper than most land units climb)");
       ImGui::SameLine();
-      if (toggle("Km grid", mTools.ShowKmGrid())) {
+      if (toggle("Km grid", EdIcon::Ruler, mTools.ShowKmGrid())) {
         mTools.SetShowKmGrid(!mTools.ShowKmGrid());
       }
       tip("Lines every kilometre (51.2 units, the game's scale) and the map's centre lines. Alt+drag in the view measures a distance.");
@@ -472,12 +467,13 @@ namespace faf::editor
                                  : "Map border (the playable area): edit it from any tool");
       divider();
       // What the view shows, one toggle per kind (Blender's object type visibility); hidden things aren't picked.
-      if (IconToggle("##showprops", EdIcon::Tree, mTools.ShowProps())) {
+      // One joined row (1 px apart, rounded at its ends), as Blender's and the image editors' toggle groups.
+      if (IconToggle("##showprops", EdIcon::Tree, mTools.ShowProps(), EdSegment::First)) {
         mTools.ShowProps() = !mTools.ShowProps();
       }
       tip(mTools.ShowProps() ? "Props shown (trees, rocks, wrecks): click to hide them" : "Props hidden: click to show them");
-      ImGui::SameLine();
-      if (IconToggle("##showunits", EdIcon::Tank, mTools.ShowUnits())) {
+      ImGui::SameLine(0.0f, 1.0f);
+      if (IconToggle("##showunits", EdIcon::Tank, mTools.ShowUnits(), EdSegment::Middle)) {
         mTools.ShowUnits() = !mTools.ShowUnits();
       }
       tip(mTools.ShowUnits() ? "Units shown (the armies' and civilians' units): click to hide them" : "Units hidden: click to show them");
@@ -497,13 +493,14 @@ namespace faf::editor
       };
       std::set<std::string>& hidden = mTools.HiddenMarkerTypes();
       for (const MarkerGroup& group : kGroups) {
+        const EdSegment segment = &group == &kGroups[std::size(kGroups) - 1] ? EdSegment::Last : EdSegment::Middle;
         bool shown = true;
         for (const MarkerType& type : MarkerTypes()) {
           shown = shown && (std::string(group.group) != type.group || hidden.count(type.type) == 0);
         }
-        ImGui::SameLine();
+        ImGui::SameLine(0.0f, 1.0f);
         ImGui::PushID(group.group);
-        if (IconToggle("##showmarkers", group.icon, shown)) {
+        if (IconToggle("##showmarkers", group.icon, shown, segment)) {
           for (const MarkerType& type : MarkerTypes()) {
             if (std::string(group.group) == type.group) {
               if (shown) {
