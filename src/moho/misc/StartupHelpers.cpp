@@ -4314,6 +4314,11 @@ bool moho::DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std
 
 bool moho::DISK_MountDirectoryNow(const std::filesystem::path& directory, const char* const mountpoint)
 {
+  return DISK_MountDirectoriesNow({{directory, std::string(mountpoint)}});
+}
+
+bool moho::DISK_MountDirectoriesNow(const std::vector<std::pair<std::filesystem::path, std::string>>& folders)
+{
   fa::vector<moho::SVFSMountPoint> mountPoints;
   std::filesystem::path launchDirectory;
   {
@@ -4321,8 +4326,10 @@ bool moho::DISK_MountDirectoryNow(const std::filesystem::path& directory, const 
     if (!gMountTableKnown) {
       return false;
     }
-    const std::u8string folder = directory.generic_u8string();
-    gMountedPoints.push_back(moho::SVFSMountPoint(reinterpret_cast<const char*>(folder.c_str()), mountpoint));
+    for (const auto& [directory, mountpoint] : folders) {
+      const std::u8string folder = directory.generic_u8string();
+      gMountedPoints.push_back(moho::SVFSMountPoint(reinterpret_cast<const char*>(folder.c_str()), mountpoint.c_str()));
+    }
     mountPoints = gMountedPoints;
     launchDirectory = gLaunchDirectory;
   }

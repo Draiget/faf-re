@@ -1500,6 +1500,9 @@ namespace moho
    */
   bool DISK_MountDirectoryNow(const std::filesystem::path& directory, const char* mountpoint);
 
+  /** DISK_MountDirectoryNow for several folders (folder, mount point) with one rebuild of the file system. */
+  bool DISK_MountDirectoriesNow(const std::vector<std::pair<std::filesystem::path, std::string>>& folders);
+
   /**
    * Address: 0x00459DA0 (FUN_00459DA0, ?DISK_GetAllowedProtocols@Moho@@YA?AV?$vector@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@V?$allocator@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@@2@@std@@XZ)
    *

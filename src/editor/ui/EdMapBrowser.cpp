@@ -246,9 +246,8 @@ namespace faf::editor
     // Where it is on disk, which says whose it is.
     if (moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS(); vfs != nullptr) {
       fa::string disk;
-      if (vfs->FindFile(&disk, scenario.c_str(), nullptr) != nullptr) {
-        details.disk = disk.c_str();
-      }
+      (void)vfs->FindFile(&disk, scenario.c_str(), nullptr); // empty when the file isn't there
+      details.disk = disk.c_str();
     }
     const std::string disk = Lower(details.disk);
     const std::string vault = Lower(mDocument.VaultFolder().generic_string());
@@ -399,7 +398,10 @@ namespace faf::editor
       // The same folder (mounted at startup): open it. Another folder of that name: the game would mix them.
       fa::string disk;
       moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS();
-      const bool same = vfs != nullptr && vfs->FindFile(&disk, listed.c_str(), nullptr) != nullptr &&
+      if (vfs != nullptr) {
+        (void)vfs->FindFile(&disk, listed.c_str(), nullptr); // empty when the file isn't there
+      }
+      const bool same = !disk.empty() &&
                         std::filesystem::equivalent(std::filesystem::path(disk.c_str()).parent_path(), folder, code);
       if (!same) {
         refuse("the game already has a map folder named " + mount + " (" + std::string(disk.c_str()) + "); rename one of them");

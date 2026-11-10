@@ -50,6 +50,7 @@
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/misc/SessionStartup.h"
+#include "moho/misc/CVirtualFileSystem.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/WRenViewport.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -155,6 +156,108 @@ namespace faf::editor
       }
       return true;
     }
+    /**
+     * The vault the FAF client set: `custom_vault_path` in fa_path.lua, which the init file reads from the folder
+     * above its own (`dofile(InitFileDir .. '/../fa_path.lua')`) and mounts the maps of. Empty without one.
+     */
+    [[nodiscard]] std::filesystem::path ClientVaultFolder()
+    {
+      const std::filesystem::path script = moho::DISK_GetDataPathScriptFile();
+      if (script.empty()) {
+        return {};
+      }
+      std::ifstream file(script.parent_path().parent_path() / "fa_path.lua");
+      std::string line;
+      while (std::getline(file, line)) {
+        const std::size_t name = line.find("custom_vault_path");
+        const std::size_t open = name == std::string::npos ? name : line.find('"', name);
+        const std::size_t close = open == std::string::npos ? open : line.find('"', open + 1);
+        if (close == std::string::npos) {
+          continue;
+        }
+        const std::string value = line.substr(open + 1, close - open - 1);
+        std::filesystem::path folder(std::u8string(reinterpret_cast<const char8_t*>(value.data()), value.size()));
+        // The client's "relative game paths" option writes it without the home folder.
+        if (!folder.empty() && !folder.has_root_name()) {
+          if (PWSTR profile = nullptr; SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_Profile, 0, nullptr, &profile))) {
+            folder = std::filesystem::path(profile) / folder.relative_path();
+            ::CoTaskMemFree(profile);
+          }
+        }
+        return folder;
+      }
+      return {};
+    }
+
+    /** Whether this Windows user can list and write `folder`'s maps (another user's Documents can't). */
+    [[nodiscard]] bool VaultUsable(const std::filesystem::path& folder)
+    {
+      std::error_code code;
+      if (folder.empty() || !std::filesystem::is_directory(folder, code)) {
+        return false;
+      }
+      std::filesystem::create_directories(folder / "maps", code);
+      std::filesystem::directory_iterator listing(folder / "maps", code);
+      if (code) {
+        return false;
+      }
+      const std::filesystem::path probe = folder / "maps" / ".faf_editor_write_check";
+      bool written = false;
+      {
+        std::ofstream out(probe, std::ios::binary);
+        written = out.good();
+      }
+      std::filesystem::remove(probe, code);
+      return written;
+    }
+
+    /**
+     * Mounts the vault's map folders the init file didn't (it mounts the FAF client's vault only, so maps
+     * downloaded into another one were gone after a restart: user report). A folder whose name the game
+     * already lists is left alone, as the init file does (two folders of one name would mix).
+     */
+    void MountVaultMaps(const std::filesystem::path& vault)
+    {
+      const auto lower = [](std::string text) {
+        std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return text;
+      };
+      moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS();
+      std::vector<std::pair<std::filesystem::path, std::string>> folders;
+      std::error_code code;
+      for (const auto& entry : std::filesystem::directory_iterator(vault / "maps", code)) {
+        if (!entry.is_directory(code)) {
+          continue;
+        }
+        std::string scenario;
+        for (const auto& file : std::filesystem::directory_iterator(entry.path(), code)) {
+          const std::string name = lower(file.path().filename().string());
+          if (name.size() > 13 && name.compare(name.size() - 13, 13, "_scenario.lua") == 0) {
+            scenario = name;
+          }
+        }
+        const std::string folder = lower(entry.path().filename().string());
+        // FindFile returns its out string whether or not it found the file; an empty one is "not there".
+        fa::string disk;
+        if (vfs != nullptr && !scenario.empty()) {
+          (void)vfs->FindFile(&disk, ("/maps/" + folder + "/" + scenario).c_str(), nullptr);
+        }
+        if (scenario.empty() || !disk.empty()) {
+          continue;
+        }
+        folders.emplace_back(entry.path(), "/maps/" + folder);
+      }
+      if (folders.empty()) {
+        return;
+      }
+      if (!moho::DISK_MountDirectoriesNow(folders)) {
+        gpg::Warnf("editor: the vault's %zu map folders not in the game's list couldn't be mounted", folders.size());
+        return;
+      }
+      gpg::Logf("editor: mounted %zu map folders of the vault the init file doesn't mount (first: %s)", folders.size(),
+                folders.front().first.string().c_str());
+    }
+
     void OnMenuCommand(UINT command);
     bool OnViewportMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
     void OnMenuOpening(HMENU menu);
@@ -609,6 +712,23 @@ namespace faf::editor
       if (const std::filesystem::path folder = EditorSettingsFolder(); !folder.empty()) {
         mPendingFafTokenFile = folder / "faf_login.bin";
       }
+      // The vault: `/vault <folder>` (a test folder); else the FAF client's (fa_path.lua), which the game mounts and
+      // the client lists, when this Windows user can write it; else Documents\My Games\..., as init_faf.lua finds
+      // it without a client path. Its maps the init file didn't mount are mounted here.
+      const std::filesystem::path clientVault = ClientVaultFolder();
+      if (fa::vector<fa::string> vault; moho::CFG_GetArgOption("/vault", 1, &vault) && !vault.empty()) {
+        mDocument.SetVaultFolder(vault[0].c_str());
+      } else if (VaultUsable(clientVault)) {
+        mDocument.SetVaultFolder(clientVault);
+      } else if (PWSTR documents = nullptr; SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &documents))) {
+        mDocument.SetVaultFolder(std::filesystem::path(documents) / "My Games" / "Gas Powered Games" / "Supreme Commander Forged Alliance");
+        ::CoTaskMemFree(documents);
+        if (!clientVault.empty()) {
+          gpg::Logf("editor: the FAF client's vault %s isn't writable by this Windows user", clientVault.string().c_str());
+        }
+      }
+      gpg::Logf("editor: the vault is %s", mDocument.VaultFolder().string().c_str());
+      MountVaultMaps(mDocument.VaultFolder());
       mPlay.FindMaps();
       mPlay.ReadCommandLine();
       mShell = new EdShell(mLog, mPlay, mDocument);
@@ -617,15 +737,6 @@ namespace faf::editor
         mShell->Browser().Faf().SetPictureCache(mPendingFafTokenFile.parent_path() / "cache" / "maps");
       }
       mDocument.SetBeforeDrop([this] { mScene.Detach(); });
-      // The vault, as init_faf.lua finds it without the client's custom path: Documents\My Games\...;
-      // `/vault <folder>` sets another (the FAF client's custom vault, or a test folder).
-      if (fa::vector<fa::string> vault; moho::CFG_GetArgOption("/vault", 1, &vault) && !vault.empty()) {
-        mDocument.SetVaultFolder(vault[0].c_str());
-      } else if (PWSTR documents = nullptr; SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &documents))) {
-        mDocument.SetVaultFolder(std::filesystem::path(documents) / "My Games" / "Gas Powered Games" / "Supreme Commander Forged Alliance");
-        ::CoTaskMemFree(documents);
-      }
-      gpg::Logf("editor: the vault is %s", mDocument.VaultFolder().string().c_str());
       mScene.SetTools(&mShell->Tools());
       mShell->Tools().SetPropPictures([this](const std::string& blueprint) { return mPropThumbnails.Get(blueprint); });
       ReadOpenCommandLine();
