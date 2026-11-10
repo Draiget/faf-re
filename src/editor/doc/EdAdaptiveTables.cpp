@@ -397,6 +397,44 @@ namespace faf::editor
     return text.substr(0, before) + (needComma ? "," : "") + "\n\n" + entry + text.substr(span.close);
   }
 
+  std::string WithLobbyOptionValues(const std::string& text, const std::string& key, const std::string& label, const std::string& help,
+                                    const std::vector<std::pair<std::string, std::string>>& values)
+  {
+    const OptionSpan span = FindOptionSpan(text, key);
+    const int count = static_cast<int>(values.size());
+    int defaultKey = 1;
+    if (span.from != std::string::npos) {
+      const int kept = NumberAfter(text, span.from, span.to, "default", 1);
+      defaultKey = kept >= 1 && kept <= count ? kept : 1;
+    }
+    const auto quoted = [](std::string s) {
+      std::string out;
+      for (const char c : s) {
+        out += c == '"' ? std::string("\\\"") : std::string(1, c);
+      }
+      return out;
+    };
+    std::string entry = "{\n    default = " + std::to_string(defaultKey) + ",\n    label = \"" + quoted(label) + "\",\n    help = \"" + quoted(help) +
+                        "\",\n    key = '" + key + "',\n    pref = '" + key + "',\n    values = {\n";
+    for (int i = 0; i < count; ++i) {
+      entry += "        { text = \"" + quoted(values[static_cast<std::size_t>(i)].first) + "\", help = \"" +
+               quoted(values[static_cast<std::size_t>(i)].second) + "\", key = " + std::to_string(i + 1) + ", },\n";
+    }
+    entry += "    },\n},\n";
+    if (span.from != std::string::npos) {
+      return text.substr(0, span.from) + entry + text.substr(span.to);
+    }
+    if (span.close == std::string::npos) {
+      return (text.empty() ? std::string() : text + "\n") + "options = {\n\n" + entry + "\n}\n";
+    }
+    std::size_t before = span.close;
+    while (before > 0 && std::isspace(static_cast<unsigned char>(text[before - 1])) != 0) {
+      --before;
+    }
+    const bool needComma = before > 0 && text[before - 1] == '}';
+    return text.substr(0, before) + (needComma ? "," : "") + "\n\n" + entry + text.substr(span.close);
+  }
+
   std::string WithoutLobbyOption(const std::string& text, const std::string& key)
   {
     const OptionSpan span = FindOptionSpan(text, key);

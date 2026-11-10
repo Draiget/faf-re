@@ -81,6 +81,12 @@ namespace faf::editor
    */
   std::string WithLobbyOption(const std::string& text, const std::string& key, const std::string& label, bool hydro,
                               const std::vector<int>& groupSizes);
+  /**
+   * The text with option `key` written with these values (text and help each, keys 1, 2, ...), replaced where it is
+   * (keeping its default when that is still a value) or added at the end of `options`.
+   */
+  std::string WithLobbyOptionValues(const std::string& text, const std::string& key, const std::string& label, const std::string& help,
+                                    const std::vector<std::pair<std::string, std::string>>& values);
   /** The text without option `key` (unchanged when it has none). */
   std::string WithoutLobbyOption(const std::string& text, const std::string& key);
 } // namespace faf::editor

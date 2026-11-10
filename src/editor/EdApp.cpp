@@ -34,6 +34,7 @@
 #include <cstring>
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdRoundTrip.h"
+#include "editor/doc/EdUnitWrecks.h"
 #include "editor/ui/EdImGuiRenderer.h"
 #include "editor/tools/EdHeightFile.h"
 #include "editor/view/EdMapScene.h"
@@ -553,6 +554,7 @@ namespace faf::editor
       /** `/framemarker <name>[@distance]` (test runs): the camera goes to that marker once the map is shown. */
       std::string mFrameMarkerArg;
       bool mSelectUnitDone = false;
+      int mFocusPanelFrames = 0;
       bool mWaterFilesDone = false;
       bool mLightingFilesDone = false;
       bool mLightingFromDone = false;
@@ -1188,6 +1190,13 @@ namespace faf::editor
           }
         }
         mShell->Draw();
+        // `/focuspanel <window>` (test runs): that panel in front, a while after the map opened (opening fronts Info).
+        if (mFocusPanelFrames < 90 && mDocument.GetState() == EdDocument::State::Open) {
+          if (fa::vector<fa::string> panel; ++mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/focuspanel", 1, &panel) && !panel.empty()) {
+            ImGui::SetWindowFocus(panel[0].c_str());
+            gpg::Logf("editor: /focuspanel %s", panel[0].c_str());
+          }
+        }
         switch (mShell->TakeCommand()) {
         case EdShell::Command::Save:
           SaveDocument();
@@ -1715,6 +1724,7 @@ namespace faf::editor
           mWaterSetArg.clear();
         }
         tools.SetUnitSelectionCount(mScene.UnitSelectionCount());
+        tools.SetUnitSelection(mScene.UnitSelection());
         if (!mUnitToolArg.empty()) {
           const std::size_t first = mUnitToolArg.find(',');
           const std::size_t second = first == std::string::npos ? std::string::npos : mUnitToolArg.find(',', first + 1);
@@ -1727,10 +1737,22 @@ namespace faf::editor
           // The map's reclaim, counted twice a second while the Props tool shows.
           if (++mReclaimFrames % 30 == 1) {
             const EdDocument::ReclaimTotals reclaim = mDocument.PropReclaim();
-            if (reclaim.props > 0 || !reclaim.rows.empty()) {
-              char summary[200];
-              (void)std::snprintf(summary, sizeof(summary), "%d props: %.0f mass, %.0f energy. %d give none, %d have no blueprint.", reclaim.props,
-                                  reclaim.mass, reclaim.energy, reclaim.none, reclaim.unknown);
+            // The units that become wrecks count too: from the start (WRECKAGE), and those the script's groups add.
+            const UnitWreckTotals wrecks = MapUnitWrecks(mDocument);
+            if (reclaim.props > 0 || !reclaim.rows.empty() || wrecks.startCount > 0 || wrecks.scriptCount > 0) {
+              char summary[480];
+              int used = std::snprintf(summary, sizeof(summary), "%d props: %.0f mass, %.0f energy. %d give none, %d have no blueprint.",
+                                       reclaim.props, reclaim.mass, reclaim.energy, reclaim.none, reclaim.unknown);
+              if (wrecks.startCount > 0 && used > 0 && used < static_cast<int>(sizeof(summary))) {
+                used += std::snprintf(summary + used, sizeof(summary) - static_cast<std::size_t>(used),
+                                      " Unit wrecks from the start: %d, %.0f mass, %.0f energy.", wrecks.startCount, wrecks.startMass,
+                                      wrecks.startEnergy);
+              }
+              if (wrecks.scriptCount > 0 && used > 0 && used < static_cast<int>(sizeof(summary))) {
+                (void)std::snprintf(summary + used, sizeof(summary) - static_cast<std::size_t>(used),
+                                    " The script's wreck groups, all on: %d more, %.0f mass, %.0f energy (lobby options decide).",
+                                    wrecks.scriptCount, wrecks.scriptMass, wrecks.scriptEnergy);
+              }
               std::vector<std::string> rows;
               for (std::size_t i = 0; i < reclaim.rows.size() && i < 8; ++i) {
                 const EdDocument::ReclaimRow& row = reclaim.rows[i];
@@ -2567,6 +2589,14 @@ namespace faf::editor
         if (EdTools::UnitWreckAsk wreck; tools.TakeUnitWreck(wreck) && mDocument.GetState() == EdDocument::State::Open) {
           mScene.SetUnitsWreck(wreck.army, wreck.names, wreck.wreck);
           mUnitTreeFrames = 0;
+        }
+        if (EdTools::UnitGroupAsk group; tools.TakeUnitGroup(group) && mDocument.GetState() == EdDocument::State::Open) {
+          if (group.select) {
+            mScene.SelectUnits(std::move(group.units));
+          } else {
+            (void)mScene.MoveUnitsToGroup(group.army, group.names, group.path);
+            mUnitTreeFrames = 0;
+          }
         }
       }
       // `/slope`, `/kmgrid` for test runs: the view aids on.

@@ -25,6 +25,8 @@ namespace faf::editor
       ScriptUnit,
       /** In a group the map's script creates as wrecks (`CreateArmyGroup(..., true)`). */
       ScriptWreck,
+      /** In a group the script creates as wrecks or as units, as a lobby option picks (DualGap's civilian base). */
+      ScriptEither,
       /** In a group nothing creates (the script doesn't name it): never in a game. */
       Never,
     };
@@ -34,6 +36,18 @@ namespace faf::editor
     /** One sentence for the Properties panel. */
     std::string text;
   };
+
+  /** One `CreateArmyGroup(army, group, wreckage)` (or a kin) in a map's script: names as written, `..` a name's start. */
+  struct ScriptGroupCreation
+  {
+    /** The army, when written as a string ('ARMY_17'); empty when made at run time. */
+    std::string army;
+    std::string name;
+    /** `'Optional_Wreckage_' .. w`: the name is the start of the groups' names. */
+    bool prefix = false;
+    bool wreck = false;
+  };
+  std::vector<ScriptGroupCreation> ScriptGroupCreations(const std::string& script);
 
   /** The names of the groups from under the army's root down to the unit's (empty when the unit isn't there). */
   std::vector<std::string> UnitGroupPath(const UnitGroup& root, const std::string& unit);

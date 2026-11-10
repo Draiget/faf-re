@@ -276,7 +276,9 @@ namespace faf::editor
     [[nodiscard]] moho::IDecalManager* Decals() const;
     /** The map's `_save.lua` (markers, areas) and `_script.lua` as the editor keeps them. */
     [[nodiscard]] SaveFile& SaveData() noexcept { return mSave; }
+    [[nodiscard]] const SaveFile& SaveData() const noexcept { return mSave; }
     [[nodiscard]] std::string& Script() noexcept { return mScript; }
+    [[nodiscard]] const std::string& Script() const noexcept { return mScript; }
     /** An adaptive map's `_tables.lua` as the editor keeps it (empty when the map has none yet). */
     [[nodiscard]] const std::string& TablesText() const noexcept { return mTables; }
     [[nodiscard]] bool Adaptive() const noexcept { return !mFacts.tablesPath.empty(); }

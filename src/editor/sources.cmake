@@ -15,6 +15,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdSaveFile.cpp
   doc/EdUnits.cpp
   doc/EdUnitFate.cpp
+  doc/EdUnitWrecks.cpp
   doc/EdPackage.cpp
   doc/EdWaterPreset.cpp
   doc/EdJson.cpp

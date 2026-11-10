@@ -25,13 +25,6 @@ namespace faf::editor
       return false;
     }
 
-    /** One group creation in the script: its name (or the start of it, before `..`) and whether as wrecks. */
-    struct ScriptGroup
-    {
-      std::string name;
-      bool prefix = false;
-      bool wreck = false;
-    };
 
     /** The arguments of the call whose `(` is at `open`, split at top-level commas (strings and nesting skipped). */
     std::vector<std::string> Arguments(const std::string& text, const std::size_t open)
@@ -78,9 +71,12 @@ namespace faf::editor
       return text.substr(a, b - a);
     }
 
-    std::vector<ScriptGroup> ScriptGroups(const std::string& script)
+  } // namespace
+
+  std::vector<ScriptGroupCreation> ScriptGroupCreations(const std::string& script)
+  {
     {
-      std::vector<ScriptGroup> groups;
+      std::vector<ScriptGroupCreation> groups;
       // ScenarioUtilities' group creators: CreateArmyGroup(army, group, wreckage), CreateArmyGroupAsPlatoon(...),
       // CreateArmyTree(army, group) and their kin all take the group's name second.
       for (std::size_t at = script.find("CreateArmy"); at != std::string::npos; at = script.find("CreateArmy", at + 10)) {
@@ -98,7 +94,10 @@ namespace faf::editor
           continue; // a name made at run time: not matched
         }
         const std::size_t close = second.find(second[0], 1);
-        ScriptGroup group;
+        ScriptGroupCreation group;
+        if (const std::string first = Trim(args[0]); first.size() >= 2 && (first[0] == '\'' || first[0] == '"') && first.back() == first[0]) {
+          group.army = first.substr(1, first.size() - 2);
+        }
         group.name = second.substr(1, close - 1);
         group.prefix = second.find("..", close) != std::string::npos;
         group.wreck = Trim(function) == "CreateArmyGroup" && args.size() >= 3 && Trim(args[2]) == "true";
@@ -106,7 +105,10 @@ namespace faf::editor
       }
       return groups;
     }
+  }
 
+  namespace
+  {
     /** A number after `name =` in text[from, to), or `otherwise`. */
     double NumberAfter(const std::string& text, const std::size_t from, const std::size_t to, const char* const name, const double otherwise)
     {
@@ -157,17 +159,29 @@ namespace faf::editor
         return fate;
       }
     }
-    const std::vector<ScriptGroup> made = ScriptGroups(script);
+    const std::vector<ScriptGroupCreation> made = ScriptGroupCreations(script);
     for (auto group = path.rbegin(); group != path.rend(); ++group) {
-      for (const ScriptGroup& creation : made) {
+      // Every creation of this group: one script may make it as wrecks for one lobby option and as units for another.
+      bool asWreck = false;
+      bool asUnit = false;
+      for (const ScriptGroupCreation& creation : made) {
         if (creation.prefix ? group->rfind(creation.name, 0) == 0 : *group == creation.name) {
-          fate.kind = creation.wreck ? UnitFate::Kind::ScriptWreck : UnitFate::Kind::ScriptUnit;
-          fate.group = *group;
-          fate.text = std::string("Only when the map's script creates the group ") + *group + (creation.wreck ? ", as wrecks" : ", as units") +
-                      " (a lobby option often decides it).";
-          return fate;
+          (creation.wreck ? asWreck : asUnit) = true;
         }
       }
+      if (!asWreck && !asUnit) {
+        continue;
+      }
+      fate.group = *group;
+      if (asWreck && asUnit) {
+        fate.kind = UnitFate::Kind::ScriptEither;
+        fate.text = "Only when the map's script creates the group " + *group + ": as wrecks or as live units, as a lobby option picks.";
+      } else {
+        fate.kind = asWreck ? UnitFate::Kind::ScriptWreck : UnitFate::Kind::ScriptUnit;
+        fate.text = "Only when the map's script creates the group " + *group + (asWreck ? ", as wrecks" : ", as units") +
+                    " (a lobby option often decides it).";
+      }
+      return fate;
     }
     fate.group = path.empty() ? std::string() : path.back();
     fate.text = path.empty() ? "Not in a group: never in a game."
@@ -191,7 +205,17 @@ namespace faf::editor
       }
     }
     if (start == std::string::npos) {
-      return wreck;
+      // FAF's Blueprints.lua "hotfix for naval wrecks": a NAVAL unit without a Wreckage table gets the default one
+      // (DefaultWreckage, MassMult 0.9, EnergyMult 0).
+      const std::size_t categories = text.find("Categories");
+      const std::size_t close = categories == std::string::npos ? categories : text.find('}', categories);
+      const std::string list = close == std::string::npos ? std::string() : text.substr(categories, close - categories);
+      if (list.find("\"NAVAL\"") == std::string::npos && list.find("'NAVAL'") == std::string::npos) {
+        return wreck;
+      }
+      const std::string naval = std::string("Categories = {") + list.substr(list.find('{') + 1) +
+                                "},\nWreckage = { Blueprint = '/props/DefaultWreckage/DefaultWreckage_prop.bp', EnergyMult = 0, MassMult = 0.9 }";
+      return WreckOfUnit(naval, buildCostMass, buildCostEnergy, underwater);
     }
     int depth = 0;
     std::size_t end = start;

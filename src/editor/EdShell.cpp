@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 
 #include "editor/EdLog.h"
 #include "editor/EdPlay.h"
@@ -15,6 +16,8 @@
 #include "gpg/core/utils/Logging.h"
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "legacy/containers/String.h"
+#include "moho/misc/StartupHelpers.h"
 
 namespace faf::editor
 {
@@ -865,6 +868,13 @@ namespace faf::editor
 
   void EdShell::DrawMapPanel()
   {
+    // `/mapscroll <pixels>` (test runs): the panel scrolled there, a while after a map opened.
+    static int scrollFrames = 0;
+    if (mDocument.GetState() == EdDocument::State::Open && scrollFrames < 80 && ++scrollFrames >= 70) {
+      if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/mapscroll", 1, &value) && !value.empty()) {
+        ImGui::SetNextWindowScroll(ImVec2(-1.0f, static_cast<float>(std::atof(value[0].c_str()))));
+      }
+    }
     if (!ImGui::Begin(kMapWindow, &mShowMap)) {
       ImGui::End();
       return;

@@ -34,7 +34,12 @@ namespace
             ScenarioUtils.CreateArmyGroup('ARMY_17', 'Optional_Wreckage_' .. w, true)
         end
     end
-    ScenarioUtils.CreateArmyGroup('ARMY_17', 'Optional_Civilian_Base_2', false)
+    if(optional_civilian_base == 2) then
+        ScenarioUtils.CreateArmyGroup('ARMY_17', 'Optional_Civilian_Base_2', true)
+    elseif(optional_civilian_base == 3) then
+        ScenarioUtils.CreateArmyGroup('ARMY_17', 'Optional_Civilian_Base_2', false)
+    end
+    ScenarioUtils.CreateArmyGroup('ARMY_17', 'Outpost', false)
     ScenarioUtils.CreateArmyGroupAsPlatoon('ARMY_17', 'Patrol', 'GrowthFormation')
 )lua";
 
@@ -61,7 +66,9 @@ namespace
     const UnitFate prefix = faf::editor::FateOfUnit({"Optional_Wreckage_2", "Middle"}, true, kScript);
     EXPECT_EQ(prefix.kind, UnitFate::Kind::ScriptWreck);
     EXPECT_EQ(prefix.group, "Optional_Wreckage_2");
-    EXPECT_EQ(faf::editor::FateOfUnit({"Optional_Civilian_Base_2"}, true, kScript).kind, UnitFate::Kind::ScriptUnit);
+    // Made as wrecks for one lobby option and as units for another.
+    EXPECT_EQ(faf::editor::FateOfUnit({"Optional_Civilian_Base_2"}, true, kScript).kind, UnitFate::Kind::ScriptEither);
+    EXPECT_EQ(faf::editor::FateOfUnit({"Outpost"}, true, kScript).kind, UnitFate::Kind::ScriptUnit);
     EXPECT_EQ(faf::editor::FateOfUnit({"Patrol"}, true, kScript).kind, UnitFate::Kind::ScriptUnit);
     // Exact names only match exactly.
     EXPECT_EQ(faf::editor::FateOfUnit({"Optional_Civilian_Base_3"}, true, kScript).kind, UnitFate::Kind::Never);
@@ -101,5 +108,12 @@ namespace
     EXPECT_DOUBLE_EQ(wet.mass, 2250.0 * 0.9 * 0.8 * 0.6);
     // No Wreckage table: no wreck.
     EXPECT_FALSE(faf::editor::WreckOfUnit("UnitBlueprint { Economy = { BuildCostMass = 50 } }", 50.0, 0.0, false).exists);
+    // A naval unit without one gets FAF's default (Blueprints.lua): UES0103, a tech 1 frigate of 280 mass.
+    const faf::editor::WreckValue frigate =
+      faf::editor::WreckOfUnit("UnitBlueprint { Categories = { \"UEF\", \"NAVAL\", \"TECH1\", }, Economy = { BuildCostMass = 280 } }", 280.0,
+                               2000.0, false);
+    EXPECT_TRUE(frigate.exists);
+    EXPECT_DOUBLE_EQ(frigate.mass, 280.0 * 0.9 * 0.9);
+    EXPECT_DOUBLE_EQ(frigate.energy, 0.0);
   }
 } // namespace

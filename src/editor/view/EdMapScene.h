@@ -156,6 +156,11 @@ namespace faf::editor
     [[nodiscard]] std::string PropDetails(const std::string& blueprint) const;
     /** How many units the Units tool has selected, for its panel. */
     [[nodiscard]] int UnitSelectionCount() const noexcept { return static_cast<int>(mUnitSelection.size()); }
+    [[nodiscard]] const std::vector<std::pair<std::string, std::string>>& UnitSelection() const noexcept { return mUnitSelection; }
+    /** The panels' Select: these units (army, name) selected. */
+    void SelectUnits(std::vector<std::pair<std::string, std::string>> units) { mUnitSelection = std::move(units); }
+    /** Moves `names` of `army` into the group `path` (made when missing); one undo step. False when nothing changed. */
+    bool MoveUnitsToGroup(const std::string& army, const std::vector<std::string>& names, const std::vector<std::string>& path);
     /** Whether the armies' units are drawn (test runs wait for it). */
     [[nodiscard]] bool UnitsReady() const noexcept { return !mUnitRefs.empty(); }
     /** How many decals the Decals tool has selected, for its panel. */

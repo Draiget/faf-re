@@ -297,6 +297,31 @@ namespace faf::editor
       return {};
     }
     void SetUnitSelectionCount(const int count) noexcept { mUnitSelectionCount = count; }
+    /** The view's unit selection (army, name), each frame, for the panels. */
+    void SetUnitSelection(std::vector<std::pair<std::string, std::string>> units) { mUnitSelectionNow = std::move(units); }
+    [[nodiscard]] const std::vector<std::pair<std::string, std::string>>& UnitSelection() const noexcept { return mUnitSelectionNow; }
+    /** A panel's ask: select these units, or move these units of an army into a group (made when missing). */
+    struct UnitGroupAsk
+    {
+      bool select = false;
+      std::vector<std::pair<std::string, std::string>> units;
+      std::string army;
+      std::vector<std::string> names;
+      std::vector<std::string> path;
+    };
+    void AskUnitGroup(UnitGroupAsk ask)
+    {
+      mUnitGroupAsk = std::move(ask);
+      mUnitGroupAsked = true;
+    }
+    [[nodiscard]] bool TakeUnitGroup(UnitGroupAsk& ask)
+    {
+      if (!std::exchange(mUnitGroupAsked, false)) {
+        return false;
+      }
+      ask = std::move(mUnitGroupAsk);
+      return true;
+    }
     /** Test runs (`/unittool <type>,<army>[,select]`). */
     void SetUnitTool(std::string type, std::string army, const bool select)
     {
@@ -893,6 +918,9 @@ namespace faf::editor
     GroupAsk mGroupAsk = GroupAsk::None;
     UnitWreckAsk mUnitWreckAsk;
     bool mUnitWreckAsked = false;
+    std::vector<std::pair<std::string, std::string>> mUnitSelectionNow;
+    UnitGroupAsk mUnitGroupAsk;
+    bool mUnitGroupAsked = false;
     void DrawUnitGroup(const UnitGroup& group, std::vector<std::string>& path);
     int mTerrainTypeCode = 81;
     bool mShowTerrainTypes = true;

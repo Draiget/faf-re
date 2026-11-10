@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <functional>
 #include <initializer_list>
 #include <string>
 #include <vector>
@@ -11,6 +12,9 @@
 #include "editor/EdShell.h"
 #include "editor/doc/EdAdaptiveTables.h"
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdUnitFate.h"
+#include "editor/doc/EdUnitWrecks.h"
+#include "editor/doc/EdUnits.h"
 #include "editor/tools/EdMarkers.h"
 #include "editor/ui/EdHelp.h"
 #include "imgui.h"
@@ -415,6 +419,206 @@ namespace faf::editor
       };
       list("Forward", "forwardCrazyrushMexes: the mexes the crazyrush option spawns forward", changed.forwardCrazyrush);
       list("The one core mex", "crazyrushOneMexes: the one mex per player the crazyrush option keeps", changed.crazyrushOne);
+    }
+
+    // The script's unit groups: the wreckage options' wrecks and the civilian bases, which the lobby turns on.
+    Header("SCRIPT GROUPS");
+    HelpNote("Unit groups the map's script creates, most of them by lobby options: the wreckage options' groups become wrecks "
+             "(reclaim), the civilian base and defence options' groups wrecks or live units. A group is in a game only when its "
+             "option asks for it. Select a group's units, or move the units selected in the view into it.");
+    {
+      const std::vector<ScriptGroupCreation> creations = ScriptGroupCreations(mDocument.Script());
+      const auto creates = [&](const std::string& army, const std::string& name, bool& wreckOut, bool& unitOut) {
+        for (const ScriptGroupCreation& creation : creations) {
+          if ((creation.army.empty() || creation.army == army) &&
+              (creation.prefix ? name.rfind(creation.name, 0) == 0 : name == creation.name)) {
+            (creation.wreck ? wreckOut : unitOut) = true;
+          }
+        }
+        return wreckOut || unitOut;
+      };
+      std::vector<std::string> armies;
+      for (const ScriptGroupCreation& creation : creations) {
+        if (!creation.army.empty() && std::find(armies.begin(), armies.end(), creation.army) == armies.end()) {
+          armies.push_back(creation.army);
+        }
+      }
+      if (armies.empty()) {
+        ImGui::TextDisabled("The map's script creates no unit groups.");
+      }
+      for (const std::string& army : armies) {
+        UnitGroup root;
+        for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
+          std::string error;
+          if (entry.name == army) {
+            (void)ParseUnitGroup(entry.Get("Units"), root, error);
+          }
+        }
+        // The units selected in the view that are this army's.
+        std::vector<std::string> picked;
+        for (const auto& [owner, name] : mTools.UnitSelection()) {
+          if (owner == army) {
+            picked.push_back(name);
+          }
+        }
+        ImGui::PushID(army.c_str());
+        ImGui::TextUnformatted(army.c_str());
+        ImGui::SameLine();
+        ImGui::TextDisabled("%zu of its units selected", picked.size());
+        // Each group the script creates, at any depth of the army's tree.
+        struct Row
+        {
+          std::vector<std::string> path;
+          const UnitGroup* group;
+          bool wreck;
+          bool unit;
+        };
+        std::vector<Row> rows;
+        std::vector<std::string> path;
+        const std::function<void(const UnitGroup&)> walk = [&](const UnitGroup& group) {
+          for (const UnitGroup& child : group.groups) {
+            path.push_back(child.name);
+            bool asWreck = false;
+            bool asUnit = false;
+            if (creates(army, child.name, asWreck, asUnit)) {
+              rows.push_back({path, &child, asWreck, asUnit});
+            } else {
+              walk(child);
+            }
+            path.pop_back();
+          }
+        };
+        walk(root);
+        for (const Row& row : rows) {
+          ImGui::PushID(row.path.back().c_str());
+          std::vector<const SaveUnit*> units;
+          CollectUnits(*row.group, units);
+          double mass = 0.0;
+          if (row.wreck) {
+            for (const SaveUnit* const unit : units) {
+              mass += UnitBlueprintWreck(unit->type, UnderWater(mDocument, unit->position[0], unit->position[2])).wreck.mass;
+            }
+          }
+          ImGui::AlignTextToFramePadding();
+          ImGui::Text("   %s", row.path.back().c_str());
+          ImGui::SetItemTooltip("%s", row.wreck && row.unit ? "Created as wrecks or as live units, as a lobby option picks."
+                                      : row.wreck           ? "Created as wrecks."
+                                                            : "Created as live units.");
+          ImGui::SameLine();
+          if (row.wreck) {
+            ImGui::TextDisabled("%zu units, %.0f mass%s", units.size(), mass, row.unit ? " or live" : " as wrecks");
+          } else {
+            ImGui::TextDisabled("%zu live units", units.size());
+          }
+          RowButtons buttons(right, {"Add selected", "Select"});
+          if (buttons.Button("Add selected", !picked.empty())) {
+            EdTools::UnitGroupAsk ask;
+            ask.army = army;
+            ask.names = picked;
+            ask.path = row.path;
+            mTools.AskUnitGroup(std::move(ask));
+          }
+          if (buttons.Button("Select", !units.empty())) {
+            EdTools::UnitGroupAsk ask;
+            ask.select = true;
+            for (const SaveUnit* const unit : units) {
+              ask.units.emplace_back(army, unit->name);
+            }
+            mTools.AskUnitGroup(std::move(ask));
+          }
+          ImGui::PopID();
+        }
+
+        // The wreckage options, as the adaptive template writes them: option k creates groups <start>2 .. <start>k.
+        struct Loop
+        {
+          const char* key;
+          const char* label;
+          const char* start;
+        };
+        static constexpr Loop kLoops[] = {
+          {"optional_wreckage", "Wreckage", "Optional_Wreckage_"},
+          {"optional_naval_wreckage", "Naval wreckage", "Optional_Wreckage_Naval_"},
+          {"optional_wreckage_middle", "Middle wreckage", "Optional_Wreckage_Middle_"},
+        };
+        for (const Loop& loop : kLoops) {
+          const bool made = std::any_of(creations.begin(), creations.end(), [&](const ScriptGroupCreation& c) {
+            return c.prefix && c.name == loop.start && (c.army.empty() || c.army == army);
+          });
+          if (!made || mDocument.Script().find(loop.key) == std::string::npos) {
+            continue;
+          }
+          ImGui::PushID(loop.key);
+          // The groups there are: <start>2, <start>3, ... up to the first missing one.
+          int highest = 1;
+          std::vector<double> levelMass;
+          std::vector<std::size_t> levelUnits;
+          for (int k = 2; k < 32; ++k) {
+            const UnitGroup* group = nullptr;
+            for (const Row& row : rows) {
+              if (row.path.back() == loop.start + std::to_string(k)) {
+                group = row.group;
+              }
+            }
+            if (group == nullptr) {
+              break;
+            }
+            std::vector<const SaveUnit*> units;
+            CollectUnits(*group, units);
+            double mass = 0.0;
+            for (const SaveUnit* const unit : units) {
+              mass += UnitBlueprintWreck(unit->type, UnderWater(mDocument, unit->position[0], unit->position[2])).wreck.mass;
+            }
+            levelMass.push_back(mass);
+            levelUnits.push_back(units.size());
+            highest = k;
+          }
+          const LobbyOption lobby = FindLobbyOption(options, loop.key);
+          ImGui::AlignTextToFramePadding();
+          ImGui::Text("%s", loop.label);
+          ImGui::SameLine();
+          ImGui::TextDisabled("lobby key %s, %d groups", loop.key, highest - 1);
+          if (!lobby.found) {
+            ImGui::SameLine();
+            ImGui::TextColored(kWarn, "not in the lobby");
+          } else if (lobby.values != highest) {
+            ImGui::SameLine();
+            ImGui::TextColored(kWarn, "lobby: %d values for %d groups", lobby.values, highest - 1);
+          }
+          const std::string next = loop.start + std::to_string(highest + 1);
+          RowButtons buttons(right, {"Add to lobby", ("+ " + next).c_str()});
+          if (highest > 1 && buttons.Button(lobby.found ? "Rewrite" : "Add to lobby")) {
+            std::vector<std::pair<std::string, std::string>> values;
+            values.emplace_back("disabled", std::string("No ") + loop.label + ".");
+            double total = 0.0;
+            std::size_t count = 0;
+            for (int k = 2; k <= highest; ++k) {
+              total += levelMass[static_cast<std::size_t>(k - 2)];
+              count += levelUnits[static_cast<std::size_t>(k - 2)];
+              char help[200];
+              (void)std::snprintf(help, sizeof(help), "Spawns %s2%s%s: %zu wrecks, %.0f mass.", loop.start, k > 2 ? " to " : "",
+                                  k > 2 ? (loop.start + std::to_string(k)).c_str() : "", count, total);
+              values.emplace_back("level " + std::to_string(k - 1), help);
+            }
+            options = WithLobbyOptionValues(options, loop.key, loop.label, std::string("How many of the map's ") + loop.label +
+                                                                            " groups spawn (wrecks to reclaim).",
+                                            values);
+            optionsEdited = true;
+          }
+          ImGui::SetItemTooltip("Writes the option into _options.lua: disabled, then one value per group level (its texts are replaced)");
+          if (buttons.Button(("+ " + next).c_str())) {
+            EdTools::UnitGroupAsk ask;
+            ask.army = army;
+            ask.names = picked;
+            ask.path = {next};
+            mTools.AskUnitGroup(std::move(ask));
+          }
+          ImGui::SetItemTooltip("A new group %s in %s, with the units selected in the view (%zu): the option's next level", next.c_str(),
+                                army.c_str(), picked.size());
+          ImGui::PopID();
+        }
+        ImGui::PopID();
+      }
     }
 
     if (edited && !(changed == tables)) {

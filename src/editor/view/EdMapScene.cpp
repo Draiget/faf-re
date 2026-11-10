@@ -1,4 +1,5 @@
 #include "editor/view/EdMapScene.h"
+#include "editor/doc/EdUnitFate.h"
 
 #include <algorithm>
 #include <cmath>
@@ -1801,6 +1802,7 @@ namespace faf::editor
     int drawn = 0;
     int missing = 0;
     int unreadable = 0;
+    int wrecks = 0;
     for (const SaveEntry& army : mDocument.SaveData().Armies()) {
       UnitGroup group;
       std::string error;
@@ -1818,10 +1820,21 @@ namespace faf::editor
         moho::RResId id{};
         id.name.assign(lower.c_str());
         moho::RUnitBlueprint* const blueprint = rules->GetUnitBlueprint(id);
-        moho::RMeshBlueprint* const mesh = blueprint != nullptr ? rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint) : nullptr;
+        moho::RMeshBlueprint* mesh = blueprint != nullptr ? rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint) : nullptr;
         if (mesh == nullptr) {
           ++missing;
           continue;
+        }
+        // A unit that becomes a wreck in a game is drawn as its wreck: the `<mesh>_wreck` blueprint FAF's Blueprints.lua
+        // makes for every unit (ExtractWreckageBlueprint: the Wreckage shader), which the game's wreck props take.
+        if (const UnitFate fate = FateOfUnit(UnitGroupPath(group, unit->name), true, mDocument.Script());
+            fate.kind == UnitFate::Kind::Wreck || fate.kind == UnitFate::Kind::ScriptWreck) {
+          moho::RResId wreckId{};
+          wreckId.name.assign((std::string(blueprint->Display.MeshBlueprint.name.c_str()) + "_wreck").c_str());
+          if (moho::RMeshBlueprint* const wreck = rules->GetMeshBlueprint(wreckId); wreck != nullptr) {
+            mesh = wreck;
+            ++wrecks;
+          }
         }
         const float scale = blueprint->Display.UniformScale;
         moho::MeshInstance* const instance =
@@ -1844,7 +1857,8 @@ namespace faf::editor
         ++drawn;
       }
     }
-    gpg::Logf("editor: %d units drawn, %d without a blueprint or mesh, %d armies unreadable", drawn, missing, unreadable);
+    gpg::Logf("editor: %d units drawn (%d as wrecks), %d without a blueprint or mesh, %d armies unreadable", drawn, wrecks, missing,
+              unreadable);
   }
 
   moho::MeshInstance* EdMapScene::MakePropInstance(const moho::CWldPropEntry& entry) const
@@ -1995,23 +2009,39 @@ namespace faf::editor
 
   void EdMapScene::SetUnitsWreck(const std::string& army, const std::vector<std::string>& names, const bool wreck)
   {
-    const std::string group = wreck ? "WRECKAGE" : "INITIAL";
+    if (MoveUnitsToGroup(army, names, {wreck ? "WRECKAGE" : "INITIAL"})) {
+      gpg::Logf("editor: (%s from the start)", wreck ? "wrecks" : "units");
+    }
+  }
+
+  bool EdMapScene::MoveUnitsToGroup(const std::string& army, const std::vector<std::string>& names, const std::vector<std::string>& path)
+  {
+    std::string where;
+    for (const std::string& part : path) {
+      where += (where.empty() ? "" : "/") + part;
+    }
     EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
     int moved = 0;
+    bool made = false;
     (void)EditArmyUnits(army, [&](UnitGroup& root) {
-      if (GroupAt(root, {group}) == nullptr) {
-        (void)AddGroup(root, {}, group);
+      // The groups on the way, made when missing.
+      for (std::size_t depth = 0; depth < path.size(); ++depth) {
+        const std::vector<std::string> head(path.begin(), path.begin() + static_cast<std::ptrdiff_t>(depth + 1));
+        if (GroupAt(root, head) == nullptr) {
+          made = AddGroup(root, std::vector<std::string>(path.begin(), path.begin() + static_cast<std::ptrdiff_t>(depth)), path[depth]) || made;
+        }
       }
-      moved = MoveUnitsTo(root, names, {group});
+      moved = names.empty() ? 0 : MoveUnitsTo(root, names, path);
     });
-    if (moved == 0) {
+    if (moved == 0 && !made) {
       mDocument.RestoreSaveData(before);
-      gpg::Warnf("editor: %s: no unit moved to %s", army.c_str(), group.c_str());
-      return;
+      gpg::Warnf("editor: %s: nothing moved to %s", army.c_str(), where.c_str());
+      return false;
     }
     mDocument.SaveDataEdited(std::move(before));
     ReloadUnits();
-    gpg::Logf("editor: %d units of %s moved to %s (%s from the start)", moved, army.c_str(), group.c_str(), wreck ? "wrecks" : "units");
+    gpg::Logf("editor: %d units of %s moved to %s%s", moved, army.c_str(), where.c_str(), made ? " (made)" : "");
+    return true;
   }
 
   void EdMapScene::CtrlKey(const char key)
