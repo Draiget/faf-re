@@ -1217,7 +1217,15 @@ namespace
         meshEffect->GetStringAnnotation(material.mShaderAnnotation, fa::string("depthTechnique"), fa::string(""));
       material.mDepthTechnique.assign_owned(depthTechnique.view());
     }
-    return std::string_view(material.mDepthTechnique.c_str()) == "Depth";
+    return std::string_view(material.mDepthTechnique.c_str()) == "Depth" && !MeshMaterialUnderConstruction(material);
+  }
+
+  bool MeshMaterialUnderConstruction(const MeshMaterial& material)
+  {
+    // The build shaders (UEFBuild, CybranBuild, AeonBuild..., SeraphimBuild) draw the finished unit see-through over
+    // the part built so far, but their depth pass is the plain "Depth" of the whole finished shape. Traced, that
+    // invisible shape shaded the ground and the half-built unit under it; they keep the shadow map's shadow instead.
+    return std::string_view(material.mShaderAnnotation.c_str()).find("Build") != std::string_view::npos;
   }
 
   bool MeshMaterialAlphaTraced(MeshMaterial& material)
@@ -1313,7 +1321,8 @@ namespace
 
       // Engine addition (ren_RayTracedShadows): with rays on, opaque materials shadow by ray (RayScene.cpp)
       // and the map keeps only what the scene lacks.
-      if (gMeshDepthSkipsTraced && std::string_view(material.mDepthTechnique.c_str()) == "Depth") {
+      if (gMeshDepthSkipsTraced && std::string_view(material.mDepthTechnique.c_str()) == "Depth" &&
+          !MeshMaterialUnderConstruction(material)) {
         continue;
       }
       if (gMeshDepthSkipsAlpha) {

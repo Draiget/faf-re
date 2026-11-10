@@ -12,9 +12,12 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/GpuDriven.h"
+#include "gpg/gal/backends/common/ImageCodec.h"
+#include "moho/misc/FileWaitHandleSet.h"
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/particles/SParticleBuffer.h"
+#include "moho/resource/CParticleTexture.h"
 #include "moho/render/DynamicLightsShader.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -63,8 +66,6 @@ namespace moho
     constexpr float kCellSize = 3.0f;
     // A light lasts no longer than this many ticks, whatever its source's life (smoke that glows for seconds).
     constexpr float kMaxLifetime = 12.0f;
-    // Warm fire: the colour of additive particles, whose own colour sits in ramp textures the CPU doesn't read.
-    constexpr float kFireColor[3] = {1.0f, 0.62f, 0.32f};
 
     [[nodiscard]] bool BackendReadsBoundDepth(gpg::gal::Device& device)
     {
@@ -73,6 +74,59 @@ namespace moho
         (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 || context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
     }
   } // namespace
+
+  const DynamicLights::RampColor& DynamicLights::ColorOfRamp(const char* const path)
+  {
+    const std::string key = (path != nullptr) ? path : "";
+    const auto found = mRampColors.find(key);
+    if (found != mRampColors.end()) {
+      return found->second;
+    }
+    RampColor ramp; // the warm default when the ramp can't be read
+    if (!key.empty()) {
+      // The game path (/textures/particles/...) resolved to its file in the mounted folders and archives.
+      fa::string diskPath{};
+      if (FWaitHandleSet* const files = FILE_GetWaitHandleSet(); files != nullptr && files->mHandle != nullptr) {
+        files->mHandle->FindFile(&diskPath, key.c_str(), nullptr);
+      }
+      const gpg::MemBuffer<char> file = diskPath.empty() ? gpg::MemBuffer<char>{} : DISK_ReadFile(diskPath.c_str());
+      gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
+      gpg::gal::imaging::DecodeOptions options{};
+      options.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+      gpg::gal::imaging::Image image;
+      if (file.mBegin != nullptr && file.Size() != 0U && codec != nullptr &&
+          SUCCEEDED(codec->Decode(file.mBegin, file.Size(), options, image)) && !image.subresources.empty() && image.width != 0U) {
+        // A ramp runs over the particle's life left to right (one row per ramp selection): the light is its
+        // alpha-weighted colour over the first 60 %, where effects are brightest.
+        const gpg::gal::imaging::Image::Subresource& top = image.subresources.front();
+        const std::uint32_t columns = std::max<std::uint32_t>(1U, (top.width * 3U) / 5U);
+        double sum[3]{};
+        double alpha = 0.0;
+        double samples = 0.0;
+        for (std::uint32_t row = 0U; row < top.height; ++row) {
+          const std::uint8_t* const pixels = image.bytes.data() + top.offset + static_cast<std::size_t>(row) * top.rowPitch;
+          for (std::uint32_t column = 0U; column < columns; ++column) {
+            const std::uint8_t* const pixel = pixels + static_cast<std::size_t>(column) * 4U;
+            const double a = pixel[3] / 255.0;
+            for (int channel = 0; channel < 3; ++channel) {
+              sum[channel] += a * pixel[channel] / 255.0;
+            }
+            alpha += a;
+            samples += 1.0;
+          }
+        }
+        const double peak = std::max({sum[0], sum[1], sum[2]});
+        if (peak > 1.0e-6 && samples > 0.0) {
+          for (int channel = 0; channel < 3; ++channel) {
+            ramp.color[channel] = static_cast<float>(sum[channel] / peak);
+          }
+          // Mean brightness of the brightest channel, weighted by alpha: dim smoke ramps give weak lights.
+          ramp.strength = static_cast<float>(std::clamp(peak / samples * 1.5, 0.1, 1.0));
+        }
+      }
+    }
+    return mRampColors.emplace(key, ramp).first->second;
+  }
 
   DynamicLights& DynamicLights::Get()
   {
@@ -116,7 +170,10 @@ namespace moho
       const float position[3] = {particle.mPos.x, particle.mPos.y, particle.mPos.z};
       const float velocity[3] = {particle.mDir.x, particle.mDir.y, particle.mDir.z};
       const float size = 0.5f * (particle.mBeginSize + particle.mEndSize);
-      AddSource(position, velocity, kFireColor, light ? size * 1.5f : size, now + particle.mInterop, particle.mLifetime);
+      // The particle's own colour: its ramp texture's (UEF build effects blue, Cybran red, fire orange).
+      const RampColor& ramp = ColorOfRamp(particle.mRampTexture.tex != nullptr ? particle.mRampTexture.tex->mTexturePath.c_str() : nullptr);
+      AddSource(position, velocity, ramp.color, light ? size * 1.5f : size, now + particle.mInterop, particle.mLifetime);
+      mLights.back().intensity *= ramp.strength;
     }
     for (const SWorldTrail& trail : batch.mTrails) {
       if (trail.mBlendMode != 3) {
@@ -125,17 +182,34 @@ namespace moho
       // The trail's newest end follows its projectile or engine.
       const float position[3] = {trail.mEndPos.x, trail.mEndPos.y, trail.mEndPos.z};
       const float still[3]{};
-      AddSource(position, still, kFireColor, trail.mSize, now, 2.0f);
+      const RampColor& ramp = ColorOfRamp(trail.mRampTexture.tex != nullptr ? trail.mRampTexture.tex->mTexturePath.c_str() : nullptr);
+      AddSource(position, still, ramp.color, trail.mSize, now, 2.0f);
+      mLights.back().intensity *= ramp.strength;
     }
     for (const SWorldBeam& beam : batch.mBeams) {
-      // A beam is sent again every beat while it lasts: a light for one beat at its middle, in its own colour.
-      const float position[3] = {0.5f * (beam.mStart.x + beam.mEnd.x), 0.5f * (beam.mStart.y + beam.mEnd.y), 0.5f * (beam.mStart.z + beam.mEnd.z)};
+      if (beam.mBlendMode != SWorldBeam::BlendMode::Mode3) {
+        continue;
+      }
+      // A beam is sent again every beat while it lasts, so each light lives one beat. Its colour is the beam's own
+      // (build lasers: UEF blue, Cybran red), at full brightness: the beam colours are dim (0.6 for a Cybran
+      // build beam) and the texture brightens them on screen. Where it hits (the build point, the target) gets
+      // the light; where it starts a smaller one.
+      const auto bright = [](const Vector4f& c, float (&out)[3]) {
+        const float peak = std::max({c.x, c.y, c.z, 1.0e-3f});
+        out[0] = std::clamp(c.x / peak, 0.0f, 1.0f);
+        out[1] = std::clamp(c.y / peak, 0.0f, 1.0f);
+        out[2] = std::clamp(c.z / peak, 0.0f, 1.0f);
+      };
+      float startColor[3]{};
+      float endColor[3]{};
+      bright(beam.mStartColor, startColor);
+      bright(beam.mEndColor, endColor);
       const float still[3]{};
-      const float color[3] = {std::clamp(beam.mStartColor.x, 0.0f, 1.0f), std::clamp(beam.mStartColor.y, 0.0f, 1.0f), std::clamp(beam.mStartColor.z, 0.0f, 1.0f)};
-      const float dx = beam.mEnd.x - beam.mStart.x;
-      const float dy = beam.mEnd.y - beam.mStart.y;
-      const float dz = beam.mEnd.z - beam.mStart.z;
-      AddSource(position, still, color, beam.mWidth + 0.15f * std::sqrt(dx * dx + dy * dy + dz * dz), now, 1.5f);
+      const float end[3] = {beam.mEnd.x, beam.mEnd.y, beam.mEnd.z};
+      const float start[3] = {beam.mStart.x, beam.mStart.y, beam.mStart.z};
+      AddSource(end, still, endColor, 1.2f + beam.mWidth * 10.0f, now, 1.5f);
+      AddSource(start, still, startColor, 0.4f + beam.mWidth * 5.0f, now, 1.5f);
+      mLights.back().intensity *= 0.6f;
     }
 
     // Merge this beat's sources per cell: brighter (each further source adds less) and as far-reaching as the largest.

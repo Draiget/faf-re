@@ -7,13 +7,15 @@
 // light data, so the lights are gathered from what reaches the renderer each beat (CWorldParticles::AddParticles):
 //  - particles drawn additively, and the "TLight" particles the game's scripts create as lights;
 //  - the newest end of each additive trail (projectile glows, engine trails);
-//  - beams, in their own colour.
+//  (both in their ramp texture's colour, read once per texture)
+//  - additive beams, in their own colour, where they hit and where they start.
 // Nearby sources merge into one light per 3-unit cell. Each light is aged on the CPU in game ticks (the particle
 // shader's time) and fades out over its source's life. A half-resolution compute pass sums them per pixel from the
 // depth of terrain and opaque meshes, and a composite multiplies (1 + light) into the colour, so lit ground keeps
 // its own hue. Direct3D 12 and Vulkan only (it reads the bound depth target, as ren_Ao does).
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -62,6 +64,16 @@ namespace moho
     };
 
   private:
+    struct RampColor
+    {
+      float color[3]{1.0f, 0.62f, 0.32f}; // the colour, brightest channel 1
+      float strength = 1.0f;              // how bright and opaque the ramp is, 0..1
+    };
+    /** The light colour of a particle ramp texture (its alpha-weighted colour over the first part of life), cached. */
+    [[nodiscard]] const RampColor& ColorOfRamp(const char* path);
+
+    std::map<std::string, RampColor> mRampColors;
+
     void AddSource(const float position[3], const float velocity[3], const float color[3], float size, float birth, float lifetime);
 
     gpg::gal::Device* mDevice = nullptr;
