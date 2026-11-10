@@ -267,4 +267,43 @@ Scenario = {
     const std::string none = "ScenarioInfo = {\n    size = {512, 512},\n}\n";
     EXPECT_EQ(faf::editor::WithScenarioReclaim(none, 1.0, 2.0), none);
   }
+  TEST(SaveFile, ChainsReadAndWriteAsTheGamesSaves)
+  {
+    // SCMP_009's Chains block, as the retail save has it (CR LF).
+    const std::string chains =
+      "    Chains = {\r\n"
+      "        ['Naval_Chain_Left'] = {\r\n"
+      "            Markers = {\r\n"
+      "                \"Naval Link 00\",\r\n"
+      "                \"Naval Link 01\",\r\n"
+      "            },\r\n"
+      "        },\r\n"
+      "        ['Naval_Chain_Right'] = {\r\n"
+      "            Markers = {\r\n"
+      "                \"Naval Link 05\",\r\n"
+      "            },\r\n"
+      "        },\r\n"
+      "    },\r\n";
+    const std::string text = "Scenario = {\r\n" + chains + "    next_queue_id = '1',\r\n}\r\n";
+    faf::editor::SaveFile save;
+    std::string error;
+    ASSERT_TRUE(save.Parse(text, error)) << error;
+    ASSERT_EQ(save.Chains().size(), 2u);
+    EXPECT_EQ(save.Chains()[0].name, "Naval_Chain_Left");
+    EXPECT_EQ(save.Chains()[0].markers, (std::vector<std::string>{"Naval Link 00", "Naval Link 01"}));
+    EXPECT_EQ(save.Text(), text);
+    // Written anew, the same chains give the same text: the game's layout.
+    const std::string body = faf::editor::SaveFile::ChainsText(save.Chains(), 8, "\r\n");
+    EXPECT_EQ("    Chains = {" + body + "},\r\n", chains);
+    // A change: only the Chains block is new, and it reads back.
+    save.Chains()[1].markers.push_back("Naval Link 06");
+    save.Chains().push_back({"Patrol", {}});
+    EXPECT_TRUE(save.Changed());
+    faf::editor::SaveFile again;
+    ASSERT_TRUE(again.Parse(save.Text(), error)) << error;
+    ASSERT_EQ(again.Chains().size(), 3u);
+    EXPECT_EQ(again.Chains()[1].markers.back(), "Naval Link 06");
+    EXPECT_TRUE(again.Chains()[2].markers.empty());
+    EXPECT_NE(save.Text().find("    next_queue_id = '1',\r\n}"), std::string::npos);
+  }
 } // namespace

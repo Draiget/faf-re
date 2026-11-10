@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <cctype>
 #include <cstdio>
 #include <map>
@@ -362,6 +363,8 @@ namespace faf::editor
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputTextWithHint("##markerfilter", "Filter by name or type", mMarkerFilter, sizeof(mMarkerFilter));
 
+    DrawChains();
+
     // Group, then type, then the markers in the save's order.
     std::array<std::map<std::string, std::vector<std::size_t>>, kMarkerGroupCount> tree;
     for (std::size_t i = 0; i < markers.size(); ++i) {
@@ -482,6 +485,113 @@ namespace faf::editor
     ImGui::EndChild();
     ImGui::End();
   }
+  void EdShell::DrawChains()
+  {
+    std::vector<MarkerChain>& chains = mDocument.SaveData().Chains();
+    char header[64];
+    (void)std::snprintf(header, sizeof(header), "Chains (%zu)###chains", chains.size());
+    if (!ImGui::CollapsingHeader(header)) {
+      return;
+    }
+    // Each change is one undo step: the save as it was, the change, then the step.
+    const auto change = [this](const std::function<void(std::vector<MarkerChain>&)>& edit, const char* const what) {
+      EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+      edit(mDocument.SaveData().Chains());
+      if (before.chains != mDocument.SaveData().Chains()) {
+        mDocument.SaveDataEdited(std::move(before));
+        gpg::Logf("editor: chains: %s (%zu chains)", what, mDocument.SaveData().Chains().size());
+      }
+    };
+    std::vector<std::string> selected;
+    for (const SaveEntry& marker : mTools.MarkerSelection()) {
+      selected.push_back(marker.name);
+    }
+    for (std::size_t c = 0; c < chains.size(); ++c) {
+      ImGui::PushID(static_cast<int>(c));
+      const bool open = ImGui::TreeNodeEx("##chain", ImGuiTreeNodeFlags_SpanAvailWidth, "%s  (%zu)", chains[c].name.c_str(), chains[c].markers.size());
+      if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+        mTools.AskMarkerSelect(chains[c].markers, ImGui::GetIO().KeyCtrl);
+      }
+      if (open) {
+        for (std::size_t m = 0; m < chains[c].markers.size(); ++m) {
+          ImGui::PushID(static_cast<int>(m));
+          ImGui::Text("%zu  %s", m + 1, chains[c].markers[m].c_str());
+          const float buttons = ImGui::GetFrameHeight() * 3.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+          ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - buttons);
+          ImGui::BeginDisabled(m == 0);
+          if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
+            change([&](std::vector<MarkerChain>& all) { std::swap(all[c].markers[m], all[c].markers[m - 1]); }, "a marker moved up");
+          }
+          ImGui::EndDisabled();
+          ImGui::SameLine();
+          ImGui::BeginDisabled(m + 1 == chains[c].markers.size());
+          if (ImGui::ArrowButton("##down", ImGuiDir_Down)) {
+            change([&](std::vector<MarkerChain>& all) { std::swap(all[c].markers[m], all[c].markers[m + 1]); }, "a marker moved down");
+          }
+          ImGui::EndDisabled();
+          ImGui::SameLine();
+          if (ImGui::Button("x", ImVec2(ImGui::GetFrameHeight(), 0.0f))) {
+            change([&](std::vector<MarkerChain>& all) { all[c].markers.erase(all[c].markers.begin() + static_cast<std::ptrdiff_t>(m)); },
+                   "a marker taken out");
+          }
+          ImGui::PopID();
+          if (c >= chains.size() || m >= chains[c].markers.size()) {
+            break;
+          }
+        }
+        ImGui::BeginDisabled(selected.empty());
+        if (ImGui::SmallButton("Add the selected")) {
+          change(
+            [&](std::vector<MarkerChain>& all) {
+              for (const std::string& name : selected) {
+                if (std::find(all[c].markers.begin(), all[c].markers.end(), name) == all[c].markers.end()) {
+                  all[c].markers.push_back(name);
+                }
+              }
+            },
+            "markers added");
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Delete chain")) {
+          change([&](std::vector<MarkerChain>& all) { all.erase(all.begin() + static_cast<std::ptrdiff_t>(c)); }, "a chain deleted");
+          ImGui::TreePop();
+          ImGui::PopID();
+          break;
+        }
+        char name[128];
+        (void)std::snprintf(name, sizeof(name), "%s", chains[c].name.c_str());
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::InputText("##rename", name, sizeof(name), ImGuiInputTextFlags_EnterReturnsTrue) && name[0] != '\0') {
+          const std::string wanted = name;
+          const bool taken = std::any_of(chains.begin(), chains.end(), [&](const MarkerChain& other) { return other.name == wanted; });
+          if (!taken) {
+            change([&](std::vector<MarkerChain>& all) { all[c].name = wanted; }, "a chain renamed");
+          }
+        }
+        ImGui::TreePop();
+      }
+      ImGui::PopID();
+    }
+    // A new chain, from the selected markers in their selection order.
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("New chain").x - ImGui::GetStyle().FramePadding.x * 4.0f);
+    ImGui::InputTextWithHint("##newchain", "chain name", mNewChainName, sizeof(mNewChainName));
+    ImGui::SameLine();
+    const std::string wanted = mNewChainName;
+    const bool taken = std::any_of(chains.begin(), chains.end(), [&](const MarkerChain& other) { return other.name == wanted; });
+    ImGui::BeginDisabled(wanted.empty() || taken);
+    if (ImGui::Button("New chain")) {
+      change([&](std::vector<MarkerChain>& all) { all.push_back({wanted, selected}); }, "a chain made");
+      mNewChainName[0] = '\0';
+    }
+    ImGui::EndDisabled();
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+    ImGui::TextWrapped("A chain is a route scripts and the AI follow (Naval_Chain_Left on Seton's Clutch). A new one takes the selected "
+                       "markers; a click on a chain selects its markers. Renaming or deleting a marker updates the chains.");
+    ImGui::PopStyleColor();
+    ImGui::Separator();
+  }
+
   namespace
   {
     float CheckGround(const void* const context, const float x, const float z)

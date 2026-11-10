@@ -315,6 +315,7 @@ namespace faf::editor
       std::string script;
       std::vector<SaveEntry> armies;
       std::string scenario;
+      std::vector<MarkerChain> chains;
     };
     [[nodiscard]] SaveSnapshot SaveDataNow() const;
     void RestoreSaveData(const SaveSnapshot& snapshot);

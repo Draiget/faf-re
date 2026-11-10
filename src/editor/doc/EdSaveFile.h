@@ -38,6 +38,14 @@ namespace faf::editor
    * areas parsed out. Text writes the file again: unchanged, or with only the blocks whose entries
    * changed written anew in the game's own layout, everything else as it was.
    */
+  /** A chain of `_save.lua`'s `Chains`: its name and its markers' names, in order (a route scripts and the AI follow). */
+  struct MarkerChain
+  {
+    std::string name;
+    std::vector<std::string> markers;
+    bool operator==(const MarkerChain& other) const { return name == other.name && markers == other.markers; }
+  };
+
   /** Where a save entry was in the text: what came before it (space, banners), itself with its comma, its values. */
   struct SaveEntrySpan
   {
@@ -59,6 +67,11 @@ namespace faf::editor
     [[nodiscard]] const std::vector<SaveEntry>& Markers() const noexcept { return mMarkers; }
     [[nodiscard]] const std::vector<SaveEntry>& Areas() const noexcept { return mAreas; }
     [[nodiscard]] const std::vector<SaveEntry>& Armies() const noexcept { return mArmies; }
+    /** The `Chains` block's chains (written again, in the game's layout, only when they change). */
+    [[nodiscard]] std::vector<MarkerChain>& Chains() noexcept { return mChains; }
+    [[nodiscard]] const std::vector<MarkerChain>& Chains() const noexcept { return mChains; }
+    /** The chains as the game's saves write them, the entries at `indent` spaces, in these line ends. */
+    [[nodiscard]] static std::string ChainsText(const std::vector<MarkerChain>& chains, int indent, const std::string& nl);
 
     /** The file's text with the current markers and areas. */
     [[nodiscard]] std::string Text() const;
@@ -87,6 +100,9 @@ namespace faf::editor
     Block mMarkerBlock;
     Block mAreaBlock;
     Block mArmyBlock;
+    Block mChainBlock;
+    std::vector<MarkerChain> mChains;
+    std::vector<MarkerChain> mChainsRead;
     std::vector<SaveEntry> mArmies;
     std::vector<SaveEntry> mArmiesRead;
     std::vector<SaveEntry> mMarkers;

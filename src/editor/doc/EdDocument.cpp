@@ -530,7 +530,7 @@ namespace faf::editor
 
   EdDocument::SaveSnapshot EdDocument::SaveDataNow() const
   {
-    return {mSave.Markers(), mSave.Areas(), mScript, mSave.Armies(), mScenario};
+    return {mSave.Markers(), mSave.Areas(), mScript, mSave.Armies(), mScenario, mSave.Chains()};
   }
 
   void EdDocument::RestoreSaveData(const SaveSnapshot& snapshot)
@@ -540,6 +540,7 @@ namespace faf::editor
     mScript = snapshot.script;
     mSave.Armies() = snapshot.armies;
     mScenario = snapshot.scenario;
+    mSave.Chains() = snapshot.chains;
     mFacts.armies = Armies();
     mModified = true;
   }

@@ -78,7 +78,7 @@ namespace faf::editor
     const std::optional<EdDocument::PlayableRect> area = mMap != nullptr ? mDocument.PlayableArea() : std::nullopt;
     if (mMap == nullptr || mCamera == nullptr || mTools == nullptr ||
         (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive() && mSelection.empty() && !area &&
-         mDocument.SaveData().Markers().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() && !mTools->UnitsToolActive() &&
+         mDocument.SaveData().Markers().empty() && mDocument.SaveData().Chains().empty() && !mTools->ShowGrid() && !mTools->DecalsToolActive() && !mTools->UnitsToolActive() &&
          mTools->CheckPins().empty() && !mTools->ShowingPathing() && !mTools->ShowSlope() && !mTools->ShowKmGrid() && !mRulerShown && !mBoxing) ||
         moho::ren_Viewport == nullptr) {
       return;
@@ -354,6 +354,37 @@ namespace faf::editor
       }
       line(mapW * 0.5f, 0.0f, mapW * 0.5f, mapH, 0xE040C0FFu);
       line(0.0f, mapH * 0.5f, mapW, mapH * 0.5f, 0xE040C0FFu);
+    }
+    // The chains: a line through each one's markers in order, and a small post at its first.
+    if (mTools->MarkersToolActive()) {
+      for (const MarkerChain& chain : mDocument.SaveData().Chains()) {
+        bool havePrevious = false;
+        moho::CD3DPrimBatcher::Vertex previous{};
+        for (std::size_t i = 0; i < chain.markers.size(); ++i) {
+          const auto found = std::find_if(mDocument.SaveData().Markers().begin(), mDocument.SaveData().Markers().end(),
+                                          [&](const SaveEntry& marker) { return marker.name == chain.markers[i]; });
+          float x = 0.0f, y = 0.0f, z = 0.0f;
+          if (found == mDocument.SaveData().Markers().end() || !MarkerPosition(*found, x, y, z)) {
+            continue;
+          }
+          // Pink, doubled a little above: apart from the path nodes' blue, green and white links.
+          moho::CD3DPrimBatcher::Vertex vertex = groundVertex(x, z, 0xFFFF50D0u, 2.0f);
+          if (havePrevious) {
+            batcher->DrawLine(previous, vertex);
+            moho::CD3DPrimBatcher::Vertex from = previous;
+            moho::CD3DPrimBatcher::Vertex to = vertex;
+            from.mY += 0.6f;
+            to.mY += 0.6f;
+            batcher->DrawLine(from, to);
+          } else {
+            moho::CD3DPrimBatcher::Vertex top = vertex;
+            top.mY += 8.0f;
+            batcher->DrawLine(vertex, top);
+          }
+          previous = vertex;
+          havePrevious = true;
+        }
+      }
     }
     // Box select: the rectangle's edges where they meet the ground.
     if (mBoxing) {
@@ -2605,6 +2636,10 @@ namespace faf::editor
         if (MarkerTypeOf(marker) == "Blank Marker") {
           mDocument.RenameArmy(name, value);
         }
+        // The chains name it too.
+        for (MarkerChain& chain : mDocument.SaveData().Chains()) {
+          std::replace(chain.markers.begin(), chain.markers.end(), name, value);
+        }
         marker.name = value;
         std::replace(mMarkerSelection.begin(), mMarkerSelection.end(), name, value);
       } else {
@@ -2849,6 +2884,9 @@ namespace faf::editor
     if (markers.size() != count) {
       for (const std::string& name : mMarkerSelection) {
         (void)RemoveLinksTo(markers, name);
+        for (MarkerChain& chain : mDocument.SaveData().Chains()) {
+          chain.markers.erase(std::remove(chain.markers.begin(), chain.markers.end(), name), chain.markers.end());
+        }
       }
     }
     mMarkerSelection.clear();

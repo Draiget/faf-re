@@ -108,6 +108,9 @@ namespace faf::editor
     void DrawScriptPanel();
     /** The map's lighting, edited live; Import / Export of FAFME's `.scmlighting` (ui/EdInfoPanels.cpp). */
     void DrawLightingPanel();
+    /** The Markers panel's chains: made, renamed, deleted, their markers added, ordered, taken out (ui/EdInfoPanels.cpp). */
+    void DrawChains();
+    char mNewChainName[128]{};
     bool mShowLighting = false;
     LightingState mLighting;
     LightingState mLightingBefore;

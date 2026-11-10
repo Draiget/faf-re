@@ -321,6 +321,8 @@ namespace faf::editor
     mMarkerBlock = {};
     mAreaBlock = {};
     mArmyBlock = {};
+    mChainBlock = {};
+    mChains.clear();
     mMarkers.clear();
     mAreas.clear();
     mArmies.clear();
@@ -348,10 +350,51 @@ namespace faf::editor
         return false;
       }
     }
+    // The chains: `['name'] = { Markers = { "a", "b", }, },` each.
+    if (FindBlock(mText, std::regex(R"(\bChains\s*=\s*\{)"), 0, mChainBlock.open, mChainBlock.close, mChainBlock.indent)) {
+      mChainBlock.found = true;
+      const std::string body = mText.substr(mChainBlock.open + 1, mChainBlock.close - mChainBlock.open - 1);
+      const std::regex entry(R"(\[\s*['"]([^'"]*)['"]\s*\]\s*=\s*\{\s*Markers\s*=\s*\{([^}]*)\})");
+      const std::regex name(R"(['"]([^'"]*)['"])");
+      for (auto it = std::sregex_iterator(body.begin(), body.end(), entry); it != std::sregex_iterator(); ++it) {
+        MarkerChain chain;
+        chain.name = (*it)[1].str();
+        const std::string list = (*it)[2].str();
+        for (auto n = std::sregex_iterator(list.begin(), list.end(), name); n != std::sregex_iterator(); ++n) {
+          chain.markers.push_back((*n)[1].str());
+        }
+        mChains.push_back(std::move(chain));
+      }
+    }
     mMarkersRead = mMarkers;
     mAreasRead = mAreas;
     mArmiesRead = mArmies;
+    mChainsRead = mChains;
     return true;
+  }
+
+  std::string SaveFile::ChainsText(const std::vector<MarkerChain>& chains, const int indent, const std::string& nl)
+  {
+    const std::string pad(static_cast<std::size_t>(indent), ' ');
+    const std::string close(static_cast<std::size_t>(std::max(indent - 4, 0)), ' ');
+    std::string out = nl;
+    for (const MarkerChain& chain : chains) {
+      out += pad + "[" + Quote(chain.name) + "] = {" + nl;
+      out += pad + "    Markers = {" + nl;
+      for (const std::string& marker : chain.markers) {
+        std::string quoted = "\"";
+        for (const char c : marker) {
+          if (c == '"' || c == '\\') {
+            quoted += '\\';
+          }
+          quoted += c;
+        }
+        out += pad + "        " + quoted + "\"," + nl;
+      }
+      out += pad + "    }," + nl;
+      out += pad + "}," + nl;
+    }
+    return out + close;
   }
 
   void SaveFile::MarkSaved()
@@ -362,7 +405,7 @@ namespace faf::editor
 
   bool SaveFile::Changed() const
   {
-    return mMarkers != mMarkersRead || mAreas != mAreasRead || mArmies != mArmiesRead;
+    return mMarkers != mMarkersRead || mAreas != mAreasRead || mArmies != mArmiesRead || mChains != mChainsRead;
   }
 
   std::string SaveFile::Text() const
@@ -382,6 +425,9 @@ namespace faf::editor
     }
     if (mArmyBlock.found && mArmies != mArmiesRead) {
       replaces.push_back({&mArmyBlock, Rebuild(mArmyBlock, mArmies, mArmiesRead)});
+    }
+    if (mChainBlock.found && mChains != mChainsRead) {
+      replaces.push_back({&mChainBlock, ChainsText(mChains, mChainBlock.indent, mText.find("\r\n") != std::string::npos ? "\r\n" : "\n")});
     }
     std::sort(replaces.begin(), replaces.end(), [](const Replace& a, const Replace& b) { return a.block->open > b.block->open; });
     std::string out = mText;
