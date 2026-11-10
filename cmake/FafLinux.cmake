@@ -245,6 +245,12 @@ endforeach()
 include(FafPrecompiledHeaders)
 faf_precompile(faf_sim)
 
+# --- The game client (issue #255) ----------------------------------------------------------
+option(FAF_LINUX_CLIENT "Build the Linux game client (issue #255, not finished)" OFF)
+if(FAF_LINUX_CLIENT)
+  include(FafLinuxClient)
+endif()
+
 # --- faf_sim_math_tests (plan WPL.23) ---------------------------------------------------
 # The golden sim-math tests (tests/sim_math) on every faf_sim object, as Windows runs
 # them on faf_engine: every golden case, the pathfinder's and the random stream's too.

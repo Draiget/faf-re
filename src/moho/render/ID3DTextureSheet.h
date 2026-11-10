@@ -10,14 +10,8 @@
 #if defined(_WIN32)
 #include <d3d9types.h>
 #else
-struct RECT
-{
-  long left;
-  long top;
-  long right;
-  long bottom;
-};
-
+// RECT comes from the POSIX <Windows.h> (platform/posix/win32), which platform/PosixCompat.h
+// includes in every Linux translation unit.
 struct D3DLOCKED_RECT
 {
   int Pitch;
