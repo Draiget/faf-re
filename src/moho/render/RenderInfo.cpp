@@ -24,7 +24,9 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/GpuPathSettings.h"
 
+#if FAFRE_PLATFORM_WINDOWS
 #pragma comment(lib, "psapi.lib")
+#endif
 
 namespace moho
 {

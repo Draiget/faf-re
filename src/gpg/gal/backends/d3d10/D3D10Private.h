@@ -10,6 +10,7 @@
 #include "EffectD3D10.hpp"
 #include "EffectTechniqueD3D10.hpp"
 #include "EffectVariableD3D10.hpp"
+#include "D3D10MatrixRows.h"
 #include "Float16HardwareVertexFormatterD3D10.hpp"
 #include "HardwareVertexFormatterD3D10.hpp"
 #include "IndexBufferD3D10.hpp"
@@ -337,31 +338,6 @@ namespace
     [[maybe_unused]] fa::string MakeD3DErrorString(const HRESULT code)
     {
       return MakeShortString(::gpg::D3DErrorToString(static_cast<long>(code)));
-    }
-
-    /**
-     * Address: 0x0094D490 (FUN_0094D490)
-     *
-     * What it does:
-     * Copies rows `(0,1,2)`, `(4,5,6)`, `(8,9,10)`, `(12,13,14)` from one
-     * source 4x4 matrix into four contiguous 3-float destination rows.
-     */
-    [[maybe_unused]] const Matrix* CopyMatrix4x3Rows(
-      float* const outRow0,
-      float* const outRow1,
-      float* const outRow2,
-      float* const outRow3,
-      const Matrix& matrix
-    )
-    {
-      float* const outRows[4] = {outRow0, outRow1, outRow2, outRow3};
-      for (int row = 0; row < 4; ++row) {
-        outRows[row][0] = matrix.r[row].x;
-        outRows[row][1] = matrix.r[row].y;
-        outRows[row][2] = matrix.r[row].z;
-      }
-
-      return &matrix;
     }
 
     /**

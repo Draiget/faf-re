@@ -5,8 +5,11 @@
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/backends/d3d10/Float16HardwareVertexFormatterD3D10.hpp"
 #include "gpg/gal/backends/d3d10/HardwareVertexFormatterD3D10.hpp"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/Float16HardwareVertexFormatterD3D9.hpp"
 #include "gpg/gal/backends/d3d9/HardwareVertexFormatterD3D9.hpp"
+#endif
 
 namespace gpg::gal
 {
@@ -16,18 +19,22 @@ namespace gpg::gal
 		// order (dynamic initializers 0x00BE9B00, 0x00BE9B20, 0x00BE9B40,
 		// 0x00BE9B60) and destroys them at exit (0x00C09610..0x00C09640); they
 		// sit at 0x00F8E298, 0x00F8E294, 0x00F8E290 and 0x00F8E28C.
+#if FAFRE_PLATFORM_WINDOWS
 		HardwareVertexFormatterD3D9 sHardwareVertexFormatterD3D9;
 		Float16HardwareVertexFormatterD3D9 sFloat16HardwareVertexFormatterD3D9;
+#endif
 		HardwareVertexFormatterD3D10 sHardwareVertexFormatterD3D10;
 		Float16HardwareVertexFormatterD3D10 sFloat16HardwareVertexFormatterD3D10;
 
 		// Each API's candidates, best first, null-terminated (0x00F2E3D8 for
 		// D3D9, 0x00F2E3E4 for D3D10).
+#if FAFRE_PLATFORM_WINDOWS
 		MeshFormatter* const sHardwareVertexFormattersD3D9[] = {
 			&sFloat16HardwareVertexFormatterD3D9,
 			&sHardwareVertexFormatterD3D9,
 			nullptr,
 		};
+#endif
 		MeshFormatter* const sHardwareVertexFormattersD3D10[] = {
 			&sFloat16HardwareVertexFormatterD3D10,
 			&sHardwareVertexFormatterD3D10,
@@ -81,8 +88,10 @@ namespace gpg::gal
 	MeshFormatter* GetHardwareVertexFormatter()
 	{
 		switch (Device::GetInstance()->GetDeviceContext()->mDeviceType) {
+#if FAFRE_PLATFORM_WINDOWS
 		case DeviceApi::Direct3D9:
 			return ChooseHardwareVertexFormatter(sHardwareVertexFormattersD3D9);
+#endif
 		case DeviceApi::Direct3D10:
 		// FAF addition: Direct3D 11 builds the same vertex formats 14/15 as
 		// D3D10 (the formatters only ask the active device for them).

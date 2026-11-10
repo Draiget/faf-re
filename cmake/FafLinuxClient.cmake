@@ -14,7 +14,7 @@
 set(_faf_client_windows_only
   "^gpg/gal/backends/(d3d9|d3d10|d3d11|d3d12|dxgi)/"
   "/FX11/"
-  "^gpg/gal/(DxgiAdapterInfo|D3DErrorToString|D3DErrorToWideString)\\.cpp$"
+  "^gpg/gal/(DxgiAdapterInfo|D3DErrorToWideString)\\.cpp$"
   "^gpg/gal/backends/common/WindowsCursor\\.cpp$"
   "^moho/movie/sfd/DirectSoundMovieSink\\.cpp$"
   # The Win32 crash dialog; gpg/core/diagnostics/posix/DiagnosticsPosix.cpp has the POSIX one.
@@ -35,10 +35,13 @@ set(_faf_client_windows_only
 
 # Portable files in the Windows backends' folders that the Vulkan backend shares: the DXGI format
 # tables, the Direct3D 11 vertex layouts (D3D11_INPUT_ELEMENT_DESC from the POSIX <d3d11.h>) and
-# the effect-source translator (FX to modern HLSL, plain text work).
+# the effect-source translator (FX to modern HLSL, plain text work), the abstract base classes'
+# out-of-line members, and the vertex formatters Direct3D 10 to 12 and Vulkan share.
 set(_faf_client_shared_backend_files
   "^gpg/gal/backends/dxgi/DxgiFormats\\.cpp$"
-  "^gpg/gal/backends/d3d11/(D3D11VertexLayouts|EffectSourceD3D11)\\.cpp$")
+  "^gpg/gal/backends/d3d11/(D3D11VertexLayouts|EffectSourceD3D11)\\.cpp$"
+  "^gpg/gal/backends/d3d9/D3D9BaseClasses\\.cpp$"
+  "^gpg/gal/backends/d3d10/(Float16)?HardwareVertexFormatterD3D10\\.cpp$")
 list(APPEND _faf_client_windows_only
   # The Direct3D 9 state manager's caches.
   "^gpg/gal/StateCache\\.cpp$"
@@ -241,3 +244,11 @@ target_include_directories(faf_client_objs PRIVATE
   "${PROJECT_SOURCE_DIR}/src/platform/posix/wx"
   "${FAF_DEPENDENCIES_DIR}/vulkan/include"
   "${FAF_DEPENDENCIES_DIR}/DirectX-Headers/include/directx")
+
+# The Linux client executable (issue #256): its entry point (src/platform/posix/ClientMainPosix.cpp,
+# WinMain's place), the client objects and the simulation. Not built by default until it links;
+# `--target faf_client` lists what is still unresolved.
+add_executable(faf_client EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/src/platform/posix/ClientMainPosix.cpp")
+target_include_directories(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/wx")
+target_link_libraries(faf_client PRIVATE faf_client_objs faf_client_dxc faf_client_imaging faf_sim faf_directxtex_linux)
+target_link_options(faf_client PRIVATE -Wl,--error-limit=0)

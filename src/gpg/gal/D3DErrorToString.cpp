@@ -1,4 +1,5 @@
-#include "gpg/gal/GalInterfacesPrivate.h"
+// A plain text table: the Linux client links it too (issue #255).
+#include "gpg/gal/Error.hpp"
 
 namespace gpg
 {

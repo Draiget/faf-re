@@ -1,4 +1,10 @@
-#include "gpg/gal/backends/d3d9/D3D9Private.h"
+// The abstract base classes' out-of-line members. Nothing here uses Direct3D 9, so the Vulkan
+// backend links this file too (the Linux client, issue #255).
+#include "gpg/gal/CubeRenderTarget.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
+#include "gpg/gal/IndexBuffer.hpp"
+#include "gpg/gal/PipelineState.hpp"
+#include "gpg/gal/RenderTarget.hpp"
 
 namespace gpg::gal
 {
@@ -92,6 +98,8 @@ namespace gpg::gal
     PipelineState::~PipelineState() = default;
 namespace
 {
+        constexpr int kCubeFaceCount = 6;
+
         constexpr unsigned int kCubeFaceByIndex[kCubeFaceCount] = {
             0U,
             1U,

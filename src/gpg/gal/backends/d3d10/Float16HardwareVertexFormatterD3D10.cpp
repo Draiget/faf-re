@@ -1,4 +1,9 @@
-#include "gpg/gal/backends/d3d10/D3D10Private.h"
+// Nothing here uses Direct3D 10: the formatter asks the active device for its vertex format, so
+// Direct3D 11, 12 and Vulkan use it too, and the Linux client links this file (issue #255).
+#include "gpg/gal/backends/d3d10/Float16HardwareVertexFormatterD3D10.hpp"
+#include "gpg/gal/backends/d3d10/D3D10MatrixRows.h"
+#include "gpg/gal/Device.hpp"
+#include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/HalfFloat.h"
 
 namespace gpg::gal
