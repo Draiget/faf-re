@@ -348,6 +348,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/UnitPresetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdUnitPreset.cpp
   editor/LayerPresetTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLayerPreset.cpp
   editor/PropPaintTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdPropPaint.cpp
+  editor/SkyboxTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdSkybox.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightFile.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/undo/EdHeightHistory.cpp)

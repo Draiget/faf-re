@@ -11,6 +11,7 @@
 
 #include "editor/doc/EdPackage.h"
 #include "editor/doc/EdLighting.h"
+#include "editor/doc/EdSkybox.h"
 #include "editor/doc/EdWater.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/tools/EdDecals.h"
@@ -186,7 +187,15 @@ namespace faf::editor
       Decals,
       Water,
       Lighting,
+      Skybox,
     };
+    /** The map's sky now (SkyDome: the dome, horizon, planets, cirrus). */
+    [[nodiscard]] SkyboxState SkyboxNow() const;
+    /** Puts a sky on the map (its dome is rebuilt on the next frame); no undo step, SkyboxEdited records one. */
+    void ApplySkybox(const SkyboxState& sky);
+    void SkyboxEdited(SkyboxState before);
+    [[nodiscard]] std::vector<std::pair<SkyboxState, SkyboxState>>& SkyboxUndo() noexcept { return mSkyboxUndo; }
+    [[nodiscard]] std::vector<std::pair<SkyboxState, SkyboxState>>& SkyboxRedo() noexcept { return mSkyboxRedo; }
     /** The map's lighting now (sun, ambience, shadow, specular, bloom, fog). */
     [[nodiscard]] LightingState LightingNow() const;
     /** Puts a lighting state on the map at once (no undo step; LightingEdited records one). */
@@ -351,6 +360,8 @@ namespace faf::editor
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropRedo;
     std::vector<LayerEdit> mLayerUndo;
     std::vector<LayerEdit> mLayerRedo;
+    std::vector<std::pair<SkyboxState, SkyboxState>> mSkyboxUndo;
+    std::vector<std::pair<SkyboxState, SkyboxState>> mSkyboxRedo;
     std::vector<std::pair<LightingState, LightingState>> mLightingUndo;
     std::vector<std::pair<LightingState, LightingState>> mLightingRedo;
     std::vector<std::pair<WaterState, WaterState>> mWaterUndo;

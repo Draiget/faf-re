@@ -41,6 +41,9 @@ namespace faf::editor
     /** The Lighting panel's Import / Export buttons, taken by the app (it asks for the file). */
     [[nodiscard]] bool TakeLightingImport() noexcept { return std::exchange(mLightingImport, false); }
     [[nodiscard]] bool TakeLightingExport() noexcept { return std::exchange(mLightingExport, false); }
+    /** The Lighting panel's sky Import / Export (FAFME's `.scmskybox`), taken by the app. */
+    [[nodiscard]] bool TakeSkyboxImport() noexcept { return std::exchange(mSkyboxImport, false); }
+    [[nodiscard]] bool TakeSkyboxExport() noexcept { return std::exchange(mSkyboxExport, false); }
     /**
      * A test run: the open map (as saved) played solo for 8 s of game time, then stopped; the Lua errors and other
      * warnings logged meanwhile join the Check's findings (`/testrun` for test runs).
@@ -110,6 +113,8 @@ namespace faf::editor
     bool mLightingEditing = false;
     bool mLightingImport = false;
     bool mLightingExport = false;
+    bool mSkyboxImport = false;
+    bool mSkyboxExport = false;
     bool mShowScript = false;
     bool mFocusScript = false;
     std::string mScriptBuffer;

@@ -524,6 +524,7 @@ namespace faf::editor
                       : kind == EdDocument::EditKind::Decals   ? UndoDecals(false)
                       : kind == EdDocument::EditKind::Water    ? UndoWater(false)
                       : kind == EdDocument::EditKind::Lighting ? UndoLighting(false)
+                      : kind == EdDocument::EditKind::Skybox   ? UndoSkybox(false)
                                                              : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -544,6 +545,7 @@ namespace faf::editor
                       : kind == EdDocument::EditKind::Decals   ? UndoDecals(true)
                       : kind == EdDocument::EditKind::Water    ? UndoWater(true)
                       : kind == EdDocument::EditKind::Lighting ? UndoLighting(true)
+                      : kind == EdDocument::EditKind::Skybox   ? UndoSkybox(true)
                                                              : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -1458,6 +1460,21 @@ namespace faf::editor
     to.push_back(std::move(step));
     mSelection.clear();
     RebuildProps();
+    return true;
+  }
+
+  bool EdMapScene::UndoSkybox(const bool redo)
+  {
+    auto& from = redo ? mDocument.SkyboxRedo() : mDocument.SkyboxUndo();
+    auto& to = redo ? mDocument.SkyboxUndo() : mDocument.SkyboxRedo();
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mDocument.ApplySkybox(redo ? step.second : step.first);
+    to.push_back(std::move(step));
+    gpg::Logf("editor: %s a sky edit: %zu planets", redo ? "redid" : "undid", mDocument.SkyboxNow().planets.size());
     return true;
   }
 

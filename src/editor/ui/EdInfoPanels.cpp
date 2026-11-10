@@ -1031,6 +1031,31 @@ namespace faf::editor
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
     ImGui::TextWrapped("FAForeverMapEditor's lighting settings file: the sun, ambience, shadow, specular, bloom and fog.");
     ImGui::PopStyleColor();
+    ImGui::SeparatorText("Sky");
+    {
+      const SkyboxState sky = mDocument.SkyboxNow();
+      ImGui::Text("Dome %.0f across, %d x %d segments", static_cast<double>(sky.scale), sky.subdivisionsAxis, sky.subdivisionsHeight);
+      ImGui::ColorButton("##horizon", ImVec4(sky.horizonColor[0], sky.horizonColor[1], sky.horizonColor[2], 1.0f), ImGuiColorEditFlags_NoTooltip);
+      ImGui::SameLine();
+      ImGui::TextUnformatted("horizon");
+      ImGui::SameLine();
+      ImGui::ColorButton("##zenith", ImVec4(sky.zenithColor[0], sky.zenithColor[1], sky.zenithColor[2], 1.0f), ImGuiColorEditFlags_NoTooltip);
+      ImGui::SameLine();
+      ImGui::TextUnformatted("zenith");
+      ImGui::Text("%zu planet%s, cirrus %s", sky.planets.size(), sky.planets.size() == 1 ? "" : "s",
+                  sky.cirrusTexture.empty() ? "(none)" : sky.cirrusTexture.substr(sky.cirrusTexture.find_last_of('/') + 1).c_str());
+    }
+    if (ImGui::Button("Import .scmskybox...")) {
+      mSkyboxImport = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Export##sky")) {
+      mSkyboxExport = true;
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+    ImGui::TextWrapped("FAForeverMapEditor's sky file: the dome, horizon and zenith colours, planets and cirrus. An import is one "
+                       "undo step and is saved with the map.");
+    ImGui::PopStyleColor();
     ImGui::End();
   }
 } // namespace faf::editor

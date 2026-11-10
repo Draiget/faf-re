@@ -343,6 +343,7 @@ namespace faf::editor
       bool mMarkerFilesDone = false;
       bool mUnitFilesDone = false;
       bool mPaintSetDone = false;
+      bool mSkyboxFilesDone = false;
       int mLayerFileStep = 0;
       /** `/waterset <on>,<level>,<deep>,<abyss>` (test runs): the sea set as one edit once the map is shown. */
       std::string mWaterSetArg;
@@ -1643,6 +1644,52 @@ namespace faf::editor
           std::ofstream out(exportFile, std::ios::binary | std::ios::trunc);
           out.write(text.data(), static_cast<std::streamsize>(text.size()));
           (out ? gpg::Logf : gpg::Warnf)("editor: paint list (%zu props) exported to %s", tools.PaintList().size(), exportFile.string().c_str());
+        }
+      }
+      // The Lighting panel's sky file, or `/skyboximport <file>`, `/skyboxexport <file>` for test runs.
+      {
+        std::filesystem::path importFile;
+        std::filesystem::path exportFile;
+        if (mShell->TakeSkyboxImport()) {
+          importFile = AskFile(HandleOf(mGame.supcomFrame), false, L"Sky (*.scmskybox)\0*.scmskybox\0All files\0*.*\0", L"scmskybox",
+                               L"Import a sky");
+        }
+        if (mShell->TakeSkyboxExport()) {
+          exportFile = AskFile(HandleOf(mGame.supcomFrame), true, L"Sky (*.scmskybox)\0*.scmskybox\0", L"scmskybox", L"Export the sky");
+        }
+        if (mScene.Attached() && !mSkyboxFilesDone) {
+          mSkyboxFilesDone = true;
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/skyboxexport", 1, &file) && !file.empty()) {
+            exportFile = file[0].c_str();
+          }
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/skyboximport", 1, &file) && !file.empty()) {
+            importFile = file[0].c_str();
+          }
+        }
+        // Export first, so a test run can write the sky and read another in one go.
+        if (!exportFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
+          const SkyboxState sky = mDocument.SkyboxNow();
+          const std::string text = SkyboxToScmskybox(sky);
+          std::ofstream out(exportFile, std::ios::binary | std::ios::trunc);
+          out.write(text.data(), static_cast<std::streamsize>(text.size()));
+          (out ? gpg::Logf : gpg::Warnf)("editor: the sky (%zu planets, cirrus %s) exported to %s", sky.planets.size(), sky.cirrusTexture.c_str(),
+                                        exportFile.string().c_str());
+        }
+        if (!importFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
+          std::ifstream in(importFile, std::ios::binary);
+          const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+          SkyboxState sky;
+          std::string error;
+          if (!in || !SkyboxFromScmskybox(text, sky, error)) {
+            gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
+          } else {
+            const SkyboxState before = mDocument.SkyboxNow();
+            mDocument.ApplySkybox(sky);
+            mDocument.SkyboxEdited(before);
+            gpg::Logf("editor: sky imported from %s: dome %.0f, %zu planets, zenith %.2f %.2f %.2f", importFile.string().c_str(),
+                      static_cast<double>(sky.scale), sky.planets.size(), static_cast<double>(sky.zenithColor[0]),
+                      static_cast<double>(sky.zenithColor[1]), static_cast<double>(sky.zenithColor[2]));
+          }
         }
       }
       const bool importAsked = tools.TakeImportRequest();

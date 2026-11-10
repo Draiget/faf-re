@@ -20,6 +20,7 @@
 #include "lua/LuaObject.h"
 #include "lua/luaplus/include/lauxlib.h"
 #include "lua/LuaTableIterator.h"
+#include "moho/render/SkyDome.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/CVirtualFileSystem.h"
 #include "moho/misc/FileWaitHandleSet.h"
@@ -672,6 +673,89 @@ namespace faf::editor
     return names;
   }
 
+  SkyboxState EdDocument::SkyboxNow() const
+  {
+    SkyboxState sky;
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return sky;
+    }
+    const moho::SkyDome& dome = static_cast<const moho::IWldTerrainRes&>(*mMap->mTerrainRes).GetSkyDome();
+    const auto three = [](const Wm3::Vector3f& v, float (&out)[3]) {
+      out[0] = v.x;
+      out[1] = v.y;
+      out[2] = v.z;
+    };
+    three(dome.mDomeOrigin, sky.position);
+    // SkyDome::Load's order (0x00815FA0), FAFME's names.
+    sky.horizonHeight = dome.mDomeShapeParams.x;
+    sky.scale = dome.mDomeShapeParams.y;
+    sky.subtractHeight = dome.mDomeShapeParams.z;
+    sky.subdivisionsAxis = dome.mWidth;
+    sky.subdivisionsHeight = dome.mHeight;
+    sky.zenithHeight = dome.mHorizonSize;
+    three(dome.mHorizonColor, sky.horizonColor);
+    three(dome.mSkyColor, sky.zenithColor);
+    sky.decalGlow = dome.mHorizonBlend;
+    sky.albedo = dome.mAtmosphereTexPath.c_str();
+    sky.glow = dome.mAtmosphereTexPath2.c_str();
+    for (const moho::SkyDomeDecalVertices& record : dome.mDecalUploads) {
+      SkyboxPlanet planet;
+      std::memcpy(&planet, record.mBytes, sizeof(planet));
+      sky.planets.push_back(planet);
+    }
+    sky.cirrusMultiplier = dome.mCirrusMultiplier;
+    sky.cirrusColor[0] = dome.mCirrusColor_R;
+    sky.cirrusColor[1] = dome.mCirrusColor_G;
+    sky.cirrusColor[2] = dome.mCirrusColor_B;
+    sky.cirrusTexture = dome.mCirrusTexPath.c_str();
+    static_assert(sizeof(sky.cirrus) == sizeof(dome.mCirrusData), "four 20-byte cirrus layers");
+    std::memcpy(sky.cirrus, dome.mCirrusData, sizeof(sky.cirrus));
+    return sky;
+  }
+
+  void EdDocument::ApplySkybox(const SkyboxState& sky)
+  {
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return;
+    }
+    moho::SkyDome& dome = mMap->mTerrainRes->GetSkyDome();
+    // As SkyDome::Load: its GPU resources dropped first, so the next frame builds the dome from these.
+    dome.Reset();
+    dome.mDomeOrigin = Wm3::Vector3f(sky.position[0], sky.position[1], sky.position[2]);
+    dome.mDomeShapeParams = Wm3::Vector3f(sky.horizonHeight, sky.scale, sky.subtractHeight);
+    dome.mWidth = sky.subdivisionsAxis;
+    dome.mHeight = sky.subdivisionsHeight;
+    dome.mHorizonSize = sky.zenithHeight;
+    dome.mHorizonColor = Wm3::Vector3f(sky.horizonColor[0], sky.horizonColor[1], sky.horizonColor[2]);
+    dome.mSkyColor = Wm3::Vector3f(sky.zenithColor[0], sky.zenithColor[1], sky.zenithColor[2]);
+    dome.mHorizonBlend = sky.decalGlow;
+    dome.mAtmosphereTexPath.assign(sky.albedo.c_str());
+    dome.mAtmosphereTexPath2.assign(sky.glow.c_str());
+    dome.mDecalUploads.clear();
+    for (const SkyboxPlanet& planet : sky.planets) {
+      moho::SkyDomeDecalVertices record{};
+      std::memcpy(record.mBytes, &planet, sizeof(planet));
+      dome.mDecalUploads.push_back(record);
+    }
+    dome.mCirrusMultiplier = sky.cirrusMultiplier;
+    dome.mCirrusColor_R = sky.cirrusColor[0];
+    dome.mCirrusColor_G = sky.cirrusColor[1];
+    dome.mCirrusColor_B = sky.cirrusColor[2];
+    dome.mCirrusTexPath.assign(sky.cirrusTexture.c_str());
+    std::memcpy(dome.mCirrusData, sky.cirrus, sizeof(sky.cirrus));
+    mModified = true;
+  }
+
+  void EdDocument::SkyboxEdited(SkyboxState before)
+  {
+    mSkyboxUndo.emplace_back(std::move(before), SkyboxNow());
+    if (mSkyboxUndo.size() > 50) {
+      mSkyboxUndo.erase(mSkyboxUndo.begin());
+    }
+    EditEnded(EditKind::Skybox);
+    mModified = true;
+  }
+
   LightingState EdDocument::LightingNow() const
   {
     LightingState lighting;
@@ -876,6 +960,7 @@ namespace faf::editor
     mDecalRedo.clear();
     mWaterRedo.clear();
     mLightingRedo.clear();
+    mSkyboxRedo.clear();
   }
 
   bool EdDocument::PopUndo(EditKind& kind)
