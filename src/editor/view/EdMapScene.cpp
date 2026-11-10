@@ -525,6 +525,7 @@ namespace faf::editor
                       : kind == EdDocument::EditKind::Water    ? UndoWater(false)
                       : kind == EdDocument::EditKind::Lighting ? UndoLighting(false)
                       : kind == EdDocument::EditKind::Skybox   ? UndoSkybox(false)
+                      : kind == EdDocument::EditKind::Waves    ? UndoWaves(false)
                                                              : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -546,6 +547,7 @@ namespace faf::editor
                       : kind == EdDocument::EditKind::Water    ? UndoWater(true)
                       : kind == EdDocument::EditKind::Lighting ? UndoLighting(true)
                       : kind == EdDocument::EditKind::Skybox   ? UndoSkybox(true)
+                      : kind == EdDocument::EditKind::Waves    ? UndoWaves(true)
                                                              : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -1460,6 +1462,21 @@ namespace faf::editor
     to.push_back(std::move(step));
     mSelection.clear();
     RebuildProps();
+    return true;
+  }
+
+  bool EdMapScene::UndoWaves(const bool redo)
+  {
+    auto& from = redo ? mDocument.WavesRedo() : mDocument.WavesUndo();
+    auto& to = redo ? mDocument.WavesUndo() : mDocument.WavesRedo();
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mDocument.ApplyWaves(redo ? step.second : step.first);
+    to.push_back(std::move(step));
+    gpg::Logf("editor: %s a wave edit: %d wave generators", redo ? "redid" : "undid", mDocument.WaveCount());
     return true;
   }
 

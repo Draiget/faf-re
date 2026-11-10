@@ -20,6 +20,10 @@
 #include "lua/LuaObject.h"
 #include "lua/luaplus/include/lauxlib.h"
 #include "lua/LuaTableIterator.h"
+#include "gpg/core/streams/PipeStream.h"
+#include "gpg/core/streams/BinaryReader.h"
+#include "gpg/core/streams/BinaryWriter.h"
+#include "moho/terrain/water/WaveSystem.h"
 #include "moho/render/SkyDome.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/CVirtualFileSystem.h"
@@ -673,6 +677,70 @@ namespace faf::editor
     return names;
   }
 
+  std::vector<WaveRecord> EdDocument::WavesNow() const
+  {
+    std::vector<WaveRecord> waves;
+    moho::WaveSystem* const system = mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetWaveSystem() : nullptr;
+    if (system == nullptr) {
+      return waves;
+    }
+    gpg::PipeStream pipe;
+    {
+      gpg::BinaryWriter writer(&pipe);
+      system->Save(writer);
+    }
+    pipe.VirtFlush();
+    // Drained in chunks: GetLength (0x009566C0) counts the first block only from where a read left it, so before any
+    // read it comes up short on a stream of several blocks.
+    std::string bytes;
+    char chunk[65536];
+    for (;;) {
+      const std::size_t got = pipe.VirtReadNonBlocking(chunk, sizeof(chunk));
+      if (got == 0) {
+        break;
+      }
+      bytes.append(chunk, got);
+    }
+    if (!WaveRecordsFromBytes(bytes, waves)) {
+      gpg::Warnf("editor: the wave generators didn't read back (%zu bytes)", bytes.size());
+    }
+    return waves;
+  }
+
+  int EdDocument::WaveCount() const
+  {
+    moho::WaveSystem* const system = mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetWaveSystem() : nullptr;
+    return system != nullptr ? static_cast<int>(system->mWaveGenerators.end_ - system->mWaveGenerators.start_) : 0;
+  }
+
+  void EdDocument::ApplyWaves(const std::vector<WaveRecord>& waves)
+  {
+    moho::WaveSystem* const system = mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetWaveSystem() : nullptr;
+    const moho::CHeightField* const field = system != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr) {
+      return;
+    }
+    const std::string bytes = WaveRecordsToBytes(waves);
+    gpg::PipeStream pipe;
+    pipe.VirtWrite(bytes.data(), bytes.size());
+    pipe.VirtFlush();
+    gpg::BinaryReader reader(&pipe);
+    // The map's current format (above 51: every float of a generator is read, WaveGenerator::LoadSerializedState).
+    system->Load(60, field->height - 1, field->width - 1, reader);
+    mModified = true;
+  }
+
+  void EdDocument::WavesEdited(std::vector<WaveRecord> before)
+  {
+    mWavesUndo.emplace_back(std::move(before), WavesNow());
+    // A retail map has thousands; a few steps are enough.
+    if (mWavesUndo.size() > 20) {
+      mWavesUndo.erase(mWavesUndo.begin());
+    }
+    EditEnded(EditKind::Waves);
+    mModified = true;
+  }
+
   SkyboxState EdDocument::SkyboxNow() const
   {
     SkyboxState sky;
@@ -978,6 +1046,7 @@ namespace faf::editor
     mWaterRedo.clear();
     mLightingRedo.clear();
     mSkyboxRedo.clear();
+    mWavesRedo.clear();
   }
 
   bool EdDocument::PopUndo(EditKind& kind)

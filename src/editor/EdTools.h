@@ -3,6 +3,7 @@
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdMaskBrush.h"
 #include "editor/doc/EdPropPaint.h"
+#include "editor/tools/EdWaves.h"
 #include "editor/doc/EdWater.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdMarkers.h"
@@ -112,6 +113,52 @@ namespace faf::editor
     /** The Water panel's Import / Export of FAForeverMapEditor's `.scmwtr`, taken by the app (it asks for the file). */
     [[nodiscard]] bool TakeWaterImport() noexcept { return std::exchange(mWaterImport, false); }
     [[nodiscard]] bool TakeWaterExport() noexcept { return std::exchange(mWaterExport, false); }
+    /** The Water panel's waves: what was asked, and the settings for adding them along the shore. */
+    enum class WaveAsk
+    {
+      None,
+      AddAlongShore,
+      Clear,
+      LoadPatterns,
+      Import,
+      Export,
+    };
+    struct WaveSettings
+    {
+      WavePattern pattern;
+      float depth = 2.0f;
+      float density = 0.25f;
+      float spacing = 4.0f;
+      float centre = 0.0f;
+      float range = 180.0f;
+    };
+    void SetWaveCount(const int count) noexcept { mWaveCount = count; }
+    [[nodiscard]] WaveAsk TakeWaveAsk(WaveSettings& settings)
+    {
+      if (mWavePatterns.empty()) {
+        mWavePatterns = BuiltInWavePatterns();
+      }
+      mWavePattern = std::clamp(mWavePattern, 0, static_cast<int>(mWavePatterns.size()) - 1);
+      settings = {mWavePatterns[static_cast<std::size_t>(mWavePattern)], mWaveDepth, mWaveDensity, mWaveSpacing, mWaveCentre, mWaveRange};
+      return std::exchange(mWaveAsk, WaveAsk::None);
+    }
+    /** Patterns read from a file, after the built-in ones. */
+    void AddWavePatterns(const std::vector<WavePattern>& patterns)
+    {
+      if (mWavePatterns.empty()) {
+        mWavePatterns = BuiltInWavePatterns();
+      }
+      mWavePatterns.insert(mWavePatterns.end(), patterns.begin(), patterns.end());
+    }
+    /** Test runs (`/waves`): a pattern, depth, density and spacing, then add them along the shore. */
+    void AskWaves(const int pattern, const float depth, const float density, const float spacing) noexcept
+    {
+      mWavePattern = pattern;
+      mWaveDepth = depth;
+      mWaveDensity = density;
+      mWaveSpacing = spacing;
+      mWaveAsk = WaveAsk::AddAlongShore;
+    }
     [[nodiscard]] bool TakeWaterChange(WaterState& water, bool& final)
     {
       if (!mWaterChanged) {
@@ -644,6 +691,15 @@ namespace faf::editor
     int mPathingLayer = 0;
     WaterState mWater;
     bool mWaterEditing = false;
+    int mWaveCount = 0;
+    std::vector<WavePattern> mWavePatterns;
+    int mWavePattern = 0;
+    float mWaveDepth = 2.0f;
+    float mWaveDensity = 0.25f;
+    float mWaveSpacing = 4.0f;
+    float mWaveCentre = 0.0f;
+    float mWaveRange = 180.0f;
+    WaveAsk mWaveAsk = WaveAsk::None;
     bool mWaterChanged = false;
     bool mWaterFinal = false;
     bool mWaterImport = false;

@@ -344,6 +344,7 @@ namespace faf::editor
       bool mUnitFilesDone = false;
       bool mPaintSetDone = false;
       bool mSkyboxFilesDone = false;
+      bool mWaveSwitchesDone = false;
       int mLayerFileStep = 0;
       /** `/waterset <on>,<level>,<deep>,<abyss>` (test runs): the sea set as one edit once the map is shown. */
       std::string mWaterSetArg;
@@ -1688,6 +1689,137 @@ namespace faf::editor
             gpg::Logf("editor: sky imported from %s: dome %.0f, %zu planets, zenith %.2f %.2f %.2f", importFile.string().c_str(),
                       static_cast<double>(sky.scale), sky.planets.size(), static_cast<double>(sky.zenithColor[0]),
                       static_cast<double>(sky.zenithColor[1]), static_cast<double>(sky.zenithColor[2]));
+          }
+        }
+      }
+      // The Water panel's waves, or `/waves <pattern>,<depth>,<density %>[,<spacing>]`, `/wavesclear`, `/wavesexport <file>`,
+      // `/wavesimport <file>`, `/wavepatterns <file>` for test runs (export first, then clear, import, patterns, add).
+      {
+        tools.SetWaveCount(mDocument.WaveCount());
+        std::vector<std::pair<EdTools::WaveAsk, std::filesystem::path>> asks;
+        EdTools::WaveSettings settings;
+        const EdTools::WaveAsk ask = tools.TakeWaveAsk(settings);
+        if (ask != EdTools::WaveAsk::None) {
+          asks.emplace_back(ask, std::filesystem::path());
+        }
+        if (mScene.Attached() && !mWaveSwitchesDone) {
+          mWaveSwitchesDone = true;
+          const auto file = [](const char* const option) {
+            fa::vector<fa::string> value;
+            return moho::CFG_GetArgOption(option, 1, &value) && !value.empty() ? std::filesystem::path(value[0].c_str()) : std::filesystem::path();
+          };
+          if (const auto f = file("/wavesexport"); !f.empty()) {
+            asks.emplace_back(EdTools::WaveAsk::Export, f);
+          }
+          if (moho::CFG_GetArgOption("/wavesclear", 0, nullptr)) {
+            asks.emplace_back(EdTools::WaveAsk::Clear, std::filesystem::path());
+          }
+          if (const auto f = file("/wavesimport"); !f.empty()) {
+            asks.emplace_back(EdTools::WaveAsk::Import, f);
+          }
+          if (const auto f = file("/wavepatterns"); !f.empty()) {
+            asks.emplace_back(EdTools::WaveAsk::LoadPatterns, f);
+          }
+          if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/waves", 1, &value) && !value.empty()) {
+            float numbers[4] = {0.0f, 2.0f, 25.0f, 4.0f};
+            std::string list = value[0].c_str();
+            for (int i = 0; i < 4 && !list.empty(); ++i) {
+              numbers[i] = static_cast<float>(std::atof(list.c_str()));
+              const std::size_t comma = list.find(',');
+              list = comma == std::string::npos ? std::string() : list.substr(comma + 1);
+            }
+            tools.AskWaves(static_cast<int>(numbers[0]), numbers[1], numbers[2] / 100.0f, numbers[3]);
+            (void)tools.TakeWaveAsk(settings);
+            asks.emplace_back(EdTools::WaveAsk::AddAlongShore, std::filesystem::path());
+          }
+        }
+        for (auto& [what, path] : asks) {
+          if (mDocument.GetState() != EdDocument::State::Open) {
+            break;
+          }
+          const HWND owner = HandleOf(mGame.supcomFrame);
+          if (what == EdTools::WaveAsk::Export) {
+            if (path.empty()) {
+              path = AskFile(owner, true, L"Waves (*.scmwaves)\0*.scmwaves\0", L"scmwaves", L"Export the wave generators");
+            }
+            if (!path.empty()) {
+              const std::vector<WaveRecord> waves = mDocument.WavesNow();
+              const std::string text = WavesToScmwaves(waves);
+              std::ofstream out(path, std::ios::binary | std::ios::trunc);
+              out.write(text.data(), static_cast<std::streamsize>(text.size()));
+              (out ? gpg::Logf : gpg::Warnf)("editor: %zu wave generators exported to %s", waves.size(), path.string().c_str());
+            }
+          } else if (what == EdTools::WaveAsk::Import || what == EdTools::WaveAsk::LoadPatterns) {
+            const bool patterns = what == EdTools::WaveAsk::LoadPatterns;
+            if (path.empty()) {
+              path = patterns ? AskFile(owner, false, L"Wave patterns (*.lua)\0*.lua\0All files\0*.*\0", L"lua", L"Load wave patterns")
+                              : AskFile(owner, false, L"Waves (*.scmwaves)\0*.scmwaves\0All files\0*.*\0", L"scmwaves", L"Import wave generators");
+            }
+            if (path.empty()) {
+              continue;
+            }
+            std::ifstream in(path, std::ios::binary);
+            const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            std::string error;
+            if (patterns) {
+              std::vector<WavePattern> read;
+              if (!in || !ParseWavePatterns(text, read, error)) {
+                gpg::Warnf("editor: %s: %s", path.string().c_str(), in ? error.c_str() : "can't read it");
+              } else {
+                tools.AddWavePatterns(read);
+                gpg::Logf("editor: %zu wave patterns from %s", read.size(), path.string().c_str());
+              }
+              continue;
+            }
+            std::vector<WaveRecord> waves;
+            if (!in || !WavesFromScmwaves(text, waves, error)) {
+              gpg::Warnf("editor: %s: %s", path.string().c_str(), in ? error.c_str() : "can't read it");
+              continue;
+            }
+            std::vector<WaveRecord> before = mDocument.WavesNow();
+            mDocument.ApplyWaves(waves);
+            mDocument.WavesEdited(std::move(before));
+            gpg::Logf("editor: %zu wave generators imported from %s (in place of the map's)", waves.size(), path.string().c_str());
+          } else if (what == EdTools::WaveAsk::Clear) {
+            std::vector<WaveRecord> before = mDocument.WavesNow();
+            if (!before.empty()) {
+              mDocument.ApplyWaves({});
+              const std::size_t count = before.size();
+              mDocument.WavesEdited(std::move(before));
+              gpg::Logf("editor: %zu wave generators cleared", count);
+            }
+          } else if (what == EdTools::WaveAsk::AddAlongShore) {
+            const moho::CHeightField* const field = mDocument.Map()->mTerrainRes->GetHeightField();
+            const WaterState water = mDocument.WaterNow();
+            if (field == nullptr || !water.enabled) {
+              gpg::Warnf("editor: waves need a sea");
+              continue;
+            }
+            const int width = field->width - 1;
+            const int height = field->height - 1;
+            std::vector<float> heights(static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height));
+            for (int z = 0; z < field->height; ++z) {
+              for (int x = 0; x < field->width; ++x) {
+                heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width) + static_cast<std::size_t>(x)] =
+                  mDocument.Map()->mTerrainRes->GetHeightAt(x, z);
+              }
+            }
+            const std::vector<ShorePoint> found =
+              FindShorePoints(heights, width, height, water.elevation, settings.depth, settings.centre, settings.range);
+            std::uint32_t seed = static_cast<std::uint32_t>(::GetTickCount());
+            const std::vector<ShorePoint> picked = PickShorePoints(found, settings.density, settings.spacing, seed);
+            std::vector<WaveRecord> before = mDocument.WavesNow();
+            std::vector<WaveRecord> after = before;
+            for (const ShorePoint& point : picked) {
+              after.push_back(MakeShoreWave(settings.pattern, point, water.elevation, seed));
+            }
+            if (!picked.empty()) {
+              mDocument.ApplyWaves(after);
+              mDocument.WavesEdited(std::move(before));
+            }
+            gpg::Logf("editor: %zu %s waves added along the shore (%zu places at depth %.2f, %.0f%% of them, spacing %.1f), %d now",
+                      picked.size(), settings.pattern.name.c_str(), found.size(), static_cast<double>(settings.depth),
+                      static_cast<double>(settings.density * 100.0f), static_cast<double>(settings.spacing), mDocument.WaveCount());
           }
         }
       }

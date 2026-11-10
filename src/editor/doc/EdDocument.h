@@ -12,6 +12,7 @@
 #include "editor/doc/EdPackage.h"
 #include "editor/doc/EdLighting.h"
 #include "editor/doc/EdSkybox.h"
+#include "editor/tools/EdWaves.h"
 #include "editor/doc/EdWater.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/tools/EdDecals.h"
@@ -188,7 +189,17 @@ namespace faf::editor
       Water,
       Lighting,
       Skybox,
+      Waves,
     };
+    /** The map's wave generators (through the wave system's own Save, WaveSystem::Save 0x00889AD0). */
+    [[nodiscard]] std::vector<WaveRecord> WavesNow() const;
+    /** How many wave generators the map has. */
+    [[nodiscard]] int WaveCount() const;
+    /** Puts these generators on the map in place of its own (WaveSystem::Load 0x008899E0); no undo step. */
+    void ApplyWaves(const std::vector<WaveRecord>& waves);
+    void WavesEdited(std::vector<WaveRecord> before);
+    [[nodiscard]] std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>>& WavesUndo() noexcept { return mWavesUndo; }
+    [[nodiscard]] std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>>& WavesRedo() noexcept { return mWavesRedo; }
     /** The map's sky now (SkyDome: the dome, horizon, planets, cirrus). */
     [[nodiscard]] SkyboxState SkyboxNow() const;
     /** Puts a sky on the map (its dome is rebuilt on the next frame); no undo step, SkyboxEdited records one. */
@@ -360,6 +371,8 @@ namespace faf::editor
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropRedo;
     std::vector<LayerEdit> mLayerUndo;
     std::vector<LayerEdit> mLayerRedo;
+    std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>> mWavesUndo;
+    std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>> mWavesRedo;
     std::vector<std::pair<SkyboxState, SkyboxState>> mSkyboxUndo;
     std::vector<std::pair<SkyboxState, SkyboxState>> mSkyboxRedo;
     std::vector<std::pair<LightingState, LightingState>> mLightingUndo;

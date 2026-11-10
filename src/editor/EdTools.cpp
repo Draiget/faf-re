@@ -907,6 +907,64 @@ namespace faf::editor
     }
     Note("A game path (/textures/engine/waves.dds); Enter applies it as one undo step.");
     mWaterEditing = active;
+
+    SectionHeader("SHORE WAVES");
+    {
+      if (mWavePatterns.empty()) {
+        mWavePatterns = BuiltInWavePatterns();
+      }
+      mWavePattern = std::clamp(mWavePattern, 0, static_cast<int>(mWavePatterns.size()) - 1);
+      char count[64];
+      (void)std::snprintf(count, sizeof(count), "%d wave generator%s", mWaveCount, mWaveCount == 1 ? "" : "s");
+      ImGui::TextUnformatted(count);
+      ImGui::SetNextItemWidth(-1.0f);
+      if (ImGui::BeginCombo("##wavepattern", mWavePatterns[static_cast<std::size_t>(mWavePattern)].name.c_str())) {
+        for (std::size_t i = 0; i < mWavePatterns.size(); ++i) {
+          if (ImGui::Selectable(mWavePatterns[i].name.c_str(), static_cast<int>(i) == mWavePattern)) {
+            mWavePattern = static_cast<int>(i);
+          }
+          if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s\n%s", mWavePatterns[i].texture.c_str(), mWavePatterns[i].ramp.c_str());
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::DragFloat("##wavedepth", &mWaveDepth, 0.05f, 0.0f, 50.0f, "Depth below the sea %.2f");
+      ImGui::SetNextItemWidth(-1.0f);
+      float percent = mWaveDensity * 100.0f;
+      if (ImGui::SliderFloat("##wavedensity", &percent, 1.0f, 100.0f, "Density %.0f%%")) {
+        mWaveDensity = percent / 100.0f;
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::DragFloat("##wavespacing", &mWaveSpacing, 0.1f, 0.0f, 64.0f, "Spacing %.1f");
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::DragFloat2("##wavedirection", &mWaveCentre, 1.0f, 0.0f, 360.0f, "%.0f");
+      ImGui::TextDisabled("Facing (degrees) and how far from it");
+      if (ImGui::Button("Add along the shore")) {
+        mWaveAsk = WaveAsk::AddAlongShore;
+      }
+      ImGui::SameLine();
+      ImGui::BeginDisabled(mWaveCount == 0);
+      if (ImGui::Button("Clear##waves")) {
+        mWaveAsk = WaveAsk::Clear;
+      }
+      ImGui::EndDisabled();
+      if (ImGui::Button("Load patterns...")) {
+        mWaveAsk = WaveAsk::LoadPatterns;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Import##waves")) {
+        mWaveAsk = WaveAsk::Import;
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Export##waves")) {
+        mWaveAsk = WaveAsk::Export;
+      }
+      Note("Waves start where the ground is the depth below the sea and travel to the shore, as the retail maps' shore "
+           "waves do; the built-in patterns are SCMP_001's. Patterns load from a wavepatterns.lua (FAForeverMapEditor's); "
+           "Import and Export are its .scmwaves. Each change is one undo step.");
+    }
     Note("Water bodies at their own levels come with the water-levels work (docs/WATER_BODIES.md on feat/water-levels).");
   }
 

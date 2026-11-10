@@ -23,6 +23,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdLayerPreset.cpp
   doc/EdPropPaint.cpp
   doc/EdSkybox.cpp
+  tools/EdWaves.cpp
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp
