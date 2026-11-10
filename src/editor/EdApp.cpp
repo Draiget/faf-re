@@ -347,6 +347,7 @@ namespace faf::editor
       bool mPaintSetDone = false;
       bool mSkyboxFilesDone = false;
       bool mWaveSwitchesDone = false;
+      bool mTerrainTypeArgDone = false;
       int mReclaimFrames = 0;
       bool mReclaimLogged = false;
       int mLayerFileStep = 0;
@@ -1890,6 +1891,21 @@ namespace faf::editor
                       picked.size(), settings.pattern.name.c_str(), found.size(), static_cast<double>(settings.depth),
                       static_cast<double>(settings.density * 100.0f), static_cast<double>(settings.spacing), mDocument.WaveCount());
           }
+        }
+      }
+      // The game's terrain types, read once; `/terraintype <code>` for test runs.
+      if (!tools.HasTerrainTypes() && mDocument.GetState() == EdDocument::State::Open) {
+        std::string lua;
+        if (ReadGameFile("/lua/TerrainTypes.lua", lua)) {
+          std::vector<TerrainTypeInfo> types = ParseTerrainTypes(lua);
+          gpg::Logf("editor: %zu terrain types from /lua/TerrainTypes.lua", types.size());
+          tools.SetTerrainTypes(std::move(types));
+        }
+      }
+      if (mScene.Attached() && !mTerrainTypeArgDone) {
+        mTerrainTypeArgDone = true;
+        if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/terraintype", 1, &value) && !value.empty()) {
+          tools.SetTerrainTypeTool(std::atoi(value[0].c_str()));
         }
       }
       const bool importAsked = tools.TakeImportRequest();

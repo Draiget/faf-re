@@ -11,6 +11,7 @@
 
 #include <Windows.h>
 
+#include "editor/tools/EdTerrainTypes.h"
 #include "editor/doc/EdLayerPreset.h"
 #include "editor/doc/EdUnitPreset.h"
 #include "editor/doc/EdMarkerPreset.h"
@@ -295,6 +296,13 @@ namespace faf::editor
     void UploadMasks(const std::vector<SampleRect>& rects, unsigned layers);
     void ApplyRules();
     bool mPaintingMask = false;
+    /** A terrain type stroke: the grid before it, and the overlay's runs (rebuilt when the grid changes). */
+    bool mPaintingTypes = false;
+    std::vector<std::uint8_t> mTypesBefore;
+    std::vector<TerrainTypeRun> mTypeRuns;
+    int mTypeRunsRevision = -1;
+    void PaintTypes();
+    void EndTypeStroke();
     /** Ends a whole-mask change: the undo step, every layer uploaded, the coverage and a check made kept up to date. */
     void WholeMaskChanged(const SampleRect& whole);
     std::vector<std::string> mShaders;
@@ -383,6 +391,7 @@ namespace faf::editor
     bool UndoLighting(bool redo);
     bool UndoSkybox(bool redo);
     bool UndoWaves(bool redo);
+    bool UndoTerrainTypes(bool redo);
     /** Whether the Markers panel hides this marker's type. */
     [[nodiscard]] bool MarkerHidden(const SaveEntry& marker) const;
     void DeleteSelectedMarkers();

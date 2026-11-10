@@ -190,7 +190,18 @@ namespace faf::editor
       Lighting,
       Skybox,
       Waves,
+      TerrainTypes,
     };
+    /** The map's terrain type grid (a byte a cell, STIMap::mTerrainType, saved with the terrain): its cells, or null. */
+    [[nodiscard]] std::uint8_t* TerrainTypeCells(int& width, int& height) const;
+    [[nodiscard]] std::vector<std::uint8_t> TerrainTypesNow() const;
+    void ApplyTerrainTypes(const std::vector<std::uint8_t>& cells);
+    void TerrainTypesEdited(std::vector<std::uint8_t> before);
+    /** Counts each change to the grid, for the overlay. */
+    [[nodiscard]] int TerrainTypeRevision() const noexcept { return mTerrainTypeRevision; }
+    void TerrainTypesChanged() noexcept { ++mTerrainTypeRevision; }
+    [[nodiscard]] std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>>& TerrainTypesUndo() noexcept { return mTerrainTypesUndo; }
+    [[nodiscard]] std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>>& TerrainTypesRedo() noexcept { return mTerrainTypesRedo; }
     /** The map's wave generators (through the wave system's own Save, WaveSystem::Save 0x00889AD0). */
     [[nodiscard]] std::vector<WaveRecord> WavesNow() const;
     /** The map's prop reclaim, by blueprint (RPropBlueprint::Economy's ReclaimMassMax and ReclaimEnergyMax). */
@@ -392,6 +403,9 @@ namespace faf::editor
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropRedo;
     std::vector<LayerEdit> mLayerUndo;
     std::vector<LayerEdit> mLayerRedo;
+    std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>> mTerrainTypesUndo;
+    std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>> mTerrainTypesRedo;
+    int mTerrainTypeRevision = 0;
     std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>> mWavesUndo;
     std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>> mWavesRedo;
     std::vector<std::pair<SkyboxState, SkyboxState>> mSkyboxUndo;

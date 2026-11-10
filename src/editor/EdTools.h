@@ -4,6 +4,7 @@
 #include "editor/tools/EdMaskBrush.h"
 #include "editor/doc/EdPropPaint.h"
 #include "editor/tools/EdWaves.h"
+#include "editor/tools/EdTerrainTypes.h"
 #include "editor/doc/EdWater.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdMarkers.h"
@@ -380,6 +381,31 @@ namespace faf::editor
 
     /** Whether the Texture tool is the chosen one (the viewport's left button paints a layer's mask). */
     [[nodiscard]] bool TextureToolActive() const noexcept { return mTool == 2; }
+    /** The Texture tool paints the terrain type grid instead of the layer masks. */
+    [[nodiscard]] bool PaintingTerrainTypes() const noexcept { return mTool == 2 && mTexturePaint == 1; }
+    [[nodiscard]] std::uint8_t TerrainTypeCode() const noexcept { return static_cast<std::uint8_t>(mTerrainTypeCode); }
+    [[nodiscard]] bool ShowTerrainTypes() const noexcept { return mTool == 2 && mTexturePaint == 1 && mShowTerrainTypes; }
+    /** The game's types (TerrainTypes.lua), given once the app has read them. */
+    void SetTerrainTypes(std::vector<TerrainTypeInfo> types) { mTerrainTypes = std::move(types); }
+    [[nodiscard]] bool HasTerrainTypes() const noexcept { return !mTerrainTypes.empty(); }
+    [[nodiscard]] std::uint32_t TerrainTypeColor(const std::uint8_t code) const noexcept
+    {
+      for (const TerrainTypeInfo& type : mTerrainTypes) {
+        if (type.code == code) {
+          return type.color;
+        }
+      }
+      return 0xFFFF00FFu;
+    }
+    /** The type under the cursor (-1: none), for the panel. */
+    void SetTerrainTypeUnderCursor(const int code) noexcept { mTypeUnderCursor = code; }
+    /** Test runs (`/terraintype <code>`): the Texture tool painting that type. */
+    void SetTerrainTypeTool(const int code) noexcept
+    {
+      mTool = 2;
+      mTexturePaint = 1;
+      mTerrainTypeCode = code;
+    }
 
     /** The texture brush as the panel sets it: the brush's shape, the layer, the mode. */
     [[nodiscard]] MaskBrush CurrentMaskBrush() const noexcept
@@ -608,6 +634,7 @@ namespace faf::editor
     void DrawTexture();
     void DrawWater();
     void DrawProps();
+    void DrawTerrainTypes();
     void DrawDecals();
     void DrawMarkers();
     void DrawUnits();
@@ -651,6 +678,12 @@ namespace faf::editor
     bool mMarkerFileExport = false;
     bool mUnitFileImport = false;
     bool mUnitFileExport = false;
+    int mTexturePaint = 0;
+    int mTerrainTypeCode = 81;
+    bool mShowTerrainTypes = true;
+    int mTypeUnderCursor = -1;
+    char mTerrainTypeFilter[64]{};
+    std::vector<TerrainTypeInfo> mTerrainTypes;
     LayerFileAsk mLayerFileAsk = LayerFileAsk::None;
     int mLayerFileSlot = 1;
     bool mExportRequested = false;

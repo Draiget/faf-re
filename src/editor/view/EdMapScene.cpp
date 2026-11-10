@@ -299,6 +299,31 @@ namespace faf::editor
         }
       }
     }
+    // The terrain types (the Texture tool painting them): each run of cells in its type's colour, Default left out.
+    if (mTools->ShowTerrainTypes()) {
+      int width = 0;
+      int height = 0;
+      const std::uint8_t* const cells = mDocument.TerrainTypeCells(width, height);
+      if (cells != nullptr && mTypeRunsRevision != mDocument.TerrainTypeRevision()) {
+        mTypeRuns = TerrainTypeRuns(cells, width, height);
+        mTypeRunsRevision = mDocument.TerrainTypeRevision();
+      }
+      std::vector<moho::CD3DPrimBatcher::Vertex> quads;
+      quads.reserve(mTypeRuns.size() * 4);
+      for (const TerrainTypeRun& run : mTypeRuns) {
+        const std::uint32_t color = (mTools->TerrainTypeColor(run.code) & 0x00FFFFFFu) | 0x90000000u;
+        const float x0 = static_cast<float>(run.x0);
+        const float x1 = static_cast<float>(run.x1);
+        const float z0 = static_cast<float>(run.z);
+        quads.push_back(groundVertex(x0, z0, color, 0.3f));
+        quads.push_back(groundVertex(x1, z0, color, 0.3f));
+        quads.push_back(groundVertex(x1, z0 + 1.0f, color, 0.3f));
+        quads.push_back(groundVertex(x0, z0 + 1.0f, color, 0.3f));
+      }
+      if (!quads.empty()) {
+        batcher->DrawQuads(quads.data(), static_cast<std::uint32_t>(quads.size() / 4));
+      }
+    }
     // The Check's pathing: where the land unit can't go, and where no start reaches.
     if (mTools->ShowingPathing()) {
       std::vector<moho::CD3DPrimBatcher::Vertex> quads;
@@ -443,6 +468,7 @@ namespace faf::editor
     // A stroke in progress ends here, so undo has it whole.
     EndStroke();
     EndMaskStroke();
+    EndTypeStroke();
     EndObjectStroke();
     mSelection.clear();
     // The props first: their blueprints are the kept rules', which the next play takes.
@@ -526,6 +552,7 @@ namespace faf::editor
                       : kind == EdDocument::EditKind::Lighting ? UndoLighting(false)
                       : kind == EdDocument::EditKind::Skybox   ? UndoSkybox(false)
                       : kind == EdDocument::EditKind::Waves    ? UndoWaves(false)
+                      : kind == EdDocument::EditKind::TerrainTypes ? UndoTerrainTypes(false)
                                                              : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -548,6 +575,7 @@ namespace faf::editor
                       : kind == EdDocument::EditKind::Lighting ? UndoLighting(true)
                       : kind == EdDocument::EditKind::Skybox   ? UndoSkybox(true)
                       : kind == EdDocument::EditKind::Waves    ? UndoWaves(true)
+                      : kind == EdDocument::EditKind::TerrainTypes ? UndoTerrainTypes(true)
                                                              : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -1296,6 +1324,23 @@ namespace faf::editor
     if (mPaintingMask) {
       PaintMask(frameSeconds);
     }
+    if (mPaintingTypes) {
+      PaintTypes();
+    }
+    // The type under the cursor, for the panel.
+    if (mTools != nullptr && mTools->PaintingTerrainTypes()) {
+      float groundX = 0.0f;
+      float groundZ = 0.0f;
+      int width = 0;
+      int height = 0;
+      const std::uint8_t* const cells = mDocument.TerrainTypeCells(width, height);
+      int under = -1;
+      if (cells != nullptr && GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ) && groundX >= 0.0f &&
+          groundZ >= 0.0f && groundX < static_cast<float>(width) && groundZ < static_cast<float>(height)) {
+        under = cells[static_cast<std::size_t>(groundZ) * static_cast<std::size_t>(width) + static_cast<std::size_t>(groundX)];
+      }
+      mTools->SetTerrainTypeUnderCursor(under);
+    }
     if (mObjectStroke && mTools != nullptr && mTools->PropsToolActive() && mTools->CurrentPropMode() != EdTools::PropMode::Single) {
       float groundX = 0.0f;
       float groundZ = 0.0f;
@@ -1463,6 +1508,63 @@ namespace faf::editor
     mSelection.clear();
     RebuildProps();
     return true;
+  }
+
+  bool EdMapScene::UndoTerrainTypes(const bool redo)
+  {
+    auto& from = redo ? mDocument.TerrainTypesRedo() : mDocument.TerrainTypesUndo();
+    auto& to = redo ? mDocument.TerrainTypesUndo() : mDocument.TerrainTypesRedo();
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mDocument.ApplyTerrainTypes(redo ? step.second : step.first);
+    to.push_back(std::move(step));
+    gpg::Logf("editor: %s a terrain type stroke", redo ? "redid" : "undid");
+    return true;
+  }
+
+  void EdMapScene::PaintTypes()
+  {
+    float groundX = 0.0f;
+    float groundZ = 0.0f;
+    int width = 0;
+    int height = 0;
+    std::uint8_t* const cells = mDocument.TerrainTypeCells(width, height);
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    if (mTools == nullptr || cells == nullptr || field == nullptr ||
+        !GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), groundX, groundZ)) {
+      return;
+    }
+    const HeightBrush brush = mTools->CurrentHeightBrush();
+    float centreX[kMaxSymmetryCopies], centreZ[kMaxSymmetryCopies];
+    const int copies = HeightBrushCentres(field->width, field->height, groundX, groundZ, brush.symmetry, brush.turns, centreX, centreZ);
+    int changed = 0;
+    for (int c = 0; c < copies; ++c) {
+      changed += PaintTerrainType(cells, width, height, centreX[c], centreZ[c], brush.radius, mTools->TerrainTypeCode());
+    }
+    if (changed > 0) {
+      mDocument.TerrainTypesChanged();
+      mDocument.SetModified(true);
+    }
+  }
+
+  void EdMapScene::EndTypeStroke()
+  {
+    if (mPaintingTypes && !mTypesBefore.empty() && mTypesBefore != mDocument.TerrainTypesNow()) {
+      int width = 0;
+      int height = 0;
+      const std::uint8_t* const cells = mDocument.TerrainTypeCells(width, height);
+      std::size_t changed = 0;
+      for (std::size_t i = 0; cells != nullptr && i < mTypesBefore.size(); ++i) {
+        changed += mTypesBefore[i] != cells[i] ? 1U : 0U;
+      }
+      mDocument.TerrainTypesEdited(std::move(mTypesBefore));
+      gpg::Logf("editor: terrain type %d painted on %zu cells", static_cast<int>(mTools != nullptr ? mTools->TerrainTypeCode() : 0), changed);
+    }
+    mTypesBefore.clear();
+    mPaintingTypes = false;
   }
 
   bool EdMapScene::UndoWaves(const bool redo)
@@ -3643,6 +3745,15 @@ namespace faf::editor
         }
         return true;
       }
+      if (mTools != nullptr && mTools->PaintingTerrainTypes()) {
+        mTypesBefore = mDocument.TerrainTypesNow();
+        if (!mTypesBefore.empty()) {
+          mPaintingTypes = true;
+          ::SetCapture(window);
+          ::SetFocus(window);
+        }
+        return true;
+      }
       if (mTools != nullptr && mTools->TextureToolActive()) {
         LoadMasks();
         if (!mDocument.Masks().texels.empty()) {
@@ -3755,6 +3866,11 @@ namespace faf::editor
       }
       if (mPaintingMask) {
         EndMaskStroke();
+        ::ReleaseCapture();
+        return true;
+      }
+      if (mPaintingTypes) {
+        EndTypeStroke();
         ::ReleaseCapture();
         return true;
       }

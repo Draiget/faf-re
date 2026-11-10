@@ -755,6 +755,52 @@ namespace faf::editor
     return totals;
   }
 
+  std::uint8_t* EdDocument::TerrainTypeCells(int& width, int& height) const
+  {
+    width = 0;
+    height = 0;
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr || mMap->mTerrainRes->mMap == nullptr) {
+      return nullptr;
+    }
+    moho::TerrainTypeGrid& grid = mMap->mTerrainRes->mMap->mTerrainType;
+    width = grid.width;
+    height = grid.height;
+    return grid.data;
+  }
+
+  std::vector<std::uint8_t> EdDocument::TerrainTypesNow() const
+  {
+    int width = 0;
+    int height = 0;
+    const std::uint8_t* const cells = TerrainTypeCells(width, height);
+    return cells != nullptr ? std::vector<std::uint8_t>(cells, cells + static_cast<std::size_t>(width) * static_cast<std::size_t>(height))
+                            : std::vector<std::uint8_t>();
+  }
+
+  void EdDocument::ApplyTerrainTypes(const std::vector<std::uint8_t>& cells)
+  {
+    int width = 0;
+    int height = 0;
+    std::uint8_t* const grid = TerrainTypeCells(width, height);
+    if (grid == nullptr || cells.size() != static_cast<std::size_t>(width) * static_cast<std::size_t>(height)) {
+      return;
+    }
+    std::memcpy(grid, cells.data(), cells.size());
+    ++mTerrainTypeRevision;
+    mModified = true;
+  }
+
+  void EdDocument::TerrainTypesEdited(std::vector<std::uint8_t> before)
+  {
+    mTerrainTypesUndo.emplace_back(std::move(before), TerrainTypesNow());
+    // A megabyte a side on a 20 km map: a few steps.
+    if (mTerrainTypesUndo.size() > 20) {
+      mTerrainTypesUndo.erase(mTerrainTypesUndo.begin());
+    }
+    EditEnded(EditKind::TerrainTypes);
+    mModified = true;
+  }
+
   int EdDocument::WaveCount() const
   {
     moho::WaveSystem* const system = mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetWaveSystem() : nullptr;
@@ -1095,6 +1141,7 @@ namespace faf::editor
     mLightingRedo.clear();
     mSkyboxRedo.clear();
     mWavesRedo.clear();
+    mTerrainTypesRedo.clear();
   }
 
   bool EdDocument::PopUndo(EditKind& kind)

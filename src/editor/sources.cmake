@@ -24,6 +24,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdPropPaint.cpp
   doc/EdSkybox.cpp
   tools/EdWaves.cpp
+  tools/EdTerrainTypes.cpp
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp

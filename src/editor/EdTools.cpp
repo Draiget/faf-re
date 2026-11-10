@@ -607,6 +607,64 @@ namespace faf::editor
     DrawTextureBrowser();
   }
 
+  void EdTools::DrawTerrainTypes()
+  {
+    SectionHeader("TERRAIN TYPE");
+    const auto describe = [this](const int code) -> std::string {
+      for (const TerrainTypeInfo& type : mTerrainTypes) {
+        if (type.code == code) {
+          return type.description.empty() ? type.name : type.description + " (" + type.name + ")";
+        }
+      }
+      return "type " + std::to_string(code);
+    };
+    if (mTerrainTypes.empty()) {
+      Note("The types come from the game's /lua/TerrainTypes.lua once it is read.");
+    } else {
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::InputTextWithHint("##typefilter", "search type or style", mTerrainTypeFilter, sizeof(mTerrainTypeFilter));
+      std::string filter = mTerrainTypeFilter;
+      for (char& c : filter) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+      }
+      if (ImGui::BeginChild("##terraintypes", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 12.0f), ImGuiChildFlags_Borders)) {
+        for (const TerrainTypeInfo& type : mTerrainTypes) {
+          std::string key = type.name + " " + type.description + " " + type.style;
+          for (char& c : key) {
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          if (!filter.empty() && key.find(filter) == std::string::npos) {
+            continue;
+          }
+          ImGui::PushID(type.code);
+          // The type's colour (its file's ARGB) as a swatch, then its code, description and style.
+          const ImVec4 swatch(static_cast<float>((type.color >> 16) & 0xFF) / 255.0f, static_cast<float>((type.color >> 8) & 0xFF) / 255.0f,
+                              static_cast<float>(type.color & 0xFF) / 255.0f, 1.0f);
+          ImGui::ColorButton("##swatch", swatch, ImGuiColorEditFlags_NoTooltip, ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight() * 0.8f));
+          ImGui::SameLine();
+          char label[200];
+          (void)std::snprintf(label, sizeof(label), "%3d  %s%s", type.code, type.description.empty() ? type.name.c_str() : type.description.c_str(),
+                              type.blocking ? "  (blocking)" : "");
+          if (ImGui::Selectable(label, type.code == mTerrainTypeCode)) {
+            mTerrainTypeCode = type.code;
+          }
+          if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s, %s", type.name.c_str(), type.style.empty() ? "no style" : type.style.c_str());
+          }
+          ImGui::PopID();
+        }
+      }
+      ImGui::EndChild();
+      ImGui::Text("Painting: %s", describe(mTerrainTypeCode).c_str());
+      ImGui::TextDisabled("Under the cursor: %s", mTypeUnderCursor < 0 ? "-" : describe(mTypeUnderCursor).c_str());
+    }
+    ImGui::Checkbox("Show the types on the ground", &mShowTerrainTypes);
+    DrawBrush(false);
+    DrawSymmetry(false);
+    Note("Each cell has a type: its effects (dust, wakes), and for some (lava) whether units can go there. A stroke paints the "
+         "type in the brush, with its symmetric copies, as one undo step; the Default type (1) isn't drawn.");
+  }
+
   void EdTools::DrawTextureBrowser()
   {
     constexpr const char* kTitle = "Layer textures";
@@ -695,6 +753,14 @@ namespace faf::editor
 
   void EdTools::DrawTexture()
   {
+    SectionHeader("PAINT");
+    static const char* const kTargets[] = {"Layer masks", "Terrain types"};
+    mTexturePaint = std::clamp(mTexturePaint, 0, 1);
+    Segmented(kTargets, 2, mTexturePaint);
+    if (mTexturePaint == 1) {
+      DrawTerrainTypes();
+      return;
+    }
     DrawLayerSlots();
     SectionHeader("PAINT LAYER");
     // Strata 1-8 have masks; the lower layer is under everything and the upper one is blended by its alpha.
