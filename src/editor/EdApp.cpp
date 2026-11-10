@@ -1535,6 +1535,7 @@ namespace faf::editor
           mScene.ChangeLayerSlot(slot, value);
         }
         tools.SetLayerSlots(mScene.LayerSlots());
+        tools.SetMapSizeUnits(static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ)));
         {
           std::vector<std::string> names;
           bool add = false;

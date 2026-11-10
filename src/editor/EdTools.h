@@ -677,6 +677,8 @@ namespace faf::editor
         return albedo == other.albedo && normals == other.normals && albedoSize == other.albedoSize && normalsSize == other.normalsSize;
       }
     };
+    /** The open map's size in game units (the larger side), for the slots' map-wide switch. */
+    void SetMapSizeUnits(const float size) noexcept { mMapSizeUnits = size; }
     /** The open map's slots as the terrain has them, each frame. */
     void SetLayerSlots(std::vector<LayerSlot> slots) { mSlots = std::move(slots); }
     /** A slot the panel changed (its texture or size): the app applies it. */
@@ -1086,6 +1088,7 @@ namespace faf::editor
     std::vector<std::string> mShaders;
     std::string mShader;
     std::string mShaderChange;
+    float mMapSizeUnits = 0.0f;
 
     bool mCheckRequested = false;
     bool mRepairRequested = false;

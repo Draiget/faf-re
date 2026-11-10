@@ -1,4 +1,5 @@
 #include "editor/EdTools.h"
+#include "editor/tools/EdShaderSlots.h"
 #include "editor/ui/EdHelp.h"
 
 #include <cmath>
@@ -556,6 +557,18 @@ namespace faf::editor
       ImGui::Text("%s  %s", kSlotNames[slot], LayerTextureName(layer.albedo).c_str());
       if (ImGui::IsItemHovered() && !layer.albedo.empty()) {
         ImGui::SetTooltip("%s\n%s", layer.albedo.c_str(), layer.normals.empty() ? "(no normal map)" : layer.normals.c_str());
+      }
+      // What the shader makes of this slot (FAF's newer shaders keep some for map-wide data), and whether it does now.
+      if (const ShaderSlotUse use = ShaderSlotUseOf(mShader, slot); !use.text.empty()) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextColored(use.mapWide ? ImVec4(0.95f, 0.75f, 0.30f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), "%s", use.text.c_str());
+        ImGui::PopTextWrapPos();
+        if (use.mapWide && mMapSizeUnits > 0.0f) {
+          const bool on = MapWideOn(layer.albedoSize, mMapSizeUnits);
+          ImGui::TextDisabled(on ? "On: its size is above the map's (%.0f)." : "Off, read as an ordinary layer: its size isn't above the map's (%.0f).", mMapSizeUnits);
+          ImGui::SetItemTooltip("terrain.fx reads the slot as map-wide data only when its size is above the map's, so the tile value is "
+                                "under 1; FAF's map tools bake the texture.");
+        }
       }
       ImGui::SetNextItemWidth(-1.0f);
       float size = layer.albedoSize;
