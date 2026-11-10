@@ -864,6 +864,23 @@ namespace faf::editor
     terrain->SetWaterElevationAbyss(water.abyss);
     if (moho::CWaterShaderProperties* const shader = terrain->GetWaterShaderProperties(); shader != nullptr) {
       std::memcpy(&shader->mNumericState, &water.shader, sizeof(water.shader));
+      // The textures: new names, and the loaded ones dropped; the water's draw loads each again the next time it binds it
+      // (GetCubeMap 0x0089FC40, GetWaterRamp 0x0089FD70, GetNormalMap 0x0089FB00 load a slot that is empty).
+      fa::string* const paths[6] = {&shader->mWaterCubemap, &shader->mWaterRamp, &shader->mShaderNames[0], &shader->mShaderNames[1],
+                                    &shader->mShaderNames[2], &shader->mShaderNames[3]};
+      bool texturesChanged = false;
+      for (int i = 0; i < 6; ++i) {
+        if (water.textures[i] != paths[i]->c_str()) {
+          paths[i]->assign(water.textures[i].c_str());
+          texturesChanged = true;
+          if (std::string probe; !water.textures[i].empty() && !ReadGameFile(water.textures[i], probe)) {
+            gpg::Warnf("editor: water texture %s isn't in the game's files; the game draws a stand-in", water.textures[i].c_str());
+          }
+        }
+      }
+      if (texturesChanged) {
+        shader->releaseTextures();
+      }
     }
     // The water map (depth below the sea, for the shore and the water's colour) follows the levels.
     if (now.enabled != water.enabled || now.elevation != water.elevation || now.deep != water.deep || now.abyss != water.abyss) {

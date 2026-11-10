@@ -882,16 +882,30 @@ namespace faf::editor
     if (ImGui::Button("Export...")) {
       mWaterExport = true;
     }
-    Note("FAForeverMapEditor's water settings file. Import takes its look (colour, reflections, sun, waves) and keeps "
-         "this map's levels; its texture names are listed in the log, not applied yet.");
+    Note("FAForeverMapEditor's water settings file. Import takes its look (colour, reflections, sun, waves) and its "
+         "textures, and keeps this map's levels.");
 
     SectionHeader("TEXTURES");
     static const char* const kTextureNames[6] = {"Cubemap", "Ramp", "Normals 1", "Normals 2", "Normals 3", "Normals 4"};
     for (int i = 0; i < 6; ++i) {
+      ImGui::PushID(i);
       ImGui::TextDisabled("%s", kTextureNames[i]);
       ImGui::SameLine(90.0f);
-      ImGui::TextUnformatted(mWater.textures[i].empty() ? "(none)" : mWater.textures[i].c_str());
+      ImGui::SetNextItemWidth(-1.0f);
+      char path[260];
+      (void)std::snprintf(path, sizeof(path), "%s", mWater.textures[i].c_str());
+      if (ImGui::InputText("##texture", path, sizeof(path), ImGuiInputTextFlags_EnterReturnsTrue) && mWater.textures[i] != path) {
+        mWater.textures[i] = path;
+        mWaterChanged = true;
+        mWaterFinal = true;
+      }
+      active = active || ImGui::IsItemActive();
+      if (ImGui::IsItemHovered() && !mWater.textures[i].empty()) {
+        ImGui::SetTooltip("%s", mWater.textures[i].c_str());
+      }
+      ImGui::PopID();
     }
+    Note("A game path (/textures/engine/waves.dds); Enter applies it as one undo step.");
     mWaterEditing = active;
     Note("Water bodies at their own levels come with the water-levels work (docs/WATER_BODIES.md on feat/water-levels).");
   }

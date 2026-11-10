@@ -1359,8 +1359,7 @@ namespace faf::editor
             water.abyss = before.abyss;
             for (int i = 0; i < 6; ++i) {
               if (water.textures[i] != before.textures[i]) {
-                gpg::Logf("editor: water texture %d in the file: %s (not applied; the map keeps %s)", i, water.textures[i].c_str(),
-                          before.textures[i].c_str());
+                gpg::Logf("editor: water texture %d: %s (was %s)", i, water.textures[i].c_str(), before.textures[i].c_str());
               }
             }
             mDocument.ApplyWater(water);
