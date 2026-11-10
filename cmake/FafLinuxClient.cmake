@@ -61,20 +61,39 @@ endforeach()
 list(LENGTH _faf_client_files _faf_client_count)
 message(STATUS "faf_client: ${_faf_client_count} client translation units")
 
-# DirectX-Headers (cmake/FafDependencies.cmake): the DXGI format numbers the Vulkan backend and the
-# texture code use (<dxgiformat.h>).
+# The client's downloads (cmake/FafDependencies.cmake): DirectX-Headers for the DXGI format numbers
+# the Vulkan backend and the texture code use (<dxgiformat.h>); SDL3 for the window, input and
+# audio output; FAudio for XACT and X3DAudio (issue #258).
 if(FAF_FETCH_DEPENDENCIES)
-  set(FAF_DEPENDENCIES_ONLY DirectX-Headers)
+  set(FAF_DEPENDENCIES_ONLY DirectX-Headers SDL3 FAudio)
   include(FafDependencies)
 endif()
+
+# SDL3, static. Its X11, Wayland, audio and input backends load their system libraries at run time.
+set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+set(SDL_STATIC ON CACHE BOOL "" FORCE)
+set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory("${FAF_DEPENDENCIES_DIR}/SDL3" "${CMAKE_BINARY_DIR}/deps/SDL3" EXCLUDE_FROM_ALL SYSTEM)
+
+# FAudio, static, over that SDL3 (its CMakeLists takes SDL3_INCLUDE_DIRS and SDL3_LIBRARIES).
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(SDL3_INCLUDE_DIRS "${FAF_DEPENDENCIES_DIR}/SDL3/include")
+set(SDL3_LIBRARIES SDL3-static)
+add_subdirectory("${FAF_DEPENDENCIES_DIR}/FAudio" "${CMAKE_BINARY_DIR}/deps/FAudio" EXCLUDE_FROM_ALL SYSTEM)
 
 # The part of wxWindows 2.4.2 the game code uses (src/platform/posix/wx/wx/defs.h).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/wx/WxStandIn.cpp")
 # The Win32 window, cursor and key-state calls the UI code makes (platform/posix/win32/Windows.h).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32WindowPosix.cpp")
+# The XACT engine on FAudio's FACT (issue #258).
+list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/XactOverFact.cpp")
 
 add_library(faf_client_objs OBJECT ${_faf_client_files})
-target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd)
+target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd
+  FAudio-static SDL3::SDL3-static)  # FAudio names its static target FAudio-static, with no alias
 target_include_directories(faf_client_objs PRIVATE
   "${PROJECT_SOURCE_DIR}/src/platform/posix/wx"
   "${FAF_DEPENDENCIES_DIR}/vulkan/include"

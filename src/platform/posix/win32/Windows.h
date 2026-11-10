@@ -63,6 +63,15 @@ using LPCVOID = const void*;
 using LPSTR = char*;
 using LPCSTR = const char*;
 using LPWSTR = wchar_t*;
+using PWSTR = wchar_t*;
+struct _GUID
+{
+  std::uint32_t Data1;
+  std::uint16_t Data2;
+  std::uint16_t Data3;
+  std::uint8_t Data4[8];
+};
+using GUID = _GUID;
 using LPCWSTR = const wchar_t*;
 using DWORD64 = std::uint64_t;
 using ULONGLONG = std::uint64_t;

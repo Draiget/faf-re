@@ -269,6 +269,22 @@ set(_faf_download_DirectX-Headers
     "DirectX-Headers-1.619.5"
     "DirectX-Headers-1.619.5.tar.gz")
 
+# SDL 3.4.18 (zlib): the Linux client's window, input and audio output (issues #255, #256) and
+# FAudio's platform layer. The release archive; cmake/FafLinuxClient.cmake builds it static.
+# Linux only, like DirectX-Headers.
+set(_faf_download_SDL3
+    "https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz"
+    "9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3"
+    "SDL3-3.4.18")
+# FAudio 26.10 (zlib): XACT3 (FACT) and X3DAudio (F3DAudio) for the Linux client's sound (issue
+# #258), the same reimplementation Wine's XACT uses. The tag's source archive;
+# cmake/FafLinuxClient.cmake builds it static over SDL3. Linux only.
+set(_faf_download_FAudio
+    "https://github.com/FNA-XNA/FAudio/archive/refs/tags/26.10.tar.gz"
+    "c508f297ec8d065b456b2d9d74bab89ffc84ac3afbcb428bd54e40f09f8b901e"
+    "FAudio-26.10"
+    "FAudio-26.10.tar.gz")
+
 # Dear ImGui 1.92.4, docking branch (MIT): the map editor's panels (src/editor, .plans/map-editor).
 # The tag's source archive; cmake/deps/imgui builds the core and the Win32 platform backend.
 set(_faf_download_imgui
@@ -447,7 +463,10 @@ faf_dependency_download(monocypher)
 faf_dependency_download(DirectXTex)
 faf_dependency_download(imgui)
 if(FAF_DEPENDENCIES_ONLY)
-  faf_dependency_download(DirectX-Headers)  # Linux only (see its entry above)
+  # Linux only (see their entries above): a run that doesn't name them skips them.
+  faf_dependency_download(DirectX-Headers)
+  faf_dependency_download(SDL3)
+  faf_dependency_download(FAudio)
 endif()
 if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
   faf_dependency_download(freetype)

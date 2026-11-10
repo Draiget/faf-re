@@ -20,6 +20,11 @@
 #include <mmsystem.h>
 #include <dsound.h>
 #include <boost/ptr_container/exception.hpp>
+#if !defined(_WIN32)
+// The Linux client's XACT and X3DAudio: FAudio (issue #258).
+#include <F3DAudio.h>
+#include "platform/posix/XactOverFact.h"
+#endif
 
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/streams/BinaryReader.h"
@@ -84,6 +89,16 @@ namespace
 
   const X3DAudioFunctions& X3DAudio()
   {
+#if !defined(_WIN32)
+    // The Linux client (issue #258): FAudio's F3DAudio, built in, with X3DAudio's structures.
+    static const X3DAudioFunctions functions = [] {
+      X3DAudioFunctions linked;
+      linked.mInitialize = reinterpret_cast<decltype(linked.mInitialize)>(&F3DAudioInitialize);
+      linked.mCalculate = reinterpret_cast<decltype(linked.mCalculate)>(&F3DAudioCalculate);
+      return linked;
+    }();
+    return functions;
+#else
     static const X3DAudioFunctions functions = [] {
       for (const wchar_t* const library : {L"xaudio2_9.dll", L"X3DAudio1_7.dll"}) {
         const HMODULE module = ::LoadLibraryExW(library, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
@@ -105,6 +120,7 @@ namespace
       return X3DAudioFunctions{};
     }();
     return functions;
+#endif
   }
 } // namespace
 
@@ -1386,6 +1402,11 @@ namespace moho
    */
   int func_CreateXACTinstance(const std::uint32_t mode, void** const outEngine)
   {
+#if !defined(_WIN32)
+    // The Linux client (issue #258): XACT on FAudio's FACT; it has no debug or audition engine.
+    (void)mode;
+    return platform::posix::CreateXactEngineOverFact(outEngine);
+#else
     std::uint32_t debug = (mode >> 1u) & 1u;
     const std::uint32_t audition = mode & 1u;
     const std::uint32_t auditionMode = audition;
@@ -1426,6 +1447,7 @@ namespace moho
       result = CoCreateInstance(kXactComInterfaceClsid, nullptr, CLSCTX_INPROC_SERVER, kXactComInterfaceRiid, outEngine);
     }
     return result;
+#endif
   }
 
   void func_RetreiveXACTCOMInterface(AudioEngineImpl* impl);
@@ -2046,6 +2068,11 @@ namespace moho
       }
     }
 
+#if !defined(_WIN32)
+    // The Linux client (issue #258) has no DirectSound to ask: stereo, the default the Windows
+    // code falls back to as well. The cues' matrices follow FAudio's final mix format.
+    sSoundConfiguration->mSpeakerConfiguration = 3u;
+#else
     LPDIRECTSOUND directSound = nullptr;
     if (::DirectSoundCreate(nullptr, &directSound, nullptr) >= 0) {
       DWORD speakerConfig = 0;
@@ -2075,6 +2102,7 @@ namespace moho
     } else {
       gpg::Warnf("Failed to create DirectSound.");
     }
+#endif
   }
 
   /**
