@@ -59,6 +59,11 @@ namespace
 {
   std::mutex gDiskPathStateLock;
   std::filesystem::path gLaunchDirectory;
+  /// Engine addition: the mount table the file system was last built from (DISK_MountDirectoryNow builds
+  /// it again with more), and the file systems it replaced, kept for threads still reading through them.
+  fa::vector<moho::SVFSMountPoint> gMountedPoints;
+  std::vector<moho::CVirtualFileSystem*> gRetiredFileSystems;
+  bool gMountTableKnown = false;
   std::filesystem::path gDataPathScriptFile;
   std::vector<std::wstring> gAllowedProtocols;
   moho::SAppIdentity gAppIdentity{};
@@ -4291,6 +4296,8 @@ bool moho::DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std
     gLaunchDirectory = absoluteLaunchDirectory;
     gDataPathScriptFile = absoluteScriptPath;
     gAllowedProtocols = std::move(allowedProtocols);
+    gMountedPoints = mountPoints;
+    gMountTableKnown = true;
   }
 
   // Mount it. The binary does this at 0x0045A336-0x0045A376: ensure the
@@ -4302,6 +4309,28 @@ bool moho::DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std
     delete previous;
   }
 
+  return true;
+}
+
+bool moho::DISK_MountDirectoryNow(const std::filesystem::path& directory, const char* const mountpoint)
+{
+  fa::vector<moho::SVFSMountPoint> mountPoints;
+  std::filesystem::path launchDirectory;
+  {
+    std::lock_guard<std::mutex> lock(gDiskPathStateLock);
+    if (!gMountTableKnown) {
+      return false;
+    }
+    const std::u8string folder = directory.generic_u8string();
+    gMountedPoints.push_back(moho::SVFSMountPoint(reinterpret_cast<const char*>(folder.c_str()), mountpoint));
+    mountPoints = gMountedPoints;
+    launchDirectory = gLaunchDirectory;
+  }
+  moho::CVirtualFileSystem* const previous = moho::DISK_ExchangeVFS(moho::VFS_Create(mountPoints, launchDirectory));
+  if (previous != nullptr) {
+    std::lock_guard<std::mutex> lock(gDiskPathStateLock);
+    gRetiredFileSystems.push_back(previous);
+  }
   return true;
 }
 

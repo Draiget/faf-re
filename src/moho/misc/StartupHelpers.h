@@ -1492,6 +1492,15 @@ namespace moho
   bool DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std::filesystem::path& launchDir);
 
   /**
+   * Engine addition, not in the binary (the map editor's downloads): mounts `directory` at `mountpoint`
+   * (`/maps/<folder>`) while the game runs. The file system is built again from the startup mount table
+   * plus every folder mounted this way, and installed in place of the current one, which is kept (not
+   * destroyed) because loader threads may still be reading through it. The new folder ranks after
+   * everything mounted before it. False when no file system was set up yet.
+   */
+  bool DISK_MountDirectoryNow(const std::filesystem::path& directory, const char* mountpoint);
+
+  /**
    * Address: 0x00459DA0 (FUN_00459DA0, ?DISK_GetAllowedProtocols@Moho@@YA?AV?$vector@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@V?$allocator@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@@2@@std@@XZ)
    *
    * What it does:
