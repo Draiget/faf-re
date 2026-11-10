@@ -412,6 +412,28 @@ HLOCAL LocalFree(HLOCAL memory);
 #define FILE_FLAG_RANDOM_ACCESS 0x10000000u
 #define FILE_FLAG_OVERLAPPED 0x40000000u
 #define FILE_FLAG_NO_BUFFERING 0x20000000u
+
+// GetFileInformationByHandleEx(FileStorageInfo): the sector sizes unbuffered reads align to. The
+// POSIX files read through the page cache, so there is no sector size to report: it fails, and
+// callers keep their defaults.
+enum FILE_INFO_BY_HANDLE_CLASS
+{
+  FileStorageInfo = 16
+};
+struct FILE_STORAGE_INFO
+{
+  ULONG LogicalBytesPerSector;
+  ULONG PhysicalBytesPerSectorForAtomicity;
+  ULONG PhysicalBytesPerSectorForPerformance;
+  ULONG FileSystemEffectivePhysicalBytesPerSectorForAtomicity;
+  ULONG Flags;
+  ULONG ByteOffsetForSectorAlignment;
+  ULONG ByteOffsetForPartitionAlignment;
+};
+inline BOOL GetFileInformationByHandleEx(HANDLE, FILE_INFO_BY_HANDLE_CLASS, void*, DWORD) noexcept
+{
+  return FALSE;
+}
 #define FILE_FLAG_BACKUP_SEMANTICS 0x02000000u
 #define FILE_BEGIN 0u
 #define FILE_CURRENT 1u
@@ -520,6 +542,8 @@ BOOL SetEndOfFile(HANDLE file);
 DWORD GetFileAttributesW(const wchar_t* path);
 DWORD GetFileAttributesA(const char* path);
 BOOL MoveFileExW(const wchar_t* from, const wchar_t* to, DWORD flags);
+BOOL MoveFileExA(const char* from, const char* to, DWORD flags);
+BOOL CopyFileW(const wchar_t* from, const wchar_t* to, BOOL failIfExists);
 BOOL MoveFileW(const wchar_t* from, const wchar_t* to);
 BOOL DeleteFileW(const wchar_t* path);
 BOOL DeleteFileA(const char* path);
@@ -820,7 +844,24 @@ BOOL ReleaseCapture();
 HWND GetCapture();
 HWND SetFocus(HWND window);
 HWND GetFocus();
+// The window that has the user's input: the focused one, as the window system reports it.
+HWND GetForegroundWindow();
+// A debugger (ptrace tracer) is attached; TracerPid in /proc/self/status.
+BOOL IsDebuggerPresent();
+void DebugBreak();
 BOOL ShowWindow(HWND window, int command);
+BOOL IsWindowVisible(HWND window);
+BOOL SetWindowPos(HWND window, HWND insertAfter, int x, int y, int width, int height, UINT flags);
+#define HWND_TOP (reinterpret_cast<HWND>(0))
+#define HWND_BOTTOM (reinterpret_cast<HWND>(1))
+#define HWND_TOPMOST (reinterpret_cast<HWND>(-1))
+#define HWND_NOTOPMOST (reinterpret_cast<HWND>(-2))
+#define SWP_NOSIZE 0x0001u
+#define SWP_NOMOVE 0x0002u
+#define SWP_NOZORDER 0x0004u
+#define SWP_NOACTIVATE 0x0010u
+#define SWP_FRAMECHANGED 0x0020u
+#define SWP_SHOWWINDOW 0x0040u
 #define SW_HIDE 0
 #define SW_SHOWNORMAL 1
 #define SW_SHOWMINIMIZED 2

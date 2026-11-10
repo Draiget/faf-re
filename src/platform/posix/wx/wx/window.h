@@ -38,7 +38,11 @@ public:
   virtual bool Destroy();
   bool IsShown() const { return m_shown; }
   virtual void SetFocus() {}
-  virtual void Refresh(bool eraseBackground = true) { (void)eraseBackground; }
+  virtual void Refresh(bool eraseBackground = true, const wxRect* rect = nullptr)
+  {
+    (void)eraseBackground;
+    (void)rect;
+  }
   virtual void Update() {}
   void SetSize(int width, int height);
   // wx 2.4.2: -1 keeps a coordinate or dimension as it is (with wxSIZE_USE_EXISTING).

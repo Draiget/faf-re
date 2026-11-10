@@ -39,6 +39,10 @@ using XACT_RUNTIME_PARAMETERS =
 using XACT_STREAMING_PARAMETERS = FACTStreamingParameters;
 using XACT_NOTIFICATION_DESCRIPTION = FACTNotificationDescription;
 using XACT_NOTIFICATION = FACTNotification;
+// XACT 3's interface types, which the engine names only as opaque identities in notifications.
+using IXACT3SoundBank = FACTSoundBank;
+using IXACT3WaveBank = FACTWaveBank;
+using IXACT3Cue = FACTCue;
 using XACTINDEX = std::uint16_t;
 using XACTCATEGORY = std::uint16_t;
 using XACTVARIABLEINDEX = std::uint16_t;

@@ -19,6 +19,8 @@
 #endif
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/RenderTarget.hpp"
+#include "gpg/gal/VertexFormat.hpp"
+#include "gpg/gal/Device.hpp"
 // The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
 #if defined(_WIN32)
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"

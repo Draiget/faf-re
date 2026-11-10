@@ -36,6 +36,7 @@
 #include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
 #endif
 #include "gpg/gal/EffectTechnique.hpp"
+#include "gpg/gal/MeshFormatter.h"
 // The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
 #if defined(_WIN32)
 #include "gpg/gal/backends/d3d9/Float16HardwareVertexFormatterD3D9.hpp"

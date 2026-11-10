@@ -9,7 +9,11 @@
 #include <array>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
+
+#include <csignal>
+#include <cstdio>
 
 #include <execinfo.h>
 
@@ -24,6 +28,7 @@ namespace
     POINT cursor{};
     HWND capture = nullptr;
     HWND focus = nullptr;
+    std::unordered_set<HWND> hidden;  // windows ShowWindow hid or minimized
     HCURSOR cursorShape = nullptr;
     int cursorShowCount = 0;
     std::array<bool, 256> keysDown{};
@@ -79,6 +84,7 @@ namespace platform::posix
   void (*gWarpCursorHook)(int x, int y) = nullptr;
   void (*gFocusHook)(void* window) = nullptr;
   void (*gShowWindowHook)(void* window, int command) = nullptr;
+  void (*gSetWindowPosHook)(void* window, int x, int y, int width, int height, unsigned int flags) = nullptr;
 } // namespace platform::posix
 
 BOOL GetCursorPos(POINT* const point)
@@ -239,10 +245,84 @@ HWND GetFocus()
   return state.focus;
 }
 
+HWND GetForegroundWindow()
+{
+  return GetFocus();
+}
+
+BOOL IsDebuggerPresent()
+{
+  std::FILE* const status = std::fopen("/proc/self/status", "r");
+  if (status == nullptr) {
+    return FALSE;
+  }
+  char line[256];
+  long tracer = 0;
+  while (std::fgets(line, sizeof(line), status) != nullptr) {
+    if (std::sscanf(line, "TracerPid: %ld", &tracer) == 1) {
+      break;
+    }
+  }
+  std::fclose(status);
+  return tracer != 0 ? TRUE : FALSE;
+}
+
+void DebugBreak()
+{
+  (void)::raise(SIGTRAP);
+}
+
 BOOL ShowWindow(const HWND window, const int command)
 {
+  {
+    WindowState& state = State();
+    const std::lock_guard<std::mutex> lock(state.mutex);
+    if (command == SW_HIDE || command == SW_MINIMIZE || command == SW_SHOWMINIMIZED) {
+      state.hidden.insert(window);
+    } else {
+      state.hidden.erase(window);
+    }
+  }
   if (platform::posix::gShowWindowHook != nullptr) {
     platform::posix::gShowWindowHook(window, command);
+  }
+  return TRUE;
+}
+
+BOOL IsWindowVisible(const HWND window)
+{
+  if (window == nullptr) {
+    return FALSE;
+  }
+  WindowState& state = State();
+  const std::lock_guard<std::mutex> lock(state.mutex);
+  return state.hidden.count(window) == 0 ? TRUE : FALSE;
+}
+
+BOOL SetWindowPos(
+  const HWND window, const HWND insertAfter, const int x, const int y, const int width, const int height, const UINT flags
+)
+{
+  (void)insertAfter;  // stacking order is the window system's
+  {
+    WindowState& state = State();
+    const std::lock_guard<std::mutex> lock(state.mutex);
+    RECT& rect = state.windowRects[window];
+    if ((flags & SWP_NOMOVE) == 0u) {
+      const LONG currentWidth = rect.right - rect.left;
+      const LONG currentHeight = rect.bottom - rect.top;
+      rect.left = x;
+      rect.top = y;
+      rect.right = x + currentWidth;
+      rect.bottom = y + currentHeight;
+    }
+    if ((flags & SWP_NOSIZE) == 0u) {
+      rect.right = rect.left + width;
+      rect.bottom = rect.top + height;
+    }
+  }
+  if (platform::posix::gSetWindowPosHook != nullptr) {
+    platform::posix::gSetWindowPosHook(window, x, y, width, height, flags);
   }
   return TRUE;
 }

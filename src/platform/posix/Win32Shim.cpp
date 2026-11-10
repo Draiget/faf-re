@@ -1506,6 +1506,35 @@ BOOL MoveFileExW(const wchar_t* const from, const wchar_t* const to, const DWORD
   return TRUE;
 }
 
+BOOL MoveFileExA(const char* const from, const char* const to, const DWORD flags)
+{
+  const std::string source = SlashPath(from);
+  const std::string target = SlashPath(to);
+  if ((flags & MOVEFILE_REPLACE_EXISTING) == 0 && ::access(target.c_str(), F_OK) == 0) {
+    tLastError = ERROR_ALREADY_EXISTS;
+    return FALSE;
+  }
+  if (::rename(source.c_str(), target.c_str()) != 0) {
+    SetErrnoError();
+    return FALSE;
+  }
+  return TRUE;
+}
+
+BOOL CopyFileW(const wchar_t* const from, const wchar_t* const to, const BOOL failIfExists)
+{
+  const std::filesystem::path source = ResolveCase(NarrowPath(from));
+  const std::filesystem::path target = ResolveCase(NarrowPath(to));
+  std::error_code error;
+  const auto options = failIfExists ? std::filesystem::copy_options::none
+                                    : std::filesystem::copy_options::overwrite_existing;
+  if (!std::filesystem::copy_file(source, target, options, error)) {
+    tLastError = error ? ErrnoToWin32(error.value()) : ERROR_ALREADY_EXISTS;
+    return FALSE;
+  }
+  return TRUE;
+}
+
 BOOL MoveFileW(const wchar_t* const from, const wchar_t* const to)
 {
   return MoveFileExW(from, to, 0);

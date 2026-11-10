@@ -6,6 +6,10 @@
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
+#if !defined(_WIN32)
+#include <filesystem>
+#include <system_error>
+#endif
 
 #include <Windows.h>
 #include <psapi.h>
@@ -64,6 +68,17 @@ namespace moho
     {
       files = 0U;
       bytes = 0U;
+#if !defined(_WIN32)
+      // The Linux client (issue #255).
+      std::error_code error;
+      for (const auto& entry : std::filesystem::directory_iterator(directory, error)) {
+        std::error_code entryError;
+        if (entry.is_regular_file(entryError)) {
+          ++files;
+          bytes += static_cast<std::uint64_t>(entry.file_size(entryError));
+        }
+      }
+#else
       WIN32_FIND_DATAA entry{};
       const HANDLE search = ::FindFirstFileA((directory + "\\*").c_str(), &entry);
       if (search == INVALID_HANDLE_VALUE) {
@@ -76,6 +91,7 @@ namespace moho
         }
       } while (::FindNextFileA(search, &entry) != FALSE);
       ::FindClose(search);
+#endif
     }
 
     /** Prints `text` to the console and the log, one line at a time. */

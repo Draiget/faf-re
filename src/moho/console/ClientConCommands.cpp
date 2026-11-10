@@ -3947,7 +3947,10 @@ namespace
    * Address: 0x00BC73F0 (FUN_00BC73F0, dynamic initializer for `gCConFunc_WxInputBox`)
    * Address: 0x00BF1960 (FUN_00BF1960, dynamic atexit destructor for `gCConFunc_WxInputBox`)
    */
+#if defined(_WIN32)
+  // The input box is a wx dialog: not in the Linux client (issue #255).
   CConFunc gCConFunc_WxInputBox("WxInputBox", kConsoleStartupConWxInputBoxDescription, reinterpret_cast<CConFunc::Callback>(&CON_WxInputBox));
+#endif
 
   /**
    * Address: 0x00BC3D00 (FUN_00BC3D00, dynamic initializer for `gTConVar_graphics_Fidelity`)

@@ -5,6 +5,14 @@
 #if !defined(_WIN32)
 #include <cerrno>
 #include <csignal>
+#include <cstring>
+#include <string>
+#include <vector>
+
+#include <sys/prctl.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
+#include <unistd.h>
 #endif
 #include <chrono>
 #include <condition_variable>
@@ -500,8 +508,13 @@ namespace moho
      * It has to keep client data: without it, entities have no position history and emitters no curves, and the
      * viewer's sim crashes on the first trail in view after the load.
      */
+#if !defined(_WIN32)
+    // The Linux client (issue #255): the hidden process's id; PR_SET_PDEATHSIG ends it with the game.
+    pid_t sPreparePid = 0;
+#else
     HANDLE sPrepareJob = nullptr;
     HANDLE sPrepareProcess = nullptr;
+#endif
     std::int32_t sPreparedTick = -1;
     bool sPrepareStartDue = false;
 
@@ -518,6 +531,13 @@ namespace moho
         const std::lock_guard<std::mutex> lock(sCompressLock);
         sPrepareScanning = false;
       }
+#if !defined(_WIN32)
+      if (sPreparePid > 0) {
+        (void)::kill(sPreparePid, SIGKILL);
+        (void)::waitpid(sPreparePid, nullptr, 0);
+        sPreparePid = 0;
+      }
+#else
       if (sPrepareProcess != nullptr) {
         ::TerminateProcess(sPrepareProcess, 0u);
         ::WaitForSingleObject(sPrepareProcess, 3000u);
@@ -528,6 +548,7 @@ namespace moho
         ::CloseHandle(sPrepareJob);
         sPrepareJob = nullptr;
       }
+#endif
     }
 
     void StartKeyframePreparation()
@@ -556,6 +577,44 @@ namespace moho
         + "\" --keyframe-every " + every + " --keyframe-first " + first + " --keyframe-dir \"" + directory.string() + "\" --keyframe-prepare"
         + (replay_KeyframeQuietDisk ? " --keyframe-quiet" : "");
 
+#if !defined(_WIN32)
+      // The same arguments as the command line above, without a shell in between, so the death signal
+      // reaches this exe itself. Lower priority, as BELOW_NORMAL_PRIORITY_CLASS.
+      (void)command;
+      const std::string logPath = (directory / "prepare.log").string();
+      const std::string directoryText = directory.string();
+      const std::string selfText = self.string();
+      const std::string folder = self.parent_path().string();
+      std::vector<std::string> arguments = {
+        selfText, "/replaykeyframes", "--keep-client-data", "--label", "prepare", "--replay", sReplayPath,
+        "/init", initArgs[0].c_str(), "/nobugreport", "/nosound", "/log", logPath, "--keyframe-every", every,
+        "--keyframe-first", first, "--keyframe-dir", directoryText, "--keyframe-prepare"};
+      if (replay_KeyframeQuietDisk) {
+        arguments.emplace_back("--keyframe-quiet");
+      }
+      std::vector<char*> argv;
+      for (std::string& argument : arguments) {
+        argv.push_back(argument.data());
+      }
+      argv.push_back(nullptr);
+      const pid_t parent = ::getpid();
+      const pid_t child = ::fork();
+      if (child == 0) {
+        (void)::prctl(PR_SET_PDEATHSIG, SIGKILL);
+        if (::getppid() != parent) {
+          ::_exit(0);  // the game ended before the signal was armed
+        }
+        (void)::setpriority(PRIO_PROCESS, 0, 10);
+        (void)::chdir(folder.c_str());
+        ::execv(argv[0], argv.data());
+        ::_exit(127);
+      }
+      if (child < 0) {
+        gpg::Warnf("Replay timeline: no keyframes prepared ahead: can't start %s (%s)", selfText.c_str(), std::strerror(errno));
+        return;
+      }
+      sPreparePid = child;
+#else
       STARTUPINFOA startup{};
       startup.cb = sizeof(startup);
       PROCESS_INFORMATION process{};
@@ -578,6 +637,7 @@ namespace moho
       ::ResumeThread(process.hThread);
       ::CloseHandle(process.hThread);
       sPrepareProcess = process.hProcess;
+#endif
       {
         const std::lock_guard<std::mutex> lock(sCompressLock);
         sPrepareScanFrom = directory;
@@ -983,7 +1043,11 @@ namespace moho
       StartKeyframePreparation();
     }
     // Turned off while it runs: the CPU it uses comes back at once, and what it has written stays.
+#if !defined(_WIN32)
+    if (!replay_PrepareKeyframes && sPreparePid > 0) {
+#else
     if (!replay_PrepareKeyframes && sPrepareProcess != nullptr) {
+#endif
       TakePreparedKeyframes();
       StopKeyframePreparation();
     }

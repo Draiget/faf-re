@@ -33,6 +33,16 @@ set(_faf_client_windows_only
   #   reference editor, snapshot folder dialog, network panel and tray icon, wxURL.
   "^moho/app/(WEmitterWx|WWinLogWindow|WRefEditDialog|SnapshotDirectoryDialog|NetworkPanel|NetworkTray|WxUrl)\\.cpp$")
 
+# Portable files in the Windows backends' folders that the Vulkan backend shares: the DXGI format
+# tables, the Direct3D 11 vertex layouts (D3D11_INPUT_ELEMENT_DESC from the POSIX <d3d11.h>) and
+# the effect-source translator (FX to modern HLSL, plain text work).
+set(_faf_client_shared_backend_files
+  "^gpg/gal/backends/dxgi/DxgiFormats\\.cpp$"
+  "^gpg/gal/backends/d3d11/(D3D11VertexLayouts|EffectSourceD3D11)\\.cpp$")
+list(APPEND _faf_client_windows_only
+  # The Direct3D 9 state manager's caches.
+  "^gpg/gal/StateCache\\.cpp$")
+
 set(_faf_client_files "")
 foreach(_src IN LISTS FAF_ENGINE_SOURCES)
   set(_client FALSE)
@@ -46,6 +56,12 @@ foreach(_src IN LISTS FAF_ENGINE_SOURCES)
     foreach(_pattern IN LISTS _faf_sim_patterns _faf_client_windows_only)
       if(_src MATCHES "${_pattern}")
         set(_client FALSE)
+        break()
+      endif()
+    endforeach()
+    foreach(_pattern IN LISTS _faf_client_shared_backend_files)
+      if(_src MATCHES "${_pattern}")
+        set(_client TRUE)
         break()
       endif()
     endforeach()

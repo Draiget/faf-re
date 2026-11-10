@@ -19,6 +19,8 @@ namespace platform::posix
   // Called by SetFocus and ShowWindow so the window system can act on the real window.
   extern void (*gFocusHook)(void* window);
   extern void (*gShowWindowHook)(void* window, int command);
+  // Called by SetWindowPos (flags are SWP_*: SWP_NOMOVE and SWP_NOSIZE say which half applies).
+  extern void (*gSetWindowPosHook)(void* window, int x, int y, int width, int height, unsigned int flags);
   // The window system has events: wakes a MsgWaitForMultipleObjectsEx in the main loop.
   void WakeMessageWait();
 } // namespace platform::posix
