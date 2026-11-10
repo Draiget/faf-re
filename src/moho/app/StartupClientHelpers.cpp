@@ -40,7 +40,9 @@
 #include <Shlwapi.h>
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#if defined(_WIN32)  // the Direct3D 10 backend: Windows only (issue #255)
 #include "gpg/gal/backends/d3d10/DeviceD3D10.hpp"
+#endif
 // The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
 #if defined(_WIN32)
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"

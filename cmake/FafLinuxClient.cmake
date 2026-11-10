@@ -81,7 +81,7 @@ message(STATUS "faf_client: ${_faf_client_count} client translation units")
 # the Vulkan backend and the texture code use (<dxgiformat.h>); SDL3 for the window, input and
 # audio output; FAudio for XACT and X3DAudio (issue #258).
 if(FAF_FETCH_DEPENDENCIES)
-  set(FAF_DEPENDENCIES_ONLY DirectX-Headers SDL3 FAudio)
+  set(FAF_DEPENDENCIES_ONLY DirectX-Headers SDL3 FAudio dxc-linux)
   include(FafDependencies)
 endif()
 
@@ -112,7 +112,17 @@ list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32Win
 # The XACT engine on FAudio's FACT (issue #258).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/XactOverFact.cpp")
 
+# DXC's Linux headers bring their own Win32 types, which clash with the POSIX <Windows.h> the
+# client's files are compiled with (platform/PosixCompat.h), so the one file that includes them is
+# built on its own, without faf_sim_settings. libdxcompiler.so is loaded at run time.
+add_library(faf_client_dxc OBJECT "${PROJECT_SOURCE_DIR}/src/platform/posix/dxc/DxcGlue.cpp")
+target_include_directories(faf_client_dxc PRIVATE
+  "${PROJECT_SOURCE_DIR}/src"
+  "${FAF_DEPENDENCIES_DIR}/dxc-linux/include")
+target_compile_options(faf_client_dxc PRIVATE -pthread -Wall)
+
 add_library(faf_client_objs OBJECT ${_faf_client_files})
+add_dependencies(faf_client_objs faf_client_dxc)
 target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd
   FAudio-static SDL3::SDL3-static)  # FAudio names its static target FAudio-static, with no alias
 target_include_directories(faf_client_objs PRIVATE

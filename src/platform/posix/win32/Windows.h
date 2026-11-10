@@ -243,6 +243,7 @@ BOOL InitOnceExecuteOnce(PINIT_ONCE initOnce, PINIT_ONCE_FN function, PVOID para
 
 /// The process's command line (/proc/self/cmdline, arguments joined by spaces).
 const wchar_t* GetCommandLineW();
+const char* GetCommandLineA();
 
 /// A slim reader/writer lock, as a POSIX rwlock (statically initialisable as SRWLOCK_INIT).
 struct SRWLOCK
@@ -877,6 +878,8 @@ SHORT GetKeyState(int virtualKey);
 SHORT GetAsyncKeyState(int virtualKey);
 HCURSOR SetCursor(HCURSOR cursor);
 int ShowCursor(BOOL show);
+// Confines the cursor to `rect` (screen coordinates), or frees it for null.
+BOOL ClipCursor(const RECT* rect);
 
 // Virtual-key codes (WinUser.h), with their Windows values: the client's key bindings
 // convert wx key codes to and from them (wxCharCodeWXToMSW, issue #255).

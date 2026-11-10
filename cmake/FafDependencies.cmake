@@ -285,6 +285,14 @@ set(_faf_download_FAudio
     "FAudio-26.10"
     "FAudio-26.10.tar.gz")
 
+# DXC v1.9.2609 for Linux (the same release as the dxc entry above): libdxcompiler.so and libdxil.so
+# and the headers, for the Linux client's shader compiler (platform/posix/dxc/DxcGlue.cpp). The
+# release archive has no top folder. Linux only.
+set(_faf_download_dxc-linux
+    "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2609/linux_dxc_2026_09_28.x86_x64.tar.gz"
+    "96faadc7f5c282d2ffda49804beb4c3ee38127bc252b723234e3c5cdf7aa39a1"
+    "")
+
 # Dear ImGui 1.92.4, docking branch (MIT): the map editor's panels (src/editor, .plans/map-editor).
 # The tag's source archive; cmake/deps/imgui builds the core and the Win32 platform backend.
 set(_faf_download_imgui
@@ -467,6 +475,7 @@ if(FAF_DEPENDENCIES_ONLY)
   faf_dependency_download(DirectX-Headers)
   faf_dependency_download(SDL3)
   faf_dependency_download(FAudio)
+  faf_dependency_download(dxc-linux)
 endif()
 if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
   faf_dependency_download(freetype)

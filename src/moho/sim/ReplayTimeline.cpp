@@ -1075,9 +1075,16 @@ namespace moho
       return;
     }
     // Or will be: a save stops the sim, which shows.
+#if !defined(_WIN32)
+    // Still running: waitpid reaps nothing yet.
+    if (replay_KeyframeQuietDisk && sPreparePid > 0 && ::waitpid(sPreparePid, nullptr, WNOHANG) == 0) {
+      return;
+    }
+#else
     if (replay_KeyframeQuietDisk && sPrepareProcess != nullptr && ::WaitForSingleObject(sPrepareProcess, 0u) == WAIT_TIMEOUT) {
       return;
     }
+#endif
     if (HaveKeyframeNear(tick)) {
       return;
     }

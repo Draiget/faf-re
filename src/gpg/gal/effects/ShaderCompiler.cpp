@@ -8,16 +8,25 @@
 #include <cstdio>
 #include <cstdlib>
 #include <mutex>
+#if defined(_WIN32)
 #include <wrl/client.h>
+#endif
 
 #include <algorithm>
 #include <cctype>
+#if defined(_WIN32)
 #include <d3d12shader.h>
 
 #include "dxcapi.h"
+#else
+// The Linux client (issue #255): DXC through platform/posix/dxc/DxcGlue, which alone includes
+// DXC's headers; libdxcompiler.so from the executable's directory or FAF_DXC_DIR.
+#include "platform/posix/dxc/DxcGlue.h"
+#endif
 
 namespace gpg::gal::effects
 {
+#if defined(_WIN32)
   using Microsoft::WRL::ComPtr;
 
   struct ShaderCompiler::Library
@@ -28,9 +37,16 @@ namespace gpg::gal::effects
     ComPtr<IDxcUtils> utils;
     ComPtr<IDxcCompiler3> dxc;
   };
+#else
+  // DxcGlue holds the library; this only marks that it loaded.
+  struct ShaderCompiler::Library
+  {
+  };
+#endif
 
   namespace
   {
+#if defined(_WIN32)
     /**
      * Engine addition: a DXC compiler and utils object per thread. One object must not be used
      * by two threads at once, but separate objects compile in parallel, so the background
@@ -57,6 +73,7 @@ namespace gpg::gal::effects
       }
       return instance.dxc != nullptr ? &instance : nullptr;
     }
+#endif
 
     [[nodiscard]] std::wstring ExecutableDirectory()
     {
@@ -85,6 +102,30 @@ namespace gpg::gal::effects
     return compiler;
   }
 
+#if !defined(_WIN32)
+  ShaderCompiler::ShaderCompiler()
+  {
+    std::vector<std::string> directories;
+    {
+      // The POSIX GetModuleFileNameW gives the executable's path from /proc/self/exe.
+      const std::wstring executable = ExecutableDirectory();
+      std::string narrow;
+      for (const wchar_t c : executable) {
+        narrow.push_back(static_cast<char>(c));  // the install path is ASCII
+      }
+      directories.push_back(narrow);
+    }
+    if (const char* const configured = std::getenv("FAF_DXC_DIR"); configured != nullptr && configured[0] != '\0') {
+      directories.emplace_back(configured);
+    }
+    mLoadError = platform::posix::dxc::Load(directories, mVersion);
+    if (mLoadError.empty()) {
+      mLibrary = new Library();
+    }
+  }
+
+  ShaderCompiler::~ShaderCompiler() = default;
+#else
   ShaderCompiler::ShaderCompiler()
   {
     std::vector<std::wstring> directories{ExecutableDirectory()};
@@ -156,6 +197,7 @@ namespace gpg::gal::effects
       mLibrary->dxc.Reset();
     }
   }
+#endif
 
   bool ShaderCompiler::Available() const noexcept
   {
@@ -253,6 +295,31 @@ namespace gpg::gal::effects
     return Run(hlsl, arguments);
   }
 
+#if !defined(_WIN32)
+  CompiledShader ShaderCompiler::Run(const std::string_view hlsl, const std::vector<std::wstring>& arguments) const
+  {
+    platform::posix::dxc::Output output = platform::posix::dxc::Compile(hlsl, arguments);
+    CompiledShader result;
+    result.succeeded = output.succeeded;
+    result.code.assign(output.object.begin(), output.object.end());
+    result.messages = std::move(output.messages);
+    return result;
+  }
+
+  // DXIL reflection is the Direct3D 12 backend's; the Linux client compiles SPIR-V, whose
+  // reflection is SpirvReflect. The answers are the ones for an unreadable reflection.
+  std::uint64_t ShaderCompiler::ReflectTextureSlots(const std::vector<std::uint8_t>& dxil) const
+  {
+    (void)dxil;
+    return ~std::uint64_t{0};
+  }
+
+  std::vector<ShaderInput> ShaderCompiler::ReflectInputs(const std::vector<std::uint8_t>& dxil) const
+  {
+    (void)dxil;
+    return {};
+  }
+#else
   CompiledShader ShaderCompiler::Run(const std::string_view hlsl, const std::vector<std::wstring>& arguments) const
   {
     CompiledShader result;
@@ -380,4 +447,5 @@ namespace gpg::gal::effects
     }
     return inputs;
   }
+#endif
 } // namespace gpg::gal::effects

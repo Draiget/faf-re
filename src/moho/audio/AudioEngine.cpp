@@ -1382,6 +1382,8 @@ namespace moho
 {
   namespace
   {
+#if defined(_WIN32)
+    // XACT's COM class and interface ids, for CoCreateInstance; the Linux client has FAudio (#258).
     const IID kXactAuditionComInterfaceClsid =
       {0xcedde475u, 0x50b5u, 0x47efu, {0x91u, 0xa7u, 0x3bu, 0x49u, 0xa0u, 0xe8u, 0xe5u, 0x88u}};
     const IID kXactDebugComInterfaceClsid =
@@ -1390,6 +1392,7 @@ namespace moho
       {0x343e68e6u, 0x8f82u, 0x4a8du, {0xa2u, 0xdau, 0x6eu, 0x9au, 0x94u, 0x4bu, 0x37u, 0x8cu}};
     const IID kXactComInterfaceRiid =
       {0x893ff2e4u, 0x8d03u, 0x4d5fu, {0xb0u, 0xaau, 0x36u, 0x3au, 0x9cu, 0xbbu, 0xf4u, 0x37u}};
+#endif
   } // namespace
 
   /**

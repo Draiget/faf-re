@@ -10,8 +10,13 @@
 #include <string>
 #include <vector>
 
+#if defined(_WIN32)
 #include <d3dcompiler.h>
 #include <wrl/client.h>
+#else
+// The Linux client (issue #255): effects are preprocessed by DXC's preprocessor, not D3DPreprocess.
+#include "platform/posix/dxc/DxcGlue.h"
+#endif
 
 #include "VulkanAttachmentBarrier.h"
 #include "VulkanSurface.h"
@@ -1868,6 +1873,25 @@ namespace gpg::gal
     for (const MacroPair& macro : kInjectedMacros) {
       localContext.DefineMacro(macro.name, macro.value);
     }
+#if !defined(_WIN32)
+    std::vector<std::pair<std::string, std::string>> defines;
+    for (const EffectMacro& macro : localContext.mMacros) {
+      defines.emplace_back(macro.keyText_.c_str(), macro.valueText_.c_str());
+    }
+    const DWORD started = ::GetTickCount();
+    const char* const sourceName = context.mSourcePath.c_str();
+    const std::size_t sourceBytes = static_cast<std::size_t>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
+    const platform::posix::dxc::Output preprocessed = platform::posix::dxc::Preprocess(
+      std::string_view(context.mSourceBuffer.mBegin, sourceBytes), sourceName, defines
+    );
+    if (!preprocessed.succeeded) {
+      const std::string message = std::string("unable to preprocess effect: ") + sourceName + " reason: " + preprocessed.messages;
+      ThrowError("DeviceVulkan.cpp", __LINE__, message.c_str());
+    }
+    d3d11::TranslatedEffectSource translated = d3d11::TranslateEffectSource(
+      std::string_view(preprocessed.text), true, std::string_view{}
+    );
+#else
     std::vector<D3D_SHADER_MACRO> defines;
     for (const EffectMacro& macro : localContext.mMacros) {
       defines.push_back(D3D_SHADER_MACRO{macro.keyText_.c_str(), macro.valueText_.c_str()});
@@ -1890,6 +1914,7 @@ namespace gpg::gal
       // and running the translator's copy as well would test twice.
       std::string_view{}
     );
+#endif
     std::shared_ptr<effects::EffectProgram> program;
     try {
       program = std::make_shared<effects::EffectProgram>(

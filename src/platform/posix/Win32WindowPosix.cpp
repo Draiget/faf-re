@@ -85,6 +85,7 @@ namespace platform::posix
   void (*gFocusHook)(void* window) = nullptr;
   void (*gShowWindowHook)(void* window, int command) = nullptr;
   void (*gSetWindowPosHook)(void* window, int x, int y, int width, int height, unsigned int flags) = nullptr;
+  void (*gClipCursorHook)(bool clip, int left, int top, int right, int bottom) = nullptr;
 } // namespace platform::posix
 
 BOOL GetCursorPos(POINT* const point)
@@ -224,6 +225,15 @@ int ShowCursor(const BOOL show)
   const std::lock_guard<std::mutex> lock(state.mutex);
   state.cursorShowCount += show ? 1 : -1;
   return state.cursorShowCount;
+}
+
+BOOL ClipCursor(const RECT* const rect)
+{
+  if (platform::posix::gClipCursorHook != nullptr) {
+    platform::posix::gClipCursorHook(rect != nullptr, rect != nullptr ? rect->left : 0, rect != nullptr ? rect->top : 0,
+                                     rect != nullptr ? rect->right : 0, rect != nullptr ? rect->bottom : 0);
+  }
+  return TRUE;
 }
 
 HWND SetFocus(const HWND window)

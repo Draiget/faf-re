@@ -21,6 +21,8 @@ namespace platform::posix
   extern void (*gShowWindowHook)(void* window, int command);
   // Called by SetWindowPos (flags are SWP_*: SWP_NOMOVE and SWP_NOSIZE say which half applies).
   extern void (*gSetWindowPosHook)(void* window, int x, int y, int width, int height, unsigned int flags);
+  // Called by ClipCursor: confine the real cursor to the screen rectangle, or free it (clip false).
+  extern void (*gClipCursorHook)(bool clip, int left, int top, int right, int bottom);
   // The window system has events: wakes a MsgWaitForMultipleObjectsEx in the main loop.
   void WakeMessageWait();
 } // namespace platform::posix

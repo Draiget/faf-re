@@ -848,6 +848,35 @@ const wchar_t* GetCommandLineW()
   return sCommandLine;
 }
 
+const char* GetCommandLineA()
+{
+  // The same line, byte for byte (the arguments are UTF-8 already).
+  static char sCommandLine[8192];
+  static INIT_ONCE sOnce = INIT_ONCE_STATIC_INIT;
+  (void)InitOnceExecuteOnce(&sOnce, [](PINIT_ONCE, PVOID, PVOID*) -> BOOL {
+    const int fd = ::open("/proc/self/cmdline", O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+      return TRUE;
+    }
+    char raw[8192];
+    const ssize_t got = ::read(fd, raw, sizeof(raw) - 1);
+    (void)::close(fd);
+    std::size_t out = 0;
+    for (ssize_t at = 0; at < got && out + 1 < sizeof(sCommandLine); ++at) {
+      if (raw[at] == '\0') {
+        if (at + 1 < got) {
+          sCommandLine[out++] = ' ';
+        }
+      } else {
+        sCommandLine[out++] = raw[at];
+      }
+    }
+    sCommandLine[out] = '\0';
+    return TRUE;
+  }, nullptr, nullptr);
+  return sCommandLine;
+}
+
 HANDLE GetProcessHeap()
 {
   static int sProcessHeap = 0;
