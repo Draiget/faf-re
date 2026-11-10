@@ -114,6 +114,16 @@ namespace moho
     mRepeatBuild = !mRepeatBuild;
   }
 
+  bool PlannedUnitProxy::IsSelected() const noexcept
+  {
+    if (mUserUnit != nullptr) {
+      if (CWldSession* const sess = WLD_GetActiveSession()) {
+        return sess->mSelection.Find(mUserUnit) != sess->mSelection.end();
+      }
+    }
+    return mIsSelected;
+  }
+
   bool PlannedUnitProxy::HasBuilder(const std::uint32_t builderId, const std::uint32_t cmdIndex) const noexcept
   {
     for (const auto& builder : mBuilders) {
@@ -214,6 +224,7 @@ namespace moho
       createParams.mTickCreated = session->mGameTick;
 
       auto* userUnit = new UserUnit(session, createParams);
+      userUnit->mArmy = session->GetFocusUserArmy();
       userUnit->mTransform.pos_ = { pos.x, pos.y, pos.z };
       userUnit->mTransform.orient_ = { 0.0f, 0.0f, 0.0f, 1.0f };
       userUnit->mVariableData.mCurTransform.pos_ = { pos.x, pos.y, pos.z };
@@ -399,6 +410,13 @@ namespace moho
     }
     if (auto* proxy = FindByProxyId(proxyId)) {
       proxy->SetSelected(true);
+      if (proxy->mUserUnit != nullptr) {
+        if (CWldSession* const sess = WLD_GetActiveSession()) {
+          WeakSet<UserEntity> sel = addToSelection ? sess->GetSelection() : WeakSet<UserEntity>{};
+          (void)sel.Add(proxy->mUserUnit);
+          sess->SetSelection(sel);
+        }
+      }
     }
   }
 
@@ -406,6 +424,13 @@ namespace moho
   {
     if (auto* proxy = FindByProxyId(proxyId)) {
       proxy->SetSelected(false);
+      if (proxy->mUserUnit != nullptr) {
+        if (CWldSession* const sess = WLD_GetActiveSession()) {
+          WeakSet<UserEntity> sel = sess->GetSelection();
+          (void)sel.Remove(proxy->mUserUnit);
+          sess->SetSelection(sel);
+        }
+      }
     }
   }
 

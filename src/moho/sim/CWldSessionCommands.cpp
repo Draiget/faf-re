@@ -1,4 +1,5 @@
 #include "moho/sim/CWldSessionPrivate.h"
+#include "moho/sim/PlannedFactoryProxy.h"
 
 namespace moho
 {
@@ -3051,6 +3052,24 @@ namespace
 
         if (!resolvedByUi) {
           mode.mMode = DefaultModeFromDrag(mouseInfo->mIsDragger);
+          if (moho::IsFactoryPreOrdersEnabled() && mode.mMode == COMMOD_Reclaim) {
+            auto& pfm = moho::PlannedFactoryManager::Get();
+            const Vector3f cursorWorldPos{mouseInfo->mMouseWorldPos.x, mouseInfo->mMouseWorldPos.y, mouseInfo->mMouseWorldPos.z};
+            for (const auto& proxy : pfm.GetAllProxies()) {
+              if (!proxy) continue;
+              float halfX = 4.0f;
+              float halfZ = 4.0f;
+              if (const auto* rbp = dynamic_cast<const RUnitBlueprint*>(proxy->mBlueprint)) {
+                if (rbp->Physics.SkirtSizeX > 0.0f) halfX = rbp->Physics.SkirtSizeX * 0.5f;
+                if (rbp->Physics.SkirtSizeZ > 0.0f) halfZ = rbp->Physics.SkirtSizeZ * 0.5f;
+              }
+              if (std::abs(cursorWorldPos.x - proxy->mPosition.x) <= halfX &&
+                  std::abs(cursorWorldPos.z - proxy->mPosition.z) <= halfZ) {
+                mode.mMode = COMMOD_Move;
+                break;
+              }
+            }
+          }
         }
       }
     }

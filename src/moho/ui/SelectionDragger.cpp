@@ -358,10 +358,28 @@ namespace moho
           }
         }
         if (hitProxy == nullptr && mCam != nullptr) {
-          const GeomCamera3& cameraView = mCam->CameraGetView();
           const float mouseX = eventData != nullptr ? static_cast<float>(eventData->mMousePos.x) : mX0;
           const float mouseY = eventData != nullptr ? static_cast<float>(eventData->mMousePos.y) : mY0;
+          const GeomCamera3& cameraView = mCam->CameraGetView();
           hitProxy = pfm.HitTestScreenPoint(&cameraView, mouseX, mouseY, 40.0f);
+          if (hitProxy == nullptr) {
+            const Wm3::Vector2f screenPos(mouseX, mouseY);
+            const Wm3::Vector3f surfacePos = mCam->CameraScreenToSurface(screenPos);
+            for (const auto& proxy : pfm.GetAllProxies()) {
+              if (!proxy) continue;
+              float halfX = 4.0f;
+              float halfZ = 4.0f;
+              if (const auto* rbp = dynamic_cast<const RUnitBlueprint*>(proxy->mBlueprint)) {
+                if (rbp->Physics.SkirtSizeX > 0.0f) halfX = rbp->Physics.SkirtSizeX * 0.5f;
+                if (rbp->Physics.SkirtSizeZ > 0.0f) halfZ = rbp->Physics.SkirtSizeZ * 0.5f;
+              }
+              if (std::abs(surfacePos.x - proxy->mPosition.x) <= halfX &&
+                  std::abs(surfacePos.z - proxy->mPosition.z) <= halfZ) {
+                hitProxy = proxy.get();
+                break;
+              }
+            }
+          }
         }
 
         if (hitProxy != nullptr && hitProxy->mUserUnit != nullptr) {
@@ -383,17 +401,15 @@ namespace moho
           }
           mSess->SetSelection(newSelection);
           return;
-        } else {
-          const bool isShift = eventData != nullptr && (eventData->mModifiers & (MEM_Shift | MEM_Ctrl)) != 0u;
-          if (!isShift) {
-            pfm.ClearSelection();
-          }
         }
       }
 
       mSess->ReleaseDrag(eventData->mModifiers);
       return;
     }
+
+    WeakSet<UserEntity> draggedSelection;
+    CollectSelectionDraggerEntities(draggedSelection, *this);
 
     if (moho::IsFactoryPreOrdersEnabled() && mCam != nullptr) {
       auto& pfm = moho::PlannedFactoryManager::Get();
@@ -410,29 +426,8 @@ namespace moho
 
       const GeomCamera3& cameraView = mCam->CameraGetView();
       const auto hitProxies = pfm.HitTestScreenRect(&cameraView, minX, minY, maxX, maxY);
-
-      if ((eventData->mModifiers & MEM_Shift) != 0u) {
-        for (auto* proxy : hitProxies) {
-          if (proxy != nullptr) {
-            pfm.SelectProxy(proxy->mProxyId, true);
-          }
-        }
-      } else {
-        pfm.ClearSelection();
-        for (auto* proxy : hitProxies) {
-          if (proxy != nullptr) {
-            pfm.SelectProxy(proxy->mProxyId, true);
-          }
-        }
-      }
-    }
-
-    WeakSet<UserEntity> draggedSelection;
-    CollectSelectionDraggerEntities(draggedSelection, *this);
-    if (moho::IsFactoryPreOrdersEnabled()) {
-      auto& pfm = moho::PlannedFactoryManager::Get();
-      for (const auto& proxy : pfm.GetAllProxies()) {
-        if (proxy && proxy->IsSelected() && proxy->mUserUnit != nullptr) {
+      for (auto* proxy : hitProxies) {
+        if (proxy != nullptr && proxy->mUserUnit != nullptr) {
           (void)draggedSelection.Add(proxy->mUserUnit);
         }
       }

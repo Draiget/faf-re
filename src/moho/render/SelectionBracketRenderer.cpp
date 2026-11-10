@@ -298,7 +298,18 @@ namespace moho
       meshInstance->UpdateInterpolatedFields();
     }
 
-    Wm3::Box3f selectionBox = meshInstance != nullptr ? meshInstance->box : Invalid<Wm3::Box3f>();
+    Wm3::Box3f selectionBox;
+    if (meshInstance != nullptr) {
+      selectionBox = meshInstance->box;
+    } else {
+      selectionBox.Center = entity->mVariableData.mCurTransform.pos_;
+      selectionBox.Axis[0] = Wm3::Vector3f(1.0f, 0.0f, 0.0f);
+      selectionBox.Axis[1] = Wm3::Vector3f(0.0f, 1.0f, 0.0f);
+      selectionBox.Axis[2] = Wm3::Vector3f(0.0f, 0.0f, 1.0f);
+      selectionBox.Extent[0] = 1.0f;
+      selectionBox.Extent[1] = 1.0f;
+      selectionBox.Extent[2] = 1.0f;
+    }
 
     float selectionSizeX = ren_SelectionSizeFudge * selectionBox.Extent[0];
     float selectionSizeZ = ren_SelectionSizeFudge * selectionBox.Extent[2];
@@ -357,10 +368,15 @@ namespace moho
     selectionBox.Extent[0] = selectionSizeX;
     selectionBox.Extent[1] = 0.0f;
     selectionBox.Extent[2] = selectionSizeZ;
-    selectionBox.Center.x = selectionBox.Center.x + selectionCenterOffset.x;
+    if (meshInstance != nullptr) {
+      selectionBox.Center.x = selectionBox.Center.x + selectionCenterOffset.x;
+      selectionBox.Center.z = selectionBox.Center.z + selectionCenterOffset.z;
+    } else {
+      selectionBox.Center.x = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.x + selectionCenterOffset.x;
+      selectionBox.Center.z = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.z + selectionCenterOffset.z;
+    }
     selectionBox.Center.y = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.y
       + ren_SelectionHeightFudge + selectionCenterOffset.y;
-    selectionBox.Center.z = selectionBox.Center.z + selectionCenterOffset.z;
 
     Wm3::Vector3f boxVertices[8]{};
     selectionBox.ComputeVertices(boxVertices);
@@ -484,6 +500,9 @@ namespace moho
     }
 
     Wm3::Box3f selectionBox;
+    selectionBox.Axis[0] = Wm3::Vector3f(1.0f, 0.0f, 0.0f);
+    selectionBox.Axis[1] = Wm3::Vector3f(0.0f, 1.0f, 0.0f);
+    selectionBox.Axis[2] = Wm3::Vector3f(0.0f, 0.0f, 1.0f);
     selectionBox.Extent[0] = selectionSizeX;
     selectionBox.Extent[1] = 0.0f;
     selectionBox.Extent[2] = selectionSizeZ;

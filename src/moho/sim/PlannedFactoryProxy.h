@@ -98,7 +98,7 @@ namespace moho
     void ToggleRepeatBuild();
 
     void SetSelected(bool selected) noexcept { mIsSelected = selected; }
-    [[nodiscard]] bool IsSelected() const noexcept { return mIsSelected; }
+    [[nodiscard]] bool IsSelected() const noexcept;
 
     void SetBoundingRadius(float radius) noexcept { mBoundingRadius = radius; }
     [[nodiscard]] float GetBoundingRadius() const noexcept { return mBoundingRadius; }

@@ -829,7 +829,7 @@ UserUnit::~UserUnit()
     }
   }
 
-  if (moho::IsFactoryPreOrdersEnabled()) {
+  if (moho::IsFactoryPreOrdersEnabled() && !moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(this)) {
     moho::PlannedFactoryManager::Get().RemoveByBuilder(mParams.mEntityId);
   }
 

@@ -2533,6 +2533,7 @@ void moho::RebuildFactoryQueueDisplaySnapshot(
           queue.push_back(item);
         }
       }
+      factoryLink.UnlinkFromOwnerChain();
       return;
     }
   }
