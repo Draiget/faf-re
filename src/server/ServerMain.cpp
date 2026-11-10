@@ -1348,7 +1348,12 @@ namespace
             }
             if (!refusal.empty()) {
               Say("Lobby: launch refused: %s", refusal.c_str());
-              signal(message.from, faf::remote::net::ELobbySignal::LaunchRefused, refusal);
+              // Everyone in the lobby: FAF's joiners leave the lobby window on the host's own `Launch` message, which
+              // reaches them before the server has checked anything (lobby.lua's `Launch` handler), and all of them
+              // should see why the game didn't start.
+              for (const std::int32_t uid : signaller.InLobbyUids()) {
+                signal(uid, faf::remote::net::ELobbySignal::LaunchRefused, refusal);
+              }
               continue;
             }
             Say("Lobby: the host launched; starting the match");

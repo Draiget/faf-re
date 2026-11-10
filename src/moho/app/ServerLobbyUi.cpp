@@ -125,7 +125,9 @@ namespace
     if (state == nullptr || !moho::UI_GetManager()->SetNewLuaState(state)) {
       throw std::runtime_error("UI_GetManager()->SetNewLuaState() failed.");
     }
-    // Plan WP17.6: the lobby screen's hook (data/fafengine/lua/ui/lobby/lobby.lua) reads who runs this lobby.
+    // Plan WP17.6: the lobby screen's hook (data/fafengine/lua/ui/lobby/lobby.lua) reads who runs this lobby, and
+    // (WP2.14) that a game server starts the match, so a launch may be refused.
+    state->GetGlobals().SetBoolean("ServerLobbySession", true);
     if ((signal.flags & faf::remote::net::kLobbySignalOrganised) != 0) {
       state->GetGlobals().SetString("ServerLobbyControl", "organiser");
     } else {
@@ -251,7 +253,16 @@ namespace
       const std::string text = signal.kind == ELobbySignal::Launching ? std::string("The game server is starting the match.")
                                                                       : "The game server won't start this: " + signal.text + ".";
       gpg::Logf("SERVER LOBBY: %s", text.c_str());
-      // FAF's lobby.lua `AddChatText(text)`; autolobby.lua has none, which the log line covers.
+      // Plan WP2.14: after a refused launch the host's lobby must be put back first (FAF's TryLaunch flattened its game
+      // info); our lobby hook's `ServerLaunchRefused` does that and says why. Without the hook: FAF's lobby.lua
+      // `AddChatText(text)`; autolobby.lua has neither, which the log line covers.
+      if (signal.kind == ELobbySignal::LaunchRefused && mLobby != nullptr) {
+        if (LuaPlus::LuaObject restore = (*mLobby)["ServerLaunchRefused"]; restore.IsFunction()) {
+          LuaPlus::LuaFunction<void> serverLaunchRefused(restore);
+          serverLaunchRefused(text.c_str());
+          return;
+        }
+      }
       LuaPlus::LuaFunction<void> addChatText(LobbyMethod("AddChatText"));
       addChatText(text.c_str());
       return;
