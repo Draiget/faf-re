@@ -15,6 +15,7 @@
 #include <stdexcept>
 
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/Device.hpp"
 #include "lua/LuaArena.h"
 #include "lua/LuaObject.h"
 #include "moho/console/CConCommand.h"
@@ -1199,6 +1200,12 @@ end
       if (::GetProcessMemoryInfo(::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters))) {
         gpg::Logf("editor: after the play, %.1f MB private, %.1f MB working set", static_cast<double>(counters.PrivateUsage) / 1048576.0,
                   static_cast<double>(counters.WorkingSetSize) / 1048576.0);
+      }
+      // What the graphics driver holds for the process: video memory, and system memory the GPU reads (DXGI's
+      // or Vulkan's own counts), so a play that leaves GPU resources behind shows here.
+      if (gpg::gal::DeviceRuntimeInfo info; gpg::gal::Device::IsReady() && gpg::gal::Device::GetInstance()->GetRuntimeInfo(info)) {
+        gpg::Logf("editor: after the play, GPU memory: %.1f MB video, %.1f MB system", static_cast<double>(info.localUsage) / 1048576.0,
+                  static_cast<double>(info.nonLocalUsage) / 1048576.0);
       }
       // `/memtrace`: what the play before last left (its caches are warm by now, so this is what stays).
       if (memtrace::Running() && mTracePlay >= 2) {
