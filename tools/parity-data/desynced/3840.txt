@@ -1,0 +1,2 @@
+# Replays of game version 3840 that desynced in a parity run, fixed or not, for the nightly set.
+# None yet: 3840's first parity run comes after the Parity prewarm fills its caches.
