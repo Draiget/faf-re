@@ -242,6 +242,7 @@ namespace
     int lobbyAssignSlot = 0;        // plan WP17.2: as host, `{Type = 'SlotAssigned', Slot = <it>, Options = {OwnerID = ...}}`
     double lobbyAssignAt = -1.0;
     double lobbyEjectAt = -1.0;
+    double lobbyEstablishedAt = -1.0; // `LOBMSG_EstablishedPeers` naming the host, to the host (`CLobby::PushTask`)
     // Plan WP2.6: the content report sent before `Loaded`: "rules" (the `--rebuild` match's rules, as the game
     // client reports them), "wrong" (made-up hashes), or none.
     std::string contentReport;
@@ -368,6 +369,8 @@ namespace
         out.lobbyOptionsAt = Argument(value);
       } else if (name == "--lobby-eject-at") {
         out.lobbyEjectAt = Argument(value);
+      } else if (name == "--lobby-established-at") {
+        out.lobbyEstablishedAt = Argument(value);
       } else if (name == "--content-report") {
         out.contentReport = value;
       } else if (name == "--ui-mods") {
@@ -946,7 +949,7 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>]] [--speed-limit <step> --speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s>] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--lua-keys] [--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>] [--lobby-established-at <s>]] [--speed-limit <step> --speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s>] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--lua-keys] [--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua>]\n"
     );
     return 3;
   }
@@ -1220,6 +1223,22 @@ int main(const int argc, char** const argv)
       data.SetInteger("RequestedSlot", 1);
       const std::string what = "request " + options.lobbyRequest;
       sendScript(moho::ELobbyMsg::LOBMSG_DirectScriptData, data, what.c_str());
+    }
+    if (Due(options.lobbyEstablishedAt, elapsed) && options.lobbySayTo != 0) {
+      // As `CLobby::PushTask` (0x007C8BF0) broadcasts it: each peer's uid as int32, then -1. FAF's launch checks every
+      // player's established connections (lobby.lua `EveryoneHasEstablishedConnections`).
+      const std::int32_t uids[] = {static_cast<std::int32_t>(options.lobbySayTo), -1};
+      const std::size_t size = 3u + sizeof(uids);
+      std::vector<std::uint8_t> frame;
+      faf::remote::net::ByteWriter writer(frame);
+      writer.Byte(static_cast<std::uint8_t>(ESeatMessage::Lobby));
+      writer.Varint(static_cast<std::uint64_t>(options.lobbySayTo));
+      writer.Byte(static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_EstablishedPeers));
+      writer.Byte(static_cast<std::uint8_t>(size));
+      writer.Byte(static_cast<std::uint8_t>(size >> 8));
+      writer.Bytes(reinterpret_cast<const std::uint8_t*>(uids), sizeof(uids));
+      (void)link.SendReliable(frame.data(), frame.size());
+      std::printf("probe %d: %.1f s: lobby: established connection to uid %d announced\n", options.uid, elapsed, options.lobbySayTo);
     }
     if (Due(options.lobbyEjectAt, elapsed) && options.lobbySayTo != 0) {
       // `CLobby::KickPeer`: `LOBMSG_Rejected` with the reason, to the participant ejected.
