@@ -30,6 +30,12 @@ namespace LuaPlus
   class LuaState;
 }
 
+namespace moho::mapformat
+{
+  struct SMapFormatInfo;
+  class ExtendedMap;
+}
+
 namespace moho
 {
   struct CBackgroundTaskControl;
@@ -114,6 +120,13 @@ namespace moho
    * auto_ptr.
    */
   [[nodiscard]] fa::auto_ptr<CWldMap> WLD_LoadMapPreview(gpg::StrArg mapPath);
+
+  /**
+   * Map format work (docs/mapformat/): the format of the map loaded for the running session and, for container 3 / 4
+   * maps, the decoded map (null for Classic maps).
+   */
+  [[nodiscard]] const mapformat::SMapFormatInfo& WLD_GetMapFormatInfo();
+  [[nodiscard]] const mapformat::ExtendedMap* WLD_GetExtendedMap();
 
   /**
    * Address: 0x008A7B90 (FUN_008A7B90, ?WLD_CreateTerrainRes@Moho@@YAPAVIWldTerrainRes@1@XZ)
@@ -618,6 +631,14 @@ namespace moho
      */
     [[nodiscard]]
     bool MapLoad(gpg::StrArg mapName, LuaPlus::LuaState* state, bool previewOnly, CBackgroundTaskControl& loadControl);
+
+    /**
+     * Map format work (docs/mapformat/), not in the original binary: loads a container 3 / 4 map by decoding it and
+     * running the Classic loaders over an in-memory export. Called by `MapLoad` once the container version is known.
+     */
+    bool MapLoadChunked(
+      gpg::Stream& stream, LuaPlus::LuaState* state, bool previewOnly, CBackgroundTaskControl& loadControl
+    );
 
     /**
      * Address: 0x00891030 (FUN_00891030, ?MapSave@CWldMap@Moho@@QAE_NVStrArg@gpg@@@Z)
