@@ -143,7 +143,8 @@ namespace faf::editor
       ImGui::PushStyleColor(ImGuiCol_Button, colour);
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, colour);
       ImGui::PushStyleColor(ImGuiCol_ButtonActive, colour);
-      ImGui::SmallButton(KindName(now.kind));
+      // Its own id: the section header below has the same word ("Unit"), and two items with one id are an ImGui error.
+      ImGui::SmallButton((std::string(KindName(now.kind)) + "##kindtag").c_str());
       ImGui::PopStyleColor(3);
       ImGui::SameLine();
       if (now.kind == SelectionProperties::Kind::Marker) {
