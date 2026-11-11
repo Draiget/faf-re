@@ -621,7 +621,7 @@ namespace moho
 
       batcher->Flush();
     }
-    if (IsFactoryPreOrdersEnabled()) {
+    if (IsFactoryPreOrdersEnabled() && sSelectionBrackets.Empty()) {
       const auto selectedProxies = PlannedFactoryManager::Instance().GetSelectedProxies();
       if (!selectedProxies.empty()) {
         const boost::shared_ptr<CD3DBatchTexture> playerBrackets =

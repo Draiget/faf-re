@@ -2298,6 +2298,16 @@ namespace
     mSelection = selection;
     mSelectionSize = static_cast<std::uint32_t>(mSelection.Size());
 
+    if (moho::IsFactoryPreOrdersEnabled()) {
+      auto& pfm = moho::PlannedFactoryManager::Get();
+      for (const auto& proxy : pfm.GetAllProxies()) {
+        if (proxy) {
+          const bool isSelected = proxy->mUserUnit != nullptr && mSelection.Find(proxy->mUserUnit) != mSelection.end();
+          proxy->SetSelected(isSelected);
+        }
+      }
+    }
+
     if (selectionChanged) {
       if (ISTIDriver* const activeDriver = sSimDriver.get(); activeDriver != nullptr) {
         SSyncFilterMaskBlock selectionMask{};

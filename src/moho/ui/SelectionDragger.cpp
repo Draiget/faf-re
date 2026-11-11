@@ -110,7 +110,9 @@ namespace
   )
   {
     for (auto it = selection.begin(); it != selection.end();) {
-      if (session.CanSelectUnit(static_cast<moho::UserUnit*>(*it))) {
+      auto* const userUnit = static_cast<moho::UserUnit*>(*it);
+      if (session.CanSelectUnit(userUnit) &&
+          (!moho::IsFactoryPreOrdersEnabled() || !moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit))) {
         ++it;
       } else {
         it = selection.Erase(it);
@@ -411,29 +413,6 @@ namespace moho
     WeakSet<UserEntity> draggedSelection;
     CollectSelectionDraggerEntities(draggedSelection, *this);
 
-    if (moho::IsFactoryPreOrdersEnabled() && mCam != nullptr) {
-      auto& pfm = moho::PlannedFactoryManager::Get();
-      float x1 = eventData != nullptr ? static_cast<float>(eventData->mMousePos.x) : mX0;
-      float y1 = eventData != nullptr ? static_cast<float>(eventData->mMousePos.y) : mY0;
-      if (const auto* d2d = dynamic_cast<const SelectionDragger2D*>(this)) {
-        x1 = d2d->mX1;
-        y1 = d2d->mY1;
-      }
-      const float minX = std::min(mX0, x1);
-      const float maxX = std::max(mX0, x1);
-      const float minY = std::min(mY0, y1);
-      const float maxY = std::max(mY0, y1);
-
-      const GeomCamera3& cameraView = mCam->CameraGetView();
-      const auto hitProxies = pfm.HitTestScreenRect(&cameraView, minX, minY, maxX, maxY);
-      for (auto* proxy : hitProxies) {
-        if (proxy != nullptr && proxy->mUserUnit != nullptr) {
-          (void)draggedSelection.Add(proxy->mUserUnit);
-        }
-      }
-    }
-
-
     if ((eventData->mModifiers & MEM_Shift) != 0u) {
       WeakSet<UserEntity> currentSelection(mSess->GetSelection());
 
@@ -477,15 +456,6 @@ namespace moho
 
         MeshInstance* const meshInstance = unit->mMeshInstance;
         if (meshInstance == nullptr) {
-          if (moho::IsFactoryPreOrdersEnabled() && moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(unit)) {
-            const std::int32_t priority = (blueprint != nullptr && blueprint->General.SelectionPriority > 0)
-              ? blueprint->General.SelectionPriority : 2;
-            const std::uint32_t bucketIndex = (priority > 1) ? static_cast<std::uint32_t>(priority) : 1u;
-            if (priorityBuckets.size() < bucketIndex) {
-              priorityBuckets.resize(bucketIndex);
-            }
-            (void)priorityBuckets[bucketIndex - 1u].Add(unit);
-          }
           continue;
         }
 
