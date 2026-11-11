@@ -211,7 +211,9 @@ float SunVisibility(float3 world)
     uint width;
     uint height;
     ShadowMap.GetDimensions(width, height);
-    return saturate(ShadowMap.Load(int3(int2(uv * float2(width, height)), 0)).g);
+    // uv may be exactly 1 (the test above and the cascade boxes are inclusive): the last texel, not the one past it.
+    const int2 texel = min(int2(uv * float2(width, height)), int2(width, height) - 1);
+    return saturate(ShadowMap.Load(int3(texel, 0)).g);
 }
 
 float3 WorldPosition(int2 pixel, float depth)

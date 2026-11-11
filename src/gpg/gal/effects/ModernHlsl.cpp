@@ -121,7 +121,8 @@ float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full) { return faf_shadow_r
     // that point's own distance along the ray plus its bias. The longer test runs first; the short stretch
     // between the two only when it found nothing. Meshes and the ground are traced apart, the ground with a
     // bias that grows with camera distance. mesh.fx's five-tap filter asks for the same point five times, so
-    // the answer is kept for the next call.
+    // the answer is kept for the next call. Effects compile as HLSL 2018, where ?:, && and || evaluate both
+    // sides: a trace whose answer may go unused sits behind an if, or every pixel pays for it.
     constexpr const char* kRayShadowHelpers = R"hlsl(
 [[vk::binding(0, 2)]] RaytracingAccelerationStructure faf_RayScene : register(t0, space1);
 // Engine addition (ren_RayAlphaShadows): alpha-tested pieces (trees). Per scene instance a record (index offset,
@@ -164,9 +165,10 @@ bool faf_ray_blocked(float3 origin, float3 direction, float tMin, float tMax, ui
     RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
     query.TraceRayInline(faf_RayScene, RAY_FLAG_NONE, mask, ray);
     while (query.Proceed()) {
-        if (query.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE &&
-            faf_ray_solid(query.CandidateInstanceIndex(), query.CandidatePrimitiveIndex(), query.CandidateTriangleBarycentrics())) {
-            query.CommitNonOpaqueTriangleHit();
+        if (query.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE) {
+            if (faf_ray_solid(query.CandidateInstanceIndex(), query.CandidatePrimitiveIndex(), query.CandidateTriangleBarycentrics())) {
+                query.CommitNonOpaqueTriangleHit();
+            }
         }
     }
     return query.CommittedStatus() == COMMITTED_TRIANGLE_HIT;
@@ -216,7 +218,8 @@ bool faf_ray_mesh_blocked(float3 p, float3 direction, float tMin, float tMax)
 {
     if (!faf_ray_blocked(p, direction, tMin, tMax, 2)) return false;
     const float under = faf_ray_under_ground(p);
-    return (under > 0) ? faf_ray_blocked(p + float3(0, under, 0), direction, tMin, tMax, 2) : true;
+    if (!(under > 0)) return true;
+    return faf_ray_blocked(p + float3(0, under, 0), direction, tMin, tMax, 2);
 }
 // The share of `count` rays from `origin` towards points spread over the sun's disc (a sunflower spiral,
 // turned by `spin`) that no mesh blocks past `tMin`.
@@ -238,7 +241,8 @@ bool faf_ray_ground_blocked(float3 p, float3 direction, float tMin, float tMax)
 {
     if (!faf_ray_blocked(p, direction, tMin, tMax, 1)) return false;
     const float under = faf_ray_under_ground(p);
-    return (under > 0) ? faf_ray_blocked(p + float3(0, under, 0), direction, tMin, tMax, 1) : true;
+    if (!(under > 0)) return true;
+    return faf_ray_blocked(p + float3(0, under, 0), direction, tMin, tMax, 1);
 }
 // One ray against the instances in `mask` answering both readings: x lit past meshT, y lit past terrainT.
 float2 faf_ray_pair(float3 start, float3 toSun, float meshT, float terrainT, float tMax, uint mask)
@@ -292,18 +296,26 @@ float2 faf_ray_light(float4 full, float2 tap)
             const float radius = sqrt(frac(seed * 7.31 + 0.5));
             meshRay = faf_ray_sun_point(toSun, radius * float2(cos(angle), sin(angle)));
         }
-        const bool shaded = faf_ray_mesh_blocked(meshPoint, meshRay, faf_RayShadows[4].y, tMax) ||
-            faf_ray_ground_blocked(meshPoint, toSun, faf_RayShadows[4].y + faf_RayShadows[7].x, tMax);
+        bool shaded = faf_ray_mesh_blocked(meshPoint, meshRay, faf_RayShadows[4].y, tMax);
+        if (!shaded) {
+            shaded = faf_ray_ground_blocked(meshPoint, toSun, faf_RayShadows[4].y + faf_RayShadows[7].x, tMax);
+        }
         lit = shaded ? float2(0, 1) : float2(1, 1);
     } else if (full.w < 2.5) {
         // Green only (terrain.fx): the terrain reading, from its own point. With a sun disc, the share of
         // faf_RayShadows[7].w rays over it that meshes don't block; the ground's own shadow stays one ray.
         const float groundT = faf_RayShadows[4].z;
         const int count = clamp((int)faf_RayShadows[7].w, 1, 16);
-        const float meshLit = soft
-            ? faf_ray_mesh_share(terrainPoint, toSun, groundT, tMax, faf_ray_noise(terrainPoint), count)
-            : (faf_ray_mesh_blocked(terrainPoint, toSun, groundT, tMax) ? 0 : 1);
-        const bool ground = meshLit > 0 && faf_ray_ground_blocked(terrainPoint, toSun, terrainOnTerrainT - max(-ahead, 0), tMax);
+        float meshLit;
+        if (soft) {
+            meshLit = faf_ray_mesh_share(terrainPoint, toSun, groundT, tMax, faf_ray_noise(terrainPoint), count);
+        } else {
+            meshLit = faf_ray_mesh_blocked(terrainPoint, toSun, groundT, tMax) ? 0 : 1;
+        }
+        bool ground = false;
+        if (meshLit > 0) {
+            ground = faf_ray_ground_blocked(terrainPoint, toSun, terrainOnTerrainT - max(-ahead, 0), tMax);
+        }
         lit = float2(1, ground ? 0 : meshLit);
     } else {
         // Both readings (a call site that reads the whole texel): the old way, both points lifted first.
