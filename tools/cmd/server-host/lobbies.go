@@ -33,6 +33,15 @@ type Seat struct {
 	token   string
 }
 
+// Observer is one person allowed to watch a lobby's game (plan WP13.1/WP17.5): its own token, the
+// game's replay from the lobby's observe port, ObserverDelaySeconds late unless a referee.
+type Observer struct {
+	Name    string `json:"name"`
+	Referee bool   `json:"referee"`
+	Watch   string `json:"watch,omitempty"`
+	token   string
+}
+
 // LobbyMap is the part of a map a lobby reports.
 type LobbyMap struct {
 	ID      string `json:"id"`
@@ -56,6 +65,9 @@ type Lobby struct {
 	Control        string            `json:"control"`
 	StartWhenReady float64           `json:"start_when_ready"`
 	Seats          []Seat            `json:"seats"`
+	Observers      []Observer        `json:"observers"`
+	ObserverDelay  float64           `json:"observer_delay_seconds"`
+	ObservePort    int               `json:"observe_port,omitempty"`
 	Hint           Hint              `json:"hint"`
 	Phase          string            `json:"phase"`
 	Beat           int               `json:"beat"`
@@ -75,6 +87,8 @@ type CreateRequest struct {
 	Map            string            `json:"map"`
 	Options        map[string]string `json:"options"`
 	Seats          []Seat            `json:"seats"`
+	Observers      []Observer        `json:"observers"`
+	ObserverDelay  float64           `json:"observer_delay_seconds"`
 	Control        string            `json:"control"`
 	StartWhenReady float64           `json:"start_when_ready"`
 	LobbyMinutes   float64           `json:"lobby_minutes"`
@@ -260,6 +274,23 @@ func (m *manager) validate(req *CreateRequest) (Map, error) {
 	if humans == 0 {
 		return mp, errors.New("a lobby needs a human seat (an all-AI game has nobody to host or watch it)")
 	}
+	if len(req.Observers) > 32 {
+		return mp, errors.New("at most 32 observers")
+	}
+	if req.ObserverDelay < 0 || req.ObserverDelay > 3600 {
+		return mp, errors.New("observer_delay_seconds is 0..3600")
+	}
+	for i := range req.Observers {
+		o := &req.Observers[i]
+		if len(o.Name) > 40 {
+			return mp, fmt.Errorf("observer %d: name too long", i+1)
+		}
+		if o.Name == "" {
+			o.Name = "Observer " + strconv.Itoa(i+1)
+		}
+		o.token = randomHex(16)
+		o.Watch = ""
+	}
 	return mp, nil
 }
 
@@ -269,6 +300,18 @@ func matchFile(l *Lobby, scenario string) string {
 	fmt.Fprintf(&b, "-- Written by server-host for lobby %s (%s).\n", l.ID, l.Name)
 	fmt.Fprintf(&b, "MatchSeed = %d\n", 1+randomInt(1<<30))
 	fmt.Fprintf(&b, "MatchLobbyControl = %s\n", luaString(l.Control))
+	if len(l.Observers) > 0 {
+		var watchers, referees []string
+		for _, o := range l.Observers {
+			if o.Referee {
+				referees = append(referees, luaString(o.token))
+			} else {
+				watchers = append(watchers, luaString(o.token))
+			}
+		}
+		fmt.Fprintf(&b, "MatchObservers = { %s }\nMatchReferees = { %s }\n", strings.Join(watchers, ", "), strings.Join(referees, ", "))
+		fmt.Fprintf(&b, "MatchRules = { ObserverDelaySeconds = %s }\n", strconv.FormatFloat(l.ObserverDelay, 'f', -1, 64))
+	}
 	b.WriteString("MatchTokens = {")
 	for _, s := range l.Seats {
 		if s.Kind == "human" {
@@ -427,24 +470,36 @@ func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
 		if running(l.State) {
 			live++
 			used[l.Port] = true
+			if l.ObservePort != 0 {
+				used[l.ObservePort] = true
+			}
 		}
 	}
 	if live >= m.cfg.maxLobbies {
 		m.mu.Unlock()
 		return nil, http.StatusConflict, fmt.Errorf("this host runs at most %d lobbies", m.cfg.maxLobbies)
 	}
-	port := 0
-	for p := m.cfg.portFirst; p <= m.cfg.portLast; p++ {
+	// A game port, and with observers a second one they watch from.
+	wanted := 1
+	if len(req.Observers) > 0 {
+		wanted = 2
+	}
+	var ports []int
+	for p := m.cfg.portFirst; p <= m.cfg.portLast && len(ports) < wanted; p++ {
 		if !used[p] && portFree(m.cfg.listenIP, p) {
-			port = p
-			break
+			ports = append(ports, p)
 		}
 	}
 	id := "l" + strconv.Itoa(m.next)
 	m.next++
 	m.mu.Unlock()
-	if port == 0 {
-		return nil, http.StatusConflict, fmt.Errorf("no free game port in %d-%d", m.cfg.portFirst, m.cfg.portLast)
+	if len(ports) < wanted {
+		return nil, http.StatusConflict, fmt.Errorf("no %d free ports in %d-%d", wanted, m.cfg.portFirst, m.cfg.portLast)
+	}
+	port := ports[0]
+	observePort := 0
+	if wanted == 2 {
+		observePort = ports[1]
 	}
 	restPort, err := freeLocalTCPPort()
 	if err != nil {
@@ -460,7 +515,14 @@ func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
 	now := time.Now().UTC()
 	l := &Lobby{ID: id, Name: req.Name, State: "starting", Map: LobbyMap{mp.ID, mp.Name, mp.KM, mp.Players}, Options: opts,
 		CPUs: cpuList, Port: port, Created: now.Format(time.RFC3339), Control: req.Control, StartWhenReady: req.StartWhenReady,
-		Seats: req.Seats, Hint: hint, restPort: restPort, restToken: randomHex(24), done: make(chan struct{})}
+		Seats: req.Seats, Observers: req.Observers, ObserverDelay: req.ObserverDelay, ObservePort: observePort,
+		Hint: hint, restPort: restPort, restToken: randomHex(24), done: make(chan struct{})}
+	if l.Observers == nil {
+		l.Observers = []Observer{}
+	}
+	for i := range l.Observers {
+		l.Observers[i].Watch = fmt.Sprintf("/replay gpgnet://%s:%d/%s", m.cfg.publicHost, observePort, l.Observers[i].token)
+	}
 	l.Dir = filepath.Join(m.cfg.runsDir, id+"-"+now.Format("20060102-150405"))
 	for i := range l.Seats {
 		if s := &l.Seats[i]; s.Kind == "human" {
@@ -482,6 +544,9 @@ func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
 		"--listen", net.JoinHostPort(m.cfg.listenIP, strconv.Itoa(port)),
 		"--lobby-seconds", strconv.Itoa(int(req.LobbyMinutes * 60)),
 		"--rest", "127.0.0.1:" + strconv.Itoa(restPort), "--rest-token-file", tokenPath, "--cpus", cpuArg(cpuList)}
+	if observePort != 0 {
+		args = append(args, "--observe", net.JoinHostPort(m.cfg.listenIP, strconv.Itoa(observePort)))
+	}
 	if req.StartWhenReady > 0 {
 		args = append(args, "--start-when-ready", strconv.FormatFloat(req.StartWhenReady, 'f', -1, 64))
 	}
@@ -640,6 +705,7 @@ func (m *manager) stopAll() {
 func (m *manager) snapshot(l *Lobby) *Lobby {
 	c := *l
 	c.Seats = append([]Seat(nil), l.Seats...)
+	c.Observers = append([]Observer{}, l.Observers...)
 	c.CPUs = append([]int(nil), l.CPUs...)
 	c.Options = map[string]string{}
 	for k, v := range l.Options {

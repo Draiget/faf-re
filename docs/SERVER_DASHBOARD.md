@@ -94,6 +94,10 @@ main_x64.exe /init init_faf.lua /windowed 1280 720 /connectserver 203.0.113.5:27
 
 The token is that seat's alone; hand each player only their own line.
 
+### Watching
+
+A lobby may list observers, each with a name and a token of their own, and a delay for them (`observer_delay_seconds`). An observer marked referee watches with no delay. Each gets a watch line, for example `/replay gpgnet://203.0.113.5:27201/9f3a…41`, which the game opens as a live replay of the lobby's game: `main_x64.exe /init init_faf.lua /replay gpgnet://203.0.113.5:27201/9f3a…41`. This is the game's own live-replay path (plan WP13.1), so it needn't be a server-mode build. The lobby then takes a second port from `--ports` for the watchers.
+
 ### A lobby's page
 
 Open shows the lobby through the host: its seats (joined, ready, ping), the countdown, the controls (start, pause, resume, end, eject, set options or a player's team, faction and colour), the events, and during the game each army: score, mass and energy (stored, income per second, storage), units against the unit cap, the commander's health and upgrades, and the result.
@@ -135,8 +139,8 @@ The host (`server-host`):
 | `GET /api/v1/host` | the machine: `name`, `cpu_model`, `memory_mb`, `cpus` (each `id`, `core`, `socket`, `load` over 1 s and `load10` over 10 s in %, the `lobbies` on it), the number of running `lobbies`, the `ai` personalities |
 | `GET /api/v1/maps` | the maps: `id`, `name`, `file`, `size`, `km`, `players` (start spots), `description`, `source` |
 | `GET /api/v1/hint?players=<n>&km=<km>` | a game's cost: `mean_cores`, `worst_cores`, `suggested_cores`, `basis` |
-| `GET /api/v1/lobbies` | every lobby: `id`, `name`, `state`, `map`, `cpus`, `port`, `seats` (with each human's `join` line), `hint`, `phase`, `beat`, `exit` |
-| `POST /api/v1/lobbies` | a new lobby: `{"map": "scmp_009", "seats": [{"kind": "human", "name": "Ann", "faction": 1, "team": 2}, {"kind": "ai", "ai": "adaptive", "faction": 2, "team": 3}], "options": {"Victory": "demoralization"}, "control": "player", "start_when_ready": 10, "lobby_minutes": 60, "cpus": "auto", "cores": 1}`; `cpus` may instead list CPU ids. Faction 1-4 (UEF, Aeon, Cybran, Seraphim) or 5 (random, chosen by the host); team 1 is no team, 2-9 teams 1-8 |
+| `GET /api/v1/lobbies` | every lobby: `id`, `name`, `state`, `map`, `cpus`, `port`, `seats` (with each human's `join` line), `observers` (each `name`, `referee`, `watch` line), `observer_delay_seconds`, `observe_port`, `hint`, `phase`, `beat`, `exit` |
+| `POST /api/v1/lobbies` | a new lobby: `{"map": "scmp_009", "seats": [{"kind": "human", "name": "Ann", "faction": 1, "team": 2}, {"kind": "ai", "ai": "adaptive", "faction": 2, "team": 3}], "options": {"Victory": "demoralization"}, "control": "player", "start_when_ready": 10, "lobby_minutes": 60, "observers": [{"name": "Caster"}, {"name": "Ref", "referee": true}], "observer_delay_seconds": 120, "cpus": "auto", "cores": 1}`; `cpus` may instead list CPU ids. Faction 1-4 (UEF, Aeon, Cybran, Seraphim) or 5 (random, chosen by the host); team 1 is no team, 2-9 teams 1-8 |
 | `DELETE /api/v1/lobbies/<id>` | stops the lobby's server (SIGTERM, a kill after 10 s); `?forget=1` then removes it from the list |
 | `/api/v1/lobbies/<id>/api/v1/...` | that lobby's own API, below, with the host's token |
 

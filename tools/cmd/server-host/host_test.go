@@ -141,6 +141,38 @@ func TestValidateAndMatchFile(t *testing.T) {
 	}
 }
 
+func TestObservers(t *testing.T) {
+	m := testManager(t)
+	req := CreateRequest{Map: "scmp_009", Seats: []Seat{{Kind: "human"}}, Observers: []Observer{{Name: "Caster"}, {Referee: true}}, ObserverDelay: 120}
+	mp, err := m.validate(&req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.Observers[1].Name != "Observer 2" || req.Observers[0].token == "" || req.Observers[0].token == req.Observers[1].token {
+		t.Fatalf("observers %+v", req.Observers)
+	}
+	l := &Lobby{ID: "l1", Control: "organiser", Seats: req.Seats, Observers: req.Observers, ObserverDelay: req.ObserverDelay}
+	text := matchFile(l, mp.File)
+	for _, want := range []string{"MatchObservers = { '" + req.Observers[0].token + "' }", "MatchReferees = { '" + req.Observers[1].token + "' }",
+		"MatchRules = { ObserverDelaySeconds = 120 }"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("match file lacks %q:\n%s", want, text)
+		}
+	}
+	if strings.Contains(matchFile(&Lobby{ID: "l2", Control: "player", Seats: req.Seats}, mp.File), "MatchObservers") {
+		t.Error("observers written for a lobby without any")
+	}
+	for _, bad := range []CreateRequest{
+		{Map: "scmp_009", Seats: []Seat{{Kind: "human"}}, ObserverDelay: -1},
+		{Map: "scmp_009", Seats: []Seat{{Kind: "human"}}, Observers: make([]Observer, 33)},
+	} {
+		b := bad
+		if _, err := m.validate(&b); err == nil {
+			t.Errorf("accepted %+v", bad)
+		}
+	}
+}
+
 func TestAPIAuthAndRoutes(t *testing.T) {
 	m := testManager(t)
 	a := &api{token: "0123456789abcdef0123", corsOrigin: "http://localhost:5173", m: m, maps: m.maps, procDir: t.TempDir(), hostName: "h"}
