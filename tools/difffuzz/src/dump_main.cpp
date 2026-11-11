@@ -12,6 +12,12 @@
 #include "legacy/math/X87Math.h"
 #include "platform/X87Precision.h"
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#else
+#include <cpuid.h>
+#endif
+
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -90,6 +96,39 @@ namespace
 #if defined(_PC_24)
     platform::SetX87PrecisionControl(_PC_24);
 #endif
+  }
+
+  /// The CPU's vendor and brand string from cpuid (leaf 0, leaves 0x80000002-4), e.g. "AuthenticAMD AMD EPYC 7763".
+  std::string CpuName()
+  {
+    unsigned int regs[4] = {};
+    const auto query = [&regs](const unsigned int leaf) {
+#if defined(_MSC_VER)
+      int out[4] = {};
+      __cpuid(out, static_cast<int>(leaf));
+      std::memcpy(regs, out, sizeof(regs));
+#else
+      __cpuid(leaf, regs[0], regs[1], regs[2], regs[3]);
+#endif
+    };
+    query(0u);
+    char vendor[13] = {};
+    std::memcpy(vendor + 0, &regs[1], 4);
+    std::memcpy(vendor + 4, &regs[3], 4);
+    std::memcpy(vendor + 8, &regs[2], 4);
+    std::string name = vendor;
+    query(0x80000000u);
+    if (regs[0] >= 0x80000004u) {
+      char brand[49] = {};
+      for (unsigned int leaf = 0x80000002u; leaf <= 0x80000004u; ++leaf) {
+        query(leaf);
+        std::memcpy(brand + (leaf - 0x80000002u) * 16u, regs, 16);
+      }
+      std::string text = brand;
+      const std::size_t start = text.find_first_not_of(' ');
+      name += " " + (start == std::string::npos ? std::string{} : text.substr(start));
+    }
+    return name;
   }
 
   void PrintWords(const u32* words, const int count)
@@ -393,6 +432,11 @@ namespace
       }
     }
     std::printf("faf_math_dump --check: %zu blocks, %d differ from %s\n", actual.size(), bad, goldenPath);
+    if (bad > 0) {
+      // x87 transcendentals (fpatan, fsin, f2xm1, fyl2x) aren't specified to the last bit, so the CPU decides what a
+      // target built on them gives: name it, to tell a code change from a machine the golden file wasn't made on.
+      std::printf("faf_math_dump --check: this machine's CPU: %s\n", CpuName().c_str());
+    }
     return bad;
   }
 } // namespace
