@@ -36,6 +36,7 @@
 #include "editor/doc/EdDocument.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "editor/doc/EdRoundTrip.h"
 #include "editor/doc/EdUnitWrecks.h"
 #include "editor/ui/EdImGuiRenderer.h"
@@ -1437,6 +1438,68 @@ namespace faf::editor
               stepAt = now + 2.0;
             } else if (step == 2 && now >= stepAt) {
               (void)logInfo("after");
+              step = 3;
+            }
+          }
+          // `/playdecaltest` (test runs, with /playeditorview): in the editor's view, the map's first decal copied beside the
+          // first commander, then the map's last decal moved 40 units, then both taken back as undo does; the play's
+          // decals counted and looked up after each (WPE.49).
+          if (moho::CFG_GetArgOption("/playdecaltest", 0, nullptr) && mScene.OverPlay() && mScene.SessionMap() != nullptr &&
+              mDocument.Decals() != nullptr) {
+            static int step = 0;
+            static EdDocument::DecalSnapshot original;
+            static DecalState added;
+            static DecalState moved;
+            moho::IDecalManager* const play = mScene.SessionMap()->mTerrainRes->GetDecalManager();
+            const auto inPlay = [play](const DecalState& state) {
+              const std::string key = DecalKey(state);
+              for (const DecalState& d : CaptureDecals(*play)) {
+                if (DecalKey(d) == key) {
+                  return true;
+                }
+              }
+              return false;
+            };
+            if (step == 0 && play != nullptr) {
+              for (const LiveUnit& u : mScene.LiveNow()) {
+                if (u.blueprint.find("0001") != std::string::npos && step == 0) {
+                  original = mDocument.DecalsNow();
+                  if (original.empty()) {
+                    step = 9;
+                    gpg::Warnf("editor: decal test: the map has no decals");
+                    break;
+                  }
+                  gpg::Logf("editor: decal test: %zu decals in the editor, %d in the play", original.size(), play->GetDecalCount());
+                  added = original.front();
+                  added.position[0] = u.x + 20.0f;
+                  added.position[2] = u.z;
+                  (void)AddDecal(*mDocument.Decals(), added);
+                  mDocument.DecalsEdited(original);
+                  const EdDocument::DecalSnapshot now = mDocument.DecalsNow();
+                  added = now.back();
+                  gpg::Logf("editor: decal test: one added at %.0f,%.0f: %d in the play, the new one there: %s", static_cast<double>(added.position[0]),
+                            static_cast<double>(added.position[2]), play->GetDecalCount(), inPlay(added) ? "yes" : "no");
+                  step = 1;
+                }
+              }
+            } else if (step == 1 && play != nullptr) {
+              const EdDocument::DecalSnapshot before = mDocument.DecalsNow();
+              EdDocument::DecalSnapshot after = before;
+              DecalState& last = after[after.size() - 2]; // the map's own last decal (the test's is after it)
+              const DecalState was = last;
+              last.position[0] += 40.0f;
+              moved = last;
+              // As the editor's own decal moves do it: the decals set, then the edit recorded (which sends it to the play).
+              RestoreDecals(*mDocument.Decals(), after);
+              mDocument.DecalsEdited(before);
+              gpg::Logf("editor: decal test: the map's decal %s moved 40: %d in the play, there at the old place: %s, at the new: %s",
+                        was.names[0].c_str(), play->GetDecalCount(), inPlay(was) ? "yes" : "no", inPlay(moved) ? "yes" : "no");
+              step = 2;
+            } else if (step == 2 && play != nullptr) {
+              mDocument.RestoreDecals(original);
+              gpg::Logf("editor: decal test: back to the map's own (undo's way): %d in the play, the added one there: %s, the moved one at "
+                        "its new place: %s",
+                        play->GetDecalCount(), inPlay(added) ? "yes" : "no", inPlay(moved) ? "yes" : "no");
               step = 3;
             }
           }

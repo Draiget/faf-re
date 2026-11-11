@@ -429,6 +429,10 @@ namespace faf::editor
     /** The lighting / water written into one map's terrain (the document's, or a play's). */
     static void LightingInto(moho::IWldTerrainRes& terrain, const LightingState& lighting);
     static void WaterInto(moho::IWldTerrainRes& terrain, const WaterState& water, bool warnTextures);
+    /** The play's decal manager while the editor's view is in front of one; null otherwise. */
+    [[nodiscard]] moho::IDecalManager* LiveDecals() const;
+    /** A decal edit's change made in the play's map too (WPE.49). */
+    void MirrorDecalsLive(const DecalSnapshot& before, const DecalSnapshot& after);
     std::string mPath;
     MapFacts mFacts;
     std::string mError;

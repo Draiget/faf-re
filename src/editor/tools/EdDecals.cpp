@@ -5,6 +5,7 @@
 #include <cstring>
 #include <map>
 #include <set>
+#include <unordered_map>
 
 #include "moho/misc/CVirtualFileSystem.h"
 #include "moho/misc/FileWaitHandleSet.h"
@@ -120,6 +121,69 @@ namespace faf::editor
         manager.DestroyDecal(decal);
       }
     }
+  }
+
+  std::string DecalKey(const DecalState& state)
+  {
+    std::string key = state.names[0];
+    key.push_back('\0');
+    key += state.names[1];
+    key.push_back('\0');
+    const auto bytes = [&key](const void* const data, const std::size_t size) { key.append(static_cast<const char*>(data), size); };
+    bytes(&state.type, sizeof(state.type));
+    bytes(state.scale, sizeof(state.scale));
+    bytes(state.position, sizeof(state.position));
+    bytes(state.orientation, sizeof(state.orientation));
+    bytes(&state.cutoff, sizeof(state.cutoff));
+    bytes(&state.nearCutoff, sizeof(state.nearCutoff));
+    return key;
+  }
+
+  DecalMirror MirrorDecals(moho::IDecalManager& live, const std::vector<DecalState>& before, const std::vector<DecalState>& after)
+  {
+    // How many of each decal (by content) went (> 0) or came (< 0).
+    std::unordered_map<std::string, int> change;
+    for (const DecalState& state : before) {
+      ++change[DecalKey(state)];
+    }
+    for (const DecalState& state : after) {
+      --change[DecalKey(state)];
+    }
+    DecalMirror result;
+    std::unordered_map<std::string, std::vector<moho::CWldTerrainDecal*>> liveByKey;
+    bool liveRead = false;
+    for (const auto& [key, count] : change) {
+      if (count <= 0) {
+        continue;
+      }
+      if (!liveRead) {
+        liveRead = true;
+        const std::int32_t total = live.GetDecalCount();
+        for (std::int32_t i = 0; i < total; ++i) {
+          if (moho::CWldTerrainDecal* const decal = live.GetDecal(i); decal != nullptr) {
+            liveByKey[DecalKey(CaptureDecal(*decal))].push_back(decal);
+          }
+        }
+      }
+      std::vector<moho::CWldTerrainDecal*>& found = liveByKey[key];
+      for (int n = 0; n < count; ++n) {
+        if (found.empty()) {
+          ++result.missing; // not in the play (it differed from the map before the edit)
+          continue;
+        }
+        live.DestroyDecal(found.back());
+        found.pop_back();
+        ++result.removed;
+      }
+    }
+    for (const DecalState& state : after) {
+      int& count = change[DecalKey(state)];
+      if (count < 0 && AddDecal(live, state) != nullptr) {
+        ++count;
+        ++result.added;
+      }
+    }
+    return result;
   }
 
   moho::CWldTerrainDecal* AddDecal(moho::IDecalManager& manager, const DecalState& state)

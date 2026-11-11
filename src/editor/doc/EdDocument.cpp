@@ -1282,14 +1282,36 @@ namespace faf::editor
   void EdDocument::RestoreDecals(const DecalSnapshot& decals)
   {
     if (moho::IDecalManager* const manager = Decals(); manager != nullptr) {
+      const DecalSnapshot before = LiveDecals() != nullptr ? DecalsNow() : DecalSnapshot{};
       faf::editor::RestoreDecals(*manager, decals);
+      MirrorDecalsLive(before, decals);
       mModified = true;
+    }
+  }
+
+  moho::IDecalManager* EdDocument::LiveDecals() const
+  {
+    return mLiveMap != nullptr && mLiveMap->mTerrainRes != nullptr ? mLiveMap->mTerrainRes->GetDecalManager() : nullptr;
+  }
+
+  void EdDocument::MirrorDecalsLive(const DecalSnapshot& before, const DecalSnapshot& after)
+  {
+    moho::IDecalManager* const live = LiveDecals();
+    if (live == nullptr) {
+      return;
+    }
+    const DecalMirror done = MirrorDecals(*live, before, after);
+    if (done.removed + done.added + done.missing > 0) {
+      gpg::Logf("editor: decals into the play: %d removed, %d added%s (%d there now)", done.removed, done.added,
+                done.missing > 0 ? (", " + std::to_string(done.missing) + " to remove weren't in it").c_str() : "", live->GetDecalCount());
     }
   }
 
   void EdDocument::DecalsEdited(DecalSnapshot before)
   {
-    mDecalUndo.emplace_back(std::move(before), DecalsNow());
+    DecalSnapshot now = DecalsNow();
+    MirrorDecalsLive(before, now);
+    mDecalUndo.emplace_back(std::move(before), std::move(now));
     // About 120 bytes a decal: a 2,000-decal map is about half a megabyte a step, twice.
     if (mDecalUndo.size() > 100) {
       mDecalUndo.erase(mDecalUndo.begin());
