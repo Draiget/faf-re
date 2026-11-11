@@ -207,6 +207,40 @@ namespace faf::editor
     }
     ImGui::End();
 
+    // The map is up but its props and units aren't yet (they wait for the game's blueprints): said at the view's top,
+    // with a spinner and the time so far, so a map without its trees and wrecks isn't taken for finished (user report).
+    {
+      static double loadingSince = -1.0;
+      if (mTools.ModelsLoading() && !playing) {
+        const double now = ImGui::GetTime();
+        if (loadingSince < 0.0) {
+          loadingSince = now;
+        }
+        char text[160];
+        (void)std::snprintf(text, sizeof(text), "Loading models: trees, rocks, wrecks and units appear when the game's blueprints are ready (%.0f s)",
+                            now - loadingSince);
+        ImDrawList* const dl = ImGui::GetForegroundDrawList();
+        const ImVec2 size = ImGui::CalcTextSize(text);
+        const float pad = 8.0f;
+        const float spinner = size.y;
+        const float width = spinner + pad * 3.0f + size.x;
+        const ImVec2 at(viewport->Pos.x + mGameView.x + (mGameView.z - width) * 0.5f, viewport->Pos.y + mGameView.y + 12.0f);
+        dl->AddRectFilled(at, ImVec2(at.x + width, at.y + size.y + pad * 2.0f), IM_COL32(20, 22, 28, 225), 6.0f);
+        dl->AddRect(at, ImVec2(at.x + width, at.y + size.y + pad * 2.0f), IM_COL32(240, 180, 70, 200), 6.0f);
+        // A turning arc.
+        const ImVec2 centre(at.x + pad + spinner * 0.5f, at.y + pad + spinner * 0.5f);
+        const float start = static_cast<float>(now * 6.0);
+        dl->PathArcTo(centre, spinner * 0.42f, start, start + 4.2f, 20);
+        dl->PathStroke(IM_COL32(240, 180, 70, 255), 0, 2.5f);
+        dl->AddText(ImVec2(at.x + pad * 2.0f + spinner, at.y + pad), IM_COL32(235, 235, 235, 255), text);
+      } else {
+        if (loadingSince >= 0.0) {
+          gpg::Logf("editor: the map's models were loading for %.1f s (the view said so)", ImGui::GetTime() - loadingSince);
+        }
+        loadingSince = -1.0;
+      }
+    }
+
     if (panels) {
       if (mShowTools) {
         DrawToolsPanel();

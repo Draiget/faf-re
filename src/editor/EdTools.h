@@ -494,6 +494,9 @@ namespace faf::editor
       float radius = 3.0f;
       std::uint32_t colour = 0xF0FFA040u;
     };
+    /** The map's props and units still loading (the view says so, else an empty map looks finished; user report). */
+    void SetModelsLoading(const bool loading) noexcept { mModelsLoading = loading; }
+    [[nodiscard]] bool ModelsLoading() const noexcept { return mModelsLoading; }
     void ClearViewRings() noexcept { mViewRings.clear(); }
     void AddViewRing(const ViewRing& ring) { mViewRings.push_back(ring); }
     [[nodiscard]] const std::vector<ViewRing>& ViewRings() const noexcept { return mViewRings; }
@@ -973,6 +976,7 @@ namespace faf::editor
     UnitGroupAsk mUnitGroupAsk;
     bool mUnitGroupAsked = false;
     std::vector<ViewRing> mViewRings;
+    bool mModelsLoading = false;
     std::set<std::pair<std::string, std::string>> mPreviewHiddenUnits;
     std::set<std::string> mPreviewHiddenMarkers;
     void DrawUnitGroup(const UnitGroup& group, std::vector<std::string>& path);

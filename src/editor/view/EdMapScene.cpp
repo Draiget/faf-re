@@ -2,7 +2,9 @@
 #include "editor/doc/EdUnitFate.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <functional>
 #include <map>
 #include <set>
@@ -11,6 +13,7 @@
 #include <windowsx.h>
 
 #include "editor/EdTools.h"
+#include "moho/misc/StartupHelpers.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdMapFile.h"
 #include "moho/app/CScApp.h"
@@ -1759,7 +1762,16 @@ namespace faf::editor
       }
     }
     if (!mPropsDone) {
-      CreateProps();
+      // `/holdmodels <seconds>` (test runs): the models made that long after the map shows, so the view's
+      // "Loading models" notice can be seen on a machine where the blueprints are ready at once.
+      static const double hold = [] {
+        fa::vector<fa::string> value;
+        return moho::CFG_GetArgOption("/holdmodels", 1, &value) && !value.empty() ? std::atof(value[0].c_str()) : 0.0;
+      }();
+      static const auto started = std::chrono::steady_clock::now();
+      if (hold <= 0.0 || std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count() >= hold) {
+        CreateProps();
+      }
     }
     UpdatePropPreview();
     MoveWithKeys(frameSeconds);

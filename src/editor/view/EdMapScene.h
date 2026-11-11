@@ -189,6 +189,8 @@ namespace faf::editor
     bool MoveUnitsToGroup(const std::string& army, const std::vector<std::string>& names, const std::vector<std::string>& path);
     /** Whether the armies' units are drawn (test runs wait for it). */
     [[nodiscard]] bool UnitsReady() const noexcept { return !mUnitRefs.empty(); }
+    /** The map shows, but its props and units wait for the game's blueprints (built after startup). */
+    [[nodiscard]] bool ModelsPending() const noexcept { return mMap != nullptr && !mPropsDone; }
     /** How many decals the Decals tool has selected, for its panel. */
     [[nodiscard]] int DecalSelectionCount() const noexcept { return static_cast<int>(mDecalSelection.size()); }
     /** Selects markers by name (`add` toggles them in the selection instead), for the Markers panel. */

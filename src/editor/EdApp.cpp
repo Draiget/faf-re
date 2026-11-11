@@ -1170,6 +1170,7 @@ namespace faf::editor
       ++mFramesRun;
       mLastFrame = now;
       mScene.Update(frameSeconds, moho::WLD_GetFrameAction() == moho::EWldFrameAction::Inactive);
+      mShell->Tools().SetModelsLoading(mScene.ModelsPending());
 
       if (mImGuiReady) {
         ImGui_ImplWin32_NewFrame();
