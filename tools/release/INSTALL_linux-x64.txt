@@ -1,0 +1,27 @@
+The engine's native Linux build (no Wine). Needs Linux x64 with glibc 2.39 or newer (Ubuntu 24.04,
+Debian 13, Fedora 40 or later), a Vulkan driver (Mesa or NVIDIA), FAF's game data and Forged Alliance itself.
+It plays with players on the rebuilt engine (Windows or Linux) over its own network links; it can't join
+games of the original ForgedAlliance.exe.
+
+What is in this package
+  ForgedAlliance                 the engine (Vulkan)
+  libdxcompiler.so, libdxil.so   shader compiler; must stay next to ForgedAlliance
+  fafengine/lua/...              the engine's own Lua hook files; must sit in a folder named fafengine
+                                 next to ForgedAlliance (the engine mounts it at /fafengine)
+
+Install
+  1. Extract this package into a folder of its own, keeping fafengine as is:
+       tar -xzf faf-engine-<version>-linux-x64.tar.gz -C ~/faf-engine
+  2. Copy from FAF's bin folder (the one with init_faf.lua and fa_path.lua) into that folder:
+     init_faf.lua, SupComDataPath.lua, SupComDataPathFAF.lua, tahoma.ttf, tahomabd.ttf,
+     and fa_path.lua into the folder above it (init_faf.lua finds fa_path.lua one folder up).
+
+Run, from that folder:
+  ./ForgedAlliance /init init_faf.lua /nobugreport /log ~/faf-engine.log /windowed 1280 800
+
+From a FAF client that starts the rebuilt engine (the test build of FAForever/downlords-faf-client#3590),
+put ForgedAlliance in the client's bin folder as ForgedAlliance.exe, with the two .so files and fafengine
+next to it.
+
+A crash prints its stack to the terminal (or the desktop session's log); please attach it together with
+the log file from /log.
