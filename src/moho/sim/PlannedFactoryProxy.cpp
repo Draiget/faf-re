@@ -342,6 +342,10 @@ namespace moho
     if (unit == nullptr) {
       return false;
     }
+    const std::uint32_t entIndex = unit->mParams.mEntityId & 0xFFFFu;
+    if ((entIndex & 0x7000u) == 0x7000u) {
+      return true;
+    }
     for (const auto& proxy : mProxies) {
       if (proxy && proxy->mUserUnit == unit) {
         return true;
@@ -820,6 +824,8 @@ namespace moho
       return true;
     }
 
+    PlannedFactoryManager::ScopedBufferingSuppression suppressBuffering;
+
     gpg::fastvector<UserUnit*> targetUnits;
     targetUnits.push_back(unit);
 
@@ -829,11 +835,16 @@ namespace moho
         (void)gpg::STR_InitFilename(&bpResId.name, order.blueprintId.c_str());
         REntityBlueprint* const bp = session->mRules->GetEntityBlueprint(bpResId);
         if (bp != nullptr) {
+          gpg::Logf("[PlannedFactory] Issuing %d build orders for '%s' to factory %u",
+                    order.count, order.blueprintId.c_str(), unitId);
           SSTICommandIssueData factoryCommand(EUnitCommandType::UNITCOMMAND_BuildFactory);
           factoryCommand.mBlueprint = static_cast<RUnitBlueprint*>(bp);
           for (int i = 0; i < order.count; ++i) {
-            ISSUE_FactoryCommand(targetUnits, factoryCommand, false);
+            ISSUE_Command(targetUnits, factoryCommand, false);
           }
+        } else {
+          gpg::Logf("[PlannedFactory] FAILED to resolve blueprint '%s' for factory %u!",
+                    order.blueprintId.c_str(), unitId);
         }
       }
     }
