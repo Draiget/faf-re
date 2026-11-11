@@ -25,6 +25,7 @@
 #include <fstream>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <thread>
 #include <typeinfo>
@@ -411,27 +412,59 @@ namespace
   const HANDLE kCurrentThreadPseudoHandle = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-2));
   const HANDLE kCurrentProcessPseudoHandle = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
 
-  [[nodiscard]] ShimHandle* AsShimHandle(const HANDLE handle) noexcept
+  /// The open handles, as Windows keeps them: a HANDLE is its object's address, this table holds one
+  /// reference and every call that uses a handle holds another while it runs. A closed handle then
+  /// fails with ERROR_INVALID_HANDLE instead of reaching freed memory (a connector thread may still
+  /// signal an event its owner has closed, as ~CSimDriver does before its client manager stops), and an
+  /// object another thread is waiting on or signalling lives until that call returns.
+  /// Built on first use and never destroyed: static constructors in other files create events before
+  /// this file's globals would exist, and threads may still signal while the process exits.
+  struct HandleTable
+  {
+    std::shared_mutex lock;
+    std::unordered_map<HANDLE, std::shared_ptr<ShimHandle>> handles;
+  };
+
+  [[nodiscard]] HandleTable& Handles()
+  {
+    static HandleTable* const table = new HandleTable();
+    return *table;
+  }
+
+  [[nodiscard]] HANDLE Register(std::shared_ptr<ShimHandle> object)
+  {
+    const HANDLE handle = object.get();
+    HandleTable& table = Handles();
+    const std::unique_lock lock(table.lock);
+    table.handles.emplace(handle, std::move(object));
+    return handle;
+  }
+
+  [[nodiscard]] std::shared_ptr<ShimHandle> AsShimHandle(const HANDLE handle)
   {
     if (handle == nullptr || handle == INVALID_HANDLE_VALUE || handle == kCurrentThreadPseudoHandle) {
       return nullptr;
     }
-    return static_cast<ShimHandle*>(handle);
+    HandleTable& table = Handles();
+    const std::shared_lock lock(table.lock);
+    const auto found = table.handles.find(handle);
+    return found != table.handles.end() ? found->second : nullptr;
   }
 
-  [[nodiscard]] WaitObject* AsWaitObject(const HANDLE handle) noexcept
+  [[nodiscard]] std::shared_ptr<WaitObject> AsWaitObject(const HANDLE handle)
   {
-    ShimHandle* const object = AsShimHandle(handle);
+    std::shared_ptr<ShimHandle> object = AsShimHandle(handle);
     return object != nullptr && (object->kind == ShimHandle::Kind::Event || object->kind == ShimHandle::Kind::Semaphore ||
                                  object->kind == ShimHandle::Kind::Mutex)
-             ? static_cast<WaitObject*>(object)
+             ? std::static_pointer_cast<WaitObject>(std::move(object))
              : nullptr;
   }
 
-  [[nodiscard]] FileObject* AsFileObject(const HANDLE handle) noexcept
+  [[nodiscard]] std::shared_ptr<FileObject> AsFileObject(const HANDLE handle)
   {
-    ShimHandle* const object = AsShimHandle(handle);
-    return object != nullptr && object->kind == ShimHandle::Kind::File ? static_cast<FileObject*>(object) : nullptr;
+    std::shared_ptr<ShimHandle> object = AsShimHandle(handle);
+    return object != nullptr && object->kind == ShimHandle::Kind::File ? std::static_pointer_cast<FileObject>(std::move(object))
+                                                                       : nullptr;
   }
 
   [[nodiscard]] pthread_mutex_t* SectionMutex(CRITICAL_SECTION* const section) noexcept
@@ -450,10 +483,10 @@ std::string platform::posix::NativePath(const char* const path)
 
 HANDLE CreateEventW(void*, const BOOL manualReset, const BOOL initialState, const wchar_t*)
 {
-  auto* const event = new WaitObject(ShimHandle::Kind::Event);
+  const auto event = std::make_shared<WaitObject>(ShimHandle::Kind::Event);
   event->manualReset = manualReset != FALSE;
   event->count = initialState != FALSE ? 1 : 0;
-  return event;
+  return Register(event);
 }
 
 HANDLE CreateEventA(void* const attributes, const BOOL manualReset, const BOOL initialState, const char*)
@@ -463,15 +496,15 @@ HANDLE CreateEventA(void* const attributes, const BOOL manualReset, const BOOL i
 
 HANDLE CreateSemaphoreW(void*, const LONG initialCount, const LONG maximumCount, const wchar_t*)
 {
-  auto* const semaphore = new WaitObject(ShimHandle::Kind::Semaphore);
+  const auto semaphore = std::make_shared<WaitObject>(ShimHandle::Kind::Semaphore);
   semaphore->count = initialCount;
   semaphore->maximum = maximumCount;
-  return semaphore;
+  return Register(semaphore);
 }
 
 BOOL ReleaseSemaphore(const HANDLE handle, const LONG releaseCount, LONG* const previousCount)
 {
-  WaitObject* const object = AsWaitObject(handle);
+  const std::shared_ptr<WaitObject> object = AsWaitObject(handle);
   if (object == nullptr || object->kind != ShimHandle::Kind::Semaphore || releaseCount <= 0) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -493,12 +526,12 @@ BOOL ReleaseSemaphore(const HANDLE handle, const LONG releaseCount, LONG* const 
 
 HANDLE CreateMutexW(void*, const BOOL initialOwner, const wchar_t*)
 {
-  auto* const mutex = new WaitObject(ShimHandle::Kind::Mutex);
+  const auto mutex = std::make_shared<WaitObject>(ShimHandle::Kind::Mutex);
   mutex->count = 1;
   if (initialOwner != FALSE) {
     mutex->AcquireLocked();
   }
-  return mutex;
+  return Register(mutex);
 }
 
 HANDLE CreateMutexA(void* const attributes, const BOOL initialOwner, const char*)
@@ -508,7 +541,7 @@ HANDLE CreateMutexA(void* const attributes, const BOOL initialOwner, const char*
 
 BOOL ReleaseMutex(const HANDLE handle)
 {
-  WaitObject* const object = AsWaitObject(handle);
+  const std::shared_ptr<WaitObject> object = AsWaitObject(handle);
   if (object == nullptr || object->kind != ShimHandle::Kind::Mutex) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -530,7 +563,7 @@ BOOL ReleaseMutex(const HANDLE handle)
 
 BOOL SetEvent(const HANDLE handle)
 {
-  WaitObject* const object = AsWaitObject(handle);
+  const std::shared_ptr<WaitObject> object = AsWaitObject(handle);
   if (object == nullptr || object->kind != ShimHandle::Kind::Event) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -549,7 +582,7 @@ BOOL SetEvent(const HANDLE handle)
 
 BOOL ResetEvent(const HANDLE handle)
 {
-  WaitObject* const object = AsWaitObject(handle);
+  const std::shared_ptr<WaitObject> object = AsWaitObject(handle);
   if (object == nullptr || object->kind != ShimHandle::Kind::Event) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -561,7 +594,7 @@ BOOL ResetEvent(const HANDLE handle)
 
 DWORD WaitForSingleObject(const HANDLE handle, const DWORD milliseconds)
 {
-  WaitObject* const object = AsWaitObject(handle);
+  const std::shared_ptr<WaitObject> object = AsWaitObject(handle);
   if (object == nullptr) {
     tLastError = ERROR_INVALID_HANDLE;
     return WAIT_FAILED;
@@ -583,7 +616,7 @@ DWORD WaitForSingleObjectEx(const HANDLE handle, const DWORD milliseconds, const
   if (alertable == FALSE) {
     return WaitForSingleObject(handle, milliseconds);
   }
-  WaitObject* const object = AsWaitObject(handle);
+  const std::shared_ptr<WaitObject> object = AsWaitObject(handle);
   if (object == nullptr) {
     tLastError = ERROR_INVALID_HANDLE;
     return WAIT_FAILED;
@@ -609,35 +642,34 @@ DWORD WaitForSingleObjectEx(const HANDLE handle, const DWORD milliseconds, const
 
 DWORD WaitForMultipleObjects(const DWORD count, const HANDLE* const handles, const BOOL waitAll, const DWORD milliseconds)
 {
-  // Polls: the engine waits on a handful of handles at most.
+  // Polls: the engine waits on a handful of handles at most. The objects are looked up once, and held
+  // for the whole wait as Windows holds them.
+  std::vector<std::shared_ptr<WaitObject>> objects(count);
+  for (DWORD index = 0; index < count; ++index) {
+    objects[index] = AsWaitObject(handles[index]);
+    if (objects[index] == nullptr) {
+      tLastError = ERROR_INVALID_HANDLE;
+      return WAIT_FAILED;
+    }
+  }
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(milliseconds);
   for (;;) {
     if (waitAll != FALSE) {
       bool all = true;
       for (DWORD index = 0; index < count && all; ++index) {
-        WaitObject* const object = AsWaitObject(handles[index]);
-        if (object == nullptr) {
-          tLastError = ERROR_INVALID_HANDLE;
-          return WAIT_FAILED;
-        }
-        std::lock_guard<std::mutex> lock(object->mutex);
-        all = object->ReadyLocked();
+        std::lock_guard<std::mutex> lock(objects[index]->mutex);
+        all = objects[index]->ReadyLocked();
       }
       if (all) {
         for (DWORD index = 0; index < count; ++index) {
-          WaitObject* const object = AsWaitObject(handles[index]);
-          std::lock_guard<std::mutex> lock(object->mutex);
-          object->AcquireLocked();
+          std::lock_guard<std::mutex> lock(objects[index]->mutex);
+          objects[index]->AcquireLocked();
         }
         return WAIT_OBJECT_0;
       }
     } else {
       for (DWORD index = 0; index < count; ++index) {
-        WaitObject* const object = AsWaitObject(handles[index]);
-        if (object == nullptr) {
-          tLastError = ERROR_INVALID_HANDLE;
-          return WAIT_FAILED;
-        }
+        WaitObject* const object = objects[index].get();
         std::lock_guard<std::mutex> lock(object->mutex);
         if (object->ReadyLocked()) {
           object->AcquireLocked();
@@ -657,12 +689,18 @@ BOOL CloseHandle(const HANDLE handle)
   if (handle == kCurrentThreadPseudoHandle || handle == kCurrentProcessPseudoHandle) {
     return TRUE;
   }
-  ShimHandle* const object = AsShimHandle(handle);
-  if (object == nullptr) {
-    tLastError = ERROR_INVALID_HANDLE;
-    return FALSE;
+  std::shared_ptr<ShimHandle> object; // released after the lock: a file closes its descriptor then
+  {
+    HandleTable& table = Handles();
+    const std::unique_lock lock(table.lock);
+    const auto found = table.handles.find(handle);
+    if (found == table.handles.end()) {
+      tLastError = ERROR_INVALID_HANDLE;
+      return FALSE;
+    }
+    object = std::move(found->second);
+    table.handles.erase(found);
   }
-  delete object;
   return TRUE;
 }
 
@@ -763,20 +801,20 @@ HANDLE OpenThread(DWORD, BOOL, const DWORD threadId)
     tLastError = ERROR_INVALID_PARAMETER;
     return nullptr;
   }
-  auto* const thread = new ThreadObject();
+  const auto thread = std::make_shared<ThreadObject>();
   thread->threadId = threadId;
   thread->queue = ApcQueueOf(threadId);
-  return thread;
+  return Register(thread);
 }
 
 DWORD QueueUserAPC(const PAPCFUNC function, const HANDLE threadHandle, const ULONG_PTR data)
 {
-  ShimHandle* const object = AsShimHandle(threadHandle);
+  const std::shared_ptr<ShimHandle> object = AsShimHandle(threadHandle);
   std::shared_ptr<ApcQueue> queue;
   if (threadHandle == kCurrentThreadPseudoHandle) {
     queue = ApcQueueOf(static_cast<DWORD>(::syscall(SYS_gettid)));
   } else if (object != nullptr && object->kind == ShimHandle::Kind::Thread) {
-    queue = static_cast<ThreadObject*>(object)->queue;
+    queue = static_cast<ThreadObject*>(object.get())->queue;
   }
   if (function == nullptr || queue == nullptr) {
     tLastError = ERROR_INVALID_HANDLE;
@@ -1305,10 +1343,10 @@ HANDLE CreateFileA(
     SetErrnoError();
     return INVALID_HANDLE_VALUE;
   }
-  auto* const file = new FileObject();
+  const auto file = std::make_shared<FileObject>();
   file->fd = fd;
   tLastError = ERROR_SUCCESS;
-  return file;
+  return Register(file);
 }
 
 HANDLE CreateFileW(
@@ -1326,7 +1364,7 @@ HANDLE CreateFileW(
 
 BOOL ReadFile(const HANDLE handle, void* const buffer, const DWORD bytesToRead, DWORD* const bytesRead, void*)
 {
-  FileObject* const file = AsFileObject(handle);
+  const std::shared_ptr<FileObject> file = AsFileObject(handle);
   if (file == nullptr) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -1357,7 +1395,7 @@ BOOL ReadFile(const HANDLE handle, void* const buffer, const DWORD bytesToRead, 
 
 BOOL WriteFile(const HANDLE handle, const void* const buffer, const DWORD bytesToWrite, DWORD* const bytesWritten, void*)
 {
-  FileObject* const file = AsFileObject(handle);
+  const std::shared_ptr<FileObject> file = AsFileObject(handle);
   if (file == nullptr) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -1385,7 +1423,7 @@ BOOL WriteFile(const HANDLE handle, const void* const buffer, const DWORD bytesT
 
 BOOL SetFilePointerEx(const HANDLE handle, const LARGE_INTEGER distance, LARGE_INTEGER* const newPosition, const DWORD moveMethod)
 {
-  FileObject* const file = AsFileObject(handle);
+  const std::shared_ptr<FileObject> file = AsFileObject(handle);
   if (file == nullptr) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -1420,7 +1458,7 @@ DWORD SetFilePointer(const HANDLE handle, const LONG distance, LONG* const dista
 
 BOOL GetFileSizeEx(const HANDLE handle, LARGE_INTEGER* const size)
 {
-  FileObject* const file = AsFileObject(handle);
+  const std::shared_ptr<FileObject> file = AsFileObject(handle);
   struct stat status{};
   if (file == nullptr || ::fstat(file->fd, &status) != 0) {
     tLastError = ERROR_INVALID_HANDLE;
@@ -1446,7 +1484,7 @@ HANDLE CreateFileMappingW(
   const HANDLE file, void*, const DWORD protect, const DWORD maximumSizeHigh, const DWORD maximumSizeLow, const wchar_t*
 )
 {
-  FileObject* const source = AsFileObject(file);
+  const std::shared_ptr<FileObject> source = AsFileObject(file);
   struct stat status{};
   if (source == nullptr || protect != PAGE_READONLY || maximumSizeHigh != 0 || maximumSizeLow != 0 ||
       ::fstat(source->fd, &status) != 0) {
@@ -1463,24 +1501,24 @@ HANDLE CreateFileMappingW(
     SetErrnoError();
     return nullptr;
   }
-  auto* const mapping = new MappingObject();
+  const auto mapping = std::make_shared<MappingObject>();
   mapping->fd = fd;
   mapping->size = static_cast<std::size_t>(status.st_size);
   tLastError = ERROR_SUCCESS;
-  return mapping;
+  return Register(mapping);
 }
 
 void* MapViewOfFile(
   const HANDLE mappingHandle, const DWORD desiredAccess, const DWORD offsetHigh, const DWORD offsetLow, const std::size_t bytes
 )
 {
-  ShimHandle* const object = AsShimHandle(mappingHandle);
+  const std::shared_ptr<ShimHandle> object = AsShimHandle(mappingHandle);
   if (object == nullptr || object->kind != ShimHandle::Kind::Mapping || desiredAccess != FILE_MAP_READ ||
       offsetHigh != 0 || offsetLow != 0) {
     tLastError = ERROR_INVALID_PARAMETER;
     return nullptr;
   }
-  const auto* const mapping = static_cast<const MappingObject*>(object);
+  const auto* const mapping = static_cast<const MappingObject*>(object.get());
   const std::size_t length = bytes != 0 ? bytes : mapping->size;
   void* const view = ::mmap(nullptr, length, PROT_READ, MAP_PRIVATE, mapping->fd, 0);
   if (view == MAP_FAILED) {
@@ -1510,13 +1548,13 @@ BOOL UnmapViewOfFile(const void* const view)
 
 BOOL FlushFileBuffers(const HANDLE handle)
 {
-  FileObject* const file = AsFileObject(handle);
+  const std::shared_ptr<FileObject> file = AsFileObject(handle);
   return file != nullptr && ::fsync(file->fd) == 0 ? TRUE : FALSE;
 }
 
 BOOL SetEndOfFile(const HANDLE handle)
 {
-  FileObject* const file = AsFileObject(handle);
+  const std::shared_ptr<FileObject> file = AsFileObject(handle);
   if (file == nullptr) {
     return FALSE;
   }

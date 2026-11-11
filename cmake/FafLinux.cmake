@@ -397,6 +397,11 @@ add_executable(faf_platform_net_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/te
 target_link_libraries(faf_platform_net_tests PRIVATE faf_sim gtest_main)
 target_link_options(faf_platform_net_tests PRIVATE -Wl,--error-limit=0)
 add_test(NAME platform_net COMMAND faf_platform_net_tests)
+# The Win32 shim's handles when one thread closes what another still uses (Windows' behaviour).
+add_executable(faf_win32_shim_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimHandleTests.cpp")
+target_link_libraries(faf_win32_shim_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_win32_shim_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME win32_shim_handles COMMAND faf_win32_shim_tests)
 # Two CNetUDPConnectors in one process over loopback sockets and through peer transports, as
 # Windows runs them (tests/CMakeLists.txt).
 add_executable(faf_peer_transport_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/PeerTransportTests.cpp")
