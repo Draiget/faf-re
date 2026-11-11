@@ -83,7 +83,7 @@ namespace faf::editor
       z = mTargetZ;
     }
     /** The map's heights in game units for the material editor's map nodes (null without a map). */
-    [[nodiscard]] std::shared_ptr<TerrainSource> TerrainHeights() const;
+    [[nodiscard]] std::shared_ptr<TerrainSource> TerrainHeights();
 
     /** The open map's ten texture slots (lower, strata 1-8, upper) as the terrain has them. */
     [[nodiscard]] std::vector<EdTools::LayerSlot> LayerSlots() const;

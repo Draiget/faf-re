@@ -545,6 +545,41 @@ namespace faf::editor
             });
           });
 
+      add({"TerrainMask", "Map Mask", "Map", "A stratum's painted mask on the open map (0 none, 1 full). Covers the whole map: start a new mask "
+                                              "from it, or blend by where the map already has rock or sand.",
+           {},
+           {Out("Out", PinType::Grey)},
+           {Int("Stratum", 1, 1, 8)},
+           false},
+          [](const EvalArgs& a) {
+            TexImage& out = a.Out(0, 1);
+            const TerrainSource* t = a.terrain;
+            if (t == nullptr || t->maskWidth < 1 || t->maskHeight < 1 || t->masks.size() < static_cast<std::size_t>(t->maskWidth) * t->maskHeight) {
+              a.warning = "No map open";
+              return;
+            }
+            const int shift = 8 * (std::clamp(a.I(0), 1, 8) - 1);
+            ForRows(a.size, [&](const int y) {
+              for (int x = 0; x < a.size; ++x) {
+                // Bilinear between the mask's texels.
+                const float fx = std::clamp((static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->maskWidth) - 0.5f, 0.0f,
+                                            static_cast<float>(t->maskWidth - 1));
+                const float fy = std::clamp((static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->maskHeight) - 0.5f, 0.0f,
+                                            static_cast<float>(t->maskHeight - 1));
+                const int x0 = static_cast<int>(fx);
+                const int y0 = static_cast<int>(fy);
+                const int x1 = std::min(x0 + 1, t->maskWidth - 1);
+                const int y1 = std::min(y0 + 1, t->maskHeight - 1);
+                const auto m = [&](const int sx, const int sy) {
+                  return static_cast<float>((t->masks[static_cast<std::size_t>(sy) * t->maskWidth + sx] >> shift) & 0xFFU) / 255.0f;
+                };
+                const float tx = fx - static_cast<float>(x0);
+                const float ty = fy - static_cast<float>(y0);
+                out.Pixel(x, y)[0] = Lerp(Lerp(m(x0, y0), m(x1, y0), tx), Lerp(m(x0, y1), m(x1, y1), tx), ty);
+              }
+            });
+          });
+
       add({"TerrainSlope", "Map Slope", "Map", "The open map's steepness: 0 flat, 1 at Steepest degrees and over. Covers the whole map.",
            {},
            {Out("Out", PinType::Grey)},

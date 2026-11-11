@@ -196,4 +196,24 @@ namespace
       }
     }
   }
+  TEST(TextureGraph, MapMaskReadsTheStratumsByte)
+  {
+    NodeGraph graph(TextureNodeTypes());
+    const int mask = graph.AddNode("TerrainMask", 0.0f, 0.0f);
+    ParamValue third;
+    third.value = {3.0f, 0.0f, 0.0f, 0.0f};
+    graph.SetParam(mask, 0, third);
+    TextureGraphEvaluator eval(graph);
+    eval.SetSize(8);
+    auto terrain = std::make_shared<TerrainSource>();
+    terrain->maskWidth = 2;
+    terrain->maskHeight = 1;
+    // Stratum 3 (byte 2): full on the left texel, none on the right; stratum 1 full everywhere (must not show).
+    terrain->masks = {0xFF00FFULL, 0x0000FFULL};
+    eval.SetTerrain(terrain);
+    eval.Evaluate(mask);
+    EXPECT_TRUE(eval.Warning(mask).empty());
+    EXPECT_NEAR(eval.Output(mask, 0)->Pixel(0, 4)[0], 1.0f, 1e-5f);
+    EXPECT_NEAR(eval.Output(mask, 0)->Pixel(7, 4)[0], 0.0f, 1e-5f);
+  }
 } // namespace

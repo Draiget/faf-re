@@ -40,6 +40,10 @@ namespace faf::editor
     int height = 0;
     float units = 1.0f;
     std::vector<float> heights;
+    /** The stratum masks, rows along z: one texel's eight weights in one word, byte k for stratum k + 1 (EdMaskBrush.h). */
+    int maskWidth = 0;
+    int maskHeight = 0;
+    std::vector<std::uint64_t> masks;
   };
 
   /** The texture graph's node types (the palette). The output node is "Output". */

@@ -1675,7 +1675,7 @@ namespace faf::editor
     return true;
   }
 
-  std::shared_ptr<TerrainSource> EdMapScene::TerrainHeights() const
+  std::shared_ptr<TerrainSource> EdMapScene::TerrainHeights()
   {
     const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr || field->width < 2 || field->height < 2) {
@@ -1689,6 +1689,12 @@ namespace faf::editor
     for (std::size_t i = 0; i < terrain->heights.size(); ++i) {
       terrain->heights[i] = static_cast<float>(field->data[i]) / 128.0f;
     }
+    // The stratum masks as painted (read from the map once, then the editor's own).
+    LoadMasks();
+    const EdDocument::MaskGrid& masks = mDocument.Masks();
+    terrain->maskWidth = masks.width;
+    terrain->maskHeight = masks.height;
+    terrain->masks = masks.texels;
     return terrain;
   }
 
