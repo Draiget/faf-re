@@ -495,6 +495,15 @@ namespace faf::editor
     /** Some units were hidden by the Adaptive Map window's lobby preview last frame (shown again when it ends). */
     bool mPreviewCulled = false;
     /** In front of a play: the session's map (given back to the renderer), and whether its interface was drawn. */
+    /** The marker under the cursor (its helper drawn in the hover colour); empty for none. */
+    std::string mHoverMarker;
+
+  public:
+    /** Test runs (`/hovermarker <name>`): the cursor kept on that marker's place on the screen. */
+    void TestHoverMarker(std::string name) { mTestHover = std::move(name); }
+
+  private:
+    std::string mTestHover;
     bool mOverPlay = false;
     moho::CWldMap* mSessionMap = nullptr;
     bool mUiWas = true;

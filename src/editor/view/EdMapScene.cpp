@@ -640,7 +640,50 @@ namespace faf::editor
         }
       }
     }
-    // The Select tool: a ring around what a click would pick (Blender's hover highlight).
+    // `/hovermarker` (test runs): the cursor on that marker, as a real mouse over it would be.
+    if (!mTestHover.empty() && mCamera != nullptr) {
+      if (mTestHover == "near" && !mMarkerSelection.empty()) {
+        // The marker nearest the selected one (on the screen with it), not itself.
+        float sx = 0.0f, sy = 0.0f, sz = 0.0f;
+        for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+          if (marker.name == mMarkerSelection.front()) {
+            (void)ShownMarkerPosition(marker, sx, sy, sz);
+          }
+        }
+        float best = 1e9f;
+        for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+          float x = 0.0f, y = 0.0f, z = 0.0f;
+          // Clear of the selected one's gizmo (8 units), which a cursor on it would pick first.
+          if (marker.name != mMarkerSelection.front() && ShownMarkerPosition(marker, x, y, z) && std::hypot(x - sx, z - sz) > 8.0f &&
+              std::hypot(x - sx, z - sz) < best) {
+            best = std::hypot(x - sx, z - sz);
+            mTestHover = marker.name;
+          }
+        }
+        mMarkerSelection.clear(); // no gizmo over the view (it would take the cursor first)
+      }
+      for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        if (marker.name == mTestHover && ShownMarkerPosition(marker, x, y, z)) {
+          const Wm3::Vector2f at = mCamera->Project(Wm3::Vec3f{x, y, z});
+          mCursor = POINT{static_cast<LONG>(at.x), static_cast<LONG>(at.y)};
+        }
+      }
+    }
+    // The marker under the cursor, drawn in the hover colour next frame (the Select and Markers tools).
+    std::string hoverMarker;
+    if (mTools->MarkersToolActive() && !mDragMarkers && mGizmoDrag == GizmoPart::None && PickGizmo(mCursor) == GizmoPart::None) {
+      float mx = 0.0f;
+      float mz = 0.0f;
+      if (GroundAt(static_cast<float>(mCursor.x), static_cast<float>(mCursor.y), mx, mz)) {
+        const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+        const int hit = PickMarker(mx, mz);
+        if (hit >= 0 && static_cast<std::size_t>(hit) < markers.size()) {
+          hoverMarker = markers[static_cast<std::size_t>(hit)].name;
+        }
+      }
+    }
+    // The Select tool: a ring around what a click would pick (Blender's hover highlight); a marker shows its own helper lit.
     if (mTools->SelectToolActive() && !mDragMarkers && !mDragUnits && !mDragDecals && !mDragSelection && mGizmoDrag == GizmoPart::None &&
         PickGizmo(mCursor) == GizmoPart::None) {
       float hx = 0.0f;
@@ -650,7 +693,13 @@ namespace faf::editor
       constexpr std::uint32_t kHover = 0xE0FFFFFFu;
       const moho::CWldTerrainDecal* const hoverDecal =
         hover.kind == PickKind::Decal && mDocument.Decals() != nullptr ? FindDecal(*mDocument.Decals(), hover.index) : nullptr;
-      if (hoverDecal != nullptr) {
+      if (hover.kind == PickKind::Marker) {
+        // A marker: its own helper drawn in the hover colour (DrawMarkers), no ring round it (user ask 2026-11-11).
+        const std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+        if (hover.index >= 0 && static_cast<std::size_t>(hover.index) < markers.size()) {
+          hoverMarker = markers[static_cast<std::size_t>(hover.index)].name;
+        }
+      } else if (hoverDecal != nullptr) {
         // A decal: its own outline, along the ground.
         float cx[4], cz[4];
         DecalCorners(FootprintOf(*hoverDecal), cx, cz);
@@ -673,6 +722,10 @@ namespace faf::editor
         }
       }
     }
+    if (hoverMarker != mHoverMarker && !hoverMarker.empty() && !mTestHover.empty()) {
+      gpg::Logf("editor: /hovermarker: the cursor is over marker %s", hoverMarker.c_str());
+    }
+    mHoverMarker = std::move(hoverMarker);
     // The play's selected units (in front of a play): a red ring each, and where a drag puts them.
     {
       std::vector<EdTools::ViewRing> live;
@@ -4310,17 +4363,25 @@ namespace faf::editor
       if (!ShownMarkerPosition(marker, x, y, z)) {
         continue;
       }
-      const std::uint32_t color = MarkerColor(marker);
+      // Under the cursor: its helper in the hover colour, drawn twice over (no ring round it; user ask 2026-11-11).
+      const bool hovered = !mHoverMarker.empty() && marker.name == mHoverMarker;
+      const std::uint32_t color = hovered ? 0xFFFFF59Du : MarkerColor(marker);
       // Half a size of n + 0.5: a marker in a cell's middle (where Snap and the game's resources put it) has its
       // square's edges on the grid's lines.
       const float r = start ? 4.5f : (type == "Hydrocarbon" ? 2.5f : 1.5f);
       const float base = y + 0.5f;
       // A square on the ground, square to the grid, and a post above it.
-      batcher.DrawLine(vertex(x - r, base, z - r, color), vertex(x + r, base, z - r, color));
-      batcher.DrawLine(vertex(x + r, base, z - r, color), vertex(x + r, base, z + r, color));
-      batcher.DrawLine(vertex(x + r, base, z + r, color), vertex(x - r, base, z + r, color));
-      batcher.DrawLine(vertex(x - r, base, z + r, color), vertex(x - r, base, z - r, color));
-      batcher.DrawLine(vertex(x, base, z, color), vertex(x, base + (start ? 10.0f : 4.0f), z, color));
+      for (const float grow : {0.0f, hovered ? 0.25f : -1.0f}) {
+        if (grow < 0.0f) {
+          continue;
+        }
+        const float s = r + grow;
+        batcher.DrawLine(vertex(x - s, base, z - s, color), vertex(x + s, base, z - s, color));
+        batcher.DrawLine(vertex(x + s, base, z - s, color), vertex(x + s, base, z + s, color));
+        batcher.DrawLine(vertex(x + s, base, z + s, color), vertex(x - s, base, z + s, color));
+        batcher.DrawLine(vertex(x - s, base, z + s, color), vertex(x - s, base, z - s, color));
+        batcher.DrawLine(vertex(x + grow, base, z, color), vertex(x + grow, base + (start ? 10.0f : 4.0f), z, color));
+      }
       if (std::find(mMarkerSelection.begin(), mMarkerSelection.end(), marker.name) != mMarkerSelection.end()) {
         constexpr std::uint32_t kSelected = 0xF0FFE040u;
         for (int s = 0; s < 20; ++s) {

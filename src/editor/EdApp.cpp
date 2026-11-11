@@ -2195,6 +2195,12 @@ namespace faf::editor
             tools.SetGridStep(static_cast<float>(std::atof(step[0].c_str())));
           }
         }
+        if (fa::vector<fa::string> hover; !mFrameMarkerArg.empty() && moho::CFG_GetArgOption("/hovermarker", 1, &hover) && !hover.empty()) {
+          // `/hovermarker <name>` (test runs, with /framemarker): the cursor kept on that marker ("Mass+08" for "Mass 08").
+          std::string name = hover[0].c_str();
+          std::replace(name.begin(), name.end(), '+', ' ');
+          mScene.TestHoverMarker(name);
+        }
         if (!mFrameMarkerArg.empty()) {
           const std::size_t at = mFrameMarkerArg.find('@');
           mScene.FrameMarker(mFrameMarkerArg.substr(0, at),
