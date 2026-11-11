@@ -5670,18 +5670,19 @@ namespace faf::editor
       if (lod == nullptr) {
         return;
       }
-      const bool alphaTested = std::string(lod->mShaderName.c_str()).find("Alpha") != std::string::npos;
+      // A swaying prop (UndulatingNormalMappedAlpha: the trees) gets the swaying shell and redraw, so they move with
+      // it; its shell a hairline (each leaf card gets a rim; a wide rim on every card painted a tree group amber).
+      const std::string shader = lod->mShaderName.c_str();
+      const bool alphaTested = shader.find("Alpha") != std::string::npos;
+      const bool sways = shader.find("Undulating") != std::string::npos;
+      const char* const shellTechnique = sways ? "EditorOutlineAlphaSway"
+        : alphaTested                          ? "EditorOutlineAlpha"
+                                               : "EditorOutline";
       const boost::shared_ptr<moho::MeshMaterial> hull = moho::MeshMaterial::Create(
-        fa::string(alphaTested ? "EditorOutlineAlpha" : "EditorOutline"),
-        lod->mAlbedoName,
-        fa::string(),
-        fa::string(),
-        fa::string(),
-        fa::string(),
-        nullptr
+        fa::string(shellTechnique), lod->mAlbedoName, fa::string(), fa::string(), fa::string(), fa::string(), nullptr
       );
       const boost::shared_ptr<moho::MeshMaterial> over = moho::MeshMaterial::Create(
-        fa::string("EditorPropOver"),
+        fa::string(sways ? "EditorPropOverSway" : "EditorPropOver"),
         lod->mAlbedoName,
         lod->mNormalsName,
         lod->mSpecularName,
@@ -5699,11 +5700,11 @@ namespace faf::editor
         return;
       }
       gpg::Logf(
-        "editor: prop %d outlined (%s, shader %s%s)",
+        "editor: prop %d outlined (%s, shader %s: %s)",
         wanted,
         entry.mBlueprintPath.c_str(),
-        lod->mShaderName.c_str(),
-        alphaTested ? ", cut out by its albedo" : ""
+        shader.c_str(),
+        shellTechnique
       );
     }
     for (moho::MeshInstance* const instance : {mHighlight, mHighlightOver}) {

@@ -131,8 +131,6 @@ technique TMsdfText
      */
     constexpr const char kEditorOutlineSource[] = R"fx(
 
-static const float EditorOutlineWidth = 0.002;
-
 VERTEXNORMAL_VERTEX EditorOutlineVS(
     float3 position : POSITION0,
     float3 normal : NORMAL0,
@@ -146,7 +144,9 @@ VERTEXNORMAL_VERTEX EditorOutlineVS(
     float3 row3 : TEXCOORD4,
     anim_t anim : TEXCOORD5,
     float4 material : TEXCOORD6,
-    float4 color : COLOR0
+    float4 color : COLOR0,
+    uniform float width,
+    uniform bool sway
 )
 {
     VERTEXNORMAL_VERTEX vertex = (VERTEXNORMAL_VERTEX)0;
@@ -154,9 +154,14 @@ VERTEXNORMAL_VERTEX EditorOutlineVS(
     int bone = anim.y + boneIndex[0];
     float4x4 worldMatrix = ComputeWorldMatrix( bone, row0, row1, row2, row3);
     float4 world = mul( float4(position,1), worldMatrix);
+    if (sway) {
+        // UndulatingNormalMappedVS's wind, so the shell moves with a swaying tree.
+        float sinSq = sin( 0.05 * time - dot(windDirection, row3.xyz));
+        world.xyz += 0.003 * position.y * sinSq * sinSq * windDirection;
+    }
     float3 worldNormal = normalize( mul( normal, (float3x3)worldMatrix));
     float distance = abs( mul( world, viewMatrix).z);
-    world.xyz += worldNormal * distance * EditorOutlineWidth;
+    world.xyz += worldNormal * distance * width;
     vertex.position = mul( world, mul( viewMatrix, projMatrix));
     vertex.texcoord0 = texcoord0;
     vertex.color = color;
@@ -191,7 +196,43 @@ technique EditorOutline_HighFidelity
         AlphaState( AlphaBlend_Disable_Write_RGB )
         RasterizerState( Rasterizer_Cull_CW )
         DepthState( Depth_Disable )
-        VertexShader = compile vs_1_1 EditorOutlineVS();
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.002, false);
+        PixelShader = compile ps_2_0 EditorOutlinePS();
+    }
+}
+
+technique EditorOutline_MedFidelity
+<
+    int fidelity = FIDELITY_MEDIUM;
+    string abstractTechnique = "EditorOutline";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.002, false);
+        PixelShader = compile ps_2_0 EditorOutlinePS();
+    }
+}
+
+technique EditorOutline_LowFidelity
+<
+    int fidelity = FIDELITY_LOW;
+    string abstractTechnique = "EditorOutline";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.002, false);
         PixelShader = compile ps_2_0 EditorOutlinePS();
     }
 }
@@ -214,26 +255,8 @@ technique EditorOutlineAlpha_HighFidelity
         AlphaRef = 0x80;
         AlphaFunc = Greater;
 #endif
-        VertexShader = compile vs_1_1 EditorOutlineVS();
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.002, false);
         PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
-    }
-}
-
-technique EditorOutline_MedFidelity
-<
-    int fidelity = FIDELITY_MEDIUM;
-    string abstractTechnique = "EditorOutline";
-    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
-    int parameter = PARAM_FRACTIONCOMPLETE;
->
-{
-    pass P0
-    {
-        AlphaState( AlphaBlend_Disable_Write_RGB )
-        RasterizerState( Rasterizer_Cull_CW )
-        DepthState( Depth_Disable )
-        VertexShader = compile vs_1_1 EditorOutlineVS();
-        PixelShader = compile ps_2_0 EditorOutlinePS();
     }
 }
 
@@ -255,26 +278,8 @@ technique EditorOutlineAlpha_MedFidelity
         AlphaRef = 0x80;
         AlphaFunc = Greater;
 #endif
-        VertexShader = compile vs_1_1 EditorOutlineVS();
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.002, false);
         PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
-    }
-}
-
-technique EditorOutline_LowFidelity
-<
-    int fidelity = FIDELITY_LOW;
-    string abstractTechnique = "EditorOutline";
-    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
-    int parameter = PARAM_FRACTIONCOMPLETE;
->
-{
-    pass P0
-    {
-        AlphaState( AlphaBlend_Disable_Write_RGB )
-        RasterizerState( Rasterizer_Cull_CW )
-        DepthState( Depth_Disable )
-        VertexShader = compile vs_1_1 EditorOutlineVS();
-        PixelShader = compile ps_2_0 EditorOutlinePS();
     }
 }
 
@@ -296,7 +301,76 @@ technique EditorOutlineAlpha_LowFidelity
         AlphaRef = 0x80;
         AlphaFunc = Greater;
 #endif
-        VertexShader = compile vs_1_1 EditorOutlineVS();
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.002, false);
+        PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
+    }
+}
+
+technique EditorOutlineAlphaSway_HighFidelity
+<
+    int fidelity = FIDELITY_HIGH;
+    string abstractTechnique = "EditorOutlineAlphaSway";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.0007, true);
+        PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
+    }
+}
+
+technique EditorOutlineAlphaSway_MedFidelity
+<
+    int fidelity = FIDELITY_MEDIUM;
+    string abstractTechnique = "EditorOutlineAlphaSway";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.0007, true);
+        PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
+    }
+}
+
+technique EditorOutlineAlphaSway_LowFidelity
+<
+    int fidelity = FIDELITY_LOW;
+    string abstractTechnique = "EditorOutlineAlphaSway";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.0007, false);
         PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
     }
 }
@@ -354,6 +428,76 @@ technique EditorPropOver_LowFidelity
 <
     int fidelity = FIDELITY_LOW;
     string abstractTechnique = "EditorPropOver";
+    int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 VertexNormalVS();
+        PixelShader = compile ps_2_0 VertexNormalPS_LowFidelity( true, d3d_Greater, 0x80 );
+    }
+}
+
+// The swaying props (UndulatingNormalMappedAlpha: the trees) drawn again the same way, swaying as they do.
+technique EditorPropOverSway_HighFidelity
+<
+    int fidelity = FIDELITY_HIGH;
+    string abstractTechnique = "EditorPropOverSway";
+    int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 UndulatingNormalMappedVS();
+        PixelShader = compile ps_2_a NormalMappedPS(false,false,true,  true, d3d_Greater, 0x80 );
+    }
+}
+
+technique EditorPropOverSway_MedFidelity
+<
+    int fidelity = FIDELITY_MEDIUM;
+    string abstractTechnique = "EditorPropOverSway";
+    int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 UndulatingNormalMappedVS();
+        PixelShader = compile ps_2_a NormalMappedPS(false,false,false,  true, d3d_Greater, 0x80 );
+    }
+}
+
+technique EditorPropOverSway_LowFidelity
+<
+    int fidelity = FIDELITY_LOW;
+    string abstractTechnique = "EditorPropOverSway";
     int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
     int parameter = PARAM_FRACTIONCOMPLETE;
 >
@@ -1003,7 +1147,13 @@ technique EditorPropOver_LowFidelity
                 "EditorOutlineAlpha_LowFidelity",
                 "EditorPropOver_HighFidelity",
                 "EditorPropOver_MedFidelity",
-                "EditorPropOver_LowFidelity"}) {
+                "EditorPropOver_LowFidelity",
+                "EditorOutlineAlphaSway_HighFidelity",
+                "EditorOutlineAlphaSway_MedFidelity",
+                "EditorOutlineAlphaSway_LowFidelity",
+                "EditorPropOverSway_HighFidelity",
+                "EditorPropOverSway_MedFidelity",
+                "EditorPropOverSway_LowFidelity"}) {
             if (program == nullptr || !program->TechniqueCompiles(name)) {
               throw std::runtime_error(
                 std::string("technique ") + name + " did not compile (see the shader messages above)"
