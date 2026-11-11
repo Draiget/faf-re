@@ -1573,6 +1573,74 @@ namespace faf::editor
               step = 3;
             }
           }
+          // `/playridgetest` (test runs, with /playeditorview; `/playnopathdirty` to compare): in the editor's view, a
+          // steep ridge raised 35 units east of the first commander, 70 units long north to south; then the commander
+          // ordered to a point 70 units east, and where it is logged every 2 s (WPE.47: the path clusters redone over
+          // new ground).
+          if (moho::CFG_GetArgOption("/playridgetest", 0, nullptr) && mScene.OverPlay()) {
+            SetLiveHeightsNoPathDirty(moho::CFG_GetArgOption("/playnopathdirty", 0, nullptr));
+            static int step = 0;
+            static double stepAt = 0.0;
+            static float x = 0.0f;
+            static float z = 0.0f;
+            static std::uint32_t unitId = 0;
+            if (step == 0) {
+              for (const LiveUnit& u : mScene.LiveNow()) {
+                if (u.blueprint.find("0001") != std::string::npos && step == 0) {
+                  unitId = u.id;
+                  x = u.x;
+                  z = u.z;
+                  step = 1;
+                  stepAt = now + 1.0;
+                }
+              }
+            } else if (step == 1 && now >= stepAt) {
+              // `/playridgeoff`: no ridge, the route the commander takes over the map as it is (the control).
+              for (int k = -4; k <= 4 && !moho::CFG_GetArgOption("/playridgeoff", 0, nullptr); ++k) {
+                (void)mScene.TestRaise(x + 35.0f, z + static_cast<float>(k) * 8.0f, 1.5f);
+              }
+              gpg::Logf(
+                "editor: ridge test: a ridge at x %.0f from z %.0f to %.0f (path clusters %s)",
+                static_cast<double>(x + 35.0f),
+                static_cast<double>(z - 32.0f),
+                static_cast<double>(z + 32.0f),
+                moho::CFG_GetArgOption("/playnopathdirty", 0, nullptr) ? "left as they were" : "redone"
+              );
+              step = 2;
+              stepAt = now + 2.0;
+            } else if (step == 2 && now >= stepAt) {
+              char lua[200];
+              std::snprintf(
+                lua,
+                sizeof(lua),
+                "IssueClearCommands({u}) IssueMove({u}, {%.1f, GetTerrainHeight(%.1f, %.1f), %.1f})",
+                static_cast<double>(x + 70.0f),
+                static_cast<double>(x + 70.0f),
+                static_cast<double>(z),
+                static_cast<double>(z)
+              );
+              LiveUnitDo(unitId, lua);
+              step = 3;
+              stepAt = now + 2.0;
+            } else if (step >= 3 && step < 18 && now >= stepAt) {
+              for (const LiveUnit& u : LiveUnits()) {
+                if (u.id == unitId) {
+                  gpg::Logf(
+                    "editor: ridge test: %.0f s: the commander at %.1f,%.1f (%.1f east, %.1f off the line; target %.1f "
+                    "east)",
+                    static_cast<double>((step - 2) * 2),
+                    static_cast<double>(u.x),
+                    static_cast<double>(u.z),
+                    static_cast<double>(u.x - x),
+                    static_cast<double>(u.z - z),
+                    70.0
+                  );
+                }
+              }
+              ++step;
+              stepAt = now + 2.0;
+            }
+          }
           // `/playheighttest` (test runs, with /playeditorview): in the editor's view, a raise under the first commander,
           // then the sim's own terrain height there and the commander's height read through its Lua (WPE.40: the play's
           // sim takes it; WPE.47: the commander stands on the new ground).

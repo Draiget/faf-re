@@ -35,4 +35,7 @@ namespace faf::editor
   void LiveWaterLevels(bool enabled, float elevation, float deep, float abyss);
   /** Test runs (`/playnoreseat`): the play's units left where they were on changed ground, to compare against. */
   void SetLiveHeightsNoReseat(bool off) noexcept;
+  /** Test runs (`/playnopathdirty`): the play's path clusters left as they were over changed ground, to compare
+   * against. */
+  void SetLiveHeightsNoPathDirty(bool off) noexcept;
 } // namespace faf::editor

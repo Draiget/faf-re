@@ -33,6 +33,7 @@ namespace faf::editor
     std::mutex gMutex;
     std::vector<Patch> gQueue;
     bool gNoReseat = false;
+    bool gNoPathDirty = false;
 
     /** Water levels for the sim, waiting for its next beat. */
     struct WaterLevels
@@ -113,7 +114,7 @@ namespace faf::editor
         area.x1 = std::max(area.x1, patch.rect.x1);
         area.z1 = std::max(area.z1, patch.rect.z1);
       }
-      if (sim.mPathTables != nullptr) {
+      if (sim.mPathTables != nullptr && !gNoPathDirty) {
         // A footprint's slope check reaches a few cells past the cell it stands on.
         constexpr int kPad = 4;
         sim.mPathTables->DirtyClusters(gpg::Rect2i{std::max(0, area.x0 - kPad), std::max(0, area.z0 - kPad),
@@ -141,10 +142,23 @@ namespace faf::editor
           ++reseated;
         }
       }
-      gpg::Logf("editor: %zu height rectangles (%zu samples) into the play's sim; its height at %.0f,%.0f %.2f -> %.2f; %d units re-seated, "
-                "path clusters in %d,%d..%d,%d redone",
-                patches.size(), samples, static_cast<double>(cx), static_cast<double>(cz), static_cast<double>(before),
-                static_cast<double>(field->GetElevation(cx, cz)), reseated, area.x0, area.z0, area.x1, area.z1);
+      gpg::Logf(
+        "editor: %zu height rectangles (%zu samples) into the play's sim; its height at %.0f,%.0f %.2f -> %.2f; %d "
+        "units re-seated, "
+        "path clusters in %d,%d..%d,%d %s",
+        patches.size(),
+        samples,
+        static_cast<double>(cx),
+        static_cast<double>(cz),
+        static_cast<double>(before),
+        static_cast<double>(field->GetElevation(cx, cz)),
+        reseated,
+        area.x0,
+        area.z0,
+        area.x1,
+        area.z1,
+        gNoPathDirty ? "left as they were" : "redone"
+      );
     }
   } // namespace
 
@@ -205,6 +219,13 @@ namespace faf::editor
   void SetLiveHeightsNoReseat(const bool off) noexcept
   {
     gNoReseat = off;
+  }
+
+  void SetLiveHeightsNoPathDirty(
+    const bool off
+  ) noexcept
+  {
+    gNoPathDirty = off;
   }
 
   void DropLiveHeights()
