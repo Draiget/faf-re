@@ -107,7 +107,7 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--pose-budget-kbps <n>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy] "
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n> [--start-when-ready <seconds>]] [--lobby-away-seconds <n>] [--stats-every <beats>] [--pose-budget-kbps <n>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy] "
     "[--control <ip:port> --control-key <file>] [--rest <ip:port> --rest-token-file <file> [--rest-cors-origin <origin>]] "
     "[--checksum-period <beats>] [--digests <file>] [--state-digests <file>]\n";
 
@@ -572,6 +572,7 @@ namespace
     std::optional<double> awayPauseSeconds;  // each player's pause while away (`--away-pause-seconds`)
     std::optional<double> lobbyAwaySeconds;  // the logical host's succession (`--lobby-away-seconds`)
     std::optional<double> observerDelaySeconds; // plan WP13.1: how far behind the game observers watch
+    std::optional<double> startWhenReadySeconds; // plan WP17.12: once every player is ready, start after this (`--start-when-ready`)
     bool fixedSpeed = false;                 // nobody changes the game speed
     bool noCheats = false;                   // `CheatsEnabled` is "false", whatever a host or organiser sets
     std::string defeatedPlayerView;          // plan WP13.4: "observe" (as the original game) or "disconnect" (`--defeated-view`)
@@ -614,7 +615,7 @@ namespace
     };
     if (!(seconds("ReconnectSeconds", matchRules.reconnectSeconds) && seconds("AwayPauseSeconds", matchRules.awayPauseSeconds) &&
           seconds("LobbyAwaySeconds", matchRules.lobbyAwaySeconds) && seconds("ObserverDelaySeconds", matchRules.observerDelaySeconds) &&
-          flag("FixedSpeed", matchRules.fixedSpeed) && flag("NoCheats", matchRules.noCheats))) {
+          seconds("StartWhenReadySeconds", matchRules.startWhenReadySeconds) && flag("FixedSpeed", matchRules.fixedSpeed) && flag("NoCheats", matchRules.noCheats))) {
       return false;
     }
     if (const LuaPlus::LuaObject version = table["GameVersion"]; !version.IsNil()) {
@@ -1080,6 +1081,16 @@ namespace
     if (!awayPauseGiven && matchRules.awayPauseSeconds) {
       awayPauseSeconds = *matchRules.awayPauseSeconds;
     }
+    // Plan WP17.12: start the lobby's game once every player is ready, after this many seconds (0: off). The flag wins.
+    double startWhenReadySeconds = matchRules.startWhenReadySeconds.value_or(0.0);
+    if (ReadOption("--start-when-ready", text)) {
+      startWhenReadySeconds = std::atof(text.c_str());
+      if (startWhenReadySeconds < 0.0 || startWhenReadySeconds > 3600.0) {
+        end.error = "--start-when-ready takes seconds, 0 to 3600, not " + text;
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+    }
     if (!defeatedViewGiven) {
       defeatedView = matchRules.defeatedPlayerView.empty() ? "observe" : matchRules.defeatedPlayerView;
     } else if (defeatedView != "observe" && defeatedView != "disconnect") {
@@ -1474,6 +1485,12 @@ namespace
         bool launched = false;
         std::int32_t lastHost = signaller.Host();
         const int forceStartsBefore = gForceStartRequests;
+        // Plan WP17.12: each participant's last ready state, and when the countdown that starts the game ends.
+        std::map<std::int32_t, bool> readyOf;
+        std::optional<Clock::time_point> countdownEnd;
+        if (startWhenReadySeconds > 0.0) {
+          Say("Lobby: the game starts %.0f s after every player is ready", startWhenReadySeconds);
+        }
         // Plan WP2.14: what the host's launch is checked against. The match file's configuration stays the one the
         // game starts with (plan WPR.55: the clients' launch comes from the server, never from the lobby's message).
         const faf::server::SLaunchFacts matchFacts = ReadLaunchFacts(config);
@@ -1610,7 +1627,14 @@ namespace
             control->Poll(requests, ControlNowUs());
             for (const faf::server::SControlRequest& request : requests) {
               if (request.op == "status") {
-                control->Reply(request.id, "\"phase\":\"lobby\",\"host\":" + std::to_string(signaller.Host()) + "," + controlSeats());
+                std::string countdown = ",\"start_when_ready_seconds\":" + std::to_string(static_cast<int>(startWhenReadySeconds));
+                if (countdownEnd) {
+                  const double left = std::max(0.0, std::chrono::duration<double>(*countdownEnd - Clock::now()).count());
+                  char text[32];
+                  std::snprintf(text, sizeof(text), "%.1f", left);
+                  countdown += ",\"countdown_seconds\":" + std::string(text);
+                }
+                control->Reply(request.id, "\"phase\":\"lobby\",\"host\":" + std::to_string(signaller.Host()) + countdown + "," + controlSeats());
               } else if (request.op == "set_options") {
                 // Plan WP17.2: an organised lobby's options from the organiser: the launch, the pins, and the players' screens.
                 const std::vector<std::pair<std::string, std::string>> pairs = OptionPairs(request.options);
@@ -1769,10 +1793,41 @@ namespace
             }
             controlNews();
           }
-          if (control) {
-            // Plan WP17.2: who readied up or stood down in the lobby.
-            for (const auto& [uid, ready] : net->TakeReadyChanges()) {
-              controlEvent("ready", "\"uid\":" + std::to_string(uid) + ",\"ready\":" + (ready ? "true" : "false"));
+          // Plan WP17.2: who readied up or stood down in the lobby (kept for WP17.12's countdown).
+          for (const auto& [uid, ready] : net->TakeReadyChanges()) {
+            readyOf[uid] = ready;
+            controlEvent("ready", "\"uid\":" + std::to_string(uid) + ",\"ready\":" + (ready ? "true" : "false"));
+          }
+          // Plan WP17.12: every player of the match in the lobby and ready starts the countdown; anyone leaving or
+          // standing down before it ends stops it; at its end the match starts as the operator's force start does.
+          if (startWhenReadySeconds > 0.0 && !launched) {
+            const std::vector<std::int32_t> inLobby = signaller.InLobbyUids();
+            std::string waitingFor;
+            for (const moho::SLaunchClient& client : roster.Remotes()) {
+              if (client.uid == signaller.Host()) {
+                continue; // as in FAF's lobby, the host has no Ready: it is the one who launches once the others are
+              }
+              const bool in = std::find(inLobby.begin(), inLobby.end(), client.uid) != inLobby.end();
+              const auto ready = readyOf.find(client.uid);
+              if (!in || ready == readyOf.end() || !ready->second) {
+                waitingFor = std::string(client.name.c_str()) + (in ? " isn't ready" : " isn't in the lobby");
+                break;
+              }
+            }
+            const bool everyoneReady = waitingFor.empty() && roster.Remotes().size() > 1u;
+            if (everyoneReady && !countdownEnd) {
+              countdownEnd = Clock::now() + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(startWhenReadySeconds));
+              Say("Lobby: every player is ready; the game starts in %.0f s", startWhenReadySeconds);
+              controlEvent("countdown", "\"seconds\":" + std::to_string(static_cast<int>(startWhenReadySeconds)));
+            } else if (!everyoneReady && countdownEnd) {
+              countdownEnd.reset();
+              Say("Lobby: the countdown stops: %s", waitingFor.c_str());
+              controlEvent("countdown_cancelled", "\"reason\":" + faf::server::JsonString(waitingFor));
+            }
+            if (countdownEnd && Clock::now() >= *countdownEnd) {
+              Say("Lobby: the countdown ended; the match starts as the match file says");
+              controlEvent("launched", "\"by\":\"ready\"");
+              launched = true;
             }
           }
           std::this_thread::sleep_for(std::chrono::milliseconds(20));
