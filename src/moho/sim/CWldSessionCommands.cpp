@@ -1362,8 +1362,62 @@ namespace moho
   )
   {
     CWldSession* const session = WLD_GetActiveSession();
+
+    if (IsFactoryPreOrdersEnabled()) {
+      auto& pfm = PlannedFactoryManager::Get();
+      for (UserUnit* const unit : units) {
+        if (unit != nullptr && pfm.IsPlannedProxyUnit(unit)) {
+          if (auto* proxy = pfm.FindByUserUnit(unit)) {
+            RallyPointOrder rallyOrder{};
+            rallyOrder.commandType = commandIssueData.mCommandType;
+            rallyOrder.targetType = commandIssueData.mTarget.mType;
+            rallyOrder.targetEntityId = commandIssueData.mTarget.mEnt;
+            if (commandIssueData.mTarget.mType == EAiTargetType::AITARGET_Entity) {
+              if (session != nullptr) {
+                if (UserEntity* const targetEntity = session->LookupEntityId(static_cast<EntId>(commandIssueData.mTarget.mEnt))) {
+                  rallyOrder.position = Vector3f{
+                    targetEntity->mVariableData.mCurTransform.pos_.x,
+                    targetEntity->mVariableData.mCurTransform.pos_.y,
+                    targetEntity->mVariableData.mCurTransform.pos_.z
+                  };
+                }
+              }
+            } else {
+              rallyOrder.position = Vector3f{
+                commandIssueData.mTarget.mPos.x,
+                commandIssueData.mTarget.mPos.y,
+                commandIssueData.mTarget.mPos.z
+              };
+            }
+            proxy->AddRallyOrder(rallyOrder, clearQueue);
+            gpg::Logf("[PlannedFactory] Recorded rally point (%.1f, %.1f, %.1f) for proxy %u (clear=%d)",
+                      rallyOrder.position.x, rallyOrder.position.y, rallyOrder.position.z,
+                      proxy->mProxyId, clearQueue ? 1 : 0);
+          }
+        }
+      }
+    }
+
+    gpg::fastvector<UserUnit*> realUnits;
+    if (IsFactoryPreOrdersEnabled()) {
+      auto& pfm = PlannedFactoryManager::Get();
+      for (UserUnit* const unit : units) {
+        if (unit != nullptr && !pfm.IsPlannedProxyUnit(unit)) {
+          realUnits.push_back(unit);
+        }
+      }
+    } else {
+      realUnits = units;
+    }
+
+    if (session == nullptr || session->mCommandManager == nullptr) {
+      return;
+    }
+
     CommandManager* const commandManager = session->mCommandManager;
-    STIMap* const playableMap = session->mWldMap->mTerrainRes->mMap;
+    STIMap* const playableMap = (session->mWldMap != nullptr && session->mWldMap->mTerrainRes != nullptr)
+      ? session->mWldMap->mTerrainRes->mMap
+      : nullptr;
 
     std::uint32_t packedCommandId = 0u;
     commandIssueData.nextCommandId =
@@ -1411,23 +1465,45 @@ namespace moho
       }
     }
 
-    BVSet<EntId, EntIdUniverse> issuedEntitySet{};
-    func_DecodeEntIdSet(issuedEntitySet, units);
-    // The returned execution beat expires local edits and retires the helper;
-    // the packed command id remains in the published descriptor.
-    const CmdId issueBeat = sSimDriver->IssueFactoryCommand(issuedEntitySet, commandIssueData, clearQueue);
+    CmdId issueBeat = 0;
+    if (!realUnits.empty()) {
+      BVSet<EntId, EntIdUniverse> issuedEntitySet{};
+      func_DecodeEntIdSet(issuedEntitySet, realUnits);
+      issueBeat = sSimDriver->IssueFactoryCommand(issuedEntitySet, commandIssueData, clearQueue);
+    } else {
+      issueBeat = static_cast<CmdId>(session->mGameTick);
+    }
 
     SSTICommandConstantData commandConstantData{};
     InitializePublishedCommandDescriptorFromIssueData(&commandConstantData, &commandIssueData);
 
+    const std::uint8_t deleteWhenDue = realUnits.empty() ? 0u : 1u;
     UserCommandIssueHelper* const commandHelper =
-      FindOrCreateCommandIssueHelper(*commandManager, commandConstantData, 1u, issueBeat);
+      FindOrCreateCommandIssueHelper(*commandManager, commandConstantData, deleteWhenDue, issueBeat);
     commandHelper->mVariableData = SSTICommandVariableData(commandIssueData);
     commandHelper->mVariableDataDirty = 1u;
+    if (realUnits.empty()) {
+      commandHelper->mDeleteWhenDue = 0u;
+    }
 
     for (UserUnit* const unit : units) {
       UserCommandQueue* const factoryQueue = unit->GetFactoryCommandQueue();
       if (factoryQueue == nullptr) {
+        continue;
+      }
+
+      if (IsFactoryPreOrdersEnabled() && PlannedFactoryManager::Get().IsPlannedProxyUnit(unit)) {
+        if (clearQueue) {
+          for (const auto& link : factoryQueue->primaryLinks) {
+            if (UserCommandIssueHelper* const oldHelper = link.GetObjectPtr()) {
+              delete oldHelper;
+            }
+          }
+          factoryQueue->primaryLinks.clear();
+          factoryQueue->issueQueue.clear();
+        }
+        factoryQueue->primaryLinks.push_back(WeakPtr<UserCommandIssueHelper>(commandHelper));
+        factoryQueue->resolvedLinksDirty = 1u;
         continue;
       }
 
@@ -3250,7 +3326,8 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
     if (const UserUnit* const u = hoverEntity->IsUserUnit()) {
       if (PlannedFactoryManager::Get().IsPlannedProxyUnit(u)) {
         if (const auto* proxy = PlannedFactoryManager::Get().FindByUserUnit(u)) {
-          if (proxy->mBuilderEntityId != 0) {
+          const bool canAssist = (selectionCommandCaps & RULEUCC_Repair) != 0;
+          if (canAssist && proxy->mBuilderEntityId != 0 && wldSession->LookupEntityId(static_cast<EntId>(proxy->mBuilderEntityId)) != nullptr) {
             hoverEntity = wldSession->LookupEntityId(static_cast<EntId>(proxy->mBuilderEntityId));
           } else {
             hoverEntity = nullptr;

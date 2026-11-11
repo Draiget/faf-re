@@ -21,6 +21,19 @@ namespace moho
   using CCamera = GeomCamera3;
   class CUIWorldView;
   class UserUnit;
+  enum class EUnitCommandType : std::int32_t;
+  enum class EAiTargetType : std::int32_t;
+
+  /**
+   * Represents one factory rally point or waypoint order buffered on a planned proxy.
+   */
+  struct RallyPointOrder
+  {
+    EUnitCommandType commandType;
+    EAiTargetType targetType;
+    Vector3f position{Vector3f::ZERO};
+    std::uint32_t targetEntityId{0};
+  };
 
   /**
    * 3D Ray representation used for picking and hit testing.
@@ -74,6 +87,7 @@ namespace moho
     Vector3f mPosition{Vector3f::ZERO};
 
     std::vector<PreOrder> mPreOrders{};
+    std::vector<RallyPointOrder> mRallyOrders{};
     Vector3f mRallyPoint{Vector3f::ZERO};
     bool mHasRallyPoint{false};
     bool mRepeatBuild{false};
@@ -92,6 +106,7 @@ namespace moho
     void ClearPreOrders();
 
     void SetRallyPoint(const Vector3f& rallyPos);
+    void AddRallyOrder(const RallyPointOrder& order, bool clear = false);
     void ClearRallyPoint();
 
     void SetRepeatBuild(bool repeat);

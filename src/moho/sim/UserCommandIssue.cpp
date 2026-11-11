@@ -761,22 +761,14 @@ namespace moho
             mgr.QueuePlannedFactoryOrders(bpId, 1, clearQueue);
           }
         } else if (data.mCommandType == EUnitCommandType::UNITCOMMAND_Move) {
-          Vector3f rallyPos{Vector3f::ZERO};
-          if (data.mTarget.mType == EAiTargetType::AITARGET_Ground) {
-            rallyPos = Vector3f{data.mTarget.mPos.x, data.mTarget.mPos.y, data.mTarget.mPos.z};
-            mgr.SetSelectedPlannedFactoriesRallyPoint(rallyPos);
-          } else if (data.mTarget.mType == EAiTargetType::AITARGET_Entity) {
-            CWldSession* const currentSession = WLD_GetActiveSession();
-            if (currentSession != nullptr) {
-              if (UserEntity* const targetEntity = currentSession->LookupEntityId(static_cast<EntId>(data.mTarget.mEnt))) {
-                rallyPos = Vector3f{
-                  targetEntity->mVariableData.mCurTransform.pos_.x,
-                  targetEntity->mVariableData.mCurTransform.pos_.y,
-                  targetEntity->mVariableData.mCurTransform.pos_.z
-                };
-                mgr.SetSelectedPlannedFactoriesRallyPoint(rallyPos);
-              }
+          gpg::fastvector<UserUnit*> proxyUnits;
+          for (UserUnit* const u : units) {
+            if (mgr.IsPlannedProxyUnit(u)) {
+              proxyUnits.push_back(u);
             }
+          }
+          if (!proxyUnits.empty()) {
+            ISSUE_FactoryCommand(proxyUnits, data, clearQueue);
           }
         }
       }
@@ -823,7 +815,11 @@ namespace moho
           if (const UserUnit* asUnit = targetEntity->IsUserUnit()) {
             if (moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
               if (const auto* proxy = moho::PlannedFactoryManager::Get().FindByUserUnit(asUnit)) {
-                if (proxy->mBuilderEntityId != 0 && session->LookupEntityId(static_cast<EntId>(proxy->mBuilderEntityId)) != nullptr) {
+                const bool isMoveCommand = (data.mCommandType == EUnitCommandType::UNITCOMMAND_Move ||
+                                            data.mCommandType == EUnitCommandType::UNITCOMMAND_AggressiveMove ||
+                                            data.mCommandType == EUnitCommandType::UNITCOMMAND_FormMove ||
+                                            data.mCommandType == EUnitCommandType::UNITCOMMAND_FormAggressiveMove);
+                if (!isMoveCommand && proxy->mBuilderEntityId != 0 && session->LookupEntityId(static_cast<EntId>(proxy->mBuilderEntityId)) != nullptr) {
                   data.mTarget.mEnt = static_cast<std::int32_t>(proxy->mBuilderEntityId);
                 } else {
                   data.mTarget.mType = EAiTargetType::AITARGET_Ground;

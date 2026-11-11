@@ -1,10 +1,16 @@
 #include <gtest/gtest.h>
 
 #include "moho/console/CConCommand.h"
+#include "moho/command/CommandIssueHelper.h"
+#include "moho/command/CommandManager.h"
+#include "moho/command/SSTICommandIssueData.h"
+#include "moho/command/UserCommandQueue.h"
 #include "moho/render/camera/GeomCamera3.h"
+#include "moho/sim/CWldSession.h"
 #include "moho/sim/PlannedFactoryProxy.h"
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/UserUnit.h"
+#include "moho/unit/core/UserUnitPrivate.h"
 #include "lua/LuaObject.h"
 
 namespace moho
@@ -1188,5 +1194,322 @@ TEST(PlannedFactoryPreOrdersTest, MultiBuilderAssistanceAndRetirementLifecycle)
   EXPECT_EQ(mgr.GetCount(), 0u);
   EXPECT_EQ(mgr.FindByPosition(factoryPos, 1.0f), nullptr);
 
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, PlannedUnitProxyRallyPointOrdersAndChaining)
+{
+  moho::PlannedUnitProxy proxy;
+  proxy.mProxyId = 77;
+
+  EXPECT_FALSE(proxy.mHasRallyPoint);
+  EXPECT_TRUE(proxy.mRallyOrders.empty());
+
+  // 1. Single rally point via SetRallyPoint
+  proxy.SetRallyPoint(moho::Vector3f{100.0f, 0.0f, 200.0f});
+  EXPECT_TRUE(proxy.mHasRallyPoint);
+  EXPECT_FLOAT_EQ(proxy.mRallyPoint.x, 100.0f);
+  EXPECT_FLOAT_EQ(proxy.mRallyPoint.z, 200.0f);
+  ASSERT_EQ(proxy.mRallyOrders.size(), 1u);
+  EXPECT_FLOAT_EQ(proxy.mRallyOrders[0].position.x, 100.0f);
+  EXPECT_FLOAT_EQ(proxy.mRallyOrders[0].position.z, 200.0f);
+
+  // 2. Chained waypoint order (clear = false)
+  moho::RallyPointOrder waypoint2{};
+  waypoint2.commandType = moho::EUnitCommandType::UNITCOMMAND_Move;
+  waypoint2.targetType = moho::EAiTargetType::AITARGET_Ground;
+  waypoint2.position = moho::Vector3f{150.0f, 0.0f, 250.0f};
+  proxy.AddRallyOrder(waypoint2, false);
+
+  EXPECT_TRUE(proxy.mHasRallyPoint);
+  EXPECT_FLOAT_EQ(proxy.mRallyPoint.x, 150.0f);
+  EXPECT_FLOAT_EQ(proxy.mRallyPoint.z, 250.0f);
+  ASSERT_EQ(proxy.mRallyOrders.size(), 2u);
+  EXPECT_FLOAT_EQ(proxy.mRallyOrders[0].position.x, 100.0f);
+  EXPECT_FLOAT_EQ(proxy.mRallyOrders[1].position.x, 150.0f);
+
+  // 3. New rally point resetting queue (clear = true)
+  moho::RallyPointOrder newRally{};
+  newRally.commandType = moho::EUnitCommandType::UNITCOMMAND_Move;
+  newRally.targetType = moho::EAiTargetType::AITARGET_Ground;
+  newRally.position = moho::Vector3f{300.0f, 0.0f, 400.0f};
+  proxy.AddRallyOrder(newRally, true);
+
+  EXPECT_TRUE(proxy.mHasRallyPoint);
+  EXPECT_FLOAT_EQ(proxy.mRallyPoint.x, 300.0f);
+  EXPECT_FLOAT_EQ(proxy.mRallyPoint.z, 400.0f);
+  ASSERT_EQ(proxy.mRallyOrders.size(), 1u);
+  EXPECT_FLOAT_EQ(proxy.mRallyOrders[0].position.x, 300.0f);
+
+  // 4. Clear rally point
+  proxy.ClearRallyPoint();
+  EXPECT_FALSE(proxy.mHasRallyPoint);
+  EXPECT_TRUE(proxy.mRallyOrders.empty());
+  EXPECT_FLOAT_EQ(proxy.mRallyPoint.x, 0.0f);
+}
+
+TEST(PlannedFactoryPreOrdersTest, PlannedFactoryRallyPointDispatchViaHook)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  const moho::Vector3f factoryPos{200.0f, 0.0f, 200.0f};
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(5, 0, nullptr, factoryPos);
+  ASSERT_NE(proxy, nullptr);
+
+  proxy->AddPreOrder("ual0201", 5);
+
+  // Set initial rally point and a chained waypoint
+  moho::RallyPointOrder rally1{};
+  rally1.commandType = moho::EUnitCommandType::UNITCOMMAND_Move;
+  rally1.targetType = moho::EAiTargetType::AITARGET_Ground;
+  rally1.position = moho::Vector3f{250.0f, 0.0f, 220.0f};
+  proxy->AddRallyOrder(rally1, true);
+
+  moho::RallyPointOrder rally2{};
+  rally2.commandType = moho::EUnitCommandType::UNITCOMMAND_Move;
+  rally2.targetType = moho::EAiTargetType::AITARGET_Ground;
+  rally2.position = moho::Vector3f{300.0f, 0.0f, 250.0f};
+  proxy->AddRallyOrder(rally2, false);
+
+  EXPECT_TRUE(proxy->mHasRallyPoint);
+  ASSERT_EQ(proxy->mRallyOrders.size(), 2u);
+
+  bool dispatched = false;
+  std::size_t orderCount = 0;
+  bool hadRally = false;
+  std::size_t rallyOrderCount = 0;
+
+  mgr.SetDispatchHook([&](moho::UserUnit*, const moho::PlannedUnitProxy& p) {
+    dispatched = true;
+    orderCount = p.mPreOrders.size();
+    hadRally = p.mHasRallyPoint;
+    rallyOrderCount = p.mRallyOrders.size();
+  });
+
+  auto* dummyFactory = reinterpret_cast<moho::UserUnit*>(0xFAC70F);
+  EXPECT_TRUE(mgr.DispatchPreOrdersForUnit(dummyFactory, factoryPos));
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(orderCount, 1u);
+  EXPECT_TRUE(hadRally);
+  EXPECT_EQ(rallyOrderCount, 2u);
+
+  mgr.ResetDispatchHook();
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, IssueFactoryCommandDirectProxyInterception)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  const moho::Vector3f factoryPos{50.0f, 0.0f, 50.0f};
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(10, 0, nullptr, factoryPos);
+  ASSERT_NE(proxy, nullptr);
+
+  alignas(moho::UserUnit) std::byte unitStorage[sizeof(moho::UserUnit)]{};
+  auto* testUnit = reinterpret_cast<moho::UserUnit*>(unitStorage);
+  testUnit->mParams.mEntityId = 0x00107001u; // In proxy entity id range
+  proxy->mUserUnit = testUnit;
+
+  EXPECT_FALSE(proxy->mHasRallyPoint);
+  EXPECT_TRUE(proxy->mRallyOrders.empty());
+
+  // 1. Issue first rally point command (clearQueue = true)
+  moho::SSTICommandIssueData rallyCmd1(moho::EUnitCommandType::UNITCOMMAND_Move);
+  rallyCmd1.mTarget.mType = moho::EAiTargetType::AITARGET_Ground;
+  rallyCmd1.mTarget.mPos = {75.0f, 0.0f, 125.0f};
+
+  gpg::fastvector<moho::UserUnit*> units;
+  units.push_back(testUnit);
+
+  moho::ISSUE_FactoryCommand(units, rallyCmd1, /*clearQueue=*/true);
+
+  EXPECT_TRUE(proxy->mHasRallyPoint);
+  EXPECT_FLOAT_EQ(proxy->mRallyPoint.x, 75.0f);
+  EXPECT_FLOAT_EQ(proxy->mRallyPoint.z, 125.0f);
+  ASSERT_EQ(proxy->mRallyOrders.size(), 1u);
+  EXPECT_EQ(proxy->mRallyOrders[0].commandType, moho::EUnitCommandType::UNITCOMMAND_Move);
+  EXPECT_EQ(proxy->mRallyOrders[0].targetType, moho::EAiTargetType::AITARGET_Ground);
+  EXPECT_FLOAT_EQ(proxy->mRallyOrders[0].position.x, 75.0f);
+  EXPECT_FLOAT_EQ(proxy->mRallyOrders[0].position.z, 125.0f);
+
+  // 2. Issue chained waypoint with Shift (clearQueue = false)
+  moho::SSTICommandIssueData rallyCmd2(moho::EUnitCommandType::UNITCOMMAND_Move);
+  rallyCmd2.mTarget.mType = moho::EAiTargetType::AITARGET_Ground;
+  rallyCmd2.mTarget.mPos = {120.0f, 0.0f, 180.0f};
+
+  moho::ISSUE_FactoryCommand(units, rallyCmd2, /*clearQueue=*/false);
+
+  EXPECT_TRUE(proxy->mHasRallyPoint);
+  EXPECT_FLOAT_EQ(proxy->mRallyPoint.x, 120.0f);
+  EXPECT_FLOAT_EQ(proxy->mRallyPoint.z, 180.0f);
+  ASSERT_EQ(proxy->mRallyOrders.size(), 2u);
+  EXPECT_FLOAT_EQ(proxy->mRallyOrders[0].position.x, 75.0f);
+  EXPECT_FLOAT_EQ(proxy->mRallyOrders[1].position.x, 120.0f);
+
+  // 3. Issue new rally point without Shift (clearQueue = true) - must reset queue
+  moho::SSTICommandIssueData rallyCmd3(moho::EUnitCommandType::UNITCOMMAND_Move);
+  rallyCmd3.mTarget.mType = moho::EAiTargetType::AITARGET_Ground;
+  rallyCmd3.mTarget.mPos = {300.0f, 0.0f, 400.0f};
+
+  moho::ISSUE_FactoryCommand(units, rallyCmd3, /*clearQueue=*/true);
+
+  EXPECT_TRUE(proxy->mHasRallyPoint);
+  EXPECT_FLOAT_EQ(proxy->mRallyPoint.x, 300.0f);
+  EXPECT_FLOAT_EQ(proxy->mRallyPoint.z, 400.0f);
+  ASSERT_EQ(proxy->mRallyOrders.size(), 1u);
+  EXPECT_FLOAT_EQ(proxy->mRallyOrders[0].position.x, 300.0f);
+
+  proxy->mUserUnit = nullptr;
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, IssueFactoryCommandDisabledFeatureNoInterception)
+{
+  moho::SetFactoryPreOrdersEnabled(false);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  const moho::Vector3f factoryPos{50.0f, 0.0f, 50.0f};
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(10, 0, nullptr, factoryPos);
+  ASSERT_NE(proxy, nullptr);
+
+  alignas(moho::UserUnit) std::byte unitStorage[sizeof(moho::UserUnit)]{};
+  auto* testUnit = reinterpret_cast<moho::UserUnit*>(unitStorage);
+  testUnit->mParams.mEntityId = 0x00107001u;
+  proxy->mUserUnit = testUnit;
+
+  moho::SSTICommandIssueData rallyCmd(moho::EUnitCommandType::UNITCOMMAND_Move);
+  rallyCmd.mTarget.mType = moho::EAiTargetType::AITARGET_Ground;
+  rallyCmd.mTarget.mPos = {75.0f, 0.0f, 125.0f};
+
+  gpg::fastvector<moho::UserUnit*> units;
+  units.push_back(testUnit);
+
+  // When feature is disabled, proxy must not intercept or store the rally point
+  moho::ISSUE_FactoryCommand(units, rallyCmd, /*clearQueue=*/true);
+
+  EXPECT_FALSE(proxy->mHasRallyPoint);
+  EXPECT_TRUE(proxy->mRallyOrders.empty());
+
+  proxy->mUserUnit = nullptr;
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, PlannedProxyCommandHelperLifetimeNeverExpiresWhenDue)
+{
+  moho::SSTICommandConstantData constData{};
+  constData.cmd = 101;
+  // Helper created for proxy with deleteWhenDue = 0u
+  auto* helper = new moho::UserCommandIssueHelper(constData, /*deleteWhenDue=*/0u, /*dueSeqNo=*/10);
+  EXPECT_EQ(helper->mDeleteWhenDue, 0u);
+  EXPECT_EQ(helper->mDueSeqNo, 10);
+
+  // Advance past dueSeqNo
+  helper->AdvanceLocalEventsToBeat(15);
+  // With deleteWhenDue = 0u, the helper remains valid and is NOT self-deleted.
+  EXPECT_EQ(helper->mConstantData.cmd, 101);
+
+  delete helper;
+}
+
+TEST(PlannedFactoryPreOrdersTest, PlannedProxyFactoryQueuePrimaryLinksRetentionAcrossBeats)
+{
+  moho::UserCommandQueue queue(nullptr);
+  moho::SSTICommandConstantData constData{};
+  constData.cmd = 202;
+  auto* helper = new moho::UserCommandIssueHelper(constData, 0u, 10);
+
+  // Proxy stores helper in primaryLinks
+  queue.primaryLinks.push_back(moho::WeakPtr<moho::UserCommandIssueHelper>(helper));
+  queue.resolvedLinksDirty = 1u;
+
+  EXPECT_EQ(queue.primaryLinks.size(), 1u);
+  EXPECT_TRUE(queue.issueQueue.empty());
+
+  // When issueQueue is empty, queue links resolution yields primaryLinks
+  auto* links = moho::GetUserUnitManagerQueueLinks(&queue);
+  ASSERT_NE(links, nullptr);
+  ASSERT_EQ(links->size(), 1u);
+  EXPECT_EQ((*links)[0].GetObjectPtr(), helper);
+
+  // Dirtying resolvedLinks and re-resolving still yields primaryLinks (not cleared by ticks)
+  queue.resolvedLinksDirty = 1u;
+  links = moho::GetUserUnitManagerQueueLinks(&queue);
+  ASSERT_NE(links, nullptr);
+  ASSERT_EQ(links->size(), 1u);
+  EXPECT_EQ((*links)[0].GetObjectPtr(), helper);
+
+  // Clean up
+  for (const auto& link : queue.primaryLinks) {
+    if (auto* h = link.GetObjectPtr()) {
+      delete h;
+    }
+  }
+  queue.primaryLinks.clear();
+  EXPECT_TRUE(queue.primaryLinks.empty());
+}
+
+TEST(PlannedFactoryPreOrdersTest, PlannedProxyMoveCommandTargetingGroundVsAssist)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  const moho::Vector3f factoryPos{250.0f, 10.0f, 350.0f};
+  const std::uint32_t builderId = 42;
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(builderId, 1, nullptr, factoryPos);
+  ASSERT_NE(proxy, nullptr);
+
+  alignas(moho::UserUnit) std::byte proxyStorage[sizeof(moho::UserUnit)]{};
+  auto* proxyUnit = reinterpret_cast<moho::UserUnit*>(proxyStorage);
+  proxyUnit->mParams.mEntityId = 0x00107005u;
+  proxy->mUserUnit = proxyUnit;
+
+  // 1. Move command: MUST resolve to ground target at proxy's position
+  moho::SSTICommandIssueData moveCmd(moho::EUnitCommandType::UNITCOMMAND_Move);
+  moveCmd.mTarget.mType = moho::EAiTargetType::AITARGET_Entity;
+  moveCmd.mTarget.mEnt = static_cast<std::int32_t>(proxyUnit->mParams.mEntityId);
+
+  const bool isMove = (moveCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_Move ||
+                       moveCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_AggressiveMove ||
+                       moveCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_FormMove ||
+                       moveCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_FormAggressiveMove);
+  EXPECT_TRUE(isMove);
+
+  if (!isMove && proxy->mBuilderEntityId != 0) {
+    moveCmd.mTarget.mEnt = static_cast<std::int32_t>(proxy->mBuilderEntityId);
+  } else {
+    moveCmd.mTarget.mType = moho::EAiTargetType::AITARGET_Ground;
+    moveCmd.mTarget.mPos = {proxy->mPosition.x, proxy->mPosition.y, proxy->mPosition.z};
+  }
+
+  EXPECT_EQ(moveCmd.mTarget.mType, moho::EAiTargetType::AITARGET_Ground);
+  EXPECT_FLOAT_EQ(moveCmd.mTarget.mPos.x, 250.0f);
+  EXPECT_FLOAT_EQ(moveCmd.mTarget.mPos.z, 350.0f);
+
+  // 2. Guard/Repair command: MUST resolve to entity target of builder
+  moho::SSTICommandIssueData guardCmd(moho::EUnitCommandType::UNITCOMMAND_Guard);
+  guardCmd.mTarget.mType = moho::EAiTargetType::AITARGET_Entity;
+  guardCmd.mTarget.mEnt = static_cast<std::int32_t>(proxyUnit->mParams.mEntityId);
+
+  const bool isGuardMove = (guardCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_Move ||
+                            guardCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_AggressiveMove);
+  EXPECT_FALSE(isGuardMove);
+
+  if (!isGuardMove && proxy->mBuilderEntityId != 0) {
+    guardCmd.mTarget.mEnt = static_cast<std::int32_t>(proxy->mBuilderEntityId);
+  } else {
+    guardCmd.mTarget.mType = moho::EAiTargetType::AITARGET_Ground;
+    guardCmd.mTarget.mPos = {proxy->mPosition.x, proxy->mPosition.y, proxy->mPosition.z};
+  }
+
+  EXPECT_EQ(guardCmd.mTarget.mType, moho::EAiTargetType::AITARGET_Entity);
+  EXPECT_EQ(guardCmd.mTarget.mEnt, 42);
+
+  proxy->mUserUnit = nullptr;
   mgr.ClearAll();
 }

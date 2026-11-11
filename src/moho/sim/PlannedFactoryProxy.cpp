@@ -3,7 +3,9 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
 #include "moho/command/CmdDefs.h"
+#include "moho/command/CommandIssueHelper.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/command/UserCommandQueue.h"
 #include "moho/console/CConCommand.h"
 #include "moho/entity/EntityId.h"
 #include "moho/render/camera/GeomCamera3.h"
@@ -22,6 +24,15 @@ namespace moho
   PlannedUnitProxy::~PlannedUnitProxy()
   {
     if (mUserUnit != nullptr) {
+      if (UserCommandQueue* const factoryQueue = mUserUnit->GetFactoryCommandQueue()) {
+        for (const auto& link : factoryQueue->primaryLinks) {
+          if (UserCommandIssueHelper* const helper = link.GetObjectPtr()) {
+            delete helper;
+          }
+        }
+        factoryQueue->primaryLinks.clear();
+        factoryQueue->issueQueue.clear();
+      }
       CWldSession* const session = WLD_GetActiveSession();
       if (session != nullptr) {
         if (session->mSelection.Find(mUserUnit) != session->mSelection.end()) {
@@ -101,12 +112,31 @@ namespace moho
 
   void PlannedUnitProxy::SetRallyPoint(const Vector3f& rallyPos)
   {
+    mRallyOrders.clear();
+    RallyPointOrder order{};
+    order.commandType = EUnitCommandType::UNITCOMMAND_Move;
+    order.targetType = EAiTargetType::AITARGET_Ground;
+    order.position = rallyPos;
+    order.targetEntityId = 0;
+    mRallyOrders.push_back(order);
     mRallyPoint = rallyPos;
+    mHasRallyPoint = true;
+  }
+
+  void PlannedUnitProxy::AddRallyOrder(const RallyPointOrder& order, const bool clear)
+  {
+    if (clear) {
+      mRallyOrders.clear();
+    }
+    mRallyOrders.push_back(order);
+    mRallyPoint = order.position;
     mHasRallyPoint = true;
   }
 
   void PlannedUnitProxy::ClearRallyPoint()
   {
+    mRallyOrders.clear();
+    mRallyPoint = Vector3f{0.0f, 0.0f, 0.0f};
     mHasRallyPoint = false;
   }
 
@@ -849,11 +879,34 @@ namespace moho
       }
     }
 
-    if (proxy->mHasRallyPoint) {
+    if (!proxy->mRallyOrders.empty()) {
+      for (std::size_t i = 0; i < proxy->mRallyOrders.size(); ++i) {
+        const auto& rally = proxy->mRallyOrders[i];
+        gpg::Logf("[PlannedFactory] Dispatching rally order (type=%d, targetType=%d, pos=%.1f, %.1f, %.1f) to completed factory %u",
+                  static_cast<int>(rally.commandType), static_cast<int>(rally.targetType),
+                  rally.position.x, rally.position.y, rally.position.z, unitId);
+        SSTICommandIssueData rallyCommand(rally.commandType);
+        rallyCommand.mTarget.mType = rally.targetType;
+        if (rally.targetType == EAiTargetType::AITARGET_Entity) {
+          if (session != nullptr && session->LookupEntityId(static_cast<EntId>(rally.targetEntityId)) != nullptr) {
+            rallyCommand.mTarget.mEnt = rally.targetEntityId;
+          } else {
+            rallyCommand.mCommandType = EUnitCommandType::UNITCOMMAND_Move;
+            rallyCommand.mTarget.mType = EAiTargetType::AITARGET_Ground;
+            rallyCommand.mTarget.mPos = rally.position;
+          }
+        } else {
+          rallyCommand.mTarget.mPos = rally.position;
+        }
+        ISSUE_FactoryCommand(targetUnits, rallyCommand, i == 0);
+      }
+    } else if (proxy->mHasRallyPoint) {
+      gpg::Logf("[PlannedFactory] Dispatching fallback rally point (%.1f, %.1f, %.1f) to completed factory %u",
+                proxy->mRallyPoint.x, proxy->mRallyPoint.y, proxy->mRallyPoint.z, unitId);
       SSTICommandIssueData rallyCommand(EUnitCommandType::UNITCOMMAND_Move);
       rallyCommand.mTarget.mType = EAiTargetType::AITARGET_Ground;
       rallyCommand.mTarget.mPos = proxy->mRallyPoint;
-      ISSUE_FactoryCommand(targetUnits, rallyCommand, false);
+      ISSUE_FactoryCommand(targetUnits, rallyCommand, true);
     }
 
     if (proxy->mRepeatBuild && session != nullptr) {
