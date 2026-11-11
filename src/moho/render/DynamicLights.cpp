@@ -25,7 +25,7 @@
 namespace moho
 {
   // Engine addition (ren_DynamicLights): see DynamicLights.h.
-  int ren_DynamicLights = 1;
+  int ren_DynamicLights = 0;
   float ren_DynamicLightIntensity = 1.0f;
   float ren_DynamicLightRadius = 1.0f;
   float ren_DynamicLightTest = 0.0f;
@@ -35,7 +35,7 @@ namespace moho
     TConVar<int> gTConVar_ren_DynamicLights(
       "ren_DynamicLights",
       "Direct3D 12 and Vulkan: explosions, muzzle flashes, engines, projectiles and beams light the ground and the units "
-      "around them (from the effects' additive particles and beams). 1 on, 0 off.",
+      "around them (from the effects' additive particles and beams). 1 on, 0 off (default).",
       &ren_DynamicLights
     );
     TConVar<float> gTConVar_ren_DynamicLightIntensity(

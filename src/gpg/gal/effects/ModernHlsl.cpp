@@ -25,7 +25,7 @@ namespace gpg::gal::effects
   std::atomic<bool> gShadowCascadesBlocked{false};
   RayShadowConstants gRayShadows{};
   bool gRayQueryShaders = false;
-  int gRayTracedShadows = 1;
+  int gRayTracedShadows = 0;
 
   std::string_view RayShadowDeclaration() noexcept
   {

@@ -72,7 +72,8 @@ namespace moho
     "ren_RayAo",
     "Direct3D 12 and Vulkan with ray tracing, while ren_RayTracedShadows is on: ambient occlusion by short rays over "
     "the half-sphere above each point (ren_RayAoRays of them, ren_AoRadius long) instead of from the screen's depth, "
-    "so units, buildings and ground off the screen or behind others shade too. 1 on (default), 0 off.",
+    "so units, buildings and ground off the screen or behind others shade too. 1 on (default; nothing while "
+    "ren_RayTracedShadows is off), 0 off.",
     &ren_RayAo
   );
   TConVar<int> gTConVar_ren_RayAoRays("ren_RayAoRays", "Rays per point for ren_RayAo (1-16).", &ren_RayAoRays);

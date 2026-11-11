@@ -134,7 +134,7 @@ namespace moho
       "ren_RayTracedShadows",
       "Direct3D 12 and Vulkan with ray tracing (DXR 1.1 / VK_KHR_ray_query): sun shadows of the ground, units and "
       "buildings by a ray towards the sun from every lit point, instead of the shadow map (trees and other "
-      "alpha-tested meshes stay in the map). 1 on (default), 0 off (live); -1 at startup keeps the device from "
+      "alpha-tested meshes stay in the map). 1 on, 0 off (default, live); -1 at startup keeps the device from "
       "setting ray tracing up at all.",
       &gpg::gal::effects::gRayTracedShadows
     );
