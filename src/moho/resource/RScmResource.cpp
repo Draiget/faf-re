@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <new>
+#include <thread>
 #include <typeinfo>
 
 #include "gpg/core/containers/ReadArchive.h"
@@ -132,7 +133,7 @@ namespace moho
     }
     (void)GetSkeleton();
     const char* const base = reinterpret_cast<const char*>(&file);
-    for (const SAniSkelBone& bone : mSkeleton->mBones) {
+    for (const SAniSkelBone& bone : mSkeleton.load(std::memory_order_acquire)->mBones) {
       if (bone.mBoneName != nullptr && bone.mBoneName + std::strlen(bone.mBoneName) >= base + keptBytes) {
         return; // bone names after the bones
       }
@@ -144,7 +145,7 @@ namespace moho
     trimmed->mVertexCount = 0u;
     trimmed->mIndexCount = 0u;
     const boost::shared_ptr<const SScmFile> trimmedFile(trimmed, &DeleteTrimmedScmFile);
-    mSkeleton->RebindFile(trimmedFile);
+    mSkeleton.load(std::memory_order_acquire)->RebindFile(trimmedFile);
     mFile = trimmedFile;
   }
 
@@ -156,9 +157,19 @@ namespace moho
    */
   RScmResource::~RScmResource()
   {
-    delete mSkeleton;
-    mSkeleton = nullptr;
+    delete mSkeleton.exchange(nullptr, std::memory_order_acq_rel);
   }
+
+  namespace
+  {
+    /// Engine addition: the value `mSkeleton` holds while one thread parses the
+    /// skeleton, so another can tell "not built" from "being built". Never
+    /// dereferenced and never handed to a caller.
+    const char sSkeletonBuildInProgressStorage = 0;
+
+    CAniSkel* const kSkeletonBuildInProgress =
+      reinterpret_cast<CAniSkel*>(const_cast<char*>(&sSkeletonBuildInProgressStorage));
+  } // namespace
 
   /**
    * Address: 0x00538DB0 (FUN_00538DB0,
@@ -166,20 +177,54 @@ namespace moho
    *
    * What it does:
    * Lazily constructs the owned skeleton on first request by parsing this
-   * resource's SCM file into a `CAniResourceSkel` (allocated with
-   * `operator new(0x48)`), then returns one shared handle that aliases this
-   * resource's own shared-control block so the skeleton stays alive for as long
-   * as the returned handle does.
+   * resource's SCM file into a `CAniResourceSkel`, then returns one shared handle
+   * that keeps this resource, and so the skeleton, alive for as long as the
+   * handle lives.
+   *
+   * The build is claimed by one thread through `mSkeleton` itself: null means not
+   * built, the marker means a thread is parsing, anything else is the result. That
+   * keeps two threads from parsing the same file into two skeletons and losing
+   * one, and it publishes with release so a reader never sees a half-built one.
+   * Without it the plain `if (mSkeleton == nullptr)` had both races.
    */
   boost::shared_ptr<const CAniSkel> RScmResource::GetSkeleton()
   {
-    if (mSkeleton == nullptr) {
-      // The binary allocates a 0x48-byte CAniResourceSkel and constructs it
-      // from this resource's name + SCM file, storing it through the CAniSkel*
-      // base pointer lane.
-      CAniSkel* const previousSkeleton = mSkeleton;
-      mSkeleton = new CAniResourceSkel(mName, mFile);
-      delete previousSkeleton;
+    for (;;) {
+      CAniSkel* const current = mSkeleton.load(std::memory_order_acquire);
+      if (current != nullptr && current != kSkeletonBuildInProgress) {
+        break;
+      }
+
+      if (current == kSkeletonBuildInProgress) {
+        // Another thread is parsing this resource's skeleton. Let it finish
+        // rather than parsing it a second time.
+        std::this_thread::yield();
+        continue;
+      }
+
+      CAniSkel* expected = nullptr;
+      if (!mSkeleton.compare_exchange_weak(
+            expected, kSkeletonBuildInProgress, std::memory_order_acq_rel, std::memory_order_acquire
+          )) {
+        // Lost the claim: `expected` holds what the winner stored, and the next
+        // pass either returns that or waits for it.
+        continue;
+      }
+
+      try {
+        // The binary allocates a 0x48-byte CAniResourceSkel and constructs it
+        // from this resource's name + SCM file, storing it through the CAniSkel*
+        // base pointer lane.
+        CAniSkel* const built = new CAniResourceSkel(mName, mFile);
+        mSkeleton.store(built, std::memory_order_release);
+      } catch (...) {
+        // Parsing can fail (the bone tables are resized). Put the slot back to
+        // "not built" before letting the exception out, so the next caller tries
+        // again instead of spinning on a marker no thread will ever clear.
+        mSkeleton.store(nullptr, std::memory_order_release);
+        throw;
+      }
+      break;
     }
 
     struct KeepOwnerAlive
@@ -192,7 +237,7 @@ namespace moho
     };
 
     KeepOwnerAlive keepOwner{shared_from_this()};
-    return boost::shared_ptr<const CAniSkel>(mSkeleton, keepOwner);
+    return boost::shared_ptr<const CAniSkel>(mSkeleton.load(std::memory_order_acquire), keepOwner);
   }
 
   /**

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 
 #include "boost/shared_ptr.h"
@@ -94,9 +95,13 @@ namespace moho
   public:
     fa::string mName;                        // +0x08
     boost::shared_ptr<const SScmFile> mFile; // +0x24
-    CAniSkel* mSkeleton;                     // +0x2C
-    Wm3::AxisAlignedBox3f mBounds;           // +0x30
-    float mSize;                             // +0x48
+    // Engine addition: atomic so the lazy build below can claim it for one
+    // thread. `std::atomic<T*>` has the same size and alignment as `T*` on
+    // every target this builds for, so the +0x2C offset and the 0x4C size
+    // are unchanged.
+    std::atomic<CAniSkel*> mSkeleton; // +0x2C
+    Wm3::AxisAlignedBox3f mBounds;    // +0x30
+    float mSize;                      // +0x48
   };
 
   static_assert(offsetof(RScmResource, mName) == 0x08, "RScmResource::mName offset must be 0x08");
