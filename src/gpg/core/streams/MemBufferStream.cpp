@@ -207,7 +207,7 @@ namespace
   };
 
   MemBufferTypeInfoBootstrap gMemBufferTypeInfoBootstrap;
-}
+} // namespace
 
 /**
  * Address: 0x0094E8A0 (FUN_0094E8A0, MemBufferCharTypeInfo deleting-dtor thunk)

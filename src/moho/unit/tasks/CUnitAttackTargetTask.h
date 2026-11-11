@@ -14,7 +14,7 @@ namespace gpg
 {
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -42,10 +42,7 @@ namespace moho
    * whose recovered stand-in calls `std::terminate()`. Issuing any attack order
    * aborted the process from the sim thread.
    */
-  class CAttackTargetTask
-    : public CCommandTask
-    , public Listener<EAiAttackerEvent>
-    , public Listener<ECommandEvent>
+  class CAttackTargetTask : public CCommandTask, public Listener<EAiAttackerEvent>, public Listener<ECommandEvent>
   {
   public:
     using CCommandTask::CCommandTask;
@@ -57,11 +54,8 @@ namespace moho
      * Chooses melee-vs-ranged attack task allocation from dispatch unit state,
      * then forwards into the corresponding dispatch-bound constructor lane.
      */
-    [[nodiscard]] static CAttackTargetTask* Create(
-      CCommandTask* dispatchTask,
-      CAiTarget* target,
-      CAiFormationInstance* formation
-    );
+    [[nodiscard]] static CAttackTargetTask*
+    Create(CCommandTask* dispatchTask, CAiTarget* target, CAiFormationInstance* formation);
 
     /**
      * Address: 0x005F2750 (FUN_005F2750, Moho::CAttackTargetTask::operator new `_0` overload)
@@ -80,7 +74,6 @@ namespace moho
       CAiFormationInstance* formation,
       bool enableOverchargeWeapon
     );
-
   };
 
   // The base ends here, at +0x50: what used to be 0x40 bytes of padding is the
@@ -273,13 +266,23 @@ namespace moho
      * VFTable SLOT: 0 of `??_7CUnitAttackTargetTask@Moho@@6B?$Listener@W4EAiAttackerEvent@Moho@@@Moho@@@`,
      * installed at +0x34 by the constructor at 0x005F29E5.
      */
-    void OnEvent(EAiAttackerEvent event) override { HandleAiAttackerEvent(event); }
+    void OnEvent(
+      EAiAttackerEvent event
+    ) override
+    {
+      HandleAiAttackerEvent(event);
+    }
 
     /**
      * VFTable SLOT: 0 of `??_7CUnitAttackTargetTask@Moho@@6B?$Listener@W4ECommandEvent@Moho@@@Moho@@@`,
      * installed at +0x44 by the constructor at 0x005F29EC.
      */
-    void OnEvent(ECommandEvent event) override { HandleCommandEvent(event); }
+    void OnEvent(
+      ECommandEvent event
+    ) override
+    {
+      HandleCommandEvent(event);
+    }
 
     /**
      * Address: 0x005F3450 (FUN_005F3450, Moho::CUnitAttackTargetTask::UpdateAttacker)
@@ -289,31 +292,28 @@ namespace moho
      * the attacker event-list lane when the entity target changed.
      */
     [[nodiscard]] bool UpdateAttacker(CAiTarget* desiredTarget);
+
   public:
     // +0x00..+0x4F are the bases: `CCommandTask`, the
     // attacker-event listener and the command-event listener.
-    CCommandTask* mDispatchTask;      // +0x50
-    CUnitCommand* mCommand;           // +0x54
-    CAiFormationInstance* mFormation; // +0x58
-    UnitWeapon* mWeapon;              // +0x5C
-    CAiTarget mTarget;                // +0x60
-    Wm3::Vector3f mTargetPosition;    // +0x80
-    std::uint8_t mHasMobileTarget;    // +0x8C
+    CCommandTask* mDispatchTask;          // +0x50
+    CUnitCommand* mCommand;               // +0x54
+    CAiFormationInstance* mFormation;     // +0x58
+    UnitWeapon* mWeapon;                  // +0x5C
+    CAiTarget mTarget;                    // +0x60
+    Wm3::Vector3f mTargetPosition;        // +0x80
+    std::uint8_t mHasMobileTarget;        // +0x8C
     std::uint8_t mIgnoreFormationUpdates; // +0x8D
-    std::uint8_t mIsGrounded;         // +0x8E
-    std::uint8_t mPad008F;            // +0x8F
+    std::uint8_t mIsGrounded;             // +0x8E
+    std::uint8_t mPad008F;                // +0x8F
   };
 
   static_assert(
     offsetof(CUnitAttackTargetTask, mDispatchTask) == 0x50,
     "CUnitAttackTargetTask::mDispatchTask offset must be 0x50"
   );
-  static_assert(
-    offsetof(CUnitAttackTargetTask, mWeapon) == 0x5C, "CUnitAttackTargetTask::mWeapon offset must be 0x5C"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTask, mTarget) == 0x60, "CUnitAttackTargetTask::mTarget offset must be 0x60"
-  );
+  static_assert(offsetof(CUnitAttackTargetTask, mWeapon) == 0x5C, "CUnitAttackTargetTask::mWeapon offset must be 0x5C");
+  static_assert(offsetof(CUnitAttackTargetTask, mTarget) == 0x60, "CUnitAttackTargetTask::mTarget offset must be 0x60");
   static_assert(
     offsetof(CUnitAttackTargetTask, mTargetPosition) == 0x80,
     "CUnitAttackTargetTask::mTargetPosition offset must be 0x80"

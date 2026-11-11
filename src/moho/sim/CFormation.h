@@ -87,11 +87,8 @@ namespace moho
      * through `CWldSession::GetSelectionUnits` (0x00896000) or
      * `WeakSet<UserUnit>::Add` (0x00822270).
      */
-    void ChooseFormation(
-      const Wm3::Vector3f& mouseWorldPos,
-      WeakSet<UserUnit>& selection,
-      bool useLastQueuedDestination
-    );
+    void
+    ChooseFormation(const Wm3::Vector3f& mouseWorldPos, WeakSet<UserUnit>& selection, bool useLastQueuedDestination);
 
     /**
      * Address: 0x008382A0 (FUN_008382A0, Moho::CFormation::Finalize)
@@ -183,7 +180,10 @@ namespace moho
   static_assert(offsetof(CFormation, mType) == 0x14, "CFormation::mType offset must be 0x14");
   static_assert(offsetof(CFormation, mBestFormation) == 0x3C, "CFormation::mBestFormation offset must be 0x3C");
   static_assert(offsetof(CFormation, mTravelFormation) == 0x40, "CFormation::mTravelFormation offset must be 0x40");
-  static_assert(offsetof(CFormation, mNumFormationScripts) == 0x44, "CFormation::mNumFormationScripts offset must be 0x44");
+  static_assert(
+    offsetof(CFormation, mNumFormationScripts) == 0x44,
+    "CFormation::mNumFormationScripts offset must be 0x44"
+  );
   static_assert(offsetof(CFormation, mDirection) == 0x48, "CFormation::mDirection offset must be 0x48");
   static_assert(sizeof(Wm3::Quaternionf) == 0x10, "Wm3::Quaternionf size must be 0x10");
   static_assert(offsetof(CFormation, mTimeLeft) == 0x5C, "CFormation::mTimeLeft offset must be 0x5C");

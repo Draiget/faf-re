@@ -170,128 +170,124 @@ namespace moho
   int CUnitCarrierLaunch::Execute()
   {
     switch (mTaskState) {
-      case TASKSTATE_Preparing: {
-        if (mHasCarrierTransportedUnit) {
-          // Carried set was seeded by the ctor from the command's units.
-          // An empty set here means there is nothing to launch.
-          if (mCarriedUnits.mVec.start_ == mCarriedUnits.mVec.end_) {
-            return -1; // matches the binary's LABEL_4 / TASKSTATE_Processing exit
-          }
-        } else {
-          // First entry: pull every unit currently stored inside the
-          // transport into the carried set so subsequent ticks can
-          // unload them one at a time. The binary calls the raw
-          // `fastvector_Entity::AddAll`; the modern equivalent that
-          // preserves element ordering and type safety is the
-          // typed `AddUnits(const EntitySetTemplate<Unit>&)` helper.
-          const EntitySetTemplate<Unit> stored = mUnit->AiTransport->TransportGetStoredUnits();
-          mCarriedUnits.AddRange(stored.mVec.begin(), stored.mVec.end());
+    case TASKSTATE_Preparing: {
+      if (mHasCarrierTransportedUnit) {
+        // Carried set was seeded by the ctor from the command's units.
+        // An empty set here means there is nothing to launch.
+        if (mCarriedUnits.mVec.start_ == mCarriedUnits.mVec.end_) {
+          return -1; // matches the binary's LABEL_4 / TASKSTATE_Processing exit
         }
-
-        // Spawn the sibling retrieve task that drives the unload-and-
-        // wait flow on the receiving side. The retrieve task is created
-        // with an empty tracked-unit set; the Starting case populates
-        // the binary's tracked set lazily as units are released.
-        EntitySetTemplate<Unit> emptyTracked{};
-        (void)CUnitCarrierRetrieve::Create(this, emptyTracked);
-
-        mTaskState = TASKSTATE_Waiting;
-        return 1;
+      } else {
+        // First entry: pull every unit currently stored inside the
+        // transport into the carried set so subsequent ticks can
+        // unload them one at a time. The binary calls the raw
+        // `fastvector_Entity::AddAll`; the modern equivalent that
+        // preserves element ordering and type safety is the
+        // typed `AddUnits(const EntitySetTemplate<Unit>&)` helper.
+        const EntitySetTemplate<Unit> stored = mUnit->AiTransport->TransportGetStoredUnits();
+        mCarriedUnits.AddRange(stored.mVec.begin(), stored.mVec.end());
       }
 
-      case TASKSTATE_Waiting: {
-        // Convert the launch goal cell (mPos1.x0, mPos1.z0) into a world
-        // position centered on the unit's footprint, then issue a Ground
-        // "Guard" command to the carried-unit set at that position.
-        SOCellPos launchCell{};
-        launchCell.x = static_cast<std::int16_t>(mLaunchGoal.mPos1.x0);
-        launchCell.z = static_cast<std::int16_t>(mLaunchGoal.mPos1.z0);
+      // Spawn the sibling retrieve task that drives the unload-and-
+      // wait flow on the receiving side. The retrieve task is created
+      // with an empty tracked-unit set; the Starting case populates
+      // the binary's tracked set lazily as units are released.
+      EntitySetTemplate<Unit> emptyTracked{};
+      (void)CUnitCarrierRetrieve::Create(this, emptyTracked);
 
-        const SFootprint& footprint = mUnit->GetFootprint();
-        const Wm3::Vector3f worldPos = COORDS_ToWorldPos(
-          mUnit->SimulationRef->mMapData,
-          launchCell,
-          footprint
-        );
+      mTaskState = TASKSTATE_Waiting;
+      return 1;
+    }
 
-        SSTICommandIssueData command(EUnitCommandType::UNITCOMMAND_Guard);
-        command.mTarget.mType = EAiTargetType::AITARGET_Ground;
-        command.mTarget.mEnt = 0xF0000000u;
-        command.mTarget.mPos.x = worldPos.x;
-        command.mTarget.mPos.y = worldPos.y;
-        command.mTarget.mPos.z = worldPos.z;
-        command.unk38 = 0;
-        command.mOri = Zeroed<Wm3::Quaternionf>();
-        command.unk4C = 1.0f;
+    case TASKSTATE_Waiting: {
+      // Convert the launch goal cell (mPos1.x0, mPos1.z0) into a world
+      // position centered on the unit's footprint, then issue a Ground
+      // "Guard" command to the carried-unit set at that position.
+      SOCellPos launchCell{};
+      launchCell.x = static_cast<std::int16_t>(mLaunchGoal.mPos1.x0);
+      launchCell.z = static_cast<std::int16_t>(mLaunchGoal.mPos1.z0);
 
-        (void)IssueCommandToSelectedUnits(mUnit->SimulationRef, mCarriedUnits, command, true);
+      const SFootprint& footprint = mUnit->GetFootprint();
+      const Wm3::Vector3f worldPos = COORDS_ToWorldPos(mUnit->SimulationRef->mMapData, launchCell, footprint);
 
-        mTaskState = TASKSTATE_Starting;
-        mUnit->AiTransport->TransportResetReservation();
-        return 0;
-      }
+      SSTICommandIssueData command(EUnitCommandType::UNITCOMMAND_Guard);
+      command.mTarget.mType = EAiTargetType::AITARGET_Ground;
+      command.mTarget.mEnt = 0xF0000000u;
+      command.mTarget.mPos.x = worldPos.x;
+      command.mTarget.mPos.y = worldPos.y;
+      command.mTarget.mPos.z = worldPos.z;
+      command.unk38 = 0;
+      command.mOri = Zeroed<Wm3::Quaternionf>();
+      command.unk4C = 1.0f;
 
-      case TASKSTATE_Starting: {
-        Entity** const start = mCarriedUnits.mVec.start_;
-        Entity** const end = mCarriedUnits.mVec.end_;
-        if (start == end) {
-          // No more units to launch; transition to the terminal state.
-          mTaskState = TASKSTATE_Processing;
-          return 3;
-        }
+      (void)IssueCommandToSelectedUnits(mUnit->SimulationRef, mCarriedUnits, command, true);
 
-        Unit* const next = (*start != nullptr) ? static_cast<Unit*>(*start) : nullptr;
+      mTaskState = TASKSTATE_Starting;
+      mUnit->AiTransport->TransportResetReservation();
+      return 0;
+    }
 
-        // Pop the first unit into a one-element tracked set (matches the
-        // binary's transient v25/searchSlot pair).
-        EntitySetTemplate<Unit> firstUnit{};
-        (void)firstUnit.Add(next);
-
-        // Capture the transform produced by removing the unit from the
-        // transport so we can re-settle the unit at that pose. The binary
-        // initializes the orient quaternion to identity (1,0,0,0) before
-        // calling the transport, then overwrites with the result.
-        VTransform unloadTransform{};
-        unloadTransform.orient_.w = 1.0f;
-        unloadTransform.orient_.x = 0.0f;
-        unloadTransform.orient_.y = 0.0f;
-        unloadTransform.orient_.z = 0.0f;
-        unloadTransform.pos_ = Wm3::Vector3f{};
-        mUnit->AiTransport->TransportRemoveFromStorage(next, unloadTransform);
-
-        next->SetPendingTransform(unloadTransform, 1.0f);
-        next->AdvanceCoords();
-        next->AdvanceCoords();
-        // 0x006072FF..0x00607303: `EntitySetTemplate<Unit>::Remove`
-        // (0x005E8960, memmove-compacting erase) -- the launched unit leaves
-        // the carried set, so the next Starting tick launches the next one.
-        (void)mCarriedUnits.Remove(next);
-
-        // 0x00607308..0x006073CE: the unloaded orientation's forward (+Z)
-        // axis -- (2(xz + wy), 2(yz - wx), 1 - 2(x^2 + y^2)) -- scaled by
-        // Air.MaxAirspeed (blueprint +0x370).
-        const Wm3::Quaternionf& q = unloadTransform.orient_;
-        const Wm3::Vector3f forward{
-          ((q.z * q.x) + (q.y * q.w)) * 2.0f,
-          ((q.z * q.y) - (q.x * q.w)) * 2.0f,
-          1.0f - (((q.y * q.y) + (q.x * q.x)) * 2.0f),
-        };
-        const float maxSpeed = next->GetBlueprint()->Air.MaxAirspeed;
-
-        Wm3::Vector3f velocity{};
-        velocity.x = forward.x * maxSpeed;
-        velocity.y = forward.y * maxSpeed;
-        velocity.z = forward.z * maxSpeed;
-        next->UnitMotion->SetImmediateVelocity(velocity, unloadTransform.orient_);
-
+    case TASKSTATE_Starting: {
+      Entity** const start = mCarriedUnits.mVec.start_;
+      Entity** const end = mCarriedUnits.mVec.end_;
+      if (start == end) {
+        // No more units to launch; transition to the terminal state.
+        mTaskState = TASKSTATE_Processing;
         return 3;
       }
 
-      case TASKSTATE_Processing:
-        return -1;
+      Unit* const next = (*start != nullptr) ? static_cast<Unit*>(*start) : nullptr;
 
-      default:
-        return 1;
+      // Pop the first unit into a one-element tracked set (matches the
+      // binary's transient v25/searchSlot pair).
+      EntitySetTemplate<Unit> firstUnit{};
+      (void)firstUnit.Add(next);
+
+      // Capture the transform produced by removing the unit from the
+      // transport so we can re-settle the unit at that pose. The binary
+      // initializes the orient quaternion to identity (1,0,0,0) before
+      // calling the transport, then overwrites with the result.
+      VTransform unloadTransform{};
+      unloadTransform.orient_.w = 1.0f;
+      unloadTransform.orient_.x = 0.0f;
+      unloadTransform.orient_.y = 0.0f;
+      unloadTransform.orient_.z = 0.0f;
+      unloadTransform.pos_ = Wm3::Vector3f{};
+      mUnit->AiTransport->TransportRemoveFromStorage(next, unloadTransform);
+
+      next->SetPendingTransform(unloadTransform, 1.0f);
+      next->AdvanceCoords();
+      next->AdvanceCoords();
+      // 0x006072FF..0x00607303: `EntitySetTemplate<Unit>::Remove`
+      // (0x005E8960, memmove-compacting erase) -- the launched unit leaves
+      // the carried set, so the next Starting tick launches the next one.
+      (void)mCarriedUnits.Remove(next);
+
+      // 0x00607308..0x006073CE: the unloaded orientation's forward (+Z)
+      // axis -- (2(xz + wy), 2(yz - wx), 1 - 2(x^2 + y^2)) -- scaled by
+      // Air.MaxAirspeed (blueprint +0x370).
+      const Wm3::Quaternionf& q = unloadTransform.orient_;
+      const Wm3::Vector3f forward{
+        ((q.z * q.x) + (q.y * q.w)) * 2.0f,
+        ((q.z * q.y) - (q.x * q.w)) * 2.0f,
+        1.0f - (((q.y * q.y) + (q.x * q.x)) * 2.0f),
+      };
+      const float maxSpeed = next->GetBlueprint()->Air.MaxAirspeed;
+
+      Wm3::Vector3f velocity{};
+      velocity.x = forward.x * maxSpeed;
+      velocity.y = forward.y * maxSpeed;
+      velocity.z = forward.z * maxSpeed;
+      next->UnitMotion->SetImmediateVelocity(velocity, unloadTransform.orient_);
+
+      return 3;
+    }
+
+    case TASKSTATE_Processing:
+      return -1;
+
+    default:
+      return 1;
     }
   }
 
@@ -302,7 +298,9 @@ namespace moho
    * Deserializes the `CCommandTask` base, launch goal, launch-state bool, and
    * carried-unit set.
    */
-  void CUnitCarrierLaunch::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitCarrierLaunch::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -326,7 +324,9 @@ namespace moho
    * Serializes the `CCommandTask` base, launch goal, launch-state bool, and
    * carried-unit set.
    */
-  void CUnitCarrierLaunch::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitCarrierLaunch::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;

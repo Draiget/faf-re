@@ -182,10 +182,10 @@ namespace moho
     friend class CNetTCPConnection;
     friend struct SPartialConnection;
 
-    platform::net::Socket mSocket{platform::net::kInvalidSocket};               // +0x08
-    gpg::DList<CNetTCPConnection> mConnections;   // +0x0C
-    TDatList<SPartialConnection, void> mPartials; // +0x14
-    HANDLE mHandle{nullptr};                      // +0x1C
+    platform::net::Socket mSocket{platform::net::kInvalidSocket}; // +0x08
+    gpg::DList<CNetTCPConnection> mConnections;                   // +0x0C
+    TDatList<SPartialConnection, void> mPartials;                 // +0x14
+    HANDLE mHandle{nullptr};                                      // +0x1C
   };
   static_assert(sizeof(CNetTCPConnector) == 0x20, "CNetTCPConnector size must be 0x20");
 } // namespace moho

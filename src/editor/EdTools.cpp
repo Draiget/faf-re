@@ -28,14 +28,28 @@ namespace faf::editor
       const char* key;
     };
     constexpr ToolInfo kTools[] = {
-      {"Select", "S"}, {"Terrain", "T"}, {"Texture", "P"}, {"Water", "W"}, {"Props", "O"}, {"Decals", "D"}, {"Markers", "M"},
+      {"Select", "S"},
+      {"Terrain", "T"},
+      {"Texture", "P"},
+      {"Water", "W"},
+      {"Props", "O"},
+      {"Decals", "D"},
+      {"Markers", "M"},
       {"Units", "U"},
     };
 
     /** Draws tool `index`'s icon in the square at `p`, `s` wide. */
-    void DrawToolIcon(ImDrawList* const draw, const int index, const ImVec2 p, const float s, const ImU32 color)
+    void DrawToolIcon(
+      ImDrawList* const draw,
+      const int index,
+      const ImVec2 p,
+      const float s,
+      const ImU32 color
+    )
     {
-      const auto at = [&](const float x, const float y) { return ImVec2(p.x + x * s, p.y + y * s); };
+      const auto at = [&](const float x, const float y) {
+        return ImVec2(p.x + x * s, p.y + y * s);
+      };
       switch (index) {
       case 0: // arrow
         draw->AddTriangleFilled(at(0.25f, 0.1f), at(0.25f, 0.8f), at(0.78f, 0.58f), color);
@@ -91,25 +105,70 @@ namespace faf::editor
       bool square;
     };
     constexpr SymmetryMode kSymmetry[] = {
-      {"None", 1, false},           {"Left-right", 2, false},   {"Top-bottom", 2, false},     {"Diagonal \\", 2, true},
-      {"Diagonal /", 2, true},      {"Half turn", 2, false},    {"Both axes", 4, false},      {"Both diagonals", 4, true},
-      {"Quarter turns", 4, true},   {"N-way turn", 0, true},
+      {"None", 1, false},
+      {"Left-right", 2, false},
+      {"Top-bottom", 2, false},
+      {"Diagonal \\", 2, true},
+      {"Diagonal /", 2, true},
+      {"Half turn", 2, false},
+      {"Both axes", 4, false},
+      {"Both diagonals", 4, true},
+      {"Quarter turns", 4, true},
+      {"N-way turn", 0, true},
     };
 
     /** The symmetry mode's copies of the point (u, v) in [0, 1]; `n` for the N-way turn. */
-    int SymmetryCopies(const int mode, const float u, const float v, const int n, ImVec2* const out)
+    int SymmetryCopies(
+      const int mode,
+      const float u,
+      const float v,
+      const int n,
+      ImVec2* const out
+    )
     {
       const ImVec2 id(u, v), mx(1.0f - u, v), mz(u, 1.0f - v), d1(v, u), d2(1.0f - v, 1.0f - u), pt(1.0f - u, 1.0f - v);
       switch (mode) {
-      case 0: out[0] = id; return 1;
-      case 1: out[0] = id; out[1] = mx; return 2;
-      case 2: out[0] = id; out[1] = mz; return 2;
-      case 3: out[0] = id; out[1] = d1; return 2;
-      case 4: out[0] = id; out[1] = d2; return 2;
-      case 5: out[0] = id; out[1] = pt; return 2;
-      case 6: out[0] = id; out[1] = mx; out[2] = mz; out[3] = pt; return 4;
-      case 7: out[0] = id; out[1] = d1; out[2] = d2; out[3] = pt; return 4;
-      case 8: out[0] = id; out[1] = ImVec2(1.0f - v, u); out[2] = pt; out[3] = ImVec2(v, 1.0f - u); return 4;
+      case 0:
+        out[0] = id;
+        return 1;
+      case 1:
+        out[0] = id;
+        out[1] = mx;
+        return 2;
+      case 2:
+        out[0] = id;
+        out[1] = mz;
+        return 2;
+      case 3:
+        out[0] = id;
+        out[1] = d1;
+        return 2;
+      case 4:
+        out[0] = id;
+        out[1] = d2;
+        return 2;
+      case 5:
+        out[0] = id;
+        out[1] = pt;
+        return 2;
+      case 6:
+        out[0] = id;
+        out[1] = mx;
+        out[2] = mz;
+        out[3] = pt;
+        return 4;
+      case 7:
+        out[0] = id;
+        out[1] = d1;
+        out[2] = d2;
+        out[3] = pt;
+        return 4;
+      case 8:
+        out[0] = id;
+        out[1] = ImVec2(1.0f - v, u);
+        out[2] = pt;
+        out[3] = ImVec2(v, 1.0f - u);
+        return 4;
       default:
         for (int k = 0; k < n; ++k) {
           const float a = 6.2831853f * static_cast<float>(k) / static_cast<float>(n);
@@ -122,12 +181,20 @@ namespace faf::editor
     }
 
     /** The mode's diagram: the map square, its mirror lines or turn centre, and one sample point's copies. */
-    void DrawSymmetryIcon(ImDrawList* const draw, const int mode, const int n, const ImVec2 p, const float s)
+    void DrawSymmetryIcon(
+      ImDrawList* const draw,
+      const int mode,
+      const int n,
+      const ImVec2 p,
+      const float s
+    )
     {
       const float pad = s * 0.08f;
       const ImVec2 a(p.x + pad, p.y + pad);
       const float w = s - 2.0f * pad;
-      const auto at = [&](const float u, const float v) { return ImVec2(a.x + u * w, a.y + v * w); };
+      const auto at = [&](const float u, const float v) {
+        return ImVec2(a.x + u * w, a.y + v * w);
+      };
       draw->AddRectFilled(a, ImVec2(a.x + w, a.y + w), kCellBack, 2.0f);
       draw->AddRect(a, ImVec2(a.x + w, a.y + w), kCellLine, 2.0f);
       const auto line = [&](const ImVec2 from, const ImVec2 to) {
@@ -135,29 +202,44 @@ namespace faf::editor
         for (int i = 0; i < 8; i += 2) {
           const float t0 = static_cast<float>(i) / 8.0f;
           const float t1 = static_cast<float>(i + 1) / 8.0f;
-          draw->AddLine(ImVec2(from.x + (to.x - from.x) * t0, from.y + (to.y - from.y) * t0),
-                        ImVec2(from.x + (to.x - from.x) * t1, from.y + (to.y - from.y) * t1), kAccent, 1.2f);
+          draw->AddLine(
+            ImVec2(from.x + (to.x - from.x) * t0, from.y + (to.y - from.y) * t0),
+            ImVec2(from.x + (to.x - from.x) * t1, from.y + (to.y - from.y) * t1),
+            kAccent,
+            1.2f
+          );
         }
       };
-      if (mode == 1 || mode == 6) line(at(0.5f, 0.0f), at(0.5f, 1.0f));
-      if (mode == 2 || mode == 6) line(at(0.0f, 0.5f), at(1.0f, 0.5f));
-      if (mode == 3 || mode == 7) line(at(0.0f, 0.0f), at(1.0f, 1.0f));
-      if (mode == 4 || mode == 7) line(at(1.0f, 0.0f), at(0.0f, 1.0f));
-      if (mode == 5 || mode == 8 || mode == 9) draw->AddCircleFilled(at(0.5f, 0.5f), s * 0.05f, kAccent);
+      if (mode == 1 || mode == 6)
+        line(at(0.5f, 0.0f), at(0.5f, 1.0f));
+      if (mode == 2 || mode == 6)
+        line(at(0.0f, 0.5f), at(1.0f, 0.5f));
+      if (mode == 3 || mode == 7)
+        line(at(0.0f, 0.0f), at(1.0f, 1.0f));
+      if (mode == 4 || mode == 7)
+        line(at(1.0f, 0.0f), at(0.0f, 1.0f));
+      if (mode == 5 || mode == 8 || mode == 9)
+        draw->AddCircleFilled(at(0.5f, 0.5f), s * 0.05f, kAccent);
       ImVec2 copies[8];
       const int count = SymmetryCopies(mode, 0.27f, 0.22f, n, copies);
       for (int i = 0; i < count; ++i) {
-        draw->AddCircleFilled(at(copies[i].x, copies[i].y), s * 0.075f, i == 0 ? IM_COL32(255, 255, 255, 255) : kAccent);
+        draw->AddCircleFilled(
+          at(copies[i].x, copies[i].y), s * 0.075f, i == 0 ? IM_COL32(255, 255, 255, 255) : kAccent
+        );
       }
     }
 
     /** The panel's help: one line with the rest on hover (ui/EdHelp.cpp). */
-    void Note(const char* const text)
+    void Note(
+      const char* const text
+    )
     {
       HelpNote(text);
     }
 
-    void SectionHeader(const char* const text)
+    void SectionHeader(
+      const char* const text
+    )
     {
       ImGui::Spacing();
       ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
@@ -166,10 +248,15 @@ namespace faf::editor
     }
 
     /** A row of buttons, the chosen one marked, like the mockup's segmented buttons. */
-    void Segmented(const char* const* labels, const int count, int& chosen)
+    void Segmented(
+      const char* const* labels,
+      const int count,
+      int& chosen
+    )
     {
-      const float width = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x * static_cast<float>(count - 1)) /
-                          static_cast<float>(count);
+      const float width =
+        (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x * static_cast<float>(count - 1)) /
+        static_cast<float>(count);
       for (int i = 0; i < count; ++i) {
         if (i > 0) {
           ImGui::SameLine();
@@ -196,20 +283,40 @@ namespace faf::editor
     // The scrollbar always has its room: the symmetry tiles take their height from the width, so a scrollbar that
     // came and went with the content's height flipped every frame (narrower, shorter, no scrollbar; wider, taller,
     // a scrollbar again; user report).
-    if (ImGui::BeginChild("##toolsettings", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
+    if (
+      ImGui::BeginChild(
+        "##toolsettings", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar
+      )
+    ) {
       ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.67f, 0.70f, 0.74f, 1.0f));
       ImGui::TextUnformatted(kTools[mTool].name);
       ImGui::PopStyleColor();
       ImGui::Separator();
       switch (mTool) {
-      case 0: DrawSelect(); break;
-      case 1: DrawTerrain(); break;
-      case 2: DrawTexture(); break;
-      case 3: DrawWater(); break;
-      case 4: DrawProps(); break;
-      case 5: DrawDecals(); break;
-      case 6: DrawMarkers(); break;
-      default: DrawUnits(); break;
+      case 0:
+        DrawSelect();
+        break;
+      case 1:
+        DrawTerrain();
+        break;
+      case 2:
+        DrawTexture();
+        break;
+      case 3:
+        DrawWater();
+        break;
+      case 4:
+        DrawProps();
+        break;
+      case 5:
+        DrawDecals();
+        break;
+      case 6:
+        DrawMarkers();
+        break;
+      default:
+        DrawUnits();
+        break;
       }
     }
     ImGui::EndChild();
@@ -219,7 +326,9 @@ namespace faf::editor
   {
     const float cell = ImGui::GetFrameHeight() * 1.55f;
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 3.0f));
-    if (ImGui::BeginChild("##toolstrip", ImVec2(cell + 4.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar)) {
+    if (
+      ImGui::BeginChild("##toolstrip", ImVec2(cell + 4.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar)
+    ) {
       ImDrawList* const draw = ImGui::GetWindowDrawList();
       for (int i = 0; i < static_cast<int>(IM_ARRAYSIZE(kTools)); ++i) {
         ImGui::PushID(i);
@@ -239,10 +348,20 @@ namespace faf::editor
           draw->AddRectFilled(p, q, IM_COL32(42, 47, 55, 255), 4.0f);
         }
         const float icon = cell * 0.56f;
-        DrawToolIcon(draw, i, ImVec2(p.x + (cell - icon) * 0.5f, p.y + (cell - icon) * 0.5f), icon,
-                     i == mTool ? kAccent : (hovered ? kIconHot : kIconIdle));
-        draw->AddText(ImGui::GetFont(), ImGui::GetFontSize() * 0.62f, ImVec2(q.x - ImGui::GetFontSize() * 0.45f, q.y - ImGui::GetFontSize() * 0.7f),
-                      IM_COL32(93, 100, 109, 255), kTools[i].key);
+        DrawToolIcon(
+          draw,
+          i,
+          ImVec2(p.x + (cell - icon) * 0.5f, p.y + (cell - icon) * 0.5f),
+          icon,
+          i == mTool ? kAccent : (hovered ? kIconHot : kIconIdle)
+        );
+        draw->AddText(
+          ImGui::GetFont(),
+          ImGui::GetFontSize() * 0.62f,
+          ImVec2(q.x - ImGui::GetFontSize() * 0.45f, q.y - ImGui::GetFontSize() * 0.7f),
+          IM_COL32(93, 100, 109, 255),
+          kTools[i].key
+        );
         ImGui::PopID();
       }
     }
@@ -250,13 +369,19 @@ namespace faf::editor
     ImGui::PopStyleVar();
   }
 
-  void EdTools::DrawBrush(const bool withModes)
+  void EdTools::DrawBrush(
+    const bool withModes
+  )
   {
     SectionHeader("BRUSH");
     if (withModes) {
       // Rows of up to three; each entry is its HeightBrushMode.
       static const char* const kRows[4][3] = {
-        {"Raise", "Lower", "Smooth"}, {"Flatten", "Set height", "Noise"}, {"Terrace", "Plane", "Stamp"}, {"Erode", "Water erode", nullptr}};
+        {"Raise", "Lower", "Smooth"},
+        {"Flatten", "Set height", "Noise"},
+        {"Terrace", "Plane", "Stamp"},
+        {"Erode", "Water erode", nullptr}
+      };
       static constexpr int kModeOf[4][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}, {9, 10, -1}};
       static constexpr int kRowSize[4] = {3, 3, 3, 2};
       for (int row = 0; row < 4; ++row) {
@@ -288,8 +413,13 @@ namespace faf::editor
         break;
       case HeightBrushMode::Plane: {
         char text[120];
-        (void)std::snprintf(text, sizeof(text), "Ctrl+click three points on the terrain; the brush moves the ground towards their plane (%d of 3%s).",
-                            mPlanePoints, mPlanePoints == 3 && !mPlaneSet ? ", on one line" : "");
+        (void)std::snprintf(
+          text,
+          sizeof(text),
+          "Ctrl+click three points on the terrain; the brush moves the ground towards their plane (%d of 3%s).",
+          mPlanePoints,
+          mPlanePoints == 3 && !mPlaneSet ? ", on one line" : ""
+        );
         Note(text);
         if (ImGui::Button("Clear points")) {
           ClearPlanePoints();
@@ -309,11 +439,17 @@ namespace faf::editor
       case HeightBrushMode::Erode:
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::SliderFloat("##talus", &mErodeTalus, 0.05f, 2.0f, "Talus slope %.2f");
-        Note("Slopes steeper than the talus slope slump towards it; gentler ground stays. Ground moves downhill, none is made.");
+        Note(
+          "Slopes steeper than the talus slope slump towards it; gentler ground stays. Ground moves downhill, none is "
+          "made."
+        );
         break;
       case HeightBrushMode::WaterErode:
-        Note("Rain on the brush: droplets run downhill, carry ground away where they speed up and leave it where they slow, "
-             "carving channels and fans. Strength sets how much rain. Ground is moved, none is made.");
+        Note(
+          "Rain on the brush: droplets run downhill, carry ground away where they speed up and leave it where they "
+          "slow, "
+          "carving channels and fans. Strength sets how much rain. Ground is moved, none is made."
+        );
         break;
       default:
         break;
@@ -327,7 +463,9 @@ namespace faf::editor
     ImGui::SliderFloat("##falloff", &mFalloff, 0.0f, 1.0f, "Falloff %.2f");
   }
 
-  void EdTools::DrawSymmetry(const bool withCheck)
+  void EdTools::DrawSymmetry(
+    const bool withCheck
+  )
   {
     SectionHeader("SYMMETRY");
     const float available = ImGui::GetContentRegionAvail().x;
@@ -350,13 +488,27 @@ namespace faf::editor
       if (hovered) {
         ImGui::SetTooltip("%s%s", kSymmetry[i].name, kSymmetry[i].square ? " (square maps)" : "");
       }
-      draw->AddRectFilled(p, ImVec2(p.x + cell, p.y + cell + labelHeight), on ? kAccentSoft : IM_COL32(34, 38, 45, 255), 4.0f);
-      draw->AddRect(p, ImVec2(p.x + cell, p.y + cell + labelHeight), on ? kAccent : (hovered ? IM_COL32(74, 83, 95, 255) : kCellLine), 4.0f);
+      draw->AddRectFilled(
+        p, ImVec2(p.x + cell, p.y + cell + labelHeight), on ? kAccentSoft : IM_COL32(34, 38, 45, 255), 4.0f
+      );
+      draw->AddRect(
+        p,
+        ImVec2(p.x + cell, p.y + cell + labelHeight),
+        on ? kAccent : (hovered ? IM_COL32(74, 83, 95, 255) : kCellLine),
+        4.0f
+      );
       DrawSymmetryIcon(draw, i, mNWay, ImVec2(p.x + cell * 0.12f, p.y + cell * 0.06f), cell * 0.76f);
       const float labelSize = ImGui::GetFontSize() * 0.66f;
       const ImVec2 textSize = ImGui::GetFont()->CalcTextSizeA(labelSize, cell, cell, kSymmetry[i].name);
-      draw->AddText(ImGui::GetFont(), labelSize, ImVec2(p.x + (cell - textSize.x) * 0.5f, p.y + cell * 0.86f),
-                    on ? IM_COL32(255, 211, 166, 255) : kIconIdle, kSymmetry[i].name, nullptr, cell);
+      draw->AddText(
+        ImGui::GetFont(),
+        labelSize,
+        ImVec2(p.x + (cell - textSize.x) * 0.5f, p.y + cell * 0.86f),
+        on ? IM_COL32(255, 211, 166, 255) : kIconIdle,
+        kSymmetry[i].name,
+        nullptr,
+        cell
+      );
       ImGui::PopID();
     }
     if (mSymmetry == 9) {
@@ -366,11 +518,21 @@ namespace faf::editor
     if (mDetectedSymmetry >= 0) {
       char found[120];
       if (mDetectedSymmetry == 9) {
-        (void)std::snprintf(found, sizeof(found), "The map's heights: %d-way turn (%.1f%% of points match).", mNWay,
-                            static_cast<double>(mDetectedMatch) * 100.0);
+        (void)std::snprintf(
+          found,
+          sizeof(found),
+          "The map's heights: %d-way turn (%.1f%% of points match).",
+          mNWay,
+          static_cast<double>(mDetectedMatch) * 100.0
+        );
       } else {
-        (void)std::snprintf(found, sizeof(found), "The map's heights: %s (%.1f%% of points match).", kSymmetry[mDetectedSymmetry].name,
-                            static_cast<double>(mDetectedMatch) * 100.0);
+        (void)std::snprintf(
+          found,
+          sizeof(found),
+          "The map's heights: %s (%.1f%% of points match).",
+          kSymmetry[mDetectedSymmetry].name,
+          static_cast<double>(mDetectedMatch) * 100.0
+        );
       }
       ImGui::TextColored(ImVec4(0.55f, 0.80f, 0.55f, 1.0f), "%s", found);
     } else if (mDetectedSymmetry == -1) {
@@ -379,16 +541,22 @@ namespace faf::editor
     const int copies = mSymmetry == 9 ? mNWay : kSymmetry[mSymmetry].copies;
     char note[300];
     if (mSymmetry == 9) {
-      (void)std::snprintf(note, sizeof(note),
-                          "Every edit is written to all %d copies: the first sector (from the centre towards the right, turning down) "
-                          "is painted, the others copy it. Turns other than 4 fall between vertices, so their copies are "
-                          "close, not identical; the check shows by how much.",
-                          copies);
+      (void)std::snprintf(
+        note,
+        sizeof(note),
+        "Every edit is written to all %d copies: the first sector (from the centre towards the right, turning down) "
+        "is painted, the others copy it. Turns other than 4 fall between vertices, so their copies are "
+        "close, not identical; the check shows by how much.",
+        copies
+      );
     } else {
-      (void)std::snprintf(note, sizeof(note),
-                          "Every edit is written to all %d copies. Where copies overlap, each vertex takes the strongest copy, "
-                          "so the halves stay identical.",
-                          copies);
+      (void)std::snprintf(
+        note,
+        sizeof(note),
+        "Every edit is written to all %d copies. Where copies overlap, each vertex takes the strongest copy, "
+        "so the halves stay identical.",
+        copies
+      );
     }
     Note(note);
     if (!withCheck) {
@@ -417,17 +585,24 @@ namespace faf::editor
     (void)std::snprintf(amount, sizeof(amount), format, static_cast<double>(largest));
     char result[200];
     if (mDiffering == 0) {
-      (void)std::snprintf(result, sizeof(result), "All %d %s match their copies (largest difference %s).", mChecked, unit, amount);
+      (void)std::snprintf(
+        result, sizeof(result), "All %d %s match their copies (largest difference %s).", mChecked, unit, amount
+      );
     } else {
-      (void)std::snprintf(result, sizeof(result), "%d of %d %s differ from a copy, by up to %s.", mDiffering, mChecked, unit, amount);
+      (void)std::snprintf(
+        result, sizeof(result), "%d of %d %s differ from a copy, by up to %s.", mDiffering, mChecked, unit, amount
+      );
     }
     ImGui::TextWrapped("%s", result);
     if (mDiffering > 0) {
       if (ImGui::Button("Copy the source part to the other copies")) {
         mRepairRequested = true;
       }
-      Note(mSymmetry == 9 ? "The source part is the first sector. One undo step."
-                          : "The source part is the top or left one (the copy nearest the map's top-left corner). One undo step.");
+      Note(
+        mSymmetry == 9
+          ? "The source part is the first sector. One undo step."
+          : "The source part is the top or left one (the copy nearest the map's top-left corner). One undo step."
+      );
     }
   }
 
@@ -436,8 +611,12 @@ namespace faf::editor
     // What is selected, and what a click would pick (the white ring in the view).
     ImGui::TextUnformatted(mSelectSelected.empty() ? "Nothing selected" : mSelectSelected.c_str());
     ImGui::TextDisabled("Under the cursor: %s", mSelectHover.empty() ? "-" : mSelectHover.c_str());
-    Note("Click a marker, unit, prop or decal to select it; the white ring shows what a click picks. Ctrl adds or takes one out, "
-         "a drag or the arrows move the selection, Delete removes it, Q and E turn props by 15 degrees. Each is one undo step.");
+    Note(
+      "Click a marker, unit, prop or decal to select it; the white ring shows what a click picks. Ctrl adds or takes "
+      "one out, "
+      "a drag or the arrows move the selection, Delete removes it, Q and E turn props by 15 degrees. Each is one undo "
+      "step."
+    );
   }
 
   void EdTools::DrawTerrain()
@@ -455,15 +634,28 @@ namespace faf::editor
     }
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::DragFloat("##heightscale", &mHeightScale, 0.01f, 0.01f, 16.0f, "Height scale %.2f");
-    static constexpr const char* kSizes[] = {"Export at the map's size", "Export 257 wide", "Export 513 wide", "Export 1025 wide",
-                                             "Export 2049 wide", "Export 4097 wide"};
+    static constexpr const char* kSizes[] = {
+      "Export at the map's size",
+      "Export 257 wide",
+      "Export 513 wide",
+      "Export 1025 wide",
+      "Export 2049 wide",
+      "Export 4097 wide"
+    };
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::Combo("##exportsize", &mExportSize, kSizes, IM_ARRAYSIZE(kSizes));
-    Note("Import reads .png, .raw, .r16 (World Machine), .bmp or .tif, resampled to the map's size; export writes .png (16-bit grey), "
-         ".raw or .r16. Heights are times the scale both ways. An import is one undo step.");
+    Note(
+      "Import reads .png, .raw, .r16 (World Machine), .bmp or .tif, resampled to the map's size; export writes .png "
+      "(16-bit grey), "
+      ".raw or .r16. Heights are times the scale both ways. An import is one undo step."
+    );
   }
 
-  void EdTools::AddPlanePoint(const float x, const float height, const float z) noexcept
+  void EdTools::AddPlanePoint(
+    const float x,
+    const float height,
+    const float z
+  ) noexcept
   {
     if (mPlanePoints == 3) {
       // The oldest goes.
@@ -488,7 +680,11 @@ namespace faf::editor
     }
   }
 
-  int EdTools::PlanePoints(float (&x)[3], float (&height)[3], float (&z)[3]) const noexcept
+  int EdTools::PlanePoints(
+    float (&x)[3],
+    float (&height)[3],
+    float (&z)[3]
+  ) const noexcept
   {
     for (int i = 0; i < mPlanePoints; ++i) {
       x[i] = mPlanePointX[i];
@@ -501,7 +697,9 @@ namespace faf::editor
   namespace
   {
     /** "grass001" from "/env/evergreen/layers/grass001_albedo.dds"; "(empty)" for none. */
-    std::string LayerLabel(const std::string& path)
+    std::string LayerLabel(
+      const std::string& path
+    )
     {
       if (path.empty()) {
         return "(empty)";
@@ -549,8 +747,10 @@ namespace faf::editor
     if (ImGui::Button("Make a texture with nodes...", ImVec2(-1.0f, 0.0f))) {
       mMaterialAsk = std::clamp(mMaskLayer + 1, 1, 8);
     }
-    ImGui::SetItemTooltip("The Material Editor (View > Material Editor), on the paint layer: textures built from nodes as in UE4, "
-                          "shown on the map as you edit");
+    ImGui::SetItemTooltip(
+      "The Material Editor (View > Material Editor), on the paint layer: textures built from nodes as in UE4, "
+      "shown on the map as you edit"
+    );
     mLibrary.Pump(3);
     static const char* const kSlotNames[10] = {"Lower", "1", "2", "3", "4", "5", "6", "7", "8", "Upper"};
     const float thumb = ImGui::GetFrameHeight() * 1.6f;
@@ -573,18 +773,30 @@ namespace faf::editor
       ImGui::BeginGroup();
       ImGui::Text("%s  %s", kSlotNames[slot], LayerTextureName(layer.albedo).c_str());
       if (ImGui::IsItemHovered() && !layer.albedo.empty()) {
-        ImGui::SetTooltip("%s\n%s", layer.albedo.c_str(), layer.normals.empty() ? "(no normal map)" : layer.normals.c_str());
+        ImGui::SetTooltip(
+          "%s\n%s", layer.albedo.c_str(), layer.normals.empty() ? "(no normal map)" : layer.normals.c_str()
+        );
       }
       // What the shader makes of this slot (FAF's newer shaders keep some for map-wide data), and whether it does now.
       if (const ShaderSlotUse use = ShaderSlotUseOf(mShader, slot); !use.text.empty()) {
         ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextColored(use.mapWide ? ImVec4(0.95f, 0.75f, 0.30f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled), "%s", use.text.c_str());
+        ImGui::TextColored(
+          use.mapWide ? ImVec4(0.95f, 0.75f, 0.30f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),
+          "%s",
+          use.text.c_str()
+        );
         ImGui::PopTextWrapPos();
         if (use.mapWide && mMapSizeUnits > 0.0f) {
           const bool on = MapWideOn(layer.albedoSize, mMapSizeUnits);
-          ImGui::TextDisabled(on ? "On: its size is above the map's (%.0f)." : "Off, read as an ordinary layer: its size isn't above the map's (%.0f).", mMapSizeUnits);
-          ImGui::SetItemTooltip("terrain.fx reads the slot as map-wide data only when its size is above the map's, so the tile value is "
-                                "under 1; FAF's map tools bake the texture.");
+          ImGui::TextDisabled(
+            on ? "On: its size is above the map's (%.0f)."
+               : "Off, read as an ordinary layer: its size isn't above the map's (%.0f).",
+            mMapSizeUnits
+          );
+          ImGui::SetItemTooltip(
+            "terrain.fx reads the slot as map-wide data only when its size is above the map's, so the tile value is "
+            "under 1; FAF's map tools bake the texture."
+          );
         }
       }
       ImGui::SetNextItemWidth(-1.0f);
@@ -640,8 +852,10 @@ namespace faf::editor
       if (ImGui::Button("Export set...")) {
         mLayerFileAsk = LayerFileAsk::ExportSet;
       }
-      Note("FAForeverMapEditor's layer files: one layer's textures and sizes (.scmsl), or the shader and all ten layers "
-           "(.scmst). An import is one undo step; the masks stay as they are.");
+      Note(
+        "FAForeverMapEditor's layer files: one layer's textures and sizes (.scmsl), or the shader and all ten layers "
+        "(.scmst). An import is one undo step; the masks stay as they are."
+      );
     }
     DrawTextureBrowser();
   }
@@ -666,7 +880,11 @@ namespace faf::editor
       for (char& c : filter) {
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
       }
-      if (ImGui::BeginChild("##terraintypes", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 12.0f), ImGuiChildFlags_Borders)) {
+      if (
+        ImGui::BeginChild(
+          "##terraintypes", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 12.0f), ImGuiChildFlags_Borders
+        )
+      ) {
         for (const TerrainTypeInfo& type : mTerrainTypes) {
           std::string key = type.name + " " + type.description + " " + type.style;
           for (char& c : key) {
@@ -677,13 +895,28 @@ namespace faf::editor
           }
           ImGui::PushID(type.code);
           // The type's colour (its file's ARGB) as a swatch, then its code, description and style.
-          const ImVec4 swatch(static_cast<float>((type.color >> 16) & 0xFF) / 255.0f, static_cast<float>((type.color >> 8) & 0xFF) / 255.0f,
-                              static_cast<float>(type.color & 0xFF) / 255.0f, 1.0f);
-          ImGui::ColorButton("##swatch", swatch, ImGuiColorEditFlags_NoTooltip, ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight() * 0.8f));
+          const ImVec4 swatch(
+            static_cast<float>((type.color >> 16) & 0xFF) / 255.0f,
+            static_cast<float>((type.color >> 8) & 0xFF) / 255.0f,
+            static_cast<float>(type.color & 0xFF) / 255.0f,
+            1.0f
+          );
+          ImGui::ColorButton(
+            "##swatch",
+            swatch,
+            ImGuiColorEditFlags_NoTooltip,
+            ImVec2(ImGui::GetFrameHeight(), ImGui::GetFrameHeight() * 0.8f)
+          );
           ImGui::SameLine();
           char label[200];
-          (void)std::snprintf(label, sizeof(label), "%3d  %s%s", type.code, type.description.empty() ? type.name.c_str() : type.description.c_str(),
-                              type.blocking ? "  (blocking)" : "");
+          (void)std::snprintf(
+            label,
+            sizeof(label),
+            "%3d  %s%s",
+            type.code,
+            type.description.empty() ? type.name.c_str() : type.description.c_str(),
+            type.blocking ? "  (blocking)" : ""
+          );
           if (ImGui::Selectable(label, type.code == mTerrainTypeCode)) {
             mTerrainTypeCode = type.code;
           }
@@ -700,8 +933,11 @@ namespace faf::editor
     ImGui::Checkbox("Show the types on the ground", &mShowTerrainTypes);
     DrawBrush(false);
     DrawSymmetry(false);
-    Note("Each cell has a type: its effects (dust, wakes), and for some (lava) whether units can go there. A stroke paints the "
-         "type in the brush, with its symmetric copies, as one undo step; the Default type (1) isn't drawn.");
+    Note(
+      "Each cell has a type: its effects (dust, wakes), and for some (lava) whether units can go there. A stroke "
+      "paints the "
+      "type in the brush, with its symmetric copies, as one undo step; the Default type (1) isn't drawn."
+    );
   }
 
   void EdTools::DrawTextureBrowser()
@@ -711,15 +947,21 @@ namespace faf::editor
       mBrowseOpen = false;
       ImGui::OpenPopup(kTitle);
     }
-    // Most of the editor's window each time it opens, centred: the textures large enough to tell apart (user report: it was small).
+    // Most of the editor's window each time it opens, centred: the textures large enough to tell apart (user report: it
+    // was small).
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.72f, viewport->WorkSize.y * 0.78f), ImGuiCond_Appearing);
-    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
-                            ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowPos(
+      ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
+      ImGuiCond_Appearing,
+      ImVec2(0.5f, 0.5f)
+    );
     if (!ImGui::BeginPopupModal(kTitle, nullptr)) {
       return;
     }
-    ImGui::Text("Layer %s", mBrowseSlot == 0 ? "Lower" : (mBrowseSlot == 9 ? "Upper" : std::to_string(mBrowseSlot).c_str()));
+    ImGui::Text(
+      "Layer %s", mBrowseSlot == 0 ? "Lower" : (mBrowseSlot == 9 ? "Upper" : std::to_string(mBrowseSlot).c_str())
+    );
     ImGui::SameLine();
     ImGui::SetNextItemWidth(Em(260.0f));
     ImGui::InputTextWithHint("##filter", "search name or biome", mBrowseFilter, sizeof(mBrowseFilter));
@@ -736,8 +978,11 @@ namespace faf::editor
       mMaterialAsk = mBrowseSlot;
       ImGui::CloseCurrentPopup();
     }
-    ImGui::SetItemTooltip("Opens the Material Editor on this layer: build its texture from nodes (noise, textures, blends) and see it on the map "
-                          "as you go; Apply writes it into the map");
+    ImGui::SetItemTooltip(
+      "Opens the Material Editor on this layer: build its texture from nodes (noise, textures, blends) and see it on "
+      "the map "
+      "as you go; Apply writes it into the map"
+    );
     ImGui::SameLine();
     if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
       ImGui::CloseCurrentPopup();
@@ -782,7 +1027,11 @@ namespace faf::editor
         ImGui::PopTextWrapPos();
         ImGui::EndGroup();
         if (ImGui::IsItemHovered()) {
-          ImGui::SetTooltip("%s\n%s", texture.path.c_str(), texture.normals.empty() ? "(no normal map beside it)" : texture.normals.c_str());
+          ImGui::SetTooltip(
+            "%s\n%s",
+            texture.path.c_str(),
+            texture.normals.empty() ? "(no normal map beside it)" : texture.normals.c_str()
+          );
         }
         if (picked && mBrowseSlot >= 0 && mBrowseSlot < static_cast<int>(mSlots.size())) {
           mChangedSlot = mBrowseSlot;
@@ -816,12 +1065,20 @@ namespace faf::editor
     // Strata 1-8 have masks; the lower layer is under everything and the upper one is blended by its alpha.
     for (int layer = 0; layer < 8; ++layer) {
       // The slots as the terrain has them now (a swapped texture shows at once), else the names read at open.
-      const std::string path = mSlots.size() == 10 ? mSlots[static_cast<std::size_t>(layer + 1)].albedo
-                               : static_cast<std::size_t>(layer + 1) < mLayerNames.size() ? mLayerNames[static_cast<std::size_t>(layer + 1)] : "";
+      const std::string path = mSlots.size() == 10                 ? mSlots[static_cast<std::size_t>(layer + 1)].albedo
+        : static_cast<std::size_t>(layer + 1) < mLayerNames.size() ? mLayerNames[static_cast<std::size_t>(layer + 1)]
+                                                                   : "";
       char label[160];
       if (mHasCoverage) {
-        (void)std::snprintf(label, sizeof(label), "%d  %s  %.0f%%##layer%d", layer + 1, LayerLabel(path).c_str(),
-                            static_cast<double>(mCoverage[layer] * 100.0f), layer);
+        (void)std::snprintf(
+          label,
+          sizeof(label),
+          "%d  %s  %.0f%%##layer%d",
+          layer + 1,
+          LayerLabel(path).c_str(),
+          static_cast<double>(mCoverage[layer] * 100.0f),
+          layer
+        );
       } else {
         (void)std::snprintf(label, sizeof(label), "%d  %s##layer%d", layer + 1, LayerLabel(path).c_str(), layer);
       }
@@ -858,7 +1115,10 @@ namespace faf::editor
     DrawLimits();
 
     SectionHeader("RULES");
-    Note("Each rule sets its layer to full where the ground is in its height and slope range; they run in order over the whole map.");
+    Note(
+      "Each rule sets its layer to full where the ground is in its height and slope range; they run in order over the "
+      "whole map."
+    );
     int remove = -1;
     for (std::size_t i = 0; i < mRules.size(); ++i) {
       MaskRule& rule = mRules[i];
@@ -942,11 +1202,15 @@ namespace faf::editor
     changed(ImGui::DragFloat("##abyss", &mWater.abyss, 0.1f, 0.0f, 512.0f, "Abyss %.2f"));
     if (mWater.enabled && (mWater.deep >= mWater.elevation || mWater.abyss >= mWater.deep)) {
       ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
-      ImGui::TextWrapped("Deep should be below the level and abyss below deep: the water's colour runs from the level down to them.");
+      ImGui::TextWrapped(
+        "Deep should be below the level and abyss below deep: the water's colour runs from the level down to them."
+      );
       ImGui::PopStyleColor();
     }
-    Note("The level is where the sea's surface is; deep and abyss are the heights the water's colour darkens towards. "
-         "Units, the shore and the minimap all follow the level.");
+    Note(
+      "The level is where the sea's surface is; deep and abyss are the heights the water's colour darkens towards. "
+      "Units, the shore and the minimap all follow the level."
+    );
     ImGui::EndDisabled();
     DrawWaterBodies();
     ImGui::BeginDisabled(!mWater.enabled);
@@ -1001,8 +1265,10 @@ namespace faf::editor
     if (ImGui::Button("Export...")) {
       mWaterExport = true;
     }
-    Note("FAForeverMapEditor's water settings file. Import takes its look (colour, reflections, sun, waves) and its "
-         "textures, and keeps this map's levels.");
+    Note(
+      "FAForeverMapEditor's water settings file. Import takes its look (colour, reflections, sun, waves) and its "
+      "textures, and keeps this map's levels."
+    );
 
     SectionHeader("TEXTURES");
     static const char* const kTextureNames[6] = {"Cubemap", "Ramp", "Normals 1", "Normals 2", "Normals 3", "Normals 4"};
@@ -1013,7 +1279,10 @@ namespace faf::editor
       ImGui::SetNextItemWidth(-1.0f);
       char path[260];
       (void)std::snprintf(path, sizeof(path), "%s", mWater.textures[i].c_str());
-      if (ImGui::InputText("##texture", path, sizeof(path), ImGuiInputTextFlags_EnterReturnsTrue) && mWater.textures[i] != path) {
+      if (
+        ImGui::InputText("##texture", path, sizeof(path), ImGuiInputTextFlags_EnterReturnsTrue) &&
+        mWater.textures[i] != path
+      ) {
         mWater.textures[i] = path;
         mWaterChanged = true;
         mWaterFinal = true;
@@ -1080,9 +1349,11 @@ namespace faf::editor
       if (ImGui::Button("Export##waves")) {
         mWaveAsk = WaveAsk::Export;
       }
-      Note("Waves start where the ground is the depth below the sea and travel to the shore, as the retail maps' shore "
-           "waves do; the built-in patterns are SCMP_001's. Patterns load from a wavepatterns.lua (FAForeverMapEditor's); "
-           "Import and Export are its .scmwaves. Each change is one undo step.");
+      Note(
+        "Waves start where the ground is the depth below the sea and travel to the shore, as the retail maps' shore "
+        "waves do; the built-in patterns are SCMP_001's. Patterns load from a wavepatterns.lua (FAForeverMapEditor's); "
+        "Import and Export are its .scmwaves. Each change is one undo step."
+      );
     }
   }
 
@@ -1116,20 +1387,31 @@ namespace faf::editor
       if (!body.raw.empty()) {
         (void)std::snprintf(text, sizeof(text), "%zu  (as written)", i + 1);
       } else if (body.dry) {
-        (void)std::snprintf(text, sizeof(text), "%zu  Dry below %.1f", i + 1, static_cast<double>(body.hasFillTo ? body.fillTo : 0.0f));
+        (void)std::snprintf(
+          text, sizeof(text), "%zu  Dry below %.1f", i + 1, static_cast<double>(body.hasFillTo ? body.fillTo : 0.0f)
+        );
       } else {
         (void)std::snprintf(text, sizeof(text), "%zu  Water at %.1f", i + 1, static_cast<double>(body.elevation));
       }
       return std::string(text);
     };
-    const auto report = [&](const std::size_t i) { return i < mBodyReport.size() ? mBodyReport[i] : std::string(); };
-    const auto skipped = [](const std::string& line) { return line.find("skipped") != std::string::npos || line.find("can't") != std::string::npos; };
+    const auto report = [&](const std::size_t i) {
+      return i < mBodyReport.size() ? mBodyReport[i] : std::string();
+    };
+    const auto skipped = [](const std::string& line) {
+      return line.find("skipped") != std::string::npos || line.find("can't") != std::string::npos;
+    };
 
     // The list: each body, what the fill made of it.
     if (!mBodies.empty()) {
       const float rows = static_cast<float>(std::min<std::size_t>(mBodies.size(), 6));
-      if (ImGui::BeginChild("##bodies", ImVec2(0.0f, rows * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().WindowPadding.y * 2.0f),
-                            ImGuiChildFlags_Borders)) {
+      if (
+        ImGui::BeginChild(
+          "##bodies",
+          ImVec2(0.0f, rows * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().WindowPadding.y * 2.0f),
+          ImGuiChildFlags_Borders
+        )
+      ) {
         for (std::size_t i = 0; i < mBodies.size(); ++i) {
           ImGui::PushID(static_cast<int>(i));
           if (ImGui::Selectable(title(i).c_str(), mBody == static_cast<int>(i), ImGuiSelectableFlags_AllowOverlap)) {
@@ -1192,8 +1474,11 @@ namespace faf::editor
 
     if (mWaterPick != WaterPick::None) {
       ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.80f, 1.0f, 1.0f));
-      ImGui::TextWrapped("%s", mWaterPick == WaterPick::Seed ? "Click the map where the water starts filling. Esc cancels."
-                                                             : "Click the map to add outline points; Enter or a right click ends.");
+      ImGui::TextWrapped(
+        "%s",
+        mWaterPick == WaterPick::Seed ? "Click the map where the water starts filling. Esc cancels."
+                                      : "Click the map to add outline points; Enter or a right click ends."
+      );
       ImGui::PopStyleColor();
     }
 
@@ -1255,8 +1540,10 @@ namespace faf::editor
           clicked();
         }
         if (ImGui::IsItemHovered()) {
-          ImGui::SetTooltip("The fill spreads from here over all connected ground below its level. An outline alone (no seed) "
-                            "takes every low point inside it.");
+          ImGui::SetTooltip(
+            "The fill spreads from here over all connected ground below its level. An outline alone (no seed) "
+            "takes every low point inside it."
+          );
         }
         ImGui::SameLine();
         if (ImGui::Button(mWaterPick == WaterPick::Seed ? "Placing...##seed" : "Place##seed")) {
@@ -1273,7 +1560,12 @@ namespace faf::editor
         // Outline: a closed curve the fill stays inside.
         ImGui::Text("Outline: %zu point%s", body.outline.size(), body.outline.size() == 1 ? "" : "s");
         ImGui::SameLine();
-        if (ImGui::Button(mWaterPick == WaterPick::Outline ? "Done##outline" : (body.outline.empty() ? "Draw##outline" : "Add points##outline"))) {
+        if (
+          ImGui::Button(
+            mWaterPick == WaterPick::Outline ? "Done##outline"
+                                             : (body.outline.empty() ? "Draw##outline" : "Add points##outline")
+          )
+        ) {
           mWaterPick = mWaterPick == WaterPick::Outline ? WaterPick::None : WaterPick::Outline;
           mBodyIsNew = false;
         }
@@ -1326,9 +1618,13 @@ namespace faf::editor
       ImGui::PopStyleColor();
     }
     mBodiesEditing = active;
-    Note("Lakes and pools at their own levels, besides the sea (docs/WATER_BODIES.md). Each fills the ground below its level "
-         "that its seed reaches, inside its outline and bounds; a dry body keeps low ground dry (a polder). The game draws "
-         "them when sim_FixWaterBodies is on, which Play sets.");
+    Note(
+      "Lakes and pools at their own levels, besides the sea (docs/WATER_BODIES.md). Each fills the ground below its "
+      "level "
+      "that its seed reaches, inside its outline and bounds; a dry body keeps low ground dry (a polder). The game "
+      "draws "
+      "them when sim_FixWaterBodies is on, which Play sets."
+    );
   }
 
   void EdTools::DrawProps()
@@ -1342,7 +1638,9 @@ namespace faf::editor
     }
     if (mPropBlueprints.empty()) {
       Note("The prop list comes once the game's rules are built after startup.");
-    } else if (ImGui::BeginChild("##props", ImVec2(0.0f, ImGui::GetFrameHeight() * 1.8f * 8.0f), ImGuiChildFlags_Borders)) {
+    } else if (
+      ImGui::BeginChild("##props", ImVec2(0.0f, ImGui::GetFrameHeight() * 1.8f * 8.0f), ImGuiChildFlags_Borders)
+    ) {
       // Each prop with a picture of its model (only the rows in view ask for theirs).
       const float picture = ImGui::GetFrameHeight() * 1.8f;
       for (const std::string& blueprint : mPropBlueprints) {
@@ -1370,8 +1668,11 @@ namespace faf::editor
           } else {
             draw->AddRect(at, ImVec2(at.x + picture, at.y + picture), IM_COL32(58, 65, 75, 255));
           }
-          draw->AddText(ImVec2(at.x + picture + 6.0f, at.y + (picture - ImGui::GetTextLineHeight()) * 0.5f), ImGui::GetColorU32(ImGuiCol_Text),
-                        label.c_str());
+          draw->AddText(
+            ImVec2(at.x + picture + 6.0f, at.y + (picture - ImGui::GetTextLineHeight()) * 0.5f),
+            ImGui::GetColorU32(ImGuiCol_Text),
+            label.c_str()
+          );
         }
         if (ImGui::IsItemHovered()) {
           ImGui::SetTooltip("%s", blueprint.c_str());
@@ -1420,7 +1721,9 @@ namespace faf::editor
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::DragIntRange2("##turn", &entry.rotationMin, &entry.rotationMax, 1.0f, 0, 360, "Turn %d", "to %d");
         ImGui::SetNextItemWidth(-1.0f);
-        ImGui::DragFloatRange2("##scale", &entry.scaleMin, &entry.scaleMax, 0.01f, 0.05f, 10.0f, "Scale %.2f", "to %.2f");
+        ImGui::DragFloatRange2(
+          "##scale", &entry.scaleMin, &entry.scaleMax, 0.01f, 0.05f, 10.0f, "Scale %.2f", "to %.2f"
+        );
         ImGui::PopID();
       }
       if (remove >= 0) {
@@ -1448,14 +1751,20 @@ namespace faf::editor
         mPaintSetExport = true;
       }
       ImGui::EndDisabled();
-      Note("With props in the list, Scatter picks one for each prop by its chance, turned between its two angles. The scale "
-           "is saved to the map but the game draws props at their own size (it reads and drops it), so the view does too. "
-           "Sets are FAForeverMapEditor's .proppaintset.");
+      Note(
+        "With props in the list, Scatter picks one for each prop by its chance, turned between its two angles. The "
+        "scale "
+        "is saved to the map but the game draws props at their own size (it reads and drops it), so the view does too. "
+        "Sets are FAForeverMapEditor's .proppaintset."
+      );
     }
     DrawBrush(false);
     DrawSymmetry(false);
-    Note("Single shows the prop under the cursor and places it at a click, Scatter while the button is held, inside the brush; Erase removes those inside it. "
-         "Shift+click erases in any mode. Symmetric copies are placed and removed with them.");
+    Note(
+      "Single shows the prop under the cursor and places it at a click, Scatter while the button is held, inside the "
+      "brush; Erase removes those inside it. "
+      "Shift+click erases in any mode. Symmetric copies are placed and removed with them."
+    );
 
     SectionHeader("MAP RECLAIM");
     if (mReclaimSummary.empty()) {
@@ -1465,8 +1774,11 @@ namespace faf::editor
       for (const std::string& row : mReclaimRows) {
         ImGui::TextDisabled("%s", row.c_str());
       }
-      Note("Each prop's blueprint reclaim (Economy ReclaimMassMax, ReclaimEnergyMax), the most mass first. A scenario that keeps "
-           "a reclaim entry (FAForeverMapEditor's) gets these totals when it is saved.");
+      Note(
+        "Each prop's blueprint reclaim (Economy ReclaimMassMax, ReclaimEnergyMax), the most mass first. A scenario "
+        "that keeps "
+        "a reclaim entry (FAForeverMapEditor's) gets these totals when it is saved."
+      );
     }
   }
 
@@ -1497,15 +1809,23 @@ namespace faf::editor
       ImGui::EndDisabled();
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::SliderFloat("##decaloverlap", &mDecalOverlap, 0.0f, 0.9f, "Overlap %.2f");
-      Note("Click the ground to lay the curve's points; the decals follow it end to end, each its length along the curve "
-           "and its width across, turned with it. Enter or Place lays them (one undo step), Backspace drops the last point, "
-           "Escape clears. Symmetric copies follow.");
+      Note(
+        "Click the ground to lay the curve's points; the decals follow it end to end, each its length along the curve "
+        "and its width across, turned with it. Enter or Place lays them (one undo step), Backspace drops the last "
+        "point, "
+        "Escape clears. Symmetric copies follow."
+      );
     }
     if (mDecalMode == 1) {
       char count[64];
-      (void)std::snprintf(count, sizeof(count), "%d decal%s selected", mDecalSelectionCount, mDecalSelectionCount == 1 ? "" : "s");
+      (void)std::snprintf(
+        count, sizeof(count), "%d decal%s selected", mDecalSelectionCount, mDecalSelectionCount == 1 ? "" : "s"
+      );
       ImGui::TextUnformatted(count);
-      Note("Click a decal to select it (Ctrl adds), drag to move, Shift+click or Delete removes. Each edit is one undo step.");
+      Note(
+        "Click a decal to select it (Ctrl adds), drag to move, Shift+click or Delete removes. Each edit is one undo "
+        "step."
+      );
     }
 
     // The textures: each as itself on a checkerboard, filtered by name and type.
@@ -1550,8 +1870,11 @@ namespace faf::editor
         const float square = cell / 4.0f;
         for (int y = 0; y < 4; ++y) {
           for (int x = 0; x < 4; ++x) {
-            draw->AddRectFilled(ImVec2(p.x + x * square, p.y + y * square), ImVec2(p.x + (x + 1) * square, p.y + (y + 1) * square),
-                                (x + y) % 2 == 0 ? IM_COL32(70, 74, 80, 255) : IM_COL32(52, 55, 60, 255));
+            draw->AddRectFilled(
+              ImVec2(p.x + x * square, p.y + y * square),
+              ImVec2(p.x + (x + 1) * square, p.y + (y + 1) * square),
+              (x + y) % 2 == 0 ? IM_COL32(70, 74, 80, 255) : IM_COL32(52, 55, 60, 255)
+            );
           }
         }
         if (ImGui::InvisibleButton("##decal", ImVec2(cell, cell))) {
@@ -1565,8 +1888,13 @@ namespace faf::editor
           draw->AddRect(p, ImVec2(p.x + cell, p.y + cell), kAccent, 3.0f, 0, 2.0f);
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-          ImGui::SetTooltip("%s\n%s, placed as %s%s", texture.name.c_str(), texture.biome.c_str(), DecalTypeName(texture.type),
-                            texture.pair.empty() ? "" : "\nwith a spec map");
+          ImGui::SetTooltip(
+            "%s\n%s, placed as %s%s",
+            texture.name.c_str(),
+            texture.biome.c_str(),
+            DecalTypeName(texture.type),
+            texture.pair.empty() ? "" : "\nwith a spec map"
+          );
         }
         ImGui::PopID();
       }
@@ -1577,7 +1905,9 @@ namespace faf::editor
     ImGui::EndChild();
     if (!mDecalTexture.empty()) {
       const std::size_t slash = mDecalTexture.find_last_of('/');
-      ImGui::TextWrapped("%s (%s)", mDecalTexture.substr(slash + 1).c_str(), DecalTypeName(DecalTypeForTexture(mDecalTexture)));
+      ImGui::TextWrapped(
+        "%s (%s)", mDecalTexture.substr(slash + 1).c_str(), DecalTypeName(DecalTypeForTexture(mDecalTexture))
+      );
       bool hasPair = false;
       for (const DecalTexture& texture : mDecalTextures) {
         hasPair = hasPair || (texture.path == mDecalTexture && !texture.pair.empty());
@@ -1586,8 +1916,10 @@ namespace faf::editor
       ImGui::Checkbox("With its spec map", &mDecalWithPair);
       ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
-        ImGui::SetTooltip(hasPair ? "The decal's second texture is its _spec map, as the game's maps keep albedo decals"
-                                  : "Only an _albedo texture with a _spec next to it has one");
+        ImGui::SetTooltip(
+          hasPair ? "The decal's second texture is its _spec map, as the game's maps keep albedo decals"
+                  : "Only an _albedo texture with a _spec next to it has one"
+        );
       }
     } else {
       Note("Pick a texture to place.");
@@ -1600,10 +1932,19 @@ namespace faf::editor
     ImGui::SliderFloat("##decalturn", &mDecalTurn, -180.0f, 180.0f, "Turn %.0f deg");
     ImGui::Checkbox("Random turn", &mDecalRandomTurn);
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::DragFloat("##decalcutoff", &mDecalCutoff, 5.0f, 0.0f, 5000.0f, mDecalCutoff <= 0.0f ? "Fade distance: from its size" : "Fade at %.0f");
+    ImGui::DragFloat(
+      "##decalcutoff",
+      &mDecalCutoff,
+      5.0f,
+      0.0f,
+      5000.0f,
+      mDecalCutoff <= 0.0f ? "Fade distance: from its size" : "Fade at %.0f"
+    );
     DrawSymmetry(false);
-    Note("Place: a click puts the texture there, centred, with its symmetric copies (turned with the symmetry). "
-         "Size is along and across its heading, in game units.");
+    Note(
+      "Place: a click puts the texture there, centred, with its symmetric copies (turned with the symmetry). "
+      "Size is along and across its heading, in game units."
+    );
   }
 
   void EdTools::DrawUnits()
@@ -1614,9 +1955,14 @@ namespace faf::editor
     Segmented(kModes, 2, mUnitMode);
     if (mUnitMode == 1) {
       char count[64];
-      (void)std::snprintf(count, sizeof(count), "%d unit%s selected", mUnitSelectionCount, mUnitSelectionCount == 1 ? "" : "s");
+      (void)std::snprintf(
+        count, sizeof(count), "%d unit%s selected", mUnitSelectionCount, mUnitSelectionCount == 1 ? "" : "s"
+      );
       ImGui::TextUnformatted(count);
-      Note("Click a unit to select it (Ctrl adds), drag it or its arrows to move, Shift+click or Delete removes. Each edit is one undo step.");
+      Note(
+        "Click a unit to select it (Ctrl adds), drag it or its arrows to move, Shift+click or Delete removes. Each "
+        "edit is one undo step."
+      );
     }
 
     // The army new units join: the players' and the extra armies.
@@ -1645,9 +1991,11 @@ namespace faf::editor
     }
     if (mUnitTypes.empty()) {
       Note("The unit list comes once the game's rules are built after startup.");
-    } else if (ImGui::BeginChild("##unittypes", ImVec2(0.0f, ImGui::GetFrameHeight() * 1.6f * 9.0f), ImGuiChildFlags_Borders)) {
-      // Each unit with its build icon, as the game's build menus show it (/textures/ui/common/icons/units/<id>_icon.dds);
-      // only the rows in view ask for theirs.
+    } else if (
+      ImGui::BeginChild("##unittypes", ImVec2(0.0f, ImGui::GetFrameHeight() * 1.6f * 9.0f), ImGuiChildFlags_Borders)
+    ) {
+      // Each unit with its build icon, as the game's build menus show it
+      // (/textures/ui/common/icons/units/<id>_icon.dds); only the rows in view ask for theirs.
       mLibrary.Pump(4);
       const float icon = ImGui::GetFrameHeight() * 1.5f;
       for (const auto& [id, name] : mUnitTypes) {
@@ -1670,7 +2018,8 @@ namespace faf::editor
             c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
           }
           ImDrawList* const draw = ImGui::GetWindowDrawList();
-          const std::uint64_t image = mLibrary.Thumbnail("/textures/ui/common/icons/units/" + idLower + "_icon.dds", true);
+          const std::uint64_t image =
+            mLibrary.Thumbnail("/textures/ui/common/icons/units/" + idLower + "_icon.dds", true);
           if (image != 0U) {
             draw->AddImage(static_cast<ImTextureID>(image), at, ImVec2(at.x + icon, at.y + icon));
           } else {
@@ -1678,8 +2027,11 @@ namespace faf::editor
           }
           const float textY = at.y + (icon - ImGui::GetTextLineHeight()) * 0.5f;
           draw->AddText(ImVec2(at.x + icon + 6.0f, textY), ImGui::GetColorU32(ImGuiCol_Text), id.c_str());
-          draw->AddText(ImVec2(at.x + icon + 6.0f + ImGui::GetFontSize() * 4.5f, textY), ImGui::GetColorU32(ImGuiCol_TextDisabled),
-                        name.c_str());
+          draw->AddText(
+            ImVec2(at.x + icon + 6.0f + ImGui::GetFontSize() * 4.5f, textY),
+            ImGui::GetColorU32(ImGuiCol_TextDisabled),
+            name.c_str()
+          );
         }
         ImGui::PopID();
       }
@@ -1689,15 +2041,22 @@ namespace faf::editor
     }
     ImGui::Checkbox("Random turn", &mUnitRandomTurn);
     DrawSymmetry(false);
-    Note("Place: a click puts the unit there with its symmetric copies, in the army above, in its INITIAL group (the units the "
-         "army starts with); names are UNIT_n, as the game's saves name them.");
+    Note(
+      "Place: a click puts the unit there with its symmetric copies, in the army above, in its INITIAL group (the "
+      "units the "
+      "army starts with); names are UNIT_n, as the game's saves name them."
+    );
 
     SectionHeader("GROUPS");
     if (mUnitTreeArmy.empty() || mUnitTreeArmy != mUnitArmy) {
       Note("The army's groups show here once its units are read.");
     } else {
       // The army's groups (the INITIAL group the game starts it with, and those under it), each with its units' count.
-      if (ImGui::BeginChild("##unitgroups", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 8.0f), ImGuiChildFlags_Borders)) {
+      if (
+        ImGui::BeginChild(
+          "##unitgroups", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 8.0f), ImGuiChildFlags_Borders
+        )
+      ) {
         std::vector<std::string> path;
         DrawUnitGroup(mUnitTree, path);
       }
@@ -1732,8 +2091,11 @@ namespace faf::editor
         mGroupAsk = GroupAsk::MoveSelected;
       }
       ImGui::EndDisabled();
-      Note("A click on a group selects its units. A removed group's units and groups go up into its parent. Each change is "
-           "one undo step.");
+      Note(
+        "A click on a group selects its units. A removed group's units and groups go up into its parent. Each change "
+        "is "
+        "one undo step."
+      );
     }
 
     SectionHeader("UNIT FILE");
@@ -1746,12 +2108,19 @@ namespace faf::editor
     if (ImGui::Button(mUnitSelectionCount > 0 ? "Export selected..." : "Export the army's...")) {
       mUnitFileExport = true;
     }
-    Note("FAForeverMapEditor's units file (.scunits): type, position, turn, orders and platoon. Import puts the units in the "
-         "army above, on the ground, selected, as one undo step; units from a bigger map are moved together to its middle. "
-         "Export writes the selected units, or all of the army's.");
+    Note(
+      "FAForeverMapEditor's units file (.scunits): type, position, turn, orders and platoon. Import puts the units in "
+      "the "
+      "army above, on the ground, selected, as one undo step; units from a bigger map are moved together to its "
+      "middle. "
+      "Export writes the selected units, or all of the army's."
+    );
   }
 
-  void EdTools::DrawUnitGroup(const UnitGroup& group, std::vector<std::string>& path)
+  void EdTools::DrawUnitGroup(
+    const UnitGroup& group,
+    std::vector<std::string>& path
+  )
   {
     for (const UnitGroup::Member& member : group.order) {
       if (member.group < 0 || static_cast<std::size_t>(member.group) >= group.groups.size()) {
@@ -1762,7 +2131,8 @@ namespace faf::editor
       std::vector<const SaveUnit*> units;
       CollectUnits(child, units);
       ImGui::PushID(child.name.c_str());
-      ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
+      ImGuiTreeNodeFlags flags =
+        ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_DefaultOpen;
       if (child.groups.empty()) {
         flags |= ImGuiTreeNodeFlags_Leaf;
       }
@@ -1793,7 +2163,8 @@ namespace faf::editor
         // A border a tenth of the map in from each side, on the game's 4-unit grid.
         const int marginX = (mMapWidth / 10) / 4 * 4;
         const int marginZ = (mMapHeight / 10) / 4 * 4;
-        mAreaChange = std::array<int, 4>{marginX, marginZ, (mMapWidth - marginX) / 4 * 4, (mMapHeight - marginZ) / 4 * 4};
+        mAreaChange =
+          std::array<int, 4>{marginX, marginZ, (mMapWidth - marginX) / 4 * 4, (mMapHeight - marginZ) / 4 * 4};
       } else {
         mAreaChange.reset();
       }
@@ -1810,7 +2181,8 @@ namespace faf::editor
           // Centred: the opposite edge as far in from its side.
           if (mBorderCentred) {
             const int opposite = (i + 2) % 4;
-            area[static_cast<std::size_t>(opposite)] = std::clamp((limit - area[static_cast<std::size_t>(i)]) / 4 * 4, 0, limit);
+            area[static_cast<std::size_t>(opposite)] =
+              std::clamp((limit - area[static_cast<std::size_t>(i)]) / 4 * 4, 0, limit);
           }
           if (area[0] < area[2] && area[1] < area[3]) {
             mAreaChanged = true;
@@ -1819,13 +2191,18 @@ namespace faf::editor
         }
       }
       char size[64];
-      (void)std::snprintf(size, sizeof(size), "%d x %d of %d x %d", area[2] - area[0], area[3] - area[1], mMapWidth, mMapHeight);
+      (void)std::snprintf(
+        size, sizeof(size), "%d x %d of %d x %d", area[2] - area[0], area[3] - area[1], mMapWidth, mMapHeight
+      );
       ImGui::TextDisabled("%s", size);
       ImGui::Checkbox("Keep it centred", &mBorderCentred);
     }
-    Note("The game rounds each edge down to a multiple of 4. The ground outside is darkened as in the game; drag the border's "
-         "edges in the view with the toolbar's border button on (or the Markers tool). Saved as an area of _save.lua that "
-         "_script.lua's OnPopulate makes the playable area.");
+    Note(
+      "The game rounds each edge down to a multiple of 4. The ground outside is darkened as in the game; drag the "
+      "border's "
+      "edges in the view with the toolbar's border button on (or the Markers tool). Saved as an area of _save.lua that "
+      "_script.lua's OnPopulate makes the playable area."
+    );
   }
 
   void EdTools::DrawMarkers()
@@ -1847,11 +2224,19 @@ namespace faf::editor
       }
       ImGui::EndCombo();
     }
-    Note("Click the ground to place one (with its symmetric copies), click a marker to select it (Ctrl adds), drag to move, "
-         "Shift+click or Delete removes. Start positions are named ARMY_1, ARMY_2... (the scenario's army list is edited with the armies).");
+    Note(
+      "Click the ground to place one (with its symmetric copies), click a marker to select it (Ctrl adds), drag to "
+      "move, "
+      "Shift+click or Delete removes. Start positions are named ARMY_1, ARMY_2... (the scenario's army list is edited "
+      "with the armies)."
+    );
     ImGui::Checkbox("Connect path nodes", &mConnectNodes);
-    Note("Clicking a path node links it to the selected nodes of its graph, or unlinks them; Ctrl+Shift+click does the same "
-         "without the mode. Placing a path node links it to the selected one, so clicks lay a path. Symmetric copies follow.");
+    Note(
+      "Clicking a path node links it to the selected nodes of its graph, or unlinks them; Ctrl+Shift+click does the "
+      "same "
+      "without the mode. Placing a path node links it to the selected one, so clicks lay a path. Symmetric copies "
+      "follow."
+    );
     DrawSymmetry(false);
 
     SectionHeader("SELECTED");
@@ -1876,28 +2261,32 @@ namespace faf::editor
         const float h = ImGui::GetFrameHeight();
         ImDrawList* const dl = ImGui::GetWindowDrawList();
         const ImVec2 a(at.x, at.y + (h - size.y) * 0.5f - 1.0f);
-        dl->AddRectFilled(a, ImVec2(a.x + size.x + 8.0f, a.y + size.y + 2.0f), (colour & 0x00FFFFFFu) | 0x55000000u, 3.0f);
+        dl->AddRectFilled(
+          a, ImVec2(a.x + size.x + 8.0f, a.y + size.y + 2.0f), (colour & 0x00FFFFFFu) | 0x55000000u, 3.0f
+        );
         dl->AddText(ImVec2(a.x + 4.0f, a.y + 1.0f), colour, kind);
         ImGui::Dummy(ImVec2(size.x + 8.0f, h));
       };
       // Each property by its kind (user ask 2026-11-11: typed fields, not raw Lua): text, a number, a vector, a switch,
-      // a colour; anything else as the save writes it. Text applies on Enter, the others when let go: one undo step each.
+      // a colour; anything else as the save writes it. Text applies on Enter, the others when let go: one undo step
+      // each.
       const auto typedField = [&](const std::string& key, const std::string& raw) {
         const MarkerValue parsed = ParseMarkerValue(raw);
         float rgba[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-        const bool colour = parsed.kind == MarkerValue::Kind::String && (key == "color" || key == "colour") && MarkerColourText(parsed.text, rgba);
-        const char* const kind = colour                                       ? "color"
-                                 : parsed.kind == MarkerValue::Kind::String  ? "str"
-                                 : parsed.kind == MarkerValue::Kind::Float   ? "num"
-                                 : parsed.kind == MarkerValue::Kind::Bool    ? "bool"
-                                 : parsed.kind == MarkerValue::Kind::Vector3 ? "vec3"
-                                                                             : "lua";
-        const ImU32 kindColour = colour                                       ? IM_COL32(230, 120, 200, 255)
-                                 : parsed.kind == MarkerValue::Kind::String  ? IM_COL32(206, 145, 120, 255)
-                                 : parsed.kind == MarkerValue::Kind::Float   ? IM_COL32(181, 206, 168, 255)
-                                 : parsed.kind == MarkerValue::Kind::Bool    ? IM_COL32(86, 156, 214, 255)
-                                 : parsed.kind == MarkerValue::Kind::Vector3 ? IM_COL32(78, 201, 176, 255)
-                                                                             : IM_COL32(160, 160, 160, 255);
+        const bool colour = parsed.kind == MarkerValue::Kind::String && (key == "color" || key == "colour") &&
+          MarkerColourText(parsed.text, rgba);
+        const char* const kind = colour               ? "color"
+          : parsed.kind == MarkerValue::Kind::String  ? "str"
+          : parsed.kind == MarkerValue::Kind::Float   ? "num"
+          : parsed.kind == MarkerValue::Kind::Bool    ? "bool"
+          : parsed.kind == MarkerValue::Kind::Vector3 ? "vec3"
+                                                      : "lua";
+        const ImU32 kindColour = colour               ? IM_COL32(230, 120, 200, 255)
+          : parsed.kind == MarkerValue::Kind::String  ? IM_COL32(206, 145, 120, 255)
+          : parsed.kind == MarkerValue::Kind::Float   ? IM_COL32(181, 206, 168, 255)
+          : parsed.kind == MarkerValue::Kind::Bool    ? IM_COL32(86, 156, 214, 255)
+          : parsed.kind == MarkerValue::Kind::Vector3 ? IM_COL32(78, 201, 176, 255)
+                                                      : IM_COL32(160, 160, 160, 255);
         if (parsed.kind == MarkerValue::Kind::Raw || (parsed.kind == MarkerValue::Kind::String && !colour)) {
           return false; // text: the text field below
         }
@@ -1925,7 +2314,9 @@ namespace faf::editor
         }
         bool edited = false;
         if (colour) {
-          edited = ImGui::ColorEdit4("##value", mMarkerTypedColour, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf);
+          edited = ImGui::ColorEdit4(
+            "##value", mMarkerTypedColour, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf
+          );
         } else if (parsed.kind == MarkerValue::Kind::Float) {
           edited = ImGui::DragFloat("##value", &mMarkerTyped.number[0], 0.1f, 0.0f, 0.0f, "%.3f");
         } else if (parsed.kind == MarkerValue::Kind::Vector3) {
@@ -1964,9 +2355,14 @@ namespace faf::editor
           ImGui::SetItemTooltip("%s", MarkerFieldUse(key));
         }
         ImGui::SameLine(labelColumn);
-        badge(key == "name" ? "name" : isString ? "str" : "lua", key == "name" ? IM_COL32(220, 220, 170, 255)
-                                                                 : isString       ? IM_COL32(206, 145, 120, 255)
-                                                                                  : IM_COL32(160, 160, 160, 255));
+        badge(
+          key == "name" ? "name"
+            : isString  ? "str"
+                        : "lua",
+          key == "name" ? IM_COL32(220, 220, 170, 255)
+            : isString  ? IM_COL32(206, 145, 120, 255)
+                        : IM_COL32(160, 160, 160, 255)
+        );
         ImGui::SameLine();
         const std::string id = marker.name + "/" + key;
         if (mMarkerEditing != id) {
@@ -2008,8 +2404,12 @@ namespace faf::editor
     if (ImGui::Button("Fill the map with an air node grid", ImVec2(-1.0f, 0.0f))) {
       mAirGridAsked = true;
     }
-    Note("A grid of air path nodes over the playable area (the whole map without one), each linked to its 8 neighbours, as "
-         "FAForeverMapEditor's air presets lay them: 16 a side on any map size. AI air units path along them. One undo step.");
+    Note(
+      "A grid of air path nodes over the playable area (the whole map without one), each linked to its 8 neighbours, "
+      "as "
+      "FAForeverMapEditor's air presets lay them: 16 a side on any map size. AI air units path along them. One undo "
+      "step."
+    );
 
     SectionHeader("MARKER FILE");
     if (ImGui::Button("Import...")) {
@@ -2019,15 +2419,22 @@ namespace faf::editor
     if (ImGui::Button(mMarkerSelection.empty() ? "Export all..." : "Export selected...")) {
       mMarkerFileExport = true;
     }
-    Note("FAForeverMapEditor's marker file (.fafmapmarkers): types, positions and path links. Imported markers get new "
-         "names, are selected, and are one undo step; weather, effect and objective markers are left out.");
+    Note(
+      "FAForeverMapEditor's marker file (.fafmapmarkers): types, positions and path links. Imported markers get new "
+      "names, are selected, and are one undo step; weather, effect and objective markers are left out."
+    );
 
     SectionHeader("ARMIES");
     {
       const bool oneFfa = mTeams.size() == 1 && mTeams.front().name == "FFA";
       const std::size_t slots = mTeams.empty() ? 0 : mTeams.front().armies.size();
-      ImGui::Text("%zu player slot%s, %zu extra arm%s", slots, slots == 1 ? "" : "s", mExtraArmies.size(),
-                  mExtraArmies.size() == 1 ? "y" : "ies");
+      ImGui::Text(
+        "%zu player slot%s, %zu extra arm%s",
+        slots,
+        slots == 1 ? "" : "s",
+        mExtraArmies.size(),
+        mExtraArmies.size() == 1 ? "y" : "ies"
+      );
       if (!oneFfa && !mTeams.empty()) {
         ImGui::SameLine();
         ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "(not one FFA team)");
@@ -2035,8 +2442,12 @@ namespace faf::editor
       if (ImGui::Button("Open the Armies panel", ImVec2(-1.0f, 0.0f))) {
         mOpenArmies = true;
       }
-      Note("Slot order, extra armies, starting resources, faction and alliances are edited in the Armies panel (View > Armies). "
-           "Placing a start position adds its army (ARMY_n) to the scenario's team and _save.lua; deleting or renaming it follows.");
+      Note(
+        "Slot order, extra armies, starting resources, faction and alliances are edited in the Armies panel (View > "
+        "Armies). "
+        "Placing a start position adds its army (ARMY_n) to the scenario's team and _save.lua; deleting or renaming it "
+        "follows."
+      );
     }
     DrawPlayableArea();
   }

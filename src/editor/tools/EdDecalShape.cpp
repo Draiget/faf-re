@@ -6,7 +6,13 @@
 
 namespace faf::editor
 {
-  DecalFootprint DecalAround(const float cx, const float cz, const float sizeX, const float sizeZ, const float yaw)
+  DecalFootprint DecalAround(
+    const float cx,
+    const float cz,
+    const float sizeX,
+    const float sizeZ,
+    const float yaw
+  )
   {
     const float c = std::cos(yaw);
     const float s = std::sin(yaw);
@@ -20,7 +26,11 @@ namespace faf::editor
     return decal;
   }
 
-  void DecalCentre(const DecalFootprint& decal, float& cx, float& cz)
+  void DecalCentre(
+    const DecalFootprint& decal,
+    float& cx,
+    float& cz
+  )
   {
     const float c = std::cos(decal.yaw);
     const float s = std::sin(decal.yaw);
@@ -28,7 +38,11 @@ namespace faf::editor
     cz = decal.z + 0.5f * (decal.sizeX * s + decal.sizeZ * c);
   }
 
-  void DecalCorners(const DecalFootprint& decal, float (&x)[4], float (&z)[4])
+  void DecalCorners(
+    const DecalFootprint& decal,
+    float (&x)[4],
+    float (&z)[4]
+  )
   {
     const float c = std::cos(decal.yaw);
     const float s = std::sin(decal.yaw);
@@ -41,7 +55,11 @@ namespace faf::editor
     }
   }
 
-  bool DecalContains(const DecalFootprint& decal, const float x, const float z)
+  bool DecalContains(
+    const DecalFootprint& decal,
+    const float x,
+    const float z
+  )
   {
     if (decal.sizeX <= 0.0f || decal.sizeZ <= 0.0f) {
       return false;
@@ -55,10 +73,14 @@ namespace faf::editor
     return u >= 0.0f && u < 1.0f && v >= 0.0f && v < 1.0f;
   }
 
-  int DecalTypeForTexture(const std::string& path)
+  int DecalTypeForTexture(
+    const std::string& path
+  )
   {
     std::string lower = path;
-    std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char ch) {
+      return static_cast<char>(std::tolower(ch));
+    });
     const std::size_t slash = lower.find_last_of('/');
     const std::string file = slash == std::string::npos ? lower : lower.substr(slash + 1);
     if (file.find("normal") != std::string::npos) {
@@ -70,7 +92,10 @@ namespace faf::editor
     return 1;
   }
 
-  std::pair<float, float> PathPoint(const std::vector<std::pair<float, float>>& points, const float t)
+  std::pair<float, float> PathPoint(
+    const std::vector<std::pair<float, float>>& points,
+    const float t
+  )
   {
     if (points.empty()) {
       return {0.0f, 0.0f};
@@ -82,18 +107,25 @@ namespace faf::editor
     const float clamped = std::clamp(t, 0.0f, static_cast<float>(last));
     const int i = std::min(static_cast<int>(clamped), last - 1);
     const float u = clamped - static_cast<float>(i);
-    const auto at = [&](const int k) { return points[static_cast<std::size_t>(std::clamp(k, 0, last))]; };
+    const auto at = [&](const int k) {
+      return points[static_cast<std::size_t>(std::clamp(k, 0, last))];
+    };
     const auto p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
     const float u2 = u * u;
     const float u3 = u2 * u;
     const auto blend = [&](const float a, const float b, const float c, const float d) {
-      return 0.5f * ((2.0f * b) + (-a + c) * u + (2.0f * a - 5.0f * b + 4.0f * c - d) * u2 + (-a + 3.0f * b - 3.0f * c + d) * u3);
+      return 0.5f *
+        ((2.0f * b) + (-a + c) * u + (2.0f * a - 5.0f * b + 4.0f * c - d) * u2 + (-a + 3.0f * b - 3.0f * c + d) * u3);
     };
     return {blend(p0.first, p1.first, p2.first, p3.first), blend(p0.second, p1.second, p2.second, p3.second)};
   }
 
-  std::vector<DecalFootprint> DecalsAlongPath(const std::vector<std::pair<float, float>>& points, const float length, const float width,
-                                              const float overlap)
+  std::vector<DecalFootprint> DecalsAlongPath(
+    const std::vector<std::pair<float, float>>& points,
+    const float length,
+    const float width,
+    const float overlap
+  )
   {
     std::vector<DecalFootprint> decals;
     if (points.size() < 2 || length <= 0.0f || width <= 0.0f) {
@@ -107,9 +139,13 @@ namespace faf::editor
     along.reserve(static_cast<std::size_t>(samples) + 1);
     for (int s = 0; s <= samples; ++s) {
       line.push_back(PathPoint(points, static_cast<float>(s) / 32.0f));
-      along.push_back(s == 0 ? 0.0f
-                             : along.back() + std::hypot(line.back().first - line[line.size() - 2].first,
-                                                         line.back().second - line[line.size() - 2].second));
+      along.push_back(
+        s == 0 ? 0.0f
+               : along.back() +
+            std::hypot(
+                   line.back().first - line[line.size() - 2].first, line.back().second - line[line.size() - 2].second
+            )
+      );
     }
     const float total = along.back();
     // The point at a distance along it (past the end: on along the last direction).
@@ -124,8 +160,10 @@ namespace faf::editor
       }
       const float span = along[k] - along[k - 1];
       const float f = span > 0.0f ? (d - along[k - 1]) / span : 0.0f;
-      return std::pair<float, float>{line[k - 1].first + (line[k].first - line[k - 1].first) * f,
-                                     line[k - 1].second + (line[k].second - line[k - 1].second) * f};
+      return std::pair<float, float>{
+        line[k - 1].first + (line[k].first - line[k - 1].first) * f,
+        line[k - 1].second + (line[k].second - line[k - 1].second) * f
+      };
     };
     const float step = length * (1.0f - std::clamp(overlap, 0.0f, 0.9f));
     for (float start = 0.0f; start < total - 1e-3f && decals.size() < 4096; start += step) {
@@ -149,7 +187,9 @@ namespace faf::editor
     return decals;
   }
 
-  const char* DecalTypeName(const int type)
+  const char* DecalTypeName(
+    const int type
+  )
   {
     switch (type) {
     case 1:

@@ -120,7 +120,10 @@ namespace
   constexpr const char* kUnitSetStatName = "SetStat";
   constexpr const char* kUnitSetStatHelpText = "SetStat(Name, Value)";
 
-  [[nodiscard]] CAniPoseBone* ResolveUnitPoseBone(Unit& unit, const int boneIndex) noexcept
+  [[nodiscard]] CAniPoseBone* ResolveUnitPoseBone(
+    Unit& unit,
+    const int boneIndex
+  ) noexcept
   {
     if (unit.AniActor == nullptr || unit.AniActor->mPose.get() == nullptr || boneIndex < 0) {
       return nullptr;
@@ -148,7 +151,10 @@ namespace
     return bone;
   }
 
-  [[nodiscard]] bool ParseFireStateLexical(const char* const lexical, std::int32_t& outFireState)
+  [[nodiscard]] bool ParseFireStateLexical(
+    const char* const lexical,
+    std::int32_t& outFireState
+  )
   {
     if (lexical == nullptr) {
       return false;
@@ -206,12 +212,13 @@ namespace
    * instantiation already documented there.
    */
 
-  [[nodiscard]] BVIntSet& AsCategoryWordBitset(EntityCategorySet& range) noexcept
+  [[nodiscard]] BVIntSet& AsCategoryWordBitset(
+    EntityCategorySet& range
+  ) noexcept
   {
     return range.mBits;
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x006C3C00 (FUN_006C3C00, cfunc_UnitSetCreator)
@@ -219,7 +226,9 @@ namespace
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetCreatorL`.
  */
-int moho::cfunc_UnitSetCreator(lua_State* const luaContext)
+int moho::cfunc_UnitSetCreator(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetCreatorL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -249,7 +258,9 @@ CScrLuaInitForm* moho::func_UnitSetCreator_LuaFuncDef()
  * What it does:
  * Writes arg #2 into arg #1 unit creator weak lane and marks sync dirty.
  */
-int moho::cfunc_UnitSetCreatorL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetCreatorL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetCreatorHelpText);
 
@@ -273,7 +284,9 @@ int moho::cfunc_UnitSetCreatorL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitClearFocusEntityL`.
  */
-int moho::cfunc_UnitClearFocusEntity(lua_State* const luaContext)
+int moho::cfunc_UnitClearFocusEntity(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitClearFocusEntityL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -304,7 +317,9 @@ CScrLuaInitForm* moho::func_UnitClearFocusEntity_LuaFuncDef()
  * Clears the focused-entity weak lane and marks focus state as assigned for
  * script-side follow-up.
  */
-int moho::cfunc_UnitClearFocusEntityL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitClearFocusEntityL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kUnitClearFocusEntityHelpText);
 
@@ -325,7 +340,9 @@ int moho::cfunc_UnitClearFocusEntityL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetFocusEntityL`.
  */
-int moho::cfunc_UnitSetFocusEntity(lua_State* const luaContext)
+int moho::cfunc_UnitSetFocusEntity(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetFocusEntityL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -356,7 +373,9 @@ CScrLuaInitForm* moho::func_UnitSetFocusEntity_LuaFuncDef()
  * Resolves optional focus entity from Lua arg #2, writes it into unit focus
  * weak lane, dispatches `OnAssignedFocusEntity`, and marks focus assigned.
  */
-int moho::cfunc_UnitSetFocusEntityL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetFocusEntityL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetFocusEntityHelpText);
 
@@ -382,7 +401,9 @@ int moho::cfunc_UnitSetFocusEntityL(LuaPlus::LuaState* const state)
  * What it does:
  * Enables/disables one manipulator lane on a unit by bone index or bone name.
  */
-int moho::cfunc_UnitEnableManipulatorsL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitEnableManipulatorsL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 3, kUnitEnableManipulatorsHelpText);
@@ -421,7 +442,9 @@ int moho::cfunc_UnitEnableManipulatorsL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitEnableManipulatorsL`.
  */
-int moho::cfunc_UnitEnableManipulators(lua_State* const luaContext)
+int moho::cfunc_UnitEnableManipulators(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitEnableManipulatorsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -452,7 +475,9 @@ CScrLuaInitForm* moho::func_UnitEnableManipulators_LuaFuncDef()
  * Resolves `(self, icon)` and applies one strategic underlay icon id on the
  * unit entity.
  */
-int moho::cfunc_UnitSetStrategicUnderlayL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetStrategicUnderlayL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetStrategicUnderlayHelpText);
@@ -480,7 +505,9 @@ int moho::cfunc_UnitSetStrategicUnderlayL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetStrategicUnderlayL`.
  */
-int moho::cfunc_UnitSetStrategicUnderlay(lua_State* const luaContext)
+int moho::cfunc_UnitSetStrategicUnderlay(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetStrategicUnderlayL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -510,7 +537,9 @@ CScrLuaInitForm* moho::func_UnitSetStrategicUnderlay_LuaFuncDef()
  * What it does:
  * Applies one fire-state string command to each live unit in the input table.
  */
-int moho::cfunc_SetFireStateL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetFireStateL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetFireStateArgsHelpText);
@@ -549,7 +578,9 @@ int moho::cfunc_SetFireStateL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetFireStateL`.
  */
-int moho::cfunc_SetFireState(lua_State* const luaContext)
+int moho::cfunc_SetFireState(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetFireStateL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -579,7 +610,9 @@ CScrLuaInitForm* moho::func_SetFireState_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_ToggleFireStateL`.
  */
-int moho::cfunc_ToggleFireState(lua_State* const luaContext)
+int moho::cfunc_ToggleFireState(
+  lua_State* const luaContext
+)
 {
   return cfunc_ToggleFireStateL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -610,7 +643,9 @@ CScrLuaInitForm* moho::func_ToggleFireState_LuaFuncDef()
  * Rotates one global fire-state lane and dispatches `SetFireState` info pairs
  * for each live unit in the input table.
  */
-int moho::cfunc_ToggleFireStateL(LuaPlus::LuaState* const state)
+int moho::cfunc_ToggleFireStateL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kToggleFireStateGlobalArgsHelpText);
@@ -654,7 +689,9 @@ int moho::cfunc_ToggleFireStateL(LuaPlus::LuaState* const state)
  * What it does:
  * Adds one unit argument into a carrier's storage lane when capacity is available.
  */
-int moho::cfunc_UnitAddUnitToStorageL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitAddUnitToStorageL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitAddUnitToStorageHelpText);
 
@@ -683,7 +720,9 @@ int moho::cfunc_UnitAddUnitToStorageL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitAddUnitToStorageL`.
  */
-int moho::cfunc_UnitAddUnitToStorage(lua_State* const luaContext)
+int moho::cfunc_UnitAddUnitToStorage(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitAddUnitToStorageL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -713,7 +752,9 @@ CScrLuaInitForm* moho::func_UnitAddUnitToStorage_LuaFuncDef()
  * What it does:
  * Removes a requested nuke ammo count from the unit silo lane.
  */
-int moho::cfunc_UnitRemoveNukeSiloAmmoL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitRemoveNukeSiloAmmoL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitRemoveNukeSiloAmmoHelpText);
 
@@ -738,7 +779,9 @@ int moho::cfunc_UnitRemoveNukeSiloAmmoL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitRemoveNukeSiloAmmoL`.
  */
-int moho::cfunc_UnitRemoveNukeSiloAmmo(lua_State* const luaContext)
+int moho::cfunc_UnitRemoveNukeSiloAmmo(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitRemoveNukeSiloAmmoL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -768,7 +811,9 @@ CScrLuaInitForm* moho::func_UnitRemoveNukeSiloAmmo_LuaFuncDef()
  * What it does:
  * Removes requested tactical missile ammo amount from unit silo storage.
  */
-int moho::cfunc_UnitRemoveTacticalSiloAmmoL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitRemoveTacticalSiloAmmoL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitRemoveTacticalSiloAmmoHelpText);
 
@@ -793,7 +838,9 @@ int moho::cfunc_UnitRemoveTacticalSiloAmmoL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitRemoveTacticalSiloAmmoL`.
  */
-int moho::cfunc_UnitRemoveTacticalSiloAmmo(lua_State* const luaContext)
+int moho::cfunc_UnitRemoveTacticalSiloAmmo(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitRemoveTacticalSiloAmmoL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -823,7 +870,9 @@ CScrLuaInitForm* moho::func_UnitRemoveTacticalSiloAmmo_LuaFuncDef()
  * What it does:
  * Applies paused state from arg#2 to the unit resolved from arg#1.
  */
-int moho::cfunc_UnitSetPausedL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetPausedL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetPausedHelpText);
 
@@ -843,7 +892,9 @@ int moho::cfunc_UnitSetPausedL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetPausedL`.
  */
-int moho::cfunc_UnitSetPaused(lua_State* const luaContext)
+int moho::cfunc_UnitSetPaused(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetPausedL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -873,7 +924,9 @@ CScrLuaInitForm* moho::func_UnitSetPaused_LuaFuncDef()
  * What it does:
  * Applies consumption-active flag from arg#2 to the unit resolved from arg#1.
  */
-int moho::cfunc_UnitSetConsumptionActiveL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetConsumptionActiveL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetConsumptionActiveHelpText);
 
@@ -893,7 +946,9 @@ int moho::cfunc_UnitSetConsumptionActiveL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetConsumptionActiveL`.
  */
-int moho::cfunc_UnitSetConsumptionActive(lua_State* const luaContext)
+int moho::cfunc_UnitSetConsumptionActive(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetConsumptionActiveL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -925,7 +980,9 @@ CScrLuaInitForm* moho::func_UnitSetConsumptionActive_LuaFuncDef()
  * into the unit attributes resolved from arg#1, then refreshes active
  * consumption bookkeeping if needed.
  */
-int moho::cfunc_UnitSetConsumptionPerSecondEnergyL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetConsumptionPerSecondEnergyL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetConsumptionPerSecondEnergyHelpText);
@@ -958,7 +1015,9 @@ int moho::cfunc_UnitSetConsumptionPerSecondEnergyL(LuaPlus::LuaState* const stat
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetConsumptionPerSecondEnergyL`.
  */
-int moho::cfunc_UnitSetConsumptionPerSecondEnergy(lua_State* const luaContext)
+int moho::cfunc_UnitSetConsumptionPerSecondEnergy(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetConsumptionPerSecondEnergyL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -990,7 +1049,9 @@ CScrLuaInitForm* moho::func_UnitSetConsumptionPerSecondEnergy_LuaFuncDef()
  * into the unit attributes resolved from arg#1, then refreshes active
  * consumption bookkeeping if needed.
  */
-int moho::cfunc_UnitSetConsumptionPerSecondMassL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetConsumptionPerSecondMassL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetConsumptionPerSecondMassHelpText);
@@ -1023,7 +1084,9 @@ int moho::cfunc_UnitSetConsumptionPerSecondMassL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetConsumptionPerSecondMassL`.
  */
-int moho::cfunc_UnitSetConsumptionPerSecondMass(lua_State* const luaContext)
+int moho::cfunc_UnitSetConsumptionPerSecondMass(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetConsumptionPerSecondMassL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1053,7 +1116,9 @@ CScrLuaInitForm* moho::func_UnitSetConsumptionPerSecondMass_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetRegenRateL`.
  */
-int moho::cfunc_UnitSetRegenRate(lua_State* const luaContext)
+int moho::cfunc_UnitSetRegenRate(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetRegenRateL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1084,7 +1149,9 @@ CScrLuaInitForm* moho::func_UnitSetRegenRate_LuaFuncDef()
  * Writes a clamped non-negative regen-rate scalar from arg #2 into arg #1 unit
  * attributes.
  */
-int moho::cfunc_UnitSetRegenRateL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetRegenRateL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetRegenRateHelpText);
@@ -1112,7 +1179,9 @@ int moho::cfunc_UnitSetRegenRateL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetBuildRateL`.
  */
-int moho::cfunc_UnitSetBuildRate(lua_State* const luaContext)
+int moho::cfunc_UnitSetBuildRate(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetBuildRateL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1143,7 +1212,9 @@ CScrLuaInitForm* moho::func_UnitSetBuildRate_LuaFuncDef()
  * Writes a clamped non-negative build-rate scalar from arg #2 into arg #1 unit
  * attributes.
  */
-int moho::cfunc_UnitSetBuildRateL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetBuildRateL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetBuildRateHelpText);
@@ -1172,7 +1243,9 @@ int moho::cfunc_UnitSetBuildRateL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetProductionPerSecondEnergyL`.
  */
-int moho::cfunc_UnitSetProductionPerSecondEnergy(lua_State* const luaContext)
+int moho::cfunc_UnitSetProductionPerSecondEnergy(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetProductionPerSecondEnergyL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1203,7 +1276,9 @@ CScrLuaInitForm* moho::func_UnitSetProductionPerSecondEnergy_LuaFuncDef()
  * Writes a clamped non-negative energy production-per-second scalar from arg #2
  * into arg #1 unit attributes.
  */
-int moho::cfunc_UnitSetProductionPerSecondEnergyL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetProductionPerSecondEnergyL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetProductionPerSecondEnergyHelpText);
@@ -1232,7 +1307,9 @@ int moho::cfunc_UnitSetProductionPerSecondEnergyL(LuaPlus::LuaState* const state
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetProductionPerSecondMassL`.
  */
-int moho::cfunc_UnitSetProductionPerSecondMass(lua_State* const luaContext)
+int moho::cfunc_UnitSetProductionPerSecondMass(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetProductionPerSecondMassL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1263,7 +1340,9 @@ CScrLuaInitForm* moho::func_UnitSetProductionPerSecondMass_LuaFuncDef()
  * Writes a clamped non-negative mass production-per-second scalar from arg #2
  * into arg #1 unit attributes.
  */
-int moho::cfunc_UnitSetProductionPerSecondMassL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetProductionPerSecondMassL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetProductionPerSecondMassHelpText);
@@ -1291,7 +1370,9 @@ int moho::cfunc_UnitSetProductionPerSecondMassL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetElevationL`.
  */
-int moho::cfunc_UnitSetElevation(lua_State* const luaContext)
+int moho::cfunc_UnitSetElevation(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetElevationL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1321,7 +1402,9 @@ CScrLuaInitForm* moho::func_UnitSetElevation_LuaFuncDef()
  * What it does:
  * Writes arg #2 into arg #1 unit elevation offset attribute.
  */
-int moho::cfunc_UnitSetElevationL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetElevationL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetElevationHelpText);
@@ -1344,7 +1427,9 @@ int moho::cfunc_UnitSetElevationL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetSpeedMultL`.
  */
-int moho::cfunc_UnitSetSpeedMult(lua_State* const luaContext)
+int moho::cfunc_UnitSetSpeedMult(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetSpeedMultL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1374,7 +1459,9 @@ CScrLuaInitForm* moho::func_UnitSetSpeedMult_LuaFuncDef()
  * What it does:
  * Writes arg #2 into arg #1 unit speed-multiplier attribute.
  */
-int moho::cfunc_UnitSetSpeedMultL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetSpeedMultL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetSpeedMultHelpText);
@@ -1397,7 +1484,9 @@ int moho::cfunc_UnitSetSpeedMultL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetAccMultL`.
  */
-int moho::cfunc_UnitSetAccMult(lua_State* const luaContext)
+int moho::cfunc_UnitSetAccMult(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetAccMultL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1427,7 +1516,9 @@ CScrLuaInitForm* moho::func_UnitSetAccMult_LuaFuncDef()
  * What it does:
  * Writes arg #2 into arg #1 unit acceleration-multiplier attribute.
  */
-int moho::cfunc_UnitSetAccMultL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetAccMultL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetAccMultHelpText);
@@ -1450,7 +1541,9 @@ int moho::cfunc_UnitSetAccMultL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetTurnMultL`.
  */
-int moho::cfunc_UnitSetTurnMult(lua_State* const luaContext)
+int moho::cfunc_UnitSetTurnMult(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetTurnMultL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1480,7 +1573,9 @@ CScrLuaInitForm* moho::func_UnitSetTurnMult_LuaFuncDef()
  * What it does:
  * Writes arg #2 into arg #1 unit turn-multiplier attribute.
  */
-int moho::cfunc_UnitSetTurnMultL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetTurnMultL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetTurnMultHelpText);
@@ -1504,7 +1599,9 @@ int moho::cfunc_UnitSetTurnMultL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetBreakOffTriggerMultL`.
  */
-int moho::cfunc_UnitSetBreakOffTriggerMult(lua_State* const luaContext)
+int moho::cfunc_UnitSetBreakOffTriggerMult(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetBreakOffTriggerMultL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1534,7 +1631,9 @@ CScrLuaInitForm* moho::func_UnitSetBreakOffTriggerMult_LuaFuncDef()
  * What it does:
  * Writes arg #2 into arg #1 unit break-off-trigger multiplier attribute.
  */
-int moho::cfunc_UnitSetBreakOffTriggerMultL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetBreakOffTriggerMultL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetBreakOffTriggerMultHelpText);
@@ -1558,7 +1657,9 @@ int moho::cfunc_UnitSetBreakOffTriggerMultL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetBreakOffDistanceMultL`.
  */
-int moho::cfunc_UnitSetBreakOffDistanceMult(lua_State* const luaContext)
+int moho::cfunc_UnitSetBreakOffDistanceMult(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetBreakOffDistanceMultL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1588,7 +1689,9 @@ CScrLuaInitForm* moho::func_UnitSetBreakOffDistanceMult_LuaFuncDef()
  * What it does:
  * Writes arg #2 into arg #1 unit break-off-distance multiplier attribute.
  */
-int moho::cfunc_UnitSetBreakOffDistanceMultL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetBreakOffDistanceMultL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetBreakOffDistanceMultHelpText);
@@ -1611,7 +1714,9 @@ int moho::cfunc_UnitSetBreakOffDistanceMultL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetStatL`.
  */
-int moho::cfunc_UnitSetStat(lua_State* const luaContext)
+int moho::cfunc_UnitSetStat(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetStatL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1656,7 +1761,9 @@ std::int32_t StorePrimaryStatBitsAtomic(
  * What it does:
  * Resolves one unit stat lane and stores arg #3 payload bits into that stat.
  */
-int moho::cfunc_UnitSetStatL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetStatL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 3, kUnitSetStatHelpText);
@@ -1716,7 +1823,9 @@ int moho::cfunc_UnitSetStatL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetWorkProgressL`.
  */
-int moho::cfunc_UnitSetWorkProgress(lua_State* const luaContext)
+int moho::cfunc_UnitSetWorkProgress(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetWorkProgressL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1746,7 +1855,9 @@ CScrLuaInitForm* moho::func_UnitSetWorkProgress_LuaFuncDef()
  * What it does:
  * Writes arg #2 into arg #1 unit work-progress runtime lane.
  */
-int moho::cfunc_UnitSetWorkProgressL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetWorkProgressL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetWorkProgressHelpText);
@@ -1770,7 +1881,9 @@ int moho::cfunc_UnitSetWorkProgressL(LuaPlus::LuaState* const state)
  * Writes `Unit::ProductionActive` from arg #2 and dispatches
  * `OnProductionActive` / `OnProductionInActive` script callbacks.
  */
-int moho::cfunc_UnitSetProductionActiveL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetProductionActiveL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetProductionActiveHelpText);
 
@@ -1791,7 +1904,9 @@ int moho::cfunc_UnitSetProductionActiveL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetProductionActiveL`.
  */
-int moho::cfunc_UnitSetProductionActive(lua_State* const luaContext)
+int moho::cfunc_UnitSetProductionActive(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetProductionActiveL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1821,7 +1936,9 @@ CScrLuaInitForm* moho::func_UnitSetProductionActive_LuaFuncDef()
  * What it does:
  * Sets or clears `UNITSTATE_Busy` bit from arg#2 on unit arg#1.
  */
-int moho::cfunc_UnitSetBusyL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetBusyL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetBusyHelpText);
 
@@ -1847,7 +1964,9 @@ int moho::cfunc_UnitSetBusyL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetBusyL`.
  */
-int moho::cfunc_UnitSetBusy(lua_State* const luaContext)
+int moho::cfunc_UnitSetBusy(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetBusyL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1877,7 +1996,9 @@ CScrLuaInitForm* moho::func_UnitSetBusy_LuaFuncDef()
  * What it does:
  * Sets or clears `UNITSTATE_BlockCommandQueue` bit from arg#2 on unit arg#1.
  */
-int moho::cfunc_UnitSetBlockCommandQueueL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetBlockCommandQueueL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetBlockCommandQueueHelpText);
 
@@ -1904,7 +2025,9 @@ int moho::cfunc_UnitSetBlockCommandQueueL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetBlockCommandQueueL`.
  */
-int moho::cfunc_UnitSetBlockCommandQueue(lua_State* const luaContext)
+int moho::cfunc_UnitSetBlockCommandQueue(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetBlockCommandQueueL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1934,7 +2057,9 @@ CScrLuaInitForm* moho::func_UnitSetBlockCommandQueue_LuaFuncDef()
  * What it does:
  * Sets or clears `UNITSTATE_Immobile` bit from arg#2 on unit arg#1.
  */
-int moho::cfunc_UnitSetImmobileL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetImmobileL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetImmobileHelpText);
 
@@ -1960,7 +2085,9 @@ int moho::cfunc_UnitSetImmobileL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetImmobileL`.
  */
-int moho::cfunc_UnitSetImmobile(lua_State* const luaContext)
+int moho::cfunc_UnitSetImmobile(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetImmobileL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1990,7 +2117,9 @@ CScrLuaInitForm* moho::func_UnitSetImmobile_LuaFuncDef()
  * What it does:
  * Sets or clears `UNITSTATE_UnSelectable` bit from arg#2 on unit arg#1.
  */
-int moho::cfunc_UnitSetUnSelectableL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetUnSelectableL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetUnSelectableHelpText);
 
@@ -2017,7 +2146,9 @@ int moho::cfunc_UnitSetUnSelectableL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetUnSelectableL`.
  */
-int moho::cfunc_UnitSetUnSelectable(lua_State* const luaContext)
+int moho::cfunc_UnitSetUnSelectable(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetUnSelectableL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2047,7 +2178,9 @@ CScrLuaInitForm* moho::func_UnitSetUnSelectable_LuaFuncDef()
  * What it does:
  * Sets or clears `UNITSTATE_DoNotTarget` bit from arg#2 on unit arg#1.
  */
-int moho::cfunc_UnitSetDoNotTargetL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetDoNotTargetL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetDoNotTargetHelpText);
 
@@ -2074,7 +2207,9 @@ int moho::cfunc_UnitSetDoNotTargetL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetDoNotTargetL`.
  */
-int moho::cfunc_UnitSetDoNotTarget(lua_State* const luaContext)
+int moho::cfunc_UnitSetDoNotTarget(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetDoNotTargetL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2104,7 +2239,9 @@ CScrLuaInitForm* moho::func_UnitSetDoNotTarget_LuaFuncDef()
  * What it does:
  * Writes one boolean into `Unit::IsValidTarget`.
  */
-int moho::cfunc_UnitSetIsValidTargetL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetIsValidTargetL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetIsValidTargetHelpText);
 
@@ -2123,7 +2260,9 @@ int moho::cfunc_UnitSetIsValidTargetL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetIsValidTargetL`.
  */
-int moho::cfunc_UnitSetIsValidTarget(lua_State* const luaContext)
+int moho::cfunc_UnitSetIsValidTarget(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetIsValidTargetL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2153,7 +2292,9 @@ CScrLuaInitForm* moho::func_UnitSetIsValidTarget_LuaFuncDef()
  * What it does:
  * Sets unit stunned ticks from arg #2 seconds, scaled by 10 simulation ticks.
  */
-int moho::cfunc_UnitSetStunnedL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetStunnedL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetStunnedHelpText);
@@ -2179,7 +2320,9 @@ int moho::cfunc_UnitSetStunnedL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetStunnedL`.
  */
-int moho::cfunc_UnitSetStunned(lua_State* const luaContext)
+int moho::cfunc_UnitSetStunned(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetStunnedL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2210,7 +2353,9 @@ CScrLuaInitForm* moho::func_UnitSetStunned_LuaFuncDef()
  * Resolves `(unit, stateName, enabled)` and sets/clears the corresponding
  * state bit in `Unit::UnitStateMask` when lexical enum parsing succeeds.
  */
-int moho::cfunc_UnitSetUnitStateL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetUnitStateL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 3, kUnitSetUnitStateHelpText);
@@ -2249,7 +2394,9 @@ int moho::cfunc_UnitSetUnitStateL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetUnitStateL`.
  */
-int moho::cfunc_UnitSetUnitState(lua_State* const luaContext)
+int moho::cfunc_UnitSetUnitState(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetUnitStateL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2280,7 +2427,9 @@ CScrLuaInitForm* moho::func_UnitSetUnitState_LuaFuncDef()
  * Resolves `(unit, toggleCapName, enabled)` and toggles the matching script
  * bit lane through `Unit::ToggleScriptBit` when desired/current states differ.
  */
-int moho::cfunc_UnitSetScriptBitL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetScriptBitL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 3, kUnitSetScriptBitHelpText);
@@ -2319,7 +2468,9 @@ int moho::cfunc_UnitSetScriptBitL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetScriptBitL`.
  */
-int moho::cfunc_UnitSetScriptBit(lua_State* const luaContext)
+int moho::cfunc_UnitSetScriptBit(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetScriptBitL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2349,7 +2500,9 @@ CScrLuaInitForm* moho::func_UnitSetScriptBit_LuaFuncDef()
  * What it does:
  * Resolves one toggle-cap lexical name and toggles the matching script bit.
  */
-int moho::cfunc_UnitToggleScriptBitL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitToggleScriptBitL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitToggleScriptBitHelpText);
@@ -2383,7 +2536,9 @@ int moho::cfunc_UnitToggleScriptBitL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitToggleScriptBitL`.
  */
-int moho::cfunc_UnitToggleScriptBit(lua_State* const luaContext)
+int moho::cfunc_UnitToggleScriptBit(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitToggleScriptBitL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2413,7 +2568,9 @@ CScrLuaInitForm* moho::func_UnitToggleScriptBit_LuaFuncDef()
  * What it does:
  * Rotates one unit fire-state lane through `[0, 1, 2]`.
  */
-int moho::cfunc_UnitToggleFireStateL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitToggleFireStateL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kUnitToggleFireStateHelpText);
 
@@ -2431,7 +2588,9 @@ int moho::cfunc_UnitToggleFireStateL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitToggleFireStateL`.
  */
-int moho::cfunc_UnitToggleFireState(lua_State* const luaContext)
+int moho::cfunc_UnitToggleFireState(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitToggleFireStateL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2461,7 +2620,9 @@ CScrLuaInitForm* moho::func_UnitToggleFireState_LuaFuncDef()
  * What it does:
  * Parses arg #2 lexical fire-state and applies it to one unit when changed.
  */
-int moho::cfunc_UnitSetFireStateL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetFireStateL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetFireStateHelpText);
@@ -2490,7 +2651,9 @@ int moho::cfunc_UnitSetFireStateL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetFireStateL`.
  */
-int moho::cfunc_UnitSetFireState(lua_State* const luaContext)
+int moho::cfunc_UnitSetFireState(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetFireStateL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2520,7 +2683,9 @@ CScrLuaInitForm* moho::func_UnitSetFireState_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetAutoModeL`.
  */
-int moho::cfunc_UnitSetAutoMode(lua_State* const luaContext)
+int moho::cfunc_UnitSetAutoMode(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetAutoModeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2550,7 +2715,9 @@ CScrLuaInitForm* moho::func_UnitSetAutoMode_LuaFuncDef()
  * What it does:
  * Resolves `(unit, enabled)` and dispatches to `Unit::SetAutoMode`.
  */
-int moho::cfunc_UnitSetAutoModeL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetAutoModeL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetAutoModeHelpText);
 
@@ -2569,7 +2736,9 @@ int moho::cfunc_UnitSetAutoModeL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitAddBuildRestrictionL`.
  */
-int moho::cfunc_UnitAddBuildRestriction(lua_State* const luaContext)
+int moho::cfunc_UnitAddBuildRestriction(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitAddBuildRestrictionL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2599,7 +2768,9 @@ CScrLuaInitForm* moho::func_UnitAddBuildRestriction_LuaFuncDef()
  * What it does:
  * Merges category bits into one unit build-restriction set and marks sync dirty.
  */
-int moho::cfunc_UnitAddBuildRestrictionL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitAddBuildRestrictionL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitAddBuildRestrictionHelpText);
 
@@ -2622,7 +2793,9 @@ int moho::cfunc_UnitAddBuildRestrictionL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitRemoveBuildRestrictionL`.
  */
-int moho::cfunc_UnitRemoveBuildRestriction(lua_State* const luaContext)
+int moho::cfunc_UnitRemoveBuildRestriction(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitRemoveBuildRestrictionL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2653,7 +2826,9 @@ CScrLuaInitForm* moho::func_UnitRemoveBuildRestriction_LuaFuncDef()
  * What it does:
  * Clears category bits from one unit build-restriction set and marks sync dirty.
  */
-int moho::cfunc_UnitRemoveBuildRestrictionL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitRemoveBuildRestrictionL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitRemoveBuildRestrictionHelpText);
 
@@ -2675,7 +2850,9 @@ int moho::cfunc_UnitRemoveBuildRestrictionL(LuaPlus::LuaState* const state)
  * What it does:
  * Resolves one command-cap lexical arg and ORs it into unit command-cap mask.
  */
-int moho::cfunc_UnitAddCommandCapL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitAddCommandCapL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitAddCommandCapHelpText);
@@ -2703,7 +2880,9 @@ int moho::cfunc_UnitAddCommandCapL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitAddCommandCapL`.
  */
-int moho::cfunc_UnitAddCommandCap(lua_State* const luaContext)
+int moho::cfunc_UnitAddCommandCap(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitAddCommandCapL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2734,7 +2913,9 @@ CScrLuaInitForm* moho::func_UnitAddCommandCap_LuaFuncDef()
  * Resolves one command-cap lexical arg and clears it from unit command-cap
  * mask.
  */
-int moho::cfunc_UnitRemoveCommandCapL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitRemoveCommandCapL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitRemoveCommandCapHelpText);
@@ -2763,7 +2944,9 @@ int moho::cfunc_UnitRemoveCommandCapL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitRemoveCommandCapL`.
  */
-int moho::cfunc_UnitRemoveCommandCap(lua_State* const luaContext)
+int moho::cfunc_UnitRemoveCommandCap(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitRemoveCommandCapL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2793,7 +2976,9 @@ CScrLuaInitForm* moho::func_UnitRemoveCommandCap_LuaFuncDef()
  * What it does:
  * Resolves one toggle-cap lexical arg and ORs it into unit toggle-cap mask.
  */
-int moho::cfunc_UnitAddToggleCapL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitAddToggleCapL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitAddToggleCapHelpText);
@@ -2821,7 +3006,9 @@ int moho::cfunc_UnitAddToggleCapL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitAddToggleCapL`.
  */
-int moho::cfunc_UnitAddToggleCap(lua_State* const luaContext)
+int moho::cfunc_UnitAddToggleCap(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitAddToggleCapL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2851,7 +3038,9 @@ CScrLuaInitForm* moho::func_UnitAddToggleCap_LuaFuncDef()
  * What it does:
  * Resolves one toggle-cap lexical arg and clears it from unit toggle-cap mask.
  */
-int moho::cfunc_UnitRemoveToggleCapL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitRemoveToggleCapL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitRemoveToggleCapHelpText);
@@ -2880,7 +3069,9 @@ int moho::cfunc_UnitRemoveToggleCapL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitRemoveToggleCapL`.
  */
-int moho::cfunc_UnitRemoveToggleCap(lua_State* const luaContext)
+int moho::cfunc_UnitRemoveToggleCap(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitRemoveToggleCapL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2910,7 +3101,9 @@ CScrLuaInitForm* moho::func_UnitRemoveToggleCap_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetReclaimableL`.
  */
-int moho::cfunc_UnitSetReclaimable(lua_State* const luaContext)
+int moho::cfunc_UnitSetReclaimable(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetReclaimableL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2940,7 +3133,9 @@ CScrLuaInitForm* moho::func_UnitSetReclaimable_LuaFuncDef()
  * What it does:
  * Resolves `(self, flag)` and updates `UnitAttributes::mReclaimable`.
  */
-int moho::cfunc_UnitSetReclaimableL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetReclaimableL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetReclaimableHelpText);
 
@@ -2958,7 +3153,9 @@ int moho::cfunc_UnitSetReclaimableL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetCapturableL`.
  */
-int moho::cfunc_UnitSetCapturable(lua_State* const luaContext)
+int moho::cfunc_UnitSetCapturable(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetCapturableL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2988,7 +3185,9 @@ CScrLuaInitForm* moho::func_UnitSetCapturable_LuaFuncDef()
  * What it does:
  * Resolves `(self, flag)` and updates `UnitAttributes::mCapturable`.
  */
-int moho::cfunc_UnitSetCapturableL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetCapturableL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetCapturableHelpText);
 
@@ -3007,7 +3206,9 @@ int moho::cfunc_UnitSetCapturableL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_UnitSetOverchargePausedL`.
  */
-int moho::cfunc_UnitSetOverchargePaused(lua_State* const luaContext)
+int moho::cfunc_UnitSetOverchargePaused(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetOverchargePausedL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3037,7 +3238,9 @@ CScrLuaInitForm* moho::func_UnitSetOverchargePaused_LuaFuncDef()
  * What it does:
  * Resolves `(self, flag)` and updates `Unit::OverchargePaused`.
  */
-int moho::cfunc_UnitSetOverchargePausedL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetOverchargePausedL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetOverchargePausedHelpText);
 
@@ -3055,7 +3258,9 @@ int moho::cfunc_UnitSetOverchargePausedL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetFuelUseTimeL`.
  */
-int moho::cfunc_UnitSetFuelUseTime(lua_State* const luaContext)
+int moho::cfunc_UnitSetFuelUseTime(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetFuelUseTimeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3086,7 +3291,9 @@ CScrLuaInitForm* moho::func_UnitSetFuelUseTime_LuaFuncDef()
  * Validates `(self, fuelUseTime)` and writes the unit motion fuel-use-time
  * lane; throws a Lua error when the unit has no motion object.
  */
-int moho::cfunc_UnitSetFuelUseTimeL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetFuelUseTimeL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetFuelUseTimeHelpText);
@@ -3112,7 +3319,9 @@ int moho::cfunc_UnitSetFuelUseTimeL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetFuelRatioL`.
  */
-int moho::cfunc_UnitSetFuelRatio(lua_State* const luaContext)
+int moho::cfunc_UnitSetFuelRatio(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetFuelRatioL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3143,7 +3352,9 @@ CScrLuaInitForm* moho::func_UnitSetFuelRatio_LuaFuncDef()
  * Validates `(self, fuelRatio)` and writes the unit fuel-ratio runtime lane;
  * throws a Lua error when the unit has no motion object.
  */
-int moho::cfunc_UnitSetFuelRatioL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetFuelRatioL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetFuelRatioHelpText);
@@ -3169,7 +3380,9 @@ int moho::cfunc_UnitSetFuelRatioL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitShowBoneL`.
  */
-int moho::cfunc_UnitShowBone(lua_State* const luaContext)
+int moho::cfunc_UnitShowBone(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitShowBoneL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3200,7 +3413,9 @@ CScrLuaInitForm* moho::func_UnitShowBone_LuaFuncDef()
  * Resolves a target bone and marks it visible; when `affectChildren` is true,
  * applies visibility recursively to descendant bones in the active pose lane.
  */
-int moho::cfunc_UnitShowBoneL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitShowBoneL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 3, kUnitShowBoneHelpText);
 
@@ -3223,7 +3438,6 @@ int moho::cfunc_UnitShowBoneL(LuaPlus::LuaState* const state)
     }
   }
 
-
   return 0;
 }
 
@@ -3233,7 +3447,9 @@ int moho::cfunc_UnitShowBoneL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitHideBoneL`.
  */
-int moho::cfunc_UnitHideBone(lua_State* const luaContext)
+int moho::cfunc_UnitHideBone(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitHideBoneL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3264,7 +3480,9 @@ CScrLuaInitForm* moho::func_UnitHideBone_LuaFuncDef()
  * Resolves a target bone and marks it hidden; when `affectChildren` is true,
  * applies visibility recursively to descendant bones in the active pose lane.
  */
-int moho::cfunc_UnitHideBoneL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitHideBoneL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 3, kUnitHideBoneHelpText);
 
@@ -3276,7 +3494,6 @@ int moho::cfunc_UnitHideBoneL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaStackObject affectChildrenArg(state, 3);
   const bool affectChildren = affectChildrenArg.GetBoolean();
-
 
   if (unit != nullptr && boneIndex >= 0) {
     if (CAniPoseBone* const poseBone = ResolveUnitPoseBone(*unit, boneIndex); poseBone != nullptr) {
@@ -3297,7 +3514,9 @@ int moho::cfunc_UnitHideBoneL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetCustomNameL`.
  */
-int moho::cfunc_UnitSetCustomName(lua_State* const luaContext)
+int moho::cfunc_UnitSetCustomName(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetCustomNameL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3327,7 +3546,9 @@ CScrLuaInitForm* moho::func_UnitSetCustomName_LuaFuncDef()
  * What it does:
  * Resolves `(self, name)` and dispatches `Unit::SetCustomName`.
  */
-int moho::cfunc_UnitSetCustomNameL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetCustomNameL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetCustomNameHelpText);
@@ -3352,7 +3573,9 @@ int moho::cfunc_UnitSetCustomNameL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_UnitSetShieldRatioL`.
  */
-int moho::cfunc_UnitSetShieldRatio(lua_State* const luaContext)
+int moho::cfunc_UnitSetShieldRatio(
+  lua_State* const luaContext
+)
 {
   return cfunc_UnitSetShieldRatioL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3382,7 +3605,9 @@ CScrLuaInitForm* moho::func_UnitSetShieldRatio_LuaFuncDef()
  * What it does:
  * Resolves `(self, value)` and writes `Unit::ShieldRatio`.
  */
-int moho::cfunc_UnitSetShieldRatioL(LuaPlus::LuaState* const state)
+int moho::cfunc_UnitSetShieldRatioL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kUnitSetShieldRatioHelpText);

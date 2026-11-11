@@ -28,8 +28,8 @@ namespace gpg::gal
    * streams and particle buffers use. Static buffers are default-usage
    * buffers with a CPU copy; a lock returns the copy and the unlock uploads
    * the locked range. The copy is a `backend::LockShadow`: a lock past the end
-   * or a write past the locked range is logged instead of corrupting the heap. The D3D10 backend instead mapped a staging buffer and
-   * copied the whole of it into the GPU buffer on every unlock.
+   * or a write past the locked range is logged instead of corrupting the heap. The D3D10 backend instead mapped a
+   * staging buffer and copied the whole of it into the GPU buffer on every unlock.
    */
   class BufferStorageD3D11
   {
@@ -47,8 +47,14 @@ namespace gpg::gal
     [[nodiscard]] std::uint8_t* Lock(std::uint32_t offset, std::uint32_t size, MohoD3DLockFlags flags);
     void Unlock();
 
-    [[nodiscard]] ID3D11Buffer* Get() const noexcept { return mBuffer.Get(); }
-    [[nodiscard]] std::uint32_t ByteWidth() const noexcept { return mByteWidth; }
+    [[nodiscard]] ID3D11Buffer* Get() const noexcept
+    {
+      return mBuffer.Get();
+    }
+    [[nodiscard]] std::uint32_t ByteWidth() const noexcept
+    {
+      return mByteWidth;
+    }
 
   private:
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> mImmediate;
@@ -73,7 +79,10 @@ namespace gpg::gal
     void* Lock(unsigned int offset, unsigned int size, MohoD3DLockFlags lockFlags) override;
     void Unlock() override;
 
-    [[nodiscard]] ID3D11Buffer* GetBuffer() const noexcept { return mStorage.Get(); }
+    [[nodiscard]] ID3D11Buffer* GetBuffer() const noexcept
+    {
+      return mStorage.Get();
+    }
 
   private:
     VertexBufferContext mContext;
@@ -90,7 +99,10 @@ namespace gpg::gal
     std::int16_t* Lock(unsigned int offset, unsigned int size, MohoD3DLockFlags lockFlags) override;
     void Unlock() override;
 
-    [[nodiscard]] ID3D11Buffer* GetBuffer() const noexcept { return mStorage.Get(); }
+    [[nodiscard]] ID3D11Buffer* GetBuffer() const noexcept
+    {
+      return mStorage.Get();
+    }
     /** 32-bit indices for gal index format 2, 16-bit otherwise (as SetBufferIndices on D3D10). */
     [[nodiscard]] DXGI_FORMAT GetIndexFormat() const noexcept;
 

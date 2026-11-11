@@ -63,7 +63,9 @@ namespace
   }
 
   /** The bytes of MakeHeader(), from the member order of 0x00883280 and the vector body 0x008827F0. */
-  std::string ExpectedHeaderBytes(const std::int32_t headerVersion = 3)
+  std::string ExpectedHeaderBytes(
+    const std::int32_t headerVersion = 3
+  )
   {
     return Bytes()
       .NewObject(kHeaderName, headerVersion)
@@ -72,8 +74,12 @@ namespace
       .I32(2)
       .NewObject(kArmyVectorName, 1)
       .U32(2)
-      .NewObject(kArmyName, 0).Str("Alice").End()
-      .KnownObject(2).Str("a player name longer than sixteen bytes").End()
+      .NewObject(kArmyName, 0)
+      .Str("Alice")
+      .End()
+      .KnownObject(2)
+      .Str("a player name longer than sixteen bytes")
+      .End()
       .End()
       .Str("ScenarioInfo = { name = 'Seton' }")
       .Token('0') // the launch info: a null shared pointer
@@ -81,7 +87,10 @@ namespace
       .str();
   }
 
-  void ExpectSameHeader(const moho::SSavedGameHeader& actual, const moho::SSavedGameHeader& expected)
+  void ExpectSameHeader(
+    const moho::SSavedGameHeader& actual,
+    const moho::SSavedGameHeader& expected
+  )
   {
     EXPECT_EQ(actual.mVersion, expected.mVersion);
     EXPECT_EQ(actual.mMapName.view(), expected.mMapName.view());
@@ -97,10 +106,16 @@ namespace
   class SavedGameSerialization : public ArchiveFixture
   {
   protected:
-    static gpg::RType* HeaderType() { return gpg::RTypeOf<moho::SSavedGameHeader>(); }
+    static gpg::RType* HeaderType()
+    {
+      return gpg::RTypeOf<moho::SSavedGameHeader>();
+    }
   };
 
-  TEST_F(SavedGameSerialization, TypesAreRegisteredAsTheBinaryNamesThem)
+  TEST_F(
+    SavedGameSerialization,
+    TypesAreRegisteredAsTheBinaryNamesThem
+  )
   {
     // SSavedGameHeaderTypeInfo 0x008801A0/0x00880170 (version 3), SSavedGameArmyInfoTypeInfo 0x0087FF80,
     // RVectorType_SSavedGameArmyInfo 0x00882100/0x008821A0 (version 1).
@@ -126,7 +141,10 @@ namespace
     EXPECT_EQ(vector->IsPointer(), nullptr);
   }
 
-  TEST_F(SavedGameSerialization, AHeaderStartsAtVersion0x14)
+  TEST_F(
+    SavedGameSerialization,
+    AHeaderStartsAtVersion0x14
+  )
   {
     // 0x00880580.
     const moho::SSavedGameHeader header;
@@ -145,44 +163,63 @@ namespace
     ExpectSameHeader(assigned, source);
   }
 
-  TEST_F(SavedGameSerialization, HeaderHasItsDocumentedBytes)
+  TEST_F(
+    SavedGameSerialization,
+    HeaderHasItsDocumentedBytes
+  )
   {
     const moho::SSavedGameHeader header = MakeHeader();
-    const std::string bytes =
-      Write([&](gpg::WriteArchive& archive) { archive.Write(HeaderType(), &header, gpg::RRef{}); });
+    const std::string bytes = Write([&](gpg::WriteArchive& archive) {
+      archive.Write(HeaderType(), &header, gpg::RRef{});
+    });
     EXPECT_EQ(ToHex(bytes), ToHex(ExpectedHeaderBytes()));
 
     // A replay keyframe writes the same bytes through the fast archive.
-    const std::string fast = Write(
-      [&](gpg::WriteArchive& archive) { archive.Write(HeaderType(), &header, gpg::RRef{}); }, WriterKind::FastSink
-    );
+    const std::string fast = Write([&](gpg::WriteArchive& archive) {
+      archive.Write(HeaderType(), &header, gpg::RRef{});
+    }, WriterKind::FastSink);
     EXPECT_EQ(ToHex(fast), ToHex(bytes));
   }
 
-  TEST_F(SavedGameSerialization, HeaderReadsBackOverAnotherOne)
+  TEST_F(
+    SavedGameSerialization,
+    HeaderReadsBackOverAnotherOne
+  )
   {
     const moho::SSavedGameHeader source = MakeHeader();
     moho::SSavedGameHeader back;
     back.mVersion = 1;
     back.mMapName = fa::string("stale");
     back.mArmyInfo.resize(5);
-    Read(ExpectedHeaderBytes(), [&](gpg::ReadArchive& archive) { archive.Read(HeaderType(), &back, gpg::RRef{}); });
+    Read(ExpectedHeaderBytes(), [&](gpg::ReadArchive& archive) {
+      archive.Read(HeaderType(), &back, gpg::RRef{});
+    });
     ExpectSameHeader(back, source);
   }
 
-  TEST_F(SavedGameSerialization, HeaderRoundTripsThroughTheTextArchive)
+  TEST_F(
+    SavedGameSerialization,
+    HeaderRoundTripsThroughTheTextArchive
+  )
   {
     const moho::SSavedGameHeader source = MakeHeader();
-    const std::string text = WriteText([&](gpg::WriteArchive& archive) { archive.Write(HeaderType(), &source, gpg::RRef{}); });
+    const std::string text = WriteText([&](gpg::WriteArchive& archive) {
+      archive.Write(HeaderType(), &source, gpg::RRef{});
+    });
     EXPECT_NE(text.find("\"SSavedGameHeader\""), std::string::npos) << text;
     EXPECT_NE(text.find("\"Alice\""), std::string::npos) << text;
 
     moho::SSavedGameHeader back;
-    ReadText(text, [&](gpg::ReadArchive& archive) { archive.Read(HeaderType(), &back, gpg::RRef{}); });
+    ReadText(text, [&](gpg::ReadArchive& archive) {
+      archive.Read(HeaderType(), &back, gpg::RRef{});
+    });
     ExpectSameHeader(back, source);
   }
 
-  TEST_F(SavedGameSerialization, AnOlderHeaderVersionIsRefused)
+  TEST_F(
+    SavedGameSerialization,
+    AnOlderHeaderVersionIsRefused
+  )
   {
     // 0x008831C9: `cmp version, 3; jge`, else throw "WrongVersion" (0x00E49A94).
     moho::SSavedGameHeader back;
@@ -196,7 +233,10 @@ namespace
     });
   }
 
-  TEST_F(SavedGameSerialization, ArmyVectorIsIndexedThroughReflection)
+  TEST_F(
+    SavedGameSerialization,
+    ArmyVectorIsIndexedThroughReflection
+  )
   {
     gpg::RType* const type = gpg::ResolveSavedGameArmyInfoVectorType();
     const gpg::RIndexed* const indexed = type->IsIndexed();
@@ -237,7 +277,10 @@ namespace
   // Blacklist rows, build reservations, prefetch sets
   // ---------------------------------------------------------------------------------------------
 
-  TEST_F(SavedGameSerialization, BlackListRowsWriteTheirWeakEntityThenTheValue)
+  TEST_F(
+    SavedGameSerialization,
+    BlackListRowsWriteTheirWeakEntityThenTheValue
+  )
   {
     // SBlackListInfo::MemberSerialize 0x006DD300: the WeakPtr<Entity> (version 1, the entity as an unowned
     // tracked pointer), then the int at +0x08. The vector (0x006DB670, version 1): the count, then each row.
@@ -252,18 +295,32 @@ namespace
     rows[0].mValue = 17;
     rows[1].mValue = -4;
 
-    const std::string bytes = Write([&](gpg::WriteArchive& archive) { archive.Write(type, &rows, gpg::RRef{}); });
+    const std::string bytes = Write([&](gpg::WriteArchive& archive) {
+      archive.Write(type, &rows, gpg::RRef{});
+    });
     const std::string expected = Bytes()
                                    .NewObject("vector<SBlackListInfo>", 1)
                                    .U32(2)
-                                   .NewObject("SBlackListInfo", 0).NewObject("WeakPtr<Entity>", 1).Token('0').End().I32(17).End()
-                                   .KnownObject(1).KnownObject(2).Token('0').End().I32(-4).End()
+                                   .NewObject("SBlackListInfo", 0)
+                                   .NewObject("WeakPtr<Entity>", 1)
+                                   .Token('0')
+                                   .End()
+                                   .I32(17)
+                                   .End()
+                                   .KnownObject(1)
+                                   .KnownObject(2)
+                                   .Token('0')
+                                   .End()
+                                   .I32(-4)
+                                   .End()
                                    .End()
                                    .str();
     EXPECT_EQ(ToHex(bytes), ToHex(expected));
 
     fa::vector<moho::SBlackListInfo> back;
-    Read(bytes, [&](gpg::ReadArchive& archive) { archive.Read(type, &back, gpg::RRef{}); });
+    Read(bytes, [&](gpg::ReadArchive& archive) {
+      archive.Read(type, &back, gpg::RRef{});
+    });
     ASSERT_EQ(back.size(), 2u);
     EXPECT_EQ(back[0].mValue, 17);
     EXPECT_EQ(back[1].mValue, -4);
@@ -274,7 +331,10 @@ namespace
     EXPECT_STREQ(second.GetName(), "SBlackListInfo");
   }
 
-  TEST_F(SavedGameSerialization, BuildReservationsWriteTwoWeakPointers)
+  TEST_F(
+    SavedGameSerialization,
+    BuildReservationsWriteTwoWeakPointers
+  )
   {
     // SBuildReserveInfo: WeakPtr<Unit> then WeakPtr<CUnitCommand>, each version 1 (UnitWeakPtrReflection.cpp,
     // CUnitCommandWeakPtrReflection.cpp), each an unowned tracked pointer.
@@ -290,10 +350,21 @@ namespace
     });
     const std::string expected = Bytes()
                                    .NewObject("SBuildReserveInfo", 0)
-                                   .NewObject("WeakPtr<Unit>", 1).Token('0').End()
-                                   .NewObject("WeakPtr<CUnitCommand>", 1).Token('0').End()
+                                   .NewObject("WeakPtr<Unit>", 1)
+                                   .Token('0')
                                    .End()
-                                   .KnownObject(0).KnownObject(1).Token('0').End().KnownObject(2).Token('0').End().End()
+                                   .NewObject("WeakPtr<CUnitCommand>", 1)
+                                   .Token('0')
+                                   .End()
+                                   .End()
+                                   .KnownObject(0)
+                                   .KnownObject(1)
+                                   .Token('0')
+                                   .End()
+                                   .KnownObject(2)
+                                   .Token('0')
+                                   .End()
+                                   .End()
                                    .str();
     EXPECT_EQ(ToHex(bytes), ToHex(expected));
 
@@ -306,7 +377,10 @@ namespace
     EXPECT_EQ(back.mCom.GetObjectPtr(), nullptr);
   }
 
-  TEST_F(SavedGameSerialization, AnEmptyPrefetchSetIsAnEmptyHandleVector)
+  TEST_F(
+    SavedGameSerialization,
+    AnEmptyPrefetchSetIsAnEmptyHandleVector
+  )
   {
     // CPrefetchSet::MemberSerialize writes the set as its handle vector (vector<PrefetchHandleBase>, version 1).
     gpg::RType* const type = gpg::RTypeOf<moho::CPrefetchSet>();
@@ -317,7 +391,9 @@ namespace
     EXPECT_EQ(vector->version_, 1);
 
     moho::CPrefetchSet set;
-    const std::string bytes = Write([&](gpg::WriteArchive& archive) { archive.Write(type, &set, gpg::RRef{}); });
+    const std::string bytes = Write([&](gpg::WriteArchive& archive) {
+      archive.Write(type, &set, gpg::RRef{});
+    });
     const std::string expected =
       Bytes().NewObject("CPrefetchSet", 0).NewObject("vector<PrefetchHandleBase>", 1).U32(0).End().End().str();
     EXPECT_EQ(ToHex(bytes), ToHex(expected));
@@ -330,14 +406,18 @@ namespace
     EXPECT_STREQ(first.GetName(), "PrefetchHandleBase");
   }
 
-  TEST_F(SavedGameSerialization, ReadingAPrefetchSetReplacesItsHandles)
+  TEST_F(
+    SavedGameSerialization,
+    ReadingAPrefetchSetReplacesItsHandles
+  )
   {
     // The binary hands the loaded storage to the destination and frees the old one (0x004A657F..0x004A659C);
     // LoadPrefetchHandleBaseVector moves the loaded vector into the set. A set holding two empty handles, read
     // from an archive of an empty set, ends with none.
     moho::CPrefetchSet empty;
-    const std::string bytes =
-      Write([&](gpg::WriteArchive& archive) { archive.Write(gpg::RTypeOf<moho::CPrefetchSet>(), &empty, gpg::RRef{}); });
+    const std::string bytes = Write([&](gpg::WriteArchive& archive) {
+      archive.Write(gpg::RTypeOf<moho::CPrefetchSet>(), &empty, gpg::RRef{});
+    });
 
     moho::CPrefetchSet set;
     gpg::ResolvePrefetchHandleBaseVectorType()->IsIndexed()->SetCount(&set.mHandles, 2);
@@ -348,7 +428,10 @@ namespace
     EXPECT_EQ(set.mHandles.size(), 0u);
   }
 
-  TEST(SavedGameFileHeader, LayoutAndDefaultsMatchTheBinary)
+  TEST(
+    SavedGameFileHeader,
+    LayoutAndDefaultsMatchTheBinary
+  )
   {
     // The 0x2028-byte file header: "RGMH" magic, version 1, its own size, then the preview and game id words and
     // two 1024-unit UTF-16 strings.
@@ -376,7 +459,10 @@ namespace
   class SerializationRobustness : public SavedGameSerialization
   {};
 
-  TEST_F(SerializationRobustness, EveryTruncationOfAHeaderThrows)
+  TEST_F(
+    SerializationRobustness,
+    EveryTruncationOfAHeaderThrows
+  )
   {
     const std::string bytes = ExpectedHeaderBytes();
     for (std::size_t length = 0; length < bytes.size(); ++length) {
@@ -387,7 +473,10 @@ namespace
     }
   }
 
-  TEST_F(SerializationRobustness, AnArmyCountPastTheDataThrows)
+  TEST_F(
+    SerializationRobustness,
+    AnArmyCountPastTheDataThrows
+  )
   {
     // The count says three rows, two follow.
     std::string bytes = ExpectedHeaderBytes();
@@ -401,7 +490,10 @@ namespace
     });
   }
 
-  TEST_F(SerializationRobustness, AHugeArmyCountThrowsInsteadOfCrashing)
+  TEST_F(
+    SerializationRobustness,
+    AHugeArmyCountThrowsInsteadOfCrashing
+  )
   {
     // 0x008826C0 reserves the count it read before reading any row (0x0088270D), so a corrupted count asks for
     // that much memory at once; it must end in an exception, not a crash.
@@ -417,7 +509,10 @@ namespace
     }
   }
 
-  TEST_F(SerializationRobustness, AnotherTypeWhereTheHeaderIsExpectedThrows)
+  TEST_F(
+    SerializationRobustness,
+    AnotherTypeWhereTheHeaderIsExpectedThrows
+  )
   {
     Read(Bytes().NewObject(kArmyName, 0).Str("x").End().str(), [&](gpg::ReadArchive& archive) {
       moho::SSavedGameHeader back;
@@ -426,18 +521,23 @@ namespace
         ADD_FAILURE() << "no throw";
       } catch (const gpg::SerializationError& error) {
         EXPECT_NE(
-          std::string(error.what()).find("found an object of type \"SSavedGameArmyInfo\", but expected one of \"SSavedGameHeader\""),
+          std::string(error.what())
+            .find("found an object of type \"SSavedGameArmyInfo\", but expected one of \"SSavedGameHeader\""),
           std::string::npos
         ) << error.what();
       }
     });
   }
 
-  TEST_F(SerializationRobustness, AStringLengthPastTheDataThrows)
+  TEST_F(
+    SerializationRobustness,
+    AStringLengthPastTheDataThrows
+  )
   {
     // The map name's length rewritten to 0x7FFFFFF0.
     std::string bytes = ExpectedHeaderBytes();
-    const std::string nameLength = Bytes().I32(static_cast<std::int32_t>(std::strlen("/maps/SCMP_009/SCMP_009_scenario.lua"))).str();
+    const std::string nameLength =
+      Bytes().I32(static_cast<std::int32_t>(std::strlen("/maps/SCMP_009/SCMP_009_scenario.lua"))).str();
     const std::size_t at = bytes.find(nameLength, 1u + 4u + 4u + std::strlen(kHeaderName));
     ASSERT_NE(at, std::string::npos);
     bytes.replace(at, 4u, Bytes().I32(0x7FFFFFF0).str());
@@ -447,7 +547,10 @@ namespace
     });
   }
 
-  TEST_F(SerializationRobustness, AMissingTerminatorThrows)
+  TEST_F(
+    SerializationRobustness,
+    AMissingTerminatorThrows
+  )
   {
     std::string bytes = ExpectedHeaderBytes();
     bytes.back() = '{';

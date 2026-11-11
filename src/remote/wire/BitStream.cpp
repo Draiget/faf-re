@@ -6,7 +6,10 @@
 
 namespace faf::remote::wire
 {
-  void BitWriter::WriteBits(const std::uint32_t value, const int bitCount)
+  void BitWriter::WriteBits(
+    const std::uint32_t value,
+    const int bitCount
+  )
   {
     // Least significant bit first, filling each byte from its low bit: as many bits per step as
     // the current byte has room for.
@@ -26,7 +29,9 @@ namespace faf::remote::wire
     }
   }
 
-  void BitWriter::WriteVarUint(std::uint32_t value)
+  void BitWriter::WriteVarUint(
+    std::uint32_t value
+  )
   {
     while (value >= 0x80u) {
       WriteBits((value & 0x7Fu) | 0x80u, 8);
@@ -35,12 +40,16 @@ namespace faf::remote::wire
     WriteBits(value, 8);
   }
 
-  void BitWriter::WriteFloatExact(const float value)
+  void BitWriter::WriteFloatExact(
+    const float value
+  )
   {
     WriteBits(std::bit_cast<std::uint32_t>(value), 32);
   }
 
-  void BitWriter::WriteBytes(const std::span<const std::uint8_t> bytes)
+  void BitWriter::WriteBytes(
+    const std::span<const std::uint8_t> bytes
+  )
   {
     if ((mBitCount & 7u) == 0u) {
       mBytes.insert(mBytes.end(), bytes.begin(), bytes.end());
@@ -52,7 +61,9 @@ namespace faf::remote::wire
     }
   }
 
-  void BitWriter::Append(const BitWriter& other)
+  void BitWriter::Append(
+    const BitWriter& other
+  )
   {
     const std::size_t whole = other.mBitCount / 8u;
     if ((mBitCount & 7u) == 0u) {
@@ -68,7 +79,9 @@ namespace faf::remote::wire
     }
   }
 
-  std::uint32_t BitReader::ReadBits(const int bitCount) noexcept
+  std::uint32_t BitReader::ReadBits(
+    const int bitCount
+  ) noexcept
   {
     if (mFailed || bitCount < 0 || bitCount > 32) {
       mFailed = true;

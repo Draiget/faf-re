@@ -24,7 +24,9 @@ namespace moho
   namespace
   {
 
-    [[nodiscard]] std::string ExtractMeshFamilyPrefix(const std::string_view sourcePath)
+    [[nodiscard]] std::string ExtractMeshFamilyPrefix(
+      const std::string_view sourcePath
+    )
     {
       const std::size_t markerPos = sourcePath.rfind('_');
       if (markerPos == std::string_view::npos) {
@@ -47,7 +49,9 @@ namespace moho
      * `Entity::SetMesh` logged "Failed to load mesh for blueprint …" - 5298
      * times in one skirmish, against zero for the shipped binary.
      */
-    [[nodiscard]] bool ResourceFileExists(const std::string_view resourceName)
+    [[nodiscard]] bool ResourceFileExists(
+      const std::string_view resourceName
+    )
     {
       if (resourceName.empty()) {
         return false;
@@ -68,7 +72,9 @@ namespace moho
     }
 
     void ResolveExplicitOrFallbackPath(
-      fa::string& destination, const std::string_view sourcePath, const std::string_view fallbackName
+      fa::string& destination,
+      const std::string_view sourcePath,
+      const std::string_view fallbackName
     )
     {
       if (!destination.empty()) {
@@ -91,7 +97,10 @@ namespace moho
      * Builds one `gpg::RRef` lane for an `RMeshBlueprint*` and writes it into
      * caller-provided storage.
      */
-    [[nodiscard]] gpg::RRef* BuildMeshBlueprintRef(gpg::RRef* const out, RMeshBlueprint* const object)
+    [[nodiscard]] gpg::RRef* BuildMeshBlueprintRef(
+      gpg::RRef* const out,
+      RMeshBlueprint* const object
+    )
     {
       GPG_ASSERT(out != nullptr);
       if (!out) {
@@ -117,10 +126,12 @@ namespace moho
    * Forwards to `RBlueprint` base ctor; member defaults are supplied by the
    * in-class initializers so the body is otherwise empty.
    */
-  RMeshBlueprint::RMeshBlueprint(RRuleGameRules* const owner, const RResId& resId)
+  RMeshBlueprint::RMeshBlueprint(
+    RRuleGameRules* const owner,
+    const RResId& resId
+  )
     : RBlueprint(owner, resId)
-  {
-  }
+  {}
 
   /**
    * Address: 0x00528410 (FUN_00528410, Moho::RMeshBlueprint::dtr, scalar-deleting
@@ -155,8 +166,7 @@ namespace moho
     , mOcclude(0)
     , mSilhouette(0)
     , mPadCB(0)
-  {
-  }
+  {}
 
   /**
    * Address: 0x0051A0F0 (FUN_0051A0F0, Moho::RMeshBlueprintLOD::RMeshBlueprintLOD)
@@ -166,7 +176,9 @@ namespace moho
    * Copy-constructs one mesh LOD descriptor including all path string lanes
    * and scalar flags.
    */
-  RMeshBlueprintLOD::RMeshBlueprintLOD(const RMeshBlueprintLOD& other)
+  RMeshBlueprintLOD::RMeshBlueprintLOD(
+    const RMeshBlueprintLOD& other
+  )
     : mMeshName(other.mMeshName)
     , mAlbedoName(other.mAlbedoName)
     , mNormalsName(other.mNormalsName)
@@ -179,8 +191,7 @@ namespace moho
     , mOcclude(other.mOcclude)
     , mSilhouette(other.mSilhouette)
     , mPadCB(other.mPadCB)
-  {
-  }
+  {}
 
   /**
    * Address: 0x00519800 (FUN_00519800)
@@ -207,7 +218,9 @@ namespace moho
    * cutoff float and the three boolean flags. Preserves the pad byte without
    * touching it so the 0xCC-byte record layout is stable.
    */
-  RMeshBlueprintLOD& RMeshBlueprintLOD::operator=(const RMeshBlueprintLOD& other)
+  RMeshBlueprintLOD& RMeshBlueprintLOD::operator=(
+    const RMeshBlueprintLOD& other
+  )
   {
     if (this == &other) {
       return *this;
@@ -238,7 +251,10 @@ namespace moho
    * fallback naming rules (`_lod%d.scm`, `_albedo.dds`, `_normalsTS.dds`,
    * `_SpecTeam.dds`, `_lookup.dds`).
    */
-  void RMeshBlueprintLOD::Init(const fa::string& sourcePath, const std::uint32_t lodIndex)
+  void RMeshBlueprintLOD::Init(
+    const fa::string& sourcePath,
+    const std::uint32_t lodIndex
+  )
   {
     const std::string sourcePrefix = ExtractMeshFamilyPrefix(sourcePath.view());
 
@@ -343,7 +359,12 @@ namespace moho
 
 namespace moho
 {
-  void RMeshBlueprint::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void RMeshBlueprint::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     RRuleGameRules* rules = nullptr;
     const gpg::RRef owner{};
@@ -359,7 +380,10 @@ namespace moho
    * Address: 0x00518FC0 (FUN_00518FC0)
    */
   void RMeshBlueprint::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     archive.WritePointer(mOwner, gpg::TrackedPointerState::Unowned, gpg::RRef{});

@@ -20,7 +20,9 @@ namespace faf::editor
     constexpr float kThumb = 100.0f;
     constexpr float kPinRadius = 5.0f;
 
-    std::size_t Rows(const NodeType& type)
+    std::size_t Rows(
+      const NodeType& type
+    )
     {
       return std::max(type.inputs.size(), type.outputs.size());
     }
@@ -28,33 +30,50 @@ namespace faf::editor
     /** The drawing canvas's rule for the square under the pins (set while it draws). */
     const std::function<bool(const NodeType&)>* gHasSquare = nullptr;
 
-    bool HasThumbnail(const NodeType& type)
+    bool HasThumbnail(
+      const NodeType& type
+    )
     {
       return gHasSquare != nullptr && *gHasSquare ? (*gHasSquare)(type) : !type.outputs.empty();
     }
 
-    float NodeHeight(const NodeType& type)
+    float NodeHeight(
+      const NodeType& type
+    )
     {
       return kHeader + 6.0f + static_cast<float>(Rows(type)) * kRow + (HasThumbnail(type) ? kThumb + 10.0f : 4.0f);
     }
 
-    float PinY(const GraphNode& node, const int pin)
+    float PinY(
+      const GraphNode& node,
+      const int pin
+    )
     {
       return node.y + kHeader + 6.0f + (static_cast<float>(pin) + 0.5f) * kRow;
     }
 
-    ImU32 PinColor(const PinType type)
+    ImU32 PinColor(
+      const PinType type
+    )
     {
       switch (type) {
-      case PinType::Color: return IM_COL32(240, 170, 80, 255);
-      case PinType::Curve: return IM_COL32(110, 200, 120, 255);
-      case PinType::Emitter: return IM_COL32(240, 110, 90, 255);
-      case PinType::Texture: return IM_COL32(110, 160, 255, 255);
-      default: return IM_COL32(190, 190, 190, 255);
+      case PinType::Color:
+        return IM_COL32(240, 170, 80, 255);
+      case PinType::Curve:
+        return IM_COL32(110, 200, 120, 255);
+      case PinType::Emitter:
+        return IM_COL32(240, 110, 90, 255);
+      case PinType::Texture:
+        return IM_COL32(110, 160, 255, 255);
+      default:
+        return IM_COL32(190, 190, 190, 255);
       }
     }
 
-    bool ContainsNoCase(const std::string& text, const char* filter)
+    bool ContainsNoCase(
+      const std::string& text,
+      const char* filter
+    )
     {
       if (filter == nullptr || filter[0] == '\0') {
         return true;
@@ -62,7 +81,9 @@ namespace faf::editor
       std::string a = text;
       std::string b = filter;
       const auto lower = [](std::string& s) {
-        std::transform(s.begin(), s.end(), s.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::transform(s.begin(), s.end(), s.begin(), [](const unsigned char c) {
+          return static_cast<char>(std::tolower(c));
+        });
       };
       lower(a);
       lower(b);
@@ -70,19 +91,30 @@ namespace faf::editor
     }
   } // namespace
 
-  std::uint32_t NodeCategoryColor(const std::string& category)
+  std::uint32_t NodeCategoryColor(
+    const std::string& category
+  )
   {
     static const std::map<std::string, ImU32> colors = {
-      {"Output", IM_COL32(110, 80, 60, 255)},   {"Textures", IM_COL32(40, 90, 150, 255)}, {"Constants", IM_COL32(50, 100, 50, 255)},
-      {"Math", IM_COL32(75, 105, 80, 255)},     {"Noise", IM_COL32(100, 70, 140, 255)},   {"Adjust", IM_COL32(40, 110, 115, 255)},
-      {"Blend", IM_COL32(140, 95, 45, 255)},    {"UV", IM_COL32(140, 50, 50, 255)},       {"Normal", IM_COL32(70, 70, 150, 255)},
-      {"Channels", IM_COL32(90, 90, 90, 255)},  {"Map", IM_COL32(110, 110, 40, 255)},
+      {"Output", IM_COL32(110, 80, 60, 255)},
+      {"Textures", IM_COL32(40, 90, 150, 255)},
+      {"Constants", IM_COL32(50, 100, 50, 255)},
+      {"Math", IM_COL32(75, 105, 80, 255)},
+      {"Noise", IM_COL32(100, 70, 140, 255)},
+      {"Adjust", IM_COL32(40, 110, 115, 255)},
+      {"Blend", IM_COL32(140, 95, 45, 255)},
+      {"UV", IM_COL32(140, 50, 50, 255)},
+      {"Normal", IM_COL32(70, 70, 150, 255)},
+      {"Channels", IM_COL32(90, 90, 90, 255)},
+      {"Map", IM_COL32(110, 110, 40, 255)},
     };
     const auto found = colors.find(category);
     return found != colors.end() ? found->second : IM_COL32(80, 80, 80, 255);
   }
 
-  void EdNodeCanvas::Select(const int id)
+  void EdNodeCanvas::Select(
+    const int id
+  )
   {
     mSelection.clear();
     if (id != 0) {
@@ -90,7 +122,10 @@ namespace faf::editor
     }
   }
 
-  int EdNodeCanvas::AddAtCentre(NodeGraph& graph, const std::string& type)
+  int EdNodeCanvas::AddAtCentre(
+    NodeGraph& graph,
+    const std::string& type
+  )
   {
     const float x = (mCanvasW * 0.5f) / mZoom - mPanX - kNodeW * 0.5f;
     const float y = (mCanvasH * 0.5f) / mZoom - mPanY - 40.0f;
@@ -101,7 +136,10 @@ namespace faf::editor
     return id;
   }
 
-  void EdNodeCanvas::Frame(const NodeGraph& graph, const bool selectionOnly)
+  void EdNodeCanvas::Frame(
+    const NodeGraph& graph,
+    const bool selectionOnly
+  )
   {
     float minX = 1e9f;
     float minY = 1e9f;
@@ -126,7 +164,9 @@ namespace faf::editor
     mPanY = mCanvasH / mZoom * 0.5f - (minY + maxY) * 0.5f;
   }
 
-  bool EdNodeCanvas::Draw(NodeGraph& graph)
+  bool EdNodeCanvas::Draw(
+    NodeGraph& graph
+  )
   {
     const std::uint64_t changesBefore = graph.Changes();
     gHasSquare = &mHasSquare;
@@ -144,13 +184,19 @@ namespace faf::editor
       mFrameNext = false;
     }
 
-    ImGui::InvisibleButton("##canvas", size, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
+    ImGui::InvisibleButton(
+      "##canvas",
+      size,
+      ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle
+    );
     const bool hovered = ImGui::IsItemHovered();
     ImDrawList* dl = ImGui::GetWindowDrawList();
     dl->PushClipRect(origin, ImVec2(origin.x + size.x, origin.y + size.y), true);
     dl->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), IM_COL32(24, 24, 26, 255));
 
-    const auto toScreen = [&](const float gx, const float gy) { return ImVec2(origin.x + (gx + mPanX) * mZoom, origin.y + (gy + mPanY) * mZoom); };
+    const auto toScreen = [&](const float gx, const float gy) {
+      return ImVec2(origin.x + (gx + mPanX) * mZoom, origin.y + (gy + mPanY) * mZoom);
+    };
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     const float mouseGX = (mouse.x - origin.x) / mZoom - mPanX;
     const float mouseGY = (mouse.y - origin.y) / mZoom - mPanY;
@@ -186,7 +232,10 @@ namespace faf::editor
           pinHit = {node.id, static_cast<int>(i), true};
         }
       }
-      if (nodeHit == 0 && mouseGX >= node.x && mouseGX <= node.x + kNodeW && mouseGY >= node.y && mouseGY <= node.y + NodeHeight(*node.type)) {
+      if (
+        nodeHit == 0 && mouseGX >= node.x && mouseGX <= node.x + kNodeW && mouseGY >= node.y &&
+        mouseGY <= node.y + NodeHeight(*node.type)
+      ) {
         nodeHit = node.id;
       }
       if (pinHit.node != 0) {
@@ -376,7 +425,9 @@ namespace faf::editor
     if (ImGui::BeginDragDropTarget()) {
       if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(kPalettePayload)) {
         const std::string type(static_cast<const char*>(payload->Data), static_cast<std::size_t>(payload->DataSize));
-        if (const int id = graph.AddNode(type, std::round(mouseGX - kNodeW * 0.5f), std::round(mouseGY - 12.0f)); id != 0) {
+        if (
+          const int id = graph.AddNode(type, std::round(mouseGX - kNodeW * 0.5f), std::round(mouseGY - 12.0f)); id != 0
+        ) {
           Select(id);
         }
       }
@@ -393,12 +444,14 @@ namespace faf::editor
       const GraphNode* from = graph.Find(link.fromNode);
       const GraphNode* to = graph.Find(link.toNode);
       const bool lit = mSelection.count(link.fromNode) != 0 || mSelection.count(link.toNode) != 0;
-      const ImU32 color = lit ? IM_COL32(255, 255, 255, 255) : PinColor(from->type->outputs[static_cast<std::size_t>(link.fromPin)].type);
+      const ImU32 color =
+        lit ? IM_COL32(255, 255, 255, 255) : PinColor(from->type->outputs[static_cast<std::size_t>(link.fromPin)].type);
       curve(toScreen(from->x + kNodeW, PinY(*from, link.fromPin)), toScreen(to->x, PinY(*to, link.toPin)), color);
     }
     if (mDrag == Drag::Link) {
       if (const GraphNode* from = graph.Find(mLinkFrom.node)) {
-        const ImVec2 pin = mLinkFrom.output ? toScreen(from->x + kNodeW, PinY(*from, mLinkFrom.pin)) : toScreen(from->x, PinY(*from, mLinkFrom.pin));
+        const ImVec2 pin = mLinkFrom.output ? toScreen(from->x + kNodeW, PinY(*from, mLinkFrom.pin))
+                                            : toScreen(from->x, PinY(*from, mLinkFrom.pin));
         if (mLinkFrom.output) {
           curve(pin, mouse, IM_COL32(255, 255, 255, 200));
         } else {
@@ -420,16 +473,27 @@ namespace faf::editor
         continue;
       }
       const float rounding = 4.0f * mZoom;
-      dl->AddRectFilled(ImVec2(a.x + 3.0f, a.y + 3.0f), ImVec2(b.x + 3.0f, b.y + 3.0f), IM_COL32(0, 0, 0, 90), rounding);
+      dl->AddRectFilled(
+        ImVec2(a.x + 3.0f, a.y + 3.0f), ImVec2(b.x + 3.0f, b.y + 3.0f), IM_COL32(0, 0, 0, 90), rounding
+      );
       dl->AddRectFilled(a, b, IM_COL32(36, 36, 40, 245), rounding);
-      dl->AddRectFilled(a, ImVec2(b.x, a.y + kHeader * mZoom), NodeCategoryColor(type.category), rounding, ImDrawFlags_RoundCornersTop);
+      dl->AddRectFilled(
+        a, ImVec2(b.x, a.y + kHeader * mZoom), NodeCategoryColor(type.category), rounding, ImDrawFlags_RoundCornersTop
+      );
       const std::string warning = mWarning ? mWarning(node) : std::string();
       const bool selected = mSelection.count(node.id) != 0;
-      const ImU32 outline = !warning.empty() ? IM_COL32(230, 70, 60, 255) : selected ? IM_COL32(250, 200, 80, 255) : IM_COL32(15, 15, 15, 255);
+      const ImU32 outline = !warning.empty() ? IM_COL32(230, 70, 60, 255)
+        : selected                           ? IM_COL32(250, 200, 80, 255)
+                                             : IM_COL32(15, 15, 15, 255);
       dl->AddRect(a, b, outline, rounding, 0, selected || !warning.empty() ? 2.0f : 1.0f);
       if (showText) {
-        dl->AddText(font, fontSize, ImVec2(a.x + 7.0f * mZoom, a.y + (kHeader * mZoom - fontSize) * 0.5f), IM_COL32(240, 240, 240, 255),
-                    type.title.c_str());
+        dl->AddText(
+          font,
+          fontSize,
+          ImVec2(a.x + 7.0f * mZoom, a.y + (kHeader * mZoom - fontSize) * 0.5f),
+          IM_COL32(240, 240, 240, 255),
+          type.title.c_str()
+        );
       }
       for (std::size_t i = 0; i < type.inputs.size(); ++i) {
         const ImVec2 p = toScreen(node.x, PinY(node, static_cast<int>(i)));
@@ -440,7 +504,13 @@ namespace faf::editor
           dl->AddCircle(p, kPinRadius * mZoom, color, 0, 1.5f);
         }
         if (showText) {
-          dl->AddText(font, fontSize, ImVec2(p.x + 10.0f * mZoom, p.y - fontSize * 0.5f), IM_COL32(200, 200, 200, 255), type.inputs[i].name.c_str());
+          dl->AddText(
+            font,
+            fontSize,
+            ImVec2(p.x + 10.0f * mZoom, p.y - fontSize * 0.5f),
+            IM_COL32(200, 200, 200, 255),
+            type.inputs[i].name.c_str()
+          );
         }
       }
       for (std::size_t i = 0; i < type.outputs.size(); ++i) {
@@ -457,8 +527,13 @@ namespace faf::editor
         }
         if (showText) {
           const ImVec2 textSize = font->CalcTextSizeA(fontSize, 1e9f, 0.0f, type.outputs[i].name.c_str());
-          dl->AddText(font, fontSize, ImVec2(p.x - 10.0f * mZoom - textSize.x, p.y - fontSize * 0.5f), IM_COL32(200, 200, 200, 255),
-                      type.outputs[i].name.c_str());
+          dl->AddText(
+            font,
+            fontSize,
+            ImVec2(p.x - 10.0f * mZoom - textSize.x, p.y - fontSize * 0.5f),
+            IM_COL32(200, 200, 200, 255),
+            type.outputs[i].name.c_str()
+          );
         }
       }
       if (HasThumbnail(type)) {
@@ -472,8 +547,7 @@ namespace faf::editor
           dl->AddRect(ta, tb, IM_COL32(10, 10, 10, 255));
         }
       }
-      if (hovered && nodeHit == node.id && pinHit.node == 0 && mDrag == Drag::None &&
-          mouseGY <= node.y + kHeader) {
+      if (hovered && nodeHit == node.id && pinHit.node == 0 && mDrag == Drag::None && mouseGY <= node.y + kHeader) {
         ImGui::SetTooltip("%s%s%s", type.help.c_str(), warning.empty() ? "" : "\n\n", warning.c_str());
       }
     }
@@ -486,9 +560,15 @@ namespace faf::editor
     }
     if (pinHit.node != 0 && mDrag == Drag::None) {
       const GraphNode* node = graph.Find(pinHit.node);
-      const PinDef& pin = pinHit.output ? node->type->outputs[static_cast<std::size_t>(pinHit.pin)] : node->type->inputs[static_cast<std::size_t>(pinHit.pin)];
-      ImGui::SetTooltip("%s (%s)%s", pin.name.c_str(), PinTypeName(pin.type),
-                        pinHit.output ? "\nDrag to an input to link; Alt+click cuts its links" : "\nDrag from an output to link; Alt+click cuts it");
+      const PinDef& pin = pinHit.output ? node->type->outputs[static_cast<std::size_t>(pinHit.pin)]
+                                        : node->type->inputs[static_cast<std::size_t>(pinHit.pin)];
+      ImGui::SetTooltip(
+        "%s (%s)%s",
+        pin.name.c_str(),
+        PinTypeName(pin.type),
+        pinHit.output ? "\nDrag to an input to link; Alt+click cuts its links"
+                      : "\nDrag from an output to link; Alt+click cuts it"
+      );
     }
     dl->PopClipRect();
 
@@ -496,7 +576,12 @@ namespace faf::editor
     return graph.Changes() != changesBefore;
   }
 
-  bool EdNodeCanvas::PaletteList(NodeGraph& graph, const char* filter, const float x, const float y)
+  bool EdNodeCanvas::PaletteList(
+    NodeGraph& graph,
+    const char* filter,
+    const float x,
+    const float y
+  )
   {
     std::map<std::string, std::vector<const NodeType*>> byCategory;
     for (const auto& type : graph.Registry().All()) {
@@ -547,7 +632,9 @@ namespace faf::editor
     return false;
   }
 
-  void EdNodeCanvas::DrawPalettePopup(NodeGraph& graph)
+  void EdNodeCanvas::DrawPalettePopup(
+    NodeGraph& graph
+  )
   {
     ImGui::SetNextWindowSizeConstraints(ImVec2(Em(220.0f), Em(0.0f)), ImVec2(Em(320.0f), Em(420.0f)));
     if (!ImGui::BeginPopup("##palette")) {

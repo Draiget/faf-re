@@ -79,7 +79,6 @@
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/reflection/Reflection.h"
 
-
 using namespace moho;
 namespace moho
 {
@@ -104,8 +103,14 @@ namespace moho
   // symbol against `dumpbin /symbols` on CUnitCallTeleport.obj, which showed
   // the `Q`-prefixed definition sitting right there, unmatched.
   [[nodiscard]] bool TryBuildStructureAt(
-    SCoordsVec2* const tryPos, const RUnitBlueprint* const blueprint, Sim* const sim,
-    const int border, const bool wholeMap, const bool doCoerce, const bool useSkirt);
+    SCoordsVec2* const tryPos,
+    const RUnitBlueprint* const blueprint,
+    Sim* const sim,
+    const int border,
+    const bool wholeMap,
+    const bool doCoerce,
+    const bool useSkirt
+  );
 
   /**
    * Address: 0x0057CA20 (FUN_0057CA20, func_ScheduleBuildStructure)
@@ -115,14 +120,14 @@ namespace moho
    * `brain->mBuildStructureMap` at `where`.
    */
   void func_ScheduleBuildStructure(Unit* builder, CAiBrain* brain, CUnitCommand* command, Wm3::Vector2i where);
-}
+} // namespace moho
 
 namespace
 {
 
   struct SAttackVectorGridRow
   {
-    std::int32_t mNextColumn = 0;         // +0x00 next cell to record
+    std::int32_t mNextColumn = 0;      // +0x00 next cell to record
     fa::vector<int> mOccupancyWords{}; // +0x04 one bit per column
   };
   static_assert(sizeof(SAttackVectorGridRow) == 0x14, "SAttackVectorGridRow size must be 0x14");
@@ -147,7 +152,9 @@ namespace
    * over an `SBuildResourceInfo` stand-in that every caller reinterpret_cast
    * an `SBuildReserveInfo` into.
    */
-  void UnlinkBuildReservation(SBuildReserveInfo& reservation) noexcept
+  void UnlinkBuildReservation(
+    SBuildReserveInfo& reservation
+  ) noexcept
   {
     reservation.mCom.UnlinkFromOwnerChain();
     reservation.mUnit.UnlinkFromOwnerChain();
@@ -161,7 +168,10 @@ namespace
    * unlinking each from whatever chain it is in first -- `WeakPtr<T>::operator=`
    * on each lane, i.e. `ResetFromOwnerLinkSlot(source-lane's slot)`.
    */
-  void RebindBuildReservation(SBuildReserveInfo& destination, const SBuildReserveInfo& source) noexcept
+  void RebindBuildReservation(
+    SBuildReserveInfo& destination,
+    const SBuildReserveInfo& source
+  ) noexcept
   {
     destination.mUnit = source.mUnit;
     destination.mCom = source.mCom;
@@ -253,7 +263,9 @@ namespace
      * rather than dispatching a virtual, because this descriptor has no
      * `RIndexed` sub-object; the typed `size()` accessor is that same word.
      */
-    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(
+      const gpg::RRef& ref
+    ) const override
     {
       const fa::string base = gpg::RType::GetLexical(ref);
       const auto* const mapObject = static_cast<const BuildReserveMapStorage*>(ref.mObj);
@@ -273,11 +285,14 @@ namespace
      * in-place rather than copying the raw link fields; `RebindBuildResourceInfoLinks`
      * / `UnlinkBuildResourceInfoLink` reproduce that hand-off.
      */
-    static void SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
+    static void SerLoad(
+      gpg::ReadArchive* const archive,
+      const std::intptr_t objectPtr,
+      const int,
+      gpg::RRef* const ownerRef
+    )
     {
-      auto* const mapObject = reinterpret_cast<BuildReserveMapStorage*>(
-        objectPtr
-      );
+      auto* const mapObject = reinterpret_cast<BuildReserveMapStorage*>(objectPtr);
       if (!archive || !mapObject) {
         return;
       }
@@ -317,11 +332,14 @@ namespace
      * Serializes one `std::map<Wm3::IVector2<int>,Moho::SBuildReserveInfo>` payload
      * by writing each key/value pair through reflected type lanes.
      */
-    static void SerSave(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
+    static void SerSave(
+      gpg::WriteArchive* const archive,
+      const std::intptr_t objectPtr,
+      const int,
+      gpg::RRef* const ownerRef
+    )
     {
-      const auto* const mapObject = reinterpret_cast<const BuildReserveMapStorage*>(
-        objectPtr
-      );
+      const auto* const mapObject = reinterpret_cast<const BuildReserveMapStorage*>(objectPtr);
       if (!archive || !mapObject) {
         return;
       }
@@ -355,7 +373,9 @@ namespace
      */
     void Init() override
     {
-      static_assert(sizeof(moho::SBuildStructurePositionMap) == 0x0C, "moho::SBuildStructurePositionMap is 0x0C bytes on x86");
+      static_assert(
+        sizeof(moho::SBuildStructurePositionMap) == 0x0C, "moho::SBuildStructurePositionMap is 0x0C bytes on x86"
+      );
       size_ = sizeof(moho::SBuildStructurePositionMap);
       version_ = 1;
       serLoadFunc_ = &BuildReserveMapTypeInfo::SerLoad;
@@ -389,5 +409,4 @@ namespace
   }
 
   constexpr int kAiBrainAllianceAnySentinel = 3;
-}
-
+} // namespace

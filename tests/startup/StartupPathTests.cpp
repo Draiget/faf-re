@@ -10,24 +10,35 @@
 
 namespace
 {
-  std::string Str(const fa::string& value)
+  std::string Str(
+    const fa::string& value
+  )
   {
     return value.c_str();
   }
 
-  std::string Collapse(const char* const path, bool* const success = nullptr)
+  std::string Collapse(
+    const char* const path,
+    bool* const success = nullptr
+  )
   {
     return Str(moho::FILE_CollapsePath(path, success));
   }
 
-  std::string MakeAbsolute(const char* const path, const char* const base)
+  std::string MakeAbsolute(
+    const char* const path,
+    const char* const base
+  )
   {
     return Str(moho::FILE_MakeAbsolute(path, base));
   }
 } // namespace
 
 // The extension is what follows the last dot of the last segment (0x00410650); a dot in a folder name doesn't count.
-TEST(StartupPath, ExtensionIsInTheLastSegmentOnly)
+TEST(
+  StartupPath,
+  ExtensionIsInTheLastSegmentOnly
+)
 {
   EXPECT_STREQ(moho::FILE_Ext("/units/uel0001/uel0001_unit.bp"), "bp");
   EXPECT_STREQ(moho::FILE_Ext("archive.tar.gz"), "gz");
@@ -40,7 +51,10 @@ TEST(StartupPath, ExtensionIsInTheLastSegmentOnly)
 }
 
 // The base is everything after the last '/' or '\\' (0x004111C0); stripping cuts at the base's last dot.
-TEST(StartupPath, BaseIsTheLastSegment)
+TEST(
+  StartupPath,
+  BaseIsTheLastSegment
+)
 {
   EXPECT_EQ(Str(moho::FILE_Base("/maps/setons/setons_scenario.lua", false)), "setons_scenario.lua");
   EXPECT_EQ(Str(moho::FILE_Base("/maps/setons/setons_scenario.lua", true)), "setons_scenario");
@@ -53,7 +67,10 @@ TEST(StartupPath, BaseIsTheLastSegment)
 }
 
 // A forced extension replaces the one there (0x004108B0); an empty one removes it.
-TEST(StartupPath, ForcedExtensionReplacesTheOneThere)
+TEST(
+  StartupPath,
+  ForcedExtensionReplacesTheOneThere
+)
 {
   EXPECT_EQ(Str(moho::FILE_ForcedExt("/a/b.lua", "bp")), "/a/b.bp");
   EXPECT_EQ(Str(moho::FILE_ForcedExt("/a/b", "lua")), "/a/b.lua");
@@ -64,7 +81,10 @@ TEST(StartupPath, ForcedExtensionReplacesTheOneThere)
 }
 
 // A suggested extension is added only when the path has none (0x00410760), with one dot.
-TEST(StartupPath, SuggestedExtensionOnlyFillsAGap)
+TEST(
+  StartupPath,
+  SuggestedExtensionOnlyFillsAGap
+)
 {
   EXPECT_EQ(Str(moho::FILE_SuggestedExt("save", "SCFAsave")), "save.SCFAsave");
   EXPECT_EQ(Str(moho::FILE_SuggestedExt("save", ".SCFAsave")), "save.SCFAsave");
@@ -75,15 +95,22 @@ TEST(StartupPath, SuggestedExtensionOnlyFillsAGap)
 
 // Retail's FILE_SuggestedExt (0x004107A1), FILE_HasDrive (0x0040FDEA) and FILE_HasUNC (0x0040FEDA) throw
 // "Null argument." for an empty path; ours return an empty string or false. Left as a known difference.
-TEST(StartupPath, DISABLED_EmptyPathThrowsLikeRetail)
+TEST(
+  StartupPath,
+  DISABLED_EmptyPathThrowsLikeRetail
+)
 {
   EXPECT_THROW((void)moho::FILE_SuggestedExt("", "lua"), moho::XFileError);
   EXPECT_THROW((void)moho::FILE_HasDrive(""), moho::XFileError);
   EXPECT_THROW((void)moho::FILE_HasUNC(""), moho::XFileError);
 }
 
-// Drive, UNC, local and absolute: 0x0040FDC0, 0x0040FEB0, 0x0040FA50, 0x0040FD60. GetDrive counts from A=1 (0x0040FAF0).
-TEST(StartupPath, PathKindsAreReadFromTheFirstCharacters)
+// Drive, UNC, local and absolute: 0x0040FDC0, 0x0040FEB0, 0x0040FA50, 0x0040FD60. GetDrive counts from A=1
+// (0x0040FAF0).
+TEST(
+  StartupPath,
+  PathKindsAreReadFromTheFirstCharacters
+)
 {
   EXPECT_TRUE(moho::FILE_HasDrive("C:/x"));
   EXPECT_TRUE(moho::FILE_HasDrive("z:"));
@@ -118,7 +145,10 @@ TEST(StartupPath, PathKindsAreReadFromTheFirstCharacters)
 
 // Collapsing (0x004115A0): separators become '/', "." goes, ".." takes the previous segment. A ".." with nothing to
 // take stays and clears `success`, except at an absolute root, where it is dropped.
-TEST(StartupPath, CollapseResolvesDotSegments)
+TEST(
+  StartupPath,
+  CollapseResolvesDotSegments
+)
 {
   bool success = false;
   EXPECT_EQ(Collapse("/a/b/../c", &success), "/a/c");
@@ -144,7 +174,10 @@ TEST(StartupPath, CollapseResolvesDotSegments)
 
 // Resolving a path against a base folder (0x0040FFC0): the base must be absolute, a trailing '/' on either goes, an
 // absolute path keeps the base's drive, and a drive or UNC path is returned as it is.
-TEST(StartupPath, MakeAbsoluteJoinsWithTheBase)
+TEST(
+  StartupPath,
+  MakeAbsoluteJoinsWithTheBase
+)
 {
   EXPECT_EQ(MakeAbsolute("textures/a.dds", "/base/"), "/base/textures/a.dds");
   EXPECT_EQ(MakeAbsolute("sub\\file", "C:\\games\\"), "C:/games/sub/file");
@@ -156,7 +189,10 @@ TEST(StartupPath, MakeAbsoluteJoinsWithTheBase)
 }
 
 // The four combinations retail rejects (0x004101EE, 0x0041026D, 0x004102E9, 0x0041036F), and empty arguments.
-TEST(StartupPath, MakeAbsoluteRejectsMismatchedBases)
+TEST(
+  StartupPath,
+  MakeAbsoluteRejectsMismatchedBases
+)
 {
   EXPECT_THROW((void)MakeAbsolute("x", "relative"), moho::XFileError);
   EXPECT_THROW((void)MakeAbsolute("//srv/share", "/base"), moho::XFileError);
@@ -168,7 +204,10 @@ TEST(StartupPath, MakeAbsoluteRejectsMismatchedBases)
 
 // The folder part (0x00410A10): up to the last '/', but only when a dot follows it (a file name); a path without one
 // is taken as a folder already and loses only a trailing '/'. A drive root keeps its '/'.
-TEST(StartupPath, DirPrefixTreatsADotlessLeafAsAFolder)
+TEST(
+  StartupPath,
+  DirPrefixTreatsADotlessLeafAsAFolder
+)
 {
   EXPECT_EQ(Str(moho::FILE_DirPrefix("/maps/setons/setons_scenario.lua")), "/maps/setons");
   EXPECT_EQ(Str(moho::FILE_DirPrefix("C:\\games\\fa\\bin\\init.lua")), "C:/games/fa/bin");
@@ -182,7 +221,10 @@ TEST(StartupPath, DirPrefixTreatsADotlessLeafAsAFolder)
 }
 
 // The errno texts (0x00411A20, byte table at 0x00411AC4).
-TEST(StartupPath, ErrnoTexts)
+TEST(
+  StartupPath,
+  ErrnoTexts
+)
 {
   EXPECT_EQ(Str(moho::FILE_GetErrorFromErrno(2)), "File not found");
   EXPECT_EQ(Str(moho::FILE_GetErrorFromErrno(13)), "Access denied");
@@ -195,7 +237,10 @@ TEST(StartupPath, ErrnoTexts)
 }
 
 // A bare map name becomes its scenario file (0x008CE220); anything with a separator is taken as a path already.
-TEST(StartupPath, MapNameBecomesItsScenarioFile)
+TEST(
+  StartupPath,
+  MapNameBecomesItsScenarioFile
+)
 {
   EXPECT_EQ(Str(moho::FindMapScenario("SCMP_009")), "/maps/SCMP_009/SCMP_009_scenario.lua");
   EXPECT_EQ(Str(moho::FindMapScenario("/maps/x/x_scenario.lua")), "/maps/x/x_scenario.lua");
@@ -204,7 +249,10 @@ TEST(StartupPath, MapNameBecomesItsScenarioFile)
 }
 
 // "width,height,fps" (0x008CD6C0: tokens on ',' at 0xE16724, atoi each); anything but three tokens is refused.
-TEST(StartupPath, ResolutionTripleNeedsThreeFields)
+TEST(
+  StartupPath,
+  ResolutionTripleNeedsThreeFields
+)
 {
   moho::ResolutionTriple resolution;
   ASSERT_TRUE(moho::CFG_ParseResolutionTriple("1920,1080,60", &resolution));

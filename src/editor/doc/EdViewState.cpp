@@ -8,10 +8,14 @@
 
 namespace faf::editor
 {
-  std::string WriteViewState(const ViewState& s)
+  std::string WriteViewState(
+    const ViewState& s
+  )
   {
     std::ostringstream out;
-    const auto flag = [&](const char* const key, const bool on) { out << key << '=' << (on ? 1 : 0) << '\n'; };
+    const auto flag = [&](const char* const key, const bool on) {
+      out << key << '=' << (on ? 1 : 0) << '\n';
+    };
     out << "tool=" << s.tool << '\n';
     flag("grid", s.grid);
     flag("snap", s.snap);
@@ -35,7 +39,10 @@ namespace faf::editor
     return out.str();
   }
 
-  ViewState ReadViewState(const std::string& text, ViewState s)
+  ViewState ReadViewState(
+    const std::string& text,
+    ViewState s
+  )
   {
     std::istringstream lines(text);
     std::string line;
@@ -99,7 +106,9 @@ namespace faf::editor
     return s;
   }
 
-  std::string ViewStateFileName(const std::string& scenarioPath)
+  std::string ViewStateFileName(
+    const std::string& scenarioPath
+  )
   {
     // `/maps/scmp_009/scmp_009_scenario.lua` -> `scmp_009-<hash>.txt`.
     std::string folder = scenarioPath;
@@ -112,7 +121,9 @@ namespace faf::editor
     std::string name;
     for (const char c : folder) {
       const char lower = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-      name += std::isalnum(static_cast<unsigned char>(lower)) != 0 || lower == '.' || lower == '_' || lower == '-' ? lower : '_';
+      name += std::isalnum(static_cast<unsigned char>(lower)) != 0 || lower == '.' || lower == '_' || lower == '-'
+        ? lower
+        : '_';
     }
     // FNV-1a of the lower-cased path: the same map opened again finds its file.
     std::uint32_t hash = 2166136261u;

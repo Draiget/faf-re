@@ -47,7 +47,9 @@ namespace faf::editor
     WaterLevels gWater;
 
     /** On the sim's thread: the queued water levels into the sim's map. */
-    void ApplyWater(moho::Sim& sim)
+    void ApplyWater(
+      moho::Sim& sim
+    )
     {
       WaterLevels water;
       {
@@ -67,22 +69,31 @@ namespace faf::editor
       map.mWaterElevation = water.elevation;
       map.mWaterElevationDeep = water.deep;
       map.mWaterElevationAbyss = water.abyss;
-      gpg::Logf("editor: water into the play's sim: %s, level %.2f -> %.2f (deep %.2f, abyss %.2f)", water.enabled ? "on" : "off",
-                static_cast<double>(before), static_cast<double>(water.elevation), static_cast<double>(water.deep),
-                static_cast<double>(water.abyss));
+      gpg::Logf(
+        "editor: water into the play's sim: %s, level %.2f -> %.2f (deep %.2f, abyss %.2f)",
+        water.enabled ? "on" : "off",
+        static_cast<double>(before),
+        static_cast<double>(water.elevation),
+        static_cast<double>(water.deep),
+        static_cast<double>(water.abyss)
+      );
     }
 
     void ApplyHeights(moho::Sim& sim);
 
     /** The beat hook: whatever the editor queued for the play. */
-    void ApplyQueued(moho::Sim& sim)
+    void ApplyQueued(
+      moho::Sim& sim
+    )
     {
       ApplyWater(sim);
       ApplyHeights(sim);
     }
 
     /** On the sim's thread, at a beat's start: the queued heights into the sim's height field. */
-    void ApplyHeights(moho::Sim& sim)
+    void ApplyHeights(
+      moho::Sim& sim
+    )
     {
       std::vector<Patch> patches;
       {
@@ -117,21 +128,33 @@ namespace faf::editor
       if (sim.mPathTables != nullptr && !gNoPathDirty) {
         // A footprint's slope check reaches a few cells past the cell it stands on.
         constexpr int kPad = 4;
-        sim.mPathTables->DirtyClusters(gpg::Rect2i{std::max(0, area.x0 - kPad), std::max(0, area.z0 - kPad),
-                                                   std::min(field->width - 1, area.x1 + kPad), std::min(field->height - 1, area.z1 + kPad)});
+        sim.mPathTables->DirtyClusters(
+          gpg::Rect2i{
+            std::max(0, area.x0 - kPad),
+            std::max(0, area.z0 - kPad),
+            std::min(field->width - 1, area.x1 + kPad),
+            std::min(field->height - 1, area.z1 + kPad)
+          }
+        );
       }
       int reseated = 0;
       if (sim.mOGrid != nullptr && !gNoReseat) {
-        const Wm3::Vector3f centre{static_cast<float>(area.x0 + area.x1) * 0.5f, 0.0f, static_cast<float>(area.z0 + area.z1) * 0.5f};
-        const Wm3::Vector3f extents{static_cast<float>(area.x1 - area.x0), 100.0f, static_cast<float>(area.z1 - area.z0)};
+        const Wm3::Vector3f centre{
+          static_cast<float>(area.x0 + area.x1) * 0.5f, 0.0f, static_cast<float>(area.z0 + area.z1) * 0.5f
+        };
+        const Wm3::Vector3f extents{
+          static_cast<float>(area.x1 - area.x0), 100.0f, static_cast<float>(area.z1 - area.z0)
+        };
         const moho::VAxes3 axes{Wm3::Quaternionf(0.0f, 0.0f, 0.0f, 0.0f)};
         const Wm3::Box3f box{centre, &axes.vX, &extents.x};
         gpg::core::FastVectorN<moho::CollisionResult, 10> hits{};
         sim.mOGrid->CollectEntitiesInBox(hits, moho::ENTITYTYPE_Unit, box);
         for (const moho::CollisionResult& hit : hits) {
           moho::Unit* const unit = hit.sourceEntity->IsUnit();
-          if (unit == nullptr || unit->IsDead() || unit->DestroyQueued() ||
-              (unit->mVarDat.mLayerMask != moho::LAYER_Land && unit->mVarDat.mLayerMask != moho::LAYER_Seabed)) {
+          if (
+            unit == nullptr || unit->IsDead() || unit->DestroyQueued() ||
+            (unit->mVarDat.mLayerMask != moho::LAYER_Land && unit->mVarDat.mLayerMask != moho::LAYER_Seabed)
+          ) {
             continue;
           }
           if (unit->UnitMotion != nullptr) {
@@ -162,7 +185,11 @@ namespace faf::editor
     }
   } // namespace
 
-  void LiveHeights(moho::CWldMap& sessionMap, const moho::CHeightField& edited, const std::vector<HeightRect>& rects)
+  void LiveHeights(
+    moho::CWldMap& sessionMap,
+    const moho::CHeightField& edited,
+    const std::vector<HeightRect>& rects
+  )
   {
     if (sessionMap.mTerrainRes == nullptr || rects.empty()) {
       return;
@@ -177,8 +204,17 @@ namespace faf::editor
     std::vector<Patch> patches;
     for (const HeightRect& r : rects) {
       const gpg::Rect2i rect{r.x0, r.z0, r.x1, r.z1};
-      shown->SetElevationRectRaw(rect, edited.data + r.x0 + static_cast<std::ptrdiff_t>(r.z0) * edited.width, edited.width);
-      changed.push_back(gpg::Rect2i{std::max(0, r.x0 - 1), std::max(0, r.z0 - 1), std::min(edited.width - 1, r.x1 + 1), std::min(edited.height - 1, r.z1 + 1)});
+      shown->SetElevationRectRaw(
+        rect, edited.data + r.x0 + static_cast<std::ptrdiff_t>(r.z0) * edited.width, edited.width
+      );
+      changed.push_back(
+        gpg::Rect2i{
+          std::max(0, r.x0 - 1),
+          std::max(0, r.z0 - 1),
+          std::min(edited.width - 1, r.x1 + 1),
+          std::min(edited.height - 1, r.z1 + 1)
+        }
+      );
       // The sim's copy: the rectangle's samples (inclusive of its far edges), applied at its next beat.
       Patch patch;
       patch.rect = rect;
@@ -192,8 +228,12 @@ namespace faf::editor
     sessionMap.mTerrainRes->NotifyMapChanges(changed.data(), changed.size());
     const float cx = static_cast<float>(rects.front().x0 + rects.front().x1) * 0.5f;
     const float cz = static_cast<float>(rects.front().z0 + rects.front().z1) * 0.5f;
-    gpg::Debugf("editor: the play's drawn terrain at %.0f,%.0f is now %.2f", static_cast<double>(cx), static_cast<double>(cz),
-                static_cast<double>(shown->GetElevation(cx, cz)));
+    gpg::Debugf(
+      "editor: the play's drawn terrain at %.0f,%.0f is now %.2f",
+      static_cast<double>(cx),
+      static_cast<double>(cz),
+      static_cast<double>(shown->GetElevation(cx, cz))
+    );
     {
       const std::lock_guard<std::mutex> lock(gMutex);
       for (Patch& patch : patches) {
@@ -203,7 +243,12 @@ namespace faf::editor
     moho::gSimBeforeBeat = &ApplyQueued;
   }
 
-  void LiveWaterLevels(const bool enabled, const float elevation, const float deep, const float abyss)
+  void LiveWaterLevels(
+    const bool enabled,
+    const float elevation,
+    const float deep,
+    const float abyss
+  )
   {
     {
       const std::lock_guard<std::mutex> lock(gMutex);
@@ -216,7 +261,9 @@ namespace faf::editor
     moho::gSimBeforeBeat = &ApplyQueued;
   }
 
-  void SetLiveHeightsNoReseat(const bool off) noexcept
+  void SetLiveHeightsNoReseat(
+    const bool off
+  ) noexcept
   {
     gNoReseat = off;
   }

@@ -70,4 +70,7 @@ void moho::register_STransportPickUpInfoTypeInfo()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_STransportPickUpInfoTypeInfo_d15a1d, moho::register_STransportPickUpInfoTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_STransportPickUpInfoTypeInfo_d15a1d,
+  moho::register_STransportPickUpInfoTypeInfo
+)

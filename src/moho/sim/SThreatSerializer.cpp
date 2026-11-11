@@ -13,7 +13,9 @@ namespace moho
    * What it does:
    * Reads one 14-float `SThreat` record from archive.
    */
-  void SThreat::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SThreat::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -31,7 +33,9 @@ namespace moho
    * What it does:
    * Writes one 14-float `SThreat` record to archive.
    */
-  void SThreat::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SThreat::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;

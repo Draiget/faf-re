@@ -7,9 +7,10 @@ namespace faf::editor
 {
   /**
    * The map's lighting as the `.scmap` keeps it and the terrain resource gives it (Get/SetLightingMultiplier,
-   * SunDirection, SunAmbience, SunColor, ShadowFillColor, SpecularColor, Bloom, FogInfo). The fog is FAForeverMapEditor's
-   * colour, start and end: SFogInfo's first five floats as WRenViewport::FogOn reads them (the colour packed from the
-   * first three, the start from the fourth, the end from the fifth), whatever their recovered names say.
+   * SunDirection, SunAmbience, SunColor, ShadowFillColor, SpecularColor, Bloom, FogInfo). The fog is
+   * FAForeverMapEditor's colour, start and end: SFogInfo's first five floats as WRenViewport::FogOn reads them (the
+   * colour packed from the first three, the start from the fourth, the end from the fifth), whatever their recovered
+   * names say.
    */
   struct LightingState
   {
@@ -24,7 +25,12 @@ namespace faf::editor
     float fogStart = 0.0f;
     float fogEnd = 1000.0f;
 
-    bool operator==(const LightingState& other) const { return std::memcmp(this, &other, sizeof(*this)) == 0; }
+    bool operator==(
+      const LightingState& other
+    ) const
+    {
+      return std::memcmp(this, &other, sizeof(*this)) == 0;
+    }
   };
 
   /** FAForeverMapEditor's lighting settings file (`.scmlighting`): JsonUtility's dump of its LightingData. */
@@ -33,8 +39,8 @@ namespace faf::editor
   bool LightingFromScmlighting(const std::string& text, LightingState& lighting, std::string& error);
 
   /**
-   * A map's lighting from its `.scmap` bytes: the header, preview and height field skipped, then the shader, background,
-   * sky cubemap and environment cubemaps (one name below version 0x37, else a count of name pairs, as
+   * A map's lighting from its `.scmap` bytes: the header, preview and height field skipped, then the shader,
+   * background, sky cubemap and environment cubemaps (one name below version 0x37, else a count of name pairs, as
    * CWldTerrainRes::LoadEnvironmentLookups reads them), then CWldTerrainRes::LoadLightingAndFog's 23 floats. False with
    * `error` for a file it can't follow.
    */

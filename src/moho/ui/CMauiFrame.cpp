@@ -58,7 +58,7 @@ namespace
     *destination = owner;
     return destination;
   }
-}
+} // namespace
 
 gpg::RType* moho::CMauiFrame::sType = nullptr;
 
@@ -400,8 +400,7 @@ void moho::CMauiFrame::PurgeDeleted()
     return;
   }
 
-  auto* const deletedListHead =
-    static_cast<CMauiControlListNode*>(&mDeletedControlList);
+  auto* const deletedListHead = static_cast<CMauiControlListNode*>(&mDeletedControlList);
   while (deletedListHead->mNext != deletedListHead) {
     CMauiControlListNode* const deletedNode = deletedListHead->mPrev;
     deletedNode->ListUnlink();
@@ -423,8 +422,7 @@ float moho::CMauiFrame::GetTopmostDepth()
   float topmostDepth = gpg::nInf;
   for (CMauiControl* controlCursor = DepthFirstSuccessor(this); controlCursor != nullptr;
        controlCursor = controlCursor->DepthFirstSuccessor(this)) {
-    const float controlDepth =
-      CScriptLazyVar_float::GetValue(&controlCursor->mDepthLV);
+    const float controlDepth = CScriptLazyVar_float::GetValue(&controlCursor->mDepthLV);
     if (topmostDepth <= controlDepth) {
       topmostDepth = controlDepth;
     }
@@ -455,9 +453,7 @@ void moho::CMauiFrame::DumpGraph()
 void moho::CMauiFrame::Dump()
 {
   CMauiControl::Dump();
-  gpg::Logf(
-    "Root Frame, head=%p\n", static_cast<const void*>(mEventHandler)
-  );
+  gpg::Logf("Root Frame, head=%p\n", static_cast<const void*>(mEventHandler));
 }
 
 /**

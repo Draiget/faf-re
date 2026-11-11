@@ -19,8 +19,14 @@ namespace
   class HostNewFailure
   {
   public:
-    HostNewFailure() { failNew = true; }
-    ~HostNewFailure() { failNew = false; }
+    HostNewFailure()
+    {
+      failNew = true;
+    }
+    ~HostNewFailure()
+    {
+      failNew = false;
+    }
     HostNewFailure(const HostNewFailure&) = delete;
     HostNewFailure& operator=(const HostNewFailure&) = delete;
   };
@@ -48,7 +54,10 @@ namespace
     return blocks;
   }
 
-  TEST_F(LuaArenaLargeRun, FullCapacity)
+  TEST_F(
+    LuaArenaLargeRun,
+    FullCapacity
+  )
   {
     const auto blocks = FillArena();
     ASSERT_EQ(blocks.size(), gReserveBytes / kSpanBytes);
@@ -65,7 +74,10 @@ namespace
     ASSERT_TRUE(lua::ArenaAllocate(gReserveBytes) != nullptr);
   }
 
-  TEST_F(LuaArenaLargeRun, FailedRequestOrder)
+  TEST_F(
+    LuaArenaLargeRun,
+    FailedRequestOrder
+  )
   {
     const auto blocks = FillArena();
     ASSERT_EQ(blocks.size(), gReserveBytes / kSpanBytes);
@@ -84,7 +96,10 @@ namespace
     std::printf("1000 failed requests preserve next allocation; %.3f ms\n", milliseconds);
   }
 
-  TEST_F(LuaArenaLargeRun, HostHeapFailure)
+  TEST_F(
+    LuaArenaLargeRun,
+    HostHeapFailure
+  )
   {
     // No harness allocations after failNew. Reserving virtual space does not populate it.
     static void* blocks[kSpanCount];
@@ -106,7 +121,10 @@ namespace
     ASSERT_NE(all, nullptr);
   }
 
-  TEST_F(LuaArenaLargeRun, Oversize)
+  TEST_F(
+    LuaArenaLargeRun,
+    Oversize
+  )
   {
     void* const block = lua::ArenaAllocate(50000);
     ASSERT_TRUE(block != nullptr);
@@ -117,7 +135,10 @@ namespace
     lua::ArenaFree(block);
   }
 
-  TEST_F(LuaArenaLargeRun, CrossThreadFree)
+  TEST_F(
+    LuaArenaLargeRun,
+    CrossThreadFree
+  )
   {
     std::vector<void*> blocks(4096);
     for (void*& block : blocks) {
@@ -155,7 +176,9 @@ namespace
   }
 } // namespace
 
-void* operator new(const std::size_t bytes)
+void* operator new(
+  const std::size_t bytes
+)
 {
   if (!failNew) {
     if (void* const allocation = std::malloc(bytes != 0 ? bytes : 1)) {
@@ -165,22 +188,70 @@ void* operator new(const std::size_t bytes)
   throw std::bad_alloc{};
 }
 
-void operator delete(void* const block) noexcept { std::free(block); }
-void operator delete(void* const block, std::size_t) noexcept { std::free(block); }
-
+void operator delete(
+  void* const block
+) noexcept
+{
+  std::free(block);
+}
+void operator delete(
+  void* const block,
+  std::size_t
+) noexcept
+{
+  std::free(block);
+}
 
 // Keep the replacement allocation family paired, including GoogleTest's
 // nothrow temporary-buffer path (for example std::stable_sort).
-void* operator new[](std::size_t bytes) { return ::operator new(bytes); }
-void* operator new(std::size_t bytes, const std::nothrow_t&) noexcept
+void* operator new[](
+  std::size_t bytes
+)
 {
-  try { return ::operator new(bytes); } catch (...) { return nullptr; }
+  return ::operator new(bytes);
 }
-void* operator new[](std::size_t bytes, const std::nothrow_t&) noexcept
+void* operator new(
+  std::size_t bytes,
+  const std::nothrow_t&
+) noexcept
+{
+  try {
+    return ::operator new(bytes);
+  } catch (...) {
+    return nullptr;
+  }
+}
+void* operator new[](
+  std::size_t bytes,
+  const std::nothrow_t&
+) noexcept
 {
   return ::operator new(bytes, std::nothrow);
 }
-void operator delete[](void* block) noexcept { std::free(block); }
-void operator delete[](void* block, std::size_t) noexcept { std::free(block); }
-void operator delete(void* block, const std::nothrow_t&) noexcept { std::free(block); }
-void operator delete[](void* block, const std::nothrow_t&) noexcept { std::free(block); }
+void operator delete[](
+  void* block
+) noexcept
+{
+  std::free(block);
+}
+void operator delete[](
+  void* block,
+  std::size_t
+) noexcept
+{
+  std::free(block);
+}
+void operator delete(
+  void* block,
+  const std::nothrow_t&
+) noexcept
+{
+  std::free(block);
+}
+void operator delete[](
+  void* block,
+  const std::nothrow_t&
+) noexcept
+{
+  std::free(block);
+}

@@ -113,7 +113,9 @@ namespace moho
    * What it does:
    * Copies retained index-buffer ownership into caller storage.
    */
-  CD3DIndexSheet::BufferHandle& CD3DIndexSheet::GetBuffer(BufferHandle& outBuffer)
+  CD3DIndexSheet::BufferHandle& CD3DIndexSheet::GetBuffer(
+    BufferHandle& outBuffer
+  )
   {
     outBuffer = mBuffer;
     return outBuffer;
@@ -138,7 +140,9 @@ namespace moho
    * What it does:
    * Recreates the backing index buffer when the requested size differs.
    */
-  bool CD3DIndexSheet::SetSize(const std::uint32_t size)
+  bool CD3DIndexSheet::SetSize(
+    const std::uint32_t size
+  )
   {
     if (size == mBuffer.get()->GetContext()->size_) {
       return true;

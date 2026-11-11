@@ -88,39 +88,45 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /// The unit this slot belongs to.
-    WeakPtr<IUnit> mUnit;         // +0x00
+    WeakPtr<IUnit> mUnit; // +0x00
     /// Assignment rank handed out by `RunScript`; `SOffsetInfo::GetLeader`
     /// picks the live unit with the highest one.
     std::int32_t mLeaderPriority; // +0x08
     /// Slot offset from the formation centre (`RunScript` phase 7), already
     /// scaled and rotated by `ComputeRunScriptOffset`.
-    SCoordsVec2 mOffset;          // +0x0C
+    SCoordsVec2 mOffset; // +0x0C
     /// Smoothed world-space position the unit is steering for
     /// (`Update`, 0x0059AE90 onward); zero until the first update, which
     /// is why `GetTargetPosition` falls back to the unit's own position.
-    Wm3::Vec3f mTargetPos;        // +0x14
+    Wm3::Vec3f mTargetPos; // +0x14
     /// Smoothed heading correction (radians) applied to the slot offset when
     /// the leader is off its own slot; +inf until first computed.
-    float mHeadingAngle;          // +0x20
+    float mHeadingAngle; // +0x20
     /// Distance from the unit to `mTargetPos` this tick; `CalcFormationSpeed`
     /// compares it against `SOffsetInfo::mAvgDistToTarget` to speed
     /// stragglers up and slow the leaders down.
-    float mDistToTarget;          // +0x24
+    float mDistToTarget; // +0x24
     /// Distance from this unit's slot position to the leader's;
     /// `GetDistFromLeader` hands it to `Unit::UpdateInfoCache` as the unit's
     /// formation ordering metric.
-    float mDistFromLeader;        // +0x28
+    float mDistFromLeader; // +0x28
     /// The formation script's weight for the slot (`SFormationScriptSlot::
     /// mWeight`); `GetPriority` turns it into the unit's integer priority.
-    float mWeight;                // +0x2C
+    float mWeight; // +0x2C
   };
   static_assert(sizeof(SUnitOffsetInfo) == 0x30, "SUnitOffsetInfo size must be 0x30");
-  static_assert(offsetof(SUnitOffsetInfo, mLeaderPriority) == 0x08, "SUnitOffsetInfo::mLeaderPriority offset must be 0x08");
+  static_assert(
+    offsetof(SUnitOffsetInfo, mLeaderPriority) == 0x08,
+    "SUnitOffsetInfo::mLeaderPriority offset must be 0x08"
+  );
   static_assert(offsetof(SUnitOffsetInfo, mOffset) == 0x0C, "SUnitOffsetInfo::mOffset offset must be 0x0C");
   static_assert(offsetof(SUnitOffsetInfo, mTargetPos) == 0x14, "SUnitOffsetInfo::mTargetPos offset must be 0x14");
   static_assert(offsetof(SUnitOffsetInfo, mHeadingAngle) == 0x20, "SUnitOffsetInfo::mHeadingAngle offset must be 0x20");
   static_assert(offsetof(SUnitOffsetInfo, mDistToTarget) == 0x24, "SUnitOffsetInfo::mDistToTarget offset must be 0x24");
-  static_assert(offsetof(SUnitOffsetInfo, mDistFromLeader) == 0x28, "SUnitOffsetInfo::mDistFromLeader offset must be 0x28");
+  static_assert(
+    offsetof(SUnitOffsetInfo, mDistFromLeader) == 0x28,
+    "SUnitOffsetInfo::mDistFromLeader offset must be 0x28"
+  );
   static_assert(offsetof(SUnitOffsetInfo, mWeight) == 0x2C, "SUnitOffsetInfo::mWeight offset must be 0x2C");
 
   /**
@@ -209,33 +215,33 @@ namespace moho
     fa::map<EntId, SUnitOffsetInfo> mUnitOffsets; // +0x00
     /// Zeroed by the constructor and copied by the special members; nothing
     /// else in the binary writes it.
-    Wm3::Vec3f mPos;                                 // +0x0C
+    Wm3::Vec3f mPos; // +0x0C
     /// Mean of the script's slot offsets (`RunScript` phase 5).
-    SCoordsVec2 mSlotCenter;                         // +0x18
+    SCoordsVec2 mSlotCenter; // +0x18
     /// Mean unit position when the script ran; the centre of the overlap box.
-    SCoordsVec2 mCenter;                             // +0x20
+    SCoordsVec2 mCenter; // +0x20
     /// Added to every slot offset while `mUseDynamicOffset` is set
     /// (`GetFormationPosition`, `GetOffsetPosition`). No writer in the binary
     /// beyond the constructor and the copy members, so it stays zero in the
     /// shipped game.
-    SCoordsVec2 mDynamicOffset;                      // +0x28
+    SCoordsVec2 mDynamicOffset; // +0x28
     /// Half-size of the overlap box: `max(2, slot span)` from `RunScript`,
     /// raised to at least 10 when overlapping groups are merged.
-    SCoordsVec2 mExtent;                             // +0x30
-    bool mUseDynamicOffset;                          // +0x38
+    SCoordsVec2 mExtent;    // +0x30
+    bool mUseDynamicOffset; // +0x38
     /// Set by `CAiFormationInstance::Update` once every unit is close enough
     /// to its slot; `IsInFormation` reports it to the units.
-    bool mInFormation;                               // +0x39
+    bool mInFormation; // +0x39
     /// Formation speed: the slowest unit's max speed times 0.85, reduced
     /// further when overlapping groups are merged. `CalcFormationSpeed`
     /// returns it.
-    float mSpeed;                                    // +0x3C
+    float mSpeed; // +0x3C
     /// Midpoint of the smallest and largest `SUnitOffsetInfo::mDistToTarget`
     /// this tick; the reference `CalcFormationSpeed` scales each unit's speed
     /// against.
-    float mAvgDistToTarget;                          // +0x40
+    float mAvgDistToTarget; // +0x40
     /// Cached leader, resolved lazily by `GetLeader`.
-    WeakPtr<IUnit> mLeader;                          // +0x44
+    WeakPtr<IUnit> mLeader; // +0x44
   };
   static_assert(sizeof(SOffsetInfo) == 0x4C, "SOffsetInfo size must be 0x4C");
   static_assert(offsetof(SOffsetInfo, mPos) == 0x0C, "SOffsetInfo::mPos offset must be 0x0C");
@@ -300,16 +306,16 @@ namespace moho
     /// storage, so it does not affect the 0x10 layout below.
     inline static gpg::RType* sType = nullptr;
 
-    SCoordsVec2 mPos;     // +0x00
+    SCoordsVec2 mPos; // +0x00
     /// Address: 0x0059C790 (FUN_0059C790) -- the compiler's out-of-line
     /// `int* <- mSize` accessor emission for this field. It has no caller in
     /// the shipped binary (`PosIsFree` reads the field inline; the emission
     /// is an ICF twin of a dozen identical field readers), so it anchors on
     /// the field rather than on a function.
-    std::int32_t mSize;   // +0x08
+    std::int32_t mSize; // +0x08
     /// Address: 0x0059C7A0 (FUN_0059C7A0) -- the same caller-less accessor
     /// emission for this field.
-    std::int32_t mLayer;  // +0x0C
+    std::int32_t mLayer; // +0x0C
 
     SAssignedLocInfo() = default;
 
@@ -341,9 +347,15 @@ namespace moho
   static_assert(offsetof(SAssignedLocInfo, mSize) == 0x08, "SAssignedLocInfo::mSize offset must be 0x08");
   static_assert(offsetof(SAssignedLocInfo, mLayer) == 0x0C, "SAssignedLocInfo::mLayer offset must be 0x0C");
 
-  static_assert(sizeof(gpg::fastvector_n<WeakPtr<IUnit>, 4>) == 0x30, "fastvector_n<WeakPtr<IUnit>,4> size must be 0x30");
+  static_assert(
+    sizeof(gpg::fastvector_n<WeakPtr<IUnit>, 4>) == 0x30,
+    "fastvector_n<WeakPtr<IUnit>,4> size must be 0x30"
+  );
   static_assert(sizeof(gpg::fastvector_n<SOffsetInfo, 2>) == 0xA8, "fastvector_n<SOffsetInfo,2> size must be 0xA8");
-  static_assert(sizeof(gpg::fastvector_n<SAssignedLocInfo, 16>) == 0x110, "fastvector_n<SAssignedLocInfo,16> size must be 0x110");
+  static_assert(
+    sizeof(gpg::fastvector_n<SAssignedLocInfo, 16>) == 0x110,
+    "fastvector_n<SAssignedLocInfo,16> size must be 0x110"
+  );
   static_assert(sizeof(fa::map<EntId, SUnitOffsetInfo>) == 0x0C, "map<EntId,SUnitOffsetInfo> size must be 0x0C");
   static_assert(sizeof(fa::map<EntId, SCoordsVec2>) == 0x0C, "map<EntId,SCoordsVec2> size must be 0x0C");
 
@@ -385,7 +397,8 @@ namespace moho
    * `gpg::RFastVectorType<Moho::SAssignedLocInfo>::Init`
    * (FastVectorUIntReflection.cpp) can store this address into `serLoadFunc_`.
    */
-  void LoadFastVectorSAssignedLocInfo(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+  void
+  LoadFastVectorSAssignedLocInfo(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x0056E0A0 (FUN_0056E0A0, gpg::RFastVectorType_SAssignedLocInfo::SerSave)
@@ -395,7 +408,8 @@ namespace moho
    * `gpg::fastvector<SAssignedLocInfo>` reflection. Exposed for the same
    * reason as `LoadFastVectorSAssignedLocInfo`.
    */
-  void SaveFastVectorSAssignedLocInfo(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
+  void
+  SaveFastVectorSAssignedLocInfo(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
   /**
    * Address: 0x0056C3B0 (FUN_0056C3B0, gpg::RFastVectorType_SAssignedLocInfo::SetCount)
@@ -540,42 +554,42 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
-    LuaPlus::LuaState* mState;                                // +0x10
-    RRuleGameRules* mGamerules;                               // +0x14
-    EUnitCommandType mCommandType;                            // +0x18
+    LuaPlus::LuaState* mState;     // +0x10
+    RRuleGameRules* mGamerules;    // +0x14
+    EUnitCommandType mCommandType; // +0x18
     /// Never written by any constructor or method in the binary.
-    std::uint32_t mUnknown_0x01C;                             // +0x1C
+    std::uint32_t mUnknown_0x01C; // +0x1C
     /// Every unit in the formation (IDA: `gpg::fastvector_n4_WeakPtr_IUnit`).
-    gpg::fastvector_n<WeakPtr<IUnit>, 4> mUnits;              // +0x20
+    gpg::fastvector_n<WeakPtr<IUnit>, 4> mUnits; // +0x20
     /// The formation groups, one vector per layer (`GetLayer`: 0 ground, 1 air).
-    gpg::fastvector_n<SOffsetInfo, 2> mOffsetInfo[2];         // +0x50
+    gpg::fastvector_n<SOffsetInfo, 2> mOffsetInfo[2]; // +0x50
     /// Slots `FindSlotFor` has handed out for the current plan.
-    gpg::fastvector_n<SAssignedLocInfo, 16> mSlots;           // +0x1A0
+    gpg::fastvector_n<SAssignedLocInfo, 16> mSlots; // +0x1A0
     /// `GetFormationPosition` results by entity id, valid until the centre
     /// moves or the plan is rebuilt.
-    fa::map<EntId, SCoordsVec2> mFormationPosCache;        // +0x2B0
+    fa::map<EntId, SCoordsVec2> mFormationPosCache; // +0x2B0
     /// `GetOffsetPosition` results by entity id, same lifetime as
     /// `mFormationPosCache`.
-    fa::map<EntId, SCoordsVec2> mOffsetPosCache;           // +0x2BC
-    Wm3::Vec3f mForwardVector;                                // +0x2C8
-    Wm3::Quatf mOrientation;                                  // +0x2D4
+    fa::map<EntId, SCoordsVec2> mOffsetPosCache; // +0x2BC
+    Wm3::Vec3f mForwardVector;                   // +0x2C8
+    Wm3::Quatf mOrientation;                     // +0x2D4
     /// Rotation from the units' mean heading to the formation heading
     /// (`UpdateFormation`); `RunScript` pre-rotates each unit's relative
     /// position by it before matching slots.
-    Wm3::Quatf mOrientationChange;                            // +0x2E4
-    fa::string mScriptName;                                // +0x2F4
+    Wm3::Quatf mOrientationChange; // +0x2E4
+    fa::string mScriptName;        // +0x2F4
     /// The formation centre (`GetCoords`/`SetCoords`).
-    SCoordsVec2 mCoords;                                      // +0x310
+    SCoordsVec2 mCoords; // +0x310
     /// Multiplies every script offset (`ComputeRunScriptOffset`); `SetScale`.
-    float mScale;                                             // +0x318
+    float mScale; // +0x318
     /// Set whenever the plan must be rebuilt before it is next read.
-    std::uint8_t mPlanUpdate;                                 // +0x31C
-    std::uint8_t mPad_0x31D[3];                               // +0x31D
+    std::uint8_t mPlanUpdate;   // +0x31C
+    std::uint8_t mPad_0x31D[3]; // +0x31D
     /// Largest footprint dimension among the formation's mobile units.
-    std::int32_t mMaxSize;                                    // +0x320
+    std::int32_t mMaxSize; // +0x320
     /// Never written by any constructor or method in the binary; no formation
     /// code reads it either.
-    std::uint32_t mUnknown_0x324;                             // +0x324
+    std::uint32_t mUnknown_0x324; // +0x324
 
   public:
     /**
@@ -1120,14 +1134,24 @@ namespace moho
      */
     [[nodiscard]] static void* operator new(std::size_t size);
     [[nodiscard]] static void* operator new(std::size_t size, const std::nothrow_t&) noexcept;
-    [[nodiscard]] static void* operator new(std::size_t, void* const place) noexcept { return place; }
+    [[nodiscard]] static void* operator new(
+      std::size_t,
+      void* const place
+    ) noexcept
+    {
+      return place;
+    }
     static void operator delete(void* block, std::size_t size) noexcept;
     static void operator delete(void* block, const std::nothrow_t&) noexcept;
-    static void operator delete(void*, void*) noexcept {}
+    static void operator delete(
+      void*,
+      void*
+    ) noexcept
+    {}
 
   public:
-    Sim* mSim;                                    // +0x328
-    std::uint32_t mUnknown_0x32C;                 // +0x32C
+    Sim* mSim;                    // +0x328
+    std::uint32_t mUnknown_0x32C; // +0x32C
   };
 
   // The reference count at +0x04 and the listener ring at +0x08 are
@@ -1135,39 +1159,57 @@ namespace moho
   // them here; `sizeof(IFormationInstance) == 0x10` guards them instead, and
   // this first own-member assert re-checks the far edge.
   static_assert(offsetof(CAiFormationInstance, mState) == 0x10, "CAiFormationInstance::mState offset must be 0x10");
-  static_assert(offsetof(CAiFormationInstance, mGamerules) == 0x14, "CAiFormationInstance::mGamerules offset must be 0x14");
   static_assert(
-    offsetof(CAiFormationInstance, mCommandType) == 0x18, "CAiFormationInstance::mCommandType offset must be 0x18"
+    offsetof(CAiFormationInstance, mGamerules) == 0x14,
+    "CAiFormationInstance::mGamerules offset must be 0x14"
+  );
+  static_assert(
+    offsetof(CAiFormationInstance, mCommandType) == 0x18,
+    "CAiFormationInstance::mCommandType offset must be 0x18"
   );
   static_assert(offsetof(CAiFormationInstance, mUnits) == 0x20, "CAiFormationInstance::mUnits offset must be 0x20");
-  static_assert(offsetof(CAiFormationInstance, mOffsetInfo) == 0x50, "CAiFormationInstance::mOffsetInfo offset must be 0x50");
+  static_assert(
+    offsetof(CAiFormationInstance, mOffsetInfo) == 0x50,
+    "CAiFormationInstance::mOffsetInfo offset must be 0x50"
+  );
   static_assert(offsetof(CAiFormationInstance, mSlots) == 0x1A0, "CAiFormationInstance::mSlots offset must be 0x1A0");
   static_assert(
     offsetof(CAiFormationInstance, mFormationPosCache) == 0x2B0,
     "CAiFormationInstance::mFormationPosCache offset must be 0x2B0"
   );
   static_assert(
-    offsetof(CAiFormationInstance, mOffsetPosCache) == 0x2BC, "CAiFormationInstance::mOffsetPosCache offset must be 0x2BC"
+    offsetof(CAiFormationInstance, mOffsetPosCache) == 0x2BC,
+    "CAiFormationInstance::mOffsetPosCache offset must be 0x2BC"
   );
   static_assert(
-    offsetof(CAiFormationInstance, mForwardVector) == 0x2C8, "CAiFormationInstance::mForwardVector offset must be 0x2C8"
+    offsetof(CAiFormationInstance, mForwardVector) == 0x2C8,
+    "CAiFormationInstance::mForwardVector offset must be 0x2C8"
   );
   static_assert(
-    offsetof(CAiFormationInstance, mOrientation) == 0x2D4, "CAiFormationInstance::mOrientation offset must be 0x2D4"
+    offsetof(CAiFormationInstance, mOrientation) == 0x2D4,
+    "CAiFormationInstance::mOrientation offset must be 0x2D4"
   );
   static_assert(
     offsetof(CAiFormationInstance, mOrientationChange) == 0x2E4,
     "CAiFormationInstance::mOrientationChange offset must be 0x2E4"
   );
   static_assert(
-    offsetof(CAiFormationInstance, mScriptName) == 0x2F4, "CAiFormationInstance::mScriptName offset must be 0x2F4"
+    offsetof(CAiFormationInstance, mScriptName) == 0x2F4,
+    "CAiFormationInstance::mScriptName offset must be 0x2F4"
   );
   static_assert(offsetof(CAiFormationInstance, mCoords) == 0x310, "CAiFormationInstance::mCoords offset must be 0x310");
   static_assert(offsetof(CAiFormationInstance, mScale) == 0x318, "CAiFormationInstance::mScale offset must be 0x318");
-  static_assert(offsetof(CAiFormationInstance, mPlanUpdate) == 0x31C, "CAiFormationInstance::mPlanUpdate offset must be 0x31C");
-  static_assert(offsetof(CAiFormationInstance, mMaxSize) == 0x320, "CAiFormationInstance::mMaxSize offset must be 0x320");
   static_assert(
-    offsetof(CAiFormationInstance, mUnknown_0x324) == 0x324, "CAiFormationInstance::mUnknown_0x324 offset must be 0x324"
+    offsetof(CAiFormationInstance, mPlanUpdate) == 0x31C,
+    "CAiFormationInstance::mPlanUpdate offset must be 0x31C"
+  );
+  static_assert(
+    offsetof(CAiFormationInstance, mMaxSize) == 0x320,
+    "CAiFormationInstance::mMaxSize offset must be 0x320"
+  );
+  static_assert(
+    offsetof(CAiFormationInstance, mUnknown_0x324) == 0x324,
+    "CAiFormationInstance::mUnknown_0x324 offset must be 0x324"
   );
   static_assert(offsetof(CAiFormationInstance, mSim) == 0x328, "CAiFormationInstance::mSim offset must be 0x328");
   static_assert(sizeof(CAiFormationInstance) == 0x330, "CAiFormationInstance size must be 0x330");

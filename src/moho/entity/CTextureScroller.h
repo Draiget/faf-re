@@ -53,15 +53,15 @@ namespace moho
      */
     SScroller() noexcept;
 
-    EScrollType mType; // +0x00
-    float mFloat04;     // +0x04
-    float mFloat08;     // +0x08
-    float mFloat0C;     // +0x0C
-    float mFloat10;     // +0x10
+    EScrollType mType;      // +0x00
+    float mFloat04;         // +0x04
+    float mFloat08;         // +0x08
+    float mFloat0C;         // +0x0C
+    float mFloat10;         // +0x10
     Wm3::Vector2f mScroll1; // +0x14
     Wm3::Vector2f mScroll2; // +0x1C
-    float mFloat24; // +0x24
-    float mFloat28; // +0x28
+    float mFloat24;         // +0x24
+    float mFloat28;         // +0x28
   };
 
   class CTextureScroller
@@ -145,8 +145,8 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
-    Entity* mEntity;     // +0x00
-    SScroller mScroller; // +0x04
+    Entity* mEntity;      // +0x00
+    SScroller mScroller;  // +0x04
     std::uint8_t mDir[2]; // +0x30
     std::uint8_t mPad32[2];
     std::int32_t mSpeed[2]; // +0x34

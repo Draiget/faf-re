@@ -125,9 +125,7 @@ namespace
     offsetof(EntityAttributesSerializerHelper, mSaveCallback) == 0x10,
     "EntityAttributesSerializerHelper::mSaveCallback offset must be 0x10"
   );
-  static_assert(
-    sizeof(EntityAttributesSerializerHelper) == 0x14, "EntityAttributesSerializerHelper size must be 0x14"
-  );
+  static_assert(sizeof(EntityAttributesSerializerHelper) == 0x14, "EntityAttributesSerializerHelper size must be 0x14");
 
   EntityAttributesSerializerHelper gEntityAttributesSerializer;
 
@@ -304,7 +302,6 @@ namespace
    */
   EntityAttributesSerializerHelper::~EntityAttributesSerializerHelper() = default;
 
-
   [[nodiscard]] gpg::RType* ResolveEntIdType()
   {
     static gpg::RType* sType = nullptr;
@@ -358,7 +355,10 @@ namespace
   }
 
   template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeObjectRef(TObject* const object, gpg::RType* const type)
+  [[nodiscard]] gpg::RRef MakeObjectRef(
+    TObject* const object,
+    gpg::RType* const type
+  )
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -366,7 +366,10 @@ namespace
     return ref;
   }
 
-  void ReadBoolByte(gpg::ReadArchive* const archive, std::uint8_t& value)
+  void ReadBoolByte(
+    gpg::ReadArchive* const archive,
+    std::uint8_t& value
+  )
   {
     bool loaded = false;
     archive->ReadBool(&loaded);
@@ -418,7 +421,9 @@ namespace moho
    *
    * What it does: see header.
    */
-  SSTIEntityVariableData::SSTIEntityVariableData(const SSTIEntityVariableData& rhs)
+  SSTIEntityVariableData::SSTIEntityVariableData(
+    const SSTIEntityVariableData& rhs
+  )
     : mScmResource(rhs.mScmResource)
     , mMeshBlueprint(rhs.mMeshBlueprint)
     , mScale(rhs.mScale)
@@ -457,7 +462,9 @@ namespace moho
   /**
    * Address: 0x0067A3E0 (FUN_0067A3E0, ??4SSTIEntityVariableData@Moho@@QAEAAU01@ABU01@@Z)
    */
-  SSTIEntityVariableData& SSTIEntityVariableData::operator=(const SSTIEntityVariableData& rhs)
+  SSTIEntityVariableData& SSTIEntityVariableData::operator=(
+    const SSTIEntityVariableData& rhs
+  )
   {
     if (this == &rhs) {
       return *this;
@@ -499,7 +506,9 @@ namespace moho
   /**
    * Address: 0x00560150 (FUN_00560150, Moho::SSTIEntityVariableData::cpy)
    */
-  SSTIEntityVariableData* SSTIEntityVariableData::cpy(SSTIEntityVariableData* const destination) const
+  SSTIEntityVariableData* SSTIEntityVariableData::cpy(
+    SSTIEntityVariableData* const destination
+  ) const
   {
     if (destination == nullptr) {
       return nullptr;
@@ -543,7 +552,10 @@ namespace moho
    * Deserializes the version-2 reflected payload in the same field order used
    * by `MemberSerialize` and rejects older serializer versions.
    */
-  void SSTIEntityVariableData::MemberDeserialize(gpg::ReadArchive* const archive, const int version)
+  void SSTIEntityVariableData::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    const int version
+  )
   {
     if (version < 2) {
       throw gpg::SerializationError("Unsupported version.");
@@ -619,7 +631,10 @@ namespace moho
   /**
    * Address: 0x00559E00 (FUN_00559E00, Moho::SSTIEntityVariableData::MemberSerialize)
    */
-  void SSTIEntityVariableData::MemberSerialize(gpg::WriteArchive* const archive, const int version)
+  void SSTIEntityVariableData::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    const int version
+  )
   {
     if (version < 2) {
       throw gpg::SerializationError("Unsupported version.");
@@ -635,9 +650,13 @@ namespace moho
     // typed builders (0x00559E34 `RRef_RScmResource`, 0x00559E5F
     // `RRef_RMeshBlueprint`, and `RRef_CSndParams` for the two sound lanes
     // below), so this does too.
-    archive->WritePointer<moho::RScmResource>(const_cast<RScmResource*>(mScmResource.get()), gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer<moho::RScmResource>(
+      const_cast<RScmResource*>(mScmResource.get()), gpg::TrackedPointerState::Shared, ownerRef
+    );
 
-    archive->WritePointer<moho::RMeshBlueprint>(const_cast<RMeshBlueprint*>(mMeshBlueprint), gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::RMeshBlueprint>(
+      const_cast<RMeshBlueprint*>(mMeshBlueprint), gpg::TrackedPointerState::Unowned, ownerRef
+    );
 
     gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vec3f>();
     GPG_ASSERT(vector3Type != nullptr);
@@ -703,7 +722,9 @@ namespace moho
     return mLayerMask;
   }
 
-  void SSTIEntityVariableData::SetVisibilityGridMask(const std::uint32_t gridMask) noexcept
+  void SSTIEntityVariableData::SetVisibilityGridMask(
+    const std::uint32_t gridMask
+  ) noexcept
   {
     mLayerMask = static_cast<ELayer>(gridMask);
   }
@@ -783,9 +804,18 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_SSTIEntityAttachInfoTypeInfo_a1a5ff, moho::preregister_SSTIEntityAttachInfoTypeInfo)
-GPG_PREREGISTER_INIT(preregister_EntityAttributesTypeInfo_a1a5ff, moho::preregister_EntityAttributesTypeInfo)
-GPG_PREREGISTER_INIT(preregister_SSTIEntityVariableDataTypeInfo_a1a5ff, moho::preregister_SSTIEntityVariableDataTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_SSTIEntityAttachInfoTypeInfo_a1a5ff,
+  moho::preregister_SSTIEntityAttachInfoTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_EntityAttributesTypeInfo_a1a5ff,
+  moho::preregister_EntityAttributesTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_SSTIEntityVariableDataTypeInfo_a1a5ff,
+  moho::preregister_SSTIEntityVariableDataTypeInfo
+)
 
 namespace moho
 {

@@ -5,23 +5,38 @@
 
 namespace faf::netlink
 {
-  const char* CandidateTypeName(const CandidateType type)
+  const char* CandidateTypeName(
+    const CandidateType type
+  )
   {
     switch (type) {
-      case CandidateType::Host: return "HOST_CANDIDATE";
-      case CandidateType::ServerReflexive: return "SERVER_REFLEXIVE_CANDIDATE";
-      case CandidateType::PeerReflexive: return "PEER_REFLEXIVE_CANDIDATE";
-      case CandidateType::Relayed: return "RELAYED_CANDIDATE";
-      case CandidateType::Local: return "LOCAL_CANDIDATE";
-      case CandidateType::Stun: return "STUN_CANDIDATE";
+    case CandidateType::Host:
+      return "HOST_CANDIDATE";
+    case CandidateType::ServerReflexive:
+      return "SERVER_REFLEXIVE_CANDIDATE";
+    case CandidateType::PeerReflexive:
+      return "PEER_REFLEXIVE_CANDIDATE";
+    case CandidateType::Relayed:
+      return "RELAYED_CANDIDATE";
+    case CandidateType::Local:
+      return "LOCAL_CANDIDATE";
+    case CandidateType::Stun:
+      return "STUN_CANDIDATE";
     }
     return "HOST_CANDIDATE";
   }
 
-  std::optional<CandidateType> ParseCandidateType(const std::string_view name)
+  std::optional<CandidateType> ParseCandidateType(
+    const std::string_view name
+  )
   {
-    for (const CandidateType t : {CandidateType::Host, CandidateType::ServerReflexive, CandidateType::PeerReflexive,
-                                  CandidateType::Relayed, CandidateType::Local, CandidateType::Stun}) {
+    for (const CandidateType t :
+         {CandidateType::Host,
+          CandidateType::ServerReflexive,
+          CandidateType::PeerReflexive,
+          CandidateType::Relayed,
+          CandidateType::Local,
+          CandidateType::Stun}) {
       if (name == CandidateTypeName(t)) {
         return t;
       }
@@ -29,7 +44,9 @@ namespace faf::netlink
     return std::nullopt;
   }
 
-  std::string ToJson(const CandidatesMessage& msg)
+  std::string ToJson(
+    const CandidatesMessage& msg
+  )
   {
     JsonValue candidates = JsonValue::Array();
     for (const Candidate& c : msg.candidates) {
@@ -58,7 +75,10 @@ namespace faf::netlink
     return WriteJson(o);
   }
 
-  std::optional<CandidatesMessage> CandidatesMessageFromJson(const std::string_view text, std::string* error)
+  std::optional<CandidatesMessage> CandidatesMessageFromJson(
+    const std::string_view text,
+    std::string* error
+  )
   {
     const std::optional<JsonValue> doc = ParseJson(text, error);
     if (!doc || !doc->IsObject()) {
@@ -110,7 +130,9 @@ namespace faf::netlink
 
   namespace
   {
-    std::vector<std::string_view> Words(std::string_view s)
+    std::vector<std::string_view> Words(
+      std::string_view s
+    )
     {
       std::vector<std::string_view> out;
       std::size_t i = 0;
@@ -130,14 +152,19 @@ namespace faf::netlink
     }
 
     template <typename T>
-    bool Number(const std::string_view s, T& out)
+    bool Number(
+      const std::string_view s,
+      T& out
+    )
     {
       const auto [p, ec] = std::from_chars(s.data(), s.data() + s.size(), out);
       return ec == std::errc() && p == s.data() + s.size();
     }
   } // namespace
 
-  std::optional<Candidate> CandidateFromSdp(std::string_view line)
+  std::optional<Candidate> CandidateFromSdp(
+    std::string_view line
+  )
   {
     if (line.substr(0, 2) == "a=") {
       line.remove_prefix(2);
@@ -188,28 +215,30 @@ namespace faf::netlink
     return c;
   }
 
-  std::string CandidateToSdp(const Candidate& c)
+  std::string CandidateToSdp(
+    const Candidate& c
+  )
   {
     const char* typ = "host";
     switch (c.type) {
-      case CandidateType::Host:
-      case CandidateType::Local:
-        typ = "host";
-        break;
-      case CandidateType::ServerReflexive:
-      case CandidateType::Stun:
-        typ = "srflx";
-        break;
-      case CandidateType::PeerReflexive:
-        typ = "prflx";
-        break;
-      case CandidateType::Relayed:
-        typ = "relay";
-        break;
+    case CandidateType::Host:
+    case CandidateType::Local:
+      typ = "host";
+      break;
+    case CandidateType::ServerReflexive:
+    case CandidateType::Stun:
+      typ = "srflx";
+      break;
+    case CandidateType::PeerReflexive:
+      typ = "prflx";
+      break;
+    case CandidateType::Relayed:
+      typ = "relay";
+      break;
     }
     std::ostringstream s;
-    s << "a=candidate:" << (c.foundation.empty() ? "1" : c.foundation) << " 1 UDP " << c.priority << ' ' << c.ip
-      << ' ' << c.port << " typ " << typ;
+    s << "a=candidate:" << (c.foundation.empty() ? "1" : c.foundation) << " 1 UDP " << c.priority << ' ' << c.ip << ' '
+      << c.port << " typ " << typ;
     if (c.relAddr && c.relPort > 0) {
       s << " raddr " << *c.relAddr << " rport " << c.relPort;
     }
@@ -218,7 +247,12 @@ namespace faf::netlink
 
   namespace
   {
-    void AddUrl(std::vector<IceServer>& out, std::string_view url, const std::string& user, const std::string& cred)
+    void AddUrl(
+      std::vector<IceServer>& out,
+      std::string_view url,
+      const std::string& user,
+      const std::string& cred
+    )
     {
       IceServer s;
       if (url.substr(0, 5) == "stun:") {
@@ -266,7 +300,9 @@ namespace faf::netlink
     }
   } // namespace
 
-  std::vector<IceServer> ParseIceServers(const JsonValue& list)
+  std::vector<IceServer> ParseIceServers(
+    const JsonValue& list
+  )
   {
     std::vector<IceServer> out;
     for (const JsonValue& entry : list.Items()) {

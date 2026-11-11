@@ -59,8 +59,8 @@ namespace faf::editor
   /** What retail's emitter editor shows for a curve (its kEmitterCurveEditors table). */
   struct EmitterCurveInfo
   {
-    const char* name;    // the file's key
-    const char* group;   // the editor's tab the curve opens ("" continues the one above)
+    const char* name;  // the file's key
+    const char* group; // the editor's tab the curve opens ("" continues the one above)
     const char* caption;
     float viewMin;
     float viewMax;
@@ -90,7 +90,8 @@ namespace faf::editor
   const char* FlagName(int flag);
 
   /** The blend modes by Blendmode value (BeamRenderHelpers.cpp: the technique's suffix). */
-  inline constexpr const char* kEmitterBlendModes[6] = {"Alpha blend", "Modulate inverse", "Modulate 2x inverse", "Add", "Premultiplied alpha", "Refract"};
+  inline constexpr const char* kEmitterBlendModes[6] =
+    {"Alpha blend", "Modulate inverse", "Modulate 2x inverse", "Add", "Premultiplied alpha", "Refract"};
 
   struct EmitterBlueprint
   {
@@ -146,9 +147,11 @@ namespace faf::editor
    * The particles the emitter makes in one tick, `tickCount` ticks after it started (CEfxEmitter::Tick 0x0065CE00 with
    * TICKCOUNT = tickCount): the emit rate at the tick's phase in the repeat time adds to `carry`, its whole part is
    * emitted (spread over the tick with InterpolateEmission), each particle's curves sampled at its own phase. `random`
-   * returns 0-1. SnapToWaterline, OnlyEmitOnWater and the bone and local-space switches need a unit or the map: left out.
+   * returns 0-1. SnapToWaterline, OnlyEmitOnWater and the bone and local-space switches need a unit or the map: left
+   * out.
    */
-  std::vector<EmittedParticle> EmitTick(const EmitterBlueprint& emitter, float tickCount, float& carry, const std::function<float()>& random);
+  std::vector<EmittedParticle>
+  EmitTick(const EmitterBlueprint& emitter, float tickCount, float& carry, const std::function<float()>& random);
   /** The particle technique's type tag (CEfxEmitter::UpdateCurve): TRamp, TRampFlat, TRampAlign, TRampAnimate... */
   std::string EmitterTypeTag(const EmitterBlueprint& emitter);
   /** The emitter's whole life is over at `tickCount` (a negative Lifetime: it never ends). */
@@ -178,7 +181,8 @@ namespace faf::editor
     std::array<float, 4> color{};
   };
 
-  /** A BeamBlueprint or TrailEmitterBlueprint: its keys in the file's order (only those it has: a missing key keeps the engine's default). */
+  /** A BeamBlueprint or TrailEmitterBlueprint: its keys in the file's order (only those it has: a missing key keeps the
+   * engine's default). */
   struct FlatBlueprint
   {
     std::string kind; // "BeamBlueprint" or "TrailEmitterBlueprint"
@@ -208,8 +212,22 @@ namespace faf::editor
 
   /** The factions and kinds the browser filters by; index 0 is "all". */
   inline constexpr const char* kEffectFactions[] = {"All factions", "Aeon", "Cybran", "UEF", "Seraphim", "Other"};
-  inline constexpr const char* kEffectKinds[] = {"All kinds", "Muzzle", "Hit", "Explosion", "Smoke", "Fire", "Trail", "Beam",
-                                                  "Water", "Shield", "Build", "Ambient", "Teleport", "Other"};
+  inline constexpr const char* kEffectKinds[] = {
+    "All kinds",
+    "Muzzle",
+    "Hit",
+    "Explosion",
+    "Smoke",
+    "Fire",
+    "Trail",
+    "Beam",
+    "Water",
+    "Shield",
+    "Build",
+    "Ambient",
+    "Teleport",
+    "Other"
+  };
   /** The faction a file's name starts with (aeon_, cybran_, uef_, seraphim_ or ser_): its index in kEffectFactions. */
   int EffectFaction(const std::string& path);
   /** What the effect is for, by the words in its name (first match in kEffectKinds' order): its index there. */

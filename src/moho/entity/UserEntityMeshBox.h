@@ -10,7 +10,9 @@
 
 namespace moho
 {
-  [[nodiscard]] inline const Wm3::Box3f* SelectionEntityMeshBox(moho::UserEntity* const entity)
+  [[nodiscard]] inline const Wm3::Box3f* SelectionEntityMeshBox(
+    moho::UserEntity* const entity
+  )
   {
     moho::MeshInstance* const meshInstance = (entity != nullptr) ? entity->mMeshInstance : nullptr;
     if (meshInstance != nullptr) {

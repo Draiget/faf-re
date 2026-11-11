@@ -7,7 +7,10 @@ namespace faf::editor
   namespace
   {
     // ScmapEditor.TerrainTexture's fields in its order, the object's closing brace at `indent`.
-    std::string LayerObject(const LayerSettings& layer, const std::string& indent)
+    std::string LayerObject(
+      const LayerSettings& layer,
+      const std::string& indent
+    )
     {
       const std::string in = indent + "    ";
       const float tiling[2] = {1.0f, 1.0f};
@@ -22,7 +25,10 @@ namespace faf::editor
       return out + indent + "}";
     }
 
-    bool ReadLayer(const std::string& object, LayerSettings& layer)
+    bool ReadLayer(
+      const std::string& object,
+      LayerSettings& layer
+    )
     {
       std::string probe;
       if (!JsonValue(object, "AlbedoPath", probe) || !JsonValue(object, "AlbedoScale", probe)) {
@@ -39,12 +45,18 @@ namespace faf::editor
     }
   } // namespace
 
-  std::string LayerToScmsl(const LayerSettings& layer)
+  std::string LayerToScmsl(
+    const LayerSettings& layer
+  )
   {
     return LayerObject(layer, "");
   }
 
-  bool LayerFromScmsl(const std::string& text, LayerSettings& layer, std::string& error)
+  bool LayerFromScmsl(
+    const std::string& text,
+    LayerSettings& layer,
+    std::string& error
+  )
   {
     if (!ReadLayer(text, layer)) {
       error = "not a layer settings file (no AlbedoPath or AlbedoScale)";
@@ -53,16 +65,25 @@ namespace faf::editor
     return true;
   }
 
-  std::string LayersToScmst(const std::string& shader, const std::vector<LayerSettings>& layers)
+  std::string LayersToScmst(
+    const std::string& shader,
+    const std::vector<LayerSettings>& layers
+  )
   {
     std::string out = "{\n    \"ShaderName\": " + JsonQuoted(shader);
     for (std::size_t i = 0; i < 10; ++i) {
-      out += ",\n    \"Stratum" + std::to_string(i) + "\": " + LayerObject(i < layers.size() ? layers[i] : LayerSettings{}, "    ");
+      out += ",\n    \"Stratum" + std::to_string(i) +
+        "\": " + LayerObject(i < layers.size() ? layers[i] : LayerSettings{}, "    ");
     }
     return out + "\n}";
   }
 
-  bool LayersFromScmst(const std::string& text, std::string& shader, std::vector<LayerSettings>& layers, std::string& error)
+  bool LayersFromScmst(
+    const std::string& text,
+    std::string& shader,
+    std::vector<LayerSettings>& layers,
+    std::string& error
+  )
   {
     std::vector<LayerSettings> read(10);
     for (std::size_t i = 0; i < 10; ++i) {

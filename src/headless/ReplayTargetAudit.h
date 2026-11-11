@@ -58,7 +58,10 @@ namespace faf::headless
     class CSink final : public remote::CCommandIdRewriter
     {
     public:
-      CSink(moho::ICommandSink& next, CReplayTargetAudit& owner) noexcept
+      CSink(
+        moho::ICommandSink& next,
+        CReplayTargetAudit& owner
+      ) noexcept
         : CCommandIdRewriter(next)
         , mOwner(owner)
       {}
@@ -66,8 +69,18 @@ namespace faf::headless
       void SetCommandSource(moho::CommandSourceId sourceId) override;
 
     protected:
-      [[nodiscard]] bool RewriteEntity(std::uint32_t&) override { return true; }
-      [[nodiscard]] bool RewriteCommand(std::uint32_t&) override { return true; }
+      [[nodiscard]] bool RewriteEntity(
+        std::uint32_t&
+      ) override
+      {
+        return true;
+      }
+      [[nodiscard]] bool RewriteCommand(
+        std::uint32_t&
+      ) override
+      {
+        return true;
+      }
       [[nodiscard]] bool AllowTarget(std::uint32_t id) override;
 
     private:

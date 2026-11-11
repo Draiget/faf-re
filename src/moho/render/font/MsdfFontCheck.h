@@ -36,5 +36,6 @@ namespace moho
    * from these options: its size and range, codepoints that were asked for, and quads of a sane size. A
    * cache file is shared by every game on the machine, so it isn't trusted to have kept to them.
    */
-  [[nodiscard]] bool MSDF_CheckCookedAtlas(const SMsdfFontAtlas& atlas, const SMsdfCookOptions& options, std::string& reason);
+  [[nodiscard]] bool
+  MSDF_CheckCookedAtlas(const SMsdfFontAtlas& atlas, const SMsdfCookOptions& options, std::string& reason);
 } // namespace moho

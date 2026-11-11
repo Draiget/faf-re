@@ -9,7 +9,10 @@ namespace
   using faf::editor::LuaSpanKind;
 
   /** The kind at the start of `piece` in `text`. */
-  LuaSpanKind KindAt(const std::string& text, const std::string& piece)
+  LuaSpanKind KindAt(
+    const std::string& text,
+    const std::string& piece
+  )
   {
     const std::size_t at = text.find(piece);
     for (const auto& span : faf::editor::LuaSpans(text)) {
@@ -20,7 +23,10 @@ namespace
     return LuaSpanKind::Plain;
   }
 
-  TEST(LuaSyntax, SpansCoverTheTextInOrder)
+  TEST(
+    LuaSyntax,
+    SpansCoverTheTextInOrder
+  )
   {
     const std::string text = "local x = 1 -- one\nfunction OnPopulate()\n  LOG('hi', x)\nend\n";
     const auto spans = faf::editor::LuaSpans(text);
@@ -34,12 +40,16 @@ namespace
     EXPECT_EQ(at, text.size());
   }
 
-  TEST(LuaSyntax, Kinds)
+  TEST(
+    LuaSyntax,
+    Kinds
+  )
   {
-    const std::string text = "local w = ScenarioInfo.Options.optional_wreckage or 1\n"
-                             "if w > 1 then ScenarioUtils.CreateArmyGroup('ARMY_17', \"Optional_Wreckage_\" .. w, true) end\n"
-                             "# GPG's comment\n"
-                             "Foo{ a = nil }\n";
+    const std::string text =
+      "local w = ScenarioInfo.Options.optional_wreckage or 1\n"
+      "if w > 1 then ScenarioUtils.CreateArmyGroup('ARMY_17', \"Optional_Wreckage_\" .. w, true) end\n"
+      "# GPG's comment\n"
+      "Foo{ a = nil }\n";
     EXPECT_EQ(KindAt(text, "local"), LuaSpanKind::Keyword);
     EXPECT_EQ(KindAt(text, "ScenarioInfo"), LuaSpanKind::Engine);
     EXPECT_EQ(KindAt(text, "optional_wreckage"), LuaSpanKind::Plain);
@@ -54,7 +64,10 @@ namespace
     EXPECT_EQ(KindAt(text, ".."), LuaSpanKind::Operator);
   }
 
-  TEST(LuaSyntax, LongCommentsAndStringsRunOverLines)
+  TEST(
+    LuaSyntax,
+    LongCommentsAndStringsRunOverLines
+  )
   {
     const std::string text = "--[[ a\nb ]] x = [==[ c\n]] d ]==] y";
     EXPECT_EQ(KindAt(text, "b ]]"), LuaSpanKind::Comment);

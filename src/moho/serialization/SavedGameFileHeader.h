@@ -24,7 +24,8 @@ namespace moho
 
   static_assert(sizeof(SavedGameFileHeader) == kSavedGameFileHeaderSize, "SavedGameFileHeader size must be 0x2028");
   static_assert(
-    offsetof(SavedGameFileHeader, mAppNameUtf16) == 0x28, "SavedGameFileHeader::mAppNameUtf16 offset must be 0x28"
+    offsetof(SavedGameFileHeader, mAppNameUtf16) == 0x28,
+    "SavedGameFileHeader::mAppNameUtf16 offset must be 0x28"
   );
   static_assert(
     offsetof(SavedGameFileHeader, mSessionNameUtf16) == 0x828,

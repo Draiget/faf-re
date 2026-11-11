@@ -27,24 +27,50 @@ namespace faf::editor
     /** A short warning a node shows in its header's tooltip and as a red outline (empty: none). */
     using WarningFn = std::function<std::string(const GraphNode&)>;
 
-    void SetThumbnails(ThumbnailFn fn) { mThumbnail = std::move(fn); }
+    void SetThumbnails(
+      ThumbnailFn fn
+    )
+    {
+      mThumbnail = std::move(fn);
+    }
     /** Which node types keep the square under their pins (default: those with an output). */
     using HasSquareFn = std::function<bool(const NodeType&)>;
-    void SetHasSquare(HasSquareFn fn) { mHasSquare = std::move(fn); }
+    void SetHasSquare(
+      HasSquareFn fn
+    )
+    {
+      mHasSquare = std::move(fn);
+    }
     /** Draws a node's own picture into the square (a curve's plot); true when it drew (else the thumbnail shows). */
     using DrawSquareFn = std::function<bool(const GraphNode&, ImDrawList*, float x0, float y0, float x1, float y1)>;
-    void SetDrawSquare(DrawSquareFn fn) { mDrawSquare = std::move(fn); }
-    void SetWarnings(WarningFn fn) { mWarning = std::move(fn); }
+    void SetDrawSquare(
+      DrawSquareFn fn
+    )
+    {
+      mDrawSquare = std::move(fn);
+    }
+    void SetWarnings(
+      WarningFn fn
+    )
+    {
+      mWarning = std::move(fn);
+    }
 
     /** Draws into the rest of the current window; true while the graph changed this frame. */
     bool Draw(NodeGraph& graph);
 
-    [[nodiscard]] const std::set<int>& Selection() const noexcept { return mSelection; }
+    [[nodiscard]] const std::set<int>& Selection() const noexcept
+    {
+      return mSelection;
+    }
     void Select(int id);
     /** Adds a node of the type at the canvas's centre (the palette panel's double-click or drop). */
     int AddAtCentre(NodeGraph& graph, const std::string& type);
     /** Frames everything at the next frame. */
-    void FrameAll() noexcept { mFrameNext = true; }
+    void FrameAll() noexcept
+    {
+      mFrameNext = true;
+    }
     /** A palette panel's item being dragged is dropped here: the payload's id. */
     static constexpr const char* kPalettePayload = "FAF_GRAPH_NODE";
 

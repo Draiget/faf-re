@@ -9,7 +9,9 @@ namespace moho
   /**
    * Address: 0x00773740 (FUN_00773740, sub_773740)
    */
-  [[nodiscard]] inline moho::SEconValue TakeGrantedResourcesAndReset(moho::CEconRequest* const request) noexcept
+  [[nodiscard]] inline moho::SEconValue TakeGrantedResourcesAndReset(
+    moho::CEconRequest* const request
+  ) noexcept
   {
     moho::SEconValue out{};
     out.energy = request->mGranted.energy;
@@ -24,7 +26,9 @@ namespace moho
    *
    * Alias of FUN_005CFA20 (non-canonical helper lane).
    */
-  inline void DestroyEconomyRequestPointer(moho::CEconRequest*& request)
+  inline void DestroyEconomyRequestPointer(
+    moho::CEconRequest*& request
+  )
   {
     if (request == nullptr) {
       return;

@@ -45,7 +45,14 @@ namespace faf::editor
    * A toggle (`toggle`) is lit while `on` (the toolbar's toggle colour) and its icon dimmed while off. The next
    * button of a joined row goes after `ImGui::SameLine(0.0f, 1.0f)`.
    */
-  bool EdToolButton(const char* id, EdIcon icon, const char* label, bool toggle, bool on, EdSegment segment = EdSegment::Alone);
+  bool EdToolButton(
+    const char* id,
+    EdIcon icon,
+    const char* label,
+    bool toggle,
+    bool on,
+    EdSegment segment = EdSegment::Alone
+  );
 
   /** A square toggle with `icon` only. */
   bool IconToggle(const char* id, EdIcon icon, bool on, EdSegment segment = EdSegment::Alone);

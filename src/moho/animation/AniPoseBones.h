@@ -10,7 +10,10 @@ namespace moho
   /**
    * Engine addition: a pose's bone by index, or null for an index it doesn't have.
    */
-  [[nodiscard]] inline CAniPoseBone* ResolvePoseBone(CAniPose* const pose, const int boneIndex)
+  [[nodiscard]] inline CAniPoseBone* ResolvePoseBone(
+    CAniPose* const pose,
+    const int boneIndex
+  )
   {
     if (pose == nullptr || boneIndex < 0) {
       return nullptr;
@@ -33,7 +36,10 @@ namespace moho
   /**
    * Engine addition: as above, through an actor's pose.
    */
-  [[nodiscard]] inline CAniPoseBone* ResolvePoseBone(CAniActor* const actor, const int boneIndex)
+  [[nodiscard]] inline CAniPoseBone* ResolvePoseBone(
+    CAniActor* const actor,
+    const int boneIndex
+  )
   {
     return actor != nullptr ? ResolvePoseBone(actor->mPose.get(), boneIndex) : nullptr;
   }

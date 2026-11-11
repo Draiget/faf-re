@@ -150,11 +150,23 @@ namespace moho
     std::uint8_t mPad6D[0x03];                         // +0x6D
   };
 
-  static_assert(sizeof(CD3DDynamicTextureSheet::TextureHandle) == 0x08, "CD3DDynamicTextureSheet::TextureHandle size must be 0x08");
+  static_assert(
+    sizeof(CD3DDynamicTextureSheet::TextureHandle) == 0x08,
+    "CD3DDynamicTextureSheet::TextureHandle size must be 0x08"
+  );
   static_assert(offsetof(CD3DDynamicTextureSheet, mLink) == 0x04, "CD3DDynamicTextureSheet::mLink offset must be 0x04");
-  static_assert(offsetof(CD3DDynamicTextureSheet, mDevice) == 0x0C, "CD3DDynamicTextureSheet::mDevice offset must be 0x0C");
-  static_assert(offsetof(CD3DDynamicTextureSheet, mTexture) == 0x10, "CD3DDynamicTextureSheet::mTexture offset must be 0x10");
-  static_assert(offsetof(CD3DDynamicTextureSheet, mContext) == 0x18, "CD3DDynamicTextureSheet::mContext offset must be 0x18");
+  static_assert(
+    offsetof(CD3DDynamicTextureSheet, mDevice) == 0x0C,
+    "CD3DDynamicTextureSheet::mDevice offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(CD3DDynamicTextureSheet, mTexture) == 0x10,
+    "CD3DDynamicTextureSheet::mTexture offset must be 0x10"
+  );
+  static_assert(
+    offsetof(CD3DDynamicTextureSheet, mContext) == 0x18,
+    "CD3DDynamicTextureSheet::mContext offset must be 0x18"
+  );
   static_assert(
     offsetof(CD3DDynamicTextureSheet, mArchiveTextureMode) == 0x6C,
     "CD3DDynamicTextureSheet::mArchiveTextureMode offset must be 0x6C"

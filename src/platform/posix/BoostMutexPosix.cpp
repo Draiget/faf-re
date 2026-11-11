@@ -19,7 +19,10 @@
 namespace
 {
   // pthread_mutex_init with no attributes made recursive (boost always passes none).
-  int RecursivePthreadMutexInit(pthread_mutex_t* const mutex, const pthread_mutexattr_t* const attributes)
+  int RecursivePthreadMutexInit(
+    pthread_mutex_t* const mutex,
+    const pthread_mutexattr_t* const attributes
+  )
   {
     if (attributes != nullptr) {
       return pthread_mutex_init(mutex, attributes);

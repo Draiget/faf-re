@@ -19,10 +19,12 @@ namespace faf::editor
     /** Its weight among the list's: picked with chance / sum of chances. */
     int chance = 100;
 
-    bool operator==(const PropPaintEntry& other) const
+    bool operator==(
+      const PropPaintEntry& other
+    ) const
     {
       return blueprint == other.blueprint && rotationMin == other.rotationMin && rotationMax == other.rotationMax &&
-             scaleMin == other.scaleMin && scaleMax == other.scaleMax && chance == other.chance;
+        scaleMin == other.scaleMin && scaleMax == other.scaleMax && chance == other.chance;
     }
   };
 

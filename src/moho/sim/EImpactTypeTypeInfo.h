@@ -91,7 +91,6 @@ namespace moho
 
   static_assert(sizeof(EImpactTypeTypeInfo) == 0x78, "EImpactTypeTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x00BC7A70 (FUN_00BC7A70, register_EImpactTypeTypeInfo)
    *

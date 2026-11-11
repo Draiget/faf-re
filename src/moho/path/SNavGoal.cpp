@@ -41,7 +41,9 @@ namespace
    * Executes one non-deleting `gpg::RType` base-teardown lane for
    * `SNavGoalTypeInfo`.
    */
-  [[maybe_unused]] void cleanup_SNavGoalTypeInfoRTypeBase(moho::SNavGoalTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void cleanup_SNavGoalTypeInfoRTypeBase(
+    moho::SNavGoalTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -59,7 +61,9 @@ namespace moho
    * Builds a one-cell goal rectangle from one cell coordinate and clears the
    * secondary rectangle/layer payload.
    */
-  SNavGoal::SNavGoal(const SOCellPos cellPos) noexcept
+  SNavGoal::SNavGoal(
+    const SOCellPos cellPos
+  ) noexcept
   {
     mPos1.x0 = cellPos.x;
     mPos1.z0 = cellPos.z;
@@ -80,7 +84,9 @@ namespace moho
    * Loads the first rectangle, secondary rectangle, and layer payload in
    * exact binary archive order.
    */
-  void SNavGoal::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SNavGoal::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     const gpg::RRef ownerRef{};
 
@@ -96,7 +102,9 @@ namespace moho
    * Stores the first rectangle, secondary rectangle, and layer payload in
    * exact binary archive order.
    */
-  void SNavGoal::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SNavGoal::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef ownerRef{};
 
@@ -189,7 +197,9 @@ namespace
   [[maybe_unused]] SNavGoalBootstrap gSNavGoalBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SNavGoalTypeInfo_cc117b, moho::register_SNavGoalTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SNavGoalTypeInfo_cc117b,
+  moho::register_SNavGoalTypeInfo
+)

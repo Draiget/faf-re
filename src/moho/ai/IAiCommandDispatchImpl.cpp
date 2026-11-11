@@ -71,7 +71,9 @@ using namespace moho;
 namespace
 {
 
-  [[nodiscard]] gpg::RRef MakeDispatchObjectRef(IAiCommandDispatchImpl* const object)
+  [[nodiscard]] gpg::RRef MakeDispatchObjectRef(
+    IAiCommandDispatchImpl* const object
+  )
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -79,7 +81,10 @@ namespace
     return ref;
   }
 
-  [[nodiscard]] CUnitCommandQueue* ReadCommandQueuePointer(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] CUnitCommandQueue* ReadCommandQueuePointer(
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef
+  )
   {
     if (!archive) {
       return nullptr;
@@ -115,7 +120,9 @@ namespace
     throw gpg::SerializationError(message.c_str());
   }
 
-  [[nodiscard]] gpg::RRef MakeCommandQueueRef(CUnitCommandQueue* const queue)
+  [[nodiscard]] gpg::RRef MakeCommandQueueRef(
+    CUnitCommandQueue* const queue
+  )
   {
     gpg::RRef out{};
     gpg::RType* const staticType = gpg::RTypeOf<CUnitCommandQueue>();
@@ -147,7 +154,9 @@ namespace
     return out;
   }
 
-  [[nodiscard]] const char* BlueprintIdOrUnknown(const Unit* const unit) noexcept
+  [[nodiscard]] const char* BlueprintIdOrUnknown(
+    const Unit* const unit
+  ) noexcept
   {
     if (!unit) {
       return "<unknown>";
@@ -216,7 +225,8 @@ namespace
 
     Entity* const unitEntity = static_cast<Entity*>(unit);
     const std::uint32_t unitId = static_cast<std::uint32_t>(unitEntity->id_);
-    Entity** const found = std::lower_bound(begin, end, unitId, [](const Entity* const candidate, const std::uint32_t key) {
+    Entity** const found =
+      std::lower_bound(begin, end, unitId, [](const Entity* const candidate, const std::uint32_t key) {
       const std::uint32_t candidateId = candidate ? static_cast<std::uint32_t>(candidate->id_) : 0u;
       return candidateId < key;
     });
@@ -231,7 +241,9 @@ namespace
    * Resolves current transport owner of this dispatch unit and asks that
    * transport to detach the unit when both lanes are valid.
    */
-  int DetachDispatchUnitFromTransport(IAiCommandDispatchImpl* const dispatch)
+  int DetachDispatchUnitFromTransport(
+    IAiCommandDispatchImpl* const dispatch
+  )
   {
     if (!dispatch || !dispatch->mUnit) {
       return 0;
@@ -265,7 +277,10 @@ namespace
    * binary `switch (command->mVarDat.mCmdType - 1)` ladder (the decompiler's
    * shifted case labels are corrected to the real enum here).
    */
-  void DispatchQueuedCommand(IAiCommandDispatchImpl* const dispatch, CUnitCommand* const command)
+  void DispatchQueuedCommand(
+    IAiCommandDispatchImpl* const dispatch,
+    CUnitCommand* const command
+  )
   {
     Unit* const unit = dispatch->mUnit;
 
@@ -277,484 +292,485 @@ namespace
     const RUnitBlueprint* const unitBlueprint = dynamic_cast<const RUnitBlueprint*>(command->mConstDat.blueprint);
 
     switch (command->mVarDat.mCmdType) {
-      case EUnitCommandType::UNITCOMMAND_Stop: {
-        dispatch->Stop();
-        return;
-      }
+    case EUnitCommandType::UNITCOMMAND_Stop: {
+      dispatch->Stop();
+      return;
+    }
 
-      case EUnitCommandType::UNITCOMMAND_Move: {
-        CUnitCommand::Move(unit, command);
+    case EUnitCommandType::UNITCOMMAND_Move: {
+      CUnitCommand::Move(unit, command);
+      SOCellPos cell;
+      const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
+      NewMoveTask(goal, dispatch, 0, nullptr, 0);
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_Dive: {
+      const ELayer layer = unit->mVarDat.mLayerMask;
+      const SFootprint& footprint = unit->GetFootprint();
+      const SOCellPos cell = footprint.ToCellPos(unit->GetPosition());
+      SNavGoal goal(cell);
+      // 0x0060975C stores `(layer == Sub) * 4 + 4` at goal+0x20 (`[esp+74h]`
+      // with the goal at `[esp+54h]`), the layer slot SetNewTargetLayer
+      // reads: a submerged unit surfaces, anything else dives.
+      goal.mLayer = (layer == LAYER_Sub) ? LAYER_Water : LAYER_Sub;
+      dispatch->SetNewTargetLayer(goal);
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_FormMove: {
+      CUnitCommand::Move(unit, command);
+      if (CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command)) {
+        SOCellPos cell;
+        const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
+        (void)CUnitFormAndMoveTask::Create(formation, dispatch);
+      } else {
         SOCellPos cell;
         const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
         NewMoveTask(goal, dispatch, 0, nullptr, 0);
-        return;
       }
+      return;
+    }
 
-      case EUnitCommandType::UNITCOMMAND_Dive: {
-        const ELayer layer = unit->mVarDat.mLayerMask;
-        const SFootprint& footprint = unit->GetFootprint();
-        const SOCellPos cell = footprint.ToCellPos(unit->GetPosition());
-        SNavGoal goal(cell);
-        // 0x0060975C stores `(layer == Sub) * 4 + 4` at goal+0x20 (`[esp+74h]`
-        // with the goal at `[esp+54h]`), the layer slot SetNewTargetLayer
-        // reads: a submerged unit surfaces, anything else dives.
-        goal.mLayer = (layer == LAYER_Sub) ? LAYER_Water : LAYER_Sub;
-        dispatch->SetNewTargetLayer(goal);
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_FormMove: {
-        CUnitCommand::Move(unit, command);
-        if (CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command)) {
-          SOCellPos cell;
-          const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
-          (void)CUnitFormAndMoveTask::Create(formation, dispatch);
-        } else {
-          SOCellPos cell;
-          const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
-          NewMoveTask(goal, dispatch, 0, nullptr, 0);
+    case EUnitCommandType::UNITCOMMAND_BuildFactory: {
+      if (unitBlueprint) {
+        const LuaPlus::LuaObject blueprintLua = unitBlueprint->GetLuaBlueprint(dispatch->mSim->mLuaState);
+        if (unit->RunScriptBool("CheckBuildRestriction", blueprintLua)) {
+          (void)CFactoryBuildTask::Create(dispatch, unitBlueprint, command, nullptr);
         }
-        return;
       }
+      return;
+    }
 
-      case EUnitCommandType::UNITCOMMAND_BuildFactory: {
-        if (unitBlueprint) {
-          const LuaPlus::LuaObject blueprintLua =
-            unitBlueprint->GetLuaBlueprint(dispatch->mSim->mLuaState);
+    case EUnitCommandType::UNITCOMMAND_BuildMobile: {
+      if (unitBlueprint) {
+        // The binary inlines Unit::CanBuild (army-buildable categories, minus the
+        // unit's build restrictions, tested against the blueprint's ordinal bit);
+        // the 2007 source called CanBuild and the compiler inlined it here.
+        if (unit->CanBuild(unitBlueprint)) {
+          const LuaPlus::LuaObject blueprintLua = unitBlueprint->GetLuaBlueprint(dispatch->mSim->mLuaState);
           if (unit->RunScriptBool("CheckBuildRestriction", blueprintLua)) {
-            (void)CFactoryBuildTask::Create(dispatch, unitBlueprint, command, nullptr);
+            const Wm3::Vector3f buildDirection = command->mVarDat.mTarget2.mPos;
+            const Wm3::Quatf buildOrientation = command->mConstDat.origin;
+            const Wm3::Vector3f buildPosition = command->mTarget.GetTargetPosGun(false);
+            (void)CUnitMobileBuildTask::Create(
+              dispatch, unitBlueprint, buildPosition, buildOrientation, buildDirection
+            );
           }
         }
-        return;
       }
+      return;
+    }
 
-      case EUnitCommandType::UNITCOMMAND_BuildMobile: {
-        if (unitBlueprint) {
-          // The binary inlines Unit::CanBuild (army-buildable categories, minus the
-          // unit's build restrictions, tested against the blueprint's ordinal bit);
-          // the 2007 source called CanBuild and the compiler inlined it here.
-          if (unit->CanBuild(unitBlueprint)) {
-            const LuaPlus::LuaObject blueprintLua =
-              unitBlueprint->GetLuaBlueprint(dispatch->mSim->mLuaState);
-            if (unit->RunScriptBool("CheckBuildRestriction", blueprintLua)) {
-              const Wm3::Vector3f buildDirection = command->mVarDat.mTarget2.mPos;
-              const Wm3::Quatf buildOrientation = command->mConstDat.origin;
-              const Wm3::Vector3f buildPosition = command->mTarget.GetTargetPosGun(false);
-              (void)CUnitMobileBuildTask::Create(dispatch, unitBlueprint, buildPosition, buildOrientation, buildDirection);
-            }
-          }
-        }
-        return;
-      }
+    case EUnitCommandType::UNITCOMMAND_BuildAssist: {
+      gpg::Logf("UNITCOMMAND_BuildAssist not implemented");
+      return;
+    }
 
-      case EUnitCommandType::UNITCOMMAND_BuildAssist: {
-        gpg::Logf("UNITCOMMAND_BuildAssist not implemented");
-        return;
-      }
+    // 0x0060A40C jump table: UNITCOMMAND_Attack (slot 9) lands on 0x00609639,
+    // which calls 0x005F2750 (CreateRespectFormation, overcharge off), and
+    // UNITCOMMAND_FormAttack (slot 10) lands on 0x00609668, which calls
+    // 0x005F27D0 (Create).
+    case EUnitCommandType::UNITCOMMAND_Attack: {
+      CUnitCommand::Move(unit, command);
+      CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command);
+      (void)CAttackTargetTask::CreateRespectFormation(dispatch, &command->mTarget, formation, false);
+      return;
+    }
 
-      // 0x0060A40C jump table: UNITCOMMAND_Attack (slot 9) lands on 0x00609639,
-      // which calls 0x005F2750 (CreateRespectFormation, overcharge off), and
-      // UNITCOMMAND_FormAttack (slot 10) lands on 0x00609668, which calls
-      // 0x005F27D0 (Create).
-      case EUnitCommandType::UNITCOMMAND_Attack: {
-        CUnitCommand::Move(unit, command);
-        CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command);
-        (void)CAttackTargetTask::CreateRespectFormation(dispatch, &command->mTarget, formation, false);
-        return;
-      }
+    case EUnitCommandType::UNITCOMMAND_FormAttack: {
+      CUnitCommand::Move(unit, command);
+      CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command);
+      (void)CAttackTargetTask::Create(dispatch, &command->mTarget, formation);
+      return;
+    }
 
-      case EUnitCommandType::UNITCOMMAND_FormAttack: {
-        CUnitCommand::Move(unit, command);
-        CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command);
-        (void)CAttackTargetTask::Create(dispatch, &command->mTarget, formation);
-        return;
-      }
+    case EUnitCommandType::UNITCOMMAND_Nuke: {
+      (void)CUnitFireAtTask::Create(dispatch, &command->mTarget, 1);
+      return;
+    }
 
-      case EUnitCommandType::UNITCOMMAND_Nuke: {
-        (void)CUnitFireAtTask::Create(dispatch, &command->mTarget, 1);
-        return;
-      }
+    case EUnitCommandType::UNITCOMMAND_Tactical: {
+      (void)CUnitFireAtTask::Create(dispatch, &command->mTarget, 0);
+      return;
+    }
 
-      case EUnitCommandType::UNITCOMMAND_Tactical: {
-        (void)CUnitFireAtTask::Create(dispatch, &command->mTarget, 0);
-        return;
-      }
+    case EUnitCommandType::UNITCOMMAND_Teleport: {
+      CUnitTeleportTask::Create(&command->mTarget, dispatch, unit, &unit->GetTransform());
+      return;
+    }
 
-      case EUnitCommandType::UNITCOMMAND_Teleport: {
-        CUnitTeleportTask::Create(&command->mTarget, dispatch, unit, &unit->GetTransform());
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_Guard: {
-        if (command->mTarget.HasTarget()) {
-          if (command->mTarget.GetEntity() == nullptr) {
-            CUnitCommand::Move(unit, command);
-          }
-          (void)CUnitGuardTask::Create(dispatch, &command->mTarget);
-        } else {
-          dispatch->Stop();
-        }
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_Patrol: {
-        SOCellPos cell;
-        const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
-        (void)CUnitPatrolTask::Create(dispatch, &goal, false);
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_Ferry: {
-        (void)CUnitFerryTask::CreateFromDispatch(dispatch, unit->GetPosition());
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_FormPatrol:
-      case EUnitCommandType::UNITCOMMAND_FormAggressiveMove: {
-        CUnitCommand::Move(unit, command);
-        SOCellPos cell;
-        const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
-        // 0x0060984E-0x0060988F: the formation itself is bound through the `_0`
-        // overload (0x0061C4E0 -> ctor with inFormation=false), never folded into
-        // the plain overload's bool. With no bound formation the patrol task ended
-        // on its own arrival test instead of waiting on the formation.
-        CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command);
-        (void)CUnitPatrolTask::CreateWithFormation(dispatch, &goal, formation);
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_Reclaim: {
-        IssueReclaimTask(dispatch, command->mTarget);
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_Repair: {
-        Entity* const focus = CUnitCommand::GetFocus(command);
-        if (!focus) {
-          return;
-        }
-        Unit* creator = nullptr;
-        if (Unit* const focusUnit = focus->IsUnit()) {
-          creator = focusUnit;
-        } else if (ReconBlip* const blip = focus->IsReconBlip()) {
-          creator = blip->GetCreator();
-        } else {
-          return;
-        }
-        if (creator) {
-          (void)CUnitRepairTask::Allocate(dispatch, creator, false);
-        }
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_Capture: {
-        (void)CUnitCaptureTask::Create(dispatch, &command->mTarget);
-        return;
-      }
-
-      // Shared body (.c case Capture/SpecialAction @ 344-512): the transport gather.
-      case EUnitCommandType::UNITCOMMAND_TransportLoadUnits:
-      case EUnitCommandType::UNITCOMMAND_Dock: {
-        Unit* const target = CUnitCommand::GetTarget(command);
-
-        // 0x00609BE4-0x00609C6F: a ferry beacon always routes here, and so does
-        // any FACTORY target that is *neither* an air-staging platform nor a
-        // teleporter -- `jz` past both `IsInCategory` probes is what reaches
-        // the `HIBYTE(v94) = 1` arm. The two exclusions are not an extra way
-        // in, they are the way out: air-staging platforms and teleporters are
-        // factories too, and the tail of this same arm gives them their own
-        // handling (`IssueRefuelTask` / `IssueCallTeleportTask`). Testing them
-        // positively sent exactly the two targets that must fall through into
-        // the ferry wait, and dropped every ordinary factory -- the ferry
-        // pickup point -- into the `mIsAir` tail instead, where a land factory
-        // ends up in `IssueCallLandTransportTask`.
-        bool routeToFerry = false;
-        if (target != nullptr) {
-          if (target->IsInCategory("FERRYBEACON")) {
-            routeToFerry = true;
-          } else if (target->IsInCategory("FACTORY")) {
-            routeToFerry = !target->IsInCategory("AIRSTAGINGPLATFORM") && !target->IsInCategory("TELEPORTATION");
-          }
-        }
-
-        if (routeToFerry) {
+    case EUnitCommandType::UNITCOMMAND_Guard: {
+      if (command->mTarget.HasTarget()) {
+        if (command->mTarget.GetEntity() == nullptr) {
           CUnitCommand::Move(unit, command);
-          SOCellPos cell;
-          const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
-          Unit* const ferryTarget = CUnitCommand::GetTarget(command);
-          (void)CUnitWaitForFerryTask::Create(dispatch, goal, ferryTarget);
-          return;
         }
+        (void)CUnitGuardTask::Create(dispatch, &command->mTarget);
+      } else {
+        dispatch->Stop();
+      }
+      return;
+    }
 
-        if (CUnitCommand::GetTarget(command) == unit) {
-          EntitySetTemplate<Unit> workingSet;
-          for (Entity* const entry : command->mUnitSet.mVec) {
-            if (Unit* const setUnit = static_cast<Unit*>(entry)) {
-              (void)workingSet.Add(setUnit);
-            }
-          }
-          (void)workingSet.Remove(unit);
+    case EUnitCommandType::UNITCOMMAND_Patrol: {
+      SOCellPos cell;
+      const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
+      (void)CUnitPatrolTask::Create(dispatch, &goal, false);
+      return;
+    }
 
-          if (unit->IsInCategory("CARRIER")) {
-            if (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits) {
-              CUnitCarrierRetrieve::Create(dispatch, workingSet);
-            } else if (IAiTransport* const transport = unit->AiTransport) {
-              transport->TransportResetReservation();
-            }
-          } else {
-            for (auto it = workingSet.mVec.begin(); it != workingSet.mVec.end();) {
-              Entity* const entity = *it;
-              Unit* const setUnit = entity ? entity->IsUnit() : nullptr;
-              if (setUnit != nullptr && setUnit->GetTransportedBy() != nullptr) {
-                (void)workingSet.Remove(setUnit);
-                it = workingSet.mVec.begin(); // RemoveUnit compacts mVec; re-seek from head
-              } else {
-                ++it;
-              }
-            }
-            if (!unit->IsInCategory("AIRSTAGINGPLATFORM")) {
-              (void)CUnitLoadUnits::Create(dispatch, &workingSet);
-            }
-          }
-          return;
+    case EUnitCommandType::UNITCOMMAND_Ferry: {
+      (void)CUnitFerryTask::CreateFromDispatch(dispatch, unit->GetPosition());
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_FormPatrol:
+    case EUnitCommandType::UNITCOMMAND_FormAggressiveMove: {
+      CUnitCommand::Move(unit, command);
+      SOCellPos cell;
+      const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
+      // 0x0060984E-0x0060988F: the formation itself is bound through the `_0`
+      // overload (0x0061C4E0 -> ctor with inFormation=false), never folded into
+      // the plain overload's bool. With no bound formation the patrol task ended
+      // on its own arrival test instead of waiting on the formation.
+      CAiFormationInstance* const formation = CUnitCommand::InFormation(unit, command);
+      (void)CUnitPatrolTask::CreateWithFormation(dispatch, &goal, formation);
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_Reclaim: {
+      IssueReclaimTask(dispatch, command->mTarget);
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_Repair: {
+      Entity* const focus = CUnitCommand::GetFocus(command);
+      if (!focus) {
+        return;
+      }
+      Unit* creator = nullptr;
+      if (Unit* const focusUnit = focus->IsUnit()) {
+        creator = focusUnit;
+      } else if (ReconBlip* const blip = focus->IsReconBlip()) {
+        creator = blip->GetCreator();
+      } else {
+        return;
+      }
+      if (creator) {
+        (void)CUnitRepairTask::Allocate(dispatch, creator, false);
+      }
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_Capture: {
+      (void)CUnitCaptureTask::Create(dispatch, &command->mTarget);
+      return;
+    }
+
+    // Shared body (.c case Capture/SpecialAction @ 344-512): the transport gather.
+    case EUnitCommandType::UNITCOMMAND_TransportLoadUnits:
+    case EUnitCommandType::UNITCOMMAND_Dock: {
+      Unit* const target = CUnitCommand::GetTarget(command);
+
+      // 0x00609BE4-0x00609C6F: a ferry beacon always routes here, and so does
+      // any FACTORY target that is *neither* an air-staging platform nor a
+      // teleporter -- `jz` past both `IsInCategory` probes is what reaches
+      // the `HIBYTE(v94) = 1` arm. The two exclusions are not an extra way
+      // in, they are the way out: air-staging platforms and teleporters are
+      // factories too, and the tail of this same arm gives them their own
+      // handling (`IssueRefuelTask` / `IssueCallTeleportTask`). Testing them
+      // positively sent exactly the two targets that must fall through into
+      // the ferry wait, and dropped every ordinary factory -- the ferry
+      // pickup point -- into the `mIsAir` tail instead, where a land factory
+      // ends up in `IssueCallLandTransportTask`.
+      bool routeToFerry = false;
+      if (target != nullptr) {
+        if (target->IsInCategory("FERRYBEACON")) {
+          routeToFerry = true;
+        } else if (target->IsInCategory("FACTORY")) {
+          routeToFerry = !target->IsInCategory("AIRSTAGINGPLATFORM") && !target->IsInCategory("TELEPORTATION");
         }
+      }
 
-        if (target != nullptr) {
-          if (target->IsInCategory("CARRIER")) {
-            if (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits) {
-              IAiCommandDispatchImpl::IssueCarrierLandTask(target, dispatch);
-            } else {
-              dispatch->IssueRefuelTask(target);
-            }
-          } else if (target->IsInCategory("AIRSTAGINGPLATFORM")) {
-            dispatch->IssueRefuelTask(target);
-          } else if (target->IsInCategory("TELEPORTATION")) {
-            dispatch->IssueCallTeleportTask(target);
-          } else if (target->mIsAir) {
-            NewCallTransportCommand(dispatch, target);
-          } else {
-            dispatch->IssueCallLandTransportTask(target);
-          }
-        }
+      if (routeToFerry) {
+        CUnitCommand::Move(unit, command);
+        SOCellPos cell;
+        const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
+        Unit* const ferryTarget = CUnitCommand::GetTarget(command);
+        (void)CUnitWaitForFerryTask::Create(dispatch, goal, ferryTarget);
         return;
       }
 
-      case EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits: {
-        if (CUnitCommand::GetTarget(command) != unit) {
-          if (!unit->AiTransport || !CUnitCommand::GetTarget(command)) {
-            return;
-          }
-          EntitySetTemplate<Unit> loadSet;
-          (void)loadSet.Add(CUnitCommand::GetTarget(command));
-          if (unit->IsInCategory("CARRIER")) {
-            CUnitCarrierRetrieve::Create(dispatch, loadSet);
-            return;
-          }
-          (void)CUnitLoadUnits::Create(dispatch, &loadSet);
-          return;
-        }
-
-        Unit* first = nullptr;
+      if (CUnitCommand::GetTarget(command) == unit) {
+        EntitySetTemplate<Unit> workingSet;
         for (Entity* const entry : command->mUnitSet.mVec) {
-          Unit* const setUnit = static_cast<Unit*>(entry);
-          if (setUnit == nullptr || setUnit == unit) {
-            continue;
+          if (Unit* const setUnit = static_cast<Unit*>(entry)) {
+            (void)workingSet.Add(setUnit);
           }
-          first = setUnit;
-          break;
         }
-        if (first == nullptr) {
-          return;
-        }
-        if (first->IsInCategory("CARRIER")) {
-          IAiCommandDispatchImpl::IssueCarrierLandTask(first, dispatch);
-        } else if (first->IsInCategory("AIRSTAGINGPLATFORM")) {
-          dispatch->IssueCallAirStagingPlatformTask(first);
-        } else if (first->IsInCategory("TELEPORTATION")) {
-          dispatch->IssueCallTeleportTask(first);
-        } else if (first->mIsAir) {
-          NewCallTransportCommand(dispatch, first);
+        (void)workingSet.Remove(unit);
+
+        if (unit->IsInCategory("CARRIER")) {
+          if (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits) {
+            CUnitCarrierRetrieve::Create(dispatch, workingSet);
+          } else if (IAiTransport* const transport = unit->AiTransport) {
+            transport->TransportResetReservation();
+          }
         } else {
-          dispatch->IssueCallLandTransportTask(first);
+          for (auto it = workingSet.mVec.begin(); it != workingSet.mVec.end();) {
+            Entity* const entity = *it;
+            Unit* const setUnit = entity ? entity->IsUnit() : nullptr;
+            if (setUnit != nullptr && setUnit->GetTransportedBy() != nullptr) {
+              (void)workingSet.Remove(setUnit);
+              it = workingSet.mVec.begin(); // RemoveUnit compacts mVec; re-seek from head
+            } else {
+              ++it;
+            }
+          }
+          if (!unit->IsInCategory("AIRSTAGINGPLATFORM")) {
+            (void)CUnitLoadUnits::Create(dispatch, &workingSet);
+          }
         }
         return;
       }
 
-      case EUnitCommandType::UNITCOMMAND_TransportUnloadUnits:
-      case EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits: {
-        IAiTransport* const transport = unit->AiTransport;
-        if (!transport) {
-          return;
-        }
-        // 0x0060A207-0x0060A228: once the transport is a teleporter and the
-        // command carries a target entity, the binary hands `&command->mTarget`
-        // and the dispatch to FUN_0060B8B0 (`mov eax, esi` / `push ecx` /
-        // `call 0x60B8B0`), which resolves the target to a Unit and applies it
-        // as the teleport destination. It does not touch the reservation. That
-        // call site was missing, which is why the recovered helper below sat
-        // orphaned with `[[maybe_unused]]` even though `faidx` reports this
-        // function as its only caller in the binary.
-        if (transport->TransportIsTeleporter() && command->mTarget.GetEntity()) {
-          (void)TrySetTransportTeleportDestinationFromTarget(dispatch, &command->mTarget);
-          return;
-        }
-        const EntitySetTemplate<Unit> loaded = transport->TransportGetLoadedUnits(false);
-        if (loaded.Empty()) {
-          return;
-        }
-        if (transport->TransportIsAirStagingPlatform()) {
-          const Wm3::Vec3f targetPos = command->mTarget.GetTargetPosGun(false);
-          const SOCellPos cell = unit->GetFootprint().ToCellPos(targetPos);
-          const SNavGoal goal(cell);
-          if (unit->IsInCategory("CARRIER")) {
-            CUnitCarrierLaunch::Create(dispatch, &goal, &command->mUnitSet);
+      if (target != nullptr) {
+        if (target->IsInCategory("CARRIER")) {
+          if (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits) {
+            IAiCommandDispatchImpl::IssueCarrierLandTask(target, dispatch);
           } else {
-            CUnitUnloadUnits::Create(dispatch, &goal, &command->mUnitSet, nullptr);
+            dispatch->IssueRefuelTask(target);
           }
+        } else if (target->IsInCategory("AIRSTAGINGPLATFORM")) {
+          dispatch->IssueRefuelTask(target);
+        } else if (target->IsInCategory("TELEPORTATION")) {
+          dispatch->IssueCallTeleportTask(target);
+        } else if (target->mIsAir) {
+          NewCallTransportCommand(dispatch, target);
         } else {
-          CUnitCommand::Move(unit, command);
-          SOCellPos cell;
-          const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
+          dispatch->IssueCallLandTransportTask(target);
+        }
+      }
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits: {
+      if (CUnitCommand::GetTarget(command) != unit) {
+        if (!unit->AiTransport || !CUnitCommand::GetTarget(command)) {
+          return;
+        }
+        EntitySetTemplate<Unit> loadSet;
+        (void)loadSet.Add(CUnitCommand::GetTarget(command));
+        if (unit->IsInCategory("CARRIER")) {
+          CUnitCarrierRetrieve::Create(dispatch, loadSet);
+          return;
+        }
+        (void)CUnitLoadUnits::Create(dispatch, &loadSet);
+        return;
+      }
+
+      Unit* first = nullptr;
+      for (Entity* const entry : command->mUnitSet.mVec) {
+        Unit* const setUnit = static_cast<Unit*>(entry);
+        if (setUnit == nullptr || setUnit == unit) {
+          continue;
+        }
+        first = setUnit;
+        break;
+      }
+      if (first == nullptr) {
+        return;
+      }
+      if (first->IsInCategory("CARRIER")) {
+        IAiCommandDispatchImpl::IssueCarrierLandTask(first, dispatch);
+      } else if (first->IsInCategory("AIRSTAGINGPLATFORM")) {
+        dispatch->IssueCallAirStagingPlatformTask(first);
+      } else if (first->IsInCategory("TELEPORTATION")) {
+        dispatch->IssueCallTeleportTask(first);
+      } else if (first->mIsAir) {
+        NewCallTransportCommand(dispatch, first);
+      } else {
+        dispatch->IssueCallLandTransportTask(first);
+      }
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_TransportUnloadUnits:
+    case EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits: {
+      IAiTransport* const transport = unit->AiTransport;
+      if (!transport) {
+        return;
+      }
+      // 0x0060A207-0x0060A228: once the transport is a teleporter and the
+      // command carries a target entity, the binary hands `&command->mTarget`
+      // and the dispatch to FUN_0060B8B0 (`mov eax, esi` / `push ecx` /
+      // `call 0x60B8B0`), which resolves the target to a Unit and applies it
+      // as the teleport destination. It does not touch the reservation. That
+      // call site was missing, which is why the recovered helper below sat
+      // orphaned with `[[maybe_unused]]` even though `faidx` reports this
+      // function as its only caller in the binary.
+      if (transport->TransportIsTeleporter() && command->mTarget.GetEntity()) {
+        (void)TrySetTransportTeleportDestinationFromTarget(dispatch, &command->mTarget);
+        return;
+      }
+      const EntitySetTemplate<Unit> loaded = transport->TransportGetLoadedUnits(false);
+      if (loaded.Empty()) {
+        return;
+      }
+      if (transport->TransportIsAirStagingPlatform()) {
+        const Wm3::Vec3f targetPos = command->mTarget.GetTargetPosGun(false);
+        const SOCellPos cell = unit->GetFootprint().ToCellPos(targetPos);
+        const SNavGoal goal(cell);
+        if (unit->IsInCategory("CARRIER")) {
+          CUnitCarrierLaunch::Create(dispatch, &goal, &command->mUnitSet);
+        } else {
           CUnitUnloadUnits::Create(dispatch, &goal, &command->mUnitSet, nullptr);
         }
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_DetachFromTransport: {
-        DetachDispatchUnitFromTransport(dispatch);
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_Upgrade: {
-        const RUnitBlueprint* const targetBp = unitBlueprint;
-        if (!targetBp) {
-          return;
-        }
-        const RUnitBlueprint* const selfBp = unit->GetBlueprint();
-        if (!targetBp->General.UpgradesFrom.name.empty()) {
-          if (_stricmp(selfBp->mBlueprintId.c_str(), targetBp->General.UpgradesFrom.name.c_str()) != 0) {
-            return;
-          }
-        } else {
-          if (_stricmp(selfBp->General.UpgradesTo.name.c_str(), targetBp->mBlueprintId.c_str()) == 0) {
-            (void)CUnitUpgradeTask::Create(dispatch, targetBp);
-            return;
-          }
-          if (_stricmp(selfBp->mBlueprintId.c_str(), targetBp->mBlueprintId.c_str()) != 0) {
-            return;
-          }
-        }
-        (void)CUnitUpgradeTask::Create(dispatch, targetBp);
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_Script: {
-        (void)CUnitScriptTask::Create(dispatch, &command->mArgs);
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_AssistCommander: {
-        (void)CUnitPodAssist::Create(dispatch);
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_KillSelf: {
-        dispatch->KillSelf();
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_DestroySelf: {
-        unit->Destroy();
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_Sacrifice: {
-        Unit* const target = CUnitCommand::GetTarget(command);
-        if (!target) {
-          return;
-        }
-        if (target->IsBeingBuilt() || target->IsUnitState(UNITSTATE_Upgrading) ||
-            target->mVarDat.mMaxHealth > target->mVarDat.mHealth) {
-          (void)CUnitSacrificeTask::Create(dispatch, target);
-        } else if (target->IsUnitState(UNITSTATE_Building)) {
-          // A builder that is done but busy hands the sacrifice on to the unit
-          // it is building (0x00609A50-0x00609A9C: GetFocusEntity()->IsUnit()
-          // is the task's recipient, not the builder).
-          if (Entity* const focusEntity = target->GetFocusEntity(); focusEntity != nullptr) {
-            if (Unit* const focusUnit = focusEntity->IsUnit(); focusUnit != nullptr) {
-              (void)CUnitSacrificeTask::Create(dispatch, focusUnit);
-            }
-          }
-        }
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_Pause: {
-        unit->SetPaused(!unit->mUnitVarDat.mIsPaused);
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_OverCharge: {
-        if (Entity* const targetEntity = command->mTarget.GetEntity()) {
-          CArmyImpl* const targetArmy = targetEntity->ArmyRef;
-          if (targetArmy == nullptr ||
-              unit->ArmyRef->GetAllianceWith(targetArmy) != EAlliance::ALLIANCE_Ally) {
-            (void)CAttackTargetTask::CreateRespectFormation(dispatch, &command->mTarget, nullptr, true);
-          }
-        }
-        return;
-      }
-
-      case EUnitCommandType::UNITCOMMAND_AggressiveMove: {
+      } else {
         CUnitCommand::Move(unit, command);
         SOCellPos cell;
         const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
-        (void)CUnitPatrolTask::Create(dispatch, &goal, true);
+        CUnitUnloadUnits::Create(dispatch, &goal, &command->mUnitSet, nullptr);
+      }
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_DetachFromTransport: {
+      DetachDispatchUnitFromTransport(dispatch);
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_Upgrade: {
+      const RUnitBlueprint* const targetBp = unitBlueprint;
+      if (!targetBp) {
         return;
       }
+      const RUnitBlueprint* const selfBp = unit->GetBlueprint();
+      if (!targetBp->General.UpgradesFrom.name.empty()) {
+        if (_stricmp(selfBp->mBlueprintId.c_str(), targetBp->General.UpgradesFrom.name.c_str()) != 0) {
+          return;
+        }
+      } else {
+        if (_stricmp(selfBp->General.UpgradesTo.name.c_str(), targetBp->mBlueprintId.c_str()) == 0) {
+          (void)CUnitUpgradeTask::Create(dispatch, targetBp);
+          return;
+        }
+        if (_stricmp(selfBp->mBlueprintId.c_str(), targetBp->mBlueprintId.c_str()) != 0) {
+          return;
+        }
+      }
+      (void)CUnitUpgradeTask::Create(dispatch, targetBp);
+      return;
+    }
 
-      case EUnitCommandType::UNITCOMMAND_AssistMove: {
-        // .c FormAggressiveMove label @ 752-777 + 789-877 (real enum = AssistMove):
-        // partition the command unit-set into transports vs mobile-land units; when
-        // both are non-empty, dispatch an assist-move (transport) or a move variant.
-        CUnitCommand::Move(unit, command);
+    case EUnitCommandType::UNITCOMMAND_Script: {
+      (void)CUnitScriptTask::Create(dispatch, &command->mArgs);
+      return;
+    }
 
-        EntitySetTemplate<Unit> transportSet;
-        EntitySetTemplate<Unit> mobileLandSet;
-        for (Entity* const entry : command->mUnitSet.mVec) {
-          Unit* const setUnit = static_cast<Unit*>(entry);
-          if (setUnit == nullptr) {
-            continue;
-          }
-          if (setUnit->IsInCategory("TRANSPORTATION")) {
-            (void)transportSet.Add(setUnit);
-          } else if (setUnit->IsInCategory("MOBILE") && setUnit->IsInCategory("LAND")) {
-            (void)mobileLandSet.Add(setUnit);
+    case EUnitCommandType::UNITCOMMAND_AssistCommander: {
+      (void)CUnitPodAssist::Create(dispatch);
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_KillSelf: {
+      dispatch->KillSelf();
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_DestroySelf: {
+      unit->Destroy();
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_Sacrifice: {
+      Unit* const target = CUnitCommand::GetTarget(command);
+      if (!target) {
+        return;
+      }
+      if (
+        target->IsBeingBuilt() || target->IsUnitState(UNITSTATE_Upgrading) ||
+        target->mVarDat.mMaxHealth > target->mVarDat.mHealth
+      ) {
+        (void)CUnitSacrificeTask::Create(dispatch, target);
+      } else if (target->IsUnitState(UNITSTATE_Building)) {
+        // A builder that is done but busy hands the sacrifice on to the unit
+        // it is building (0x00609A50-0x00609A9C: GetFocusEntity()->IsUnit()
+        // is the task's recipient, not the builder).
+        if (Entity* const focusEntity = target->GetFocusEntity(); focusEntity != nullptr) {
+          if (Unit* const focusUnit = focusEntity->IsUnit(); focusUnit != nullptr) {
+            (void)CUnitSacrificeTask::Create(dispatch, focusUnit);
           }
         }
+      }
+      return;
+    }
 
-        if (!transportSet.Empty() && !mobileLandSet.Empty()) {
-          SOCellPos cell;
-          const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
-          if (unit->IsInCategory("TRANSPORTATION")) {
-            (void)CUnitAssistMoveTask::Create(dispatch, &goal);
-          } else {
-            NewMoveTask(goal, dispatch, 1, nullptr, 0);
-          }
+    case EUnitCommandType::UNITCOMMAND_Pause: {
+      unit->SetPaused(!unit->mUnitVarDat.mIsPaused);
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_OverCharge: {
+      if (Entity* const targetEntity = command->mTarget.GetEntity()) {
+        CArmyImpl* const targetArmy = targetEntity->ArmyRef;
+        if (targetArmy == nullptr || unit->ArmyRef->GetAllianceWith(targetArmy) != EAlliance::ALLIANCE_Ally) {
+          (void)CAttackTargetTask::CreateRespectFormation(dispatch, &command->mTarget, nullptr, true);
         }
-        return;
+      }
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_AggressiveMove: {
+      CUnitCommand::Move(unit, command);
+      SOCellPos cell;
+      const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
+      (void)CUnitPatrolTask::Create(dispatch, &goal, true);
+      return;
+    }
+
+    case EUnitCommandType::UNITCOMMAND_AssistMove: {
+      // .c FormAggressiveMove label @ 752-777 + 789-877 (real enum = AssistMove):
+      // partition the command unit-set into transports vs mobile-land units; when
+      // both are non-empty, dispatch an assist-move (transport) or a move variant.
+      CUnitCommand::Move(unit, command);
+
+      EntitySetTemplate<Unit> transportSet;
+      EntitySetTemplate<Unit> mobileLandSet;
+      for (Entity* const entry : command->mUnitSet.mVec) {
+        Unit* const setUnit = static_cast<Unit*>(entry);
+        if (setUnit == nullptr) {
+          continue;
+        }
+        if (setUnit->IsInCategory("TRANSPORTATION")) {
+          (void)transportSet.Add(setUnit);
+        } else if (setUnit->IsInCategory("MOBILE") && setUnit->IsInCategory("LAND")) {
+          (void)mobileLandSet.Add(setUnit);
+        }
       }
 
-      case EUnitCommandType::UNITCOMMAND_SpecialAction: {
-        // .c AssistMove label @ 778-785 (real enum = SpecialAction).
-        const Wm3::Vec3f actionPos = command->mTarget.GetTargetPosGun(false);
-        const LuaPlus::LuaObject actionArg = SCR_ToLua<Wm3::Vector3<float>>(dispatch->mSim->mLuaState, actionPos);
-        unit->RunScript("OnSpecialAction", actionArg);
-        return;
+      if (!transportSet.Empty() && !mobileLandSet.Empty()) {
+        SOCellPos cell;
+        const SNavGoal goal(*CUnitCommand::GetPosition(command, unit, &cell));
+        if (unit->IsInCategory("TRANSPORTATION")) {
+          (void)CUnitAssistMoveTask::Create(dispatch, &goal);
+        } else {
+          NewMoveTask(goal, dispatch, 1, nullptr, 0);
+        }
       }
+      return;
+    }
 
-      default:
-        return;
+    case EUnitCommandType::UNITCOMMAND_SpecialAction: {
+      // .c AssistMove label @ 778-785 (real enum = SpecialAction).
+      const Wm3::Vec3f actionPos = command->mTarget.GetTargetPosGun(false);
+      const LuaPlus::LuaObject actionArg = SCR_ToLua<Wm3::Vector3<float>>(dispatch->mSim->mLuaState, actionPos);
+      unit->RunScript("OnSpecialAction", actionArg);
+      return;
+    }
+
+    default:
+      return;
     }
   }
 } // namespace
@@ -769,7 +785,9 @@ gpg::RType* IAiCommandDispatchImpl::sType = nullptr;
  * the startup built-task child allocation lane used by command queue dispatch
  * initialization.
  */
-IAiCommandDispatch* moho::AI_CreateCommandDispatch(Unit* const unit)
+IAiCommandDispatch* moho::AI_CreateCommandDispatch(
+  Unit* const unit
+)
 {
   auto* const dispatch = new (std::nothrow) IAiCommandDispatchImpl(unit);
   (void)new (std::nothrow) CUnitGetBuiltTask(static_cast<CCommandTask*>(dispatch));
@@ -791,7 +809,9 @@ IAiCommandDispatchImpl::IAiCommandDispatchImpl()
 /**
  * Address: 0x00598D00 (FUN_00598D00, ??0IAiCommandDispatchImpl@Moho@@QAE@PAVUnit@1@PAVCTaskThread@1@PAW4EAiResult@1@@Z)
  */
-IAiCommandDispatchImpl::IAiCommandDispatchImpl(Unit* const unit)
+IAiCommandDispatchImpl::IAiCommandDispatchImpl(
+  Unit* const unit
+)
   : CCommandTask(unit, unit ? unit->SimulationRef : nullptr)
   , IAiCommandDispatch()
   , Listener<EUnitCommandQueueStatus>()
@@ -837,7 +857,9 @@ IAiCommandDispatchImpl::~IAiCommandDispatchImpl()
 /**
  * Address: 0x00599030 (FUN_00599030, ?OnEvent@IAiCommandDispatchImpl@Moho@@UAEXW4EUnitCommandQueueStatus@2@@Z)
  */
-void IAiCommandDispatchImpl::OnEvent(const EUnitCommandQueueStatus event)
+void IAiCommandDispatchImpl::OnEvent(
+  const EUnitCommandQueueStatus event
+)
 {
   if (event == EUnitCommandQueueStatus::UCQS_CommandInserted) {
     if (mUnit != nullptr) {
@@ -903,7 +925,9 @@ int IAiCommandDispatchImpl::KillSelf()
  * What it does:
  * Applies the recovered navigation goal layer to the unit motion controller.
  */
-void IAiCommandDispatchImpl::SetNewTargetLayer(const SNavGoal& goal)
+void IAiCommandDispatchImpl::SetNewTargetLayer(
+  const SNavGoal& goal
+)
 {
   mUnit->UnitMotion->SetNewTargetLayer(goal.mLayer);
 }
@@ -915,7 +939,10 @@ void IAiCommandDispatchImpl::SetNewTargetLayer(const SNavGoal& goal)
  * Validates a carrier target, warns on illegal carriers, and schedules the
  * recovered carrier-land task lane.
  */
-void IAiCommandDispatchImpl::IssueCarrierLandTask(Unit* const unit, CCommandTask* const parentTask)
+void IAiCommandDispatchImpl::IssueCarrierLandTask(
+  Unit* const unit,
+  CCommandTask* const parentTask
+)
 {
   if (!unit || unit->IsDead()) {
     return;
@@ -945,8 +972,10 @@ int IAiCommandDispatchImpl::Execute()
       return static_cast<ETaskStatus>(1);
     }
 
-    if (mUnit->IsBeingBuilt() || mUnit->IsDead() || mUnit->IsUnitState(UNITSTATE_Attached) ||
-        mUnit->IsUnitState(UNITSTATE_BlockCommandQueue)) {
+    if (
+      mUnit->IsBeingBuilt() || mUnit->IsDead() || mUnit->IsUnitState(UNITSTATE_Attached) ||
+      mUnit->IsUnitState(UNITSTATE_BlockCommandQueue)
+    ) {
       return static_cast<ETaskStatus>(1);
     }
 
@@ -986,7 +1015,9 @@ int IAiCommandDispatchImpl::Execute()
     // call (0x006EDE70) with everything else, so a failed attack - such as a
     // point defense whose target left its range - drops the order.
     const EUnitCommandType commandType = currentCommand->mVarDat.mCmdType;
-    if (commandType == EUnitCommandType::UNITCOMMAND_Patrol || commandType == EUnitCommandType::UNITCOMMAND_FormPatrol) {
+    if (
+      commandType == EUnitCommandType::UNITCOMMAND_Patrol || commandType == EUnitCommandType::UNITCOMMAND_FormPatrol
+    ) {
       commandQueue->MoveFirstCommandToBackOfQueue();
     } else {
       commandQueue->RemoveFirstCommandFromQueue();
@@ -1009,8 +1040,10 @@ int IAiCommandDispatchImpl::Execute()
     return tryDispatchHead();
   }
 
-  if (mUnit != nullptr && mUnit->mUnitVarDat.mRepeatQueue != 0 &&
-      currentCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
+  if (
+    mUnit != nullptr && mUnit->mUnitVarDat.mRepeatQueue != 0 &&
+    currentCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_BuildFactory
+  ) {
     currentCommand->mVarDat.mCount = currentCommand->mVarDat.mMaxCount;
     currentCommand->mNeedsUpdate = true;
     commandQueue->MoveFirstCommandToBackOfQueue();
@@ -1022,8 +1055,10 @@ int IAiCommandDispatchImpl::Execute()
       commandQueue->RemoveFirstCommandFromQueue();
       return tryDispatchHead();
     }
-  } else if (currentCommand->mVarDat.mCmdType != EUnitCommandType::UNITCOMMAND_Patrol &&
-             currentCommand->mVarDat.mCmdType != EUnitCommandType::UNITCOMMAND_FormPatrol) {
+  } else if (
+    currentCommand->mVarDat.mCmdType != EUnitCommandType::UNITCOMMAND_Patrol &&
+    currentCommand->mVarDat.mCmdType != EUnitCommandType::UNITCOMMAND_FormPatrol
+  ) {
     commandQueue->RemoveFirstCommandFromQueue();
     return tryDispatchHead();
   }
@@ -1044,7 +1079,9 @@ int IAiCommandDispatchImpl::Execute()
 /**
  * Address: 0x006012B0 (FUN_006012B0, Moho::IAiCommandDispatchImpl::IssueCallTeleportTask)
  */
-void IAiCommandDispatchImpl::IssueCallTeleportTask(Unit* const unit)
+void IAiCommandDispatchImpl::IssueCallTeleportTask(
+  Unit* const unit
+)
 {
   if (!unit || unit->IsDead()) {
     return;
@@ -1061,7 +1098,9 @@ void IAiCommandDispatchImpl::IssueCallTeleportTask(Unit* const unit)
 /**
  * Address: 0x00601CE0 (FUN_00601CE0, Moho::IAiCommandDispatchImpl::IssueCallAirStagingPlatformTask)
  */
-void IAiCommandDispatchImpl::IssueCallAirStagingPlatformTask(Unit* const unit)
+void IAiCommandDispatchImpl::IssueCallAirStagingPlatformTask(
+  Unit* const unit
+)
 {
   if (!unit || unit->IsDead()) {
     return;
@@ -1078,7 +1117,9 @@ void IAiCommandDispatchImpl::IssueCallAirStagingPlatformTask(Unit* const unit)
 /**
  * Address: 0x006007C0 (FUN_006007C0, Moho::IAiCommandDispatchImpl::IssueCallLandTransportTask)
  */
-void IAiCommandDispatchImpl::IssueCallLandTransportTask(Unit* const unit)
+void IAiCommandDispatchImpl::IssueCallLandTransportTask(
+  Unit* const unit
+)
 {
   if (!unit || unit->IsDead()) {
     return;
@@ -1095,7 +1136,9 @@ void IAiCommandDispatchImpl::IssueCallLandTransportTask(Unit* const unit)
 /**
  * Address: 0x00622110 (FUN_00622110, Moho::IAiCommandDispatchImpl::IssueRefuelTask)
  */
-void IAiCommandDispatchImpl::IssueRefuelTask(Unit* const unit)
+void IAiCommandDispatchImpl::IssueRefuelTask(
+  Unit* const unit
+)
 {
   if (!unit || unit->IsDead() || unit->IsBeingBuilt()) {
     return;
@@ -1115,7 +1158,10 @@ void IAiCommandDispatchImpl::IssueRefuelTask(Unit* const unit)
  * Address: 0x00599330 (FUN_00599330, Moho::IAiCommandDispatchImpl::MemberConstruct)
  */
 void IAiCommandDispatchImpl::MemberConstruct(
-  gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result
+  gpg::ReadArchive&,
+  const int,
+  const gpg::RRef&,
+  gpg::SerConstructResult& result
 )
 {
   result.SetUnowned(MakeDispatchObjectRef(new IAiCommandDispatchImpl()), 0u);
@@ -1124,7 +1170,9 @@ void IAiCommandDispatchImpl::MemberConstruct(
 /**
  * Address: 0x00599C80 (FUN_00599C80, Moho::IAiCommandDispatchImpl::MemberDeserialize)
  */
-void IAiCommandDispatchImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+void IAiCommandDispatchImpl::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -1143,7 +1191,9 @@ void IAiCommandDispatchImpl::MemberDeserialize(gpg::ReadArchive* const archive)
 /**
  * Address: 0x00599CF0 (FUN_00599CF0, Moho::IAiCommandDispatchImpl::MemberSerialize)
  */
-void IAiCommandDispatchImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+void IAiCommandDispatchImpl::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;

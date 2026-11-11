@@ -47,12 +47,26 @@ namespace faf::remote
     ~CViewFrames() override;
 
     /** Renumbers the frames' ids per view from the next beat on (remote/ViewIdMap.h). */
-    void EnableIdMaps() noexcept { mIdMapsOn = true; }
-    [[nodiscard]] bool IdMapsOn() const noexcept { return mIdMapsOn; }
+    void EnableIdMaps() noexcept
+    {
+      mIdMapsOn = true;
+    }
+    [[nodiscard]] bool IdMapsOn() const noexcept
+    {
+      return mIdMapsOn;
+    }
     /** `army`'s id map (with `EnableIdMaps`, once a beat has been built): its team's, with teams. */
-    [[nodiscard]] const CViewIdMap& IdMap(std::int32_t army) const { return *mIdMaps[TeamSlotOf(static_cast<std::size_t>(army))]; }
+    [[nodiscard]] const CViewIdMap& IdMap(
+      std::int32_t army
+    ) const
+    {
+      return *mIdMaps[TeamSlotOf(static_cast<std::size_t>(army))];
+    }
     /** The views built so far (0 before the first beat). */
-    [[nodiscard]] std::size_t ViewCount() const noexcept { return mIdMaps.size(); }
+    [[nodiscard]] std::size_t ViewCount() const noexcept
+    {
+      return mIdMaps.size();
+    }
     /**
      * Plan WPR.35: `CViewPackets::EnableTeams` for a server: needs `EnableHeldFrames` without its check, and
      * `EnablePipeline`, which finishes a team's view and then its players' on one thread, as they share an id map.
@@ -69,7 +83,10 @@ namespace faf::remote
      * edits are queued there once (`SessionEdits`). Whoever sends the frames sends `session`'s pending record
      * to every player before the beat's frames (`OnViewFrames`).
      */
-    void EnableSessionTables(wire::CSessionTableWriters& session, const std::uint32_t statsEveryBeats = kStatsEveryBeats) noexcept
+    void EnableSessionTables(
+      wire::CSessionTableWriters& session,
+      const std::uint32_t statsEveryBeats = kStatsEveryBeats
+    ) noexcept
     {
       mSession = &session;
       mSharedRecords.SetSessionTables(&session);
@@ -79,7 +96,10 @@ namespace faf::remote
      * Plan WP11.5 (#178), on the sim thread before a beat's frames are encoded: the sim rate and the server's clock
      * (ms) the held frames' headers carry, for the client's beat clock.
      */
-    void SetFrameClock(const std::int32_t simRate, const std::uint32_t serverMs) noexcept
+    void SetFrameClock(
+      const std::int32_t simRate,
+      const std::uint32_t serverMs
+    ) noexcept
     {
       mFrameSimRate = simRate;
       mFrameServerMs = serverMs;
@@ -90,8 +110,14 @@ namespace faf::remote
       mPosesOn = true;
       mPoses.InstallHook(); // #118: the animation step marks the bones it changed
     }
-    [[nodiscard]] bool PosesOn() const noexcept { return mPosesOn; }
-    [[nodiscard]] const CPoseTracker& Poses() const noexcept { return mPoses; }
+    [[nodiscard]] bool PosesOn() const noexcept
+    {
+      return mPosesOn;
+    }
+    [[nodiscard]] const CPoseTracker& Poses() const noexcept
+    {
+      return mPoses;
+    }
     /**
      * The units `army`'s client holds after this beat (its own view's and, with teams, its team's), ascending. In
      * `OnViewReady` or after `FinishViews`.
@@ -101,23 +127,49 @@ namespace faf::remote
      * Plan WP8.2: for `ids` (ascending, as `HeldUnitIds` gives them) the pose order keys, lower first: by `cameras`
      * (the view's client's, WP11.1) when it has any, else its own army's units first. Unknown ids last.
      */
-    void HeldUnitKeys(std::size_t army, std::span<const std::uint32_t> ids, std::span<const SCameraReport> cameras, std::vector<float>& out) const;
+    void HeldUnitKeys(
+      std::size_t army,
+      std::span<const std::uint32_t> ids,
+      std::span<const SCameraReport> cameras,
+      std::vector<float>& out
+    ) const;
     /** `CSharedUnitStats::SetReadEvery`'s default: a unit's stats at most 0.3 s late (server `--stats-every`). */
     static constexpr std::uint32_t kStatsEveryBeats = 4;
     /** `--stats-every <beats>` (server and headless view bench): 1 reads every unit's stats every beat. */
-    void SetStatsEveryBeats(const std::uint32_t beats) noexcept { mSharedStats.SetReadEvery(beats); }
-    [[nodiscard]] wire::CSessionTableWriters* SessionTables() const noexcept { return mSession; }
-    [[nodiscard]] const CSessionEditCollector& SessionEdits() const noexcept { return mEdits; }
+    void SetStatsEveryBeats(
+      const std::uint32_t beats
+    ) noexcept
+    {
+      mSharedStats.SetReadEvery(beats);
+    }
+    [[nodiscard]] wire::CSessionTableWriters* SessionTables() const noexcept
+    {
+      return mSession;
+    }
+    [[nodiscard]] const CSessionEditCollector& SessionEdits() const noexcept
+    {
+      return mEdits;
+    }
     /** The sim of the last beat built (null before it); for checks that run on the sim thread. */
-    [[nodiscard]] moho::Sim* LastSim() const noexcept { return mLastSim; }
+    [[nodiscard]] moho::Sim* LastSim() const noexcept
+    {
+      return mLastSim;
+    }
 
     /** The last beat's frame for `army`. */
-    [[nodiscard]] const wire::SViewFrame& Frame(std::int32_t army) const { return mFrames[static_cast<std::size_t>(army)]; }
+    [[nodiscard]] const wire::SViewFrame& Frame(
+      std::int32_t army
+    ) const
+    {
+      return mFrames[static_cast<std::size_t>(army)];
+    }
     /**
      * The frame `army` had the beat before (moved aside, not copied); null before its second
      * beat. A client that received every frame holds it: the server's baseline without loss.
      */
-    [[nodiscard]] const wire::SViewFrame* PreviousFrame(std::int32_t army) const
+    [[nodiscard]] const wire::SViewFrame* PreviousFrame(
+      std::int32_t army
+    ) const
     {
       const auto index = static_cast<std::size_t>(army);
       return mHavePrevious[index] ? &mPreviousFrames[index] : nullptr;
@@ -129,14 +181,19 @@ namespace faf::remote
      * `HeldCount` and `EncodeHeldFrame`. With `check` every view's frame is also built whole
      * (with its own id map) and compared, record by record and byte by byte (`HeldMismatches`).
      */
-    void EnableHeldFrames(const bool check = false) noexcept
+    void EnableHeldFrames(
+      const bool check = false
+    ) noexcept
     {
       mHeldOn = true;
       mHeldCheck = check;
       SetDirectUpdates(true);
       SetSharedRecords(&mSharedRecords);
     }
-    [[nodiscard]] bool HeldFramesOn() const noexcept { return mHeldOn; }
+    [[nodiscard]] bool HeldFramesOn() const noexcept
+    {
+      return mHeldOn;
+    }
     /**
      * Plan WPR.35, with `EnableHeldFrames` and without its check: what's left of a view's beat once
      * its records are applied doesn't read the sim, so `threads` threads do it while the sim goes on
@@ -145,13 +202,27 @@ namespace faf::remote
      * `OnViewReady`.
      */
     void EnablePipeline(unsigned int threads);
-    [[nodiscard]] bool PipelineOn() const noexcept { return mJobs != nullptr; }
+    [[nodiscard]] bool PipelineOn() const noexcept
+    {
+      return mJobs != nullptr;
+    }
     /** Waits for the last beat's view work. Returns the seconds waited. */
     double FinishViews();
     /** The records in `army`'s last frame (with `EnableHeldFrames`). */
-    [[nodiscard]] std::size_t HeldCount(const std::int32_t army) const { return mHeld[static_cast<std::size_t>(army)].count; }
-    /** `--view-dump`: from now on, every 2000 beats, what each player's client holds, by sim id with a hash of each record. */
-    void SetViewDump(std::FILE* const file) noexcept { mViewDump = file; }
+    [[nodiscard]] std::size_t HeldCount(
+      const std::int32_t army
+    ) const
+    {
+      return mHeld[static_cast<std::size_t>(army)].count;
+    }
+    /** `--view-dump`: from now on, every 2000 beats, what each player's client holds, by sim id with a hash of each
+     * record. */
+    void SetViewDump(
+      std::FILE* const file
+    ) noexcept
+    {
+      mViewDump = file;
+    }
     /** `army`'s last frame against the one before, as `wire::EncodeFrame` writes it. */
     [[nodiscard]] bool EncodeHeldFrame(std::int32_t army, wire::BitWriter& writer) const;
     /**
@@ -172,7 +243,12 @@ namespace faf::remote
     [[nodiscard]] std::uint64_t HeldMismatches() const noexcept;
 
     /** Records `army`'s client holds that its last frame withheld. */
-    [[nodiscard]] std::uint32_t Withheld(std::int32_t army) const { return mWithheld[static_cast<std::size_t>(army)]; }
+    [[nodiscard]] std::uint32_t Withheld(
+      std::int32_t army
+    ) const
+    {
+      return mWithheld[static_cast<std::size_t>(army)];
+    }
 
   protected:
     void OnViewPackets(moho::Sim& sim) override;
@@ -181,24 +257,54 @@ namespace faf::remote
      * The views' frames of a sealed beat are ready (`Frame`). With a pipeline they are not yet:
      * this is the last call of the beat that may read the sim, and the frames come later.
      */
-    virtual void OnViewFrames(moho::Sim& sim) { (void)sim; }
+    virtual void OnViewFrames(
+      moho::Sim& sim
+    )
+    {
+      (void)sim;
+    }
     /**
      * Other work of the beat that reads the stopped sim and nothing of the frames: on the sim thread,
      * before the frames, says how many jobs there are; `RunSideJob` then runs each on the workers in
      * the frames' batch, so work that mostly waits on memory overlaps theirs (plan #118).
      */
-    virtual std::size_t PrepareSideJobs(moho::Sim& sim) { (void)sim; return 0u; }
-    virtual void RunSideJob(const std::size_t index) { (void)index; }
+    virtual std::size_t PrepareSideJobs(
+      moho::Sim& sim
+    )
+    {
+      (void)sim;
+      return 0u;
+    }
+    virtual void RunSideJob(
+      const std::size_t index
+    )
+    {
+      (void)index;
+    }
     /** With a pipeline, on one of its threads: `army`'s frame is ready. Must not read the sim. */
-    virtual void OnViewReady(const std::size_t army) { (void)army; }
+    virtual void OnViewReady(
+      const std::size_t army
+    )
+    {
+      (void)army;
+    }
     /** With a pipeline, on the sim thread: every view's `OnViewReady` of the last beat is over. */
     virtual void OnViewsFinished() {}
 
-    void OnBeatStarting() override { (void)FinishViews(); }
+    void OnBeatStarting() override
+    {
+      (void)FinishViews();
+    }
     /** The beat `OnViewPackets` last handled. */
-    [[nodiscard]] std::uint32_t ViewBeat() const noexcept { return mViewBeat; }
+    [[nodiscard]] std::uint32_t ViewBeat() const noexcept
+    {
+      return mViewBeat;
+    }
     /** How long the sim thread waited for the last beat's view work (in `OnViewsFinished`). */
-    [[nodiscard]] double ViewWaitSeconds() const noexcept { return mViewWaitSeconds; }
+    [[nodiscard]] double ViewWaitSeconds() const noexcept
+    {
+      return mViewWaitSeconds;
+    }
 
   private:
     /** One view's frame kept between beats, and what its last beat changed. */
@@ -206,13 +312,13 @@ namespace faf::remote
     {
       // What the client holds is the world's record, unless the view's differs (`ownSlot`).
       gpg::core::ChunkedVector<wire::SEntityRecord> own; // in the view's ids
-      std::vector<std::uint32_t> ownSlot;       // per slot: index into `own`, or `kNoOwn`
-      std::vector<std::uint32_t> ownFree;       // elements of `own` no slot uses
-      std::vector<std::uint8_t> sent;           // per slot: the client holds a record
-      std::vector<std::uint8_t> keep;           // per slot: in this beat's frame
-      std::vector<std::uint64_t> references;    // per slot: a filter of the sim ids the record names
-      std::vector<std::uint32_t> referrers;     // the slots with a filter, and some that no longer have one
-      std::vector<std::uint8_t> isReferrer;     // per slot: in `referrers`
+      std::vector<std::uint32_t> ownSlot;                // per slot: index into `own`, or `kNoOwn`
+      std::vector<std::uint32_t> ownFree;                // elements of `own` no slot uses
+      std::vector<std::uint8_t> sent;                    // per slot: the client holds a record
+      std::vector<std::uint8_t> keep;                    // per slot: in this beat's frame
+      std::vector<std::uint64_t> references;             // per slot: a filter of the sim ids the record names
+      std::vector<std::uint32_t> referrers;              // the slots with a filter, and some that no longer have one
+      std::vector<std::uint8_t> isReferrer;              // per slot: in `referrers`
       std::size_t count = 0;
       std::uint32_t frameId = 0;
       std::uint32_t baselineId = wire::kNoBaseline;
@@ -263,7 +369,7 @@ namespace faf::remote
     std::vector<std::uint32_t> mUnitIds; // this beat's units' ids (the entity index's first entries)
     bool mPosesOn = false;
     CPoseTracker mPoses;
-    std::int32_t mFrameSimRate = 0;   // `SetFrameClock`
+    std::int32_t mFrameSimRate = 0; // `SetFrameClock`
     std::uint32_t mFrameServerMs = 0;
     std::vector<std::unique_ptr<CViewFrameBuilder>> mBuilders;
     std::vector<SHeldView> mHeld;
@@ -283,9 +389,9 @@ namespace faf::remote
       bool readEveryBeat; // the answer depends on more than the entity (`ViewsFollowFactsAlone`)
       bool leaving;       // in its destroy pass when last read: the sim may have let go of it since
     };
-    std::vector<SEntityKeep> mEntityIndex;          // the sim's entities by id, this beat
-    std::vector<moho::Entity*> mEntityPointers;     // the same entities
-    std::vector<SEntityKeep> mLastEntityIndex;      // and last beat
+    std::vector<SEntityKeep> mEntityIndex;      // the sim's entities by id, this beat
+    std::vector<moho::Entity*> mEntityPointers; // the same entities
+    std::vector<SEntityKeep> mLastEntityIndex;  // and last beat
     std::vector<moho::Entity*> mLastEntityPointers;
     /** An entry of `mEntityIndex` whose answer is worked out this beat. */
     struct SEntityRead
@@ -305,7 +411,7 @@ namespace faf::remote
     std::vector<std::uint32_t> mLeavingEntities; // ids of `SEntityKeep::leaving`
     std::vector<std::uint32_t> mGoneEntities;    // those no longer in the sim, this beat
     std::vector<SKeepChange> mKeepChanges;
-    std::uint64_t mEntityIndexMismatches = 0;       // the check: answers kept that a read would change
+    std::uint64_t mEntityIndexMismatches = 0;     // the check: answers kept that a read would change
     std::vector<std::uint32_t> mLiveCommands;     // the sim's commands by id, this beat
     std::vector<std::uint32_t> mLastCommands;     // and last beat
     std::vector<std::uint32_t> mReleasedCommands; // last beat's that are gone

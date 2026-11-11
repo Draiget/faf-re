@@ -54,7 +54,10 @@ namespace
     }
 })";
 
-  TEST(UnitPreset, ReadsFafmesFile)
+  TEST(
+    UnitPreset,
+    ReadsFafmesFile
+  )
   {
     std::vector<SaveUnit> units;
     float centre[3];
@@ -72,7 +75,10 @@ namespace
     EXPECT_FLOAT_EQ(centre[2], 310.0f);
   }
 
-  TEST(UnitPreset, WritesWhatItReads)
+  TEST(
+    UnitPreset,
+    WritesWhatItReads
+  )
   {
     std::vector<SaveUnit> units;
     float centre[3];
@@ -96,7 +102,10 @@ namespace
     EXPECT_FALSE(faf::editor::UnitsFromScunits("{ \"Markers\": [] }", again, centreAgain, error));
   }
 
-  TEST(UnitPreset, UnitsOffTheMapMoveTogether)
+  TEST(
+    UnitPreset,
+    UnitsOffTheMapMoveTogether
+  )
   {
     std::vector<SaveUnit> units;
     float centre[3];

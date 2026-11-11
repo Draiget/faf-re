@@ -33,7 +33,10 @@ namespace faf::editor
     /** Test runs (`/thumbdump`): the first made thumbnail whose blueprint has `name` in it, saved as a 32-bit .bmp. */
     bool Save(const std::string& name, const std::string& file, std::string& blueprint);
 
-    [[nodiscard]] std::size_t Count() const noexcept { return mEntries.size(); }
+    [[nodiscard]] std::size_t Count() const noexcept
+    {
+      return mEntries.size();
+    }
 
   private:
     struct Entry

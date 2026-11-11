@@ -21,7 +21,12 @@ namespace gpg::gal
      * `BuildCursorIcon` (0x008F8130) builds it: rows bottom-up, in the DIB's
      * B,G,R,A order.
      */
-    HICON BuildCursorIcon(const int hotspotX, const int hotspotY, Texture& texture, const bool rgbaSource)
+    HICON BuildCursorIcon(
+      const int hotspotX,
+      const int hotspotY,
+      Texture& texture,
+      const bool rgbaSource
+    )
     {
 #if !FAFRE_PLATFORM_WINDOWS
       // The window system makes the cursor (platform/posix/Win32WindowPosix.h, issue #256) from the
@@ -46,8 +51,9 @@ namespace gpg::gal
 
       HDC const dc = ::GetDC(nullptr);
       void* dibPixels = nullptr;
-      HBITMAP const colorBitmap =
-        ::CreateDIBSection(dc, reinterpret_cast<const BITMAPINFO*>(&bitmapInfo), DIB_RGB_COLORS, &dibPixels, nullptr, 0U);
+      HBITMAP const colorBitmap = ::CreateDIBSection(
+        dc, reinterpret_cast<const BITMAPINFO*>(&bitmapInfo), DIB_RGB_COLORS, &dibPixels, nullptr, 0U
+      );
       ::ReleaseDC(nullptr, dc);
       if (colorBitmap == nullptr || dibPixels == nullptr) {
         return nullptr;
@@ -63,8 +69,9 @@ namespace gpg::gal
           reinterpret_cast<const std::uint32_t*>(sourceBytes + static_cast<std::size_t>(lock.pitch) * (31U - y));
         for (std::uint32_t x = 0U; x < 32U; ++x) {
           const std::uint32_t pixel = sourceRow[x];
-          destination[y * 32U + x] =
-            rgbaSource ? ((pixel & 0xFF00FF00U) | ((pixel & 0x000000FFU) << 16U) | ((pixel & 0x00FF0000U) >> 16U)) : pixel;
+          destination[y * 32U + x] = rgbaSource
+            ? ((pixel & 0xFF00FF00U) | ((pixel & 0x000000FFU) << 16U) | ((pixel & 0x00FF0000U) >> 16U))
+            : pixel;
         }
       }
       static_cast<void>(texture.Unlock(lock));
@@ -102,10 +109,14 @@ namespace gpg::gal
     mCursorIcon = nullptr;
   }
 
-  HCURSOR WindowsCursor::SetCursor(const CursorContext& context)
+  HCURSOR WindowsCursor::SetCursor(
+    const CursorContext& context
+  )
   {
     HICON const icon = (context.texture_ != nullptr)
-      ? BuildCursorIcon(context.hotspotX_, context.hotspotY_, *context.texture_, mIsRgba != nullptr && mIsRgba(*context.texture_))
+      ? BuildCursorIcon(
+          context.hotspotX_, context.hotspotY_, *context.texture_, mIsRgba != nullptr && mIsRgba(*context.texture_)
+        )
       : nullptr;
     HICON const previousIcon = mCursorIcon;
     mCursorIcon = icon;
@@ -126,7 +137,9 @@ namespace gpg::gal
     return ::SetCursor(mCursorIcon);
   }
 
-  int WindowsCursor::ShowCursor(const bool show)
+  int WindowsCursor::ShowCursor(
+    const bool show
+  )
   {
     if (mCursorIcon == nullptr) {
       backend::ThrowError("WindowsCursor.cpp", __LINE__, "attempt to use uninitialized cursor");

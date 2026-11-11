@@ -14,8 +14,8 @@ namespace moho
 {
   namespace
   {
-    constexpr std::int32_t kSilhouetteQuadPrimitiveToken = 5;   // D3DPT_TRIANGLESTRIP
-    constexpr std::int32_t kSilhouetteQuadLastVertexIndex = 3;  // four-vertex quad
+    constexpr std::int32_t kSilhouetteQuadPrimitiveToken = 5;  // D3DPT_TRIANGLESTRIP
+    constexpr std::int32_t kSilhouetteQuadLastVertexIndex = 3; // four-vertex quad
   } // namespace
 
   /**
@@ -58,9 +58,7 @@ namespace moho
     ID3DDeviceResources* const resources = device->GetResources();
 
     CD3DVertexFormat* const vertexFormat = resources->GetVertexFormat(kScreenQuadVertexFormatToken);
-    mQuadVertexSheet.reset(
-      resources->NewVertexSheet(kScreenQuadStreamUsage, kScreenQuadVertexCount, vertexFormat)
-    );
+    mQuadVertexSheet.reset(resources->NewVertexSheet(kScreenQuadStreamUsage, kScreenQuadVertexCount, vertexFormat));
 
     const auto headWidth = static_cast<float>(static_cast<unsigned int>(device->GetHeadWidth(0U)));
     const auto headHeight = static_cast<float>(static_cast<unsigned int>(device->GetHeadHeight(0U)));
@@ -88,7 +86,9 @@ namespace moho
    * bit is set. Standard MSVC8 scalar deleting destructor thunk at vftable
    * slot 0.
    */
-  void* Silhouette::ScalarDeletingDestructor(const std::uint8_t deleteFlags)
+  void* Silhouette::ScalarDeletingDestructor(
+    const std::uint8_t deleteFlags
+  )
   {
     this->~Silhouette();
     if ((deleteFlags & 0x01u) != 0u) {
@@ -115,7 +115,10 @@ namespace moho
    * IDA names `a2` as the instance and puts the camera in `edi`, so `this` is
    * the stack argument here.
    */
-  void Silhouette::Render(const GeomCamera3& camera, const std::int32_t renderTargetIndex)
+  void Silhouette::Render(
+    const GeomCamera3& camera,
+    const std::int32_t renderTargetIndex
+  )
   {
     MeshRenderer* const renderer = MeshRenderer::GetInstance();
     CD3DDevice* const device = D3D_GetDevice();

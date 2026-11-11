@@ -4,16 +4,30 @@ namespace faf::netlink
 {
   namespace
   {
-    constexpr unsigned char kPacketData = 4; // PT_Data
+    constexpr unsigned char kPacketData = 4;  // PT_Data
     constexpr unsigned char kPacketTypes = 9; // PT_Connect .. PT_NATTraversal
-    constexpr std::size_t kHeaderSize = 15;  // kNetPacketHeaderSize
+    constexpr std::size_t kHeaderSize = 15;   // kNetPacketHeaderSize
 
-    std::uint16_t U16(const unsigned char* p) { return static_cast<std::uint16_t>(p[0] | (p[1] << 8)); }
+    std::uint16_t U16(
+      const unsigned char* p
+    )
+    {
+      return static_cast<std::uint16_t>(p[0] | (p[1] << 8));
+    }
     // Serial and sequence numbers wrap at 16 bits.
-    std::int32_t Diff16(const std::uint16_t a, const std::uint16_t b) { return static_cast<std::int16_t>(a - b); }
+    std::int32_t Diff16(
+      const std::uint16_t a,
+      const std::uint16_t b
+    )
+    {
+      return static_cast<std::int16_t>(a - b);
+    }
   } // namespace
 
-  void GameCounters::OnSent(const unsigned char* d, const std::size_t n)
+  void GameCounters::OnSent(
+    const unsigned char* d,
+    const std::size_t n
+  )
   {
     ++sent;
     if (n < kHeaderSize || d[0] != kPacketData) {
@@ -28,7 +42,10 @@ namespace faf::netlink
     mTopSeq = seq;
   }
 
-  void GameCounters::OnReceived(const unsigned char* d, const std::size_t n)
+  void GameCounters::OnReceived(
+    const unsigned char* d,
+    const std::size_t n
+  )
   {
     ++received;
     if (n < kHeaderSize || d[0] >= kPacketTypes) {

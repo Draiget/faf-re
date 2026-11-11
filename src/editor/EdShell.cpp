@@ -36,7 +36,11 @@ namespace faf::editor
     const ImVec4 kStopRed(0.62f, 0.22f, 0.20f, 1.0f);
   } // namespace
 
-  EdShell::EdShell(EdLog& log, EdPlay& play, EdDocument& document)
+  EdShell::EdShell(
+    EdLog& log,
+    EdPlay& play,
+    EdDocument& document
+  )
     : mBrowser(play, document)
     , mLog(log)
     , mPlay(play)
@@ -101,7 +105,8 @@ namespace faf::editor
       return;
     case 4:
       if (!mPlay.Active()) {
-        // The warnings logged meanwhile: Lua errors (their text names a .lua file) first, the map's own files as errors.
+        // The warnings logged meanwhile: Lua errors (their text names a .lua file) first, the map's own files as
+        // errors.
         mTestRunIssues.clear();
         const std::string folder = MapDisplayName(mTestRunMap);
         for (const std::string& line : mLog.EndCapture()) {
@@ -125,15 +130,21 @@ namespace faf::editor
           }
           mTestRunIssues.push_back(std::move(issue));
         }
-        std::stable_sort(mTestRunIssues.begin(), mTestRunIssues.end(),
-                         [](const CheckIssue& a, const CheckIssue& b) { return static_cast<int>(a.level) < static_cast<int>(b.level); });
+        std::stable_sort(mTestRunIssues.begin(), mTestRunIssues.end(), [](const CheckIssue& a, const CheckIssue& b) {
+          return static_cast<int>(a.level) < static_cast<int>(b.level);
+        });
         int counts[3] = {0, 0, 0};
         for (const CheckIssue& issue : mTestRunIssues) {
           ++counts[static_cast<int>(issue.level)];
         }
-        gpg::Logf("editor: test run done: %d errors (the map's files), %d warnings (other Lua), %d notes", counts[0], counts[1], counts[2]);
-        mTestRunSummary = "Last test run: " + std::to_string(counts[0]) + " errors, " + std::to_string(counts[1]) + " warnings, " +
-                          std::to_string(counts[2]) + " notes";
+        gpg::Logf(
+          "editor: test run done: %d errors (the map's files), %d warnings (other Lua), %d notes",
+          counts[0],
+          counts[1],
+          counts[2]
+        );
+        mTestRunSummary = "Last test run: " + std::to_string(counts[0]) + " errors, " + std::to_string(counts[1]) +
+          " warnings, " + std::to_string(counts[2]) + " notes";
         for (const CheckIssue& issue : mTestRunIssues) {
           if (issue.level != CheckIssue::Level::Note) {
             gpg::Logf("editor: test run %s: %s", CheckLevelName(issue.level), issue.text.c_str());
@@ -173,9 +184,9 @@ namespace faf::editor
     ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + toolbarHeight));
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, viewport->WorkSize.y - statusHeight - toolbarHeight));
     ImGui::SetNextWindowViewport(viewport->ID);
-    constexpr ImGuiWindowFlags kHostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
-                                            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
-                                            ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBackground;
+    constexpr ImGuiWindowFlags kHostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
+      ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBackground;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
@@ -208,7 +219,8 @@ namespace faf::editor
       }
     }
     if (const ImGuiDockNode* const middle = ImGui::DockBuilderGetCentralNode(dockspaceId); middle != nullptr) {
-      mGameView = ImVec4(middle->Pos.x - viewport->Pos.x, middle->Pos.y - viewport->Pos.y, middle->Size.x, middle->Size.y);
+      mGameView =
+        ImVec4(middle->Pos.x - viewport->Pos.x, middle->Pos.y - viewport->Pos.y, middle->Size.x, middle->Size.y);
     }
     ImGui::End();
 
@@ -223,14 +235,20 @@ namespace faf::editor
         }
         // In front of a play the view draws them with the play's own rules (WPE.51), so this is the same short wait.
         char text[200];
-        (void)std::snprintf(text, sizeof(text), "Loading models: trees, rocks, wrecks and units appear when the game's blueprints are ready (%.0f s)",
-                            now - loadingSince);
+        (void)std::snprintf(
+          text,
+          sizeof(text),
+          "Loading models: trees, rocks, wrecks and units appear when the game's blueprints are ready (%.0f s)",
+          now - loadingSince
+        );
         ImDrawList* const dl = ImGui::GetForegroundDrawList();
         const ImVec2 size = ImGui::CalcTextSize(text);
         const float pad = 8.0f;
         const float spinner = size.y;
         const float width = spinner + pad * 3.0f + size.x;
-        const ImVec2 at(viewport->Pos.x + mGameView.x + (mGameView.z - width) * 0.5f, viewport->Pos.y + mGameView.y + 12.0f);
+        const ImVec2 at(
+          viewport->Pos.x + mGameView.x + (mGameView.z - width) * 0.5f, viewport->Pos.y + mGameView.y + 12.0f
+        );
         dl->AddRectFilled(at, ImVec2(at.x + width, at.y + size.y + pad * 2.0f), IM_COL32(20, 22, 28, 225), 6.0f);
         dl->AddRect(at, ImVec2(at.x + width, at.y + size.y + pad * 2.0f), IM_COL32(240, 180, 70, 200), 6.0f);
         // A turning arc.
@@ -241,7 +259,9 @@ namespace faf::editor
         dl->AddText(ImVec2(at.x + pad * 2.0f + spinner, at.y + pad), IM_COL32(235, 235, 235, 255), text);
       } else {
         if (loadingSince >= 0.0 && !playing) {
-          gpg::Logf("editor: the map's models were loading for %.1f s (the view said so)", ImGui::GetTime() - loadingSince);
+          gpg::Logf(
+            "editor: the map's models were loading for %.1f s (the view said so)", ImGui::GetTime() - loadingSince
+          );
         }
         loadingSince = -1.0;
       }
@@ -316,7 +336,9 @@ namespace faf::editor
     DrawStatusBar();
   }
 
-  void EdShell::BuildDefaultLayout(const unsigned int dockspaceId)
+  void EdShell::BuildDefaultLayout(
+    const unsigned int dockspaceId
+  )
   {
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
     ImGui::DockBuilderRemoveNode(dockspaceId);
@@ -338,15 +360,17 @@ namespace faf::editor
     ImGui::DockBuilderFinish(dockspaceId);
   }
 
-  void EdShell::DrawToolbar(const float height)
+  void EdShell::DrawToolbar(
+    const float height
+  )
   {
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, height));
     ImGui::SetNextWindowViewport(viewport->ID);
-    constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking |
-                                        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
-                                        ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollbar;
+    constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+      ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollbar;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 6.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
@@ -390,7 +414,12 @@ namespace faf::editor
         if (playing) {
           draw->AddRectFilled(ImVec2(at.x + left, cy - r), ImVec2(at.x + left + 2.0f * r, cy + r), white, 1.5f);
         } else {
-          draw->AddTriangleFilled(ImVec2(at.x + left, cy - r * 1.1f), ImVec2(at.x + left, cy + r * 1.1f), ImVec2(at.x + left + 2.0f * r, cy), white);
+          draw->AddTriangleFilled(
+            ImVec2(at.x + left, cy - r * 1.1f),
+            ImVec2(at.x + left, cy + r * 1.1f),
+            ImVec2(at.x + left + 2.0f * r, cy),
+            white
+          );
         }
         const char* const word = playing ? "Stop" : "Play";
         const float textY = at.y + (size.y - ImGui::GetTextLineHeight()) * 0.5f;
@@ -412,7 +441,10 @@ namespace faf::editor
         }
         ImGui::PopStyleVar();
         ImGui::PopStyleColor(3);
-        tip("Play options: start slot, faction, AI opponents, fog, prebuilt units; while playing, hide the fog or watch as an observer");
+        tip(
+          "Play options: start slot, faction, AI opponents, fog, prebuilt units; while playing, hide the fog or watch "
+          "as an observer"
+        );
         ImGui::SetNextWindowSize(ImVec2(ImGui::GetFontSize() * 22.0f, 0.0f));
         if (ImGui::BeginPopup("##playsetuppopup")) {
           const std::vector<std::string>& playMaps = mPlay.Maps();
@@ -429,19 +461,25 @@ namespace faf::editor
         if (playing) {
           ImGui::SameLine();
           const bool editorView = mEditorViewInPlay;
-          ImGui::PushStyleColor(ImGuiCol_Button, editorView ? ImVec4(0.75f, 0.50f, 0.15f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_Button));
+          ImGui::PushStyleColor(
+            ImGuiCol_Button, editorView ? ImVec4(0.75f, 0.50f, 0.15f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_Button)
+          );
           if (ImGui::Button(editorView ? "Editor view  F6" : "Game view  F6", ImVec2(0.0f, buttonHeight))) {
             mEditorViewInPlay = !mEditorViewInPlay;
             gpg::Logf("editor: the toolbar: the %s view", mEditorViewInPlay ? "editor's" : "game's");
           }
           ImGui::PopStyleColor();
-          tip(editorView ? "The editor's view of the map, the play running on behind it: F6 for the game's view"
-                         : "The game's view: F6 for the editor's view of the map (the play keeps running)");
+          tip(
+            editorView ? "The editor's view of the map, the play running on behind it: F6 for the game's view"
+                       : "The game's view: F6 for the editor's view of the map (the play keeps running)"
+          );
           if (editorView) {
             ImGui::SameLine();
             ImGui::Checkbox("Game units", &mTools.ShowGameUnits());
-            tip("The play's own units in the editor's view: shown (click one to select it, drag to move it, change it in "
-                "Properties) or hidden");
+            tip(
+              "The play's own units in the editor's view: shown (click one to select it, drag to move it, change it in "
+              "Properties) or hidden"
+            );
           }
         }
       }
@@ -502,29 +540,43 @@ namespace faf::editor
       if (toggle("Grid", EdIcon::Grid, mTools.ShowGrid())) {
         mTools.SetShowGrid(!mTools.ShowGrid());
       }
-      tip("The build grid on the ground around the cursor: cells of the step's size, one unit being the cell units are built on");
+      tip(
+        "The build grid on the ground around the cursor: cells of the step's size, one unit being the cell units are "
+        "built on"
+      );
       ImGui::SameLine();
       if (toggle("Snap", EdIcon::Magnet, mTools.SnapToGrid())) {
         mTools.SetSnapToGrid(!mTools.SnapToGrid());
       }
-      tip("Markers and props placed or dragged go to the middle of a grid cell (mass and hydrocarbon points always sit on half units, as the game's saves place them)");
+      tip(
+        "Markers and props placed or dragged go to the middle of a grid cell (mass and hydrocarbon points always sit "
+        "on half units, as the game's saves place them)"
+      );
       ImGui::SameLine();
       if (toggle("On ground", EdIcon::OnGround, mTools.KeepOnGround())) {
         mTools.SetKeepOnGround(!mTools.KeepOnGround());
       }
-      tip("The move arrows keep markers and props on the ground when they move across it; off, they keep their height. "
-          "Nothing is moved under the ground either way.");
+      tip(
+        "The move arrows keep markers and props on the ground when they move across it; off, they keep their height. "
+        "Nothing is moved under the ground either way."
+      );
       ImGui::SameLine();
       if (toggle("Slope", EdIcon::Slope, mTools.ShowSlope())) {
         mTools.SetShowSlope(!mTools.ShowSlope());
       }
-      tip("Each cell's slope as the game's pathing reads it (its steepest edge): yellow above 0.25 (too steep to build on), orange "
-          "above 0.5, red above 0.75 (steeper than most land units climb)");
+      tip(
+        "Each cell's slope as the game's pathing reads it (its steepest edge): yellow above 0.25 (too steep to build "
+        "on), orange "
+        "above 0.5, red above 0.75 (steeper than most land units climb)"
+      );
       ImGui::SameLine();
       if (toggle("Km grid", EdIcon::Ruler, mTools.ShowKmGrid())) {
         mTools.SetShowKmGrid(!mTools.ShowKmGrid());
       }
-      tip("Lines every kilometre (51.2 units, the game's scale) and the map's centre lines. Alt+drag in the view measures a distance.");
+      tip(
+        "Lines every kilometre (51.2 units, the game's scale) and the map's centre lines. Alt+drag in the view "
+        "measures a distance."
+      );
       ImGui::SameLine();
       {
         static constexpr float kSteps[] = {0.5f, 1.0f, 2.0f, 4.0f, 8.0f};
@@ -553,21 +605,30 @@ namespace faf::editor
         mTools.EditingBorder() = !mTools.EditingBorder();
         mShowProperties = mShowProperties || mTools.EditingBorder();
       }
-      tip(mTools.EditingBorder() ? "Map border: on. Drag its edges in the view; its settings are in the Properties panel"
-                                 : "Map border (the playable area): edit it from any tool");
+      tip(
+        mTools.EditingBorder() ? "Map border: on. Drag its edges in the view; its settings are in the Properties panel"
+                               : "Map border (the playable area): edit it from any tool"
+      );
       divider();
       // What the view shows, one toggle per kind (Blender's object type visibility); hidden things aren't picked.
       // One joined row (1 px apart, rounded at its ends), as Blender's and the image editors' toggle groups.
       if (IconToggle("##showprops", EdIcon::Tree, mTools.ShowProps(), EdSegment::First)) {
         mTools.ShowProps() = !mTools.ShowProps();
       }
-      tip(mTools.ShowProps() ? "Props shown (trees, rocks, wrecks): click to hide them" : "Props hidden: click to show them");
+      tip(
+        mTools.ShowProps() ? "Props shown (trees, rocks, wrecks): click to hide them"
+                           : "Props hidden: click to show them"
+      );
       ImGui::SameLine(0.0f, 1.0f);
       if (IconToggle("##showunits", EdIcon::Tank, mTools.ShowUnits(), EdSegment::Middle)) {
         mTools.ShowUnits() = !mTools.ShowUnits();
       }
-      tip(mTools.ShowUnits() ? "Units shown (the armies' and civilians' units): click to hide them" : "Units hidden: click to show them");
-      // Markers by the palette's groups: shown while none of the group's types is hidden; a click shows or hides all of them.
+      tip(
+        mTools.ShowUnits() ? "Units shown (the armies' and civilians' units): click to hide them"
+                           : "Units hidden: click to show them"
+      );
+      // Markers by the palette's groups: shown while none of the group's types is hidden; a click shows or hides all of
+      // them.
       struct MarkerGroup
       {
         const char* group;
@@ -615,9 +676,12 @@ namespace faf::editor
         const std::string folder = MapDisplayName(facts.scenarioPath);
         const char* const edited = mDocument.Modified() ? "  edited" : "";
         const ImGuiStyle& style = ImGui::GetStyle();
-        const float width = ImGui::CalcTextSize(name.c_str()).x + style.ItemSpacing.x + ImGui::CalcTextSize(folder.c_str()).x +
-                            (mDocument.Modified() ? 4.0f + ImGui::CalcTextSize(edited).x : 0.0f) + Em(16.0f) + scaleWidth;
-        ImGui::SameLine(std::max(ImGui::GetCursorPosX() + Em(16.0f), ImGui::GetWindowWidth() - width - style.WindowPadding.x));
+        const float width = ImGui::CalcTextSize(name.c_str()).x + style.ItemSpacing.x +
+          ImGui::CalcTextSize(folder.c_str()).x + (mDocument.Modified() ? 4.0f + ImGui::CalcTextSize(edited).x : 0.0f) +
+          Em(16.0f) + scaleWidth;
+        ImGui::SameLine(
+          std::max(ImGui::GetCursorPosX() + Em(16.0f), ImGui::GetWindowWidth() - width - style.WindowPadding.x)
+        );
         ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(name.c_str());
         ImGui::SameLine();
@@ -628,7 +692,11 @@ namespace faf::editor
         }
         ImGui::SameLine(0.0f, Em(16.0f));
       } else {
-        ImGui::SameLine(std::max(ImGui::GetCursorPosX() + Em(16.0f), ImGui::GetWindowWidth() - scaleWidth - ImGui::GetStyle().WindowPadding.x));
+        ImGui::SameLine(
+          std::max(
+            ImGui::GetCursorPosX() + Em(16.0f), ImGui::GetWindowWidth() - scaleWidth - ImGui::GetStyle().WindowPadding.x
+          )
+        );
       }
       (void)DrawUiScaleButtons(false);
     }
@@ -636,7 +704,9 @@ namespace faf::editor
     ImGui::PopStyleVar(4);
   }
 
-  float EdShell::DrawUiScaleButtons(const bool measure)
+  float EdShell::DrawUiScaleButtons(
+    const bool measure
+  )
   {
     // The steps a click moves between; the middle button shows the scale and puts it back to 100%.
     static constexpr float kSteps[] = {0.75f, 0.85f, 1.0f, 1.1f, 1.25f, 1.4f, 1.6f, 1.8f, 2.0f};
@@ -701,8 +771,10 @@ namespace faf::editor
     // The slots: the open map's armies when it is the picked one, else numbers.
     const std::vector<std::string>& maps = mPlay.Maps();
     std::vector<std::string> slots;
-    if (!maps.empty() && mDocument.GetState() == EdDocument::State::Open &&
-        mDocument.Path() == maps[static_cast<std::size_t>(mPlay.Selected())]) {
+    if (
+      !maps.empty() && mDocument.GetState() == EdDocument::State::Open &&
+      mDocument.Path() == maps[static_cast<std::size_t>(mPlay.Selected())]
+    ) {
       const std::vector<ScenarioTeam> teams = mDocument.Teams();
       if (!teams.empty()) {
         slots = teams.front().armies;
@@ -728,7 +800,9 @@ namespace faf::editor
         ImGui::EndCombo();
       }
       ImGui::SameLine();
-      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Save").x - ImGui::GetStyle().FramePadding.x * 4.0f);
+      ImGui::SetNextItemWidth(
+        ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Save").x - ImGui::GetStyle().FramePadding.x * 4.0f
+      );
       ImGui::InputTextWithHint("##profilename", "name", mProfileName, sizeof(mProfileName));
       ImGui::SameLine();
       ImGui::BeginDisabled(mProfileName[0] == '\0');
@@ -774,7 +848,8 @@ namespace faf::editor
     const bool custom = mode == 2;
     setup.slot = std::clamp(setup.slot, 0, slotCount - 1);
     const auto slotName = [&](const int i) {
-      return slots.empty() ? "Slot " + std::to_string(i + 1) : std::to_string(i + 1) + "  " + slots[static_cast<std::size_t>(i)];
+      return slots.empty() ? "Slot " + std::to_string(i + 1)
+                           : std::to_string(i + 1) + "  " + slots[static_cast<std::size_t>(i)];
     };
     const float labelWidth = ImGui::CalcTextSize("AI opponents").x + ImGui::GetStyle().ItemSpacing.x * 2.0f;
     const auto label = [&](const char* const text) {
@@ -784,23 +859,27 @@ namespace faf::editor
       ImGui::SetNextItemWidth(-1.0f);
     };
     if (!custom) {
-    label("Start");
-    if (ImGui::BeginCombo("##slot", slotName(setup.slot).c_str())) {
-      for (int i = 0; i < slotCount; ++i) {
-        if (ImGui::Selectable(slotName(i).c_str(), i == setup.slot)) {
-          setup.slot = i;
+      label("Start");
+      if (ImGui::BeginCombo("##slot", slotName(setup.slot).c_str())) {
+        for (int i = 0; i < slotCount; ++i) {
+          if (ImGui::Selectable(slotName(i).c_str(), i == setup.slot)) {
+            setup.slot = i;
+          }
         }
+        ImGui::EndCombo();
       }
-      ImGui::EndCombo();
-    }
-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("The lobby slot you play (its army's start position)");
-    }
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip("The lobby slot you play (its army's start position)");
+      }
     }
     const std::vector<PlayChoice>& factions = mPlay.Factions();
     setup.faction = std::clamp(setup.faction, 0, static_cast<int>(factions.size()));
     label("Faction");
-    if (ImGui::BeginCombo("##faction", setup.faction == 0 ? "Random" : factions[static_cast<std::size_t>(setup.faction - 1)].name.c_str())) {
+    if (
+      ImGui::BeginCombo(
+        "##faction", setup.faction == 0 ? "Random" : factions[static_cast<std::size_t>(setup.faction - 1)].name.c_str()
+      )
+    ) {
       if (ImGui::Selectable("Random", setup.faction == 0)) {
         setup.faction = 0;
       }
@@ -825,23 +904,23 @@ namespace faf::editor
         ImGui::EndCombo();
       }
       if (!custom) {
-      setup.aiCount = std::clamp(setup.aiCount, 0, slotCount - 1);
-      label("AI opponents");
-      const std::string count = setup.aiCount == 0 ? std::string("Every other slot") : std::to_string(setup.aiCount);
-      if (ImGui::BeginCombo("##aicount", count.c_str())) {
-        if (ImGui::Selectable("Every other slot", setup.aiCount == 0)) {
-          setup.aiCount = 0;
-        }
-        for (int i = 1; i < slotCount; ++i) {
-          if (ImGui::Selectable(std::to_string(i).c_str(), setup.aiCount == i)) {
-            setup.aiCount = i;
+        setup.aiCount = std::clamp(setup.aiCount, 0, slotCount - 1);
+        label("AI opponents");
+        const std::string count = setup.aiCount == 0 ? std::string("Every other slot") : std::to_string(setup.aiCount);
+        if (ImGui::BeginCombo("##aicount", count.c_str())) {
+          if (ImGui::Selectable("Every other slot", setup.aiCount == 0)) {
+            setup.aiCount = 0;
           }
+          for (int i = 1; i < slotCount; ++i) {
+            if (ImGui::Selectable(std::to_string(i).c_str(), setup.aiCount == i)) {
+              setup.aiCount = i;
+            }
+          }
+          ImGui::EndCombo();
         }
-        ImGui::EndCombo();
-      }
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-        ImGui::SetTooltip("How many slots get an AI, taken in slot order; the rest stay empty");
-      }
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+          ImGui::SetTooltip("How many slots get an AI, taken in slot order; the rest stay empty");
+        }
       }
     }
     // Custom: one row per slot (role, its AI, its team); one You at most.
@@ -872,7 +951,8 @@ namespace faf::editor
           changed = true;
         }
         ImGui::SameLine();
-        const float aiWidth = ImGui::GetContentRegionAvail().x - teamWidth - factionWidth - ImGui::GetStyle().ItemSpacing.x * 2.0f;
+        const float aiWidth =
+          ImGui::GetContentRegionAvail().x - teamWidth - factionWidth - ImGui::GetStyle().ItemSpacing.x * 2.0f;
         if (slot.role == PlaySlot::Role::Ai) {
           slot.ai = std::clamp(slot.ai, 0, static_cast<int>(aiTypes.size()) - 1);
           ImGui::SetNextItemWidth(aiWidth);
@@ -893,8 +973,12 @@ namespace faf::editor
         if (slot.role == PlaySlot::Role::Ai) {
           slot.faction = std::clamp(slot.faction, 0, static_cast<int>(factions.size()));
           ImGui::SetNextItemWidth(factionWidth);
-          if (ImGui::BeginCombo("##slotfaction",
-                                slot.faction == 0 ? "Random" : factions[static_cast<std::size_t>(slot.faction - 1)].name.c_str())) {
+          if (
+            ImGui::BeginCombo(
+              "##slotfaction",
+              slot.faction == 0 ? "Random" : factions[static_cast<std::size_t>(slot.faction - 1)].name.c_str()
+            )
+          ) {
             if (ImGui::Selectable("Random", slot.faction == 0)) {
               slot.faction = 0;
             }
@@ -957,12 +1041,18 @@ namespace faf::editor
     ImGui::SameLine();
     ImGui::Checkbox("Quick start", &setup.quickStart);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("The commanders are there and take orders at once, without the game's warp-in\n"
-                        "(about 5 s), and the camera starts over yours. Off: the game's own start.");
+      ImGui::SetTooltip(
+        "The commanders are there and take orders at once, without the game's warp-in\n"
+        "(about 5 s), and the camera starts over yours. Off: the game's own start."
+      );
     }
     {
-      static const char* const kVictoryKeys[5] = {"sandbox", "demoralization", "domination", "eradication", "decapitation"};
-      static const char* const kVictoryNames[5] = {"Sandbox (no end)", "Assassination", "Supremacy", "Annihilation", "Decapitation"};
+      static const char* const kVictoryKeys[5] = {
+        "sandbox", "demoralization", "domination", "eradication", "decapitation"
+      };
+      static const char* const kVictoryNames[5] = {
+        "Sandbox (no end)", "Assassination", "Supremacy", "Annihilation", "Decapitation"
+      };
       int victory = 0;
       for (int i = 0; i < 5; ++i) {
         victory = setup.victory == kVictoryKeys[i] ? i : victory;
@@ -986,8 +1076,10 @@ namespace faf::editor
       mPlay.SetKeepsOwnSetup(keepOwn);
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("On: this map plays with its own setup, saved at each Play.\n"
-                        "Off: it plays with the setup of the last Play on any map.");
+      ImGui::SetTooltip(
+        "On: this map plays with its own setup, saved at each Play.\n"
+        "Off: it plays with the setup of the last Play on any map."
+      );
     }
     ImGui::EndDisabled();
 
@@ -998,8 +1090,10 @@ namespace faf::editor
       mPlay.SetFogHidden(noFog);
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("While playing: the view leaves out the fog's shading and you keep your army.\n"
-                        "Enemy units your army has no intel on stay unseen; Observer view shows them.");
+      ImGui::SetTooltip(
+        "While playing: the view leaves out the fog's shading and you keep your army.\n"
+        "Enemy units your army has no intel on stay unseen; Observer view shows them."
+      );
     }
     ImGui::SameLine();
     bool wholeMap = mPlay.SeesWholeMap();
@@ -1007,7 +1101,9 @@ namespace faf::editor
       mPlay.SetSeesWholeMap(wholeMap);
     }
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip("While playing: view the map as an observer (every army's units, no fog), then back to your army.");
+      ImGui::SetTooltip(
+        "While playing: view the map as an observer (every army's units, no fog), then back to your army."
+      );
     }
     ImGui::EndDisabled();
   }
@@ -1039,7 +1135,9 @@ namespace faf::editor
     if (ImGui::Button("Open a map...", ImVec2(-1.0f, 0.0f))) {
       mBrowser.Show();
     }
-    ImGui::SetItemTooltip("Every map on this computer and the FAF vault (File > Open, Ctrl+O); recent ones are in File > Open Recent");
+    ImGui::SetItemTooltip(
+      "Every map on this computer and the FAF vault (File > Open, Ctrl+O); recent ones are in File > Open Recent"
+    );
     ImGui::Separator();
 
     DrawPlaySetup();
@@ -1063,15 +1161,27 @@ namespace faf::editor
           ImGui::TextDisabled("version %d", facts.mapVersion);
         }
         row("Type");
-        ImGui::Text("%s%s", facts.type.empty() ? "skirmish" : facts.type.c_str(), mDocument.Adaptive() ? ", adaptive" : "");
+        ImGui::Text(
+          "%s%s", facts.type.empty() ? "skirmish" : facts.type.c_str(), mDocument.Adaptive() ? ", adaptive" : ""
+        );
         row("Size");
-        ImGui::Text("%.0f x %.0f km (%d x %d)", static_cast<double>(facts.sizeX) / 51.2, static_cast<double>(facts.sizeZ) / 51.2, facts.sizeX, facts.sizeZ);
+        ImGui::Text(
+          "%.0f x %.0f km (%d x %d)",
+          static_cast<double>(facts.sizeX) / 51.2,
+          static_cast<double>(facts.sizeZ) / 51.2,
+          facts.sizeX,
+          facts.sizeZ
+        );
         row("Players");
         ImGui::Text("%zu", mDocument.Teams().empty() ? facts.armies.size() : mDocument.Teams().front().armies.size());
         row("Water");
         if (facts.water) {
-          ImGui::Text("at %.1f (deep %.1f, abyss %.1f)", static_cast<double>(facts.waterElevation), static_cast<double>(facts.waterDeep),
-                      static_cast<double>(facts.waterAbyss));
+          ImGui::Text(
+            "at %.1f (deep %.1f, abyss %.1f)",
+            static_cast<double>(facts.waterElevation),
+            static_cast<double>(facts.waterDeep),
+            static_cast<double>(facts.waterAbyss)
+          );
         } else {
           ImGui::TextUnformatted("none");
         }
@@ -1088,7 +1198,11 @@ namespace faf::editor
           ImGui::SetWindowFocus(kInfoWindow);
         }
       }
-      if (ImGui::CollapsingHeader("Adaptive map", mDocument.Adaptive() ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None)) {
+      if (
+        ImGui::CollapsingHeader(
+          "Adaptive map", mDocument.Adaptive() ? ImGuiTreeNodeFlags_DefaultOpen : ImGuiTreeNodeFlags_None
+        )
+      ) {
         ImGui::PushID("adaptive");
         DrawAdaptivePanel();
         ImGui::PopID();
@@ -1115,7 +1229,8 @@ namespace faf::editor
     ImGui::TextUnformatted("The new folder goes into your vault's maps folder:");
     ImGui::TextDisabled("%s", (mDocument.VaultFolder() / "maps").string().c_str());
     ImGui::SetNextItemWidth(Em(420.0f));
-    const bool enter = ImGui::InputText("Folder", mSaveAsName, sizeof(mSaveAsName), ImGuiInputTextFlags_EnterReturnsTrue);
+    const bool enter =
+      ImGui::InputText("Folder", mSaveAsName, sizeof(mSaveAsName), ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::TextDisabled("FAF names map folders name.vNNNN; the files take the name without the version.");
     if (ImGui::Button("Save", ImVec2(Em(120.0f), 0.0f)) || enter) {
       std::string message;
@@ -1136,7 +1251,9 @@ namespace faf::editor
   namespace
   {
     /** The folder FAF would give a map of this title: lower case, letters and digits, `_` between words, `.v0001`. */
-    std::string FolderForTitle(const char* const title)
+    std::string FolderForTitle(
+      const char* const title
+    )
     {
       std::string folder;
       for (const char* c = title; *c != '\0'; ++c) {
@@ -1208,7 +1325,9 @@ namespace faf::editor
       ImGui::SetNextItemWidth(kWidth - 60.0f);
       ImGui::DragFloat("Sea level", &mNewMap.seaLevel, 0.25f, 0.0f, 500.0f, "%.1f");
     }
-    ImGui::TextDisabled("Start positions ARMY_1 to ARMY_%d in a ring; ARMY_17 and NEUTRAL_CIVILIAN as extra armies.", mNewMap.players);
+    ImGui::TextDisabled(
+      "Start positions ARMY_1 to ARMY_%d in a ring; ARMY_17 and NEUTRAL_CIVILIAN as extra armies.", mNewMap.players
+    );
     ImGui::Separator();
     if (ImGui::Button("Create", ImVec2(Em(120.0f), 0.0f))) {
       mNewMap.title = mNewMapTitle;
@@ -1245,8 +1364,10 @@ namespace faf::editor
       return;
     }
     ImGui::Text("%s", mPackagePlan.folder.empty() ? "(no folder)" : mPackagePlan.folder.c_str());
-    ImGui::TextDisabled("A zip with this folder at its top, as the vault takes maps: %s",
-                        (mDocument.VaultFolder() / "packages" / (mPackagePlan.folder + ".zip")).string().c_str());
+    ImGui::TextDisabled(
+      "A zip with this folder at its top, as the vault takes maps: %s",
+      (mDocument.VaultFolder() / "packages" / (mPackagePlan.folder + ".zip")).string().c_str()
+    );
     ImGui::Separator();
     for (const std::string& error : mPackagePlan.errors) {
       ImGui::TextColored(ImVec4(0.95f, 0.40f, 0.35f, 1.0f), "error: %s", error.c_str());
@@ -1255,10 +1376,16 @@ namespace faf::editor
       ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "warning: %s", warning.c_str());
     }
     if (mPackagePlan.errors.empty() && mPackagePlan.warnings.empty()) {
-      ImGui::TextColored(ImVec4(0.55f, 0.80f, 0.55f, 1.0f), "The folder's name, version and scenario paths are as the vault wants them.");
+      ImGui::TextColored(
+        ImVec4(0.55f, 0.80f, 0.55f, 1.0f), "The folder's name, version and scenario paths are as the vault wants them."
+      );
     }
     ImGui::TextDisabled("%zu files go in:", mPackagePlan.files.size());
-    if (ImGui::BeginChild("##packagefiles", ImVec2(Em(520.0f), ImGui::GetTextLineHeightWithSpacing() * 7.0f), ImGuiChildFlags_Borders)) {
+    if (
+      ImGui::BeginChild(
+        "##packagefiles", ImVec2(Em(520.0f), ImGui::GetTextLineHeightWithSpacing() * 7.0f), ImGuiChildFlags_Borders
+      )
+    ) {
       for (const std::string& file : mPackagePlan.files) {
         ImGui::TextUnformatted(file.c_str());
       }
@@ -1289,9 +1416,9 @@ namespace faf::editor
     ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - height));
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, height));
     ImGui::SetNextWindowViewport(viewport->ID);
-    constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoDocking |
-                                        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
-                                        ImGuiWindowFlags_NoNav;
+    constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+      ImGuiWindowFlags_NoNav;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 2.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     if (ImGui::Begin("##StatusBar", nullptr, kFlags)) {

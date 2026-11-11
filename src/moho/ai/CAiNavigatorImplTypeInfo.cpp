@@ -27,7 +27,9 @@ namespace
    * Adds the reflected `IAiNavigator` base entry to the navigator impl RTTI
    * node.
    */
-  void AddIAiNavigatorBase(gpg::RType& typeInfo)
+  void AddIAiNavigatorBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBase<IAiNavigator>(&typeInfo);
   }
@@ -38,7 +40,9 @@ namespace
    * What it does:
    * Adds the reflected `CTask` base entry to the navigator impl RTTI node.
    */
-  void AddCTaskBase(gpg::RType& typeInfo)
+  void AddCTaskBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBase<CTask>(&typeInfo, gpg::BaseSubobjectOffset<CAiNavigatorImpl, CTask>());
   }
@@ -50,7 +54,9 @@ namespace
    * Adds the reflected `CScriptObject` base entry to the navigator impl RTTI
    * node.
    */
-  void AddCScriptObjectBase(gpg::RType& typeInfo)
+  void AddCScriptObjectBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBase<CScriptObject>(&typeInfo, gpg::BaseSubobjectOffset<CAiNavigatorImpl, CScriptObject>());
   }
@@ -124,4 +130,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAiNavigatorImplTypeInfo_015f1a, moho::register_CAiNavigatorImplTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAiNavigatorImplTypeInfo_015f1a,
+  moho::register_CAiNavigatorImplTypeInfo
+)

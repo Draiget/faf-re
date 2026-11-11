@@ -22,7 +22,9 @@ namespace
 
   constexpr int kSize = 129;
 
-  std::vector<std::uint16_t> RandomField(const unsigned seed)
+  std::vector<std::uint16_t> RandomField(
+    const unsigned seed
+  )
   {
     std::mt19937 random(seed);
     std::vector<std::uint16_t> words(static_cast<std::size_t>(kSize) * kSize);
@@ -33,8 +35,16 @@ namespace
   }
 
   /** One stroke of `steps` brush steps along a line, recorded in `history` as the editor records one. */
-  void Stroke(std::vector<std::uint16_t>& words, HeightHistory& history, const HeightBrush& brush, const float x0, const float z0,
-              const float x1, const float z1, const int steps)
+  void Stroke(
+    std::vector<std::uint16_t>& words,
+    HeightHistory& history,
+    const HeightBrush& brush,
+    const float x0,
+    const float z0,
+    const float x1,
+    const float z1,
+    const int steps
+  )
   {
     history.BeginStroke();
     for (int i = 0; i < steps; ++i) {
@@ -49,7 +59,10 @@ namespace
     history.EndStroke(words.data());
   }
 
-  TEST(HeightHistory, UndoGivesBackTheSameBytesAndRedoTheStrokes)
+  TEST(
+    HeightHistory,
+    UndoGivesBackTheSameBytesAndRedoTheStrokes
+  )
   {
     std::vector<std::uint16_t> words = RandomField(7u);
     const std::vector<std::uint16_t> original = words;
@@ -85,7 +98,10 @@ namespace
     EXPECT_FALSE(history.Redo(words.data(), changed));
   }
 
-  TEST(HeightHistory, ANewStrokeClearsRedo)
+  TEST(
+    HeightHistory,
+    ANewStrokeClearsRedo
+  )
   {
     std::vector<std::uint16_t> words = RandomField(11u);
     HeightHistory history;
@@ -100,7 +116,10 @@ namespace
     EXPECT_EQ(history.UndoCount(), 1u);
   }
 
-  TEST(HeightHistory, TheBudgetDropsTheOldestStrokes)
+  TEST(
+    HeightHistory,
+    TheBudgetDropsTheOldestStrokes
+  )
   {
     std::vector<std::uint16_t> words = RandomField(13u);
     HeightHistory history;

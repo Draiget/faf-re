@@ -96,8 +96,10 @@ void CNetClient::Process(
   // checksum reports this client sends to one player differ from the ones
   // everyone else gets, which is what a player sending different orders to
   // different players looks like to CommandStreamCheck.
-  if (net_DebugAlterOrdersTo == mIndex && msg.GetType().raw() == static_cast<uint8_t>(ECmdStreamOp::CMDST_VerifyChecksum) &&
-      msg.GetMessageSize() > 0) {
+  if (
+    net_DebugAlterOrdersTo == mIndex &&
+    msg.GetType().raw() == static_cast<uint8_t>(ECmdStreamOp::CMDST_VerifyChecksum) && msg.GetMessageSize() > 0
+  ) {
     CMessage altered = msg;
     altered.mBuff[3] = static_cast<char>(altered.mBuff[3] ^ 0x01); // first checksum byte
     NetDataSpan alteredSpan{
@@ -202,7 +204,9 @@ void CNetClient::ReceiveMessage(
 /**
  * Engine addition, not in the binary: see the declaration.
  */
-void CNetClient::ReplaceConnection(INetConnection* const connection)
+void CNetClient::ReplaceConnection(
+  INetConnection* const connection
+)
 {
   std::scoped_lock lock(mManager->mLock);
 

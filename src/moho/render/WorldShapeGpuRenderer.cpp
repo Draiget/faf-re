@@ -24,7 +24,8 @@ namespace moho
   TConVar<int> gTConVar_ren_GpuShapes(
     "ren_GpuShapes",
     "Draw FAF's UI_DrawLine/UI_DrawRect/UI_DrawCircle shapes with instanced draws from a GPU buffer instead of the "
-    "prim batcher. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
+    "prim batcher. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 "
+    "never.",
     &ren_GpuShapes
   );
 
@@ -48,34 +49,45 @@ namespace moho
 
     gpg::gal::Device* sDeviceOfResources = nullptr;
 
-    [[nodiscard]] Vector3f PointOf(const WorldShapeRecord& record, const std::size_t index) noexcept
+    [[nodiscard]] Vector3f PointOf(
+      const WorldShapeRecord& record,
+      const std::size_t index
+    ) noexcept
     {
       return {record.mPoints[index][0], record.mPoints[index][1], record.mPoints[index][2]};
     }
   } // namespace
 
-  void DrawWorldShape(CD3DPrimBatcher& batcher, const WorldShapeRecord& record)
+  void DrawWorldShape(
+    CD3DPrimBatcher& batcher,
+    const WorldShapeRecord& record
+  )
   {
     switch (record.mKind) {
-      case WorldShapeKind::Line:
-        batcher.DrawQuad(PointOf(record, 0), PointOf(record, 1), PointOf(record, 2), PointOf(record, 3), record.mColor);
-        break;
-      case WorldShapeKind::Rect: {
-        // `DRAW_Rect` without a height field (0x00455D84..0x00455E10).
-        const Vector3f outer[4] = {PointOf(record, 0), PointOf(record, 1), PointOf(record, 2), PointOf(record, 3)};
-        const Vector3f inner[4] = {PointOf(record, 4), PointOf(record, 5), PointOf(record, 6), PointOf(record, 7)};
-        batcher.DrawQuad(outer[0], inner[0], inner[1], outer[1], record.mColor);
-        batcher.DrawQuad(outer[1], inner[1], inner[2], outer[2], record.mColor);
-        batcher.DrawQuad(inner[3], outer[3], outer[2], inner[2], record.mColor);
-        batcher.DrawQuad(outer[0], outer[3], inner[3], inner[0], record.mColor);
-        break;
-      }
-      case WorldShapeKind::Circle:
-        DRAW_Oval(
-          &batcher, PointOf(record, 0), PointOf(record, 1), PointOf(record, 2), PointOf(record, 3), PointOf(record, 4),
-          record.mColor
-        );
-        break;
+    case WorldShapeKind::Line:
+      batcher.DrawQuad(PointOf(record, 0), PointOf(record, 1), PointOf(record, 2), PointOf(record, 3), record.mColor);
+      break;
+    case WorldShapeKind::Rect: {
+      // `DRAW_Rect` without a height field (0x00455D84..0x00455E10).
+      const Vector3f outer[4] = {PointOf(record, 0), PointOf(record, 1), PointOf(record, 2), PointOf(record, 3)};
+      const Vector3f inner[4] = {PointOf(record, 4), PointOf(record, 5), PointOf(record, 6), PointOf(record, 7)};
+      batcher.DrawQuad(outer[0], inner[0], inner[1], outer[1], record.mColor);
+      batcher.DrawQuad(outer[1], inner[1], inner[2], outer[2], record.mColor);
+      batcher.DrawQuad(inner[3], outer[3], outer[2], inner[2], record.mColor);
+      batcher.DrawQuad(outer[0], outer[3], inner[3], inner[0], record.mColor);
+      break;
+    }
+    case WorldShapeKind::Circle:
+      DRAW_Oval(
+        &batcher,
+        PointOf(record, 0),
+        PointOf(record, 1),
+        PointOf(record, 2),
+        PointOf(record, 3),
+        PointOf(record, 4),
+        record.mColor
+      );
+      break;
     }
   }
 
@@ -126,7 +138,9 @@ namespace moho
     return mSupported;
   }
 
-  WorldShapeGpuRenderer::ViewStream& WorldShapeGpuRenderer::StreamFor(const void* const viewKey)
+  WorldShapeGpuRenderer::ViewStream& WorldShapeGpuRenderer::StreamFor(
+    const void* const viewKey
+  )
   {
     for (ViewStream& stream : mStreams) {
       if (stream.mViewKey == viewKey) {
@@ -134,7 +148,9 @@ namespace moho
         return stream;
       }
     }
-    std::erase_if(mStreams, [this](const ViewStream& stream) { return mDraws - stream.mLastUsedDraw > kStreamIdleDraws; });
+    std::erase_if(mStreams, [this](const ViewStream& stream) {
+      return mDraws - stream.mLastUsedDraw > kStreamIdleDraws;
+    });
     ViewStream& stream = mStreams.emplace_back();
     stream.mViewKey = viewKey;
     stream.mLastUsedDraw = mDraws;
@@ -142,7 +158,9 @@ namespace moho
   }
 
   bool WorldShapeGpuRenderer::Draw(
-    CD3DPrimBatcher& batcher, const void* const viewKey, const std::span<const WorldShapeRecord> records
+    CD3DPrimBatcher& batcher,
+    const void* const viewKey,
+    const std::span<const WorldShapeRecord> records
   )
   {
     if (!mSupported || batcher.mTextureBatcher == nullptr) {
@@ -157,8 +175,10 @@ namespace moho
     // rectangle gives the same uv transform the batcher applies.
     const boost::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromSolidColor(0xFFFFFFFFU);
     CD3DTextureBatcher& atlas = *batcher.mTextureBatcher;
-    if (!texture || texture->mWidth >= (static_cast<std::uint32_t>(atlas.mWidth) >> 1U) ||
-        texture->mHeight >= (static_cast<std::uint32_t>(atlas.mHeight) >> 1U)) {
+    if (
+      !texture || texture->mWidth >= (static_cast<std::uint32_t>(atlas.mWidth) >> 1U) ||
+      texture->mHeight >= (static_cast<std::uint32_t>(atlas.mHeight) >> 1U)
+    ) {
       return false;
     }
     const gpg::Rect2f* rect = atlas.AddTexture(texture);

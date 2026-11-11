@@ -115,4 +115,7 @@ void EEmitterParamTypeInfo::Init()
 // through gpg::LookupRType (ResolveEEmitterParamType) to translate parameter
 // names, so the descriptor must exist before that consumer runs. See
 // StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_EEmitterParamTypeInfo_770790, moho::preregister_EEmitterParamTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_EEmitterParamTypeInfo_770790,
+  moho::preregister_EEmitterParamTypeInfo
+)

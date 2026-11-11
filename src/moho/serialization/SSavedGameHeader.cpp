@@ -58,10 +58,11 @@ namespace moho
     , mArmyInfo()
     , mScenarioInfoText()
     , mLaunchInfo()
-  {
-  }
+  {}
 
-  SSavedGameHeader::SSavedGameHeader(const SSavedGameHeader& other)
+  SSavedGameHeader::SSavedGameHeader(
+    const SSavedGameHeader& other
+  )
     : mVersion(other.mVersion)
     , mMapName(other.mMapName)
     , mFocusArmy(other.mFocusArmy)
@@ -72,7 +73,9 @@ namespace moho
     mLaunchInfo.assign_retain(other.mLaunchInfo);
   }
 
-  SSavedGameHeader& SSavedGameHeader::operator=(const SSavedGameHeader& other)
+  SSavedGameHeader& SSavedGameHeader::operator=(
+    const SSavedGameHeader& other
+  )
   {
     if (this == &other) {
       return *this;
@@ -121,7 +124,10 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_SSavedGameHeaderTypeInfo_84f4eb, preregister_SSavedGameHeaderTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_SSavedGameHeaderTypeInfo_84f4eb,
+  preregister_SSavedGameHeaderTypeInfo
+)
 
 namespace moho
 {
@@ -135,7 +141,11 @@ namespace moho
    * instead of the normal 4-arg cdecl stack shape, which is why this body
    * is a free function rather than the field-bound callback itself.
    */
-  void SSavedGameHeader::MemberDeserialize(gpg::ReadArchive* const archive, const int version, const gpg::RRef&)
+  void SSavedGameHeader::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    const int version,
+    const gpg::RRef&
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -162,7 +172,11 @@ namespace moho
    * Single caller (the 0x00880280 thunk); same register-passing shape as
    * LoadSavedGameHeader/0x008831C0.
    */
-  void SSavedGameHeader::MemberSerialize(gpg::WriteArchive* const archive, const int version, const gpg::RRef&) const
+  void SSavedGameHeader::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    const int version,
+    const gpg::RRef&
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {

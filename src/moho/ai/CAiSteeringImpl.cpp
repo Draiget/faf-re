@@ -47,15 +47,23 @@ namespace moho
    * here with the same shape as CAiBrain.cpp's declaration.
    */
   [[nodiscard]] bool TryBuildStructureAt(
-    SCoordsVec2* const tryPos, const RUnitBlueprint* const blueprint, Sim* const sim,
-    const int border, const bool wholeMap, const bool doCoerce, const bool useSkirt);
+    SCoordsVec2* const tryPos,
+    const RUnitBlueprint* const blueprint,
+    Sim* const sim,
+    const int border,
+    const bool wholeMap,
+    const bool doCoerce,
+    const bool useSkirt
+  );
 } // namespace moho
 
 namespace
 {
 
-
-  [[nodiscard]] bool IsUnitState(const Unit* unit, const EUnitState state) noexcept
+  [[nodiscard]] bool IsUnitState(
+    const Unit* unit,
+    const EUnitState state
+  ) noexcept
   {
     if (!unit) {
       return false;
@@ -63,13 +71,18 @@ namespace
     return unit->IsUnitState(state);
   }
 
-  [[nodiscard]] bool HasFootprintFlag(const EFootprintFlags value, const EFootprintFlags flag) noexcept
+  [[nodiscard]] bool HasFootprintFlag(
+    const EFootprintFlags value,
+    const EFootprintFlags flag
+  ) noexcept
   {
     return (static_cast<std::uint8_t>(value) & static_cast<std::uint8_t>(flag)) != 0u;
   }
 
   // `moho::NormalizeVectorInto` (0x0044F7E0) by value.
-  [[nodiscard]] Wm3::Vector3f NormalizedOrZero(const Wm3::Vector3f& source) noexcept
+  [[nodiscard]] Wm3::Vector3f NormalizedOrZero(
+    const Wm3::Vector3f& source
+  ) noexcept
   {
     Wm3::Vector3f out{};
     (void)moho::NormalizeVectorInto(&out, source);
@@ -77,12 +90,16 @@ namespace
   }
 
   // 0x005D3230..0x005D3247: the con-var instance's value, read raw.
-  [[nodiscard]] float ReadSteeringAirTolerance(Sim* const sim)
+  [[nodiscard]] float ReadSteeringAirTolerance(
+    Sim* const sim
+  )
   {
     return moho::ReadSimConVar(sim, moho::gSimConVar_ai_SteeringAirTolerance);
   }
 
-  void UpdateMotionPathPointers(CAiSteeringImpl& steering)
+  void UpdateMotionPathPointers(
+    CAiSteeringImpl& steering
+  )
   {
     // 0x005D2F7B..0x005D2F83: without a path the inlined block is skipped
     // outright, so whatever spline lanes the motion already holds are left
@@ -107,7 +124,10 @@ namespace
     }
   }
 
-  void MotionSetTarget(CUnitMotion* const motion, const Wm3::Vector3f& target)
+  void MotionSetTarget(
+    CUnitMotion* const motion,
+    const Wm3::Vector3f& target
+  )
   {
     if (!motion) {
       return;
@@ -115,8 +135,12 @@ namespace
     motion->SetTarget(target);
   }
 
-  void
-  MotionSetTarget(CUnitMotion* const motion, const Wm3::Vector3f& target, const Wm3::Vector3f& vec, const ELayer layer)
+  void MotionSetTarget(
+    CUnitMotion* const motion,
+    const Wm3::Vector3f& target,
+    const Wm3::Vector3f& vec,
+    const ELayer layer
+  )
   {
     if (!motion) {
       return;
@@ -124,7 +148,9 @@ namespace
     motion->SetTarget(target, vec, layer);
   }
 
-  void MotionStop(CUnitMotion* const motion)
+  void MotionStop(
+    CUnitMotion* const motion
+  )
   {
     if (!motion) {
       return;
@@ -132,7 +158,9 @@ namespace
     motion->Stop(nullptr);
   }
 
-  void ApplyTopSpeedPolicy(CAiSteeringImpl& steering)
+  void ApplyTopSpeedPolicy(
+    CAiSteeringImpl& steering
+  )
   {
     if (!steering.mUnitMotion) {
       return;
@@ -144,7 +172,9 @@ namespace
     steering.mUnitMotion->mAlwaysUseTopSpeed = static_cast<std::uint8_t>(useCalc1Selector ? calc1 : calc2);
   }
 
-  void NotifyNavigatorPathRefresh(Unit* unit)
+  void NotifyNavigatorPathRefresh(
+    Unit* unit
+  )
   {
     if (!unit || !unit->AiNavigator) {
       return;
@@ -153,7 +183,9 @@ namespace
   }
 
   [[nodiscard]] float ComputeBrakingLeadDistance(
-    const Wm3::Vector3f& velocity, const RUnitBlueprintPhysics& physics, const bool ignoreBraking
+    const Wm3::Vector3f& velocity,
+    const RUnitBlueprintPhysics& physics,
+    const bool ignoreBraking
   ) noexcept
   {
     if (ignoreBraking) {
@@ -178,7 +210,10 @@ namespace
    * renormalisation), with half-extents (sizeX + sizeZ) / 4 and length / 2.
    */
   [[nodiscard]] Wm3::Box2f BuildCollisionBox2(
-    const Unit& unit, const Wm3::Vector3f& position, const float leadDistance, const float inflatedLength
+    const Unit& unit,
+    const Wm3::Vector3f& position,
+    const float leadDistance,
+    const float inflatedLength
   ) noexcept
   {
     const RUnitBlueprint* const blueprint = unit.GetBlueprint();
@@ -196,9 +231,7 @@ namespace
       position.x + (forward.x * leadDistance),
       (forward.y * leadDistance) + position.z,
     };
-    return Wm3::Box2f(
-      center, right, forward, (blueprint->mSizeX + blueprint->mSizeZ) * 0.25f, inflatedLength * 0.5f
-    );
+    return Wm3::Box2f(center, right, forward, (blueprint->mSizeX + blueprint->mSizeZ) * 0.25f, inflatedLength * 0.5f);
   }
 
   /**
@@ -241,7 +274,10 @@ namespace
   // moho::func_IsSourceUnit (FUN_0062EEA0) is defined at namespace-moho file
   // scope below so COGrid::UnitIsBlocked can invoke it cross-TU by name.
 
-  [[nodiscard]] float ComputeCollisionQueryRadius(const Unit& owner, const CAiPathSpline* path) noexcept
+  [[nodiscard]] float ComputeCollisionQueryRadius(
+    const Unit& owner,
+    const CAiPathSpline* path
+  ) noexcept
   {
     const RUnitBlueprint* const blueprint = owner.GetBlueprint();
     if (!blueprint) {
@@ -259,7 +295,10 @@ namespace
     return pathTravelDistance + brakingDistance + unitRadius;
   }
 
-  [[nodiscard]] bool ShouldIgnoreBrakingForCollisionPair(const Unit& first, const Unit& second) noexcept
+  [[nodiscard]] bool ShouldIgnoreBrakingForCollisionPair(
+    const Unit& first,
+    const Unit& second
+  ) noexcept
   {
     if (first.IsUnitState(UNITSTATE_Attacking) || second.IsUnitState(UNITSTATE_Attacking)) {
       return false;
@@ -274,7 +313,8 @@ namespace
   }
 
   [[nodiscard]] Wm3::Vector3f ResolvePathProbePosition(
-    IAiSteering* const steering, const Wm3::Vector3f& fallbackPosition
+    IAiSteering* const steering,
+    const Wm3::Vector3f& fallbackPosition
   ) noexcept
   {
     if (!steering) {
@@ -290,7 +330,10 @@ namespace
     return node ? node->mPosition : fallbackPosition;
   }
 
-  [[nodiscard]] float ComputeCollisionSeparationDistance(const Unit& first, const Unit& second) noexcept
+  [[nodiscard]] float ComputeCollisionSeparationDistance(
+    const Unit& first,
+    const Unit& second
+  ) noexcept
   {
     const RUnitBlueprint* const firstBlueprint = first.GetBlueprint();
     const RUnitBlueprint* const secondBlueprint = second.GetBlueprint();
@@ -338,7 +381,11 @@ namespace
     return approach < 0.0f;
   }
 
-  void MarkSecondarySteeringForRepath(const Unit& owner, Unit& collisionUnit, const bool sameFormation)
+  void MarkSecondarySteeringForRepath(
+    const Unit& owner,
+    Unit& collisionUnit,
+    const bool sameFormation
+  )
   {
     IAiSteering* const collisionSteering = collisionUnit.AiSteering;
     if (!collisionSteering || sameFormation) {
@@ -366,7 +413,10 @@ namespace
    * Address: 0x00597800 (FUN_00597800, sub_597800)
    */
   void PredictCollisionForSteerings(
-    IAiSteering* primarySteering, Unit* primaryUnit, Unit* secondaryUnit, IAiSteering* secondarySteering
+    IAiSteering* primarySteering,
+    Unit* primaryUnit,
+    Unit* secondaryUnit,
+    IAiSteering* secondarySteering
   )
   {
     if (!primaryUnit || !secondaryUnit || !secondarySteering) {
@@ -452,12 +502,13 @@ namespace
         prevSecondaryPos = secondaryPos;
       }
 
-      if (UnitsWillCollide(
-            primaryVelocity, *secondaryUnit, *primaryUnit, primaryPos, secondaryPos, secondaryVelocity, ignoreBraking
-          )) {
-        const float existingCollisionDistSq = collisionInfo->mUnit.GetObjectPtr() != nullptr
-          ? distanceSq(primaryPos, collisionInfo->mPos)
-          : 9999.0f;
+      if (
+        UnitsWillCollide(
+          primaryVelocity, *secondaryUnit, *primaryUnit, primaryPos, secondaryPos, secondaryVelocity, ignoreBraking
+        )
+      ) {
+        const float existingCollisionDistSq =
+          collisionInfo->mUnit.GetObjectPtr() != nullptr ? distanceSq(primaryPos, collisionInfo->mPos) : 9999.0f;
         const float newCollisionDistSq = distanceSq(primaryPos, secondaryPos);
         if (existingCollisionDistSq > newCollisionDistSq) {
           collisionInfo->mCollisionType = COLLISIONTYPE_1;
@@ -554,7 +605,9 @@ namespace
    * Resolves a predicted collision window (`COLLISIONTYPE_1`) into a concrete
    * steering action (`None`, `2`, or `4`) and optional peer repath signal.
    */
-  void ResolvePossibleCollisionState(CAiSteeringImpl& steering)
+  void ResolvePossibleCollisionState(
+    CAiSteeringImpl& steering
+  )
   {
     Unit* const owner = steering.mOwnerUnit;
     Unit* const collisionUnit = steering.mCollisionInfo.mUnit.GetObjectPtr();
@@ -571,10 +624,12 @@ namespace
     // it is a real threat; the owner's own collision state clears.
     const RUnitBlueprint* const collisionBlueprint = collisionUnit->GetBlueprint();
     if (collisionBlueprint->Air.CanFly && collisionUnit->UnitMotion) {
-      if (!collisionUnit->AiTransport &&
-          IsCollisionApproachThreat(
-            *owner, *collisionUnit, ownerPosition, collisionPosition, owner->GetVelocity(), collisionUnit->GetVelocity()
-          )) {
+      if (
+        !collisionUnit->AiTransport &&
+        IsCollisionApproachThreat(
+          *owner, *collisionUnit, ownerPosition, collisionPosition, owner->GetVelocity(), collisionUnit->GetVelocity()
+        )
+      ) {
         MotionSetTarget(collisionUnit->UnitMotion, collisionUnit->GetPosition(), Wm3::Vector3f::Zero(), LAYER_Air);
       }
 
@@ -599,10 +654,12 @@ namespace
       collisionPosition.z
     );
 
-    if (!(std::sqrt(Wm3::Vector3f::LengthSq(collisionUnit->GetVelocity())) > 0.0f) ||
-        !IsCollisionApproachThreat(
-          *owner, *collisionUnit, ownerPosition, collisionPosition, owner->GetVelocity(), collisionUnit->GetVelocity()
-        )) {
+    if (
+      !(std::sqrt(Wm3::Vector3f::LengthSq(collisionUnit->GetVelocity())) > 0.0f) ||
+      !IsCollisionApproachThreat(
+        *owner, *collisionUnit, ownerPosition, collisionPosition, owner->GetVelocity(), collisionUnit->GetVelocity()
+      )
+    ) {
       steering.SetCol(COLLISIONTYPE_None, owner->GetPosition());
       return;
     }
@@ -655,8 +712,8 @@ namespace
         ((colliderOrient.z * colliderOrient.x) - (colliderOrient.w * colliderOrient.y)) * 2.0f,
       };
       const float headingAlignment = dotYZX(ownerHeading, collisionHeading);
-      const float sideFacing = ((side.y * awayFromCollider.y) + (side.z * awayFromCollider.z)) +
-        (side.x * awayFromCollider.x);
+      const float sideFacing =
+        ((side.y * awayFromCollider.y) + (side.z * awayFromCollider.z)) + (side.x * awayFromCollider.x);
       if (!(sideFacing > 0.0f)) {
         side = {-0.0f - side.x, -0.0f - side.y, -0.0f - side.z};
       }
@@ -715,7 +772,10 @@ namespace
   constexpr std::uint32_t kDebugPathNodePrecision = 6u;
   constexpr std::uint32_t kDebugCurrentNodePrecision = 8u;
 
-  [[nodiscard]] std::uint32_t ResolvePathNodeDebugDepth(const CAiPathSpline& path, const CPathPoint& node) noexcept
+  [[nodiscard]] std::uint32_t ResolvePathNodeDebugDepth(
+    const CAiPathSpline& path,
+    const CPathPoint& node
+  ) noexcept
   {
     if (node.mState == PPS_5 || node.mState == PPS_6 || node.mState == PPS_2) {
       return kDebugDepthBlockedNode;
@@ -732,7 +792,10 @@ namespace
     return kDebugDepthDefaultNode;
   }
 
-  void DrawPathDebugOverlay(const CAiSteeringImpl& steering, CDebugCanvas& debugCanvas)
+  void DrawPathDebugOverlay(
+    const CAiSteeringImpl& steering,
+    CDebugCanvas& debugCanvas
+  )
   {
     const CAiPathSpline* const path = steering.mPath;
     if (!path) {
@@ -772,7 +835,10 @@ namespace
     }
   }
 
-  void DrawCollisionDebugOverlay(const CAiSteeringImpl& steering, CDebugCanvas& debugCanvas)
+  void DrawCollisionDebugOverlay(
+    const CAiSteeringImpl& steering,
+    CDebugCanvas& debugCanvas
+  )
   {
     Unit* const collisionUnit = steering.mCollisionInfo.mUnit.GetObjectPtr();
     if (!collisionUnit || !steering.mOwnerUnit) {
@@ -816,11 +882,16 @@ namespace
  * priority tie-breaks. Defined at namespace-moho scope so COGrid::UnitIsBlocked
  * can invoke it cross-TU by name.
  */
-bool moho::func_IsSourceUnit(const int mode, const Unit& owner, Unit* candidate) noexcept
+bool moho::func_IsSourceUnit(
+  const int mode,
+  const Unit& owner,
+  Unit* candidate
+) noexcept
 {
-  if (!candidate || candidate->IsDead() || candidate->DestroyQueued() || candidate == &owner ||
-      !candidate->IsMobile() ||
-      (mode == 1 && candidate->mVarDat.mCurTransform.pos_ != candidate->mVarDat.mLastTransform.pos_)) {
+  if (
+    !candidate || candidate->IsDead() || candidate->DestroyQueued() || candidate == &owner || !candidate->IsMobile() ||
+    (mode == 1 && candidate->mVarDat.mCurTransform.pos_ != candidate->mVarDat.mLastTransform.pos_)
+  ) {
     return true;
   }
 
@@ -836,9 +907,11 @@ bool moho::func_IsSourceUnit(const int mode, const Unit& owner, Unit* candidate)
     return true;
   }
 
-  if ((static_cast<std::uint8_t>(owner.GetFootprint().mFlags) &
-       static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures)) != 0u &&
-      candidate->GetFootprint().mFlags == EFootprintFlags::FPFLAG_None) {
+  if (
+    (static_cast<std::uint8_t>(owner.GetFootprint().mFlags) &
+     static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures)) != 0u &&
+    candidate->GetFootprint().mFlags == EFootprintFlags::FPFLAG_None
+  ) {
     return true;
   }
 
@@ -929,7 +1002,11 @@ CAiSteeringImpl::CAiSteeringImpl()
 /**
  * Address: 0x005D2790 (FUN_005D2790, ??0CAiSteeringImpl@Moho@@QAE@@Z)
  */
-CAiSteeringImpl::CAiSteeringImpl(Unit* const unit, CUnitMotion* const motion, const ELayer layer)
+CAiSteeringImpl::CAiSteeringImpl(
+  Unit* const unit,
+  CUnitMotion* const motion,
+  const ELayer layer
+)
   : CAiSteeringImpl()
 {
   mOwnerUnit = unit;
@@ -971,7 +1048,9 @@ CAiSteeringImpl::~CAiSteeringImpl()
  * What it does:
  * Loads steering runtime fields from one archive lane in serializer order.
  */
-void CAiSteeringImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+void CAiSteeringImpl::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -1052,7 +1131,9 @@ void CAiSteeringImpl::MemberDeserialize(gpg::ReadArchive* const archive)
  * Writes steering runtime fields into one write-archive lane in the same order
  * as `MemberDeserialize`.
  */
-void CAiSteeringImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+void CAiSteeringImpl::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -1114,7 +1195,10 @@ void CAiSteeringImpl::MemberSerialize(gpg::WriteArchive* const archive) const
 /**
  * Address: 0x005D29C0 (FUN_005D29C0)
  */
-CUnitMotion* CAiSteeringImpl::SetWaypoints(const Wm3::Vector3f* const waypoints, const int waypointCount)
+CUnitMotion* CAiSteeringImpl::SetWaypoints(
+  const Wm3::Vector3f* const waypoints,
+  const int waypointCount
+)
 {
   const int clampedCount = (waypoints != nullptr) ? std::clamp(waypointCount, 0, 4) : 0;
   mWaypointCount = clampedCount;
@@ -1160,7 +1244,9 @@ CUnitMotion* CAiSteeringImpl::SetWaypoints(const Wm3::Vector3f* const waypoints,
 /**
  * Address: 0x005D2110 (FUN_005D2110)
  */
-int CAiSteeringImpl::GetWaypoints(Wm3::Vector3f* const outWaypoints) const
+int CAiSteeringImpl::GetWaypoints(
+  Wm3::Vector3f* const outWaypoints
+) const
 {
   if (!outWaypoints) {
     return mWaypointCount;
@@ -1208,7 +1294,10 @@ SCollisionInfo* CAiSteeringImpl::GetColInfo()
  * Stores the collision response type and its target point (+0x84); the
  * predicted contact point in `mCollisionInfo.mPos` is left untouched.
  */
-void CAiSteeringImpl::SetCol(const ECollisionType type, const Wm3::Vector3f& position)
+void CAiSteeringImpl::SetCol(
+  const ECollisionType type,
+  const Wm3::Vector3f& position
+)
 {
   mCollisionInfo.mCollisionType = type;
   mCollisionAvoidTarget = position;
@@ -1225,7 +1314,9 @@ CAiPathSpline* CAiSteeringImpl::GetPath()
 /**
  * Address: 0x005D2390 (FUN_005D2390)
  */
-void CAiSteeringImpl::CalcAtTopSpeed1(const bool enabled)
+void CAiSteeringImpl::CalcAtTopSpeed1(
+  const bool enabled
+)
 {
   mTopSpeedFromCalc1 = static_cast<std::uint8_t>(enabled);
   ApplyTopSpeedPolicy(*this);
@@ -1234,7 +1325,9 @@ void CAiSteeringImpl::CalcAtTopSpeed1(const bool enabled)
 /**
  * Address: 0x005D23E0 (FUN_005D23E0)
  */
-void CAiSteeringImpl::CalcAtTopSpeed2(const bool enabled)
+void CAiSteeringImpl::CalcAtTopSpeed2(
+  const bool enabled
+)
 {
   mTopSpeedFromCalc2 = static_cast<std::uint8_t>(enabled);
   ApplyTopSpeedPolicy(*this);
@@ -1243,7 +1336,9 @@ void CAiSteeringImpl::CalcAtTopSpeed2(const bool enabled)
 /**
  * Address: 0x005D2430 (FUN_005D2430)
  */
-void CAiSteeringImpl::UseTopSpeed(const bool enabled)
+void CAiSteeringImpl::UseTopSpeed(
+  const bool enabled
+)
 {
   mForceTopSpeed = static_cast<std::uint8_t>(enabled);
 }
@@ -1263,7 +1358,10 @@ int CAiSteeringImpl::GetVal() const
  * Address: 0x005D2480 (FUN_005D2480, func_TrySnapPosToWaypoint)
  */
 Wm3::Vector3f CAiSteeringImpl::TrySnapPosToWaypoint(
-  const CAiSteeringImpl& steering, const int index, const Wm3::Vector3f& currentPos, const float tolerance
+  const CAiSteeringImpl& steering,
+  const int index,
+  const Wm3::Vector3f& currentPos,
+  const float tolerance
 )
 {
   if (index < 0 || index >= steering.mWaypointCount) {
@@ -1325,7 +1423,11 @@ void CAiSteeringImpl::Stop()
 /**
  * Address: 0x005D3680 (FUN_005D3680, Moho::CAiSteeringImpl::UpdatePath)
  */
-void CAiSteeringImpl::UpdatePath(const int pathMode, const Wm3::Vector3f& destination, const bool allowContinuation)
+void CAiSteeringImpl::UpdatePath(
+  const int pathMode,
+  const Wm3::Vector3f& destination,
+  const bool allowContinuation
+)
 {
   ResetCollisionInfo(mCollisionInfo);
 
@@ -1364,8 +1466,10 @@ void CAiSteeringImpl::CheckCollisions()
   }
 
   // 0x005D3767..0x005D37A7: IUnit slots +0x28, +0x34, +0x2C, then the layer.
-  if (mOwnerUnit->IsDead() || mOwnerUnit->IsBeingBuilt() || mOwnerUnit->DestroyQueued() ||
-      mOwnerUnit->mVarDat.mLayerMask == LAYER_Sub) {
+  if (
+    mOwnerUnit->IsDead() || mOwnerUnit->IsBeingBuilt() || mOwnerUnit->DestroyQueued() ||
+    mOwnerUnit->mVarDat.mLayerMask == LAYER_Sub
+  ) {
     return;
   }
 
@@ -1461,8 +1565,10 @@ bool CAiSteeringImpl::ProcessSplineMovement()
       return false;
     }
   } else if (!IsUnitState(mOwnerUnit, UNITSTATE_Immobile) && mOwnerUnit->mUnitVarDat.mStunTicks == 0) {
-    if (IsUnitState(mOwnerUnit, UNITSTATE_Moving) || IsUnitState(mOwnerUnit, UNITSTATE_Patrolling) ||
-        IsUnitState(mOwnerUnit, UNITSTATE_Attacking)) {
+    if (
+      IsUnitState(mOwnerUnit, UNITSTATE_Moving) || IsUnitState(mOwnerUnit, UNITSTATE_Patrolling) ||
+      IsUnitState(mOwnerUnit, UNITSTATE_Attacking)
+    ) {
       UpdatePath(GetVal(), mDestination, true);
       CheckCollisions();
     }
@@ -1472,8 +1578,10 @@ bool CAiSteeringImpl::ProcessSplineMovement()
   if (mPausedForStateTransition == 0) {
     if (mCollisionInfo.mCollisionType == COLLISIONTYPE_5) {
       UpdatePath(4, mDestination, true);
-    } else if (mCollisionInfo.mCollisionType == COLLISIONTYPE_1 && sim &&
-               static_cast<std::int32_t>(sim->mCurTick) >= mCollisionInfo.mTickGate) {
+    } else if (
+      mCollisionInfo.mCollisionType == COLLISIONTYPE_1 && sim &&
+      static_cast<std::int32_t>(sim->mCurTick) >= mCollisionInfo.mTickGate
+    ) {
       ResolvePossibleCollisionState(*this);
 
       switch (mCollisionInfo.mCollisionType) {
@@ -1518,7 +1626,8 @@ bool CAiSteeringImpl::DriveToNextWaypoint()
   if (mOwnerUnit && mOwnerUnit->SimulationRef) {
     // 0x005D3008..0x005D301A entry trace ("  0x%08x->DriveToNextWaypoint()\n").
     mOwnerUnit->SimulationRef->Logf(
-      "  0x%08x->DriveToNextWaypoint()\n", static_cast<std::uint32_t>(mOwnerUnit->GetEntityId()));
+      "  0x%08x->DriveToNextWaypoint()\n", static_cast<std::uint32_t>(mOwnerUnit->GetEntityId())
+    );
   }
 
   const bool processResult = ProcessSplineMovement();
@@ -1623,7 +1732,11 @@ int CAiSteeringImpl::Execute()
  * Address: 0x005D3C30 (FUN_005D3C30,
  * ?AI_CreateSteering@Moho@@YAPAVIAiSteering@1@PAVUnit@1@PAVCUnitMotion@1@W4ELayer@1@@Z)
  */
-IAiSteering* moho::AI_CreateSteering(Unit* const unit, CUnitMotion* const motion, const ELayer layer)
+IAiSteering* moho::AI_CreateSteering(
+  Unit* const unit,
+  CUnitMotion* const motion,
+  const ELayer layer
+)
 {
   return new CAiSteeringImpl(unit, motion, layer);
 }

@@ -15,7 +15,10 @@ namespace faf::remote
     std::atomic<std::uint64_t> gVersion{0}; // counts the changes, written under the lock
   } // namespace
 
-  void SetUnderlayPath(const std::uint32_t entityId, const std::string& path)
+  void SetUnderlayPath(
+    const std::uint32_t entityId,
+    const std::string& path
+  )
   {
     const std::lock_guard<std::mutex> lock(gLock);
     gVersion.fetch_add(1u, std::memory_order_release);
@@ -26,7 +29,10 @@ namespace faf::remote
     }
   }
 
-  void CopyUnderlayPath(const std::uint32_t fromEntityId, const std::uint32_t toEntityId)
+  void CopyUnderlayPath(
+    const std::uint32_t fromEntityId,
+    const std::uint32_t toEntityId
+  )
   {
     const std::lock_guard<std::mutex> lock(gLock);
     gVersion.fetch_add(1u, std::memory_order_release);
@@ -37,7 +43,9 @@ namespace faf::remote
     }
   }
 
-  void ForgetUnderlayPath(const std::uint32_t entityId)
+  void ForgetUnderlayPath(
+    const std::uint32_t entityId
+  )
   {
     const std::lock_guard<std::mutex> lock(gLock);
     gVersion.fetch_add(1u, std::memory_order_release);

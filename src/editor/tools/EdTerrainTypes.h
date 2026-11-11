@@ -6,7 +6,8 @@
 
 namespace faf::editor
 {
-  /** A terrain type from the game's `/lua/TerrainTypes.lua`: the byte a map's cell holds (its TypeCode) and its look. */
+  /** A terrain type from the game's `/lua/TerrainTypes.lua`: the byte a map's cell holds (its TypeCode) and its look.
+   */
   struct TerrainTypeInfo
   {
     int code = 1;

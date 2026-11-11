@@ -77,7 +77,9 @@ namespace gpg
      * `NULL` for an empty pointer, otherwise the pointee's lexical text in
      * brackets.
      */
-    [[nodiscard]] fa::string GetLexical(const RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(
+      const RRef& ref
+    ) const override
     {
       const pointer_type& pointer = *static_cast<const pointer_type*>(ref.mObj);
       if (!pointer) {
@@ -106,7 +108,10 @@ namespace gpg
      * What it does:
      * The pointee as element 0; any other index trips the assert.
      */
-    [[nodiscard]] RRef SubscriptIndex(void* const obj, const int ind) const override
+    [[nodiscard]] RRef SubscriptIndex(
+      void* const obj,
+      const int ind
+    ) const override
     {
       if (ind != 0) {
         HandleAssertFailure("index == 0", 65, detail::kReflectSharedPtrHeaderPath);
@@ -118,7 +123,9 @@ namespace gpg
      * What it does:
      * One element while the pointer is set.
      */
-    [[nodiscard]] size_t GetCount(void* const obj) const override
+    [[nodiscard]] size_t GetCount(
+      void* const obj
+    ) const override
     {
       return static_cast<pointer_type*>(obj)->get() != nullptr ? 1u : 0u;
     }

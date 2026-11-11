@@ -34,7 +34,6 @@ namespace moho
    */
   void SC_PrimaryAdapter(const fa::vector<fa::string>& args);
 
-
   /**
    * Address: 0x008D3BE0 (FUN_008D3BE0)
    *
@@ -47,7 +46,6 @@ namespace moho
    * (`CD3DDevice::Clear()` + `InitContext()`) while `sDeviceLock` is held.
    */
   void SC_VerticalSync(const fa::vector<fa::string>& args);
-
 
   /**
    * Address: 0x008D41B0 (FUN_008D41B0)
@@ -64,7 +62,6 @@ namespace moho
    * no-op. More than one argument is a no-op.
    */
   void SC_ToggleCursorClip(const fa::vector<fa::string>& args);
-
 
   /**
    * Address: 0x008D37C0 (FUN_008D37C0)

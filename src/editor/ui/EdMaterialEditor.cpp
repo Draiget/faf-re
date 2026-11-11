@@ -24,14 +24,24 @@ namespace faf::editor
     constexpr const char* kExtension = ".fafgraph.json";
     constexpr int kThumbSize = 64;
 
-    std::uint32_t Bgra(const float r, const float g, const float b)
+    std::uint32_t Bgra(
+      const float r,
+      const float g,
+      const float b
+    )
     {
-      const auto byte = [](const float v) { return static_cast<std::uint32_t>(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f)); };
+      const auto byte = [](const float v) {
+        return static_cast<std::uint32_t>(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f));
+      };
       return 0xFF000000U | (byte(r) << 16) | (byte(g) << 8) | byte(b);
     }
 
-    /** A texture file from the game's files as an RGBA image (at most 1024 across: a graph's input needn't be finer). */
-    bool LoadTexture(const std::string& path, TexImage& out)
+    /** A texture file from the game's files as an RGBA image (at most 1024 across: a graph's input needn't be finer).
+     */
+    bool LoadTexture(
+      const std::string& path,
+      TexImage& out
+    )
     {
       gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
       std::string bytes;
@@ -42,8 +52,10 @@ namespace faf::editor
       options.format = DXGI_FORMAT_B8G8R8A8_UNORM;
       options.mipLevels = 1;
       gpg::gal::imaging::Image image;
-      if (FAILED(codec->Decode(bytes.data(), bytes.size(), options, image)) || image.subresources.empty() ||
-          image.format != DXGI_FORMAT_B8G8R8A8_UNORM) {
+      if (
+        FAILED(codec->Decode(bytes.data(), bytes.size(), options, image)) || image.subresources.empty() ||
+        image.format != DXGI_FORMAT_B8G8R8A8_UNORM
+      ) {
         return false;
       }
       const auto& level = image.subresources.front();
@@ -57,7 +69,8 @@ namespace faf::editor
       out.Reset(size, 4);
       for (int y = 0; y < size; ++y) {
         const int sy = std::min(h - 1, y * h / size);
-        const std::uint8_t* const row = image.bytes.data() + level.offset + static_cast<std::size_t>(sy) * level.rowPitch;
+        const std::uint8_t* const row =
+          image.bytes.data() + level.offset + static_cast<std::size_t>(sy) * level.rowPitch;
         for (int x = 0; x < size; ++x) {
           const std::uint8_t* const p = row + static_cast<std::size_t>(x * w / size) * 4U;
           float* const d = out.Pixel(x, y);
@@ -73,10 +86,13 @@ namespace faf::editor
     std::filesystem::path OwnFolder()
     {
       const char* const local = std::getenv("LOCALAPPDATA");
-      return local != nullptr ? std::filesystem::path(local) / "FAForever" / "Editor" / "graphs" : std::filesystem::path("graphs");
+      return local != nullptr ? std::filesystem::path(local) / "FAForever" / "Editor" / "graphs"
+                              : std::filesystem::path("graphs");
     }
 
-    std::string NameOf(const std::filesystem::path& file)
+    std::string NameOf(
+      const std::filesystem::path& file
+    )
     {
       std::string name = file.filename().string();
       const std::size_t at = name.rfind(kExtension);
@@ -84,8 +100,14 @@ namespace faf::editor
     }
   } // namespace
 
-  std::vector<std::uint32_t> RenderMaterialPreview(const TexImage* albedo, const TexImage* normal, const int mode, const int size, const float yaw,
-                                                   const float lightYaw)
+  std::vector<std::uint32_t> RenderMaterialPreview(
+    const TexImage* albedo,
+    const TexImage* normal,
+    const int mode,
+    const int size,
+    const float yaw,
+    const float lightYaw
+  )
   {
     std::vector<std::uint32_t> pixels(static_cast<std::size_t>(size) * size);
     // The light from above and in front, turned around the sphere by `lightYaw` (0: from the viewer).
@@ -94,7 +116,10 @@ namespace faf::editor
     const float ly = 0.6f;
     const float ll = std::sqrt(lx * lx + ly * ly + lz * lz);
     const float light[3] = {lx / ll, ly / ll, lz / ll};
-    const auto shade = [&](const float u, const float v, const float (&n)[3], const float (&t)[3], const float (&b)[3], const float facing) {
+    const auto shade =
+      [&](
+        const float u, const float v, const float (&n)[3], const float (&t)[3], const float (&b)[3], const float facing
+      ) {
       float base[4] = {0.5f, 0.5f, 0.5f, 1.0f};
       if (albedo != nullptr) {
         albedo->Sample(u, v, base);
@@ -162,12 +187,16 @@ namespace faf::editor
     EdImGuiRenderer::DestroyImage(mPreviewImage);
   }
 
-  void EdMaterialEditor::SetMapFolder(const std::filesystem::path& folder)
+  void EdMaterialEditor::SetMapFolder(
+    const std::filesystem::path& folder
+  )
   {
     mMapFolder = folder;
   }
 
-  void EdMaterialEditor::SetSlotNames(std::vector<std::string> names)
+  void EdMaterialEditor::SetSlotNames(
+    std::vector<std::string> names
+  )
   {
     if (names.empty() && !mSlotNames.empty()) {
       // The map closed: nothing to show the result on, and nothing to put back.
@@ -179,7 +208,9 @@ namespace faf::editor
     mSlotNames = std::move(names);
   }
 
-  bool EdMaterialEditor::TakeLive(LiveImage& out)
+  bool EdMaterialEditor::TakeLive(
+    LiveImage& out
+  )
   {
     if (!mLiveReady) {
       return false;
@@ -190,7 +221,9 @@ namespace faf::editor
     return true;
   }
 
-  bool EdMaterialEditor::TakeRestore(int& slot)
+  bool EdMaterialEditor::TakeRestore(
+    int& slot
+  )
   {
     if (mRestore.empty()) {
       return false;
@@ -200,7 +233,9 @@ namespace faf::editor
     return true;
   }
 
-  bool EdMaterialEditor::TakeApply(Bake& out)
+  bool EdMaterialEditor::TakeApply(
+    Bake& out
+  )
   {
     if (!mBakeReady) {
       return false;
@@ -220,7 +255,9 @@ namespace faf::editor
     mLiveReady = false;
   }
 
-  void EdMaterialEditor::UpdateLive(Doc& doc)
+  void EdMaterialEditor::UpdateLive(
+    Doc& doc
+  )
   {
     if (!mLive || mSlotNames.empty()) {
       return;
@@ -252,7 +289,9 @@ namespace faf::editor
     mLiveSentAt = now;
   }
 
-  void EdMaterialEditor::ApplyBake(Doc& doc)
+  void EdMaterialEditor::ApplyBake(
+    Doc& doc
+  )
   {
     // The graph again at the bake size, apart from the preview's (its cache stays).
     TextureGraphEvaluator bake(*doc.graph);
@@ -272,7 +311,10 @@ namespace faf::editor
       mStatus = "Apply: " + error;
       return;
     }
-    if (const TexImagePtr normals = bake.Result("Normal"); normals != nullptr && mTargetSlot < 9 && !EncodeDds(*normals, DdsKind::Bc1, out.normals, error)) {
+    if (
+      const TexImagePtr normals = bake.Result("Normal");
+      normals != nullptr && mTargetSlot < 9 && !EncodeDds(*normals, DdsKind::Bc1, out.normals, error)
+    ) {
       mStatus = "Apply: " + error;
       return;
     }
@@ -292,7 +334,9 @@ namespace faf::editor
 
   EdMaterialEditor::Doc* EdMaterialEditor::Active()
   {
-    return mActive >= 0 && static_cast<std::size_t>(mActive) < mDocs.size() ? mDocs[static_cast<std::size_t>(mActive)].get() : nullptr;
+    return mActive >= 0 && static_cast<std::size_t>(mActive) < mDocs.size()
+      ? mDocs[static_cast<std::size_t>(mActive)].get()
+      : nullptr;
   }
 
   const EdMaterialEditor::Doc* EdMaterialEditor::Active() const
@@ -306,7 +350,9 @@ namespace faf::editor
     return doc != nullptr ? doc->graph->Nodes().size() : 0U;
   }
 
-  void EdMaterialEditor::OpenForSlot(const int slot)
+  void EdMaterialEditor::OpenForSlot(
+    const int slot
+  )
   {
     if (mDocs.empty()) {
       NewGraph();
@@ -317,7 +363,9 @@ namespace faf::editor
     mBringToFront = true;
   }
 
-  void EdMaterialEditor::SelectFirst(const std::string& type)
+  void EdMaterialEditor::SelectFirst(
+    const std::string& type
+  )
   {
     if (mDocs.empty()) {
       NewGraph();
@@ -332,7 +380,9 @@ namespace faf::editor
     }
   }
 
-  EdMaterialEditor::Doc& EdMaterialEditor::Make(const std::string& name)
+  EdMaterialEditor::Doc& EdMaterialEditor::Make(
+    const std::string& name
+  )
   {
     auto doc = std::make_unique<Doc>();
     doc->name = name;
@@ -342,7 +392,9 @@ namespace faf::editor
     doc->eval->SetTextureLoader(LoadTexture);
     TextureGraphEvaluator* eval = doc->eval.get();
     Doc* raw = doc.get();
-    doc->canvas.SetWarnings([eval](const GraphNode& node) { return eval->Warning(node.id); });
+    doc->canvas.SetWarnings([eval](const GraphNode& node) {
+      return eval->Warning(node.id);
+    });
     doc->canvas.SetThumbnails([raw](const GraphNode& node) {
       const auto found = raw->thumbs.find(node.id);
       return found != raw->thumbs.end() ? found->second.image : std::uint64_t{0};
@@ -360,7 +412,9 @@ namespace faf::editor
     std::string name;
     do {
       name = "Material" + std::to_string(n++);
-    } while (std::any_of(mDocs.begin(), mDocs.end(), [&](const auto& doc) { return doc->name == name; }));
+    } while (std::any_of(mDocs.begin(), mDocs.end(), [&](const auto& doc) {
+      return doc->name == name;
+    }));
     Doc& doc = Make(name);
     StartTextureGraph(*doc.graph);
     doc.undo = {doc.graph->Save()};
@@ -369,7 +423,9 @@ namespace faf::editor
     doc.savedChanges = doc.graph->Changes() - 1; // new: unsaved
   }
 
-  bool EdMaterialEditor::Open(const std::filesystem::path& file)
+  bool EdMaterialEditor::Open(
+    const std::filesystem::path& file
+  )
   {
     std::ifstream in(file, std::ios::binary);
     if (!in) {
@@ -399,7 +455,9 @@ namespace faf::editor
     return true;
   }
 
-  bool EdMaterialEditor::Save(Doc& doc)
+  bool EdMaterialEditor::Save(
+    Doc& doc
+  )
   {
     if (doc.path.empty()) {
       doc.path = Folder() / (doc.name + kExtension);
@@ -417,10 +475,14 @@ namespace faf::editor
     return true;
   }
 
-  void EdMaterialEditor::Snapshot(Doc& doc)
+  void EdMaterialEditor::Snapshot(
+    Doc& doc
+  )
   {
     // One undo step per finished edit: nothing while a button is held (a drag, a slider).
-    if (doc.graph->Changes() == doc.snapChanges || ImGui::IsMouseDown(ImGuiMouseButton_Left) || ImGui::IsAnyItemActive()) {
+    if (
+      doc.graph->Changes() == doc.snapChanges || ImGui::IsMouseDown(ImGuiMouseButton_Left) || ImGui::IsAnyItemActive()
+    ) {
       return;
     }
     const std::string text = doc.graph->Save();
@@ -436,7 +498,10 @@ namespace faf::editor
     doc.undoAt = doc.undo.size() - 1;
   }
 
-  void EdMaterialEditor::Undo(Doc& doc, const bool redo)
+  void EdMaterialEditor::Undo(
+    Doc& doc,
+    const bool redo
+  )
   {
     if (redo ? doc.undoAt + 1 >= doc.undo.size() : doc.undoAt == 0) {
       return;
@@ -449,7 +514,9 @@ namespace faf::editor
     mPreviewStale = true;
   }
 
-  void EdMaterialEditor::Evaluate(Doc& doc)
+  void EdMaterialEditor::Evaluate(
+    Doc& doc
+  )
   {
     // The map nodes read the open map's heights, fetched once and on Refresh.
     bool usesTerrain = false;
@@ -477,7 +544,9 @@ namespace faf::editor
     }
   }
 
-  void EdMaterialEditor::UpdateThumbnails(Doc& doc)
+  void EdMaterialEditor::UpdateThumbnails(
+    Doc& doc
+  )
   {
     for (auto it = doc.thumbs.begin(); it != doc.thumbs.end();) {
       if (doc.graph->Find(it->first) == nullptr) {
@@ -511,13 +580,18 @@ namespace faf::editor
     }
   }
 
-  void EdMaterialEditor::Draw(bool& open)
+  void EdMaterialEditor::Draw(
+    bool& open
+  )
   {
     // First shown over most of the editor, as a document window is.
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.8f, viewport->WorkSize.y * 0.8f), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
-                            ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowPos(
+      ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
+      ImGuiCond_FirstUseEver,
+      ImVec2(0.5f, 0.5f)
+    );
     mFocused = false;
     if (std::exchange(mBringToFront, false)) {
       ImGui::SetNextWindowFocus();
@@ -547,7 +621,11 @@ namespace faf::editor
         if (mSelectTab == static_cast<int>(i)) {
           flags |= ImGuiTabItemFlags_SetSelected;
         }
-        if (ImGui::BeginTabItem((doc.name + "###doc" + std::to_string(reinterpret_cast<std::uintptr_t>(&doc))).c_str(), &keep, flags)) {
+        if (
+          ImGui::BeginTabItem(
+            (doc.name + "###doc" + std::to_string(reinterpret_cast<std::uintptr_t>(&doc))).c_str(), &keep, flags
+          )
+        ) {
           mActive = static_cast<int>(i);
           ImGui::EndTabItem();
         }
@@ -591,7 +669,11 @@ namespace faf::editor
 
     Evaluate(*doc);
 
-    if (ImGui::BeginTable("##layout", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail())) {
+    if (
+      ImGui::BeginTable(
+        "##layout", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail()
+      )
+    ) {
       ImGui::TableSetupColumn("left", ImGuiTableColumnFlags_WidthFixed, 300.0f);
       ImGui::TableSetupColumn("graph", ImGuiTableColumnFlags_WidthStretch);
       ImGui::TableSetupColumn("palette", ImGuiTableColumnFlags_WidthFixed, 220.0f);
@@ -609,8 +691,14 @@ namespace faf::editor
       // (5) The graph over (6) the Stats.
       ImGui::TableSetColumnIndex(1);
       const float statsHeight = ImGui::GetTextLineHeightWithSpacing() * 4.5f;
-      if (ImGui::BeginChild("##graph", ImVec2(0.0f, ImGui::GetContentRegionAvail().y - statsHeight), ImGuiChildFlags_Borders,
-                            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove)) {
+      if (
+        ImGui::BeginChild(
+          "##graph",
+          ImVec2(0.0f, ImGui::GetContentRegionAvail().y - statsHeight),
+          ImGuiChildFlags_Borders,
+          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove
+        )
+      ) {
         if (doc->canvas.Draw(*doc->graph)) {
           Evaluate(*doc);
         }
@@ -674,7 +762,10 @@ namespace faf::editor
       if (ImGui::Button("Save") && doc != nullptr) {
         (void)Save(*doc);
       }
-      ImGui::SetItemTooltip("Writes the graph to %s", (Folder() / ((doc != nullptr ? doc->name : std::string("name")) + kExtension)).string().c_str());
+      ImGui::SetItemTooltip(
+        "Writes the graph to %s",
+        (Folder() / ((doc != nullptr ? doc->name : std::string("name")) + kExtension)).string().c_str()
+      );
       if (ImGui::Button("Home") && doc != nullptr) {
         doc->canvas.FrameAll();
       }
@@ -703,8 +794,9 @@ namespace faf::editor
       const bool haveMap = !mSlotNames.empty();
       ImGui::BeginDisabled(!haveMap);
       ImGui::SetNextItemWidth(Em(190.0f));
-      const std::string current = haveMap && mTargetSlot < static_cast<int>(mSlotNames.size()) ? mSlotNames[static_cast<std::size_t>(mTargetSlot)]
-                                                                                               : std::string("(no map open)");
+      const std::string current = haveMap && mTargetSlot < static_cast<int>(mSlotNames.size())
+        ? mSlotNames[static_cast<std::size_t>(mTargetSlot)]
+        : std::string("(no map open)");
       if (ImGui::BeginCombo("##slot", current.c_str())) {
         for (std::size_t s = 0; s < mSlotNames.size(); ++s) {
           if (ImGui::Selectable(mSlotNames[s].c_str(), static_cast<int>(s) == mTargetSlot)) {
@@ -719,7 +811,9 @@ namespace faf::editor
         StopLive();
       }
       mLiveStale = mLiveStale || ImGui::IsItemDeactivatedAfterEdit();
-      ImGui::SetItemTooltip("Shows the result on the map's terrain in that slot as you edit (not saved: Apply writes it into the map)");
+      ImGui::SetItemTooltip(
+        "Shows the result on the map's terrain in that slot as you edit (not saved: Apply writes it into the map)"
+      );
       ImGui::EndDisabled();
       const bool canApply = haveMap && !mMapFolder.empty() && doc != nullptr;
       ImGui::BeginDisabled(!canApply);
@@ -727,10 +821,14 @@ namespace faf::editor
         ApplyBake(*doc);
       }
       ImGui::EndDisabled();
-      ImGui::SetItemTooltip("%s", canApply ? "Bakes the graph at the bake size into DDS files in the map's env/layers folder and sets the slot to them "
-                                             "(one undo step); a linked Mask paints the stratum's mask"
-                                           : "Apply writes into the map's own folder: open a map from your vault (the game's own maps can't be "
-                                             "changed; File > Save as new map folder makes one)");
+      ImGui::SetItemTooltip(
+        "%s",
+        canApply
+          ? "Bakes the graph at the bake size into DDS files in the map's env/layers folder and sets the slot to them "
+            "(one undo step); a linked Mask paints the stratum's mask"
+          : "Apply writes into the map's own folder: open a map from your vault (the game's own maps can't be "
+            "changed; File > Save as new map folder makes one)"
+      );
       ImGui::SetNextItemWidth(Em(80.0f));
       if (ImGui::BeginCombo("##bake", (std::to_string(mBakeSize) + " px").c_str())) {
         for (const int size : {512, 1024, 2048}) {
@@ -748,7 +846,10 @@ namespace faf::editor
     }
   }
 
-  void EdMaterialEditor::DrawPreview(Doc& doc, const float width)
+  void EdMaterialEditor::DrawPreview(
+    Doc& doc,
+    const float width
+  )
   {
     static const char* const kModes[] = {"Sphere", "Plane 2x2", "Albedo", "Normal", "Mask"};
     ImGui::SetNextItemWidth(Em(110.0f));
@@ -797,20 +898,26 @@ namespace faf::editor
     }
   }
 
-  void EdMaterialEditor::DrawDetails(Doc& doc)
+  void EdMaterialEditor::DrawDetails(
+    Doc& doc
+  )
   {
     ImGui::SeparatorText("Details");
     const std::set<int>& selection = doc.canvas.Selection();
     GraphNode* node = selection.size() == 1 ? doc.graph->Find(*selection.begin()) : nullptr;
     if (node == nullptr) {
-      ImGui::TextWrapped("%s", selection.empty() ? "Select a node to edit its settings." : "Several nodes are selected.");
+      ImGui::TextWrapped(
+        "%s", selection.empty() ? "Select a node to edit its settings." : "Several nodes are selected."
+      );
       ImGui::Spacing();
       ImGui::SeparatorText("Graph");
       ImGui::Text("Name: %s", doc.name.c_str());
       ImGui::TextDisabled("%s", (doc.path.empty() ? Folder() / (doc.name + kExtension) : doc.path).string().c_str());
       ImGui::Spacing();
-      ImGui::TextWrapped("Right-click the graph (or drop a link on empty space) to add a node; drag from the palette on the right. "
-                         "The wheel zooms, the right button drags the view, F frames, Del removes, Ctrl+D duplicates.");
+      ImGui::TextWrapped(
+        "Right-click the graph (or drop a link on empty space) to add a node; drag from the palette on the right. "
+        "The wheel zooms, the right button drags the view, F frames, Del removes, Ctrl+D duplicates."
+      );
       return;
     }
     const NodeType& type = *node->type;
@@ -848,7 +955,9 @@ namespace faf::editor
         break;
       case ParamKind::Choice: {
         int v = static_cast<int>(std::lround(value.value[0]));
-        const char* current = v >= 0 && static_cast<std::size_t>(v) < def.choices.size() ? def.choices[static_cast<std::size_t>(v)].c_str() : "?";
+        const char* current = v >= 0 && static_cast<std::size_t>(v) < def.choices.size()
+          ? def.choices[static_cast<std::size_t>(v)].c_str()
+          : "?";
         if (ImGui::BeginCombo(def.name.c_str(), current)) {
           for (std::size_t c = 0; c < def.choices.size(); ++c) {
             if (ImGui::Selectable(def.choices[c].c_str(), static_cast<int>(c) == v)) {
@@ -894,15 +1003,22 @@ namespace faf::editor
     ImGui::TextDisabled("Computed in %.1f ms", doc.eval->Millis(id));
   }
 
-  void EdMaterialEditor::DrawStats(Doc& doc)
+  void EdMaterialEditor::DrawStats(
+    Doc& doc
+  )
   {
     int warnings = 0;
     for (const GraphNode& node : doc.graph->Nodes()) {
       warnings += doc.eval->Warning(node.id).empty() ? 0 : 1;
     }
     ImGui::BulletText("Nodes: %zu, links: %zu", doc.graph->Nodes().size(), doc.graph->Links().size());
-    ImGui::BulletText("Size: %d x %d; last change: %d nodes computed, %.1f ms in all", doc.eval->Size(), doc.eval->Size(), doc.lastComputed,
-                      doc.lastMillis);
+    ImGui::BulletText(
+      "Size: %d x %d; last change: %d nodes computed, %.1f ms in all",
+      doc.eval->Size(),
+      doc.eval->Size(),
+      doc.lastComputed,
+      doc.lastMillis
+    );
     if (warnings > 0) {
       ImGui::BulletText("Warnings: %d (the nodes outlined in red)", warnings);
     } else {
@@ -910,7 +1026,9 @@ namespace faf::editor
     }
   }
 
-  void EdMaterialEditor::DrawPalette(Doc& doc)
+  void EdMaterialEditor::DrawPalette(
+    Doc& doc
+  )
   {
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputTextWithHint("##search", "Search", mPaletteFilter, sizeof(mPaletteFilter));
@@ -921,8 +1039,12 @@ namespace faf::editor
       }
       std::string haystack = type->title + " " + type->category;
       std::string needle = mPaletteFilter;
-      std::transform(haystack.begin(), haystack.end(), haystack.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
-      std::transform(needle.begin(), needle.end(), needle.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(haystack.begin(), haystack.end(), haystack.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
+      std::transform(needle.begin(), needle.end(), needle.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       if (needle.empty() || haystack.find(needle) != std::string::npos) {
         byCategory[type->category].push_back(type.get());
       }

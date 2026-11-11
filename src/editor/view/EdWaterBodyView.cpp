@@ -23,7 +23,9 @@ namespace faf::editor
     constexpr float kHeightWordScale = 1.0f / 128.0f;
 
     /** The body number at the start of a "water body N ..." line, 0 when it has none. */
-    std::size_t LineBody(const std::string& line)
+    std::size_t LineBody(
+      const std::string& line
+    )
     {
       constexpr const char kPrefix[] = "water body ";
       if (line.rfind(kPrefix, 0) != 0) {
@@ -57,7 +59,7 @@ namespace faf::editor
     } else {
       // As the game sets the shading defaults (STIMap::InstallWaterBodies): the sea's distances below its level.
       const bool seaShading = map->mWaterEnabled != 0u && map->mWaterElevation > map->mWaterElevationDeep &&
-                              map->mWaterElevation > map->mWaterElevationAbyss;
+        map->mWaterElevation > map->mWaterElevationAbyss;
       const float deepBelow = seaShading ? map->mWaterElevation - map->mWaterElevationDeep : 2.5f;
       const float abyssBelow = seaShading ? map->mWaterElevation - map->mWaterElevationAbyss : 15.0f;
       std::vector<std::string> log;
@@ -65,8 +67,9 @@ namespace faf::editor
       const std::vector<moho::SWaterBodyDesc> descs = WaterBodyDescs(read.bodies, deepBelow, abyssBelow, log, &bodyOf);
       // The filler numbers its lines by the bodies it was given; the panel's by the scenario's.
       std::vector<std::string> fillLog;
-      std::unique_ptr<moho::CWaterBodies> filled =
-        descs.empty() ? nullptr : moho::CWaterBodies::Build(field->data, field->width, field->height, kHeightWordScale, descs, &fillLog);
+      std::unique_ptr<moho::CWaterBodies> filled = descs.empty()
+        ? nullptr
+        : moho::CWaterBodies::Build(field->data, field->width, field->height, kHeightWordScale, descs, &fillLog);
       std::vector<bool> fillSkipped(descs.size(), false);
       for (std::string& line : fillLog) {
         const std::size_t desc = LineBody(line);
@@ -121,7 +124,10 @@ namespace faf::editor
     }
   }
 
-  void EdMapScene::DrawWaterBodyGuides(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field)
+  void EdMapScene::DrawWaterBodyGuides(
+    moho::CD3DPrimBatcher& batcher,
+    const moho::CHeightField& field
+  )
   {
     if (mTools == nullptr || !mTools->WaterToolActive()) {
       return;
@@ -149,10 +155,13 @@ namespace faf::editor
         continue;
       }
       const bool chosen = static_cast<int>(i) == selected;
-      const std::uint32_t color = body.dry ? (chosen ? 0xFFE0B060u : 0x90E0B060u) : (chosen ? 0xFF50C8FFu : 0x9050C8FFu);
+      const std::uint32_t color =
+        body.dry ? (chosen ? 0xFFE0B060u : 0x90E0B060u) : (chosen ? 0xFF50C8FFu : 0x9050C8FFu);
       // On the water where it is above the ground, else on the ground.
       const float level = body.dry ? -1.0e9f : body.elevation;
-      const auto at = [&](const float x, const float z, const float lift) { return std::max(ground(x, z), level) + lift; };
+      const auto at = [&](const float x, const float z, const float lift) {
+        return std::max(ground(x, z), level) + lift;
+      };
       const auto line = [&](const float ax, const float az, const float bx, const float bz, const float lift) {
         const int steps = std::max(1, static_cast<int>(std::hypot(bx - ax, bz - az) / 3.0f));
         for (int s = 0; s < steps; ++s) {
@@ -179,7 +188,9 @@ namespace faf::editor
         }
       } else {
         for (std::size_t k = 1; k < body.outline.size(); ++k) {
-          line(body.outline[k - 1].first, body.outline[k - 1].second, body.outline[k].first, body.outline[k].second, 0.5f);
+          line(
+            body.outline[k - 1].first, body.outline[k - 1].second, body.outline[k].first, body.outline[k].second, 0.5f
+          );
         }
       }
       if (chosen) {
@@ -187,8 +198,13 @@ namespace faf::editor
           const auto [x, z] = body.outline[k];
           const std::uint32_t handle = static_cast<int>(k) == mWaterBodyHandle ? 0xFFFFE040u : 0xFFFFFFFFu;
           const float y = at(x, z, 0.8f);
-          quads.insert(quads.end(), {vertex(x - r, y, z - r, handle), vertex(x + r, y, z - r, handle), vertex(x + r, y, z + r, handle),
-                                     vertex(x - r, y, z + r, handle)});
+          quads.insert(
+            quads.end(),
+            {vertex(x - r, y, z - r, handle),
+             vertex(x + r, y, z - r, handle),
+             vertex(x + r, y, z + r, handle),
+             vertex(x - r, y, z + r, handle)}
+          );
         }
       }
       // The seed: a pin standing on the ground, up through the water.
@@ -197,8 +213,13 @@ namespace faf::editor
         const float top = std::max(base, level) + std::max(4.0f, mDistance * 0.03f);
         const std::uint32_t pin = chosen && mWaterBodyHandle == -1 ? 0xFFFFE040u : color;
         batcher.DrawLine(vertex(body.seedX, base, body.seedZ, pin), vertex(body.seedX, top, body.seedZ, pin));
-        quads.insert(quads.end(), {vertex(body.seedX - r, top, body.seedZ - r, pin), vertex(body.seedX + r, top, body.seedZ - r, pin),
-                                   vertex(body.seedX + r, top, body.seedZ + r, pin), vertex(body.seedX - r, top, body.seedZ + r, pin)});
+        quads.insert(
+          quads.end(),
+          {vertex(body.seedX - r, top, body.seedZ - r, pin),
+           vertex(body.seedX + r, top, body.seedZ - r, pin),
+           vertex(body.seedX + r, top, body.seedZ + r, pin),
+           vertex(body.seedX - r, top, body.seedZ + r, pin)}
+        );
       }
       // The bounds: a rectangle of vertices.
       if (body.hasBounds) {
@@ -217,14 +238,19 @@ namespace faf::editor
     }
   }
 
-  int EdMapScene::WaterBodyHandleAt(const POINT at) const
+  int EdMapScene::WaterBodyHandleAt(
+    const POINT at
+  ) const
   {
     if (mCamera == nullptr || mTools == nullptr) {
       return -2;
     }
     const std::vector<WaterBody>& bodies = mTools->EditedWaterBodies();
     const int selected = mTools->SelectedWaterBody();
-    if (selected < 0 || selected >= static_cast<int>(bodies.size()) || !bodies[static_cast<std::size_t>(selected)].raw.empty()) {
+    if (
+      selected < 0 || selected >= static_cast<int>(bodies.size()) ||
+      !bodies[static_cast<std::size_t>(selected)].raw.empty()
+    ) {
       return -2;
     }
     const WaterBody& body = bodies[static_cast<std::size_t>(selected)];
@@ -257,7 +283,10 @@ namespace faf::editor
     return best;
   }
 
-  bool EdMapScene::WaterBodyPress(const HWND window, const POINT at)
+  bool EdMapScene::WaterBodyPress(
+    const HWND window,
+    const POINT at
+  )
   {
     if (mTools == nullptr || !mTools->WaterToolActive()) {
       return false;
@@ -280,15 +309,24 @@ namespace faf::editor
         if (mTools->WaterBodyIsNew()) {
           // A new lake starts a little above the ground clicked: a pond the user then raises.
           body.hasElevation = true;
-          body.elevation = std::round((mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(body.seedX), static_cast<std::int32_t>(body.seedZ)) +
-                                       2.0f) *
-                                      4.0f) /
-                           4.0f;
+          body.elevation = std::round(
+                             (mMap->mTerrainRes->GetHeightAt(
+                                static_cast<std::int32_t>(body.seedX), static_cast<std::int32_t>(body.seedZ)
+                              ) +
+                              2.0f) *
+                             4.0f
+                           ) /
+            4.0f;
           mTools->WaterBodyIsNew() = false;
         }
         mTools->WaterBodyPick() = EdTools::WaterPick::None;
         mTools->WaterBodiesChanged(true);
-        gpg::Logf("editor: water body %d seed at %.0f, %.0f", selected + 1, static_cast<double>(body.seedX), static_cast<double>(body.seedZ));
+        gpg::Logf(
+          "editor: water body %d seed at %.0f, %.0f",
+          selected + 1,
+          static_cast<double>(body.seedX),
+          static_cast<double>(body.seedZ)
+        );
       }
       return true;
     case EdTools::WaterPick::Outline:
@@ -311,7 +349,9 @@ namespace faf::editor
     return true;
   }
 
-  void EdMapScene::WaterBodyDrag(const POINT at)
+  void EdMapScene::WaterBodyDrag(
+    const POINT at
+  )
   {
     if (mWaterBodyHandle == -2 || mTools == nullptr) {
       return;
@@ -320,8 +360,10 @@ namespace faf::editor
     const int selected = mTools->SelectedWaterBody();
     float groundX = 0.0f;
     float groundZ = 0.0f;
-    if (selected < 0 || selected >= static_cast<int>(bodies.size()) ||
-        !GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+    if (
+      selected < 0 || selected >= static_cast<int>(bodies.size()) ||
+      !GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)
+    ) {
       return;
     }
     WaterBody& body = bodies[static_cast<std::size_t>(selected)];
@@ -329,7 +371,9 @@ namespace faf::editor
       body.seedX = std::round(groundX);
       body.seedZ = std::round(groundZ);
     } else if (mWaterBodyHandle < static_cast<int>(body.outline.size())) {
-      body.outline[static_cast<std::size_t>(mWaterBodyHandle)] = {std::round(groundX * 2.0f) / 2.0f, std::round(groundZ * 2.0f) / 2.0f};
+      body.outline[static_cast<std::size_t>(mWaterBodyHandle)] = {
+        std::round(groundX * 2.0f) / 2.0f, std::round(groundZ * 2.0f) / 2.0f
+      };
     }
     mTools->WaterBodiesChanged(false);
   }

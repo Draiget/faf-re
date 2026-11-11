@@ -11,7 +11,9 @@
 
 namespace gpg::gal::vulkan
 {
-  const char* ResultName(const VkResult result) noexcept
+  const char* ResultName(
+    const VkResult result
+  ) noexcept
   {
     switch (result) {
     case VK_SUCCESS:
@@ -53,14 +55,20 @@ namespace gpg::gal::vulkan
     }
   }
 
-  void CheckVk(const char* const file, const int line, const VkResult result)
+  void CheckVk(
+    const char* const file,
+    const int line,
+    const VkResult result
+  )
   {
     if (result >= 0) {
       return;
     }
     char message[128]{};
     std::snprintf(message, sizeof(message), "%s (%d)", ResultName(result), static_cast<int>(result));
-    if (result == VK_ERROR_DEVICE_LOST || result == VK_ERROR_OUT_OF_DEVICE_MEMORY || result == VK_ERROR_OUT_OF_HOST_MEMORY) {
+    if (
+      result == VK_ERROR_DEVICE_LOST || result == VK_ERROR_OUT_OF_DEVICE_MEMORY || result == VK_ERROR_OUT_OF_HOST_MEMORY
+    ) {
       // Logged here, before the throw: whatever catches it may not get to write anything.
       gpg::Warnf("Vulkan: %s at %s(%d)", message, (file != nullptr) ? file : "?", line);
     }
@@ -70,11 +78,16 @@ namespace gpg::gal::vulkan
   namespace
   {
     constexpr VkComponentMapping kIdentity{
-      VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
+      VK_COMPONENT_SWIZZLE_IDENTITY,
+      VK_COMPONENT_SWIZZLE_IDENTITY,
+      VK_COMPONENT_SWIZZLE_IDENTITY,
+      VK_COMPONENT_SWIZZLE_IDENTITY,
     };
   } // namespace
 
-  TextureFormat ToVulkanTexture(const DXGI_FORMAT format) noexcept
+  TextureFormat ToVulkanTexture(
+    const DXGI_FORMAT format
+  ) noexcept
   {
     TextureFormat result{VK_FORMAT_UNDEFINED, kIdentity};
     switch (format) {
@@ -115,7 +128,9 @@ namespace gpg::gal::vulkan
       break;
     case DXGI_FORMAT_A8_UNORM:
       result.format = VK_FORMAT_R8_UNORM;
-      result.swizzle = {VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_R};
+      result.swizzle = {
+        VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_R
+      };
       break;
     case DXGI_FORMAT_R8_UNORM:
       result.format = VK_FORMAT_R8_UNORM;
@@ -202,7 +217,9 @@ namespace gpg::gal::vulkan
     return result;
   }
 
-  VkFormat ToVulkanVertex(const DXGI_FORMAT format) noexcept
+  VkFormat ToVulkanVertex(
+    const DXGI_FORMAT format
+  ) noexcept
   {
     switch (format) {
     case DXGI_FORMAT_R32G32B32A32_FLOAT:
@@ -240,13 +257,17 @@ namespace gpg::gal::vulkan
     }
   }
 
-  bool IsDepthFormat(const VkFormat format) noexcept
+  bool IsDepthFormat(
+    const VkFormat format
+  ) noexcept
   {
     return format == VK_FORMAT_D16_UNORM || format == VK_FORMAT_D32_SFLOAT || format == VK_FORMAT_D24_UNORM_S8_UINT ||
       format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_X8_D24_UNORM_PACK32;
   }
 
-  bool HasStencil(const VkFormat format) noexcept
+  bool HasStencil(
+    const VkFormat format
+  ) noexcept
   {
     return format == VK_FORMAT_D24_UNORM_S8_UINT || format == VK_FORMAT_D32_SFLOAT_S8_UINT;
   }
@@ -256,7 +277,10 @@ namespace gpg::gal::vulkan
 
   namespace
   {
-    [[nodiscard]] VkDeviceSize AlignUp(const VkDeviceSize value, const VkDeviceSize alignment) noexcept
+    [[nodiscard]] VkDeviceSize AlignUp(
+      const VkDeviceSize value,
+      const VkDeviceSize alignment
+    ) noexcept
     {
       return (alignment <= 1U) ? value : (value + alignment - 1U) / alignment * alignment;
     }
@@ -270,13 +294,18 @@ namespace gpg::gal::vulkan
     constexpr VkDeviceSize kPageSize = 8ULL << 20U;
   }
 
-  void UploadAllocator::Initialize(MemoryAllocator& memory, const VkDevice device)
+  void UploadAllocator::Initialize(
+    MemoryAllocator& memory,
+    const VkDevice device
+  )
   {
     mMemory = &memory;
     mDevice = device;
   }
 
-  void UploadAllocator::DestroyPage(Page& page) noexcept
+  void UploadAllocator::DestroyPage(
+    Page& page
+  ) noexcept
   {
     if (page.buffer != VK_NULL_HANDLE) {
       Vk().vkDestroyBuffer(mDevice, page.buffer, nullptr);
@@ -294,28 +323,37 @@ namespace gpg::gal::vulkan
     mCurrent = nullptr;
   }
 
-  UploadAllocator::Page* UploadAllocator::NewPage(const VkDeviceSize size)
+  UploadAllocator::Page* UploadAllocator::NewPage(
+    const VkDeviceSize size
+  )
   {
     auto page = std::make_unique<Page>();
     page->size = size;
     VkBufferCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     info.size = size;
-    info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    info.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+      VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     CheckVk("VulkanCore.cpp", __LINE__, Vk().vkCreateBuffer(mDevice, &info, nullptr, &page->buffer));
     VkMemoryRequirements requirements{};
     Vk().vkGetBufferMemoryRequirements(mDevice, page->buffer, &requirements);
-    page->memory = mMemory->Allocate(
-      requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, true
+    page->memory =
+      mMemory->Allocate(requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, true);
+    CheckVk(
+      "VulkanCore.cpp",
+      __LINE__,
+      Vk().vkBindBufferMemory(mDevice, page->buffer, page->memory.memory, page->memory.offset)
     );
-    CheckVk("VulkanCore.cpp", __LINE__, Vk().vkBindBufferMemory(mDevice, page->buffer, page->memory.memory, page->memory.offset));
     mPages.push_back(std::move(page));
     return mPages.back().get();
   }
 
-  UploadAllocation UploadAllocator::Allocate(const VkDeviceSize bytes, const VkDeviceSize alignment, const std::uint64_t serial)
+  UploadAllocation UploadAllocator::Allocate(
+    const VkDeviceSize bytes,
+    const VkDeviceSize alignment,
+    const std::uint64_t serial
+  )
   {
     const VkDeviceSize size = std::max<VkDeviceSize>(bytes, 1U);
     if (mCurrent != nullptr) {
@@ -347,7 +385,9 @@ namespace gpg::gal::vulkan
     return UploadAllocation{chosen->buffer, 0U, chosen->memory.mapped};
   }
 
-  void UploadAllocator::Retire(const std::uint64_t completedSerial) noexcept
+  void UploadAllocator::Retire(
+    const std::uint64_t completedSerial
+  ) noexcept
   {
     for (const std::unique_ptr<Page>& page : mPages) {
       if (page->busy && page->lastSerial <= completedSerial) {

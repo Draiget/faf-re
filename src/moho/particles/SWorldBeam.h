@@ -13,7 +13,7 @@ namespace gpg
   class ReadArchive;
   class WriteArchive;
   class RType;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -45,12 +45,24 @@ namespace moho
      * handles retained through `CountedPtr`'s copy, the UV lanes); emitted out
      * of line for `fa::vector<SWorldBeam>`'s copy steps. Formerly transcribed
      * as `CopyWorldBeamForVectorMove` in BeamRenderHelpers.cpp, removed 2026-09-10.)
-     * Address: 0x0049FCF0 (FUN_0049FCF0 -- the compiler-generated copy assignment of `SWorldBeam` as emitted for its `fa::vector` instantiation; callers 0x0049E5D0, 0x0049E600, 0x0049F6F0; formerly `CopyAssignWorldBeamAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0049FFD0 (FUN_0049FFD0 -- the compiler-generated copy assignment of `SWorldBeam` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopyAssignWorldBeamIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A0020 (FUN_004A0020 -- the implicit destructor of `SWorldBeam` as emitted for its `fa::vector` instantiation; callers 0x0049F270, 0x004A0150, 0x004A0CE0; formerly `DestroyWorldBeamTextureLanesInPlace` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A0640 (FUN_004A0640 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SWorldBeam` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopyConstructWorldBeamIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A0690 (FUN_004A0690 -- the implicit destructor of `SWorldBeam` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldBeamTextureLanesInPlaceDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A0730 (FUN_004A0730 -- the implicit destructor of `SWorldBeam` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldBeamTextureLanesInPlaceAndReturnSelf` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0049FCF0 (FUN_0049FCF0 -- the compiler-generated copy assignment of `SWorldBeam` as emitted for its
+     * `fa::vector` instantiation; callers 0x0049E5D0, 0x0049E600, 0x0049F6F0; formerly
+     * `CopyAssignWorldBeamAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0049FFD0 (FUN_0049FFD0 -- the compiler-generated copy assignment of `SWorldBeam` as emitted for its
+     * `fa::vector` instantiation; zero callers, unreachable; formerly `CopyAssignWorldBeamIfDestinationPresent` in
+     * moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.) Address: 0x004A0020 (FUN_004A0020 -- the
+     * implicit destructor of `SWorldBeam` as emitted for its `fa::vector` instantiation; callers 0x0049F270,
+     * 0x004A0150, 0x004A0CE0; formerly `DestroyWorldBeamTextureLanesInPlace` in moho/particles/CWorldParticles.cpp
+     * (RULE ONE), removed 2026-09-10.) Address: 0x004A0640 (FUN_004A0640 -- the compiler-generated copy constructor
+     * (placement copy into a raw slot) of `SWorldBeam` as emitted for its `fa::vector` instantiation; zero callers,
+     * unreachable; formerly `CopyConstructWorldBeamIfDestinationPresentDuplicateA` in
+     * moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.) Address: 0x004A0690 (FUN_004A0690 -- the
+     * implicit destructor of `SWorldBeam` as emitted for its `fa::vector` instantiation; zero callers, unreachable;
+     * formerly `DestroyWorldBeamTextureLanesInPlaceDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE),
+     * removed 2026-09-10.) Address: 0x004A0730 (FUN_004A0730 -- the implicit destructor of `SWorldBeam` as emitted for
+     * its `fa::vector` instantiation; zero callers, unreachable; formerly
+     * `DestroyWorldBeamTextureLanesInPlaceAndReturnSelf` in moho/particles/CWorldParticles.cpp (RULE ONE), removed
+     * 2026-09-10.)
      */
     VTransform mCurStart;                    // +0x00
     VTransform mLastStart;                   // +0x1C
@@ -66,10 +78,10 @@ namespace moho
     Vector4f mEndColor;                      // +0xA4
     CountedPtr_CParticleTexture mTexture1;   // +0xB4
     CountedPtr_CParticleTexture mTexture2;   // +0xB8
-    float mUShift = 0.0f;                     // +0xBC
-    float mVShift = 0.0f;                     // +0xC0
-    float mRepeatRate = 0.0f;                 // +0xC4
-    BlendMode mBlendMode = BlendMode::Mode0;  // +0xC8
+    float mUShift = 0.0f;                    // +0xBC
+    float mVShift = 0.0f;                    // +0xC0
+    float mRepeatRate = 0.0f;                // +0xC4
+    BlendMode mBlendMode = BlendMode::Mode0; // +0xC8
 
     /**
      * Address: 0x00490000 (FUN_00490000, Moho::SWorldBeam::MemberDeserialize)
@@ -93,9 +105,7 @@ namespace moho
   static_assert(offsetof(SWorldBeam, mFromStart) == 0x38, "SWorldBeam::mFromStart offset must be 0x38");
   static_assert(offsetof(SWorldBeam, mCurEnd) == 0x3C, "SWorldBeam::mCurEnd offset must be 0x3C");
   static_assert(offsetof(SWorldBeam, mLastEnd) == 0x58, "SWorldBeam::mLastEnd offset must be 0x58");
-  static_assert(
-    offsetof(SWorldBeam, mLastInterpolation) == 0x74, "SWorldBeam::mLastInterpolation offset must be 0x74"
-  );
+  static_assert(offsetof(SWorldBeam, mLastInterpolation) == 0x74, "SWorldBeam::mLastInterpolation offset must be 0x74");
   static_assert(offsetof(SWorldBeam, mStart) == 0x78, "SWorldBeam::mStart offset must be 0x78");
   static_assert(offsetof(SWorldBeam, mEnd) == 0x84, "SWorldBeam::mEnd offset must be 0x84");
   static_assert(offsetof(SWorldBeam, mWidth) == 0x90, "SWorldBeam::mWidth offset must be 0x90");

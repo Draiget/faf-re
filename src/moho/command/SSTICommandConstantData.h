@@ -50,17 +50,20 @@ namespace moho
   };
 
   static_assert(offsetof(SSTICommandConstantData, cmd) == 0x00, "SSTICommandConstantData::cmd offset must be 0x00");
-  static_assert(offsetof(SSTICommandConstantData, mFormationScriptIndex) == 0x04, "SSTICommandConstantData::mFormationScriptIndex offset must be 0x04");
   static_assert(
-    offsetof(SSTICommandConstantData, origin) == 0x08, "SSTICommandConstantData::origin offset must be 0x08"
+    offsetof(SSTICommandConstantData, mFormationScriptIndex) == 0x04,
+    "SSTICommandConstantData::mFormationScriptIndex offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SSTICommandConstantData, origin) == 0x08,
+    "SSTICommandConstantData::origin offset must be 0x08"
   );
   static_assert(offsetof(SSTICommandConstantData, unk1) == 0x18, "SSTICommandConstantData::unk1 offset must be 0x18");
   static_assert(
-    offsetof(SSTICommandConstantData, blueprint) == 0x1C, "SSTICommandConstantData::blueprint offset must be 0x1C"
+    offsetof(SSTICommandConstantData, blueprint) == 0x1C,
+    "SSTICommandConstantData::blueprint offset must be 0x1C"
   );
-  static_assert(
-    offsetof(SSTICommandConstantData, unk2) == 0x20, "SSTICommandConstantData::unk2 offset must be 0x20"
-  );
+  static_assert(offsetof(SSTICommandConstantData, unk2) == 0x20, "SSTICommandConstantData::unk2 offset must be 0x20");
   static_assert(sizeof(SSTICommandConstantData) == 0x3C, "SSTICommandConstantData size must be 0x3C");
   /**
    * Address: 0x00552630 (FUN_00552630, preregister_SSTICommandConstantDataTypeInfo)

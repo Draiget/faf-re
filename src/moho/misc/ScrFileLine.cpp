@@ -68,7 +68,9 @@ namespace
     }
   }
 
-  void ExpandTabsToVisualColumns(fa::string& text)
+  void ExpandTabsToVisualColumns(
+    fa::string& text
+  )
   {
     std::size_t tabIndex = text.find("\t", 0U, 1U);
     while (tabIndex != fa::string::npos) {
@@ -91,7 +93,10 @@ namespace
  * Initializes one script-source line row with line-number text and tab-expanded
  * source content.
  */
-moho::ScrFileLine::ScrFileLine(const int lineNumberOneBased, const fa::string& sourceLineText)
+moho::ScrFileLine::ScrFileLine(
+  const int lineNumberOneBased,
+  const fa::string& sourceLineText
+)
   : mMarkerState(-1)
   , mLineNumberText()
   , mSourceText()
@@ -113,7 +118,9 @@ moho::ScrFileLine::ScrFileLine(const int lineNumberOneBased, const fa::string& s
  * row, initializing each string member to empty SSO state and then
  * assigning the owning-copy of the corresponding source string.
  */
-moho::ScrFileLine::ScrFileLine(const ScrFileLine& other)
+moho::ScrFileLine::ScrFileLine(
+  const ScrFileLine& other
+)
   : mMarkerState(other.mMarkerState)
   , mLineNumberText()
   , mSourceText()
@@ -139,4 +146,3 @@ moho::ScrFileLine::~ScrFileLine()
   mSourceText.tidy(true, 0U);
   mLineNumberText.tidy(true, 0U);
 }
-

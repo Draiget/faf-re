@@ -51,7 +51,12 @@ namespace
    * float denormal range rounds differently from `mulss`. Callers keep the
    * binary's own `lengthSq > length^2` guard.
    */
-  void ScalePlanarToLength(float& x, float& z, const float lengthSq, const float length) noexcept
+  void ScalePlanarToLength(
+    float& x,
+    float& z,
+    const float lengthSq,
+    const float length
+  ) noexcept
   {
     Wm3::Vector3f planar{x, 0.0f, z};
     fa::ScaleVectorToLengthX87(&planar.x, &planar.x, lengthSq, length);
@@ -170,41 +175,34 @@ SteeringParams::SteeringParams(
   const float speedLimit
 ) noexcept
 {
-  ::new (outParams) SteeringParams(
-    unit,
-    *sourcePosition,
-    *destinationPosition,
-    *forwardVector,
-    speedLimit,
-    false
-  );
+  ::new (outParams) SteeringParams(unit, *sourcePosition, *destinationPosition, *forwardVector, speedLimit, false);
   return outParams;
 }
 
 namespace moho
 {
-/**
- * Address: 0x00698FF0 (FUN_00698FF0)
- */
-SteeringParams BuildSteeringParamsFromTransform(
-  Unit* const unit,
-  const VTransform& transform,
-  const Wm3::Vector3f& destination
-) noexcept
-{
-  const Wm3::Quaternionf& q = transform.orient_;
-  Wm3::Vector3f forward{};
-  forward.x = ((q.x * q.z) + (q.w * q.y)) * 2.0f;
-  forward.y = ((q.y * q.z) - (q.w * q.x)) * 2.0f;
-  forward.z = 1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f);
+  /**
+   * Address: 0x00698FF0 (FUN_00698FF0)
+   */
+  SteeringParams BuildSteeringParamsFromTransform(
+    Unit* const unit,
+    const VTransform& transform,
+    const Wm3::Vector3f& destination
+  ) noexcept
+  {
+    const Wm3::Quaternionf& q = transform.orient_;
+    Wm3::Vector3f forward{};
+    forward.x = ((q.x * q.z) + (q.w * q.y)) * 2.0f;
+    forward.y = ((q.y * q.z) - (q.w * q.x)) * 2.0f;
+    forward.z = 1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f);
 
-  Wm3::Vector3f source{};
-  source.x = transform.pos_.x;
-  source.y = 0.0f;
-  source.z = transform.pos_.z;
+    Wm3::Vector3f source{};
+    source.x = transform.pos_.x;
+    source.y = 0.0f;
+    source.z = transform.pos_.z;
 
-  return SteeringParams(unit, source, destination, forward, 0.0f, true);
-}
+    return SteeringParams(unit, source, destination, forward, 0.0f, true);
+  }
 } // namespace moho
 
 /**
@@ -239,9 +237,7 @@ SteeringParams BuildSteeringParamsFromTransform(
   const float maxMagnitude
 ) noexcept
 {
-  const float lengthSq =
-    (inOutDirection->x * inOutDirection->x) +
-    (inOutDirection->y * inOutDirection->y) +
+  const float lengthSq = (inOutDirection->x * inOutDirection->x) + (inOutDirection->y * inOutDirection->y) +
     (inOutDirection->z * inOutDirection->z);
 
   if (lengthSq <= (maxMagnitude * maxMagnitude)) {
@@ -253,9 +249,7 @@ SteeringParams BuildSteeringParamsFromTransform(
   inOutDirection->y = ((blendDirection->y * deltaLength) + maxMagnitude) * inOutDirection->y;
   inOutDirection->z = ((blendDirection->z * deltaLength) + maxMagnitude) * inOutDirection->z;
 
-  const float adjustedLengthSq =
-    (inOutDirection->x * inOutDirection->x) +
-    (inOutDirection->y * inOutDirection->y) +
+  const float adjustedLengthSq = (inOutDirection->x * inOutDirection->x) + (inOutDirection->y * inOutDirection->y) +
     (inOutDirection->z * inOutDirection->z);
   const float normalizeScale = maxMagnitude / std::sqrt(adjustedLengthSq);
 
@@ -285,8 +279,7 @@ float ComputeSteeringSpeedCapFromParams(
     const float inverseLength = 1.0f / std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ));
 
     const float headingAlignment =
-      (params->mForwardXZ.y * (deltaZ * inverseLength)) +
-      (params->mForwardXZ.x * (deltaX * inverseLength));
+      (params->mForwardXZ.y * (deltaZ * inverseLength)) + (params->mForwardXZ.x * (deltaX * inverseLength));
     if (headingAlignment < kHeadingAlignmentThreshold) {
       return 0.0f;
     }
@@ -294,12 +287,8 @@ float ComputeSteeringSpeedCapFromParams(
     return params->mMaxSpeed;
   }
 
-  const float crossLane =
-    (params->mDeltaZ * params->mForwardXZ.x) -
-    (params->mForwardXZ.y * params->mDeltaX);
-  const float turnScale = (crossLane == 0.0f)
-    ? 0.0f
-    : (params->mDistanceSq * kHalfScale) / crossLane;
+  const float crossLane = (params->mDeltaZ * params->mForwardXZ.x) - (params->mForwardXZ.y * params->mDeltaX);
+  const float turnScale = (crossLane == 0.0f) ? 0.0f : (params->mDistanceSq * kHalfScale) / crossLane;
 
   const float radiusLimit = params->mInvTurnRadius;
   const float absTurnScale = std::fabs(turnScale);
@@ -322,92 +311,93 @@ float ComputeSteeringSpeedCapFromParams(
 
 namespace moho
 {
-/**
- * Address: 0x006992C0 (FUN_006992C0)
- */
-Wm3::Vector2f* RotateDirectionTowardTargetLimited(
-  Wm3::Vector2f* const outDirection,
-  float maxTurnRadians,
-  const float sourceX,
-  const float sourceZ,
-  const float targetX,
-  const float targetZ
-) noexcept
-{
-  // 0x006992D1: `comiss pi, maxTurn` / `ja` keeps it; an unordered value is
-  // clamped to pi.
-  if (!(3.1415927f > maxTurnRadians)) {
-    maxTurnRadians = 3.1415927f;
-  }
+  /**
+   * Address: 0x006992C0 (FUN_006992C0)
+   */
+  Wm3::Vector2f* RotateDirectionTowardTargetLimited(
+    Wm3::Vector2f* const outDirection,
+    float maxTurnRadians,
+    const float sourceX,
+    const float sourceZ,
+    const float targetX,
+    const float targetZ
+  ) noexcept
+  {
+    // 0x006992D1: `comiss pi, maxTurn` / `ja` keeps it; an unordered value is
+    // clamped to pi.
+    if (!(3.1415927f > maxTurnRadians)) {
+      maxTurnRadians = 3.1415927f;
+    }
 
-  const float sourceLength = std::sqrt((sourceX * sourceX) + (sourceZ * sourceZ));
-  const float targetLength = std::sqrt((targetX * targetX) + (targetZ * targetZ));
-  const float lengthProduct = sourceLength * targetLength;
-  const float maxTurnCos = fa::cos(maxTurnRadians);
+    const float sourceLength = std::sqrt((sourceX * sourceX) + (sourceZ * sourceZ));
+    const float targetLength = std::sqrt((targetX * targetX) + (targetZ * targetZ));
+    const float lengthProduct = sourceLength * targetLength;
+    const float maxTurnCos = fa::cos(maxTurnRadians);
 
-  if (lengthProduct == 0.0f) {
-    outDirection->x = sourceX;
-    outDirection->y = sourceZ;
+    if (lengthProduct == 0.0f) {
+      outDirection->x = sourceX;
+      outDirection->y = sourceZ;
+      return outDirection;
+    }
+
+    const float dot = (targetZ * sourceZ) + (targetX * sourceX);
+    if (dot >= (maxTurnCos * lengthProduct)) {
+      const float scale = sourceLength / targetLength;
+      outDirection->x = targetX * scale;
+      outDirection->y = targetZ * scale;
+      return outDirection;
+    }
+
+    const float cross = (targetZ * sourceX) - (sourceZ * targetX);
+    const float maxTurnSq = maxTurnRadians * maxTurnRadians;
+    float turnSin = (((maxTurnSq * kTurnSinePolyA) - kTurnSinePolyB) * maxTurnSq + 1.0f) * maxTurnRadians;
+    // 0x006993D1: `comiss cross, 0` / `jb` -> an unordered cross also takes
+    // the negated (`-0.0f - poly`) sine.
+    if (!(cross >= 0.0f)) {
+      turnSin = -turnSin;
+    }
+
+    Wm3::Vector2f turnVector{maxTurnCos, turnSin};
+    if (std::fabs((turnSin * turnSin + maxTurnCos * maxTurnCos) - 1.0f) > kTurnVectorUnitTolerance) {
+      (void)turnVector.Normalize();
+    }
+
+    const float rotatedZ = (turnVector.x * sourceZ) + (turnVector.y * sourceX);
+    outDirection->x = (turnVector.x * sourceX) - (turnVector.y * sourceZ);
+    outDirection->y = rotatedZ;
     return outDirection;
   }
-
-  const float dot = (targetZ * sourceZ) + (targetX * sourceX);
-  if (dot >= (maxTurnCos * lengthProduct)) {
-    const float scale = sourceLength / targetLength;
-    outDirection->x = targetX * scale;
-    outDirection->y = targetZ * scale;
-    return outDirection;
-  }
-
-  const float cross = (targetZ * sourceX) - (sourceZ * targetX);
-  const float maxTurnSq = maxTurnRadians * maxTurnRadians;
-  float turnSin =
-    (((maxTurnSq * kTurnSinePolyA) - kTurnSinePolyB) * maxTurnSq + 1.0f) * maxTurnRadians;
-  // 0x006993D1: `comiss cross, 0` / `jb` -> an unordered cross also takes
-  // the negated (`-0.0f - poly`) sine.
-  if (!(cross >= 0.0f)) {
-    turnSin = -turnSin;
-  }
-
-  Wm3::Vector2f turnVector{maxTurnCos, turnSin};
-  if (std::fabs((turnSin * turnSin + maxTurnCos * maxTurnCos) - 1.0f) > kTurnVectorUnitTolerance) {
-    (void)turnVector.Normalize();
-  }
-
-  const float rotatedZ = (turnVector.x * sourceZ) + (turnVector.y * sourceX);
-  outDirection->x = (turnVector.x * sourceX) - (turnVector.y * sourceZ);
-  outDirection->y = rotatedZ;
-  return outDirection;
-}
 } // namespace moho
 
 namespace moho
 {
-/**
- * Address: 0x00699940 (FUN_00699940)
- */
-Wm3::Quaternionf*
-BuildHeadingQuaternionFromDirection2D(const Wm3::Vector2f* const direction, Wm3::Quaternionf* const outOrientation) noexcept
-{
-  const float directionX = direction ? direction->x : 0.0f;
-  const float negDirectionY = direction ? -direction->y : 0.0f;
+  /**
+   * Address: 0x00699940 (FUN_00699940)
+   */
+  Wm3::Quaternionf* BuildHeadingQuaternionFromDirection2D(
+    const Wm3::Vector2f* const direction,
+    Wm3::Quaternionf* const outOrientation
+  ) noexcept
+  {
+    const float directionX = direction ? direction->x : 0.0f;
+    const float negDirectionY = direction ? -direction->y : 0.0f;
 
-  Wm3::Vector3f matrixRows[3]{};
-  matrixRows[0].x = negDirectionY;
-  matrixRows[0].y = 0.0f;
-  matrixRows[0].z = -directionX;
-  matrixRows[1].x = 0.0f;
-  matrixRows[1].y = 1.0f;
-  matrixRows[1].z = 0.0f;
-  matrixRows[2].x = directionX;
-  matrixRows[2].y = 0.0f;
-  matrixRows[2].z = negDirectionY;
+    Wm3::Vector3f matrixRows[3]{};
+    matrixRows[0].x = negDirectionY;
+    matrixRows[0].y = 0.0f;
+    matrixRows[0].z = -directionX;
+    matrixRows[1].x = 0.0f;
+    matrixRows[1].y = 1.0f;
+    matrixRows[1].z = 0.0f;
+    matrixRows[2].x = directionX;
+    matrixRows[2].y = 0.0f;
+    matrixRows[2].z = negDirectionY;
 
-  Wm3::Quaternionf temp{};
-  (void)moho::MatrixToQuat(matrixRows, &temp);
-  *outOrientation = temp;
-  return outOrientation;
-}
+    Wm3::Quaternionf temp{};
+    (void)moho::MatrixToQuat(matrixRows, &temp);
+    *outOrientation = temp;
+    return outOrientation;
+  }
 } // namespace moho
 
 gpg::RType* CAiPathSpline::sType = nullptr;
@@ -550,13 +540,17 @@ namespace
   gpg::RType* gFastVectorCPathPointType = nullptr;
   gpg::RType* gPathSplineContinuationType = nullptr;
   template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(
+    TSerializer& serializer
+  ) noexcept
   {
     return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
   }
 
   template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
+  void InitializeSerializerNode(
+    TSerializer& serializer
+  ) noexcept
   {
     gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
     serializer.mHelperNext = self;
@@ -564,7 +558,9 @@ namespace
   }
 
   template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(
+    TSerializer& serializer
+  ) noexcept
   {
     if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
       serializer.mHelperNext->mPrev = serializer.mHelperPrev;
@@ -659,7 +655,12 @@ namespace
    * the literal `7`, not `0`. Bound as `RType::serLoadFunc_` via
    * `FastVectorCPathPointTypeInfo::Init` below.
    */
-  void LoadFastVectorCPathPoint(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorCPathPoint(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -694,7 +695,12 @@ namespace
    * the `Load` side confirmed against the `.c`/`.asm`. Bound as
    * `RType::serSaveFunc_` via `FastVectorCPathPointTypeInfo::Init` below.
    */
-  void SaveFastVectorCPathPoint(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorCPathPoint(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -759,7 +765,9 @@ namespace
 /**
  * Address: 0x00596560 (FUN_00596560, sub_596560)
  */
-void moho::ResetCollisionInfo(SCollisionInfo& info)
+void moho::ResetCollisionInfo(
+  SCollisionInfo& info
+)
 {
   info.mUnit.UnlinkFromOwnerChain();
   info.mPos = Wm3::Vector3f::Zero();
@@ -770,7 +778,9 @@ void moho::ResetCollisionInfo(SCollisionInfo& info)
 /**
  * Address: 0x005984E0 (FUN_005984E0, Moho::SCollisionInfo::MemberDeserialize)
  */
-void SCollisionInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+void SCollisionInfo::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -793,7 +803,9 @@ void SCollisionInfo::MemberDeserialize(gpg::ReadArchive* const archive)
 /**
  * Address: 0x005985A0 (FUN_005985A0, Moho::SCollisionInfo::MemberSerialize)
  */
-void SCollisionInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+void SCollisionInfo::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -816,7 +828,9 @@ void SCollisionInfo::MemberSerialize(gpg::WriteArchive* const archive) const
 /**
  * Address: 0x005B5530 (FUN_005B5530, Moho::SContinueInfo::MemberDeserialize)
  */
-void SContinueInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+void SContinueInfo::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -837,7 +851,9 @@ void SContinueInfo::MemberDeserialize(gpg::ReadArchive* const archive)
 /**
  * Address: 0x005B5610 (FUN_005B5610, Moho::SContinueInfo::MemberSerialize)
  */
-void SContinueInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+void SContinueInfo::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -877,7 +893,7 @@ CAiPathSpline::~CAiPathSpline()
 }
 
 /**
-  * Alias of FUN_005B2550 (non-canonical helper lane).
+ * Alias of FUN_005B2550 (non-canonical helper lane).
  */
 void CAiPathSpline::ResetNodesToInline()
 {
@@ -887,7 +903,9 @@ void CAiPathSpline::ResetNodesToInline()
 /**
  * Address: 0x005965E0 (FUN_005965E0, sub_5965E0)
  */
-CPathPoint* CAiPathSpline::TryGetNode(const std::uint32_t index)
+CPathPoint* CAiPathSpline::TryGetNode(
+  const std::uint32_t index
+)
 {
   if (index >= mNodeCount) {
     return nullptr;
@@ -896,9 +914,11 @@ CPathPoint* CAiPathSpline::TryGetNode(const std::uint32_t index)
 }
 
 /**
-    * Alias of FUN_005965E0 (non-canonical helper lane).
+ * Alias of FUN_005965E0 (non-canonical helper lane).
  */
-const CPathPoint* CAiPathSpline::TryGetNode(const std::uint32_t index) const
+const CPathPoint* CAiPathSpline::TryGetNode(
+  const std::uint32_t index
+) const
 {
   if (index >= mNodeCount) {
     return nullptr;
@@ -941,7 +961,10 @@ const CPathPoint* CAiPathSpline::TryGetNode(const std::uint32_t index) const
  * full `MultQuadVec` matrix expansion: the two round differently once a lane
  * is denormal (a level hull's y), and the waypoint heading inherits it.
  */
-int CAiPathSpline::Update(Unit* const unit, const int updateMode)
+int CAiPathSpline::Update(
+  Unit* const unit,
+  const int updateMode
+)
 {
   ResetNodesToInline();
   nodes.Clear();
@@ -961,8 +984,7 @@ int CAiPathSpline::Update(Unit* const unit, const int updateMode)
   const float speedLimit = unit->mInfoCache.mFormationTopSpeed;
 
   const Wm3::Vector3f velocity = unit->GetVelocity();
-  const float speed = std::sqrt(
-    (velocity.x * velocity.x) + (velocity.y * velocity.y) + (velocity.z * velocity.z));
+  const float speed = std::sqrt((velocity.x * velocity.x) + (velocity.y * velocity.y) + (velocity.z * velocity.z));
 
   // Momentum carried into the simulation: the facing scaled to the current
   // speed, so a unit that is stationary but pointed somewhere contributes no
@@ -974,14 +996,11 @@ int CAiPathSpline::Update(Unit* const unit, const int updateMode)
   // saturated vector rather than a flag, and every later use is a dot product
   // whose sign is all that matters.
   Wm3::Vector3f travelDirection{
-    std::numeric_limits<float>::max(),
-    std::numeric_limits<float>::max(),
-    std::numeric_limits<float>::max()
+    std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max()
   };
   if (speed != 0.0f) {
     const float inverseSpeed = 1.0f / speed;
-    travelDirection = Wm3::Vector3f{
-      velocity.x * inverseSpeed, velocity.y * inverseSpeed, velocity.z * inverseSpeed};
+    travelDirection = Wm3::Vector3f{velocity.x * inverseSpeed, velocity.y * inverseSpeed, velocity.z * inverseSpeed};
   }
 
   const RUnitBlueprintPhysics& physics = unit->GetBlueprint()->Physics;
@@ -990,9 +1009,8 @@ int CAiPathSpline::Update(Unit* const unit, const int updateMode)
 
   // Reversing: the hull is travelling against its facing, so the momentum
   // that gets braked points backwards too.
-  const float facingAlignment = (travelDirection.y * forward.y)
-    + (travelDirection.z * forward.z)
-    + (travelDirection.x * forward.x);
+  const float facingAlignment =
+    (travelDirection.y * forward.y) + (travelDirection.z * forward.z) + (travelDirection.x * forward.x);
   if (facingAlignment < 0.0f) {
     step = Wm3::Vector3f{-step.x, -step.y, -step.z};
     point.mState = PPS_2;
@@ -1059,40 +1077,39 @@ int CAiPathSpline::Update(Unit* const unit, const int updateMode)
       }
     }
 
-    if (std::isnan(point.mPosition.x) || std::isnan(point.mPosition.y)
-      || std::isnan(point.mPosition.z)) {
+    if (std::isnan(point.mPosition.x) || std::isnan(point.mPosition.y) || std::isnan(point.mPosition.z)) {
       // Diagnostic dump kept as the original wrote it - the operands that
       // produced the NaN are what makes this reproducible.
       const Wm3::Vector3f& currentPosition = unit->GetPosition();
       gpg::Logf("unit = %s\n", unit->GetBlueprint()->mBlueprintId.c_str());
-      gpg::Logf("curPos = %f, %f, %f\n",
-        currentPosition.x, currentPosition.y, currentPosition.z);
+      gpg::Logf("curPos = %f, %f, %f\n", currentPosition.x, currentPosition.y, currentPosition.z);
       gpg::Logf("oldVel = %f, %f\n", step.x, -step.z);
       gpg::Logf("v = %f, %f\n", newVelocityX, newVelocityZ);
       const Wm3::Vector3f& previousVelocity = mContinuation.mOldVelocity;
-      gpg::Logf("prevSpeed = %f\n", std::sqrt(
-        (previousVelocity.x * previousVelocity.x)
-        + (previousVelocity.y * previousVelocity.y)
-        + (previousVelocity.z * previousVelocity.z)));
-      gpg::Logf("prevPos = %f, %f, %f\n",
+      gpg::Logf(
+        "prevSpeed = %f\n",
+        std::sqrt(
+          (previousVelocity.x * previousVelocity.x) + (previousVelocity.y * previousVelocity.y) +
+          (previousVelocity.z * previousVelocity.z)
+        )
+      );
+      gpg::Logf(
+        "prevPos = %f, %f, %f\n",
         mContinuation.mOldPosition.x,
         mContinuation.mOldPosition.y,
-        mContinuation.mOldPosition.z);
+        mContinuation.mOldPosition.z
+      );
       gpg::Logf("acc = %f, %f\n", brakeX, brakeZ);
     }
 
-    if (planarSpeedSq <= 1.0e-6f
-      && (updateMode == 3 || (updateMode == 4 && nodes.size() > 5))) {
+    if (planarSpeedSq <= 1.0e-6f && (updateMode == 3 || (updateMode == 4 && nodes.size() > 5))) {
       point.mState = PPS_8;
     }
 
     // Nodes sit on the surface the hull actually rides.
-    const float groundElevation =
-      heightField->GetElevation(point.mPosition.x, point.mPosition.z);
+    const float groundElevation = heightField->GetElevation(point.mPosition.x, point.mPosition.z);
     const ERuleBPUnitMovementType motionType = physics.MotionType;
-    if (motionType == RULEUMT_Water
-      || motionType == RULEUMT_AmphibiousFloating
-      || motionType == RULEUMT_Hover) {
+    if (motionType == RULEUMT_Water || motionType == RULEUMT_AmphibiousFloating || motionType == RULEUMT_Hover) {
       float surface = groundElevation;
       // Engine addition (water bodies): the level at the point; -10000 without water.
       const float waterElevation = map->GetWaterElevationAt(point.mPosition.x, point.mPosition.z);
@@ -1136,7 +1153,9 @@ namespace
    * yaw-only orientation hides a wrong y/z lane (both forms agree when
    * x = z = 0); a tilted hover unit does not (replay 26935800 beat 513).
    */
-  [[nodiscard]] Wm3::Vector3f HeadingFromOrientation(const Wm3::Quatf& orient) noexcept
+  [[nodiscard]] Wm3::Vector3f HeadingFromOrientation(
+    const Wm3::Quatf& orient
+  ) noexcept
   {
     Wm3::Vector3f forward = moho::QuatForwardAxis(orient);
     if (std::fabs(forward.y) > 0.99000001f) {
@@ -1149,7 +1168,11 @@ namespace
    * Unit direction of an XZ delta whose length is already known; a zero
    * length yields the FLT_MAX sentinel the binary's inline normalize produces.
    */
-  [[nodiscard]] Wm3::Vector3f DirectionOfDelta(const float deltaX, const float deltaZ, const float length) noexcept
+  [[nodiscard]] Wm3::Vector3f DirectionOfDelta(
+    const float deltaX,
+    const float deltaZ,
+    const float length
+  ) noexcept
   {
     if (length == 0.0f) {
       constexpr float kMax = std::numeric_limits<float>::max();
@@ -1163,7 +1186,10 @@ namespace
    * Distance needed to brake from `speedPerTick` (converted back to units per
    * second) with the stronger of the blueprint's acceleration and brake.
    */
-  [[nodiscard]] float BrakingDistanceFor(const RUnitBlueprintPhysics& physics, const float speedPerTick) noexcept
+  [[nodiscard]] float BrakingDistanceFor(
+    const RUnitBlueprintPhysics& physics,
+    const float speedPerTick
+  ) noexcept
   {
     float decel = physics.MaxAcceleration;
     if (physics.MaxBrake > decel) {
@@ -1176,7 +1202,9 @@ namespace
     return (speedPerSecond * speedPerSecond) / (decel * 2.0f);
   }
 
-  [[nodiscard]] float LargerBlueprintExtent(const Unit& unit) noexcept
+  [[nodiscard]] float LargerBlueprintExtent(
+    const Unit& unit
+  ) noexcept
   {
     const RUnitBlueprint* const blueprint = unit.GetBlueprint();
     float extent = blueprint->mSizeX;
@@ -1258,11 +1286,9 @@ void CAiPathSpline::Generate(
   }
   Wm3::Vector3f toDestination = DirectionOfDelta(deltaX, deltaZ, distance);
   Wm3::Vector3f oldVelocity = unit->GetVelocity();
-  float alignment =
-    (toDestination.z * forward.z) + (toDestination.y * forward.y) + (toDestination.x * forward.x);
-  const float currentSpeed = std::sqrt(
-    ((oldVelocity.x * oldVelocity.x) + (oldVelocity.z * oldVelocity.z)) + (oldVelocity.y * oldVelocity.y)
-  );
+  float alignment = (toDestination.z * forward.z) + (toDestination.y * forward.y) + (toDestination.x * forward.x);
+  const float currentSpeed =
+    std::sqrt(((oldVelocity.x * oldVelocity.x) + (oldVelocity.z * oldVelocity.z)) + (oldVelocity.y * oldVelocity.y));
   float speedRatio = (currentSpeed * 10.0f) / physics.MaxSpeed;
   const bool turnRadiusDominant = physics.TurnRadius > physics.TurnRate;
 
@@ -1307,8 +1333,9 @@ void CAiPathSpline::Generate(
       const float elevation = map->mHeightField->GetElevation(point.mPosition.x, point.mPosition.z);
       // Engine addition (water bodies): the level at the point. Without bodies, the map's level
       // even when its water is off, as the binary reads it.
-      const float depth = elevation - (map->HasWaterBodies()
-        ? map->GetWaterElevationAt(point.mPosition.x, point.mPosition.z) : map->GetWaterElevation());
+      const float depth = elevation -
+        (map->HasWaterBodies() ? map->GetWaterElevationAt(point.mPosition.x, point.mPosition.z)
+                               : map->GetWaterElevation());
       if (depth > depthLimit && depth < 0.0f) {
         const float depthFraction = depth / depthLimit;
         speedScale = 0.5f;
@@ -1463,15 +1490,16 @@ void CAiPathSpline::Generate(
       gpg::Logf("moveVec = %f, %f, %f\n", moveX, 0.0f, moveVec.z);
       const Wm3::Vector3f& prevVel = mContinuation.mOldVelocity;
       gpg::Logf(
-        "prevSpeed = %f\n",
-        std::sqrt(((prevVel.x * prevVel.x) + (prevVel.y * prevVel.y)) + (prevVel.z * prevVel.z))
+        "prevSpeed = %f\n", std::sqrt(((prevVel.x * prevVel.x) + (prevVel.y * prevVel.y)) + (prevVel.z * prevVel.z))
       );
       gpg::Logf("curSpeed = %f\n", speedPerTick);
       gpg::Logf("wantSpeed = %f\n", wantSpeed);
       gpg::Logf("newforward = %f, %f, %f\n", driveHeading.x, driveHeading.y, forward.z);
       gpg::Logf(
         "prevPos = %f, %f, %f\n",
-        mContinuation.mOldPosition.x, mContinuation.mOldPosition.y, mContinuation.mOldPosition.z
+        mContinuation.mOldPosition.x,
+        mContinuation.mOldPosition.y,
+        mContinuation.mOldPosition.z
       );
       gpg::Logf("acc = %f, %f\n", accelX, accelZ);
     }
@@ -1505,63 +1533,63 @@ void CAiPathSpline::Generate(
 
     bool finished = false;
     switch (state) {
-      case PPS_3:
-        finished = speedRatio <= kStoppedSpeedRatio;
-        break;
-      case PPS_4:
-        if (speedRatio > kStoppedSpeedRatio) {
-          break;
-        }
-        state = (physics.MaxSpeedReverse <= 0.0f || physics.RotateOnSpot != 0u) ? PPS_7 : PPS_5;
-        break;
-      case PPS_5: {
-        const float brakingDistance = BrakingDistanceFor(physics, speedPerTick);
-        (void)VecSetLength(&moveVec, LargerBlueprintExtent(*unit) + brakingDistance);
-        const Wm3::Vector3f probe{
-          moveVec.x + point.mPosition.x, moveVec.y + point.mPosition.y, moveVec.z + point.mPosition.z
-        };
-        if (UnitWontFitAt(probe, unit)) {
-          state = PPS_6;
-          break;
-        }
-        const bool keepReversing = doBackup ? (brakingDistance <= remaining) : (alignment <= kReverseAlignedCos);
-        if (!keepReversing) {
-          state = PPS_6;
-        }
+    case PPS_3:
+      finished = speedRatio <= kStoppedSpeedRatio;
+      break;
+    case PPS_4:
+      if (speedRatio > kStoppedSpeedRatio) {
         break;
       }
-      case PPS_6:
-        if (speedRatio > kStoppedSpeedRatio) {
-          break;
-        }
-        if (doBackup) {
-          finished = true;
-          break;
-        }
-        state = PPS_7;
-        break;
-      case PPS_7: {
-        const float brakingDistance = BrakingDistanceFor(physics, speedPerTick);
-        if (mPathType == PT_0 && brakingDistance > remaining) {
-          state = PPS_3;
-        }
-        if (alignment >= kForwardAlignedCos) {
-          break;
-        }
-        (void)VecSetLength(&moveVec, LargerBlueprintExtent(*unit) + brakingDistance);
-        const Wm3::Vector3f probe{
-          moveVec.x + point.mPosition.x, moveVec.y + point.mPosition.y, moveVec.z + point.mPosition.z
-        };
-        if (UnitWontFitAt(probe, unit)) {
-          state = PPS_4;
-        } else if (turnRadiusDominant && UnitIsBlockedAt(probe, unit, 2)) {
-          state = PPS_4;
-        }
+      state = (physics.MaxSpeedReverse <= 0.0f || physics.RotateOnSpot != 0u) ? PPS_7 : PPS_5;
+      break;
+    case PPS_5: {
+      const float brakingDistance = BrakingDistanceFor(physics, speedPerTick);
+      (void)VecSetLength(&moveVec, LargerBlueprintExtent(*unit) + brakingDistance);
+      const Wm3::Vector3f probe{
+        moveVec.x + point.mPosition.x, moveVec.y + point.mPosition.y, moveVec.z + point.mPosition.z
+      };
+      if (UnitWontFitAt(probe, unit)) {
+        state = PPS_6;
         break;
       }
-      default:
-        finished = state == PPS_8;
+      const bool keepReversing = doBackup ? (brakingDistance <= remaining) : (alignment <= kReverseAlignedCos);
+      if (!keepReversing) {
+        state = PPS_6;
+      }
+      break;
+    }
+    case PPS_6:
+      if (speedRatio > kStoppedSpeedRatio) {
         break;
+      }
+      if (doBackup) {
+        finished = true;
+        break;
+      }
+      state = PPS_7;
+      break;
+    case PPS_7: {
+      const float brakingDistance = BrakingDistanceFor(physics, speedPerTick);
+      if (mPathType == PT_0 && brakingDistance > remaining) {
+        state = PPS_3;
+      }
+      if (alignment >= kForwardAlignedCos) {
+        break;
+      }
+      (void)VecSetLength(&moveVec, LargerBlueprintExtent(*unit) + brakingDistance);
+      const Wm3::Vector3f probe{
+        moveVec.x + point.mPosition.x, moveVec.y + point.mPosition.y, moveVec.z + point.mPosition.z
+      };
+      if (UnitWontFitAt(probe, unit)) {
+        state = PPS_4;
+      } else if (turnRadiusDominant && UnitIsBlockedAt(probe, unit, 2)) {
+        state = PPS_4;
+      }
+      break;
+    }
+    default:
+      finished = state == PPS_8;
+      break;
     }
     if (finished) {
       break;
@@ -1574,7 +1602,9 @@ void CAiPathSpline::Generate(
 /**
  * Address: 0x005B5FB0 (FUN_005B5FB0, Moho::CAiPathSpline::MemberDeserialize)
  */
-void CAiPathSpline::MemberDeserialize(gpg::ReadArchive* const archive)
+void CAiPathSpline::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -1608,7 +1638,9 @@ void CAiPathSpline::MemberDeserialize(gpg::ReadArchive* const archive)
 /**
  * Address: 0x005B60E0 (FUN_005B60E0, Moho::CAiPathSpline::MemberSerialize)
  */
-void CAiPathSpline::MemberSerialize(gpg::WriteArchive* const archive) const
+void CAiPathSpline::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -1717,7 +1749,9 @@ void ECollisionTypeTypeInfo::Init()
  * What it does:
  * Executes one non-deleting destruction lane for `CPathPointTypeInfo`.
  */
-[[maybe_unused]] void DestroyCPathPointTypeInfoBody(CPathPointTypeInfo* const typeInfo) noexcept
+[[maybe_unused]] void DestroyCPathPointTypeInfoBody(
+  CPathPointTypeInfo* const typeInfo
+) noexcept
 {
   typeInfo->~CPathPointTypeInfo();
 }
@@ -1779,7 +1813,9 @@ const char* FastVectorCPathPointTypeInfo::GetName() const
  * What it does:
  * Formats vector lexical text and appends the runtime path-point count.
  */
-fa::string FastVectorCPathPointTypeInfo::GetLexical(const gpg::RRef& ref) const
+fa::string FastVectorCPathPointTypeInfo::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -1801,14 +1837,20 @@ const gpg::RIndexed* FastVectorCPathPointTypeInfo::IsIndexed() const
  */
 void FastVectorCPathPointTypeInfo::Init()
 {
-  static_assert(sizeof(gpg::core::FastVectorInline<moho::CPathPoint>) == 0x10, "gpg::core::FastVectorInline<moho::CPathPoint> is 0x10 bytes on x86");
+  static_assert(
+    sizeof(gpg::core::FastVectorInline<moho::CPathPoint>) == 0x10,
+    "gpg::core::FastVectorInline<moho::CPathPoint> is 0x10 bytes on x86"
+  );
   size_ = sizeof(gpg::core::FastVectorInline<moho::CPathPoint>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorCPathPoint;
   serSaveFunc_ = &SaveFastVectorCPathPoint;
 }
 
-gpg::RRef FastVectorCPathPointTypeInfo::SubscriptIndex(void* obj, const int ind) const
+gpg::RRef FastVectorCPathPointTypeInfo::SubscriptIndex(
+  void* obj,
+  const int ind
+) const
 {
   gpg::RRef out{};
   out.mType = gpg::RTypeOf<moho::CPathPoint>();
@@ -1826,7 +1868,9 @@ gpg::RRef FastVectorCPathPointTypeInfo::SubscriptIndex(void* obj, const int ind)
   return out;
 }
 
-size_t FastVectorCPathPointTypeInfo::GetCount(void* obj) const
+size_t FastVectorCPathPointTypeInfo::GetCount(
+  void* obj
+) const
 {
   if (!obj) {
     return 0u;
@@ -1842,7 +1886,10 @@ size_t FastVectorCPathPointTypeInfo::GetCount(void* obj) const
  * Resizes one reflected `fastvector<CPathPoint>` lane and fills new slots
  * with zero vectors plus `PPS_7` state.
  */
-void FastVectorCPathPointTypeInfo::SetCount(void* obj, const int count) const
+void FastVectorCPathPointTypeInfo::SetCount(
+  void* obj,
+  const int count
+) const
 {
   if (!obj || count < 0) {
     return;
@@ -1863,7 +1910,9 @@ void FastVectorCPathPointTypeInfo::SetCount(void* obj, const int count) const
  * Loads path-point position/direction vectors and state enum lanes from a
  * read archive payload.
  */
-void CPathPoint::MemberDeserialize(gpg::ReadArchive* const archive)
+void CPathPoint::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (archive == nullptr) {
     return;
@@ -1896,7 +1945,9 @@ void CPathPoint::MemberDeserialize(gpg::ReadArchive* const archive)
  * Writes `CPathPoint` position/direction vectors and path-state enum lanes
  * into archive storage using reflected runtime types.
  */
-void CPathPoint::MemberSerialize(gpg::WriteArchive* const archive) const
+void CPathPoint::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (archive == nullptr) {
     return;
@@ -1987,19 +2038,42 @@ namespace
   [[maybe_unused]] CPathPointReflectionBootstrap gCPathPointReflectionBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SCollisionInfoTypeInfo_9ee641, moho::register_SCollisionInfoTypeInfo)
-GPG_PREREGISTER_INIT(register_ECollisionTypeTypeInfo_9ee641, moho::register_ECollisionTypeTypeInfo)
-GPG_PREREGISTER_INIT(register_EPathPointStateTypeInfo_9ee641, moho::register_EPathPointStateTypeInfo)
-GPG_PREREGISTER_INIT(register_CPathPointTypeInfo_9ee641, moho::register_CPathPointTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SCollisionInfoTypeInfo_9ee641,
+  moho::register_SCollisionInfoTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_ECollisionTypeTypeInfo_9ee641,
+  moho::register_ECollisionTypeTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_EPathPointStateTypeInfo_9ee641,
+  moho::register_EPathPointStateTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_CPathPointTypeInfo_9ee641,
+  moho::register_CPathPointTypeInfo
+)
 
-GPG_PREREGISTER_INIT(register_FastVectorCPathPointType_9ee641, moho::register_FastVectorCPathPointType)
+GPG_PREREGISTER_INIT(
+  register_FastVectorCPathPointType_9ee641,
+  moho::register_FastVectorCPathPointType
+)
 
-GPG_PREREGISTER_INIT(preregister_FastVectorCPathPointType_9ee641, preregister_FastVectorCPathPointType)
-GPG_PREREGISTER_INIT(construct_EPathPointStateTypeInfo_9ee641, construct_EPathPointStateTypeInfo)
-GPG_PREREGISTER_INIT(construct_CPathPointTypeInfo_9ee641, construct_CPathPointTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_FastVectorCPathPointType_9ee641,
+  preregister_FastVectorCPathPointType
+)
+GPG_PREREGISTER_INIT(
+  construct_EPathPointStateTypeInfo_9ee641,
+  construct_EPathPointStateTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  construct_CPathPointTypeInfo_9ee641,
+  construct_CPathPointTypeInfo
+)
 
 namespace moho
 {

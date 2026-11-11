@@ -35,7 +35,6 @@
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 
-
 namespace moho
 {
   extern bool ren_FogOfWarHidden;
@@ -251,7 +250,9 @@ end
 )lua";
 
     /** "AI: Easy" for "<LOC lobui_0347>AI: Easy". */
-    std::string WithoutLocTag(std::string text)
+    std::string WithoutLocTag(
+      std::string text
+    )
     {
       if (text.rfind("<LOC", 0) == 0) {
         const std::size_t end = text.find('>');
@@ -263,14 +264,18 @@ end
     }
   } // namespace
 
-  void InstallLoadingView(LuaPlus::LuaState* const state)
+  void InstallLoadingView(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state != nullptr && !moho::SCR_LuaDoString(kLoadingView, state)) {
       gpg::Warnf("editor: the loading view did not install; the game's loading screen shows");
     }
   }
 
-  std::string MapDisplayName(const std::string& scenarioPath)
+  std::string MapDisplayName(
+    const std::string& scenarioPath
+  )
   {
     std::string name = scenarioPath;
     const std::size_t slash = name.find_last_of('/');
@@ -324,8 +329,7 @@ end
               entry.title = name.GetString();
             }
           }
-        } catch (const std::exception&) {
-        }
+        } catch (const std::exception&) {}
       }
       if (entry.title.empty()) {
         entry.title = MapDisplayName(entry.path);
@@ -334,7 +338,9 @@ end
       entries.push_back(std::move(entry));
     }
     const auto lower = [](std::string text) {
-      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return text;
     };
     std::sort(entries.begin(), entries.end(), [&](const Entry& a, const Entry& b) {
@@ -361,8 +367,10 @@ end
       return;
     }
     // Each list is a Lua array of tables; `keyField` and `nameField` name the two strings taken.
-    const auto read = [&](const char* module, const char* table, const char* keyField, const char* nameField,
-                          std::vector<PlayChoice>& out) {
+    const auto read =
+      [&](
+        const char* module, const char* table, const char* keyField, const char* nameField, std::vector<PlayChoice>& out
+      ) {
       try {
         const LuaPlus::LuaObject list = moho::SCR_Import(state, module)[table];
         if (!list.IsTable()) {
@@ -377,7 +385,9 @@ end
           const LuaPlus::LuaObject key = entry[keyField];
           const LuaPlus::LuaObject name = entry[nameField];
           if (key.IsString()) {
-            out.push_back({key.GetString(), WithoutLocTag(name.IsString() ? name.GetString() : key.GetString()), std::string()});
+            out.push_back(
+              {key.GetString(), WithoutLocTag(name.IsString() ? name.GetString() : key.GetString()), std::string()}
+            );
           }
         }
       } catch (const std::exception& error) {
@@ -431,8 +441,11 @@ end
           for (int32_t k = 1; ai.IsTable() && k <= ai.GetN(); ++k) {
             const LuaPlus::LuaObject type = ai[k];
             if (type.IsTable() && type["key"].IsString()) {
-              mod.aiTypes.push_back({type["key"].GetString(),
-                                     WithoutLocTag(type["name"].IsString() ? type["name"].GetString() : type["key"].GetString()), mod.uid});
+              mod.aiTypes.push_back(
+                {type["key"].GetString(),
+                 WithoutLocTag(type["name"].IsString() ? type["name"].GetString() : type["key"].GetString()),
+                 mod.uid}
+              );
             }
           }
           mMods.push_back(std::move(mod));
@@ -441,20 +454,29 @@ end
     } catch (const std::exception& error) {
       gpg::Warnf("editor: the mod list: %s", error.what());
     }
-    std::sort(mMods.begin(), mMods.end(), [](const PlayMod& a, const PlayMod& b) { return a.name < b.name; });
+    std::sort(mMods.begin(), mMods.end(), [](const PlayMod& a, const PlayMod& b) {
+      return a.name < b.name;
+    });
     // The AI mods' types after the game's, named with their mod.
     for (const PlayMod& mod : mMods) {
       for (PlayChoice type : mod.aiTypes) {
         // An AI mod may also list the game's own types: those stay the game's.
-        if (std::any_of(mAiTypes.begin(), mAiTypes.end(), [&](const PlayChoice& known) { return known.key == type.key; })) {
+        if (std::any_of(mAiTypes.begin(), mAiTypes.end(), [&](const PlayChoice& known) {
+          return known.key == type.key;
+        })) {
           continue;
         }
         type.name = mod.name + ": " + type.name;
         mAiTypes.push_back(std::move(type));
       }
     }
-    gpg::Logf("editor: %zu sim mods, %zu of them with AI types", mMods.size(),
-              static_cast<std::size_t>(std::count_if(mMods.begin(), mMods.end(), [](const PlayMod& mod) { return !mod.aiTypes.empty(); })));
+    gpg::Logf(
+      "editor: %zu sim mods, %zu of them with AI types",
+      mMods.size(),
+      static_cast<std::size_t>(std::count_if(mMods.begin(), mMods.end(), [](const PlayMod& mod) {
+      return !mod.aiTypes.empty();
+    }))
+    );
     // FAF's quick start plays against "rush".
     mSetup.ai = 0;
     for (std::size_t i = 0; i < mAiTypes.size(); ++i) {
@@ -489,11 +511,18 @@ end
       }
     }
     // Only mods the game data still has.
-    mods.erase(std::remove_if(mods.begin(), mods.end(),
-                              [&](const std::string& uid) {
-                                return std::none_of(mMods.begin(), mMods.end(), [&](const PlayMod& mod) { return mod.uid == uid; });
-                              }),
-               mods.end());
+    mods.erase(
+      std::remove_if(
+        mods.begin(),
+        mods.end(),
+        [&](const std::string& uid) {
+      return std::none_of(mMods.begin(), mMods.end(), [&](const PlayMod& mod) {
+        return mod.uid == uid;
+      });
+    }
+      ),
+      mods.end()
+    );
     std::sort(mods.begin(), mods.end());
     return mods;
   }
@@ -526,7 +555,9 @@ end
     }
   }
 
-  void EdPlay::Select(const int index)
+  void EdPlay::Select(
+    const int index
+  )
   {
     mSelected = index;
     const auto own = mMapSetups.find(SelectedKey());
@@ -538,7 +569,9 @@ end
     }
   }
 
-  void EdPlay::SetKeepsOwnSetup(const bool keep)
+  void EdPlay::SetKeepsOwnSetup(
+    const bool keep
+  )
   {
     mKeepOwnSetup = keep;
     if (keep) {
@@ -549,7 +582,9 @@ end
     WriteSetups();
   }
 
-  void EdPlay::SetSetupsFile(std::string path)
+  void EdPlay::SetSetupsFile(
+    std::string path
+  )
   {
     mSetupsFile = std::move(path);
   }
@@ -560,16 +595,24 @@ end
       return {};
     }
     std::string key = MapDisplayName(mMaps[static_cast<std::size_t>(mSelected)]);
-    std::transform(key.begin(), key.end(), key.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    std::transform(key.begin(), key.end(), key.begin(), [](const unsigned char c) {
+      return static_cast<char>(std::tolower(c));
+    });
     // FAF vault folders carry a version (scmp_009.v0003); every version shares one setup.
-    if (key.size() > 6 && key[key.size() - 6] == '.' && key[key.size() - 5] == 'v' &&
-        std::all_of(key.end() - 4, key.end(), [](const unsigned char c) { return std::isdigit(c) != 0; })) {
+    if (
+      key.size() > 6 && key[key.size() - 6] == '.' && key[key.size() - 5] == 'v' &&
+      std::all_of(key.end() - 4, key.end(), [](const unsigned char c) {
+      return std::isdigit(c) != 0;
+    })
+    ) {
       key.erase(key.size() - 6);
     }
     return key;
   }
 
-  EdPlay::StoredSetup EdPlay::Store(const PlaySetup& setup) const
+  EdPlay::StoredSetup EdPlay::Store(
+    const PlaySetup& setup
+  ) const
   {
     StoredSetup stored;
     stored.withAi = setup.withAi;
@@ -587,10 +630,15 @@ end
     stored.mods = setup.mods;
     stored.slots.clear();
     for (const PlaySlot& slot : setup.slots) {
-      const std::string role = slot.role == PlaySlot::Role::You ? "you" : slot.role == PlaySlot::Role::Ai ? "ai" : "empty";
+      const std::string role = slot.role == PlaySlot::Role::You ? "you"
+        : slot.role == PlaySlot::Role::Ai                       ? "ai"
+                                                                : "empty";
       const std::string key =
-        slot.role == PlaySlot::Role::Ai && slot.ai >= 0 && slot.ai < static_cast<int>(mAiTypes.size()) ? mAiTypes[static_cast<std::size_t>(slot.ai)].key : "";
-      stored.slots += (stored.slots.empty() ? "" : ",") + role + ":" + key + ":" + std::to_string(slot.team) + ":" + std::to_string(slot.faction);
+        slot.role == PlaySlot::Role::Ai && slot.ai >= 0 && slot.ai < static_cast<int>(mAiTypes.size())
+        ? mAiTypes[static_cast<std::size_t>(slot.ai)].key
+        : "";
+      stored.slots += (stored.slots.empty() ? "" : ",") + role + ":" + key + ":" + std::to_string(slot.team) + ":" +
+        std::to_string(slot.faction);
     }
     stored.victory = setup.victory;
     stored.unitCap = setup.unitCap;
@@ -598,7 +646,9 @@ end
     return stored;
   }
 
-  PlaySetup EdPlay::Restore(const StoredSetup& stored) const
+  PlaySetup EdPlay::Restore(
+    const StoredSetup& stored
+  ) const
   {
     PlaySetup setup = mSetup; // an AI the game no longer has keeps the current choice
     setup.withAi = stored.withAi;
@@ -662,8 +712,8 @@ end
   }
 
   // play_setups.ini: a [last] section and a [map <key>] section per map that keeps its own setup,
-  // each with opponents=solo|ai, ai=<key>, faction=<key>|random, fog=0|1, slot=<n from 1>, aicount=<n, 0 all>, prebuilt=0|1,
-  // quickstart=0|1 (missing: on).
+  // each with opponents=solo|ai, ai=<key>, faction=<key>|random, fog=0|1, slot=<n from 1>, aicount=<n, 0 all>,
+  // prebuilt=0|1, quickstart=0|1 (missing: on).
   void EdPlay::ReadSetups()
   {
     mMapSetups.clear();
@@ -737,8 +787,12 @@ end
         }
       }
     }
-    gpg::Logf("editor: play setups from %s (%s last, %zu maps of their own)", mSetupsFile.c_str(),
-              mHaveLastSetup ? "a" : "no", mMapSetups.size());
+    gpg::Logf(
+      "editor: play setups from %s (%s last, %zu maps of their own)",
+      mSetupsFile.c_str(),
+      mHaveLastSetup ? "a" : "no",
+      mMapSetups.size()
+    );
   }
 
   void EdPlay::WriteSetups() const
@@ -786,7 +840,8 @@ end
   namespace
   {
     /** The built-in profiles, in the menu's order. */
-    const char* const kBuiltInProfiles[] = {"Solo sandbox", "You vs 1 AI", "2 v 2 with AI", "Free for all with AI", "Watch 4 AI"};
+    const char* const kBuiltInProfiles[] =
+      {"Solo sandbox", "You vs 1 AI", "2 v 2 with AI", "Free for all with AI", "Watch 4 AI"};
   } // namespace
 
   std::vector<PlayProfile> EdPlay::Profiles() const
@@ -801,7 +856,10 @@ end
     return profiles;
   }
 
-  void EdPlay::ApplyProfile(const std::string& name, const int slots)
+  void EdPlay::ApplyProfile(
+    const std::string& name,
+    const int slots
+  )
   {
     if (const auto saved = mProfiles.find(name); saved != mProfiles.end()) {
       mSetup = Restore(saved->second);
@@ -852,7 +910,9 @@ end
     PrepareRules();
   }
 
-  void EdPlay::SaveProfile(const std::string& name)
+  void EdPlay::SaveProfile(
+    const std::string& name
+  )
   {
     if (name.empty()) {
       return;
@@ -867,7 +927,9 @@ end
     return mWholeMap && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing;
   }
 
-  void EdPlay::SetSeesWholeMap(const bool wholeMap)
+  void EdPlay::SetSeesWholeMap(
+    const bool wholeMap
+  )
   {
     moho::CWldSession* const session = moho::WLD_GetActiveSession();
     if (session == nullptr || moho::WLD_GetFrameAction() != moho::EWldFrameAction::Playing || wholeMap == mWholeMap) {
@@ -890,7 +952,9 @@ end
     return mFogHidden && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing;
   }
 
-  void EdPlay::SetFogHidden(const bool hidden)
+  void EdPlay::SetFogHidden(
+    const bool hidden
+  )
   {
     if (hidden == mFogHidden) {
       return;
@@ -901,7 +965,9 @@ end
     gpg::Logf("editor: the view %s the fog", hidden ? "leaves out" : "shows");
   }
 
-  bool EdPlay::StartSession(const std::string& scenario)
+  bool EdPlay::StartSession(
+    const std::string& scenario
+  )
   {
     mPlayerArmy = 0;
     mWholeMap = false;
@@ -928,18 +994,38 @@ end
       gpg::Warnf("editor: the session launcher did not load; playing with FAF's quick start");
       return moho::StartCommandLineSession(scenario.c_str(), false);
     }
-    const bool withAi = (mSetup.withAi || std::any_of(mSetup.slots.begin(), mSetup.slots.end(),
-                                                      [](const PlaySlot& slot) { return slot.role == PlaySlot::Role::Ai; })) &&
-                        mSetup.ai >= 0 && mSetup.ai < static_cast<int>(mAiTypes.size());
+    const bool withAi = (mSetup.withAi ||
+                         std::any_of(
+                           mSetup.slots.begin(),
+                           mSetup.slots.end(),
+                           [](const PlaySlot& slot) {
+      return slot.role == PlaySlot::Role::Ai;
+    }
+                         )) &&
+      mSetup.ai >= 0 && mSetup.ai < static_cast<int>(mAiTypes.size());
     const std::string aiKey = withAi ? mAiTypes[static_cast<std::size_t>(mSetup.ai)].key : std::string{};
-    const int faction = mSetup.faction >= 1 && mSetup.faction <= static_cast<int>(mFactions.size()) ? mSetup.faction : 0;
+    const int faction =
+      mSetup.faction >= 1 && mSetup.faction <= static_cast<int>(mFactions.size()) ? mSetup.faction : 0;
     const char* const fog = mSetup.fog ? "explored" : "none";
-    gpg::Logf("editor: play %s (%s, faction %s, fog %s, slot %d, %d AI, prebuilt %s)", scenario.c_str(), withAi ? aiKey.c_str() : "solo",
-              faction > 0 ? mFactions[static_cast<std::size_t>(faction - 1)].key.c_str() : "random", fog, mSetup.slot + 1,
-              mSetup.aiCount, mSetup.prebuilt ? "on" : "off");
+    gpg::Logf(
+      "editor: play %s (%s, faction %s, fog %s, slot %d, %d AI, prebuilt %s)",
+      scenario.c_str(),
+      withAi ? aiKey.c_str() : "solo",
+      faction > 0 ? mFactions[static_cast<std::size_t>(faction - 1)].key.c_str() : "random",
+      fog,
+      mSetup.slot + 1,
+      mSetup.aiCount,
+      mSetup.prebuilt ? "on" : "off"
+    );
     char extra[160];
-    (void)std::snprintf(extra, sizeof(extra), "__EditorPlayExtra = { slot = %d, aiCount = %d, prebuilt = %s, mods = {", mSetup.slot + 1,
-                        mSetup.aiCount, mSetup.prebuilt ? "true" : "false");
+    (void)std::snprintf(
+      extra,
+      sizeof(extra),
+      "__EditorPlayExtra = { slot = %d, aiCount = %d, prebuilt = %s, mods = {",
+      mSetup.slot + 1,
+      mSetup.aiCount,
+      mSetup.prebuilt ? "true" : "false"
+    );
     std::string extraText = extra;
     const std::vector<std::string> playedMods = PlayedMods();
     for (const std::string& uid : playedMods) {
@@ -947,14 +1033,24 @@ end
     }
     extraText += "}, slots = {";
     for (const PlaySlot& slot : mSetup.slots) {
-      const std::string role = slot.role == PlaySlot::Role::You ? "you" : slot.role == PlaySlot::Role::Ai ? "ai" : "empty";
-      const std::string key = slot.ai >= 0 && slot.ai < static_cast<int>(mAiTypes.size()) ? mAiTypes[static_cast<std::size_t>(slot.ai)].key : "rush";
+      const std::string role = slot.role == PlaySlot::Role::You ? "you"
+        : slot.role == PlaySlot::Role::Ai                       ? "ai"
+                                                                : "empty";
+      const std::string key = slot.ai >= 0 && slot.ai < static_cast<int>(mAiTypes.size())
+        ? mAiTypes[static_cast<std::size_t>(slot.ai)].key
+        : "rush";
       extraText += "{ role = '" + role + "', ai = '" + key + "', team = " + std::to_string(slot.team) +
-                   ", faction = " + std::to_string(slot.faction) + " }, ";
+        ", faction = " + std::to_string(slot.faction) + " }, ";
     }
     char options[160];
-    (void)std::snprintf(options, sizeof(options), "}, victory = '%s', unitCap = %d, cheatMult = '%.1f' }", mSetup.victory.c_str(), mSetup.unitCap,
-                        static_cast<double>(mSetup.cheatMult));
+    (void)std::snprintf(
+      options,
+      sizeof(options),
+      "}, victory = '%s', unitCap = %d, cheatMult = '%.1f' }",
+      mSetup.victory.c_str(),
+      mSetup.unitCap,
+      static_cast<double>(mSetup.cheatMult)
+    );
     (void)moho::SCR_LuaDoString((extraText + options).c_str(), state);
     if (!playedMods.empty()) {
       gpg::Logf("editor: play with %zu mod%s", playedMods.size(), playedMods.size() == 1 ? "" : "s");
@@ -966,8 +1062,13 @@ end
         list += slot.team > 0 ? "/t" + std::to_string(slot.team) : std::string();
         list += slot.faction > 0 ? "/f" + std::to_string(slot.faction) : std::string();
       }
-      gpg::Logf("editor: play slots:%s; victory %s, unit cap %d, AI cheat %.1f", list.c_str(), mSetup.victory.c_str(), mSetup.unitCap,
-                static_cast<double>(mSetup.cheatMult));
+      gpg::Logf(
+        "editor: play slots:%s; victory %s, unit cap %d, AI cheat %.1f",
+        list.c_str(),
+        mSetup.victory.c_str(),
+        mSetup.unitCap,
+        static_cast<double>(mSetup.cheatMult)
+      );
     }
     try {
       const LuaPlus::LuaObject start = state->GetGlobal("EditorStartPlay");
@@ -1023,7 +1124,9 @@ end
       return;
     }
     const auto lower = [](std::string text) {
-      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return text;
     };
     // One map, or several separated by commas: the runs take them in turn.
@@ -1087,8 +1190,12 @@ end
     }
     mAutoQuit = moho::CFG_GetArgOption("/playquit", 0, nullptr);
     mAutoExitApp = moho::CFG_GetArgOption("/playexitapp", 0, nullptr);
-    gpg::Logf("editor: command-line play of %s, %d cycle(s), %.1f s each", MapDisplayName(mMaps[static_cast<std::size_t>(found)]).c_str(),
-              mAutoCyclesLeft, static_cast<double>(mAutoSeconds));
+    gpg::Logf(
+      "editor: command-line play of %s, %d cycle(s), %.1f s each",
+      MapDisplayName(mMaps[static_cast<std::size_t>(found)]).c_str(),
+      mAutoCyclesLeft,
+      static_cast<double>(mAutoSeconds)
+    );
   }
 
   void EdPlay::DriveCommandLineRuns()
@@ -1114,7 +1221,10 @@ end
           mSetup.withAi = true;
           mSetup.ai = mAutoAi;
         }
-        if (const std::vector<PlayProfile> profiles = Profiles(); mAutoProfile >= 1 && mAutoProfile <= static_cast<int>(profiles.size())) {
+        if (
+          const std::vector<PlayProfile> profiles = Profiles();
+          mAutoProfile >= 1 && mAutoProfile <= static_cast<int>(profiles.size())
+        ) {
           ApplyProfile(profiles[static_cast<std::size_t>(mAutoProfile - 1)].name, 8);
         }
         mPlayRequested = true;
@@ -1138,7 +1248,8 @@ end
         // `/playlogarmies`: each army's name and its stance to the others, as the UI sees them (IsAlly).
         if (mAutoLogArmies) {
           if (LuaPlus::LuaState* const state = moho::USER_GetLuaState(); state != nullptr) {
-            (void)moho::SCR_LuaDoString(R"lua(
+            (void)moho::SCR_LuaDoString(
+              R"lua(
 local armies = GetArmiesTable().armiesTable
 for i, a in armies do
     local line = 'editor: army ' .. i .. ' ' .. tostring(a.nickname) .. (a.human and ' (you)' or '') .. ':'
@@ -1149,11 +1260,15 @@ for i, a in armies do
     end
     LOG(line)
 end
-)lua", state);
+)lua",
+              state
+            );
           }
         }
-      } else if (fa::vector<fa::string> poke; !mPokeDone && now - mPlayingSince >= 1.5 && moho::CFG_GetArgOption("/playterrainpoke", 1, &poke) &&
-                                                !poke.empty()) {
+      } else if (
+        fa::vector<fa::string> poke; !mPokeDone && now - mPlayingSince >= 1.5 &&
+        moho::CFG_GetArgOption("/playterrainpoke", 1, &poke) && !poke.empty()
+      ) {
         // `/playterrainpoke x,z,size,height` (WPE.39, editing while the map plays): the rendered terrain's height at
         // (x, z), the sim told to flatten a square there (SimLua FlattenMapRect, the sim's own Lua), and the rendered
         // height again two seconds on: the sim's beat sync (SSyncData::mTerrainUpdate -> SyncTerrain) carries it over.
@@ -1163,25 +1278,52 @@ end
           mPokeX = x;
           mPokeZ = z;
           mPokeAt = now + 2.0;
-          if (const moho::CWldSession* const session = moho::WLD_GetActiveSession(); session != nullptr && session->GetSTIMap() != nullptr) {
-            gpg::Logf("editor: terrain poke: rendered height at %.1f,%.1f before: %.2f", static_cast<double>(x), static_cast<double>(z),
-                      static_cast<double>(session->GetSTIMap()->mHeightField->GetElevation(x, z)));
+          if (
+            const moho::CWldSession* const session = moho::WLD_GetActiveSession();
+            session != nullptr && session->GetSTIMap() != nullptr
+          ) {
+            gpg::Logf(
+              "editor: terrain poke: rendered height at %.1f,%.1f before: %.2f",
+              static_cast<double>(x),
+              static_cast<double>(z),
+              static_cast<double>(session->GetSTIMap()->mHeightField->GetElevation(x, z))
+            );
           }
           char command[200];
-          (void)std::snprintf(command, sizeof(command), "SimLua FlattenMapRect(%g, %g, %g, %g, %g)", static_cast<double>(x - size * 0.5f),
-                              static_cast<double>(z - size * 0.5f), static_cast<double>(size), static_cast<double>(size), static_cast<double>(height));
+          (void)std::snprintf(
+            command,
+            sizeof(command),
+            "SimLua FlattenMapRect(%g, %g, %g, %g, %g)",
+            static_cast<double>(x - size * 0.5f),
+            static_cast<double>(z - size * 0.5f),
+            static_cast<double>(size),
+            static_cast<double>(size),
+            static_cast<double>(height)
+          );
           moho::CON_Execute(command);
           gpg::Logf("editor: terrain poke: %s", command);
           // The sim's own height there, as the sim logs it (the rendered terrain follows only what the camera sees).
-          (void)std::snprintf(command, sizeof(command), "SimLua LOG('editor: terrain poke: the sim height now ', GetTerrainHeight(%g, %g))",
-                              static_cast<double>(x), static_cast<double>(z));
+          (void)std::snprintf(
+            command,
+            sizeof(command),
+            "SimLua LOG('editor: terrain poke: the sim height now ', GetTerrainHeight(%g, %g))",
+            static_cast<double>(x),
+            static_cast<double>(z)
+          );
           moho::CON_Execute(command);
         }
       } else if (mPokeAt > 0.0 && now >= mPokeAt) {
         mPokeAt = 0.0;
-        if (const moho::CWldSession* const session = moho::WLD_GetActiveSession(); session != nullptr && session->GetSTIMap() != nullptr) {
-          gpg::Logf("editor: terrain poke: rendered height at %.1f,%.1f after: %.2f", static_cast<double>(mPokeX), static_cast<double>(mPokeZ),
-                    static_cast<double>(session->GetSTIMap()->mHeightField->GetElevation(mPokeX, mPokeZ)));
+        if (
+          const moho::CWldSession* const session = moho::WLD_GetActiveSession();
+          session != nullptr && session->GetSTIMap() != nullptr
+        ) {
+          gpg::Logf(
+            "editor: terrain poke: rendered height at %.1f,%.1f after: %.2f",
+            static_cast<double>(mPokeX),
+            static_cast<double>(mPokeZ),
+            static_cast<double>(session->GetSTIMap()->mHeightField->GetElevation(mPokeX, mPokeZ))
+          );
         }
       } else if (mAutoWholeMap && mWholeMap && now - mPlayingSince >= static_cast<double>(mAutoSeconds) * 0.5) {
         if (const moho::CWldSession* const session = moho::WLD_GetActiveSession()) {
@@ -1229,12 +1371,20 @@ end
     if (!mQuickStartSimSent) {
       mQuickStartSimSent = true;
       if (!mSetup.prebuilt) { // with prebuilt units FAF has no warp-in
-        moho::CON_Execute("SimLua function __EdQuick(u) u.PlayCommanderWarpInEffect = function(s) s:SetBlockCommandQueue(false) end "
-                          "u:ShowBone(0, true) u:SetBlockCommandQueue(false) end");
-        moho::CON_Execute("SimLua function __EdQuickBones(u) local w = u.Blueprint.Display.WarpInEffect if w and w.HideBones then "
-                          "for _, b in pairs(w.HideBones) do u:HideBone(b, true) end end end");
-        moho::CON_Execute("SimLua local n = 0 for _, a in pairs(ArmyBrains) do for _, u in pairs(a:GetListOfUnits(categories.COMMAND, false)) do "
-                          "__EdQuick(u) __EdQuickBones(u) n = n + 1 end end LOG('editor: quick start: ' .. n .. ' commanders at tick ' .. GetGameTick())");
+        moho::CON_Execute(
+          "SimLua function __EdQuick(u) u.PlayCommanderWarpInEffect = function(s) s:SetBlockCommandQueue(false) end "
+          "u:ShowBone(0, true) u:SetBlockCommandQueue(false) end"
+        );
+        moho::CON_Execute(
+          "SimLua function __EdQuickBones(u) local w = u.Blueprint.Display.WarpInEffect if w and w.HideBones then "
+          "for _, b in pairs(w.HideBones) do u:HideBone(b, true) end end end"
+        );
+        moho::CON_Execute(
+          "SimLua local n = 0 for _, a in pairs(ArmyBrains) do for _, u in pairs(a:GetListOfUnits(categories.COMMAND, "
+          "false)) do "
+          "__EdQuick(u) __EdQuickBones(u) n = n + 1 end end LOG('editor: quick start: ' .. n .. ' commanders at tick ' "
+          ".. GetGameTick())"
+        );
       }
     }
     // The camera: over your commander now, not FAF's zoom to it a second in (its own zoom then stays where it is). The
@@ -1251,7 +1401,8 @@ end
     }
     const moho::CWldSession* const session = moho::WLD_GetActiveSession();
     moho::UserArmy* const army = session != nullptr ? session->GetFocusArmy() : nullptr;
-    moho::CameraImpl* const camera = moho::CAM_GetManager() != nullptr ? moho::CAM_GetManager()->GetCamera("WorldCamera") : nullptr;
+    moho::CameraImpl* const camera =
+      moho::CAM_GetManager() != nullptr ? moho::CAM_GetManager()->GetCamera("WorldCamera") : nullptr;
     if (army == nullptr || camera == nullptr) {
       return;
     }
@@ -1269,7 +1420,11 @@ end
         camera->TargetBox(box, 0.0f);
         camera->TargetNothing();
         mQuickStartPending = false;
-        gpg::Logf("editor: quick start: the camera over your commander at %.0f,%.0f", static_cast<double>(at.x), static_cast<double>(at.z));
+        gpg::Logf(
+          "editor: quick start: the camera over your commander at %.0f,%.0f",
+          static_cast<double>(at.x),
+          static_cast<double>(at.z)
+        );
         return;
       }
     }
@@ -1284,8 +1439,12 @@ end
     const auto now = std::chrono::steady_clock::now();
     if (mLastAction != moho::EWldFrameAction::Inactive) {
       const double ms = std::chrono::duration<double, std::milli>(now - mPhaseStart).count();
-      gpg::Logf("editor: phase %d took %.0f ms (session start to now %.0f ms)", static_cast<int>(mLastAction), ms,
-                std::chrono::duration<double, std::milli>(now - mSessionStart).count());
+      gpg::Logf(
+        "editor: phase %d took %.0f ms (session start to now %.0f ms)",
+        static_cast<int>(mLastAction),
+        ms,
+        std::chrono::duration<double, std::milli>(now - mSessionStart).count()
+      );
     } else {
       mSessionStart = now;
     }
@@ -1308,8 +1467,10 @@ end
     mStopRequested = false;
 
     // Two seconds after a play ends: what the process keeps (WPE.16, memory given back after a play).
-    if (mMemoryCheckAt != std::chrono::steady_clock::time_point{} && std::chrono::steady_clock::now() >= mMemoryCheckAt &&
-        action == moho::EWldFrameAction::Inactive) {
+    if (
+      mMemoryCheckAt != std::chrono::steady_clock::time_point{} && std::chrono::steady_clock::now() >= mMemoryCheckAt &&
+      action == moho::EWldFrameAction::Inactive
+    ) {
       mMemoryCheckAt = {};
       // The editor's UI Lua state holds the play's garbage until its own next collection (0.4 MB a play on
       // SCMP_009), and the Lua range keeps its highest size: collected now, so each play starts from the same
@@ -1319,15 +1480,28 @@ end
       }
       PROCESS_MEMORY_COUNTERS_EX counters{};
       counters.cb = sizeof(counters);
-      if (::GetProcessMemoryInfo(::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters))) {
-        gpg::Logf("editor: after the play, %.1f MB private, %.1f MB working set", static_cast<double>(counters.PrivateUsage) / 1048576.0,
-                  static_cast<double>(counters.WorkingSetSize) / 1048576.0);
+      if (
+        ::GetProcessMemoryInfo(
+          ::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters)
+        )
+      ) {
+        gpg::Logf(
+          "editor: after the play, %.1f MB private, %.1f MB working set",
+          static_cast<double>(counters.PrivateUsage) / 1048576.0,
+          static_cast<double>(counters.WorkingSetSize) / 1048576.0
+        );
       }
       // What the graphics driver holds for the process: video memory, and system memory the GPU reads (DXGI's
       // or Vulkan's own counts), so a play that leaves GPU resources behind shows here.
-      if (gpg::gal::DeviceRuntimeInfo info; gpg::gal::Device::IsReady() && gpg::gal::Device::GetInstance()->GetRuntimeInfo(info)) {
-        gpg::Logf("editor: after the play, GPU memory: %.1f MB video, %.1f MB system", static_cast<double>(info.localUsage) / 1048576.0,
-                  static_cast<double>(info.nonLocalUsage) / 1048576.0);
+      if (
+        gpg::gal::DeviceRuntimeInfo info;
+        gpg::gal::Device::IsReady() && gpg::gal::Device::GetInstance()->GetRuntimeInfo(info)
+      ) {
+        gpg::Logf(
+          "editor: after the play, GPU memory: %.1f MB video, %.1f MB system",
+          static_cast<double>(info.localUsage) / 1048576.0,
+          static_cast<double>(info.nonLocalUsage) / 1048576.0
+        );
       }
       // `/memtrace`: what the play before last left (its caches are warm by now, so this is what stays).
       if (memtrace::Running() && mTracePlay >= 2) {
@@ -1336,13 +1510,10 @@ end
       // The engine's live object counts by type (InstanceCounter), and which changed since the last play.
       if (moho::StatItem* const counts = moho::GetEngineStats()->GetItem("Instance Counts", false); counts != nullptr) {
         std::map<std::string, int> now;
-        counts->VisitChildren(
-          [](moho::StatItem* const child, void* const context) {
-            // The primary slot: instance counters never write the realtime one.
-            (*static_cast<std::map<std::string, int>*>(context))[child->Name().c_str()] = child->GetInt(false);
-          },
-          &now
-        );
+        counts->VisitChildren([](moho::StatItem* const child, void* const context) {
+          // The primary slot: instance counters never write the realtime one.
+          (*static_cast<std::map<std::string, int>*>(context))[child->Name().c_str()] = child->GetInt(false);
+        }, &now);
         std::string changed;
         for (const auto& [name, count] : now) {
           const auto before = mInstanceCounts.find(name);
@@ -1367,8 +1538,14 @@ end
       static lua::ArenaUsage lastArena;
       for (std::size_t c = 0; c < lua::ArenaUsage::kClasses && lastArena.committedBytes != 0; ++c) {
         if (arena.classSpans[c] != lastArena.classSpans[c]) {
-          gpg::Logf("editor:   Lua blocks of %u bytes: %u -> %u spans, %u -> %u blocks free on the shared lists", arena.classBytes[c],
-                    lastArena.classSpans[c], arena.classSpans[c], lastArena.classFreeBlocks[c], arena.classFreeBlocks[c]);
+          gpg::Logf(
+            "editor:   Lua blocks of %u bytes: %u -> %u spans, %u -> %u blocks free on the shared lists",
+            arena.classBytes[c],
+            lastArena.classSpans[c],
+            arena.classSpans[c],
+            lastArena.classFreeBlocks[c],
+            arena.classFreeBlocks[c]
+          );
         }
       }
       lastArena = arena;
@@ -1377,13 +1554,22 @@ end
       // The rules kept between plays (their blueprints' Lua state): what each play adds to it stays.
       if (moho::RRuleGameRules* const kept = moho::RULE_PeekKept(); kept != nullptr) {
         const LuaPlus::LuaState* const rules = static_cast<moho::RRuleGameRulesImpl*>(kept)->mLuaState;
-        gpg::Logf("editor: the kept rules' Lua state counts %d KB", rules != nullptr ? lua_getgccount(rules->m_state) : 0);
+        gpg::Logf(
+          "editor: the kept rules' Lua state counts %d KB", rules != nullptr ? lua_getgccount(rules->m_state) : 0
+        );
       }
-      gpg::Logf("editor: Lua range: %.1f MB committed, %.1f MB in spans (%.1f MB small-block spans, %.1f MB of them free on "
-                "the shared lists; %.1f MB in %zu freed large runs), %zu light cells; the UI state counts %d KB",
-                arena.committedBytes / kMB, arena.spanBytes / kMB, arena.smallSpanBytes / kMB, arena.smallFreeBytes / kMB,
-                arena.freeRunBytes / kMB, arena.freeRuns, arena.lightCells,
-                ui != nullptr ? lua_getgccount(ui->m_state) : 0);
+      gpg::Logf(
+        "editor: Lua range: %.1f MB committed, %.1f MB in spans (%.1f MB small-block spans, %.1f MB of them free on "
+        "the shared lists; %.1f MB in %zu freed large runs), %zu light cells; the UI state counts %d KB",
+        arena.committedBytes / kMB,
+        arena.spanBytes / kMB,
+        arena.smallSpanBytes / kMB,
+        arena.smallFreeBytes / kMB,
+        arena.freeRunBytes / kMB,
+        arena.freeRuns,
+        arena.lightCells,
+        ui != nullptr ? lua_getgccount(ui->m_state) : 0
+      );
 #endif
     }
 

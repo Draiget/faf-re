@@ -68,4 +68,3 @@ namespace moho
 
   static_assert(sizeof(CUnitRefuelTypeInfo) == 0x64, "CUnitRefuelTypeInfo size must be 0x64");
 } // namespace moho
-

@@ -53,8 +53,12 @@ namespace moho
   {
     size_ = sizeof(RPropBlueprintEconomy);
     gpg::RType::Init();
-    AddField<float>("ReclaimMassMax", offsetof(RPropBlueprintEconomy, ReclaimMassMax), 3, "Max Reclaimable mass resource.");
-    AddField<float>("ReclaimEnergyMax", offsetof(RPropBlueprintEconomy, ReclaimEnergyMax), 3, "Max Reclaimable Energy resource.");
+    AddField<float>(
+      "ReclaimMassMax", offsetof(RPropBlueprintEconomy, ReclaimMassMax), 3, "Max Reclaimable mass resource."
+    );
+    AddField<float>(
+      "ReclaimEnergyMax", offsetof(RPropBlueprintEconomy, ReclaimEnergyMax), 3, "Max Reclaimable Energy resource."
+    );
     Finish();
   }
 
@@ -69,4 +73,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RPropBlueprintEconomyTypeInfo_51d7a0, moho::register_RPropBlueprintEconomyTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_RPropBlueprintEconomyTypeInfo_51d7a0,
+  moho::register_RPropBlueprintEconomyTypeInfo
+)

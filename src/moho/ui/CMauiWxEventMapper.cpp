@@ -6,8 +6,7 @@ namespace
   /// The control under the mouse as of the last mouse event (`0x010BDBA0`),
   /// rebound on every MET_MouseEnter / MET_MouseExit in `func_OnMouseMove`.
   moho::WeakPtr<moho::CMauiControl> gMouseOverControl{};
-}
-
+} // namespace
 
 /**
  * Address: 0x007A48D0 (FUN_007A48D0, ??1CMauiWxEventMapper@Moho@@QAE@@Z)
@@ -125,8 +124,7 @@ namespace
       gpg::Warnf("Error running '/lua/ui/game/construction.lua:OnMouseButtonPress': %s", message);
     }
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x007A4970 (FUN_007A4970, func_OnMouseMove)
@@ -207,9 +205,7 @@ void moho::CMauiWxEventMapper::OnMouseMove(
       eventPayload.mSource = previousOver;
       previousOver->PostEvent(eventPayload);
     }
-    if (
-      moho::CMauiControl* const enteredControl = hitControl.GetObjectPtr(); enteredControl != nullptr
-    ) {
+    if (moho::CMauiControl* const enteredControl = hitControl.GetObjectPtr(); enteredControl != nullptr) {
       eventPayload.mEventType = moho::MET_MouseEnter;
       eventPayload.mSource = enteredControl;
       enteredControl->PostEvent(eventPayload);
@@ -220,7 +216,6 @@ void moho::CMauiWxEventMapper::OnMouseMove(
   // ---- Step 4: Dispatch the wx mouse event into typed Maui paths ----
   const bool isPress = mouseEvent.ButtonDown();
   const bool isDoubleClick = mouseEvent.ButtonDClick();
-
 
   if (!isPress && !isDoubleClick) {
     // ---- Non-press paths: release / motion / wheel / skip ----
@@ -349,9 +344,7 @@ namespace
     eventPayload.mModifiers = static_cast<moho::EMauiEventModifier>(modifierBits);
     eventPayload.mSource = nullptr;
 
-    if (
-      moho::CMauiControl* const focused = moho::Maui_CurrentFocusControl.GetObjectPtr(); focused != nullptr
-    ) {
+    if (moho::CMauiControl* const focused = moho::Maui_CurrentFocusControl.GetObjectPtr(); focused != nullptr) {
       eventPayload.mSource = focused;
       if (focused->HandleEvent(eventPayload)) {
         return;
@@ -370,8 +363,7 @@ namespace
     eventPayload.mSource = captureControl;
     (void)captureControl->HandleEvent(eventPayload);
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x007A4FD0 (FUN_007A4FD0)
@@ -404,7 +396,6 @@ void moho::CMauiWxEventMapper::OnKeyDown(
   const MauiEventDispatchGuard dispatchGuard;
   DispatchMauiKeyEventToFocusOrCapture(keyEvent, moho::MET_KeyDown);
 }
-
 
 /**
  * Address: 0x007A50B0 (FUN_007A50B0)

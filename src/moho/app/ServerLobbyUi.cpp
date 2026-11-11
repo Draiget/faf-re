@@ -41,11 +41,15 @@ namespace
   using faf::remote::net::ELobbySignal;
   using faf::remote::net::SLobbySignal;
 
-  /** The participant's virtual connection, as the lobby Lua passes addresses: "a.b.c.d:port" (netlink/EngineLinks.h). */
-  [[nodiscard]] std::string AddressText(const std::int32_t uid)
+  /** The participant's virtual connection, as the lobby Lua passes addresses: "a.b.c.d:port" (netlink/EngineLinks.h).
+   */
+  [[nodiscard]] std::string AddressText(
+    const std::int32_t uid
+  )
   {
     const faf::netlink::EngineAddress address = faf::netlink::EngineAddressFor(uid);
-    return std::string(moho::NET_GetDottedOctetFromUInt32(address.addrHost).c_str()) + ":" + std::to_string(address.portHost);
+    return std::string(moho::NET_GetDottedOctetFromUInt32(address.addrHost).c_str()) + ":" +
+      std::to_string(address.portHost);
   }
 
   class CServerLobbyTask final : public moho::CPullTask<CServerLobbyTask>
@@ -85,7 +89,10 @@ namespace
         if (!message.empty() && message[0] == static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::LaunchInfo)) {
           Launch(message);
         } else {
-          gpg::Warnf("SERVER LOBBY: a game message (%d) before the launch; dropped", message.empty() ? -1 : static_cast<int>(message[0]));
+          gpg::Warnf(
+            "SERVER LOBBY: a game message (%d) before the launch; dropped",
+            message.empty() ? -1 : static_cast<int>(message[0])
+          );
         }
       }
     }
@@ -99,7 +106,9 @@ namespace
     }
   }
 
-  LuaPlus::LuaObject CServerLobbyTask::LobbyMethod(const char* const name) const
+  LuaPlus::LuaObject CServerLobbyTask::LobbyMethod(
+    const char* const name
+  ) const
   {
     if (mLobby == nullptr) {
       throw std::runtime_error("No lobby.");
@@ -107,7 +116,9 @@ namespace
     return moho::SCR_GetLuaTableFieldOrThrow(*mLobby, name, "No lobby.", "Lobby method \"%s\" is unavailable.");
   }
 
-  void CServerLobbyTask::CreateLobby(const SLobbySignal& signal)
+  void CServerLobbyTask::CreateLobby(
+    const SLobbySignal& signal
+  )
   {
     if (mLobby != nullptr) {
       // Plan WPR.50: a role while this game has a lobby: the logical host changed (the old one left or went quiet),
@@ -143,12 +154,19 @@ namespace
     const std::string uidText = std::to_string(faf::remote::ServerSessionUid());
     // No NAT-traversal object: `InternalCreateLobby` takes the session's relay connector (CLobby.cpp).
     mLobby = new LuaPlus::LuaObject(createLobbyFn.Call_UDP(
-      (signal.flags & faf::remote::net::kLobbySignalAutoLobby) != 0, 0, fa::string(signal.name.c_str()), uidText.c_str(), nullptr, 1
+      (signal.flags & faf::remote::net::kLobbySignalAutoLobby) != 0,
+      0,
+      fa::string(signal.name.c_str()),
+      uidText.c_str(),
+      nullptr,
+      1
     ));
     gpg::Logf("SERVER LOBBY: lobby made for \"%s\" (uid %s).", signal.name.c_str(), uidText.c_str());
   }
 
-  void CServerLobbyTask::Launch(const std::vector<std::uint8_t>& message)
+  void CServerLobbyTask::Launch(
+    const std::vector<std::uint8_t>& message
+  )
   {
     mLaunched = true;
     LuaPlus::LuaState* const state = moho::USER_GetLuaState();
@@ -198,7 +216,9 @@ namespace
     launch.source = build.localSourceId;
     faf::remote::client::SetServerLaunch(launch);
     gpg::Logf(
-      "SERVER LOBBY: launched by the server: map %s, client %d, source %u", build.mapName.c_str(), static_cast<int>(build.localClientIndex),
+      "SERVER LOBBY: launched by the server: map %s, client %d, source %u",
+      build.mapName.c_str(),
+      static_cast<int>(build.localClientIndex),
       static_cast<unsigned>(build.localSourceId)
     );
 
@@ -210,13 +230,15 @@ namespace
     sessionInfo->mMapName = build.mapName;
     sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
     sessionInfo->mClientManager = nullptr; // the network driver makes its own (remote/client/NetworkSimDriver.h)
-    moho::LOBBY_ServerSessionLaunched(); // the lobby's screen closes as a launched lobby's does
+    moho::LOBBY_ServerSessionLaunched();   // the lobby's screen closes as a launched lobby's does
     delete mLobby;
     mLobby = nullptr;
     moho::WLD_BeginSession(sessionInfo);
   }
 
-  void CServerLobbyTask::Apply(const SLobbySignal& signal)
+  void CServerLobbyTask::Apply(
+    const SLobbySignal& signal
+  )
   {
     switch (signal.kind) {
     case ELobbySignal::Host: {
@@ -250,8 +272,9 @@ namespace
     }
     case ELobbySignal::LaunchRefused:
     case ELobbySignal::Launching: {
-      const std::string text = signal.kind == ELobbySignal::Launching ? std::string("The game server is starting the match.")
-                                                                      : "The game server won't start this: " + signal.text + ".";
+      const std::string text = signal.kind == ELobbySignal::Launching
+        ? std::string("The game server is starting the match.")
+        : "The game server won't start this: " + signal.text + ".";
       gpg::Logf("SERVER LOBBY: %s", text.c_str());
       // Plan WP2.14: after a refused launch the host's lobby must be put back first (FAF's TryLaunch flattened its game
       // info); our lobby hook's `ServerLaunchRefused` does that and says why. Without the hook: FAF's lobby.lua

@@ -44,9 +44,8 @@ namespace moho
      * Slot: 2
      * Demangled: _purecall
      */
-    virtual IClient* CreateNetClient(
-      const char* name, int idx, int32_t ownerId, unsigned int sourceId, INetConnection* connection
-    ) = 0;
+    virtual IClient*
+    CreateNetClient(const char* name, int idx, int32_t ownerId, unsigned int sourceId, INetConnection* connection) = 0;
 
     /**
      * Address: 0x00A82547

@@ -22,7 +22,9 @@ namespace faf::remote
 {
   namespace
   {
-    [[nodiscard]] CPoseTracker::SRawBone RawBone(const moho::CAniPoseBone& bone) noexcept
+    [[nodiscard]] CPoseTracker::SRawBone RawBone(
+      const moho::CAniPoseBone& bone
+    ) noexcept
     {
       CPoseTracker::SRawBone raw{};
       std::memcpy(raw.transform, &bone.mLocalTransform, sizeof(raw.transform));
@@ -30,7 +32,9 @@ namespace faf::remote
       return raw;
     }
 
-    [[nodiscard]] wire::SPoseBone ReadBone(const moho::CAniPoseBone& bone)
+    [[nodiscard]] wire::SPoseBone ReadBone(
+      const moho::CAniPoseBone& bone
+    )
     {
       const moho::VTransform& local = bone.mLocalTransform;
       const float position[3] = {local.pos_.x, local.pos_.y, local.pos_.z};
@@ -42,7 +46,10 @@ namespace faf::remote
      * Whether a client holding `held` should get `now`: moved by `kMoveSteps` quantiser steps (about M0.3's tolerance:
      * 0.001 in position, 0.0001 in a quaternion component), or other flags.
      */
-    [[nodiscard]] bool Moved(const wire::SPoseBone& held, const wire::SPoseBone& now) noexcept
+    [[nodiscard]] bool Moved(
+      const wire::SPoseBone& held,
+      const wire::SPoseBone& now
+    ) noexcept
     {
       constexpr std::int64_t kMoveSteps = 2;
       for (std::size_t i = 0; i < 3; ++i) {
@@ -59,7 +66,10 @@ namespace faf::remote
     }
 
     /** `now - held`, component by component; the flags are `now`'s. */
-    [[nodiscard]] wire::SPoseBone Difference(const wire::SPoseBone& held, const wire::SPoseBone& now) noexcept
+    [[nodiscard]] wire::SPoseBone Difference(
+      const wire::SPoseBone& held,
+      const wire::SPoseBone& now
+    ) noexcept
     {
       wire::SPoseBone out;
       for (std::size_t i = 0; i < 3; ++i) {
@@ -94,7 +104,9 @@ namespace faf::remote
     moho::gAniPoseUpdatedHook = &OnPoseUpdated;
   }
 
-  void CPoseTracker::OnPoseUpdated(const moho::CAniActor& actor)
+  void CPoseTracker::OnPoseUpdated(
+    const moho::CAniActor& actor
+  )
   {
     // On a pose job's thread (or the sim thread), during the tick: the index doesn't change then, and each actor's
     // update runs once a tick, so only this unit's hook state (and one slot of the marked list) is written here.
@@ -141,18 +153,25 @@ namespace faf::remote
     }
   }
 
-  void CPoseTracker::Unindex(SUnit& unit)
+  void CPoseTracker::Unindex(
+    SUnit& unit
+  )
   {
     if (unit.hook == nullptr || unit.hook->indexedUnder == nullptr) {
       return;
     }
-    if (const auto found = mByActor.find(unit.hook->indexedUnder); found != mByActor.end() && found->second == unit.hook.get()) {
+    if (
+      const auto found = mByActor.find(unit.hook->indexedUnder);
+      found != mByActor.end() && found->second == unit.hook.get()
+    ) {
       mByActor.erase(found);
     }
     unit.hook->indexedUnder = nullptr;
   }
 
-  void CPoseTracker::TakeMarks(SUnit& unit)
+  void CPoseTracker::TakeMarks(
+    SUnit& unit
+  )
   {
     // #118: the hook quantised the marked bones and found them moved: their values only move over (no bone is read).
     SHookState& state = *unit.hook;
@@ -171,7 +190,9 @@ namespace faf::remote
     }
   }
 
-  void CPoseTracker::ReadUnit(SUnit& unit)
+  void CPoseTracker::ReadUnit(
+    SUnit& unit
+  )
   {
     // The actor's current pose, not the unit's published one: a server keeps no client handles, so that one is null
     // for most units (`POSE_HoldClientHandles`), and the actor's poses are recycled in place (`sim_RecyclePose`), the
@@ -234,7 +255,11 @@ namespace faf::remote
     }
   }
 
-  void CPoseTracker::Refresh(const std::span<const std::uint32_t> ids, const std::span<moho::Entity* const> entities, const bool parallel)
+  void CPoseTracker::Refresh(
+    const std::span<const std::uint32_t> ids,
+    const std::span<moho::Entity* const> entities,
+    const bool parallel
+  )
   {
     // Last beat's changes leave first: the units holding them may leave the list below.
     for (SUnit* const unit : mTouched) {
@@ -256,7 +281,10 @@ namespace faf::remote
     mNext.clear(); // the units that left, freed now that nothing of this beat points at them
   }
 
-  void CPoseTracker::Merge(const std::span<const std::uint32_t> ids, const std::span<moho::Entity* const> entities)
+  void CPoseTracker::Merge(
+    const std::span<const std::uint32_t> ids,
+    const std::span<moho::Entity* const> entities
+  )
   {
     mNext.clear();
     std::vector<std::unique_ptr<SUnit>> merged;
@@ -291,7 +319,9 @@ namespace faf::remote
     mUnits.swap(merged);
   }
 
-  void CPoseTracker::ReadAll(const bool parallel)
+  void CPoseTracker::ReadAll(
+    const bool parallel
+  )
   {
     // #118: only the units the hook marked, the new ones and a sixteenth of all (the sweep: what the hook can't see,
     // such as a new actor or a bone a script hid between updates). The first beat reads every unit.
@@ -393,7 +423,10 @@ namespace faf::remote
   }
 
   bool CPoseTracker::EncodeView(
-    const std::span<const std::uint32_t> held, const std::span<const std::uint32_t> heldBefore, const bool fresh, wire::BitWriter& out
+    const std::span<const std::uint32_t> held,
+    const std::span<const std::uint32_t> heldBefore,
+    const bool fresh,
+    wire::BitWriter& out
   ) const
   {
     thread_local std::vector<wire::SUnitPose> lane;
@@ -434,11 +467,15 @@ namespace faf::remote
     return wire::EncodePoseLane(lane, out);
   }
 
-  std::span<const wire::SPoseBone> CPoseTracker::SentPose(const std::uint32_t id) const noexcept
+  std::span<const wire::SPoseBone> CPoseTracker::SentPose(
+    const std::uint32_t id
+  ) const noexcept
   {
-    const auto found = std::lower_bound(mUnits.begin(), mUnits.end(), id, [](const std::unique_ptr<SUnit>& unit, const std::uint32_t value) {
+    const auto found = std::lower_bound(
+      mUnits.begin(), mUnits.end(), id, [](const std::unique_ptr<SUnit>& unit, const std::uint32_t value) {
       return unit->id < value;
-    });
+    }
+    );
     if (found == mUnits.end() || (*found)->id != id) {
       return {};
     }
@@ -446,8 +483,13 @@ namespace faf::remote
   }
 
   bool CPoseTracker::EncodeViewBudgeted(
-    const std::span<const std::uint32_t> held, const std::span<const std::uint32_t> heldBefore, const bool fresh,
-    const std::size_t budgetBytes, const std::span<const float> priority, const std::uint32_t beat, std::vector<SOwedPose>& owed,
+    const std::span<const std::uint32_t> held,
+    const std::span<const std::uint32_t> heldBefore,
+    const bool fresh,
+    const std::size_t budgetBytes,
+    const std::span<const float> priority,
+    const std::uint32_t beat,
+    std::vector<SOwedPose>& owed,
     wire::BitWriter& out
   ) const
   {
@@ -461,8 +503,8 @@ namespace faf::remote
     {
       wire::SUnitPose pose;
       std::size_t bytes = 0;
-      int rank = 2;         // 0: the client must drop the unit's pose; 1: owed past kOwedMaxBeats; 2: the rest
-      float key = 0.0f;     // rank 1: -age; rank 2: the camera order
+      int rank = 2;     // 0: the client must drop the unit's pose; 1: owed past kOwedMaxBeats; 2: the rest
+      float key = 0.0f; // rank 1: -age; rank 2: the camera order
       std::uint32_t since = 0;
       bool wasOwed = false;
     };
@@ -517,7 +559,8 @@ namespace faf::remote
       if (candidate.rank != 0) {
         const std::uint32_t age = beat - since;
         candidate.rank = wasOwed && age >= kOwedMaxBeats ? 1 : 2;
-        candidate.key = candidate.rank == 1 ? -static_cast<float>(age) : (heldIndex < priority.size() ? priority[heldIndex] : 0.0f);
+        candidate.key =
+          candidate.rank == 1 ? -static_cast<float>(age) : (heldIndex < priority.size() ? priority[heldIndex] : 0.0f);
       }
       wire::BitWriter alone;
       if (!wire::EncodePoseLane(std::span<const wire::SUnitPose>(&candidate.pose, 1u), alone)) {
@@ -542,7 +585,9 @@ namespace faf::remote
     }
     // Owed units with no change this beat stay owed (still held, still a unit with a pose).
     std::size_t candidateOwed = 0;
-    std::sort(owedNext.begin(), owedNext.end(), [](const SOwedPose& a, const SOwedPose& b) { return a.id < b.id; });
+    std::sort(owedNext.begin(), owedNext.end(), [](const SOwedPose& a, const SOwedPose& b) {
+      return a.id < b.id;
+    });
     thread_local std::vector<std::uint32_t> considered;
     considered.clear();
     for (const SCandidate& candidate : candidates) {
@@ -559,10 +604,14 @@ namespace faf::remote
       }
     }
     if (candidateOwed != 0u) {
-      std::sort(owedNext.begin(), owedNext.end(), [](const SOwedPose& a, const SOwedPose& b) { return a.id < b.id; });
+      std::sort(owedNext.begin(), owedNext.end(), [](const SOwedPose& a, const SOwedPose& b) {
+        return a.id < b.id;
+      });
     }
     owed.swap(owedNext);
-    std::sort(lane.begin(), lane.end(), [](const wire::SUnitPose& a, const wire::SUnitPose& b) { return a.id < b.id; });
+    std::sort(lane.begin(), lane.end(), [](const wire::SUnitPose& a, const wire::SUnitPose& b) {
+      return a.id < b.id;
+    });
     return wire::EncodePoseLane(lane, out);
   }
 } // namespace faf::remote

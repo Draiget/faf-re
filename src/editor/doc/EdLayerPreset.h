@@ -13,9 +13,12 @@ namespace faf::editor
     float albedoSize = 4.0f;
     float normalsSize = 4.0f;
 
-    bool operator==(const LayerSettings& other) const
+    bool operator==(
+      const LayerSettings& other
+    ) const
     {
-      return albedo == other.albedo && normals == other.normals && albedoSize == other.albedoSize && normalsSize == other.normalsSize;
+      return albedo == other.albedo && normals == other.normals && albedoSize == other.albedoSize &&
+        normalsSize == other.normalsSize;
     }
   };
 
@@ -31,5 +34,6 @@ namespace faf::editor
    * one to Stratum9 the upper one. Reading needs all ten.
    */
   std::string LayersToScmst(const std::string& shader, const std::vector<LayerSettings>& layers);
-  bool LayersFromScmst(const std::string& text, std::string& shader, std::vector<LayerSettings>& layers, std::string& error);
+  bool
+  LayersFromScmst(const std::string& text, std::string& shader, std::vector<LayerSettings>& layers, std::string& error);
 } // namespace faf::editor

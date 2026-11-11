@@ -14,7 +14,9 @@
 
 namespace
 {
-  std::wstring Quote(const wchar_t* arg)
+  std::wstring Quote(
+    const wchar_t* arg
+  )
   {
     std::wstring s = L"\"";
     s += arg;
@@ -22,10 +24,13 @@ namespace
     return s;
   }
 
-  bool LogSaysOver(const wchar_t* path)
+  bool LogSaysOver(
+    const wchar_t* path
+  )
   {
-    HANDLE f = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
-                           OPEN_EXISTING, 0, nullptr);
+    HANDLE f = CreateFileW(
+      path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0, nullptr
+    );
     if (f == INVALID_HANDLE_VALUE) {
       return false;
     }
@@ -44,7 +49,10 @@ namespace
   }
 } // namespace
 
-int wmain(int argc, wchar_t** argv)
+int wmain(
+  int argc,
+  wchar_t** argv
+)
 {
   if (argc < 5) {
     std::fprintf(stderr, "usage: recorder.exe <out.txt> <timeout-seconds> <game-log|-> <exe> [args...]\n");
@@ -97,8 +105,10 @@ int wmain(int argc, wchar_t** argv)
     reinterpret_cast<LPTHREAD_START_ROUTINE>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "LoadLibraryA"));
   HANDLE thread = CreateRemoteThread(pi.hProcess, nullptr, 0, loadLibrary, remote, 0, nullptr);
   DWORD loaded = 0;
-  if (thread == nullptr || WaitForSingleObject(thread, 30000) != WAIT_OBJECT_0 || !GetExitCodeThread(thread, &loaded) ||
-      loaded == 0) {
+  if (
+    thread == nullptr || WaitForSingleObject(thread, 30000) != WAIT_OBJECT_0 || !GetExitCodeThread(thread, &loaded) ||
+    loaded == 0
+  ) {
     std::fprintf(stderr, "recorder: recorder.dll did not load into the game\n");
     TerminateProcess(pi.hProcess, 3);
     return 3;

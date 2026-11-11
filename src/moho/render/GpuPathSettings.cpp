@@ -33,7 +33,8 @@ namespace moho
     TConVar<bool> gTConVar_d3d_PipelineCache(
       "d3d_PipelineCache",
       "Keep Direct3D 12 pipeline states on disk across sessions, so they are not compiled again in the frame that "
-      "first draws them (1, the default) or create every one in that frame (0). /nopipelinecache turns it off at startup.",
+      "first draws them (1, the default) or create every one in that frame (0). /nopipelinecache turns it off at "
+      "startup.",
       &gpg::gal::gPipelineDiskCache
     );
 
@@ -58,7 +59,8 @@ namespace moho
     /** Engine addition: `ren_PipelineMemo` (see gpg/gal/backends/common/PipelineMemo.h). */
     TConVar<bool> gTConVar_ren_PipelineMemo(
       "ren_PipelineMemo",
-      "Direct3D 12 / Vulkan: a draw finds its pipeline in a small table of recent ones (1, the default), or always builds "
+      "Direct3D 12 / Vulkan: a draw finds its pipeline in a small table of recent ones (1, the default), or always "
+      "builds "
       "the full key (0). Read at each draw.",
       &gpg::gal::gPipelineMemo
     );
@@ -66,7 +68,8 @@ namespace moho
     /** Engine addition: `ren_UsedTextureTable` (see gpg/gal/backends/common/PipelineMemo.h). */
     TConVar<bool> gTConVar_ren_UsedTextureTable(
       "ren_UsedTextureTable",
-      "Direct3D 12 / Vulkan: an effect pass keeps its texture table when only bindings its shaders don't read changed (1, "
+      "Direct3D 12 / Vulkan: an effect pass keeps its texture table when only bindings its shaders don't read changed "
+      "(1, "
       "the default), or rebuilds it on any change (0). Read at each pass.",
       &gpg::gal::gUsedTextureTable
     );
@@ -74,7 +77,8 @@ namespace moho
     /** Engine addition: `ren_VulkanDynamicConstants` (see gpg/gal/backends/common/PipelineMemo.h). */
     TConVar<bool> gTConVar_ren_VulkanDynamicConstants(
       "ren_VulkanDynamicConstants",
-      "Vulkan: a draw whose shader constants changed binds one set per upload buffer with its constants' offset (1, the "
+      "Vulkan: a draw whose shader constants changed binds one set per upload buffer with its constants' offset (1, "
+      "the "
       "default), or allocates and writes a new set (0). Read between frames.",
       &gpg::gal::gVulkanDynamicConstants
     );
@@ -214,22 +218,35 @@ namespace moho
 
     const GpuPathEntry kGpuPaths[] = {
       {"ren_GpuIcons", &ren_GpuIcons, gpg::gal::kGpuPathStrategicIcons, gpg::gal::kGpuFeatureVertexPulling},
-      {"ren_GpuIconClassify", &ren_GpuIconClassify, gpg::gal::kGpuPathIconClassify,
+      {"ren_GpuIconClassify",
+       &ren_GpuIconClassify,
+       gpg::gal::kGpuPathIconClassify,
        gpg::gal::kGpuFeatureVertexPulling | gpg::gal::kGpuFeatureCompute | gpg::gal::kGpuFeatureIndirectDraw},
       {"ren_GpuFog", &ren_GpuFog, gpg::gal::kGpuPathFogOfWar, gpg::gal::kGpuFeatureVertexPulling},
-      {"ren_GpuSelectBrackets", &ren_GpuSelectBrackets, gpg::gal::kGpuPathSelectBrackets, gpg::gal::kGpuFeatureVertexPulling},
+      {"ren_GpuSelectBrackets",
+       &ren_GpuSelectBrackets,
+       gpg::gal::kGpuPathSelectBrackets,
+       gpg::gal::kGpuFeatureVertexPulling},
       {"ren_ParticleBatch", &ren_ParticleBatch, gpg::gal::kGpuPathParticleBatch, gpg::gal::kGpuFeatureBufferCopy},
-      {"ren_GpuProjectileIcons", &ren_GpuProjectileIcons, gpg::gal::kGpuPathProjectileIcons,
+      {"ren_GpuProjectileIcons",
+       &ren_GpuProjectileIcons,
+       gpg::gal::kGpuPathProjectileIcons,
        gpg::gal::kGpuFeatureVertexPulling},
       {"ren_GpuShapes", &ren_GpuShapes, gpg::gal::kGpuPathWorldShapes, gpg::gal::kGpuFeatureVertexPulling},
       {"ren_GpuRanges", &ren_GpuRanges, gpg::gal::kGpuPathRanges, gpg::gal::kGpuFeatureVertexPulling},
       {"ren_GpuText", &ren_GpuText, gpg::gal::kGpuPathMsdfText, gpg::gal::kGpuFeatureVertexPulling},
-      {"ren_GpuFontCook", &ren_GpuFontCook, gpg::gal::kGpuPathMsdfCook,
+      {"ren_GpuFontCook",
+       &ren_GpuFontCook,
+       gpg::gal::kGpuPathMsdfCook,
        gpg::gal::kGpuFeatureVertexPulling | gpg::gal::kGpuFeatureCompute},
     };
   } // namespace
 
-  bool GpuPathEnabled(const int setting, const std::uint32_t path, const std::uint32_t requiredFeatures)
+  bool GpuPathEnabled(
+    const int setting,
+    const std::uint32_t path,
+    const std::uint32_t requiredFeatures
+  )
   {
     if (setting == 0) {
       return false;

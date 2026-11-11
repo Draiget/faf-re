@@ -34,19 +34,15 @@ namespace moho
 
   struct EntityLineCollision
   {
-    Entity* entity;                    // +0x00
-    Wm3::Vec3f direction;              // +0x04
-    Wm3::Vec3f position;               // +0x10
-    float distanceFromLineStart;       // +0x1C
+    Entity* entity;              // +0x00
+    Wm3::Vec3f direction;        // +0x04
+    Wm3::Vec3f position;         // +0x10
+    float distanceFromLineStart; // +0x1C
   };
   static_assert(sizeof(EntityLineCollision) == 0x20, "EntityLineCollision size must be 0x20");
   static_assert(offsetof(EntityLineCollision, entity) == 0x00, "EntityLineCollision::entity offset must be 0x00");
-  static_assert(
-    offsetof(EntityLineCollision, direction) == 0x04, "EntityLineCollision::direction offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EntityLineCollision, position) == 0x10, "EntityLineCollision::position offset must be 0x10"
-  );
+  static_assert(offsetof(EntityLineCollision, direction) == 0x04, "EntityLineCollision::direction offset must be 0x04");
+  static_assert(offsetof(EntityLineCollision, position) == 0x10, "EntityLineCollision::position offset must be 0x10");
   static_assert(
     offsetof(EntityLineCollision, distanceFromLineStart) == 0x1C,
     "EntityLineCollision::distanceFromLineStart offset must be 0x1C"
@@ -67,16 +63,16 @@ namespace moho
    */
   struct EntityOccupationManager
   {
-    std::int32_t mWidth;                                 // +0x00
-    std::int32_t mHeight;                                // +0x04
-    std::int32_t mLastIndex;                             // +0x08
-    std::int32_t mGridWidthShift;                        // +0x0C
-    EntityCollisionCellNode** mUnitBuckets;              // +0x10
-    EntityCollisionCellNode** mPropBuckets;              // +0x14
-    EntityCollisionCellNode** mEntityBuckets;            // +0x18
-    EntityCollisionCellNode* mFreeNodeHead;              // +0x1C
-    std::int32_t mFreeNodeCount;                         // +0x20
-    fa::vector<EntityCollisionCellNode*> mAllBlocks;  // +0x24
+    std::int32_t mWidth;                             // +0x00
+    std::int32_t mHeight;                            // +0x04
+    std::int32_t mLastIndex;                         // +0x08
+    std::int32_t mGridWidthShift;                    // +0x0C
+    EntityCollisionCellNode** mUnitBuckets;          // +0x10
+    EntityCollisionCellNode** mPropBuckets;          // +0x14
+    EntityCollisionCellNode** mEntityBuckets;        // +0x18
+    EntityCollisionCellNode* mFreeNodeHead;          // +0x1C
+    std::int32_t mFreeNodeCount;                     // +0x20
+    fa::vector<EntityCollisionCellNode*> mAllBlocks; // +0x24
 
     /**
      * Address: 0x004FCD20 (FUN_004FCD20, Moho::EntityOccupationManager::EntityOccupationManager)
@@ -168,19 +164,25 @@ namespace moho
   };
 
   static_assert(sizeof(EntityOccupationManager) == 0x34, "EntityOccupationManager size must be 0x34");
-  static_assert(offsetof(EntityOccupationManager, mLastIndex) == 0x08, "EntityOccupationManager::mLastIndex offset must be 0x08");
+  static_assert(
+    offsetof(EntityOccupationManager, mLastIndex) == 0x08,
+    "EntityOccupationManager::mLastIndex offset must be 0x08"
+  );
   static_assert(
     offsetof(EntityOccupationManager, mGridWidthShift) == 0x0C,
     "EntityOccupationManager::mGridWidthShift offset must be 0x0C"
   );
   static_assert(
-    offsetof(EntityOccupationManager, mFreeNodeHead) == 0x1C, "EntityOccupationManager::mFreeNodeHead offset must be 0x1C"
+    offsetof(EntityOccupationManager, mFreeNodeHead) == 0x1C,
+    "EntityOccupationManager::mFreeNodeHead offset must be 0x1C"
   );
   static_assert(
-    offsetof(EntityOccupationManager, mFreeNodeCount) == 0x20, "EntityOccupationManager::mFreeNodeCount offset must be 0x20"
+    offsetof(EntityOccupationManager, mFreeNodeCount) == 0x20,
+    "EntityOccupationManager::mFreeNodeCount offset must be 0x20"
   );
   static_assert(
-    offsetof(EntityOccupationManager, mAllBlocks) == 0x24, "EntityOccupationManager::mAllBlocks offset must be 0x24"
+    offsetof(EntityOccupationManager, mAllBlocks) == 0x24,
+    "EntityOccupationManager::mAllBlocks offset must be 0x24"
   );
 
   class COGrid
@@ -317,7 +319,9 @@ namespace moho
      * excluded). No caller anywhere in the shipped binary.
      */
     void CollectEntitiesCollidingWithEntity(
-      EEntityType flags, Entity* source, gpg::core::FastVectorN<CollisionResult, 10>& outCollisions
+      EEntityType flags,
+      Entity* source,
+      gpg::core::FastVectorN<CollisionResult, 10>& outCollisions
     );
 
     /**
@@ -331,7 +335,9 @@ namespace moho
      * out-of-line copy has no callers.
      */
     int GatherUnmarkedEntities(
-      const Wm3::AxisAlignedBox3f& bounds, EEntityType flags, gpg::core::FastVectorInline<Entity*>& outEntities
+      const Wm3::AxisAlignedBox3f& bounds,
+      EEntityType flags,
+      gpg::core::FastVectorInline<Entity*>& outEntities
     );
 
     /**
@@ -379,7 +385,10 @@ namespace moho
     [[nodiscard]] static bool UnitIsBlocked(const SOCellPos& cellPos, COGrid& grid, Unit* unit, int mode);
   };
 
-  static_assert(offsetof(COGrid, mEntityOccupationManager) == 0x04, "COGrid::mEntityOccupationManager offset must be 0x04");
+  static_assert(
+    offsetof(COGrid, mEntityOccupationManager) == 0x04,
+    "COGrid::mEntityOccupationManager offset must be 0x04"
+  );
   static_assert(offsetof(COGrid, terrainOccupation) == 0x38, "COGrid::terrainOccupation offset must be 0x38");
   static_assert(offsetof(COGrid, waterOccupation) == 0x48, "COGrid::waterOccupation offset must be 0x48");
   static_assert(offsetof(COGrid, mOccupation) == 0x58, "COGrid::mOccupation offset must be 0x58");
@@ -456,7 +465,9 @@ namespace moho
    * there is no precise CollideBox test — cached-bounds overlap is the only filter.
    */
   void GatherUnmarkedUnitsInBox(
-    COGrid& grid, const Wm3::AxisAlignedBox3f& box, gpg::core::FastVectorInline<CollisionResult>& into
+    COGrid& grid,
+    const Wm3::AxisAlignedBox3f& box,
+    gpg::core::FastVectorInline<CollisionResult>& into
   );
 
   /**
@@ -489,8 +500,8 @@ namespace moho
    * between the two cell centres. Used by the AI path navigator's transition
    * gate (CAiPathNavigator).
    */
-  [[nodiscard]] bool PathTransitionBlocked(
-    const SOCellPos& toCell, const SOCellPos& fromCell, COGrid& grid, Unit* unit, int mode);
+  [[nodiscard]] bool
+  PathTransitionBlocked(const SOCellPos& toCell, const SOCellPos& fromCell, COGrid& grid, Unit* unit, int mode);
 
   /**
    * VFTABLE: 0x00E3192C

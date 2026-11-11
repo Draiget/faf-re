@@ -29,7 +29,10 @@ namespace moho
      * two non-empty sets only count as the same when each holds one unit and
      * it is the same unit. Each `begin()` prunes, as every walk does.
      */
-    [[nodiscard]] bool HoldTheSameUnit(const WeakSet<UserEntity>& lhs, const WeakSet<UserEntity>& rhs)
+    [[nodiscard]] bool HoldTheSameUnit(
+      const WeakSet<UserEntity>& lhs,
+      const WeakSet<UserEntity>& rhs
+    )
     {
       const bool lhsEmpty = lhs.begin() == lhs.end();
       if (lhsEmpty && rhs.begin() == rhs.end()) {
@@ -91,7 +94,9 @@ namespace moho
    * Subscribes this listener to the session's selection broadcaster
    * (`session + 0x00`); the node is at complete-object +0x08.
    */
-  void IdleUnitSelector::AttachToSessionListenerLane(CWldSession* const session)
+  void IdleUnitSelector::AttachToSessionListenerLane(
+    CWldSession* const session
+  )
   {
     session->mSelectionBroadcaster.AddListener(this);
   }
@@ -103,7 +108,9 @@ namespace moho
    * Detaches this idle-selector listener node from its current lane and
    * leaves it self-linked.
    */
-  void IdleUnitSelector::DetachFromSessionListenerLane(CWldSession* const)
+  void IdleUnitSelector::DetachFromSessionListenerLane(
+    CWldSession* const
+  )
   {
     ListUnlink();
   }
@@ -116,7 +123,9 @@ namespace moho
    * holds the same unit as the cycle's copy (0x00868690), the copy is cleared
    * (the set's whole-tree erase, `_Erase` 0x007B0870) and the cycle restarts.
    */
-  void IdleUnitSelector::OnEvent(const SSelectionEvent event)
+  void IdleUnitSelector::OnEvent(
+    const SSelectionEvent event
+  )
   {
     if (HoldTheSameUnit(mIdleSet, *event.mCurrentSelection)) {
       return;
@@ -126,40 +135,43 @@ namespace moho
     mFocusStep = 0;
   }
 
-  void IdleUnitSelector::CycleCameraFocus(const WeakSet<UserEntity>& selection, CameraImpl* const camera)
+  void IdleUnitSelector::CycleCameraFocus(
+    const WeakSet<UserEntity>& selection,
+    CameraImpl* const camera
+  )
   {
     IdleUnitSelector& selector = GlobalIdleUnitSelector();
     switch (selector.mFocusStep) {
-      case 0:
-        selector.mFocusStep = 1;
-        selector.mIdleSet = selection;
-        return;
+    case 0:
+      selector.mFocusStep = 1;
+      selector.mIdleSet = selection;
+      return;
 
-      case 1:
-        camera->TargetEntities(selection, false, camera->CameraGetTargetZoom(), 0.0f);
-        selector.mFocusStep = 2;
-        return;
+    case 1:
+      camera->TargetEntities(selection, false, camera->CameraGetTargetZoom(), 0.0f);
+      selector.mFocusStep = 2;
+      return;
 
-      case 2: {
-        UserEntity* const first = *selection.begin();
-        MeshInstance* const meshInstance = first->mMeshInstance;
-        const Wm3::Box3f* meshBox = &Invalid<Wm3::Box3f>();
-        if (meshInstance != nullptr) {
-          meshInstance->UpdateInterpolatedFields();
-          meshBox = &meshInstance->box;
-        }
-        const Wm3::Box3f orientedBox(*meshBox);
-        Wm3::AxisAlignedBox3f frameBox{};
-        frameBox = moho::AxisAlignedBoundsFromBox(orientedBox);
-
-        camera->TargetBox(frameBox, 0.0f);
-        camera->TargetNothing();
-        selector.mFocusStep = 1;
-        return;
+    case 2: {
+      UserEntity* const first = *selection.begin();
+      MeshInstance* const meshInstance = first->mMeshInstance;
+      const Wm3::Box3f* meshBox = &Invalid<Wm3::Box3f>();
+      if (meshInstance != nullptr) {
+        meshInstance->UpdateInterpolatedFields();
+        meshBox = &meshInstance->box;
       }
+      const Wm3::Box3f orientedBox(*meshBox);
+      Wm3::AxisAlignedBox3f frameBox{};
+      frameBox = moho::AxisAlignedBoundsFromBox(orientedBox);
 
-      default:
-        return;
+      camera->TargetBox(frameBox, 0.0f);
+      camera->TargetNothing();
+      selector.mFocusStep = 1;
+      return;
+    }
+
+    default:
+      return;
     }
   }
 

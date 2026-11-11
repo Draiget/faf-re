@@ -12,12 +12,17 @@ namespace faf::editor
   namespace
   {
     /** How many numbers a parameter of the kind keeps in the file. */
-    int NumbersOf(const ParamKind kind)
+    int NumbersOf(
+      const ParamKind kind
+    )
     {
       return kind == ParamKind::Color ? 4 : kind == ParamKind::Text ? 0 : 1;
     }
 
-    int PinIndex(const std::vector<PinDef>& pins, const std::string& name)
+    int PinIndex(
+      const std::vector<PinDef>& pins,
+      const std::string& name
+    )
     {
       for (std::size_t i = 0; i < pins.size(); ++i) {
         if (pins[i].name == name) {
@@ -28,7 +33,9 @@ namespace faf::editor
     }
 
     /** "[1, 2.5, 3]" into its numbers. */
-    std::vector<float> Numbers(const std::string& array)
+    std::vector<float> Numbers(
+      const std::string& array
+    )
     {
       std::vector<float> out;
       const char* at = array.c_str();
@@ -45,31 +52,47 @@ namespace faf::editor
     }
   } // namespace
 
-  bool PinsCompatible(const PinType from, const PinType to) noexcept
+  bool PinsCompatible(
+    const PinType from,
+    const PinType to
+  ) noexcept
   {
-    const auto image = [](const PinType type) { return type == PinType::Grey || type == PinType::Color; };
+    const auto image = [](const PinType type) {
+      return type == PinType::Grey || type == PinType::Color;
+    };
     return from == to || (image(from) && image(to));
   }
 
-  const char* PinTypeName(const PinType type) noexcept
+  const char* PinTypeName(
+    const PinType type
+  ) noexcept
   {
     switch (type) {
-    case PinType::Grey: return "grey";
-    case PinType::Color: return "colour";
-    case PinType::Curve: return "curve";
-    case PinType::Emitter: return "emitter";
-    case PinType::Texture: return "texture";
+    case PinType::Grey:
+      return "grey";
+    case PinType::Color:
+      return "colour";
+    case PinType::Curve:
+      return "curve";
+    case PinType::Emitter:
+      return "emitter";
+    case PinType::Texture:
+      return "texture";
     }
     return "?";
   }
 
-  const NodeType& NodeTypeRegistry::Add(NodeType type)
+  const NodeType& NodeTypeRegistry::Add(
+    NodeType type
+  )
   {
     mTypes.push_back(std::make_unique<NodeType>(std::move(type)));
     return *mTypes.back();
   }
 
-  const NodeType* NodeTypeRegistry::Find(const std::string& name) const
+  const NodeType* NodeTypeRegistry::Find(
+    const std::string& name
+  ) const
   {
     for (const auto& type : mTypes) {
       if (type->name == name) {
@@ -79,7 +102,11 @@ namespace faf::editor
     return nullptr;
   }
 
-  int NodeGraph::AddNode(const std::string& typeName, const float x, const float y)
+  int NodeGraph::AddNode(
+    const std::string& typeName,
+    const float x,
+    const float y
+  )
   {
     const NodeType* type = mRegistry->Find(typeName);
     if (type == nullptr || (type->isOutput && OutputNode() != 0)) {
@@ -102,9 +129,13 @@ namespace faf::editor
     return mNodes.back().id;
   }
 
-  bool NodeGraph::RemoveNode(const int id)
+  bool NodeGraph::RemoveNode(
+    const int id
+  )
   {
-    const auto found = std::find_if(mNodes.begin(), mNodes.end(), [id](const GraphNode& node) { return node.id == id; });
+    const auto found = std::find_if(mNodes.begin(), mNodes.end(), [id](const GraphNode& node) {
+      return node.id == id;
+    });
     if (found == mNodes.end() || found->type->isOutput) {
       return false;
     }
@@ -114,8 +145,16 @@ namespace faf::editor
         fed.push_back(link.toNode);
       }
     }
-    mLinks.erase(std::remove_if(mLinks.begin(), mLinks.end(), [id](const GraphLink& link) { return link.fromNode == id || link.toNode == id; }),
-                 mLinks.end());
+    mLinks.erase(
+      std::remove_if(
+        mLinks.begin(),
+        mLinks.end(),
+        [id](const GraphLink& link) {
+      return link.fromNode == id || link.toNode == id;
+    }
+      ),
+      mLinks.end()
+    );
     mNodes.erase(found);
     for (const int to : fed) {
       Touch(to);
@@ -124,7 +163,9 @@ namespace faf::editor
     return true;
   }
 
-  GraphNode* NodeGraph::Find(const int id)
+  GraphNode* NodeGraph::Find(
+    const int id
+  )
   {
     for (GraphNode& node : mNodes) {
       if (node.id == id) {
@@ -134,7 +175,9 @@ namespace faf::editor
     return nullptr;
   }
 
-  const GraphNode* NodeGraph::Find(const int id) const
+  const GraphNode* NodeGraph::Find(
+    const int id
+  ) const
   {
     return const_cast<NodeGraph*>(this)->Find(id);
   }
@@ -149,7 +192,11 @@ namespace faf::editor
     return 0;
   }
 
-  void NodeGraph::SetParam(const int id, const std::size_t param, const ParamValue& value)
+  void NodeGraph::SetParam(
+    const int id,
+    const std::size_t param,
+    const ParamValue& value
+  )
   {
     GraphNode* node = Find(id);
     if (node == nullptr || param >= node->params.size()) {
@@ -162,7 +209,11 @@ namespace faf::editor
     Touch(id);
   }
 
-  void NodeGraph::MoveNode(const int id, const float x, const float y)
+  void NodeGraph::MoveNode(
+    const int id,
+    const float x,
+    const float y
+  )
   {
     if (GraphNode* node = Find(id); node != nullptr && (node->x != x || node->y != y)) {
       node->x = x;
@@ -171,18 +222,29 @@ namespace faf::editor
     }
   }
 
-  LinkResult NodeGraph::Link(const int fromNode, const int fromPin, const int toNode, const int toPin)
+  LinkResult NodeGraph::Link(
+    const int fromNode,
+    const int fromPin,
+    const int toNode,
+    const int toPin
+  )
   {
     const GraphNode* from = Find(fromNode);
     const GraphNode* to = Find(toNode);
-    if (from == nullptr || to == nullptr || fromPin < 0 || toPin < 0 || static_cast<std::size_t>(fromPin) >= from->type->outputs.size() ||
-        static_cast<std::size_t>(toPin) >= to->type->inputs.size()) {
+    if (
+      from == nullptr || to == nullptr || fromPin < 0 || toPin < 0 ||
+      static_cast<std::size_t>(fromPin) >= from->type->outputs.size() ||
+      static_cast<std::size_t>(toPin) >= to->type->inputs.size()
+    ) {
       return LinkResult::BadPin;
     }
     if (fromNode == toNode) {
       return LinkResult::SameNode;
     }
-    if (!PinsCompatible(from->type->outputs[static_cast<std::size_t>(fromPin)].type, to->type->inputs[static_cast<std::size_t>(toPin)].type)) {
+    if (!PinsCompatible(
+          from->type->outputs[static_cast<std::size_t>(fromPin)].type,
+          to->type->inputs[static_cast<std::size_t>(toPin)].type
+        )) {
       return LinkResult::WrongType;
     }
     // A loop: `to` already feeds `from`.
@@ -190,18 +252,37 @@ namespace faf::editor
     if (std::find(fedByTo.begin(), fedByTo.end(), fromNode) != fedByTo.end()) {
       return LinkResult::Cycle;
     }
-    mLinks.erase(std::remove_if(mLinks.begin(), mLinks.end(), [&](const GraphLink& link) { return link.toNode == toNode && link.toPin == toPin; }),
-                 mLinks.end());
+    mLinks.erase(
+      std::remove_if(
+        mLinks.begin(),
+        mLinks.end(),
+        [&](const GraphLink& link) {
+      return link.toNode == toNode && link.toPin == toPin;
+    }
+      ),
+      mLinks.end()
+    );
     mLinks.push_back({fromNode, fromPin, toNode, toPin});
     Touch(toNode);
     return LinkResult::Ok;
   }
 
-  bool NodeGraph::Unlink(const int toNode, const int toPin)
+  bool NodeGraph::Unlink(
+    const int toNode,
+    const int toPin
+  )
   {
     const auto before = mLinks.size();
-    mLinks.erase(std::remove_if(mLinks.begin(), mLinks.end(), [&](const GraphLink& link) { return link.toNode == toNode && link.toPin == toPin; }),
-                 mLinks.end());
+    mLinks.erase(
+      std::remove_if(
+        mLinks.begin(),
+        mLinks.end(),
+        [&](const GraphLink& link) {
+      return link.toNode == toNode && link.toPin == toPin;
+    }
+      ),
+      mLinks.end()
+    );
     if (mLinks.size() == before) {
       return false;
     }
@@ -209,7 +290,10 @@ namespace faf::editor
     return true;
   }
 
-  const GraphLink* NodeGraph::InputLink(const int toNode, const int toPin) const
+  const GraphLink* NodeGraph::InputLink(
+    const int toNode,
+    const int toPin
+  ) const
   {
     for (const GraphLink& link : mLinks) {
       if (link.toNode == toNode && link.toPin == toPin) {
@@ -219,7 +303,9 @@ namespace faf::editor
     return nullptr;
   }
 
-  std::vector<int> NodeGraph::Downstream(const int id) const
+  std::vector<int> NodeGraph::Downstream(
+    const int id
+  ) const
   {
     std::vector<int> out{id};
     for (std::size_t i = 0; i < out.size(); ++i) {
@@ -232,7 +318,9 @@ namespace faf::editor
     return out;
   }
 
-  bool NodeGraph::Order(std::vector<int>& out) const
+  bool NodeGraph::Order(
+    std::vector<int>& out
+  ) const
   {
     out.clear();
     std::unordered_map<int, int> waiting;
@@ -261,12 +349,17 @@ namespace faf::editor
     return out.size() == mNodes.size();
   }
 
-  std::vector<int> NodeGraph::OrderFor(const int id) const
+  std::vector<int> NodeGraph::OrderFor(
+    const int id
+  ) const
   {
     std::vector<int> out;
     std::vector<int> visiting;
     const std::function<void(int)> visit = [&](const int at) {
-      if (std::find(out.begin(), out.end(), at) != out.end() || std::find(visiting.begin(), visiting.end(), at) != visiting.end()) {
+      if (
+        std::find(out.begin(), out.end(), at) != out.end() ||
+        std::find(visiting.begin(), visiting.end(), at) != visiting.end()
+      ) {
         return;
       }
       visiting.push_back(at);
@@ -284,7 +377,9 @@ namespace faf::editor
     return out;
   }
 
-  void NodeGraph::Touch(const int id)
+  void NodeGraph::Touch(
+    const int id
+  )
   {
     for (const int at : Downstream(id)) {
       if (GraphNode* node = Find(at)) {
@@ -300,8 +395,8 @@ namespace faf::editor
     for (std::size_t n = 0; n < mNodes.size(); ++n) {
       const GraphNode& node = mNodes[n];
       // The node's own fields before its parameters: JsonValue finds a key's first use.
-      out += "    {\"id\": " + std::to_string(node.id) + ", \"type\": " + JsonQuoted(node.type->name) + ", \"x\": " + JsonNumber(node.x) +
-             ", \"y\": " + JsonNumber(node.y) + ", \"params\": {";
+      out += "    {\"id\": " + std::to_string(node.id) + ", \"type\": " + JsonQuoted(node.type->name) +
+        ", \"x\": " + JsonNumber(node.x) + ", \"y\": " + JsonNumber(node.y) + ", \"params\": {";
       for (std::size_t p = 0; p < node.params.size(); ++p) {
         const ParamDef& def = node.type->params[p];
         out += (p == 0 ? "" : ", ") + JsonQuoted(def.name) + ": ";
@@ -324,16 +419,19 @@ namespace faf::editor
       const GraphNode* from = Find(link.fromNode);
       const GraphNode* to = Find(link.toNode);
       out += "    {\"from\": " + std::to_string(link.fromNode) +
-             ", \"out\": " + JsonQuoted(from->type->outputs[static_cast<std::size_t>(link.fromPin)].name) +
-             ", \"to\": " + std::to_string(link.toNode) + ", \"in\": " + JsonQuoted(to->type->inputs[static_cast<std::size_t>(link.toPin)].name) +
-             "}";
+        ", \"out\": " + JsonQuoted(from->type->outputs[static_cast<std::size_t>(link.fromPin)].name) +
+        ", \"to\": " + std::to_string(link.toNode) +
+        ", \"in\": " + JsonQuoted(to->type->inputs[static_cast<std::size_t>(link.toPin)].name) + "}";
       out += l + 1 < mLinks.size() ? ",\n" : "\n";
     }
     out += "  ]\n}\n";
     return out;
   }
 
-  bool NodeGraph::Load(const std::string& text, std::string& error)
+  bool NodeGraph::Load(
+    const std::string& text,
+    std::string& error
+  )
   {
     std::string kind;
     if (!JsonValue(text, "graph", kind) || kind != "fafgraph") {
@@ -402,7 +500,10 @@ namespace faf::editor
       float to = 0.0f;
       std::string out;
       std::string in;
-      if (!JsonFloat(object, "from", from) || !JsonFloat(object, "to", to) || !JsonValue(object, "out", out) || !JsonValue(object, "in", in)) {
+      if (
+        !JsonFloat(object, "from", from) || !JsonFloat(object, "to", to) || !JsonValue(object, "out", out) ||
+        !JsonValue(object, "in", in)
+      ) {
         continue;
       }
       const GraphNode* fromNode = Find(static_cast<int>(from));

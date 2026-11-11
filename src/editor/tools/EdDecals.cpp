@@ -16,18 +16,27 @@ namespace faf::editor
 {
   namespace
   {
-    std::string Lower(std::string text)
+    std::string Lower(
+      std::string text
+    )
     {
-      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+      });
       return text;
     }
 
-    Wm3::Vec3f Vec(const float (&value)[3])
+    Wm3::Vec3f Vec(
+      const float (&value)[3]
+    )
     {
       return Wm3::Vec3f{value[0], value[1], value[2]};
     }
 
-    void Copy(const Wm3::Vec3f& from, float (&to)[3])
+    void Copy(
+      const Wm3::Vec3f& from,
+      float (&to)[3]
+    )
     {
       to[0] = from.x;
       to[1] = from.y;
@@ -35,7 +44,10 @@ namespace faf::editor
     }
 
     /** Puts a state's fields on a decal, touching the textures only when their names change (setting one loads it). */
-    void Apply(moho::CWldTerrainDecal& decal, const DecalState& state)
+    void Apply(
+      moho::CWldTerrainDecal& decal,
+      const DecalState& state
+    )
     {
       decal.mType = static_cast<moho::EWldTerrainDecalType>(state.type);
       for (int slot = 0; slot < 2; ++slot) {
@@ -49,15 +61,20 @@ namespace faf::editor
     }
   } // namespace
 
-  bool DecalState::operator==(const DecalState& other) const
+  bool DecalState::operator==(
+    const DecalState& other
+  ) const
   {
     return index == other.index && type == other.type && names[0] == other.names[0] && names[1] == other.names[1] &&
-           std::memcmp(scale, other.scale, sizeof(scale)) == 0 && std::memcmp(position, other.position, sizeof(position)) == 0 &&
-           std::memcmp(orientation, other.orientation, sizeof(orientation)) == 0 && cutoff == other.cutoff &&
-           nearCutoff == other.nearCutoff;
+      std::memcmp(scale, other.scale, sizeof(scale)) == 0 &&
+      std::memcmp(position, other.position, sizeof(position)) == 0 &&
+      std::memcmp(orientation, other.orientation, sizeof(orientation)) == 0 && cutoff == other.cutoff &&
+      nearCutoff == other.nearCutoff;
   }
 
-  DecalState CaptureDecal(const moho::CWldTerrainDecal& decal)
+  DecalState CaptureDecal(
+    const moho::CWldTerrainDecal& decal
+  )
   {
     DecalState state;
     state.index = decal.mIndex;
@@ -72,7 +89,9 @@ namespace faf::editor
     return state;
   }
 
-  std::vector<DecalState> CaptureDecals(moho::IDecalManager& manager)
+  std::vector<DecalState> CaptureDecals(
+    moho::IDecalManager& manager
+  )
   {
     std::vector<DecalState> decals;
     const std::int32_t count = manager.GetDecalCount();
@@ -85,7 +104,10 @@ namespace faf::editor
     return decals;
   }
 
-  moho::CWldTerrainDecal* FindDecal(moho::IDecalManager& manager, const int index)
+  moho::CWldTerrainDecal* FindDecal(
+    moho::IDecalManager& manager,
+    const int index
+  )
   {
     const std::int32_t count = manager.GetDecalCount();
     for (std::int32_t i = 0; i < count; ++i) {
@@ -97,7 +119,10 @@ namespace faf::editor
     return nullptr;
   }
 
-  void RestoreDecals(moho::IDecalManager& manager, const std::vector<DecalState>& decals)
+  void RestoreDecals(
+    moho::IDecalManager& manager,
+    const std::vector<DecalState>& decals
+  )
   {
     std::map<int, moho::CWldTerrainDecal*> current;
     const std::int32_t count = manager.GetDecalCount();
@@ -123,13 +148,17 @@ namespace faf::editor
     }
   }
 
-  std::string DecalKey(const DecalState& state)
+  std::string DecalKey(
+    const DecalState& state
+  )
   {
     std::string key = state.names[0];
     key.push_back('\0');
     key += state.names[1];
     key.push_back('\0');
-    const auto bytes = [&key](const void* const data, const std::size_t size) { key.append(static_cast<const char*>(data), size); };
+    const auto bytes = [&key](const void* const data, const std::size_t size) {
+      key.append(static_cast<const char*>(data), size);
+    };
     bytes(&state.type, sizeof(state.type));
     bytes(state.scale, sizeof(state.scale));
     bytes(state.position, sizeof(state.position));
@@ -139,7 +168,11 @@ namespace faf::editor
     return key;
   }
 
-  DecalMirror MirrorDecals(moho::IDecalManager& live, const std::vector<DecalState>& before, const std::vector<DecalState>& after)
+  DecalMirror MirrorDecals(
+    moho::IDecalManager& live,
+    const std::vector<DecalState>& before,
+    const std::vector<DecalState>& after
+  )
   {
     // How many of each decal (by content) went (> 0) or came (< 0).
     std::unordered_map<std::string, int> change;
@@ -186,7 +219,10 @@ namespace faf::editor
     return result;
   }
 
-  moho::CWldTerrainDecal* AddDecal(moho::IDecalManager& manager, const DecalState& state)
+  moho::CWldTerrainDecal* AddDecal(
+    moho::IDecalManager& manager,
+    const DecalState& state
+  )
   {
     moho::CWldTerrainDecal* const decal = manager.LoadDecal(nullptr);
     if (decal != nullptr) {
@@ -195,7 +231,9 @@ namespace faf::editor
     return decal;
   }
 
-  DecalFootprint FootprintOf(const moho::CWldTerrainDecal& decal)
+  DecalFootprint FootprintOf(
+    const moho::CWldTerrainDecal& decal
+  )
   {
     DecalFootprint footprint;
     footprint.x = decal.mPosition.x;

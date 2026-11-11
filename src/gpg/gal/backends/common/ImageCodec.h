@@ -31,7 +31,7 @@ namespace gpg::gal::imaging
   {
     struct Subresource
     {
-      std::size_t offset = 0;     // into `bytes`
+      std::size_t offset = 0; // into `bytes`
       std::uint32_t width = 0;
       std::uint32_t height = 0;
       std::uint32_t depth = 1;
@@ -43,7 +43,7 @@ namespace gpg::gal::imaging
     DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
     std::uint32_t width = 0;
     std::uint32_t height = 0;
-    std::uint32_t depth = 1;     // volume textures
+    std::uint32_t depth = 1; // volume textures
     std::uint32_t mipLevels = 1;
     std::uint32_t arraySize = 1; // 6 for a cube
     bool cube = false;
@@ -52,7 +52,13 @@ namespace gpg::gal::imaging
     std::vector<std::uint8_t> bytes;
 
     /** Lays out empty storage for the given shape. */
-    void Allocate(DXGI_FORMAT imageFormat, std::uint32_t imageWidth, std::uint32_t imageHeight, std::uint32_t levels, std::uint32_t slices);
+    void Allocate(
+      DXGI_FORMAT imageFormat,
+      std::uint32_t imageWidth,
+      std::uint32_t imageHeight,
+      std::uint32_t levels,
+      std::uint32_t slices
+    );
   };
 
   /** How D3DX fits the file into the decoded top level. */
@@ -65,11 +71,11 @@ namespace gpg::gal::imaging
   // Hashed as raw bytes into the decode cache key: keep every field 4 bytes, so no padding.
   struct DecodeOptions
   {
-    std::uint32_t skipMipLevels = 0;           // texture quality: top levels to drop (TextureQuality.h)
-    DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;  // UNKNOWN: as the file
-    std::uint32_t width = 0;                   // 0: as the file
+    std::uint32_t skipMipLevels = 0;          // texture quality: top levels to drop (TextureQuality.h)
+    DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN; // UNKNOWN: as the file
+    std::uint32_t width = 0;                  // 0: as the file
     std::uint32_t height = 0;
-    std::uint32_t mipLevels = 0;               // 0: as the file
+    std::uint32_t mipLevels = 0; // 0: as the file
     ResizeFilter filter = ResizeFilter::Default;
   };
 

@@ -23,7 +23,8 @@ namespace moho
   TConVar<int> gTConVar_ren_GpuProjectileIcons(
     "ren_GpuProjectileIcons",
     "Draw projectile icons with one instanced draw per view instead of the prim batcher. Same icons, same "
-    "order, same atlas. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
+    "order, same atlas. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it "
+    "can, 0 never.",
     &ren_GpuProjectileIcons
   );
 
@@ -53,7 +54,9 @@ namespace moho
 
   bool ProjectileIconRenderer::IsActive()
   {
-    if (!GpuPathEnabled(ren_GpuProjectileIcons, gpg::gal::kGpuPathProjectileIcons, gpg::gal::kGpuFeatureVertexPulling)) {
+    if (!GpuPathEnabled(
+          ren_GpuProjectileIcons, gpg::gal::kGpuPathProjectileIcons, gpg::gal::kGpuFeatureVertexPulling
+        )) {
       return false;
     }
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
@@ -91,7 +94,9 @@ namespace moho
     return mSupported;
   }
 
-  void ProjectileIconRenderer::Begin(const void* const viewKey)
+  void ProjectileIconRenderer::Begin(
+    const void* const viewKey
+  )
   {
     mViewKey = viewKey;
     mPending.clear();
@@ -128,7 +133,9 @@ namespace moho
     record.mSlot = slot;
   }
 
-  ProjectileIconRenderer::ViewStream& ProjectileIconRenderer::StreamFor(const void* const viewKey)
+  ProjectileIconRenderer::ViewStream& ProjectileIconRenderer::StreamFor(
+    const void* const viewKey
+  )
   {
     for (ViewStream& stream : mStreams) {
       if (stream.mViewKey == viewKey) {
@@ -136,14 +143,18 @@ namespace moho
         return stream;
       }
     }
-    std::erase_if(mStreams, [this](const ViewStream& stream) { return mDraws - stream.mLastUsedDraw > kStreamIdleDraws; });
+    std::erase_if(mStreams, [this](const ViewStream& stream) {
+      return mDraws - stream.mLastUsedDraw > kStreamIdleDraws;
+    });
     ViewStream& stream = mStreams.emplace_back();
     stream.mViewKey = viewKey;
     stream.mLastUsedDraw = mDraws;
     return stream;
   }
 
-  bool ProjectileIconRenderer::Flush(CD3DPrimBatcher& batcher)
+  bool ProjectileIconRenderer::Flush(
+    CD3DPrimBatcher& batcher
+  )
   {
     if (mPending.empty()) {
       return true;
@@ -235,7 +246,9 @@ namespace moho
     return true;
   }
 
-  void ProjectileIconRenderer::DrawWithBatcher(CD3DPrimBatcher& batcher)
+  void ProjectileIconRenderer::DrawWithBatcher(
+    CD3DPrimBatcher& batcher
+  )
   {
     for (const ProjectileIconInstance& record : mPending) {
       batcher.SetTexture(mTextures[record.mSlot]);

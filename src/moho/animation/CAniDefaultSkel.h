@@ -21,9 +21,8 @@ namespace moho
      * Hands back the one default skeleton, shared. Inlined into
      * `SerConstructHelper<CAniDefaultSkel>::Construct` 0x0054ABB0.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * What it does:
@@ -31,7 +30,10 @@ namespace moho
      * `SerSaveConstructHelper<CAniDefaultSkel>::SaveConstructArgs` 0x0054AAA0.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     static gpg::RType* sType;

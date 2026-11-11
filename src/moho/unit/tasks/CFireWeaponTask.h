@@ -76,8 +76,8 @@ namespace moho
 
   public:
     std::uint32_t mReserved18;
-    Unit* mUnit;            // 0x1C
-    UnitWeapon* mWeapon;    // 0x20
+    Unit* mUnit;             // 0x1C
+    UnitWeapon* mWeapon;     // 0x20
     std::int32_t mFireClock; // 0x24
   };
 

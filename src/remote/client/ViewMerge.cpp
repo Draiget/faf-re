@@ -7,7 +7,11 @@
 namespace faf::remote::client
 {
   void CViewFrameMerger::Merge(
-    const wire::SViewFrame& own, const wire::SViewFrame* const team, const std::int32_t army, wire::SViewFrame& merged, std::uint64_t& blipsLeftOut
+    const wire::SViewFrame& own,
+    const wire::SViewFrame* const team,
+    const std::int32_t army,
+    wire::SViewFrame& merged,
+    std::uint64_t& blipsLeftOut
   )
   {
     merged.frameId = own.frameId;
@@ -38,7 +42,10 @@ namespace faf::remote::client
   }
 
   bool CViewFrameMerger::Decode(
-    const std::span<const std::uint8_t> own, const std::span<const std::uint8_t> team, const wire::SFrameCodec& codec, wire::SViewFrame& merged
+    const std::span<const std::uint8_t> own,
+    const std::span<const std::uint8_t> team,
+    const wire::SFrameCodec& codec,
+    wire::SViewFrame& merged
   )
   {
     wire::SViewFrame ownFrame;

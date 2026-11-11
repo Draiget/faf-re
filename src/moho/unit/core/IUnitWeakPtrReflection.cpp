@@ -69,7 +69,9 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeIUnitRefFromRawObject(void* rawObject)
+  [[nodiscard]] gpg::RRef MakeIUnitRefFromRawObject(
+    void* rawObject
+  )
   {
     gpg::RRef out{};
     out.mObj = nullptr;
@@ -101,7 +103,9 @@ namespace
     return out;
   }
 
-  [[nodiscard]] gpg::RRef MakeIUnitRefFromWeakPtr(const moho::WeakPtr<moho::IUnit>& weak)
+  [[nodiscard]] gpg::RRef MakeIUnitRefFromWeakPtr(
+    const moho::WeakPtr<moho::IUnit>& weak
+  )
   {
     return MakeIUnitRefFromRawObject(weak.GetObjectPtr());
   }
@@ -110,8 +114,8 @@ namespace
   {
     using InvokeFn = int(__thiscall*)(void* boundObject);
 
-    InvokeFn invoke;     // +0x00
-    void* boundObject;   // +0x04
+    InvokeFn invoke;   // +0x00
+    void* boundObject; // +0x04
   };
   static_assert(sizeof(BoundThiscallInvoker) == 0x08, "BoundThiscallInvoker size must be 0x08");
 
@@ -135,7 +139,12 @@ namespace
    * What it does:
    * Loads tracked pointer payload and assigns the weak pointer from the upcast IUnit object.
    */
-  void LoadWeakPtrIUnit(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void LoadWeakPtrIUnit(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<moho::WeakPtr<moho::IUnit>*>(objectPtr);
     GPG_ASSERT(weak != nullptr);
@@ -173,7 +182,12 @@ namespace
    * What it does:
    * Converts the weak pointer payload into `RRef` and writes it as an unowned raw pointer.
    */
-  void SaveWeakPtrIUnit(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveWeakPtrIUnit(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<moho::WeakPtr<moho::IUnit>*>(objectPtr);
     GPG_ASSERT(weak != nullptr);
@@ -193,7 +207,12 @@ namespace
    * (`ReadArchive::Read`, 0x00953DA0) -- not by calling the element type's
    * load callback directly.
    */
-  void LoadFastVectorWeakPtrIUnit(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorWeakPtrIUnit(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto& weakUnits = *reinterpret_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(objectPtr);
 
@@ -212,9 +231,15 @@ namespace
    * Writes the element count, then every element through the archive
    * (`WriteArchive::Write`, 0x00953CA0) owned by `ownerRef`.
    */
-  void SaveFastVectorWeakPtrIUnit(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorWeakPtrIUnit(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
-    const auto& weakUnits = *reinterpret_cast<const gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(objectPtr);
+    const auto& weakUnits =
+      *reinterpret_cast<const gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(objectPtr);
 
     const unsigned int count = static_cast<unsigned int>(weakUnits.Size());
     archive->WriteUInt(count);
@@ -246,7 +271,9 @@ const char* moho::RWeakPtrType<moho::IUnit>::GetName() const
  * Returns `"NULL"` for empty weak pointers, otherwise wraps pointee lexical
  * text inside square brackets.
  */
-fa::string moho::RWeakPtrType<moho::IUnit>::GetLexical(const gpg::RRef& ref) const
+fa::string moho::RWeakPtrType<moho::IUnit>::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   auto* const weak = static_cast<const moho::WeakPtr<moho::IUnit>*>(ref.mObj);
   if (!weak || !weak->HasValue()) {
@@ -287,7 +314,10 @@ void moho::RWeakPtrType<moho::IUnit>::Init()
  * What it does:
  * Asserts `index == 0` and returns the pointed `IUnit` as a reflected `RRef`.
  */
-gpg::RRef moho::RWeakPtrType<moho::IUnit>::SubscriptIndex(void* obj, const int ind) const
+gpg::RRef moho::RWeakPtrType<moho::IUnit>::SubscriptIndex(
+  void* obj,
+  const int ind
+) const
 {
   if (ind != 0) {
     gpg::HandleAssertFailure("index == 0", 64, kReflectWeakPtrHeaderPath);
@@ -297,7 +327,9 @@ gpg::RRef moho::RWeakPtrType<moho::IUnit>::SubscriptIndex(void* obj, const int i
   return MakeIUnitRefFromWeakPtr(*weak);
 }
 
-size_t moho::RWeakPtrType<moho::IUnit>::GetCount(void* obj) const
+size_t moho::RWeakPtrType<moho::IUnit>::GetCount(
+  void* obj
+) const
 {
   auto* const weak = static_cast<moho::WeakPtr<moho::IUnit>*>(obj);
   if (!weak) {
@@ -328,7 +360,9 @@ const char* gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetName() const
  * What it does:
  * Formats vector lexical text and appends the runtime weak-pointer element count.
  */
-fa::string gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   const int count = static_cast<int>(GetCount(ref.mObj));
@@ -342,14 +376,20 @@ const gpg::RIndexed* gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::IsIndexed
 
 void gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::Init()
 {
-  static_assert(sizeof(gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>) == 0x10, "gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>> is 0x10 bytes on x86");
+  static_assert(
+    sizeof(gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>) == 0x10,
+    "gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>> is 0x10 bytes on x86"
+  );
   size_ = sizeof(gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorWeakPtrIUnit;
   serSaveFunc_ = &SaveFastVectorWeakPtrIUnit;
 }
 
-gpg::RRef gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::SubscriptIndex(void* obj, const int ind) const
+gpg::RRef gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::SubscriptIndex(
+  void* obj,
+  const int ind
+) const
 {
   auto* const weakUnits = static_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(obj);
   GPG_ASSERT(weakUnits != nullptr);
@@ -366,7 +406,9 @@ gpg::RRef gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::SubscriptIndex(void*
   return MakeIUnitRefFromWeakPtr((*weakUnits)[ind]);
 }
 
-size_t gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetCount(void* obj) const
+size_t gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetCount(
+  void* obj
+) const
 {
   if (!obj) {
     return 0u;
@@ -382,9 +424,14 @@ size_t gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::GetCount(void* obj) con
  * an empty `WeakPtr<IUnit>` built on the stack (0x0056BF79..0x0056BF9D) and
  * released after the `resize` (0x0056D1D0).
  */
-void gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::SetCount(void* obj, const int count) const
+void gpg::RFastVectorType<moho::WeakPtr<moho::IUnit>>::SetCount(
+  void* obj,
+  const int count
+) const
 {
-  static_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(obj)->resize(static_cast<std::size_t>(count), moho::WeakPtr<moho::IUnit>{});
+  static_cast<gpg::core::FastVectorInline<moho::WeakPtr<moho::IUnit>>*>(obj)->resize(
+    static_cast<std::size_t>(count), moho::WeakPtr<moho::IUnit>{}
+  );
 }
 
 /**
@@ -431,6 +478,15 @@ gpg::RType* gpg::preregister_FastVectorWeakPtrIUnitTypeStartup()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_IUnitTypeInfoStartup_b5549d, moho::preregister_IUnitTypeInfoStartup)
-GPG_PREREGISTER_INIT(preregister_WeakPtrIUnitTypeStartup_b5549d, moho::preregister_WeakPtrIUnitTypeStartup)
-GPG_PREREGISTER_INIT(preregister_FastVectorWeakPtrIUnitTypeStartup_b5549d, gpg::preregister_FastVectorWeakPtrIUnitTypeStartup)
+GPG_PREREGISTER_INIT(
+  preregister_IUnitTypeInfoStartup_b5549d,
+  moho::preregister_IUnitTypeInfoStartup
+)
+GPG_PREREGISTER_INIT(
+  preregister_WeakPtrIUnitTypeStartup_b5549d,
+  moho::preregister_WeakPtrIUnitTypeStartup
+)
+GPG_PREREGISTER_INIT(
+  preregister_FastVectorWeakPtrIUnitTypeStartup_b5549d,
+  gpg::preregister_FastVectorWeakPtrIUnitTypeStartup
+)

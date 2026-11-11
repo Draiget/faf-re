@@ -13,12 +13,19 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-inline char* _getcwd(char* const buffer, const int length) noexcept
+inline char* _getcwd(
+  char* const buffer,
+  const int length
+) noexcept
 {
   return ::getcwd(buffer, static_cast<std::size_t>(length));
 }
 
-inline char* _getdcwd(int, char* const buffer, const int length) noexcept
+inline char* _getdcwd(
+  int,
+  char* const buffer,
+  const int length
+) noexcept
 {
   return ::getcwd(buffer, static_cast<std::size_t>(length));
 }
@@ -28,7 +35,9 @@ inline int _getdrive() noexcept
   return 0;
 }
 
-inline int _mkdir(const char* const path) noexcept
+inline int _mkdir(
+  const char* const path
+) noexcept
 {
   char unixPath[4096];
   std::size_t at = 0;

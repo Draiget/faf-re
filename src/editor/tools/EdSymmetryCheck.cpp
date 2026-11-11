@@ -7,8 +7,14 @@
 namespace faf::editor
 {
 
-  SymmetryReport CheckSymmetry(const std::uint16_t* const heights, const int width, const int height, const Symmetry requested, const int turns,
-                               const int turnTolerance)
+  SymmetryReport CheckSymmetry(
+    const std::uint16_t* const heights,
+    const int width,
+    const int height,
+    const Symmetry requested,
+    const int turns,
+    const int turnTolerance
+  )
   {
     SymmetryReport report;
     const Symmetry symmetry = EffectiveSymmetry(requested, width, height);
@@ -20,17 +26,23 @@ namespace faf::editor
     std::vector<std::uint8_t> marked(static_cast<std::size_t>(blocksX) * static_cast<std::size_t>(blocksZ), 0);
     const auto mark = [&](const int x, const int z) {
       ++report.differing;
-      marked[static_cast<std::size_t>(z / kSymmetryBlock) * static_cast<std::size_t>(blocksX) + static_cast<std::size_t>(x / kSymmetryBlock)] = 1;
+      marked
+        [static_cast<std::size_t>(z / kSymmetryBlock) * static_cast<std::size_t>(blocksX) +
+         static_cast<std::size_t>(x / kSymmetryBlock)] = 1;
     };
     const auto at = [&](const int x, const int z) {
-      return static_cast<int>(heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)]);
+      return static_cast<int>(
+        heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)]
+      );
     };
 
     if (symmetry == Symmetry::NWay) {
       for (int z = 0; z < height; ++z) {
         for (int x = 0; x < width; ++x) {
           double source = 0.0;
-          if (TurnSector(width, height, turns, x, z) == 0 || !TurnedHeight(heights, width, height, turns, x, z, source)) {
+          if (
+            TurnSector(width, height, turns, x, z) == 0 || !TurnedHeight(heights, width, height, turns, x, z, source)
+          ) {
             continue;
           }
           ++report.checked;
@@ -62,16 +74,28 @@ namespace faf::editor
 
     for (int bz = 0; bz < blocksZ; ++bz) {
       for (int bx = 0; bx < blocksX; ++bx) {
-        if (marked[static_cast<std::size_t>(bz) * static_cast<std::size_t>(blocksX) + static_cast<std::size_t>(bx)] != 0) {
-          report.blocks.push_back({bx * kSymmetryBlock, bz * kSymmetryBlock, std::min(width - 1, (bx + 1) * kSymmetryBlock),
-                                   std::min(height - 1, (bz + 1) * kSymmetryBlock)});
+        if (
+          marked[static_cast<std::size_t>(bz) * static_cast<std::size_t>(blocksX) + static_cast<std::size_t>(bx)] != 0
+        ) {
+          report.blocks.push_back(
+            {bx * kSymmetryBlock,
+             bz * kSymmetryBlock,
+             std::min(width - 1, (bx + 1) * kSymmetryBlock),
+             std::min(height - 1, (bz + 1) * kSymmetryBlock)}
+          );
         }
       }
     }
     return report;
   }
 
-  SampleRect MakeSymmetric(std::uint16_t* const heights, const int width, const int height, const Symmetry requested, const int turns)
+  SampleRect MakeSymmetric(
+    std::uint16_t* const heights,
+    const int width,
+    const int height,
+    const Symmetry requested,
+    const int turns
+  )
   {
     const Symmetry symmetry = EffectiveSymmetry(requested, width, height);
     if (heights == nullptr || width < 2 || height < 2 || symmetry == Symmetry::None) {
@@ -82,7 +106,9 @@ namespace faf::editor
       for (int z = 0; z < height; ++z) {
         for (int x = 0; x < width; ++x) {
           double source = 0.0;
-          if (TurnSector(width, height, turns, x, z) != 0 && TurnedHeight(heights, width, height, turns, x, z, source)) {
+          if (
+            TurnSector(width, height, turns, x, z) != 0 && TurnedHeight(heights, width, height, turns, x, z, source)
+          ) {
             heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] =
               static_cast<std::uint16_t>(std::lround(std::clamp(source, 0.0, 65535.0)));
           }
@@ -103,9 +129,12 @@ namespace faf::editor
           if (!first) {
             continue;
           }
-          const std::uint16_t word = heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
+          const std::uint16_t word =
+            heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
           for (int c = 1; c < copies; ++c) {
-            heights[static_cast<std::size_t>(copyZ[c]) * static_cast<std::size_t>(width) + static_cast<std::size_t>(copyX[c])] = word;
+            heights
+              [static_cast<std::size_t>(copyZ[c]) * static_cast<std::size_t>(width) +
+               static_cast<std::size_t>(copyX[c])] = word;
           }
         }
       }
@@ -113,7 +142,11 @@ namespace faf::editor
     return {0, 0, width - 1, height - 1};
   }
 
-  DetectedSymmetry DetectSymmetry(const std::uint16_t* heights, const int width, const int height)
+  DetectedSymmetry DetectSymmetry(
+    const std::uint16_t* heights,
+    const int width,
+    const int height
+  )
   {
     DetectedSymmetry best;
     if (heights == nullptr || width < 8 || height < 8) {
@@ -121,8 +154,8 @@ namespace faf::editor
     }
     const std::size_t count = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
     const auto [low, high] = std::minmax_element(heights, heights + count);
-    constexpr int kFlat = 2 * 128;      // 2 game units
-    constexpr int kTolerance = 64;      // half a game unit
+    constexpr int kFlat = 2 * 128; // 2 game units
+    constexpr int kTolerance = 64; // half a game unit
     constexpr float kNeeded = 0.97f;
     if (*high - *low < kFlat) {
       return best;
@@ -134,9 +167,18 @@ namespace faf::editor
       int copies;
     };
     static constexpr Candidate kCandidates[] = {
-      {Symmetry::LeftRight, 0, 2},    {Symmetry::TopBottom, 0, 2},  {Symmetry::DiagonalBack, 0, 2}, {Symmetry::DiagonalForward, 0, 2},
-      {Symmetry::HalfTurn, 0, 2},     {Symmetry::BothAxes, 0, 4},   {Symmetry::BothDiagonals, 0, 4}, {Symmetry::QuarterTurns, 0, 4},
-      {Symmetry::NWay, 3, 3},         {Symmetry::NWay, 5, 5},       {Symmetry::NWay, 6, 6},         {Symmetry::NWay, 8, 8},
+      {Symmetry::LeftRight, 0, 2},
+      {Symmetry::TopBottom, 0, 2},
+      {Symmetry::DiagonalBack, 0, 2},
+      {Symmetry::DiagonalForward, 0, 2},
+      {Symmetry::HalfTurn, 0, 2},
+      {Symmetry::BothAxes, 0, 4},
+      {Symmetry::BothDiagonals, 0, 4},
+      {Symmetry::QuarterTurns, 0, 4},
+      {Symmetry::NWay, 3, 3},
+      {Symmetry::NWay, 5, 5},
+      {Symmetry::NWay, 6, 6},
+      {Symmetry::NWay, 8, 8},
     };
     // About 128 x 128 points.
     const int step = std::max(1, std::min(width, height) / 128);
@@ -150,9 +192,18 @@ namespace faf::editor
       for (int z = 0; z < height; z += step) {
         for (int x = 0; x < width; x += step) {
           float copyX[kMaxSymmetryCopies], copyZ[kMaxSymmetryCopies];
-          const int copies = HeightBrushCentres(width, height, static_cast<float>(x), static_cast<float>(z), candidate.symmetry,
-                                                candidate.turns, copyX, copyZ);
-          const int here = heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
+          const int copies = HeightBrushCentres(
+            width,
+            height,
+            static_cast<float>(x),
+            static_cast<float>(z),
+            candidate.symmetry,
+            candidate.turns,
+            copyX,
+            copyZ
+          );
+          const int here =
+            heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
           bool any = false;
           bool same = true;
           for (int c = 1; c < copies; ++c) {
@@ -162,7 +213,8 @@ namespace faf::editor
               continue; // a turned point off the map
             }
             any = true;
-            const int there = heights[static_cast<std::size_t>(cz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(cx)];
+            const int there =
+              heights[static_cast<std::size_t>(cz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(cx)];
             if (std::abs(there - here) > kTolerance) {
               same = false;
               break;
@@ -178,7 +230,9 @@ namespace faf::editor
         continue;
       }
       const float share = static_cast<float>(matched) / static_cast<float>(compared);
-      if (share >= kNeeded && (candidate.copies > bestCopies || (candidate.copies == bestCopies && share > best.matched))) {
+      if (
+        share >= kNeeded && (candidate.copies > bestCopies || (candidate.copies == bestCopies && share > best.matched))
+      ) {
         best = {candidate.symmetry, candidate.turns, share};
         bestCopies = candidate.copies;
       }

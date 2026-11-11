@@ -22,7 +22,10 @@ namespace
 
   struct CEconRequestTypeInfoBootstrap
   {
-    CEconRequestTypeInfoBootstrap() { moho::register_CEconRequestTypeInfoStartup(); }
+    CEconRequestTypeInfoBootstrap()
+    {
+      moho::register_CEconRequestTypeInfoStartup();
+    }
   };
   CEconRequestTypeInfoBootstrap gCEconRequestTypeInfoBootstrap;
 } // namespace
@@ -68,7 +71,9 @@ void moho::register_CEconRequestTypeInfoStartup()
   (void)AcquireCEconRequestTypeInfo();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CEconRequestTypeInfoStartup_c49737, moho::register_CEconRequestTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CEconRequestTypeInfoStartup_c49737,
+  moho::register_CEconRequestTypeInfoStartup
+)

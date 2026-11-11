@@ -11,7 +11,10 @@
 #include <chrono>
 #include <thread>
 
-TEST(Win32ShimHandles, SignallingAClosedEventFails)
+TEST(
+  Win32ShimHandles,
+  SignallingAClosedEventFails
+)
 {
   const HANDLE event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
   ASSERT_NE(event, nullptr);
@@ -21,7 +24,10 @@ TEST(Win32ShimHandles, SignallingAClosedEventFails)
   EXPECT_EQ(WaitForSingleObject(event, 0), WAIT_FAILED);
 }
 
-TEST(Win32ShimHandles, ClosingTwiceFailsTheSecondTime)
+TEST(
+  Win32ShimHandles,
+  ClosingTwiceFailsTheSecondTime
+)
 {
   const HANDLE event = CreateEventW(nullptr, TRUE, FALSE, nullptr);
   ASSERT_TRUE(CloseHandle(event));
@@ -29,19 +35,27 @@ TEST(Win32ShimHandles, ClosingTwiceFailsTheSecondTime)
   EXPECT_EQ(GetLastError(), static_cast<DWORD>(ERROR_INVALID_HANDLE));
 }
 
-TEST(Win32ShimHandles, AWaitOutlivesTheHandleClosedUnderIt)
+TEST(
+  Win32ShimHandles,
+  AWaitOutlivesTheHandleClosedUnderIt
+)
 {
   // Windows keeps the object while a wait holds it; closing the handle doesn't signal it.
   const HANDLE event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
   std::atomic<DWORD> result{0xFFFFFFFFu};
-  std::thread waiter([&] { result = WaitForSingleObject(event, 300); });
+  std::thread waiter([&] {
+    result = WaitForSingleObject(event, 300);
+  });
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
   ASSERT_TRUE(CloseHandle(event));
   waiter.join();
   EXPECT_EQ(result.load(), static_cast<DWORD>(WAIT_TIMEOUT));
 }
 
-TEST(Win32ShimHandles, SignallingWhileTheOwnerClosesIsSafe)
+TEST(
+  Win32ShimHandles,
+  SignallingWhileTheOwnerClosesIsSafe
+)
 {
   // The ~CSimDriver order: a connector thread signals while the owner closes the event.
   for (int round = 0; round < 2000; ++round) {
@@ -49,8 +63,7 @@ TEST(Win32ShimHandles, SignallingWhileTheOwnerClosesIsSafe)
     std::atomic<bool> started{false};
     std::thread signaller([&] {
       started = true;
-      while (SetEvent(event) != FALSE) {
-      }
+      while (SetEvent(event) != FALSE) {}
     });
     while (!started) {
       std::this_thread::yield();

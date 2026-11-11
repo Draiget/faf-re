@@ -39,7 +39,12 @@ namespace moho
     /**
      * Address: 0x00484660 (FUN_00484660, Moho::SPartialConnection::SPartialConnection)
      */
-    SPartialConnection(CNetTCPConnector* connector, const platform::net::Socket socket, const u_long address, const u_short port)
+    SPartialConnection(
+      CNetTCPConnector* connector,
+      const platform::net::Socket socket,
+      const u_long address,
+      const u_short port
+    )
       : TDatListItem<SPartialConnection, void>()
       , mConnector(connector)
       , mSocket(socket)
@@ -206,7 +211,10 @@ u_short CNetTCPConnector::GetLocalPort()
  * What it does:
  * Creates an outbound non-blocking TCP connection object.
  */
-INetConnection* CNetTCPConnector::Connect(const u_long address, const u_short port)
+INetConnection* CNetTCPConnector::Connect(
+  const u_long address,
+  const u_short port
+)
 {
   const platform::net::Socket socket = platform::net::OpenSocket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (socket == platform::net::kInvalidSocket) {
@@ -234,8 +242,10 @@ INetConnection* CNetTCPConnector::Connect(const u_long address, const u_short po
   name.sin_family = AF_INET;
   name.sin_port = ::htons(port);
   name.sin_addr.s_addr = ::htonl(address);
-  if (platform::net::Connect(socket, name) == platform::net::kSocketError &&
-      platform::net::LastError() != platform::net::error::kWouldBlock) {
+  if (
+    platform::net::Connect(socket, name) == platform::net::kSocketError &&
+    platform::net::LastError() != platform::net::error::kWouldBlock
+  ) {
     gpg::Logf(
       "CNetTCPConnector::Connect(%s:%d): connect() failed: %s",
       NET_GetHostName(address).c_str(),
@@ -263,7 +273,10 @@ INetConnection* CNetTCPConnector::Connect(const u_long address, const u_short po
  * What it does:
  * Finds next pending remote endpoint awaiting accept.
  */
-bool CNetTCPConnector::FindNextAddress(u_long& outAddress, u_short& outPort)
+bool CNetTCPConnector::FindNextAddress(
+  u_long& outAddress,
+  u_short& outPort
+)
 {
   for (CNetTCPConnection* const connection : mConnections) {
     if (connection->mState == kNetStatePending) {
@@ -282,7 +295,10 @@ bool CNetTCPConnector::FindNextAddress(u_long& outAddress, u_short& outPort)
  * What it does:
  * Accepts endpoint into active connection list or creates placeholder.
  */
-INetConnection* CNetTCPConnector::Accept(const u_long address, const u_short port)
+INetConnection* CNetTCPConnector::Accept(
+  const u_long address,
+  const u_short port
+)
 {
   gpg::Logf("CNetTCPConnector::Accept(%s:%d)", NET_GetHostName(address).c_str(), port);
 
@@ -303,7 +319,10 @@ INetConnection* CNetTCPConnector::Accept(const u_long address, const u_short por
  * What it does:
  * Rejects endpoint pending connection.
  */
-void CNetTCPConnector::Reject(const u_long address, const u_short port)
+void CNetTCPConnector::Reject(
+  const u_long address,
+  const u_short port
+)
 {
   gpg::Logf("CNetTCPConnector::Reject(%s:%d)", NET_GetHostName(address).c_str(), port);
 
@@ -381,7 +400,9 @@ void CNetTCPConnector::Push()
  * What it does:
  * Redirects socket network events to supplied event handle.
  */
-void CNetTCPConnector::SelectEvent(const HANDLE ev)
+void CNetTCPConnector::SelectEvent(
+  const HANDLE ev
+)
 {
   platform::net::SelectSocketEvents(mSocket, ev, platform::net::kEventAccept);
 
@@ -410,7 +431,9 @@ HANDLE CNetTCPConnector::GetSelectedEventHandle() const noexcept
  * What it does:
  * Returns empty stamp snapshot for legacy TCP path.
  */
-SSendStampWindow CNetTCPConnector::SnapshotSendStamps(const int32_t /*since*/)
+SSendStampWindow CNetTCPConnector::SnapshotSendStamps(
+  const int32_t /*since*/
+)
 {
   return SSendStampWindow{0, 0};
 }
@@ -421,7 +444,9 @@ SSendStampWindow CNetTCPConnector::SnapshotSendStamps(const int32_t /*since*/)
  * What it does:
  * Initializes TCP connector around already-open listening socket.
  */
-CNetTCPConnector::CNetTCPConnector(const platform::net::Socket socket) noexcept
+CNetTCPConnector::CNetTCPConnector(
+  const platform::net::Socket socket
+) noexcept
   : INetConnector()
   , WeakObject() // 0x00484AB2: the weak-reference head is zeroed first
   , mSocket(socket)
@@ -441,7 +466,10 @@ CNetTCPConnector::CNetTCPConnector(const platform::net::Socket socket) noexcept
  * partial had buffered.
  */
 void CNetTCPConnector::ReadFromStream(
-  const platform::net::Socket socket, const u_long address, const u_short port, gpg::PipeStream& stream
+  const platform::net::Socket socket,
+  const u_long address,
+  const u_short port,
+  gpg::PipeStream& stream
 )
 {
   CNetTCPConnection* connection = nullptr;

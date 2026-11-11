@@ -22,14 +22,19 @@ namespace faf::remote
     constexpr std::uint64_t kFnvPrime = 0x100000001B3ull;
     constexpr std::size_t kReportBytes = 1u + 2u * sizeof(std::uint64_t);
 
-    void PutU64(std::vector<std::uint8_t>& out, const std::uint64_t value)
+    void PutU64(
+      std::vector<std::uint8_t>& out,
+      const std::uint64_t value
+    )
     {
       for (unsigned i = 0; i < 8u; ++i) {
         out.push_back(static_cast<std::uint8_t>(value >> (8u * i)));
       }
     }
 
-    [[nodiscard]] std::uint64_t GetU64(const std::uint8_t* const bytes) noexcept
+    [[nodiscard]] std::uint64_t GetU64(
+      const std::uint8_t* const bytes
+    ) noexcept
     {
       std::uint64_t value = 0;
       for (unsigned i = 0; i < 8u; ++i) {
@@ -39,7 +44,9 @@ namespace faf::remote
     }
   } // namespace
 
-  std::uint64_t HashModUids(std::vector<std::string> uids) noexcept
+  std::uint64_t HashModUids(
+    std::vector<std::string> uids
+  ) noexcept
   {
     std::sort(uids.begin(), uids.end());
     std::uint64_t hash = kFnvOffset;
@@ -53,7 +60,9 @@ namespace faf::remote
     return hash;
   }
 
-  std::vector<std::string> ReadModUids(const std::string& gameMods)
+  std::vector<std::string> ReadModUids(
+    const std::string& gameMods
+  )
   {
     std::vector<std::string> uids;
     if (gameMods.empty()) {
@@ -82,7 +91,10 @@ namespace faf::remote
     return uids;
   }
 
-  SContentReport MakeContentReport(moho::RRuleGameRules& rules, const std::string& gameMods)
+  SContentReport MakeContentReport(
+    moho::RRuleGameRules& rules,
+    const std::string& gameMods
+  )
   {
     SContentReport report;
     report.blueprints = BuildContentTables(rules).Hash();
@@ -90,7 +102,9 @@ namespace faf::remote
     return report;
   }
 
-  std::vector<std::uint8_t> EncodeContentReport(const SContentReport& report)
+  std::vector<std::uint8_t> EncodeContentReport(
+    const SContentReport& report
+  )
   {
     std::vector<std::uint8_t> message;
     message.reserve(kReportBytes);
@@ -100,14 +114,19 @@ namespace faf::remote
     return message;
   }
 
-  std::vector<std::uint8_t> EncodeModReport(const std::vector<SModEntry>& mods)
+  std::vector<std::uint8_t> EncodeModReport(
+    const std::vector<SModEntry>& mods
+  )
   {
     std::vector<std::uint8_t> message;
     net::ByteWriter writer(message);
     writer.Byte(static_cast<std::uint8_t>(net::ESeatMessage::ModReport));
     std::vector<const SModEntry*> kept;
     for (const SModEntry& mod : mods) {
-      if (kept.size() < kMaxReportedMods && !mod.uid.empty() && mod.uid.size() <= kMaxModText && mod.version.size() <= kMaxModText) {
+      if (
+        kept.size() < kMaxReportedMods && !mod.uid.empty() && mod.uid.size() <= kMaxModText &&
+        mod.version.size() <= kMaxModText
+      ) {
         kept.push_back(&mod);
       }
     }
@@ -122,7 +141,10 @@ namespace faf::remote
     return message;
   }
 
-  bool DecodeModReport(const std::span<const std::uint8_t> message, std::vector<SModEntry>& out)
+  bool DecodeModReport(
+    const std::span<const std::uint8_t> message,
+    std::vector<SModEntry>& out
+  )
   {
     out.clear();
     if (message.empty() || message[0] != static_cast<std::uint8_t>(net::ESeatMessage::ModReport)) {
@@ -162,7 +184,10 @@ namespace faf::remote
     return true;
   }
 
-  std::vector<std::string> UiModsOutside(const std::vector<SModEntry>& mods, const std::vector<std::string>& allowed)
+  std::vector<std::string> UiModsOutside(
+    const std::vector<SModEntry>& mods,
+    const std::vector<std::string>& allowed
+  )
   {
     std::vector<std::string> outside;
     for (const SModEntry& mod : mods) {
@@ -173,7 +198,10 @@ namespace faf::remote
     return outside;
   }
 
-  bool DecodeContentReport(const std::span<const std::uint8_t> message, SContentReport& out)
+  bool DecodeContentReport(
+    const std::span<const std::uint8_t> message,
+    SContentReport& out
+  )
   {
     if (message.size() != kReportBytes || message[0] != static_cast<std::uint8_t>(net::ESeatMessage::ContentReport)) {
       return false;
@@ -183,7 +211,9 @@ namespace faf::remote
     return true;
   }
 
-  std::optional<EContentCheck> ReadContentCheck(const std::string_view text)
+  std::optional<EContentCheck> ReadContentCheck(
+    const std::string_view text
+  )
   {
     if (text == "off") {
       return EContentCheck::Off;
@@ -197,7 +227,10 @@ namespace faf::remote
     return std::nullopt;
   }
 
-  EContentVerdict JudgeContent(const SContentReport& expected, const SContentReport* const report) noexcept
+  EContentVerdict JudgeContent(
+    const SContentReport& expected,
+    const SContentReport* const report
+  ) noexcept
   {
     if (report == nullptr) {
       return EContentVerdict::Missing;
@@ -205,7 +238,10 @@ namespace faf::remote
     return *report == expected ? EContentVerdict::Same : EContentVerdict::Differs;
   }
 
-  bool RefusesPlayer(const EContentCheck mode, const EContentVerdict verdict) noexcept
+  bool RefusesPlayer(
+    const EContentCheck mode,
+    const EContentVerdict verdict
+  ) noexcept
   {
     return mode == EContentCheck::Refuse && verdict != EContentVerdict::Same;
   }

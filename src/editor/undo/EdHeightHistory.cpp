@@ -15,7 +15,11 @@ namespace faf::editor
   }
 
   template <typename T>
-  void TileHistory<T>::Reset(const int width, const int height, const std::size_t budgetBytes)
+  void TileHistory<T>::Reset(
+    const int width,
+    const int height,
+    const std::size_t budgetBytes
+  )
   {
     mWidth = width;
     mHeight = height;
@@ -30,15 +34,26 @@ namespace faf::editor
   }
 
   template <typename T>
-  SampleRect TileHistory<T>::TileRect(const int index) const
+  SampleRect TileHistory<T>::TileRect(
+    const int index
+  ) const
   {
     const int tx = index % mTilesX;
     const int tz = index / mTilesX;
-    return {tx * kTile, tz * kTile, std::min(mWidth - 1, tx * kTile + kTile - 1), std::min(mHeight - 1, tz * kTile + kTile - 1)};
+    return {
+      tx * kTile,
+      tz * kTile,
+      std::min(mWidth - 1, tx * kTile + kTile - 1),
+      std::min(mHeight - 1, tz * kTile + kTile - 1)
+    };
   }
 
   template <typename T>
-  void TileHistory<T>::Copy(const T* const heights, const SampleRect& rect, std::vector<T>& out) const
+  void TileHistory<T>::Copy(
+    const T* const heights,
+    const SampleRect& rect,
+    std::vector<T>& out
+  ) const
   {
     out.clear();
     for (int z = rect.z0; z <= rect.z1; ++z) {
@@ -48,12 +63,19 @@ namespace faf::editor
   }
 
   template <typename T>
-  void TileHistory<T>::Paste(T* const heights, const SampleRect& rect, const std::vector<T>& in) const
+  void TileHistory<T>::Paste(
+    T* const heights,
+    const SampleRect& rect,
+    const std::vector<T>& in
+  ) const
   {
     const std::size_t rowLength = static_cast<std::size_t>(rect.x1 - rect.x0 + 1);
     for (int z = rect.z0; z <= rect.z1; ++z) {
-      std::copy_n(in.begin() + static_cast<std::ptrdiff_t>(static_cast<std::size_t>(z - rect.z0) * rowLength), rowLength,
-                  heights + static_cast<std::size_t>(z) * static_cast<std::size_t>(mWidth) + static_cast<std::size_t>(rect.x0));
+      std::copy_n(
+        in.begin() + static_cast<std::ptrdiff_t>(static_cast<std::size_t>(z - rect.z0) * rowLength),
+        rowLength,
+        heights + static_cast<std::size_t>(z) * static_cast<std::size_t>(mWidth) + static_cast<std::size_t>(rect.x0)
+      );
     }
   }
 
@@ -66,7 +88,10 @@ namespace faf::editor
   }
 
   template <typename T>
-  void TileHistory<T>::BeforeWrite(const T* const heights, const SampleRect& rect)
+  void TileHistory<T>::BeforeWrite(
+    const T* const heights,
+    const SampleRect& rect
+  )
   {
     if (!mStroking || mWidth == 0) {
       return;
@@ -92,7 +117,9 @@ namespace faf::editor
   }
 
   template <typename T>
-  void TileHistory<T>::EndStroke(const T* const heights)
+  void TileHistory<T>::EndStroke(
+    const T* const heights
+  )
   {
     if (!mStroking) {
       return;
@@ -125,7 +152,10 @@ namespace faf::editor
   }
 
   template <typename T>
-  bool TileHistory<T>::Undo(T* const heights, std::vector<SampleRect>& changed)
+  bool TileHistory<T>::Undo(
+    T* const heights,
+    std::vector<SampleRect>& changed
+  )
   {
     if (mStroking || mUndo.empty()) {
       return false;
@@ -142,7 +172,10 @@ namespace faf::editor
   }
 
   template <typename T>
-  bool TileHistory<T>::Redo(T* const heights, std::vector<SampleRect>& changed)
+  bool TileHistory<T>::Redo(
+    T* const heights,
+    std::vector<SampleRect>& changed
+  )
   {
     if (mStroking || mRedo.empty()) {
       return false;

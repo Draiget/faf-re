@@ -73,19 +73,19 @@ struct LexState;
  */
 enum expkind : std::int32_t
 {
-	VVOID = 0x00,      ///< no value
-	VNIL = 0x01,       ///< the nil constant
-	VTRUE = 0x02,      ///< the true constant
-	VFALSE = 0x03,     ///< the false constant
-	VK = 0x04,         ///< info = index of the constant in `f->k`
-	VLOCAL = 0x05,     ///< info = local register
-	VUPVAL = 0x06,     ///< info = index into `FuncState::upvalues`
-	VGLOBAL = 0x07,    ///< info = table register; aux = index of the name in `f->k`
-	VINDEXED = 0x08,   ///< info = table register; aux = index register (or constant)
-	VJMP = 0x09,       ///< info = pc of the jump instruction
-	VRELOCABLE = 0x0A, ///< info = pc of an instruction whose target register is unset
-	VNONRELOC = 0x0B,  ///< info = the register already holding the value
-	VCALL = 0x0C       ///< info = the register holding the call's first result
+  VVOID = 0x00,      ///< no value
+  VNIL = 0x01,       ///< the nil constant
+  VTRUE = 0x02,      ///< the true constant
+  VFALSE = 0x03,     ///< the false constant
+  VK = 0x04,         ///< info = index of the constant in `f->k`
+  VLOCAL = 0x05,     ///< info = local register
+  VUPVAL = 0x06,     ///< info = index into `FuncState::upvalues`
+  VGLOBAL = 0x07,    ///< info = table register; aux = index of the name in `f->k`
+  VINDEXED = 0x08,   ///< info = table register; aux = index register (or constant)
+  VJMP = 0x09,       ///< info = pc of the jump instruction
+  VRELOCABLE = 0x0A, ///< info = pc of an instruction whose target register is unset
+  VNONRELOC = 0x0B,  ///< info = the register already holding the value
+  VCALL = 0x0C       ///< info = the register holding the call's first result
 };
 
 /**
@@ -96,11 +96,11 @@ enum expkind : std::int32_t
  */
 struct expdesc
 {
-	expkind k;          // +0x00
-	std::int32_t info;  // +0x04
-	std::int32_t aux;   // +0x08
-	std::int32_t t;     // +0x0C patch list of `exit when true'
-	std::int32_t f;     // +0x10 patch list of `exit when false'
+  expkind k;         // +0x00
+  std::int32_t info; // +0x04
+  std::int32_t aux;  // +0x08
+  std::int32_t t;    // +0x0C patch list of `exit when true'
+  std::int32_t f;    // +0x10 patch list of `exit when false'
 };
 
 static_assert(offsetof(expdesc, k) == 0x00, "expdesc::k offset must be 0x00");
@@ -118,12 +118,12 @@ static_assert(sizeof(expdesc) == 0x14, "expdesc size must be 0x14");
  */
 struct BlockCnt
 {
-	BlockCnt* previous;        // +0x00 enclosing block
-	std::int32_t breaklist;    // +0x04 jumps out of this loop
-	std::int32_t continuelist; // +0x08 jumps back to this loop's step
-	std::int32_t nactvar;      // +0x0C actives outside the block
-	std::int32_t upval;        // +0x10 some local here is used as an upvalue
-	std::int32_t isbreakable;  // +0x14 block is a loop
+  BlockCnt* previous;        // +0x00 enclosing block
+  std::int32_t breaklist;    // +0x04 jumps out of this loop
+  std::int32_t continuelist; // +0x08 jumps back to this loop's step
+  std::int32_t nactvar;      // +0x0C actives outside the block
+  std::int32_t upval;        // +0x10 some local here is used as an upvalue
+  std::int32_t isbreakable;  // +0x14 block is a loop
 };
 
 static_assert(offsetof(BlockCnt, previous) == 0x00, "BlockCnt::previous offset must be 0x00");
@@ -137,15 +137,15 @@ static_assert(sizeof(BlockCnt) == 0x18, "BlockCnt size must be 0x18");
 /// Semantic payload of a token: a number literal, or an interned string.
 union SemInfo
 {
-	float r;
-	TString* ts;
+  float r;
+  TString* ts;
 };
 
 /// One lookahead-able token: its kind, plus whichever payload that kind carries.
 struct Token
 {
-	std::int32_t token;  // +0x00
-	SemInfo seminfo;     // +0x04
+  std::int32_t token; // +0x00
+  SemInfo seminfo;    // +0x04
 };
 
 static_assert(offsetof(Token, token) == 0x00, "Token::token offset must be 0x00");
@@ -161,17 +161,17 @@ static_assert(sizeof(Token) == 0x08, "Token size must be 0x08");
  */
 struct LexState
 {
-	std::int32_t current;    // +0x00 current character
-	std::int32_t linenumber; // +0x04 input line counter
-	std::int32_t lastline;   // +0x08 line of the last token consumed
-	Token t;                 // +0x0C current token
-	Token lookahead;         // +0x14 lookahead token
-	FuncState* fs;           // +0x1C function currently being compiled
-	lua_State* L;            // +0x20
-	ZIO* z;                  // +0x24 input stream
-	Mbuffer* buff;           // +0x28 token-text accumulator
-	TString* source;         // +0x2C chunk name, for error messages
-	std::int32_t nestlevel;  // +0x30 nested non-terminal depth
+  std::int32_t current;    // +0x00 current character
+  std::int32_t linenumber; // +0x04 input line counter
+  std::int32_t lastline;   // +0x08 line of the last token consumed
+  Token t;                 // +0x0C current token
+  Token lookahead;         // +0x14 lookahead token
+  FuncState* fs;           // +0x1C function currently being compiled
+  lua_State* L;            // +0x20
+  ZIO* z;                  // +0x24 input stream
+  Mbuffer* buff;           // +0x28 token-text accumulator
+  TString* source;         // +0x2C chunk name, for error messages
+  std::int32_t nestlevel;  // +0x30 nested non-terminal depth
 };
 
 static_assert(offsetof(LexState, current) == 0x00, "LexState::current offset must be 0x00");
@@ -198,22 +198,22 @@ static_assert(sizeof(LexState) == 0x34, "LexState size must be 0x34");
  */
 struct FuncState
 {
-	Proto* f;                      // +0x00   current function header
-	Table* h;                      // +0x04   constant -> index of it in `f->k'
-	FuncState* prev;               // +0x08   enclosing function
-	LexState* ls;                  // +0x0C   lexical state
-	lua_State* L;                  // +0x10   copy of the Lua state
-	BlockCnt* bl;                  // +0x14   chain of current blocks
-	std::int32_t pc;               // +0x18   next position to code
-	std::int32_t lasttarget;       // +0x1C   `pc' of last `jump target'
-	std::int32_t jpc;              // +0x20   list of pending jumps to `pc'
-	std::int32_t freereg;          // +0x24   first free register
-	std::int32_t nk;               // +0x28   number of elements in `f->k'
-	std::int32_t np;               // +0x2C   number of elements in `f->p'
-	std::int32_t nlocvars;         // +0x30   number of elements in `f->locvars'
-	std::int32_t nactvar;          // +0x34   number of active local variables
-	expdesc upvalues[MAXUPVALUES]; // +0x38   upvalues
-	std::int32_t actvar[MAXVARS];  // +0x2B8  declared-variable stack
+  Proto* f;                      // +0x00   current function header
+  Table* h;                      // +0x04   constant -> index of it in `f->k'
+  FuncState* prev;               // +0x08   enclosing function
+  LexState* ls;                  // +0x0C   lexical state
+  lua_State* L;                  // +0x10   copy of the Lua state
+  BlockCnt* bl;                  // +0x14   chain of current blocks
+  std::int32_t pc;               // +0x18   next position to code
+  std::int32_t lasttarget;       // +0x1C   `pc' of last `jump target'
+  std::int32_t jpc;              // +0x20   list of pending jumps to `pc'
+  std::int32_t freereg;          // +0x24   first free register
+  std::int32_t nk;               // +0x28   number of elements in `f->k'
+  std::int32_t np;               // +0x2C   number of elements in `f->p'
+  std::int32_t nlocvars;         // +0x30   number of elements in `f->locvars'
+  std::int32_t nactvar;          // +0x34   number of active local variables
+  expdesc upvalues[MAXUPVALUES]; // +0x38   upvalues
+  std::int32_t actvar[MAXVARS];  // +0x2B8  declared-variable stack
 };
 
 static_assert(offsetof(FuncState, f) == 0x00, "FuncState::f offset must be 0x00");

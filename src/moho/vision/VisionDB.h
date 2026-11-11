@@ -120,13 +120,13 @@ namespace moho
        */
       void PutInChain(Entry* root) noexcept;
 
-      Entry* mParent;             // +0x00
-      Entry* mContained;          // +0x04 first node of the chain this one contains
-      Entry* mNext;               // +0x08 next node in this node's own chain
-      bool mIsReal;               // +0x0C an emitter held by a Handle, not a quadtree node
-      bool mVisible;              // +0x0D the emitter currently grants vision
-      Wm3::Circle2f mPrevCircle;  // +0x10
-      Wm3::Circle2f mCurCircle;   // +0x1C
+      Entry* mParent;            // +0x00
+      Entry* mContained;         // +0x04 first node of the chain this one contains
+      Entry* mNext;              // +0x08 next node in this node's own chain
+      bool mIsReal;              // +0x0C an emitter held by a Handle, not a quadtree node
+      bool mVisible;             // +0x0D the emitter currently grants vision
+      Wm3::Circle2f mPrevCircle; // +0x10
+      Wm3::Circle2f mCurCircle;  // +0x1C
     };
     MOHO_VISIONDB_X86_ASSERT(sizeof(Entry) == 0x28, "VisionDB::Entry size must be 0x28");
     MOHO_VISIONDB_X86_ASSERT(offsetof(Entry, mParent) == 0x00, "VisionDB::Entry::mParent offset must be 0x00");
@@ -243,8 +243,8 @@ namespace moho
        */
       void Update(const Wm3::Vector2f& next, const Wm3::Vector2f& previous, float radius, bool visible);
 
-      VisionDB* mDB;  // +0x04
-      Entry* mEntry;  // +0x08
+      VisionDB* mDB; // +0x04
+      Entry* mEntry; // +0x08
     };
     MOHO_VISIONDB_X86_ASSERT(sizeof(Handle) == 0x0C, "VisionDB::Handle size must be 0x0C");
     MOHO_VISIONDB_X86_ASSERT(offsetof(Handle, mDB) == 0x04, "VisionDB::Handle::mDB offset must be 0x04");

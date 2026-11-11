@@ -24,20 +24,27 @@ namespace faf::editor
 {
   namespace
   {
-    std::string Lower(std::string text)
+    std::string Lower(
+      std::string text
+    )
     {
-      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return text;
     }
 
     std::filesystem::path OwnFolder()
     {
       const char* const local = std::getenv("LOCALAPPDATA");
-      return local != nullptr ? std::filesystem::path(local) / "FAForever" / "Editor" / "effects" : std::filesystem::path("effects");
+      return local != nullptr ? std::filesystem::path(local) / "FAForever" / "Editor" / "effects"
+                              : std::filesystem::path("effects");
     }
 
     /** The file's name without `.bp` (and the `_emit` the game's files end in, as retail's editor names the id). */
-    std::string BaseName(const std::string& path)
+    std::string BaseName(
+      const std::string& path
+    )
     {
       std::string name = path.substr(path.find_last_of("/\\") + 1);
       if (const std::size_t dot = name.rfind(".bp"); dot != std::string::npos) {
@@ -48,7 +55,10 @@ namespace faf::editor
 
   } // namespace
 
-  void EdParticleEditor::SetMapFolder(const std::filesystem::path& folder, const std::string& mapFolderName)
+  void EdParticleEditor::SetMapFolder(
+    const std::filesystem::path& folder,
+    const std::string& mapFolderName
+  )
   {
     mMapFolder = folder;
     mMapFolderName = mapFolderName;
@@ -67,7 +77,9 @@ namespace faf::editor
     }
   }
 
-  void EdParticleEditor::OpenOther(std::function<void()> open)
+  void EdParticleEditor::OpenOther(
+    std::function<void()> open
+  )
   {
     SyncGraph(); // the graph's edits counted
     if (!mDirty) {
@@ -82,7 +94,10 @@ namespace faf::editor
   {
     if (std::exchange(mAskUnsaved, false)) {
       ImGui::OpenPopup("Unsaved changes");
-      gpg::Logf("editor: particle editor: unsaved changes in %s, asked before opening another", (mFlatMode ? mName : mEffectName).c_str());
+      gpg::Logf(
+        "editor: particle editor: unsaved changes in %s, asked before opening another",
+        (mFlatMode ? mName : mEffectName).c_str()
+      );
     }
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (!ImGui::BeginPopupModal("Unsaved changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -141,7 +156,9 @@ namespace faf::editor
     mKeySelected = -1;
   }
 
-  void EdParticleEditor::NewFlat(const char* kind)
+  void EdParticleEditor::NewFlat(
+    const char* kind
+  )
   {
     ClearGraph();
     // A start as the game's own files have them.
@@ -193,7 +210,9 @@ namespace faf::editor
     RestartPreview();
   }
 
-  void EdParticleEditor::Frame(const bool showing)
+  void EdParticleEditor::Frame(
+    const bool showing
+  )
   {
     if (!showing) {
       return;
@@ -229,7 +248,9 @@ namespace faf::editor
     }
   }
 
-  bool EdParticleEditor::OpenGameEmitter(const std::string& path)
+  bool EdParticleEditor::OpenGameEmitter(
+    const std::string& path
+  )
   {
     std::string text;
     if (!ReadGameFile(path, text)) {
@@ -266,7 +287,9 @@ namespace faf::editor
     return true;
   }
 
-  bool EdParticleEditor::Save(const std::filesystem::path& file)
+  bool EdParticleEditor::Save(
+    const std::filesystem::path& file
+  )
   {
     std::error_code ec;
     std::filesystem::create_directories(file.parent_path(), ec);
@@ -290,13 +313,18 @@ namespace faf::editor
     return true;
   }
 
-  void EdParticleEditor::Draw(bool& open)
+  void EdParticleEditor::Draw(
+    bool& open
+  )
   {
     // Opened whole, over most of the editor, and never folded to its title bar (user report: it opened collapsed).
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.85f, viewport->WorkSize.y * 0.8f), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
-                            ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowPos(
+      ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
+      ImGuiCond_FirstUseEver,
+      ImVec2(0.5f, 0.5f)
+    );
     ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
     if (!ImGui::Begin("Particle Editor", &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
@@ -306,7 +334,11 @@ namespace faf::editor
     if (mFlatMode) {
       // The preview large: about half the window (user ask: the left side bigger, to see the effect well).
       const float previewWidth = std::max(ImGui::GetContentRegionAvail().x * 0.48f, 320.0f);
-      if (ImGui::BeginTable("##flatlayout2", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail())) {
+      if (
+        ImGui::BeginTable(
+          "##flatlayout2", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail()
+        )
+      ) {
         ImGui::TableSetupColumn("preview", ImGuiTableColumnFlags_WidthFixed, previewWidth);
         ImGui::TableSetupColumn("keys", ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableNextRow();
@@ -385,8 +417,12 @@ namespace faf::editor
       }
       first = false;
     };
-    const auto checkboxWidth = [&](const char* label) { return ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize(label).x; };
-    const auto buttonWidth = [&](const char* label) { return ImGui::CalcTextSize(label).x + style.FramePadding.x * 2.0f; };
+    const auto checkboxWidth = [&](const char* label) {
+      return ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize(label).x;
+    };
+    const auto buttonWidth = [&](const char* label) {
+      return ImGui::CalcTextSize(label).x + style.FramePadding.x * 2.0f;
+    };
 
     // Playing: pause, start again, loop (in both the Particle Editor and the Browser).
     flow(buttonWidth("Pause"));
@@ -402,7 +438,8 @@ namespace faf::editor
     ImGui::SetItemTooltip("Starts the effect again each time its Lifetime ends");
 
     static const char* const kBackgrounds[] = {"Night", "Grey", "Sky", "Black"};
-    const float comboWidth = ImGui::CalcTextSize("Black").x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight() + style.ItemInnerSpacing.x;
+    const float comboWidth =
+      ImGui::CalcTextSize("Black").x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight() + style.ItemInnerSpacing.x;
     flow(comboWidth);
     ImGui::SetNextItemWidth(comboWidth);
     (void)ImGui::Combo("##bg", &options.background, kBackgrounds, 4);
@@ -416,7 +453,8 @@ namespace faf::editor
     ImGui::Checkbox("Turn", &options.turn);
     ImGui::SetItemTooltip("The camera turns slowly round the effect");
     // As wide as its longest text, and a little for the grab.
-    const float sliderWidth = ImGui::CalcTextSize("above ground 30.0").x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight();
+    const float sliderWidth =
+      ImGui::CalcTextSize("above ground 30.0").x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight();
     flow(sliderWidth);
     ImGui::SetNextItemWidth(sliderWidth);
     ImGui::SliderFloat("##height", &options.height, 0.0f, 30.0f, "above ground %.1f");
@@ -469,10 +507,14 @@ namespace faf::editor
     }
     if (ImGui::BeginMenu("File")) {
       if (ImGui::MenuItem("New beam")) {
-        OpenOther([this] { NewFlat("BeamBlueprint"); });
+        OpenOther([this] {
+          NewFlat("BeamBlueprint");
+        });
       }
       if (ImGui::MenuItem("New trail")) {
-        OpenOther([this] { NewFlat("TrailEmitterBlueprint"); });
+        OpenOther([this] {
+          NewFlat("TrailEmitterBlueprint");
+        });
       }
       if (ImGui::MenuItem("New effect")) {
         OpenOther([this] {
@@ -512,8 +554,13 @@ namespace faf::editor
         mPlaceAsk = place;
       }
       ImGui::EndDisabled();
-      ImGui::SetItemTooltip("%s", place.empty() ? "Save the effect into the map's folder first (or open a game effect): the map plays it by its path"
-                                                : "An effect decoration at the middle of the map's view: an Effect marker the map's script plays the effect at");
+      ImGui::SetItemTooltip(
+        "%s",
+        place.empty()
+          ? "Save the effect into the map's folder first (or open a game effect): the map plays it by its path"
+          : "An effect decoration at the middle of the map's view: an Effect marker the map's script plays the effect "
+            "at"
+      );
     }
     ImGui::SetItemTooltip("Starts the emitter again each time its Lifetime ends");
     {
@@ -539,10 +586,15 @@ namespace faf::editor
   {
     const bool beam = mFlat.kind == "BeamBlueprint";
     ImGui::SeparatorText(beam ? "Beam" : "Trail");
-    ImGui::TextWrapped("%s", beam ? "A beam is a textured strip between two points: weapons' beams, tractor and shield beams. The preview draws it from "
-                                    "the view's centre, rising, for its Lifetime and again."
-                                  : "A trail is a ribbon left behind a moving point: missiles' and aircraft's trails. The preview moves its emitter "
-                                    "round the view's centre, a turn every 4 seconds.");
+    ImGui::TextWrapped(
+      "%s",
+      beam ? "A beam is a textured strip between two points: weapons' beams, tractor and shield beams. The preview "
+             "draws it from "
+             "the view's centre, rising, for its Lifetime and again."
+           : "A trail is a ribbon left behind a moving point: missiles' and aircraft's trails. The preview moves its "
+             "emitter "
+             "round the view's centre, a turn every 4 seconds."
+    );
     ImGui::Spacing();
     bool changed = false;
     for (const FlatField& field : FlatFields(mFlat.kind)) {
@@ -566,7 +618,8 @@ namespace faf::editor
         edited = ImGui::Checkbox(field.key, &value.flag);
         break;
       case FlatValue::Kind::Color:
-        edited = ImGui::ColorEdit4(field.key, value.color.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_AlphaBar);
+        edited =
+          ImGui::ColorEdit4(field.key, value.color.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_AlphaBar);
         break;
       case FlatValue::Kind::Text:
         if (field.texture) {
@@ -605,7 +658,11 @@ namespace faf::editor
         known = known || key == field.key;
       }
       if (!known) {
-        ImGui::TextDisabled("%s = %s (kept as written)", key.c_str(), value.kind == FlatValue::Kind::Number ? std::to_string(value.number).c_str() : value.text.c_str());
+        ImGui::TextDisabled(
+          "%s = %s (kept as written)",
+          key.c_str(),
+          value.kind == FlatValue::Kind::Number ? std::to_string(value.number).c_str() : value.text.c_str()
+        );
       }
     }
     if (mParticleTextures.empty()) {
@@ -645,7 +702,9 @@ namespace faf::editor
       return;
     }
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputTextWithHint("##filter", "Search the game's effects (e.g. muzzle, smoke, beam, trail)", mBrowserFilter, sizeof(mBrowserFilter));
+    ImGui::InputTextWithHint(
+      "##filter", "Search the game's effects (e.g. muzzle, smoke, beam, trail)", mBrowserFilter, sizeof(mBrowserFilter)
+    );
     const std::string filter = Lower(mBrowserFilter);
     if (ImGui::BeginChild("##list", ImVec2(0.0f, 0.0f))) {
       int shown = 0;
@@ -658,7 +717,9 @@ namespace faf::editor
           break;
         }
         if (ImGui::Selectable(path.c_str())) {
-          OpenOther([this, path] { (void)OpenGameEmitter(path); });
+          OpenOther([this, path] {
+            (void)OpenGameEmitter(path);
+          });
           ImGui::CloseCurrentPopup();
         }
       }

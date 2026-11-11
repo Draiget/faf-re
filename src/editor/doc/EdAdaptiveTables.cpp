@@ -24,7 +24,11 @@ namespace faf::editor
     class Reader
     {
     public:
-      explicit Reader(const std::string& text) : mText(text) {}
+      explicit Reader(
+        const std::string& text
+      )
+        : mText(text)
+      {}
 
       void SkipSpace()
       {
@@ -43,7 +47,9 @@ namespace faf::editor
         }
       }
 
-      std::optional<Value> ReadValue(std::string& error)
+      std::optional<Value> ReadValue(
+        std::string& error
+      )
       {
         SkipSpace();
         if (mAt >= mText.size()) {
@@ -86,8 +92,9 @@ namespace faf::editor
           return value;
         }
         const std::size_t start = mAt;
-        while (mAt < mText.size() && (std::isalnum(static_cast<unsigned char>(mText[mAt])) != 0 || mText[mAt] == '.' || mText[mAt] == '-' ||
-                                      mText[mAt] == '_')) {
+        while (mAt < mText.size() &&
+               (std::isalnum(static_cast<unsigned char>(mText[mAt])) != 0 || mText[mAt] == '.' || mText[mAt] == '-' ||
+                mText[mAt] == '_')) {
           ++mAt;
         }
         if (mAt == start) {
@@ -99,7 +106,10 @@ namespace faf::editor
         return value;
       }
 
-      std::size_t& At() noexcept { return mAt; }
+      std::size_t& At() noexcept
+      {
+        return mAt;
+      }
 
     private:
       const std::string& mText;
@@ -115,7 +125,11 @@ namespace faf::editor
       Value value;
     };
 
-    bool ReadAssignments(const std::string& text, std::vector<Assignment>& out, std::string& error)
+    bool ReadAssignments(
+      const std::string& text,
+      std::vector<Assignment>& out,
+      std::string& error
+    )
     {
       Reader reader(text);
       for (;;) {
@@ -153,7 +167,10 @@ namespace faf::editor
       }
     }
 
-    std::vector<std::string> Names(const Value& list, const bool hydro)
+    std::vector<std::string> Names(
+      const Value& list,
+      const bool hydro
+    )
     {
       std::vector<std::string> names;
       for (const Value& item : list.items) {
@@ -164,16 +181,24 @@ namespace faf::editor
       return names;
     }
 
-    std::vector<std::vector<std::string>> Groups(const Value& table, const bool hydro)
+    std::vector<std::vector<std::string>> Groups(
+      const Value& table,
+      const bool hydro
+    )
     {
       std::vector<std::vector<std::string>> groups;
       for (const Value& item : table.items) {
-        groups.push_back(item.isTable ? Names(item, hydro) : std::vector<std::string>{AdaptiveMarkerName(item.atom, hydro)});
+        groups.push_back(
+          item.isTable ? Names(item, hydro) : std::vector<std::string>{AdaptiveMarkerName(item.atom, hydro)}
+        );
       }
       return groups;
     }
 
-    std::string ListText(const std::vector<std::string>& names, const bool hydro)
+    std::string ListText(
+      const std::vector<std::string>& names,
+      const bool hydro
+    )
     {
       std::string text = "{";
       for (std::size_t i = 0; i < names.size(); ++i) {
@@ -184,7 +209,10 @@ namespace faf::editor
     }
 
     /** Per-army tables one army a line, as the template lays them out (the line is the army's number). */
-    std::string ArmyText(const std::vector<std::vector<std::string>>& armies, const bool hydro)
+    std::string ArmyText(
+      const std::vector<std::vector<std::string>>& armies,
+      const bool hydro
+    )
     {
       std::string text = "{";
       for (std::size_t i = 0; i < armies.size(); ++i) {
@@ -193,7 +221,10 @@ namespace faf::editor
       return text + "}";
     }
 
-    std::string GroupsText(const std::vector<std::vector<std::string>>& groups, const bool hydro)
+    std::string GroupsText(
+      const std::vector<std::vector<std::string>>& groups,
+      const bool hydro
+    )
     {
       std::string text = "{";
       for (std::size_t i = 0; i < groups.size(); ++i) {
@@ -204,13 +235,19 @@ namespace faf::editor
 
     /**
      * A table of rows (an army's mexes, an option's groups) written into its text as it is (user ask 2026-11-11: the
-     * FAF Map Editor generated these files; replace only what changed): a row whose entries are the same keeps its text,
-     * a changed one is written, and what lies between the rows (commas, line breaks, the template's alignment, comments)
-     * stays; a new row takes the separator before the last one, a dropped row goes with the separator before it.
-     * `fresh` is the whole table written anew, for a value that isn't a table of tables.
+     * FAF Map Editor generated these files; replace only what changed): a row whose entries are the same keeps its
+     * text, a changed one is written, and what lies between the rows (commas, line breaks, the template's alignment,
+     * comments) stays; a new row takes the separator before the last one, a dropped row goes with the separator before
+     * it. `fresh` is the whole table written anew, for a value that isn't a table of tables.
      */
-    std::string RowsWithin(const std::string& text, const Value& table, const std::vector<std::vector<std::string>>& rows, const bool hydro,
-                           const std::string& fresh, const char* const separator)
+    std::string RowsWithin(
+      const std::string& text,
+      const Value& table,
+      const std::vector<std::vector<std::string>>& rows,
+      const bool hydro,
+      const std::string& fresh,
+      const char* const separator
+    )
     {
       if (!table.isTable || table.items.empty() || rows.empty()) {
         return fresh;
@@ -221,7 +258,9 @@ namespace faf::editor
         }
       }
       const std::vector<Value>& items = table.items;
-      const auto between = [&](const std::size_t from, const std::size_t to) { return text.substr(from, to - from); };
+      const auto between = [&](const std::size_t from, const std::size_t to) {
+        return text.substr(from, to - from);
+      };
       // A new row's separator: a comma, and the last row's line break and indentation (not a comment by it).
       std::string added = separator;
       if (items.size() >= 2) {
@@ -258,7 +297,8 @@ namespace faf::editor
           out += ListText(rows[r], hydro);
         }
       }
-      // What followed the table's last row (a trailing comma, a comment) up to the closing brace; dropped rows don't come.
+      // What followed the table's last row (a trailing comma, a comment) up to the closing brace; dropped rows don't
+      // come.
       out += between(items.back().end, table.end - 1);
       return out + "}";
     }
@@ -278,7 +318,10 @@ namespace faf::editor
       std::size_t close = std::string::npos;
     };
 
-    OptionSpan FindOptionSpan(const std::string& text, const std::string& key)
+    OptionSpan FindOptionSpan(
+      const std::string& text,
+      const std::string& key
+    )
     {
       OptionSpan span;
       std::vector<std::size_t> opens;
@@ -296,7 +339,10 @@ namespace faf::editor
       for (std::size_t i = 0; i < text.size();) {
         const char c = text[i];
         if (c == '-' && i + 1 < text.size() && text[i + 1] == '-') {
-          if (i + 2 < text.size() && text[i + 2] == '[' && i + 3 < text.size() && (text[i + 3] == '[' || text[i + 3] == '=')) {
+          if (
+            i + 2 < text.size() && text[i + 2] == '[' && i + 3 < text.size() &&
+            (text[i + 3] == '[' || text[i + 3] == '=')
+          ) {
             i = longClose(i + 2);
           } else {
             const std::size_t line = text.find('\n', i);
@@ -310,8 +356,10 @@ namespace faf::editor
             j += text[j] == '\\' ? 2 : 1;
           }
           // `key = '<key>'` one level into options' table: that entry.
-          if (opens.size() == 2 && entry == std::string::npos && j < text.size() && text.compare(i + 1, j - i - 1, key) == 0 &&
-              j - i - 1 == key.size()) {
+          if (
+            opens.size() == 2 && entry == std::string::npos && j < text.size() &&
+            text.compare(i + 1, j - i - 1, key) == 0 && j - i - 1 == key.size()
+          ) {
             std::size_t back = i;
             while (back > 0 && std::isspace(static_cast<unsigned char>(text[back - 1])) != 0) {
               --back;
@@ -321,8 +369,10 @@ namespace faf::editor
               while (back > 0 && std::isspace(static_cast<unsigned char>(text[back - 1])) != 0) {
                 --back;
               }
-              if (back >= 3 && text.compare(back - 3, 3, "key") == 0 &&
-                  (back == 3 || (std::isalnum(static_cast<unsigned char>(text[back - 4])) == 0 && text[back - 4] != '_'))) {
+              if (
+                back >= 3 && text.compare(back - 3, 3, "key") == 0 &&
+                (back == 3 || (std::isalnum(static_cast<unsigned char>(text[back - 4])) == 0 && text[back - 4] != '_'))
+              ) {
                 entry = opens.back();
               }
             }
@@ -366,7 +416,13 @@ namespace faf::editor
     }
 
     /** A number after `name =` inside text[from, to), or `otherwise`. */
-    int NumberAfter(const std::string& text, const std::size_t from, const std::size_t to, const std::string& name, const int otherwise)
+    int NumberAfter(
+      const std::string& text,
+      const std::size_t from,
+      const std::size_t to,
+      const std::string& name,
+      const int otherwise
+    )
     {
       for (std::size_t at = text.find(name, from); at != std::string::npos && at < to; at = text.find(name, at + 1)) {
         std::size_t i = at + name.size();
@@ -387,7 +443,9 @@ namespace faf::editor
     }
   } // namespace
 
-  std::string AdaptiveOptionKey(const std::string& tableName)
+  std::string AdaptiveOptionKey(
+    const std::string& tableName
+  )
   {
     std::string key;
     for (const char c : tableName) {
@@ -401,7 +459,10 @@ namespace faf::editor
     return key;
   }
 
-  LobbyOption FindLobbyOption(const std::string& text, const std::string& key)
+  LobbyOption FindLobbyOption(
+    const std::string& text,
+    const std::string& key
+  )
   {
     LobbyOption option;
     const OptionSpan span = FindOptionSpan(text, key);
@@ -425,8 +486,13 @@ namespace faf::editor
     return option;
   }
 
-  std::string WithLobbyOption(const std::string& text, const std::string& key, const std::string& label, const bool hydro,
-                              const std::vector<int>& groupSizes)
+  std::string WithLobbyOption(
+    const std::string& text,
+    const std::string& key,
+    const std::string& label,
+    const bool hydro,
+    const std::vector<int>& groupSizes
+  )
   {
     const OptionSpan span = FindOptionSpan(text, key);
     const int groups = static_cast<int>(groupSizes.size());
@@ -437,16 +503,20 @@ namespace faf::editor
     }
     const std::string what = hydro ? "hydrocarbons" : "mexes";
     std::string lower = label;
-    std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    std::string entry = "{\n    default = " + std::to_string(defaultKey) + ",\n    label = \"" + label + "\",\n    help = \"Which of the " + lower +
-                        " spawn.\",\n    key = '" + key + "',\n    pref = '" + key + "',\n    values = {\n";
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char c) {
+      return static_cast<char>(std::tolower(c));
+    });
+    std::string entry = "{\n    default = " + std::to_string(defaultKey) + ",\n    label = \"" + label +
+      "\",\n    help = \"Which of the " + lower + " spawn.\",\n    key = '" + key + "',\n    pref = '" + key +
+      "',\n    values = {\n";
     entry += "        { text = \"none\", help = \"No " + lower + ".\", key = 1, },\n";
     int count = 0;
     for (int g = 1; g <= groups; ++g) {
       count += groupSizes[static_cast<std::size_t>(g - 1)];
       const std::string name = g == 1 ? "group 1" : "groups 1-" + std::to_string(g);
-      entry += "        { text = \"" + name + "\", help = \"" + (g == 1 ? std::string("Group 1 spawns") : "Groups 1 to " + std::to_string(g) + " spawn") +
-               " (" + std::to_string(count) + " " + what + ").\", key = " + std::to_string(g + 1) + ", },\n";
+      entry += "        { text = \"" + name + "\", help = \"" +
+        (g == 1 ? std::string("Group 1 spawns") : "Groups 1 to " + std::to_string(g) + " spawn") + " (" +
+        std::to_string(count) + " " + what + ").\", key = " + std::to_string(g + 1) + ", },\n";
     }
     entry += "    },\n},\n";
     if (span.from != std::string::npos) {
@@ -465,8 +535,13 @@ namespace faf::editor
     return text.substr(0, before) + (needComma ? "," : "") + "\n\n" + entry + text.substr(span.close);
   }
 
-  std::string WithLobbyOptionValues(const std::string& text, const std::string& key, const std::string& label, const std::string& help,
-                                    const std::vector<std::pair<std::string, std::string>>& values)
+  std::string WithLobbyOptionValues(
+    const std::string& text,
+    const std::string& key,
+    const std::string& label,
+    const std::string& help,
+    const std::vector<std::pair<std::string, std::string>>& values
+  )
   {
     const OptionSpan span = FindOptionSpan(text, key);
     const int count = static_cast<int>(values.size());
@@ -482,11 +557,12 @@ namespace faf::editor
       }
       return out;
     };
-    std::string entry = "{\n    default = " + std::to_string(defaultKey) + ",\n    label = \"" + quoted(label) + "\",\n    help = \"" + quoted(help) +
-                        "\",\n    key = '" + key + "',\n    pref = '" + key + "',\n    values = {\n";
+    std::string entry = "{\n    default = " + std::to_string(defaultKey) + ",\n    label = \"" + quoted(label) +
+      "\",\n    help = \"" + quoted(help) + "\",\n    key = '" + key + "',\n    pref = '" + key +
+      "',\n    values = {\n";
     for (int i = 0; i < count; ++i) {
       entry += "        { text = \"" + quoted(values[static_cast<std::size_t>(i)].first) + "\", help = \"" +
-               quoted(values[static_cast<std::size_t>(i)].second) + "\", key = " + std::to_string(i + 1) + ", },\n";
+        quoted(values[static_cast<std::size_t>(i)].second) + "\", key = " + std::to_string(i + 1) + ", },\n";
     }
     entry += "    },\n},\n";
     if (span.from != std::string::npos) {
@@ -503,8 +579,14 @@ namespace faf::editor
     return text.substr(0, before) + (needComma ? "," : "") + "\n\n" + entry + text.substr(span.close);
   }
 
-  std::string WithLobbyOptionWritten(const std::string& text, const std::string& key, const std::string& label, const std::string& help,
-                                     const int defaultIndex, const std::vector<LobbyValueText>& values)
+  std::string WithLobbyOptionWritten(
+    const std::string& text,
+    const std::string& key,
+    const std::string& label,
+    const std::string& help,
+    const int defaultIndex,
+    const std::vector<LobbyValueText>& values
+  )
   {
     const OptionSpan span = FindOptionSpan(text, key);
     const auto quoted = [](const std::string& s) {
@@ -515,10 +597,13 @@ namespace faf::editor
       return out;
     };
     const int count = static_cast<int>(values.size());
-    std::string entry = "{\n    default = " + std::to_string(defaultIndex >= 1 && defaultIndex <= count ? defaultIndex : 1) + ",\n    label = \"" +
-                        quoted(label) + "\",\n    help = \"" + quoted(help) + "\",\n    key = '" + key + "',\n    pref = '" + key + "',\n    values = {\n";
+    std::string entry =
+      "{\n    default = " + std::to_string(defaultIndex >= 1 && defaultIndex <= count ? defaultIndex : 1) +
+      ",\n    label = \"" + quoted(label) + "\",\n    help = \"" + quoted(help) + "\",\n    key = '" + key +
+      "',\n    pref = '" + key + "',\n    values = {\n";
     for (const LobbyValueText& value : values) {
-      entry += "        { text = \"" + quoted(value.text) + "\", help = \"" + quoted(value.help) + "\", key = " + value.key + ", },\n";
+      entry += "        { text = \"" + quoted(value.text) + "\", help = \"" + quoted(value.help) +
+        "\", key = " + value.key + ", },\n";
     }
     entry += "    },\n},\n";
     if (span.from != std::string::npos) {
@@ -535,7 +620,10 @@ namespace faf::editor
     return text.substr(0, before) + (needComma ? "," : "") + "\n\n" + entry + text.substr(span.close);
   }
 
-  std::string WithoutLobbyOption(const std::string& text, const std::string& key)
+  std::string WithoutLobbyOption(
+    const std::string& text,
+    const std::string& key
+  )
   {
     const OptionSpan span = FindOptionSpan(text, key);
     if (span.from == std::string::npos) {
@@ -552,17 +640,24 @@ namespace faf::editor
   const std::vector<OptionTable>& KnownOptionTables()
   {
     static const std::vector<OptionTable> tables = {
-      {"extraHydros", "Extra hydrocarbons", true},  {"extraMexes", "Extra mexes", false},
-      {"middleMexes", "Middle mexes", false},       {"sideMexes", "Side mexes", false},
-      {"underwaterMexes", "Underwater mexes", false}, {"islandMexes", "Island mexes", false},
-      {"expansionMexes", "Expansion mexes", false}, {"coreMexes", "Core mexes", false},
-      {"extraBaseMexes", "Extra base mexes", false}, {"topSideMexes", "Top side mexes", false},
+      {"extraHydros", "Extra hydrocarbons", true},
+      {"extraMexes", "Extra mexes", false},
+      {"middleMexes", "Middle mexes", false},
+      {"sideMexes", "Side mexes", false},
+      {"underwaterMexes", "Underwater mexes", false},
+      {"islandMexes", "Island mexes", false},
+      {"expansionMexes", "Expansion mexes", false},
+      {"coreMexes", "Core mexes", false},
+      {"extraBaseMexes", "Extra base mexes", false},
+      {"topSideMexes", "Top side mexes", false},
       {"bottomSideMexes", "Bottom side mexes", false},
     };
     return tables;
   }
 
-  std::string AdaptiveTablesPath(const std::string& script)
+  std::string AdaptiveTablesPath(
+    const std::string& script
+  )
   {
     const std::size_t end = script.find("_tables.lua");
     if (end == std::string::npos) {
@@ -576,7 +671,9 @@ namespace faf::editor
     return path.rfind("/maps/", 0) == 0 ? path : std::string();
   }
 
-  std::string WithScenarioAdaptive(const std::string& scenario)
+  std::string WithScenarioAdaptive(
+    const std::string& scenario
+  )
   {
     std::string out = scenario;
     if (const std::size_t at = out.find("AdaptiveMap"); at != std::string::npos) {
@@ -597,7 +694,10 @@ namespace faf::editor
     return out;
   }
 
-  std::string AdaptiveEntry(const std::string& markerName, const bool hydro)
+  std::string AdaptiveEntry(
+    const std::string& markerName,
+    const bool hydro
+  )
   {
     const std::string prefix = hydro ? "Hydrocarbon " : "Mass ";
     if (markerName.rfind(prefix, 0) != 0 || markerName.size() == prefix.size()) {
@@ -619,7 +719,10 @@ namespace faf::editor
     return "'" + suffix + "'";
   }
 
-  std::string AdaptiveMarkerName(const std::string& entry, const bool hydro)
+  std::string AdaptiveMarkerName(
+    const std::string& entry,
+    const bool hydro
+  )
   {
     const std::string prefix = hydro ? "Hydrocarbon " : "Mass ";
     if (entry.size() >= 2 && (entry.front() == '\'' || entry.front() == '"')) {
@@ -629,7 +732,11 @@ namespace faf::editor
     return prefix + (number > 9 ? std::to_string(number) : "0" + std::to_string(number));
   }
 
-  bool ParseAdaptiveTables(const std::string& text, AdaptiveTables& tables, std::string& error)
+  bool ParseAdaptiveTables(
+    const std::string& text,
+    AdaptiveTables& tables,
+    std::string& error
+  )
   {
     std::vector<Assignment> assignments;
     if (!ReadAssignments(text, assignments, error)) {
@@ -659,7 +766,10 @@ namespace faf::editor
     return true;
   }
 
-  std::string WithAdaptiveTables(const std::string& text, const AdaptiveTables& given)
+  std::string WithAdaptiveTables(
+    const std::string& text,
+    const AdaptiveTables& given
+  )
   {
     // A line for every army up to maxPlayerOnMap: the script reads the line of each army not in the game with
     // table.getn, which fails on a missing one.
@@ -691,7 +801,8 @@ namespace faf::editor
     std::vector<Assignment> assignments;
     std::string error;
     if (text.empty() || !ReadAssignments(text, assignments, error)) {
-      std::string out = "-- The adaptive map's tables (the \"Ultimate maps\" script's _tables.lua), written by the FAF map editor.\n";
+      std::string out =
+        "-- The adaptive map's tables (the \"Ultimate maps\" script's _tables.lua), written by the FAF map editor.\n";
       for (const auto& [name, value] : wanted) {
         out += "\n" + name + " = " + value + "\n";
       }

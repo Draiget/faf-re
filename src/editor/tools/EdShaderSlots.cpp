@@ -7,7 +7,10 @@ namespace faf::editor
   namespace
   {
     /** "Terrain" and three digits (an optional B for biplanar mapping after them): the 0XX, 1XX, 2XX, 3XX shaders. */
-    bool Numbered(const std::string& shader, std::string& digits)
+    bool Numbered(
+      const std::string& shader,
+      std::string& digits
+    )
     {
       if (shader.rfind("Terrain", 0) != 0 || shader.size() < 10) {
         return false;
@@ -22,12 +25,18 @@ namespace faf::editor
     }
   } // namespace
 
-  bool MapWideOn(const float slotSize, const float mapSize)
+  bool MapWideOn(
+    const float slotSize,
+    const float mapSize
+  )
   {
     return mapSize > 0.0f && slotSize > mapSize;
   }
 
-  ShaderSlotUse ShaderSlotUseOf(const std::string& shader, const int slot)
+  ShaderSlotUse ShaderSlotUseOf(
+    const std::string& shader,
+    const int slot
+  )
   {
     ShaderSlotUse use;
     std::string digits;
@@ -48,7 +57,8 @@ namespace faf::editor
     }
     if (slot == 8) {
       use.mapWide = true;
-      use.text = "Map-wide, not a stratum: water depth, ambient occlusion and shadow; its normal slot holds the map's normals";
+      use.text =
+        "Map-wide, not a stratum: water depth, ambient occlusion and shadow; its normal slot holds the map's normals";
     } else if (slot == 9) {
       if (xpExt || digits == "000" || digits == "050") {
         use.text = "A macrotexture over the whole map (alpha: opacity)";

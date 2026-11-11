@@ -16,9 +16,9 @@ namespace platform::posix::dxc
   struct Output
   {
     bool succeeded = false;
-    std::vector<unsigned char> object;  // the compiled code
-    std::string text;                   // preprocessed source (Preprocess)
-    std::string messages;               // errors, or warnings on success
+    std::vector<unsigned char> object; // the compiled code
+    std::string text;                  // preprocessed source (Preprocess)
+    std::string messages;              // errors, or warnings on success
   };
 
   /**
@@ -39,6 +39,8 @@ namespace platform::posix::dxc
    * D3DPreprocess does for the Windows renderers. `sourceName` names the source in messages.
    */
   Output Preprocess(
-    std::string_view source, std::string_view sourceName, const std::vector<std::pair<std::string, std::string>>& defines
+    std::string_view source,
+    std::string_view sourceName,
+    const std::vector<std::pair<std::string, std::string>>& defines
   );
 } // namespace platform::posix::dxc

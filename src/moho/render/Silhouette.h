@@ -95,10 +95,7 @@ namespace moho
     boost::shared_ptr<ID3DVertexSheet> mQuadVertexSheet; // +0x04..+0x0B
   };
 
-  static_assert(
-    offsetof(Silhouette, mQuadVertexSheet) == 0x04,
-    "Silhouette::mQuadVertexSheet offset must be 0x04"
-  );
+  static_assert(offsetof(Silhouette, mQuadVertexSheet) == 0x04, "Silhouette::mQuadVertexSheet offset must be 0x04");
   // sizeof(Silhouette) is at least 0x0C (vftable + shared_ptr{px, pi_}); the
   // ABI-exact total size depends on trailing fields that are still under
   // recovery in the render-viewport subsystem, so no hard size_assert here.

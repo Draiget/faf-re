@@ -12,7 +12,7 @@ namespace
 
     return sResourceDepositTypeNames;
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -60,13 +60,16 @@ namespace moho
   }
 
   /**
-   * Address: 0x00546CD0 (FUN_00546CD0, ?Translate@IResources@Moho@@SA?AW4EResourceType@2@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+   * Address: 0x00546CD0 (FUN_00546CD0,
+   * ?Translate@IResources@Moho@@SA?AW4EResourceType@2@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
    *
    * What it does:
    * Finds one deposit type enum by searching the static type-name table and
    * returns `kNone` when the text is unknown.
    */
-  EDepositType IResources::Translate(const fa::string& depositTypeName)
+  EDepositType IResources::Translate(
+    const fa::string& depositTypeName
+  )
   {
     fa::string* const begin = ResourceDepositTypeNameTable();
     fa::string* const end = begin + 3;
@@ -84,7 +87,9 @@ namespace moho
    * What it does:
    * Resolves one deposit-type enum lane back to its string table entry.
    */
-  const fa::string* IResources::Translate(const EDepositType depositType)
+  const fa::string* IResources::Translate(
+    const EDepositType depositType
+  )
   {
     fa::string* const begin = ResourceDepositTypeNameTable();
     return begin + static_cast<int>(depositType);

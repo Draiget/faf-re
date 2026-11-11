@@ -70,7 +70,9 @@ STransportPickUpInfo::STransportPickUpInfo()
  * search — the binary emits a separate body here and calls it from both
  * `TransportIsUnitAssignedForPickup` and `TransportIsReadyForUnit`.
  */
-bool STransportPickUpInfo::HasUnit(const Unit* const unit) const noexcept
+bool STransportPickUpInfo::HasUnit(
+  const Unit* const unit
+) const noexcept
 {
   for (const Unit* const entry : mUnits) {
     if (entry == unit) {
@@ -88,7 +90,9 @@ bool STransportPickUpInfo::HasUnit(const Unit* const unit) const noexcept
  * Finds the first pickup-entry matching `unit`, removes that slot from the
  * contiguous vector storage, and clears `mHasSpace` when the set is empty.
  */
-void STransportPickUpInfo::RemoveUnit(Unit* const unit) noexcept
+void STransportPickUpInfo::RemoveUnit(
+  Unit* const unit
+) noexcept
 {
   Entity** const begin = mUnits.mVec.begin();
   Entity** const end = mUnits.mVec.end();
@@ -112,7 +116,9 @@ void STransportPickUpInfo::RemoveUnit(Unit* const unit) noexcept
  * world position (Vector3f), unit set (EntitySetTemplate<Unit>), and
  * has-space flag from the archive via cached RType lookups.
  */
-void STransportPickUpInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+void STransportPickUpInfo::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -142,7 +148,9 @@ void STransportPickUpInfo::MemberDeserialize(gpg::ReadArchive* const archive)
  * world position (Vector3f), unit set (EntitySetTemplate<Unit>), and
  * has-space flag to the archive via cached RType lookups.
  */
-void STransportPickUpInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+void STransportPickUpInfo::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -186,7 +194,10 @@ namespace
   }
 
   template <class TObject>
-  [[nodiscard]] TObject* DecodeTrackedPointer(const gpg::TrackedPointerInfo& tracked, gpg::RType* const expectedType)
+  [[nodiscard]] TObject* DecodeTrackedPointer(
+    const gpg::TrackedPointerInfo& tracked,
+    gpg::RType* const expectedType
+  )
   {
     if (!tracked.object) {
       return nullptr;
@@ -228,7 +239,10 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 
-  [[nodiscard]] float DistSq(const Wm3::Vec3f& lhs, const Wm3::Vec3f& rhs) noexcept
+  [[nodiscard]] float DistSq(
+    const Wm3::Vec3f& lhs,
+    const Wm3::Vec3f& rhs
+  ) noexcept
   {
     const float dx = lhs.x - rhs.x;
     const float dy = lhs.y - rhs.y;
@@ -242,7 +256,10 @@ namespace
    * What it does:
    * Returns the greater integer value.
    */
-  [[nodiscard]] int MaxInt(const int lhs, const int rhs) noexcept
+  [[nodiscard]] int MaxInt(
+    const int lhs,
+    const int rhs
+  ) noexcept
   {
     if (lhs < rhs) {
       return rhs;
@@ -250,7 +267,9 @@ namespace
     return lhs;
   }
 
-  [[nodiscard]] Wm3::Vec3f NormalizeXZ(const Wm3::Vec3f& vec) noexcept
+  [[nodiscard]] Wm3::Vec3f NormalizeXZ(
+    const Wm3::Vec3f& vec
+  ) noexcept
   {
     // 0x005E6361-0x005E63E9: `sqrtf(dz*dz + dx*dx)` (0x00452FC0) compared
     // against 1e-6f with `jbe` -- the length, not the squared length, is
@@ -271,7 +290,10 @@ namespace
     return out;
   }
 
-  [[nodiscard]] SOCellPos CellPosFromWorldForUnit(const Wm3::Vec3f& worldPos, const Unit* const unit) noexcept
+  [[nodiscard]] SOCellPos CellPosFromWorldForUnit(
+    const Wm3::Vec3f& worldPos,
+    const Unit* const unit
+  ) noexcept
   {
     if (!unit) {
       return InvalidCellPos();
@@ -287,7 +309,10 @@ namespace
     return out;
   }
 
-  [[nodiscard]] const CAniSkel* ResolveUnitSkeleton(const Unit* const unit, boost::shared_ptr<const CAniSkel>& holdSkel)
+  [[nodiscard]] const CAniSkel* ResolveUnitSkeleton(
+    const Unit* const unit,
+    boost::shared_ptr<const CAniSkel>& holdSkel
+  )
   {
     holdSkel = {};
     if (!unit || !unit->AniActor) {
@@ -298,7 +323,10 @@ namespace
     return holdSkel.get();
   }
 
-  [[nodiscard]] const SAniSkelBone* ResolveUnitBoneByIndex(const Unit* const unit, const unsigned int boneIndex)
+  [[nodiscard]] const SAniSkelBone* ResolveUnitBoneByIndex(
+    const Unit* const unit,
+    const unsigned int boneIndex
+  )
   {
     boost::shared_ptr<const CAniSkel> holdSkel{};
     const CAniSkel* const skeleton = ResolveUnitSkeleton(unit, holdSkel);
@@ -346,7 +374,9 @@ gpg::RType* CAiTransportImpl::sType = nullptr;
  * Builds baseline transport state and, for unit-bound construction, resolves
  * staging/teleport category flags and links transport entity sets into the sim DB.
  */
-CAiTransportImpl::CAiTransportImpl(Unit* const unit)
+CAiTransportImpl::CAiTransportImpl(
+  Unit* const unit
+)
   : IAiTransport()
   , mUnit(unit)
   , mTeleportBeacon()
@@ -388,8 +418,7 @@ CAiTransportImpl::CAiTransportImpl(Unit* const unit)
     const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
     const EntityCategorySet* const airStagingCategory = sim->mRules->GetEntityCategory("AIRSTAGINGPLATFORM");
     const EntityCategorySet* const podStagingCategory = sim->mRules->GetEntityCategory("PODSTAGINGPLATFORM");
-    const bool isStagingTransport =
-      BlueprintBelongsToCategory(blueprint, airStagingCategory) ||
+    const bool isStagingTransport = BlueprintBelongsToCategory(blueprint, airStagingCategory) ||
       BlueprintBelongsToCategory(blueprint, podStagingCategory);
     mStagingPlatform = static_cast<std::uint8_t>(isStagingTransport ? 1u : 0u);
 
@@ -435,7 +464,12 @@ CAiTransportImpl::~CAiTransportImpl()
  * Allocates one `CAiTransportImpl` object and publishes it via
  * `SerConstructResult::SetUnowned`.
  */
-void CAiTransportImpl::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+void CAiTransportImpl::MemberConstruct(
+  gpg::ReadArchive&,
+  const int,
+  const gpg::RRef&,
+  gpg::SerConstructResult& result
+)
 {
   result.SetUnowned(gpg::MakeRRef(new CAiTransportImpl()), 0u);
 }
@@ -446,7 +480,9 @@ void CAiTransportImpl::MemberConstruct(gpg::ReadArchive&, const int, const gpg::
  * What it does:
  * Loads runtime transport state lanes from the read archive.
  */
-void CAiTransportImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+void CAiTransportImpl::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -488,8 +524,7 @@ void CAiTransportImpl::MemberDeserialize(gpg::ReadArchive* const archive)
   GPG_ASSERT(pickupInfoType != nullptr);
   archive->Read(pickupInfoType, &mPickupInfo, ownerRef);
 
-  mWaitingFormation =
-    ReadPointerUnowned<IFormationInstance>(archive, ownerRef, gpg::RTypeOf<IFormationInstance>());
+  mWaitingFormation = ReadPointerUnowned<IFormationInstance>(archive, ownerRef, gpg::RTypeOf<IFormationInstance>());
 
   gpg::RType* const vector3fType = gpg::RTypeOf<Wm3::Vector3<float>>();
   GPG_ASSERT(vector3fType != nullptr);
@@ -512,7 +547,9 @@ void CAiTransportImpl::MemberDeserialize(gpg::ReadArchive* const archive)
  * What it does:
  * Saves runtime transport state lanes into the write archive.
  */
-void CAiTransportImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+void CAiTransportImpl::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -586,7 +623,9 @@ bool CAiTransportImpl::TransportIsTeleporter() const
 /**
  * Address: 0x005E6110 (FUN_005E6110)
  */
-EntitySetTemplate<Unit> CAiTransportImpl::TransportGetLoadedUnits(const bool includeFutureLoad) const
+EntitySetTemplate<Unit> CAiTransportImpl::TransportGetLoadedUnits(
+  const bool includeFutureLoad
+) const
 {
   EntitySetTemplate<Unit> out{};
   if (!mUnit) {
@@ -620,7 +659,10 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportGetLoadedUnits(const bool inc
 /**
  * Address: 0x005E6260 (FUN_005E6260)
  */
-void CAiTransportImpl::TransportAddPickupUnits(const EntitySetTemplate<Unit>& units, const SCoordsVec2 fallbackPos)
+void CAiTransportImpl::TransportAddPickupUnits(
+  const EntitySetTemplate<Unit>& units,
+  const SCoordsVec2 fallbackPos
+)
 {
   for (Unit* const unit : units) {
     if (unit) {
@@ -655,7 +697,10 @@ void CAiTransportImpl::TransportAddPickupUnits(const EntitySetTemplate<Unit>& un
 /**
  * Address: 0x005E64A0 (FUN_005E64A0)
  */
-void CAiTransportImpl::TransportRemovePickupUnit(Unit* const unit, const bool clearReservation)
+void CAiTransportImpl::TransportRemovePickupUnit(
+  Unit* const unit,
+  const bool clearReservation
+)
 {
   mPickupInfo.RemoveUnit(unit);
   if (clearReservation) {
@@ -684,7 +729,9 @@ namespace
 /**
  * Address: 0x005E64D0 (FUN_005E64D0)
  */
-void CAiTransportImpl::TransportRemoveUnitReservation(Unit* const unit)
+void CAiTransportImpl::TransportRemoveUnitReservation(
+  Unit* const unit
+)
 {
   for (SAiReservedTransportBone* it = mReservedBones.begin(); it != mReservedBones.end();) {
     Unit* const reserved = it->reservedUnit.GetObjectPtr();
@@ -751,7 +798,9 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportGetPickupUnits()
 /**
  * Address: 0x005E6690 (FUN_005E6690)
  */
-bool CAiTransportImpl::TransportIsUnitAssignedForPickup(Unit* const unit) const
+bool CAiTransportImpl::TransportIsUnitAssignedForPickup(
+  Unit* const unit
+) const
 {
   return mPickupInfo.HasUnit(unit);
 }
@@ -764,7 +813,9 @@ bool CAiTransportImpl::TransportIsUnitAssignedForPickup(Unit* const unit) const
  * WildMagic, `.w`-scalar `ToMat3()`) this replaces -- `mPickupInfo.mOri` is
  * always this engine's scalar-first convention.
  */
-SOCellPos CAiTransportImpl::TransportGetPickupUnitPos(Unit* const unit) const
+SOCellPos CAiTransportImpl::TransportGetPickupUnitPos(
+  Unit* const unit
+) const
 {
   const SAiReservedTransportBone* const reservedBone = GetReservedBone(unit);
   if (!reservedBone || !mUnit) {
@@ -786,7 +837,9 @@ SOCellPos CAiTransportImpl::TransportGetPickupUnitPos(Unit* const unit) const
 /**
  * Address: 0x005E6870 (FUN_005E6870)
  */
-bool CAiTransportImpl::TransportCanCarryUnit(Unit* const unit) const
+bool CAiTransportImpl::TransportCanCarryUnit(
+  Unit* const unit
+) const
 {
   if (!unit || !unit->IsMobile()) {
     return false;
@@ -824,23 +877,28 @@ bool CAiTransportImpl::TransportCanCarryUnit(Unit* const unit) const
   );
 
   switch (transportClass) {
-    case 1:
-      return attachCount > 0;
-    case 2:
-      return transportBlueprint->Transport.Class2AttachSize != 0 && attachCount >= transportBlueprint->Transport.Class2AttachSize;
-    case 3:
-      return transportBlueprint->Transport.Class3AttachSize != 0 && attachCount >= transportBlueprint->Transport.Class3AttachSize;
-    case 4:
-      return transportBlueprint->Transport.Class4AttachSize != 0 && attachCount > transportBlueprint->Transport.Class4AttachSize;
-    default:
-      return false;
+  case 1:
+    return attachCount > 0;
+  case 2:
+    return transportBlueprint->Transport.Class2AttachSize != 0 &&
+      attachCount >= transportBlueprint->Transport.Class2AttachSize;
+  case 3:
+    return transportBlueprint->Transport.Class3AttachSize != 0 &&
+      attachCount >= transportBlueprint->Transport.Class3AttachSize;
+  case 4:
+    return transportBlueprint->Transport.Class4AttachSize != 0 &&
+      attachCount > transportBlueprint->Transport.Class4AttachSize;
+  default:
+    return false;
   }
 }
 
 /**
  * Address: 0x005E5F10 (FUN_005E5F10)
  */
-void CAiTransportImpl::TransportRemoveFromWaitingList(Unit* const unit)
+void CAiTransportImpl::TransportRemoveFromWaitingList(
+  Unit* const unit
+)
 {
   (void)mUnitSet30.Remove(unit);
 }
@@ -864,7 +922,9 @@ IFormationInstance* CAiTransportImpl::TransportGetWaitingFormation() const
 /**
  * Address: 0x005E5F40 (FUN_005E5F40)
  */
-void CAiTransportImpl::TransportGenerateWaitingFormationForUnits(const EntitySetTemplate<Unit>& units)
+void CAiTransportImpl::TransportGenerateWaitingFormationForUnits(
+  const EntitySetTemplate<Unit>& units
+)
 {
   // 0x005E5F57: the set's vector takes `units`' contents (`AddAll`, a
   // replace, not a merge).
@@ -892,14 +952,7 @@ void CAiTransportImpl::TransportGenerateWaitingFormationForUnits(const EntitySet
   CAiFormationDBImpl* const formationDB = mUnit->SimulationRef->mFormationDB;
   // 0x005E6087: the formation is built straight from `mUnitSet30`.
   auto* const formation = formationDB->NewFormation(
-    &mUnitSet30,
-    formationName,
-    &center,
-    orientation.x,
-    orientation.y,
-    orientation.z,
-    orientation.w,
-    2
+    &mUnitSet30, formationName, &center, orientation.x, orientation.y, orientation.z, orientation.w, 2
   );
   mWaitingFormation = formation;
 }
@@ -996,7 +1049,9 @@ void CAiTransportImpl::SetUpAttachPoints()
 /**
  * Address: 0x005E5120 (FUN_005E5120)
  */
-const SAiReservedTransportBone* CAiTransportImpl::GetReservedBone(Unit* const unit) const
+const SAiReservedTransportBone* CAiTransportImpl::GetReservedBone(
+  Unit* const unit
+) const
 {
   for (const SAiReservedTransportBone* it = mReservedBones.begin(); it != mReservedBones.end(); ++it) {
     if (it->reservedUnit.GetObjectPtr() == unit) {
@@ -1009,7 +1064,9 @@ const SAiReservedTransportBone* CAiTransportImpl::GetReservedBone(Unit* const un
 /**
  * Address: 0x005E50A0 (FUN_005E50A0)
  */
-int CAiTransportImpl::GetBestAttachPoint(Unit* const unit) const
+int CAiTransportImpl::GetBestAttachPoint(
+  Unit* const unit
+) const
 {
   if (!unit) {
     return -1;
@@ -1044,7 +1101,9 @@ int CAiTransportImpl::GetBestAttachPoint(Unit* const unit) const
 /**
  * Address: 0x005E6AC0 (FUN_005E6AC0)
  */
-bool CAiTransportImpl::TransportValidateType(const RUnitBlueprint* const unitBlueprint) const
+bool CAiTransportImpl::TransportValidateType(
+  const RUnitBlueprint* const unitBlueprint
+) const
 {
   if (!unitBlueprint || !mUnit) {
     return false;
@@ -1120,27 +1179,27 @@ void CAiTransportImpl::TransportFindAttachList(
 
   if (unitClass > blueprint->Transport.ClassGenericUpTo) {
     switch (unitClass) {
-      case static_cast<int>(ETransportClass::TRANSPORTCLASS_1):
-        (void)CopyAttachPointVector(mClass1AttachPoints, attachPoints);
-        break;
-      case static_cast<int>(ETransportClass::TRANSPORTCLASS_2):
-        (void)CopyAttachPointVector(mClass2AttachPoints, attachPoints);
-        outAttachSize = blueprint->Transport.Class2AttachSize;
-        break;
-      case static_cast<int>(ETransportClass::TRANSPORTCLASS_3):
-        (void)CopyAttachPointVector(mClass3AttachPoints, attachPoints);
-        outAttachSize = blueprint->Transport.Class3AttachSize;
-        break;
-      case static_cast<int>(ETransportClass::TRANSPORTCLASS_4):
-        (void)CopyAttachPointVector(mClass4AttachPoints, attachPoints);
-        outAttachSize = blueprint->Transport.Class4AttachSize;
-        [[fallthrough]];
-      case static_cast<int>(ETransportClass::TRANSPORTCLASS_SPECIAL):
-        (void)CopyAttachPointVector(mClassSAttachPoints, attachPoints);
-        outAttachSize = blueprint->Transport.ClassSAttachSize;
-        break;
-      default:
-        break;
+    case static_cast<int>(ETransportClass::TRANSPORTCLASS_1):
+      (void)CopyAttachPointVector(mClass1AttachPoints, attachPoints);
+      break;
+    case static_cast<int>(ETransportClass::TRANSPORTCLASS_2):
+      (void)CopyAttachPointVector(mClass2AttachPoints, attachPoints);
+      outAttachSize = blueprint->Transport.Class2AttachSize;
+      break;
+    case static_cast<int>(ETransportClass::TRANSPORTCLASS_3):
+      (void)CopyAttachPointVector(mClass3AttachPoints, attachPoints);
+      outAttachSize = blueprint->Transport.Class3AttachSize;
+      break;
+    case static_cast<int>(ETransportClass::TRANSPORTCLASS_4):
+      (void)CopyAttachPointVector(mClass4AttachPoints, attachPoints);
+      outAttachSize = blueprint->Transport.Class4AttachSize;
+      [[fallthrough]];
+    case static_cast<int>(ETransportClass::TRANSPORTCLASS_SPECIAL):
+      (void)CopyAttachPointVector(mClassSAttachPoints, attachPoints);
+      outAttachSize = blueprint->Transport.ClassSAttachSize;
+      break;
+    default:
+      break;
     }
   } else {
     (void)CopyAttachPointVector(mGenericAttachPoints, attachPoints);
@@ -1205,15 +1264,11 @@ fa::vector<int> CAiTransportImpl::GetClosestAttachPointsTo(
   // One `sort` call: the small-range insertion pass and the introsort above it
   // are both inside `fa::sort`, which is why the binary emitted them as
   // separate bodies for this element type.
-  fa::sort(
-    attachPoints.begin(),
-    attachPoints.end(),
-    [](const SAttachPoint& lhs, const SAttachPoint& rhs) { return lhs.distSq < rhs.distSq; }
-  );
+  fa::sort(attachPoints.begin(), attachPoints.end(), [](const SAttachPoint& lhs, const SAttachPoint& rhs) {
+    return lhs.distSq < rhs.distSq;
+  });
 
-  for (const SAttachPoint* it = attachPoints.begin();
-       it != attachPoints.end() && attachSize > 0;
-       ++it, --attachSize) {
+  for (const SAttachPoint* it = attachPoints.begin(); it != attachPoints.end() && attachSize > 0; ++it, --attachSize) {
     result.push_back(static_cast<int>(it->index));
   }
 
@@ -1223,11 +1278,15 @@ fa::vector<int> CAiTransportImpl::GetClosestAttachPointsTo(
 /**
  * Address: 0x005E4F00 (FUN_005E4F00)
  */
-bool CAiTransportImpl::IsBoneReserved(fa::vector<int> boneIndices)
+bool CAiTransportImpl::IsBoneReserved(
+  fa::vector<int> boneIndices
+)
 {
-  for (const SAiReservedTransportBone* reserved = mReservedBones.begin(); reserved != mReservedBones.end(); ++reserved) {
+  for (const SAiReservedTransportBone* reserved = mReservedBones.begin(); reserved != mReservedBones.end();
+       ++reserved) {
     for (const int* candidate = boneIndices.begin(); candidate != boneIndices.end(); ++candidate) {
-      for (const int* reservedBone = reserved->reservedBones.begin(); reservedBone != reserved->reservedBones.end(); ++reservedBone) {
+      for (const int* reservedBone = reserved->reservedBones.begin(); reservedBone != reserved->reservedBones.end();
+           ++reservedBone) {
         if (*candidate == *reservedBone) {
           return true;
         }
@@ -1254,13 +1313,7 @@ void CAiTransportImpl::ReserveBone(
   // `where = [esi+0xAC]` (_Myfirst) and count 1.
   for (int index = 0; index < static_cast<int>(boneIndices.size()); ++index) {
     SAiReservedTransportBone reservation{};
-    (void)InitReservedTransportBoneEntry(
-      transportBoneIndex,
-      bestAttachBoneIndex,
-      &reservation,
-      unit,
-      boneIndices
-    );
+    (void)InitReservedTransportBoneEntry(transportBoneIndex, bestAttachBoneIndex, &reservation, unit, boneIndices);
     (void)mReservedBones.insert(mReservedBones.begin(), reservation);
   }
 }
@@ -1268,7 +1321,9 @@ void CAiTransportImpl::ReserveBone(
 /**
  * Address: 0x005E6C70 (FUN_005E6C70)
  */
-bool CAiTransportImpl::TransportHasSpaceFor(const RUnitBlueprint* const unitBlueprint)
+bool CAiTransportImpl::TransportHasSpaceFor(
+  const RUnitBlueprint* const unitBlueprint
+)
 {
   if (!TransportValidateType(unitBlueprint)) {
     return false;
@@ -1296,7 +1351,10 @@ bool CAiTransportImpl::TransportHasSpaceFor(const RUnitBlueprint* const unitBlue
 /**
  * Address: 0x005E6E30 (FUN_005E6E30)
  */
-bool CAiTransportImpl::TransportAssignSlot(Unit* const unit, const int hookIndex)
+bool CAiTransportImpl::TransportAssignSlot(
+  Unit* const unit,
+  const int hookIndex
+)
 {
   if (!unit || !TransportValidateType(unit->GetBlueprint())) {
     return false;
@@ -1374,7 +1432,9 @@ void CAiTransportImpl::AttachUnitToBone(
 /**
  * Address: 0x005E7100 (FUN_005E7100)
  */
-bool CAiTransportImpl::TransportAttachUnit(Unit* const unit)
+bool CAiTransportImpl::TransportAttachUnit(
+  Unit* const unit
+)
 {
   if (!unit) {
     return false;
@@ -1403,7 +1463,9 @@ bool CAiTransportImpl::TransportAttachUnit(Unit* const unit)
 /**
  * Address: 0x005E7170 (FUN_005E7170)
  */
-bool CAiTransportImpl::TransportDetachUnit(Unit* const unit)
+bool CAiTransportImpl::TransportDetachUnit(
+  Unit* const unit
+)
 {
   if (!unit || !mUnit) {
     return false;
@@ -1464,7 +1526,9 @@ bool CAiTransportImpl::TransportDetachUnit(Unit* const unit)
 /**
  * Address: 0x005E73E0 (FUN_005E73E0)
  */
-EntitySetTemplate<Unit> CAiTransportImpl::TransportDetachAllUnits(const bool clearReservations)
+EntitySetTemplate<Unit> CAiTransportImpl::TransportDetachAllUnits(
+  const bool clearReservations
+)
 {
   EntitySetTemplate<Unit> detached{};
   EntitySetTemplate<Unit> storedToDestroy{};
@@ -1558,7 +1622,9 @@ void CAiTransportImpl::TransportAtPickupPosition()
 /**
  * Address: 0x005E77C0 (FUN_005E77C0)
  */
-bool CAiTransportImpl::TransportIsReadyForUnit(Unit* const unit) const
+bool CAiTransportImpl::TransportIsReadyForUnit(
+  Unit* const unit
+) const
 {
   return mPickupInfo.mHasSpace != 0 && mPickupInfo.HasUnit(unit);
 }
@@ -1566,7 +1632,9 @@ bool CAiTransportImpl::TransportIsReadyForUnit(Unit* const unit) const
 /**
  * Address: 0x005E7930 (FUN_005E7930)
  */
-int CAiTransportImpl::TransportGetAttachBone(Unit* const unit) const
+int CAiTransportImpl::TransportGetAttachBone(
+  Unit* const unit
+) const
 {
   const SAiReservedTransportBone* const reserved = GetReservedBone(unit);
   return reserved ? static_cast<int>(reserved->transportBoneIndex) : -1;
@@ -1579,7 +1647,9 @@ int CAiTransportImpl::TransportGetAttachBone(Unit* const unit) const
  * v7)`, not the generic `Quaternion::Rotate` (upstream WildMagic, `.w`-scalar
  * `ToMat3()`) this replaces.
  */
-SOCellPos CAiTransportImpl::TransportGetAttachPosition(Unit* const unit) const
+SOCellPos CAiTransportImpl::TransportGetAttachPosition(
+  Unit* const unit
+) const
 {
   const SAiReservedTransportBone* const reserved = GetReservedBone(unit);
   if (!reserved || !mUnit) {
@@ -1603,7 +1673,9 @@ SOCellPos CAiTransportImpl::TransportGetAttachPosition(Unit* const unit) const
  * v7)`, not the generic `Quaternion::Rotate` (upstream WildMagic, `.w`-scalar
  * `ToMat3()`) this replaces.
  */
-Wm3::Vec3f CAiTransportImpl::TransportGetAttachBonePosition(Unit* const unit) const
+Wm3::Vec3f CAiTransportImpl::TransportGetAttachBonePosition(
+  Unit* const unit
+) const
 {
   const SAiReservedTransportBone* const reserved = GetReservedBone(unit);
   if (!reserved || !mUnit) {
@@ -1621,7 +1693,9 @@ Wm3::Vec3f CAiTransportImpl::TransportGetAttachBonePosition(Unit* const unit) co
 /**
  * Address: 0x005E7A60 (FUN_005E7A60)
  */
-VTransform CAiTransportImpl::TransportGetAttachBoneTransform(Unit* const unit) const
+VTransform CAiTransportImpl::TransportGetAttachBoneTransform(
+  Unit* const unit
+) const
 {
   const SAiReservedTransportBone* const reserved = GetReservedBone(unit);
   if (reserved && mUnit) {
@@ -1643,7 +1717,9 @@ VTransform CAiTransportImpl::TransportGetAttachBoneTransform(Unit* const unit) c
  * The second rotation (local-to-world) then genuinely does call
  * `Moho::MultQuadVec(&v10, &v9, v7)` against the unit's own transform.
  */
-Wm3::Vec3f CAiTransportImpl::TransportGetAttachFacing(Unit* const unit) const
+Wm3::Vec3f CAiTransportImpl::TransportGetAttachFacing(
+  Unit* const unit
+) const
 {
   const SAiReservedTransportBone* const reserved = GetReservedBone(unit);
   if (!reserved || !mUnit) {
@@ -1675,7 +1751,9 @@ Wm3::Vec3f CAiTransportImpl::TransportGetPickupFacing() const
 /**
  * Address: 0x005E7BE0 (FUN_005E7BE0)
  */
-void CAiTransportImpl::TransportAddToStorage(Unit* const unit)
+void CAiTransportImpl::TransportAddToStorage(
+  Unit* const unit
+)
 {
   if (!unit || !mUnit) {
     return;
@@ -1693,7 +1771,10 @@ void CAiTransportImpl::TransportAddToStorage(Unit* const unit)
 /**
  * Address: 0x005E7CF0 (FUN_005E7CF0)
  */
-void CAiTransportImpl::TransportRemoveFromStorage(Unit* const unit, VTransform& outTransform)
+void CAiTransportImpl::TransportRemoveFromStorage(
+  Unit* const unit,
+  VTransform& outTransform
+)
 {
   if (!mUnit) {
     outTransform = VTransform{};
@@ -1739,7 +1820,9 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportGetStoredUnits() const
 /**
  * Address: 0x005E8050 (FUN_005E8050)
  */
-bool CAiTransportImpl::TransportIsStoredUnit(Unit* const unit) const
+bool CAiTransportImpl::TransportIsStoredUnit(
+  Unit* const unit
+) const
 {
   return mStoredUnits.Contains(unit);
 }
@@ -1798,7 +1881,9 @@ int CAiTransportImpl::TransportReserveStorage(
 /**
  * Address: 0x005E8020 (FUN_005E8020)
  */
-void CAiTransportImpl::TransportClearReservation(Unit* const unit)
+void CAiTransportImpl::TransportClearReservation(
+  Unit* const unit
+)
 {
   (void)mUnitSet80.Remove(unit);
 }
@@ -1816,7 +1901,9 @@ void CAiTransportImpl::TransportResetReservation()
 /**
  * Address: 0x005E8080 (FUN_005E8080)
  */
-void CAiTransportImpl::TranspotSetTeleportDest(Unit* const beaconUnit)
+void CAiTransportImpl::TranspotSetTeleportDest(
+  Unit* const beaconUnit
+)
 {
   if (beaconUnit && mUnit) {
     LuaPlus::LuaState* const state = mUnit->mLuaObj.GetActiveState();

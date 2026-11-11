@@ -111,32 +111,35 @@ namespace moho
 
     static gpg::RType* sType;
 
-    std::uint8_t mHasGoal = 0;      // +0x80
-    std::uint8_t mSpinDown = 0;     // +0x81
-    std::uint8_t mPad82[0x02]{};    // +0x82
-    Wm3::Vector3f mAxis{};          // +0x84
-    float mCurrentAngle = 0.0f;     // +0x90
-    float mGoalAngle = 0.0f;        // +0x94
-    float mSpeed = 0.0f;            // +0x98
-    float mTargetSpeed = 0.0f;      // +0x9C
-    float mAccel = 0.0f;            // +0xA0
-    std::int32_t mFollowBone = -1;  // +0xA4
+    std::uint8_t mHasGoal = 0;     // +0x80
+    std::uint8_t mSpinDown = 0;    // +0x81
+    std::uint8_t mPad82[0x02]{};   // +0x82
+    Wm3::Vector3f mAxis{};         // +0x84
+    float mCurrentAngle = 0.0f;    // +0x90
+    float mGoalAngle = 0.0f;       // +0x94
+    float mSpeed = 0.0f;           // +0x98
+    float mTargetSpeed = 0.0f;     // +0x9C
+    float mAccel = 0.0f;           // +0xA0
+    std::int32_t mFollowBone = -1; // +0xA4
   };
 
   static_assert(offsetof(CRotateManipulator, mHasGoal) == 0x80, "CRotateManipulator::mHasGoal offset must be 0x80");
   static_assert(offsetof(CRotateManipulator, mSpinDown) == 0x81, "CRotateManipulator::mSpinDown offset must be 0x81");
   static_assert(offsetof(CRotateManipulator, mAxis) == 0x84, "CRotateManipulator::mAxis offset must be 0x84");
   static_assert(
-    offsetof(CRotateManipulator, mCurrentAngle) == 0x90, "CRotateManipulator::mCurrentAngle offset must be 0x90"
+    offsetof(CRotateManipulator, mCurrentAngle) == 0x90,
+    "CRotateManipulator::mCurrentAngle offset must be 0x90"
   );
   static_assert(offsetof(CRotateManipulator, mGoalAngle) == 0x94, "CRotateManipulator::mGoalAngle offset must be 0x94");
   static_assert(offsetof(CRotateManipulator, mSpeed) == 0x98, "CRotateManipulator::mSpeed offset must be 0x98");
   static_assert(
-    offsetof(CRotateManipulator, mTargetSpeed) == 0x9C, "CRotateManipulator::mTargetSpeed offset must be 0x9C"
+    offsetof(CRotateManipulator, mTargetSpeed) == 0x9C,
+    "CRotateManipulator::mTargetSpeed offset must be 0x9C"
   );
   static_assert(offsetof(CRotateManipulator, mAccel) == 0xA0, "CRotateManipulator::mAccel offset must be 0xA0");
   static_assert(
-    offsetof(CRotateManipulator, mFollowBone) == 0xA4, "CRotateManipulator::mFollowBone offset must be 0xA4"
+    offsetof(CRotateManipulator, mFollowBone) == 0xA4,
+    "CRotateManipulator::mFollowBone offset must be 0xA4"
   );
   static_assert(sizeof(CRotateManipulator) == 0xA8, "CRotateManipulator size must be 0xA8");
 

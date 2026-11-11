@@ -25,7 +25,8 @@ namespace gpg::gal::d3d12
       return false;
     }
     createDevice = reinterpret_cast<PFN_D3D12_CREATE_DEVICE>(::GetProcAddress(module, "D3D12CreateDevice"));
-    getDebugInterface = reinterpret_cast<PFN_D3D12_GET_DEBUG_INTERFACE>(::GetProcAddress(module, "D3D12GetDebugInterface"));
+    getDebugInterface =
+      reinterpret_cast<PFN_D3D12_GET_DEBUG_INTERFACE>(::GetProcAddress(module, "D3D12GetDebugInterface"));
     serializeRootSignature =
       reinterpret_cast<PFN_D3D12_SERIALIZE_ROOT_SIGNATURE>(::GetProcAddress(module, "D3D12SerializeRootSignature"));
     if (createDevice == nullptr || serializeRootSignature == nullptr) {
@@ -53,13 +54,18 @@ namespace gpg::gal::d3d12
   {
     constexpr std::uint64_t kPageSize = 8ULL << 20U;
 
-    [[nodiscard]] std::uint64_t AlignUp(const std::uint64_t value, const std::uint64_t alignment) noexcept
+    [[nodiscard]] std::uint64_t AlignUp(
+      const std::uint64_t value,
+      const std::uint64_t alignment
+    ) noexcept
     {
       return (value + alignment - 1U) / alignment * alignment;
     }
   } // namespace
 
-  void UploadAllocator::Initialize(ID3D12Device* const device)
+  void UploadAllocator::Initialize(
+    ID3D12Device* const device
+  )
   {
     mDevice = device;
   }
@@ -71,7 +77,9 @@ namespace gpg::gal::d3d12
     mDevice.Reset();
   }
 
-  UploadAllocator::Page* UploadAllocator::NewPage(const std::uint64_t size)
+  UploadAllocator::Page* UploadAllocator::NewPage(
+    const std::uint64_t size
+  )
   {
     auto page = std::make_unique<Page>();
     page->size = size;
@@ -87,7 +95,8 @@ namespace gpg::gal::d3d12
     desc.SampleDesc.Count = 1U;
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     backend::CheckHresult(
-      "D3D12Core.cpp", __LINE__,
+      "D3D12Core.cpp",
+      __LINE__,
       mDevice->CreateCommittedResource(
         &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&page->resource)
       )
@@ -102,7 +111,11 @@ namespace gpg::gal::d3d12
     return mPages.back().get();
   }
 
-  UploadAllocation UploadAllocator::Allocate(const std::uint64_t bytes, const std::uint64_t alignment, const std::uint64_t serial)
+  UploadAllocation UploadAllocator::Allocate(
+    const std::uint64_t bytes,
+    const std::uint64_t alignment,
+    const std::uint64_t serial
+  )
   {
     const std::uint64_t size = std::max<std::uint64_t>(bytes, 1U);
     if (mCurrent != nullptr) {
@@ -137,7 +150,9 @@ namespace gpg::gal::d3d12
     return UploadAllocation{chosen->resource.Get(), 0U, chosen->cpu, chosen->gpu};
   }
 
-  void UploadAllocator::Retire(const std::uint64_t completedSerial) noexcept
+  void UploadAllocator::Retire(
+    const std::uint64_t completedSerial
+  ) noexcept
   {
     for (const std::unique_ptr<Page>& page : mPages) {
       if (page->busy && page->lastSerial <= completedSerial && page.get() != mCurrent) {
@@ -157,17 +172,18 @@ namespace gpg::gal::d3d12
     const std::uint64_t idleReserve = static_cast<std::uint64_t>(std::max(gUploadIdleMB, 0)) << 20U;
     mPages.erase(
       std::remove_if(
-        mPages.begin(), mPages.end(),
+        mPages.begin(),
+        mPages.end(),
         [&](const std::unique_ptr<Page>& page) {
-          if (page->busy || page.get() == mCurrent) {
-            return false;
-          }
-          if (page->size > kPageSize || idleKept + page->size > idleReserve) {
-            return true;
-          }
-          idleKept += page->size;
-          return false;
-        }
+      if (page->busy || page.get() == mCurrent) {
+        return false;
+      }
+      if (page->size > kPageSize || idleKept + page->size > idleReserve) {
+        return true;
+      }
+      idleKept += page->size;
+      return false;
+    }
       ),
       mPages.end()
     );
@@ -203,7 +219,11 @@ namespace gpg::gal::d3d12
   // ---------------------------------------------------------------------------
   // DescriptorPool
 
-  void DescriptorPool::Initialize(ID3D12Device* const device, const D3D12_DESCRIPTOR_HEAP_TYPE type, const std::uint32_t perHeap)
+  void DescriptorPool::Initialize(
+    ID3D12Device* const device,
+    const D3D12_DESCRIPTOR_HEAP_TYPE type,
+    const std::uint32_t perHeap
+  )
   {
     mDevice = device;
     mType = type;
@@ -241,7 +261,9 @@ namespace gpg::gal::d3d12
     return handle;
   }
 
-  void DescriptorPool::Free(const D3D12_CPU_DESCRIPTOR_HANDLE handle)
+  void DescriptorPool::Free(
+    const D3D12_CPU_DESCRIPTOR_HANDLE handle
+  )
   {
     if (handle.ptr != 0U) {
       mFree.push_back(handle);
@@ -251,7 +273,11 @@ namespace gpg::gal::d3d12
   // ---------------------------------------------------------------------------
   // DescriptorArena
 
-  void DescriptorArena::Initialize(ID3D12Device* const device, const D3D12_DESCRIPTOR_HEAP_TYPE type, const std::uint32_t capacity)
+  void DescriptorArena::Initialize(
+    ID3D12Device* const device,
+    const D3D12_DESCRIPTOR_HEAP_TYPE type,
+    const std::uint32_t capacity
+  )
   {
     D3D12_DESCRIPTOR_HEAP_DESC desc{};
     desc.Type = type;
@@ -270,7 +296,11 @@ namespace gpg::gal::d3d12
     mUsed = 0U;
   }
 
-  bool DescriptorArena::Allocate(const std::uint32_t count, D3D12_CPU_DESCRIPTOR_HANDLE& cpu, D3D12_GPU_DESCRIPTOR_HANDLE& gpu)
+  bool DescriptorArena::Allocate(
+    const std::uint32_t count,
+    D3D12_CPU_DESCRIPTOR_HANDLE& cpu,
+    D3D12_GPU_DESCRIPTOR_HANDLE& gpu
+  )
   {
     if (mUsed + count > mCapacity) {
       return false;
@@ -309,7 +339,11 @@ namespace gpg::gal::d3d12
     void Give(Block* block, std::uint64_t offset, std::uint64_t size);
   };
 
-  void SharedBufferAllocator::State::Give(Block* const block, const std::uint64_t offset, const std::uint64_t size)
+  void SharedBufferAllocator::State::Give(
+    Block* const block,
+    const std::uint64_t offset,
+    const std::uint64_t size
+  )
   {
     std::uint64_t start = offset;
     std::uint64_t length = size;
@@ -331,9 +365,13 @@ namespace gpg::gal::d3d12
 
     // An empty block goes when another empty one is kept for the next buffers.
     if (block->used == 0U) {
-      const auto empty = std::count_if(blocks.begin(), blocks.end(), [](const std::unique_ptr<Block>& b) { return b->used == 0U; });
+      const auto empty = std::count_if(blocks.begin(), blocks.end(), [](const std::unique_ptr<Block>& b) {
+        return b->used == 0U;
+      });
       if (empty > 1) {
-        blocks.erase(std::find_if(blocks.begin(), blocks.end(), [block](const std::unique_ptr<Block>& b) { return b.get() == block; }));
+        blocks.erase(std::find_if(blocks.begin(), blocks.end(), [block](const std::unique_ptr<Block>& b) {
+          return b.get() == block;
+        }));
       }
     }
   }
@@ -342,15 +380,22 @@ namespace gpg::gal::d3d12
   class SharedBufferAllocator::RangeOwner final : public IUnknown
   {
   public:
-    RangeOwner(std::shared_ptr<State> state, State::Block* const block, const std::uint64_t offset, const std::uint64_t size)
+    RangeOwner(
+      std::shared_ptr<State> state,
+      State::Block* const block,
+      const std::uint64_t offset,
+      const std::uint64_t size
+    )
       : mState(std::move(state))
       , mBlock(block)
       , mOffset(offset)
       , mSize(size)
-    {
-    }
+    {}
 
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** const object) override
+    HRESULT STDMETHODCALLTYPE QueryInterface(
+      REFIID riid,
+      void** const object
+    ) override
     {
       if (object == nullptr) {
         return E_POINTER;
@@ -364,7 +409,10 @@ namespace gpg::gal::d3d12
       return E_NOINTERFACE;
     }
 
-    ULONG STDMETHODCALLTYPE AddRef() override { return ++mReferences; }
+    ULONG STDMETHODCALLTYPE AddRef() override
+    {
+      return ++mReferences;
+    }
 
     ULONG STDMETHODCALLTYPE Release() override
     {
@@ -390,7 +438,9 @@ namespace gpg::gal::d3d12
   SharedBufferAllocator::SharedBufferAllocator() = default;
   SharedBufferAllocator::~SharedBufferAllocator() = default;
 
-  void SharedBufferAllocator::Initialize(PlacedHeapAllocator* const placed)
+  void SharedBufferAllocator::Initialize(
+    PlacedHeapAllocator* const placed
+  )
   {
     mState = std::make_shared<State>();
     mState->placed = placed;
@@ -402,7 +452,10 @@ namespace gpg::gal::d3d12
   }
 
   bool SharedBufferAllocator::Take(
-    const std::uint64_t size, TrackedResource*& outResource, std::uint64_t& outOffset, ComPtr<IUnknown>& outOwner
+    const std::uint64_t size,
+    TrackedResource*& outResource,
+    std::uint64_t& outOffset,
+    ComPtr<IUnknown>& outOwner
   )
   {
     if (mState == nullptr || size > kLargestShared) {
@@ -489,7 +542,9 @@ namespace gpg::gal::d3d12
   };
 
   PlacedHeapAllocator::State::Heap* PlacedHeapAllocator::State::Take(
-    const std::uint64_t size, const std::uint64_t alignment, std::uint64_t& outOffset
+    const std::uint64_t size,
+    const std::uint64_t alignment,
+    std::uint64_t& outOffset
   )
   {
     for (const std::unique_ptr<Heap>& heap : heaps) {
@@ -544,7 +599,11 @@ namespace gpg::gal::d3d12
     return heaps.back().get();
   }
 
-  void PlacedHeapAllocator::State::Give(Heap* const heap, const std::uint64_t offset, const std::uint64_t size)
+  void PlacedHeapAllocator::State::Give(
+    Heap* const heap,
+    const std::uint64_t offset,
+    const std::uint64_t size
+  )
   {
     std::uint64_t start = offset;
     std::uint64_t length = size;
@@ -566,9 +625,13 @@ namespace gpg::gal::d3d12
 
     // An empty heap goes when another empty one is kept for the next allocations.
     if (heap->used == 0U) {
-      const auto empty = std::count_if(heaps.begin(), heaps.end(), [](const std::unique_ptr<Heap>& h) { return h->used == 0U; });
+      const auto empty = std::count_if(heaps.begin(), heaps.end(), [](const std::unique_ptr<Heap>& h) {
+        return h->used == 0U;
+      });
       if (empty > 1) {
-        heaps.erase(std::find_if(heaps.begin(), heaps.end(), [heap](const std::unique_ptr<Heap>& h) { return h.get() == heap; }));
+        heaps.erase(std::find_if(heaps.begin(), heaps.end(), [heap](const std::unique_ptr<Heap>& h) {
+          return h.get() == heap;
+        }));
         heapBytes -= kPlacedHeapSize;
       }
     }
@@ -578,15 +641,22 @@ namespace gpg::gal::d3d12
   class PlacedHeapAllocator::RangeOwner final : public IUnknown
   {
   public:
-    RangeOwner(std::shared_ptr<State> state, State::Heap* const heap, const std::uint64_t offset, const std::uint64_t size)
+    RangeOwner(
+      std::shared_ptr<State> state,
+      State::Heap* const heap,
+      const std::uint64_t offset,
+      const std::uint64_t size
+    )
       : mState(std::move(state))
       , mHeap(heap)
       , mOffset(offset)
       , mSize(size)
-    {
-    }
+    {}
 
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** const object) override
+    HRESULT STDMETHODCALLTYPE QueryInterface(
+      REFIID riid,
+      void** const object
+    ) override
     {
       if (object == nullptr) {
         return E_POINTER;
@@ -600,7 +670,10 @@ namespace gpg::gal::d3d12
       return E_NOINTERFACE;
     }
 
-    ULONG STDMETHODCALLTYPE AddRef() override { return ++mReferences; }
+    ULONG STDMETHODCALLTYPE AddRef() override
+    {
+      return ++mReferences;
+    }
 
     ULONG STDMETHODCALLTYPE Release() override
     {
@@ -627,7 +700,11 @@ namespace gpg::gal::d3d12
   PlacedHeapAllocator::PlacedHeapAllocator() = default;
   PlacedHeapAllocator::~PlacedHeapAllocator() = default;
 
-  void PlacedHeapAllocator::Initialize(ID3D12Device* const device, const D3D12_HEAP_FLAGS flags, const wchar_t* const name)
+  void PlacedHeapAllocator::Initialize(
+    ID3D12Device* const device,
+    const D3D12_HEAP_FLAGS flags,
+    const wchar_t* const name
+  )
   {
     mState = std::make_shared<State>();
     mState->device = device;
@@ -641,7 +718,9 @@ namespace gpg::gal::d3d12
   }
 
   bool PlacedHeapAllocator::Create(
-    const D3D12_RESOURCE_DESC& desc, const D3D12_RESOURCE_STATES state, ComPtr<ID3D12Resource>& outResource
+    const D3D12_RESOURCE_DESC& desc,
+    const D3D12_RESOURCE_STATES state,
+    ComPtr<ID3D12Resource>& outResource
   )
   {
     if (mState == nullptr) {
@@ -675,7 +754,11 @@ namespace gpg::gal::d3d12
       return false;
     }
     ComPtr<ID3D12Resource> resource;
-    if (FAILED(mState->device->CreatePlacedResource(heap->heap.Get(), offset, &placed, state, nullptr, IID_PPV_ARGS(&resource)))) {
+    if (
+      FAILED(
+        mState->device->CreatePlacedResource(heap->heap.Get(), offset, &placed, state, nullptr, IID_PPV_ARGS(&resource))
+      )
+    ) {
       const std::lock_guard<std::mutex> lock(mState->mutex);
       mState->Give(heap, offset, info.SizeInBytes);
       return false;

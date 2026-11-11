@@ -141,9 +141,8 @@ namespace moho
      * own `REmitterBlueprint` (owned by the rules, so the archive may not delete it).
      * Inlined into `SerConstructHelper<REmitterBlueprint>::Construct` 0x0050FE40.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x0050FD60 (FUN_0050FD60)
@@ -153,7 +152,10 @@ namespace moho
      * `MemberConstruct` to look the blueprint up by.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     REmitterBlueprintCurve SizeCurve;             // +0x28
@@ -198,8 +200,8 @@ namespace moho
     float RepeatTime{0.0f};                       // +0x240
     float TextureFrameCount{0.0f};                // +0x244
     std::int32_t BlendMode{0};                    // +0x248
-    fa::string TextureName;                    // +0x24C
-    fa::string RampTextureName;                // +0x268
+    fa::string TextureName;                       // +0x24C
+    fa::string RampTextureName;                   // +0x268
     static gpg::RType* sType;
 
     /**
@@ -278,46 +280,58 @@ namespace moho
 
   static_assert(offsetof(REmitterBlueprint, SizeCurve) == 0x28, "REmitterBlueprint::SizeCurve offset must be 0x28");
   static_assert(
-    offsetof(REmitterBlueprint, XDirectionCurve) == 0x40, "REmitterBlueprint::XDirectionCurve offset must be 0x40"
+    offsetof(REmitterBlueprint, XDirectionCurve) == 0x40,
+    "REmitterBlueprint::XDirectionCurve offset must be 0x40"
   );
   static_assert(
-    offsetof(REmitterBlueprint, YDirectionCurve) == 0x58, "REmitterBlueprint::YDirectionCurve offset must be 0x58"
+    offsetof(REmitterBlueprint, YDirectionCurve) == 0x58,
+    "REmitterBlueprint::YDirectionCurve offset must be 0x58"
   );
   static_assert(
-    offsetof(REmitterBlueprint, ZDirectionCurve) == 0x70, "REmitterBlueprint::ZDirectionCurve offset must be 0x70"
+    offsetof(REmitterBlueprint, ZDirectionCurve) == 0x70,
+    "REmitterBlueprint::ZDirectionCurve offset must be 0x70"
   );
   static_assert(
-    offsetof(REmitterBlueprint, EmitRateCurve) == 0x88, "REmitterBlueprint::EmitRateCurve offset must be 0x88"
+    offsetof(REmitterBlueprint, EmitRateCurve) == 0x88,
+    "REmitterBlueprint::EmitRateCurve offset must be 0x88"
   );
   static_assert(
-    offsetof(REmitterBlueprint, LifetimeCurve) == 0xA0, "REmitterBlueprint::LifetimeCurve offset must be 0xA0"
+    offsetof(REmitterBlueprint, LifetimeCurve) == 0xA0,
+    "REmitterBlueprint::LifetimeCurve offset must be 0xA0"
   );
   static_assert(
-    offsetof(REmitterBlueprint, VelocityCurve) == 0xB8, "REmitterBlueprint::VelocityCurve offset must be 0xB8"
+    offsetof(REmitterBlueprint, VelocityCurve) == 0xB8,
+    "REmitterBlueprint::VelocityCurve offset must be 0xB8"
   );
   static_assert(offsetof(REmitterBlueprint, XAccelCurve) == 0xD0, "REmitterBlueprint::XAccelCurve offset must be 0xD0");
   static_assert(offsetof(REmitterBlueprint, YAccelCurve) == 0xE8, "REmitterBlueprint::YAccelCurve offset must be 0xE8");
   static_assert(
-    offsetof(REmitterBlueprint, ZAccelCurve) == 0x100, "REmitterBlueprint::ZAccelCurve offset must be 0x100"
+    offsetof(REmitterBlueprint, ZAccelCurve) == 0x100,
+    "REmitterBlueprint::ZAccelCurve offset must be 0x100"
   );
   static_assert(
-    offsetof(REmitterBlueprint, ResistanceCurve) == 0x118, "REmitterBlueprint::ResistanceCurve offset must be 0x118"
+    offsetof(REmitterBlueprint, ResistanceCurve) == 0x118,
+    "REmitterBlueprint::ResistanceCurve offset must be 0x118"
   );
   static_assert(
-    offsetof(REmitterBlueprint, StartSizeCurve) == 0x130, "REmitterBlueprint::StartSizeCurve offset must be 0x130"
+    offsetof(REmitterBlueprint, StartSizeCurve) == 0x130,
+    "REmitterBlueprint::StartSizeCurve offset must be 0x130"
   );
   static_assert(
-    offsetof(REmitterBlueprint, EndSizeCurve) == 0x148, "REmitterBlueprint::EndSizeCurve offset must be 0x148"
+    offsetof(REmitterBlueprint, EndSizeCurve) == 0x148,
+    "REmitterBlueprint::EndSizeCurve offset must be 0x148"
   );
   static_assert(
     offsetof(REmitterBlueprint, InitialRotationCurve) == 0x160,
     "REmitterBlueprint::InitialRotationCurve offset must be 0x160"
   );
   static_assert(
-    offsetof(REmitterBlueprint, RotationRateCurve) == 0x178, "REmitterBlueprint::RotationRateCurve offset must be 0x178"
+    offsetof(REmitterBlueprint, RotationRateCurve) == 0x178,
+    "REmitterBlueprint::RotationRateCurve offset must be 0x178"
   );
   static_assert(
-    offsetof(REmitterBlueprint, FrameRateCurve) == 0x190, "REmitterBlueprint::FrameRateCurve offset must be 0x190"
+    offsetof(REmitterBlueprint, FrameRateCurve) == 0x190,
+    "REmitterBlueprint::FrameRateCurve offset must be 0x190"
   );
   static_assert(
     offsetof(REmitterBlueprint, TextureSelectionCurve) == 0x1A8,
@@ -331,26 +345,33 @@ namespace moho
     "REmitterBlueprint::RampSelectionCurve offset must be 0x208"
   );
   static_assert(
-    offsetof(REmitterBlueprint, LocalVelocity) == 0x220, "REmitterBlueprint::LocalVelocity offset must be 0x220"
+    offsetof(REmitterBlueprint, LocalVelocity) == 0x220,
+    "REmitterBlueprint::LocalVelocity offset must be 0x220"
   );
   static_assert(
-    offsetof(REmitterBlueprint, LocalAcceleration) == 0x221, "REmitterBlueprint::LocalAcceleration offset must be 0x221"
+    offsetof(REmitterBlueprint, LocalAcceleration) == 0x221,
+    "REmitterBlueprint::LocalAcceleration offset must be 0x221"
   );
   static_assert(offsetof(REmitterBlueprint, Gravity) == 0x222, "REmitterBlueprint::Gravity offset must be 0x222");
   static_assert(
-    offsetof(REmitterBlueprint, AlignRotation) == 0x223, "REmitterBlueprint::AlignRotation offset must be 0x223"
+    offsetof(REmitterBlueprint, AlignRotation) == 0x223,
+    "REmitterBlueprint::AlignRotation offset must be 0x223"
   );
   static_assert(
-    offsetof(REmitterBlueprint, AlignToBone) == 0x224, "REmitterBlueprint::AlignToBone offset must be 0x224"
+    offsetof(REmitterBlueprint, AlignToBone) == 0x224,
+    "REmitterBlueprint::AlignToBone offset must be 0x224"
   );
   static_assert(
-    offsetof(REmitterBlueprint, EmitIfVisible) == 0x225, "REmitterBlueprint::EmitIfVisible offset must be 0x225"
+    offsetof(REmitterBlueprint, EmitIfVisible) == 0x225,
+    "REmitterBlueprint::EmitIfVisible offset must be 0x225"
   );
   static_assert(
-    offsetof(REmitterBlueprint, CatchupEmit) == 0x226, "REmitterBlueprint::CatchupEmit offset must be 0x226"
+    offsetof(REmitterBlueprint, CatchupEmit) == 0x226,
+    "REmitterBlueprint::CatchupEmit offset must be 0x226"
   );
   static_assert(
-    offsetof(REmitterBlueprint, CreateIfVisible) == 0x227, "REmitterBlueprint::CreateIfVisible offset must be 0x227"
+    offsetof(REmitterBlueprint, CreateIfVisible) == 0x227,
+    "REmitterBlueprint::CreateIfVisible offset must be 0x227"
   );
   static_assert(
     offsetof(REmitterBlueprint, ParticleResistance) == 0x228,
@@ -362,27 +383,33 @@ namespace moho
     "REmitterBlueprint::InterpolateEmission offset must be 0x22A"
   );
   static_assert(
-    offsetof(REmitterBlueprint, SnapToWaterline) == 0x22B, "REmitterBlueprint::SnapToWaterline offset must be 0x22B"
+    offsetof(REmitterBlueprint, SnapToWaterline) == 0x22B,
+    "REmitterBlueprint::SnapToWaterline offset must be 0x22B"
   );
   static_assert(
-    offsetof(REmitterBlueprint, OnlyEmitOnWater) == 0x22C, "REmitterBlueprint::OnlyEmitOnWater offset must be 0x22C"
+    offsetof(REmitterBlueprint, OnlyEmitOnWater) == 0x22C,
+    "REmitterBlueprint::OnlyEmitOnWater offset must be 0x22C"
   );
   static_assert(
-    offsetof(REmitterBlueprint, TextureStripCount) == 0x230, "REmitterBlueprint::TextureStripCount offset must be 0x230"
+    offsetof(REmitterBlueprint, TextureStripCount) == 0x230,
+    "REmitterBlueprint::TextureStripCount offset must be 0x230"
   );
   static_assert(offsetof(REmitterBlueprint, SortOrder) == 0x234, "REmitterBlueprint::SortOrder offset must be 0x234");
   static_assert(offsetof(REmitterBlueprint, LODCutoff) == 0x238, "REmitterBlueprint::LODCutoff offset must be 0x238");
   static_assert(offsetof(REmitterBlueprint, Lifetime) == 0x23C, "REmitterBlueprint::Lifetime offset must be 0x23C");
   static_assert(offsetof(REmitterBlueprint, RepeatTime) == 0x240, "REmitterBlueprint::RepeatTime offset must be 0x240");
   static_assert(
-    offsetof(REmitterBlueprint, TextureFrameCount) == 0x244, "REmitterBlueprint::TextureFrameCount offset must be 0x244"
+    offsetof(REmitterBlueprint, TextureFrameCount) == 0x244,
+    "REmitterBlueprint::TextureFrameCount offset must be 0x244"
   );
   static_assert(offsetof(REmitterBlueprint, BlendMode) == 0x248, "REmitterBlueprint::BlendMode offset must be 0x248");
   static_assert(
-    offsetof(REmitterBlueprint, TextureName) == 0x24C, "REmitterBlueprint::TextureName offset must be 0x24C"
+    offsetof(REmitterBlueprint, TextureName) == 0x24C,
+    "REmitterBlueprint::TextureName offset must be 0x24C"
   );
   static_assert(
-    offsetof(REmitterBlueprint, RampTextureName) == 0x268, "REmitterBlueprint::RampTextureName offset must be 0x268"
+    offsetof(REmitterBlueprint, RampTextureName) == 0x268,
+    "REmitterBlueprint::RampTextureName offset must be 0x268"
   );
   static_assert(sizeof(REmitterBlueprint) == 0x284, "REmitterBlueprint size must be 0x284");
 } // namespace moho

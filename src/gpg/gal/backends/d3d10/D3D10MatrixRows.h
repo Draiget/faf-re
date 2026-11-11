@@ -8,8 +8,8 @@
 
 namespace gpg::gal
 {
-namespace
-{
+  namespace
+  {
     /**
      * Address: 0x0094D490 (FUN_0094D490)
      *
@@ -34,5 +34,5 @@ namespace
 
       return &matrix;
     }
-} // namespace
+  } // namespace
 } // namespace gpg::gal

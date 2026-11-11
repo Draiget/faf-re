@@ -15,14 +15,18 @@ namespace
    * What it does:
    * Appends `"Min"` / `"Max"` float lanes to one `SMinMax<float>` type.
    */
-  gpg::RField* AddSMinMaxFloatFields(gpg::RType* const type)
+  gpg::RField* AddSMinMaxFloatFields(
+    gpg::RType* const type
+  )
   {
     type->AddField<float>("Min", 0);
     return type->AddField<float>("Max", 4);
   }
 
   template <typename TObject>
-  void MaterializeReflectionSingleton(TObject& singleton)
+  void MaterializeReflectionSingleton(
+    TObject& singleton
+  )
   {
     (void)singleton;
   }

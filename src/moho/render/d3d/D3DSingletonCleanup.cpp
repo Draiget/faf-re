@@ -43,7 +43,9 @@ namespace moho
    * templates (each 8 floats: two (x,y) pairs + two (u,v) pairs
    * matching the original binary layout), and unlocks the stream.
    */
-  void func_CreateSharedVertexStream(CD3DVertexFormat* const vertexFormat)
+  void func_CreateSharedVertexStream(
+    CD3DVertexFormat* const vertexFormat
+  )
   {
     CD3DDevice* const device = D3D_GetDevice();
     ID3DDeviceResources* const resources = device->GetResources();
@@ -58,9 +60,9 @@ namespace moho
       cursor[-3] = 0x3F800000u; // 1.0f
       cursor[-2] = 0u;
       cursor[-1] = 0x3F800000u; // 1.0f
-      cursor[ 0] = 0x3F800000u; // 1.0f
-      cursor[ 1] = 0u;
-      cursor[ 2] = 0x3F800000u; // 1.0f
+      cursor[0] = 0x3F800000u;  // 1.0f
+      cursor[1] = 0u;
+      cursor[2] = 0x3F800000u; // 1.0f
       cursor += 8;
     }
     sVertexStream->Unlock();
@@ -158,7 +160,9 @@ namespace moho
    * thunk when it differs from the incoming stream. Returns the
    * address of the updated singleton slot.
    */
-  fa::auto_ptr<CD3DVertexStream>* func_MoveIntoSharedVertexStream(CD3DVertexStream** const inOutStream)
+  fa::auto_ptr<CD3DVertexStream>* func_MoveIntoSharedVertexStream(
+    CD3DVertexStream** const inOutStream
+  )
   {
     CD3DVertexStream* const incoming = *inOutStream;
     *inOutStream = nullptr;
@@ -178,7 +182,9 @@ namespace moho
    * the prior holder through its deleting dtor thunk when present
    * and distinct from the new stream.
    */
-  void func_SetSharedVertexStream(CD3DVertexStream* const stream)
+  void func_SetSharedVertexStream(
+    CD3DVertexStream* const stream
+  )
   {
     sVertexStream.reset(stream);
   }

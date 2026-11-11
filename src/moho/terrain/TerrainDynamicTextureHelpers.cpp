@@ -32,15 +32,17 @@ namespace
     Transient
   };
 
-  void FillCubicBlendLookupTexture(moho::CD3DDynamicTextureSheet* const sheet, const int assertLine)
+  void FillCubicBlendLookupTexture(
+    moho::CD3DDynamicTextureSheet* const sheet,
+    const int assertLine
+  )
   {
     std::uint32_t pitchBytes = 0;
     void* mappedBits = nullptr;
     if (!sheet->Lock(&pitchBytes, &mappedBits)) {
       gpg::HandleAssertFailure(kUnreachableAssertText, assertLine, kUnreachableAssertSourcePath);
       // Binary path traps immediately after assert; keep this lane non-returning.
-      for (;;) {
-      }
+      for (;;) {}
     }
 
     (void)pitchBytes;
@@ -126,10 +128,7 @@ namespace moho
    */
   boost::shared_ptr<CD3DDynamicTextureSheet> CreateTerrainCubicBlendLookupTexture()
   {
-    return CreateTerrainCubicBlendLookupTextureImpl(
-      LookupTextureCreationLane::Tracked,
-      kTrackedLookupAssertLine
-    );
+    return CreateTerrainCubicBlendLookupTextureImpl(LookupTextureCreationLane::Tracked, kTrackedLookupAssertLine);
   }
 
   /**
@@ -142,9 +141,6 @@ namespace moho
    */
   boost::shared_ptr<CD3DDynamicTextureSheet> CreateTerrainCubicBlendLookupTextureTransient()
   {
-    return CreateTerrainCubicBlendLookupTextureImpl(
-      LookupTextureCreationLane::Transient,
-      kTransientLookupAssertLine
-    );
+    return CreateTerrainCubicBlendLookupTextureImpl(LookupTextureCreationLane::Transient, kTransientLookupAssertLine);
   }
 } // namespace moho

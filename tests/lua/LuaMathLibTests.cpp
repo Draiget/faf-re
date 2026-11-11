@@ -13,10 +13,12 @@ namespace
   using faf_lua_tests::Contains;
 
   class LuaMathLib : public faf_lua_tests::LuaFixture
-  {
-  };
+  {};
 
-  TEST_F(LuaMathLib, RoundingAndSign)
+  TEST_F(
+    LuaMathLib,
+    RoundingAndSign
+  )
   {
     EXPECT_EQ(Num("return math.floor(3.7)"), 3.0);
     EXPECT_EQ(Num("return math.floor(-3.5)"), -4.0);
@@ -27,10 +29,15 @@ namespace
     EXPECT_EQ(Num("return math.mod(7, 3)"), 1.0);
     EXPECT_EQ(Num("return math.mod(-7, 3)"), -1.0); // fmod keeps the dividend's sign
     EXPECT_EQ(Num("return math.mod(7.5, 2)"), 1.5);
-    EXPECT_TRUE(Contains(ErrorOf("return math.floor('x')"), "bad argument #1 to `floor' (number expected, got string)"));
+    EXPECT_TRUE(
+      Contains(ErrorOf("return math.floor('x')"), "bad argument #1 to `floor' (number expected, got string)")
+    );
   }
 
-  TEST_F(LuaMathLib, MinMax)
+  TEST_F(
+    LuaMathLib,
+    MinMax
+  )
   {
     EXPECT_EQ(Num("return math.max(1, 5, 3)"), 5.0);
     EXPECT_EQ(Num("return math.min(4, -2, 8)"), -2.0);
@@ -39,7 +46,10 @@ namespace
     EXPECT_TRUE(Contains(ErrorOf("return math.min(1, {})"), "bad argument #2 to `min'"));
   }
 
-  TEST_F(LuaMathLib, PowersAndLogs)
+  TEST_F(
+    LuaMathLib,
+    PowersAndLogs
+  )
   {
     EXPECT_EQ(Num("return math.sqrt(16)"), 4.0);
     EXPECT_EQ(Num("return math.pow(2, 10)"), 1024.0);
@@ -56,7 +66,10 @@ namespace
     EXPECT_TRUE(Bool("local x = math.sqrt(-1) return x ~= x")); // NaN
   }
 
-  TEST_F(LuaMathLib, Trigonometry)
+  TEST_F(
+    LuaMathLib,
+    Trigonometry
+  )
   {
     EXPECT_EQ(Num("return math.pi"), static_cast<double>(3.14159265358979f));
     EXPECT_EQ(Num("return math.sin(0)"), 0.0);
@@ -76,7 +89,10 @@ namespace
 
   // math_random (0x00919F90): no argument gives [0,1), one gives an integer in [1,u], two give
   // [l,u]; one sample is drawn per call whatever the form, and randomseed restarts the sequence.
-  TEST_F(LuaMathLib, RandomRangesAndSeeding)
+  TEST_F(
+    LuaMathLib,
+    RandomRangesAndSeeding
+  )
   {
     EXPECT_TRUE(Bool(R"(
       math.randomseed(1234)
@@ -89,7 +105,10 @@ namespace
         if b < -3 or b > 3 or math.floor(b) ~= b then return false end
       end
       return true)"));
-    EXPECT_TRUE(Bool("local seen = {} math.randomseed(7) for i = 1, 500 do seen[math.random(4)] = true end return seen[1] and seen[2] and seen[3] and seen[4]"));
+    EXPECT_TRUE(Bool(
+      "local seen = {} math.randomseed(7) for i = 1, 500 do seen[math.random(4)] = true end return seen[1] and seen[2] "
+      "and seen[3] and seen[4]"
+    ));
     EXPECT_TRUE(Bool(R"(
       math.randomseed(42)
       local a = {math.random(1000), math.random(), math.random(5, 9)}
@@ -104,7 +123,10 @@ namespace
 
   // luaopen_math puts __pow into the globals, not into math; nothing in the VM calls it here
   // (`^` is xor, see LuaLanguage.BitOperatorsTruncateToThirtyTwoBits), but scripts can.
-  TEST_F(LuaMathLib, GlobalPowIsMathPow)
+  TEST_F(
+    LuaMathLib,
+    GlobalPowIsMathPow
+  )
   {
     EXPECT_EQ(Str("return type(__pow)"), "cfunction");
     EXPECT_EQ(Num("return __pow(3, 2)"), 9.0);

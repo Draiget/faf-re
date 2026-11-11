@@ -4,7 +4,7 @@
 
 namespace gpg::gal
 {
-	using Matrix = moho::VMatrix4;
+  using Matrix = moho::VMatrix4;
 
   namespace Math
   {
@@ -88,4 +88,4 @@ namespace gpg::gal
      */
     Matrix* rotationQuaternion(Matrix* outMatrix, const Wm3::Quaternionf* rotation);
   } // namespace Math
-}
+} // namespace gpg::gal

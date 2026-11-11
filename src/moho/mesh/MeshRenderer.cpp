@@ -38,7 +38,7 @@ namespace moho
     "Place the meshes a pass gathers between ticks on worker threads (1, the default), or one by one in the pass (0).",
     &ren_MeshParallelInterp
   );
-}
+} // namespace moho
 
 namespace
 {
@@ -71,7 +71,9 @@ namespace
    * ring, downcast each node to its `MeshInstance` (`node - 4`, the base's
    * offset), and reset every LOD of an instance that has a mesh.
    */
-  void ResetInstanceBatches(moho::TDatList<moho::MeshInstance, void>& instances) noexcept
+  void ResetInstanceBatches(
+    moho::TDatList<moho::MeshInstance, void>& instances
+  ) noexcept
   {
     for (moho::MeshInstance* const instance : instances.owners()) {
       if (moho::Mesh* const mesh = instance->mesh.get(); mesh != nullptr) {
@@ -81,25 +83,27 @@ namespace
       }
     }
   }
-}
+} // namespace
 
 namespace moho
 {
-namespace
-{
+  namespace
+  {
     MeshRenderer* gMeshRendererInstance = nullptr;
 
     /// Engine addition (water bodies): the level the next mirrored passes reflect at, when set.
     bool sMirrorElevationSet = false;
     float sMirrorElevation = 0.0f;
-}
+  } // namespace
 
-  void MESH_SetMirrorElevation(const bool set, const float elevation) noexcept
+  void MESH_SetMirrorElevation(
+    const bool set,
+    const float elevation
+  ) noexcept
   {
     sMirrorElevationSet = set;
     sMirrorElevation = elevation;
   }
-
 
   /**
    * Address: 0x007DF150 (FUN_007DF150, ??0MeshRenderer@Moho@@QAE@XZ)
@@ -232,7 +236,10 @@ namespace
    * What it does:
    * Resizes renderer-owned mesh spatial-db storage for current map dimensions.
    */
-  void MeshRenderer::UpdateMapSize(const std::int32_t width, const std::int32_t height)
+  void MeshRenderer::UpdateMapSize(
+    const std::int32_t width,
+    const std::int32_t height
+  )
   {
     meshSpatialDb.ResizeForMap(width, height);
   }
@@ -264,7 +271,8 @@ namespace
    * extra conditional on this side.
    */
   boost::shared_ptr<Mesh> MeshRenderer::FindOrCreateMesh(
-    const RMeshBlueprint* const blueprint, const boost::shared_ptr<MeshMaterial> materialArg
+    const RMeshBlueprint* const blueprint,
+    const boost::shared_ptr<MeshMaterial> materialArg
   )
   {
     MeshKey key(blueprint, materialArg);
@@ -417,29 +425,29 @@ namespace
     static MeshShaderVarSet shaderVars{};
     return shaderVars;
   }
-namespace
-{
+  namespace
+  {
 
-  // ---------------------------------------------------------------------------
-  // Per-material mesh-texture shader-vars.
-  //
-  // Distinct from the 23-entry MeshShaderVarSet above, the binary holds these
-  // six texture sampler shader-vars as standalone process-wide `ShaderVar`
-  // globals, each installed by its own CRT init thunk (byte-verified from
-  // bin/2025.7.1/ForgedAlliance.exe): register thunks at 0x00BE0520
-  // (environmentTexture, global 0x010BEDC0), 0x00BE0860 (albedoTexture, global
-  // 0x010BE670), 0x00BE0880 (normalsTexture, global 0x010BEAA8), 0x00BE08A0
-  // (specularTexture, global 0x010BEC10), 0x00BE08C0 (lookupTexture, global
-  // 0x010BE820) and 0x00BE08E0 (secondaryTexture, global 0x010BE8F8). Every
-  // thunk calls `RegisterShaderVar(<name>, &global, "mesh")` (0x00438000), so
-  // all six register against the "mesh" effect. The HLSL name strings are the
-  // exact null-terminated `.rdata` literals passed to those calls (VAs
-  // 0x00E3F580 / 0x00E3F6E0 / 0x00E3F6F0 / 0x00E3F700 / 0x00E3F710 /
-  // 0x00E3F720). MeshRenderer::Render binds all six per LOD material; the
-  // recovered model groups them into one set exposed through
-  // GetMeshTextureShaderVars(), mirroring MeshShaderVarSet.
-  // ---------------------------------------------------------------------------
-      struct MeshTextureShaderVarSet
+    // ---------------------------------------------------------------------------
+    // Per-material mesh-texture shader-vars.
+    //
+    // Distinct from the 23-entry MeshShaderVarSet above, the binary holds these
+    // six texture sampler shader-vars as standalone process-wide `ShaderVar`
+    // globals, each installed by its own CRT init thunk (byte-verified from
+    // bin/2025.7.1/ForgedAlliance.exe): register thunks at 0x00BE0520
+    // (environmentTexture, global 0x010BEDC0), 0x00BE0860 (albedoTexture, global
+    // 0x010BE670), 0x00BE0880 (normalsTexture, global 0x010BEAA8), 0x00BE08A0
+    // (specularTexture, global 0x010BEC10), 0x00BE08C0 (lookupTexture, global
+    // 0x010BE820) and 0x00BE08E0 (secondaryTexture, global 0x010BE8F8). Every
+    // thunk calls `RegisterShaderVar(<name>, &global, "mesh")` (0x00438000), so
+    // all six register against the "mesh" effect. The HLSL name strings are the
+    // exact null-terminated `.rdata` literals passed to those calls (VAs
+    // 0x00E3F580 / 0x00E3F6E0 / 0x00E3F6F0 / 0x00E3F700 / 0x00E3F710 /
+    // 0x00E3F720). MeshRenderer::Render binds all six per LOD material; the
+    // recovered model groups them into one set exposed through
+    // GetMeshTextureShaderVars(), mirroring MeshShaderVarSet.
+    // ---------------------------------------------------------------------------
+    struct MeshTextureShaderVarSet
     {
       ShaderVar environmentTexture; // "environmentTexture" &0x010BEDC0
       ShaderVar albedoTexture;      // "albedoTexture"      &0x010BE670
@@ -464,8 +472,7 @@ namespace
       static MeshTextureShaderVarSet textureVars{};
       return textureVars;
     }
-}
-
+  } // namespace
 
   // ---------------------------------------------------------------------------
   // GPU mesh skinning-palette shader-vars (translation + rotation palettes).
@@ -529,7 +536,10 @@ namespace
    * file (via `RegisterShaderVar`), clears its embedded palette buffer triplet,
    * and reserves the palette to `kPaletteCapacity` (80) entries.
    */
-  MeshShaderPaletteVar* register_MeshShaderVar(const char* const name, MeshShaderPaletteVar* const paletteVar)
+  MeshShaderPaletteVar* register_MeshShaderVar(
+    const char* const name,
+    MeshShaderPaletteVar* const paletteVar
+  )
   {
     RegisterShaderVar(name, paletteVar, "mesh");
 
@@ -561,8 +571,8 @@ namespace
    * Rotation skinning-palette shader-var (binary global 0x010BEE50).
    */
   MeshShaderPaletteVar meshShaderVarRotPalette;
-namespace
-{
+  namespace
+  {
     /**
      * CRT static-init bootstrap mirroring the two `__xc_a` entries at
      * 0x00BE0900 / 0x00BE0920: registering both palette shader-vars at process
@@ -579,8 +589,7 @@ namespace
     };
 
     [[maybe_unused]] MeshPaletteShaderVarBootstrap gMeshPaletteShaderVarBootstrap;
-}
-
+  } // namespace
 
   /**
    * Address: 0x00BE0900 (FUN_00BE0900, register_MeshShaderVarTransPalette)
@@ -662,7 +671,11 @@ namespace
    * optional shadow-map lane. All float constants and HLSL names are byte-
    * verified from bin/2025.7.1/ForgedAlliance.exe.
    */
-  void MeshRenderer::ConfigureShader(const GeomCamera3& camera, Shadow* const shadow, const bool mirrored)
+  void MeshRenderer::ConfigureShader(
+    const GeomCamera3& camera,
+    Shadow* const shadow,
+    const bool mirrored
+  )
   {
     MeshShaderVarSet& sv = GetMeshShaderVars();
 
@@ -718,10 +731,14 @@ namespace
     VMatrix4 viewMatrixCopy = camera.view;
     if (mirrored) {
       const float translate = surfaceElevation * 2.0f; // flt_DFEB0C = 2.0
-      viewMatrixCopy.r[3].x += (viewMatrixCopy.r[2].x + viewMatrixCopy.r[0].x) * 0.0f + viewMatrixCopy.r[1].x * translate;
-      viewMatrixCopy.r[3].y += (viewMatrixCopy.r[2].y + viewMatrixCopy.r[0].y) * 0.0f + viewMatrixCopy.r[1].y * translate;
-      viewMatrixCopy.r[3].z += (viewMatrixCopy.r[2].z + viewMatrixCopy.r[0].z) * 0.0f + viewMatrixCopy.r[1].z * translate;
-      viewMatrixCopy.r[3].w += (viewMatrixCopy.r[2].w + viewMatrixCopy.r[0].w) * 0.0f + viewMatrixCopy.r[1].w * translate;
+      viewMatrixCopy.r[3].x +=
+        (viewMatrixCopy.r[2].x + viewMatrixCopy.r[0].x) * 0.0f + viewMatrixCopy.r[1].x * translate;
+      viewMatrixCopy.r[3].y +=
+        (viewMatrixCopy.r[2].y + viewMatrixCopy.r[0].y) * 0.0f + viewMatrixCopy.r[1].y * translate;
+      viewMatrixCopy.r[3].z +=
+        (viewMatrixCopy.r[2].z + viewMatrixCopy.r[0].z) * 0.0f + viewMatrixCopy.r[1].z * translate;
+      viewMatrixCopy.r[3].w +=
+        (viewMatrixCopy.r[2].w + viewMatrixCopy.r[0].w) * 0.0f + viewMatrixCopy.r[1].w * translate;
       viewMatrixCopy.r[1].x *= -1.0f; // flt_E4F6E8 = -1.0
       viewMatrixCopy.r[1].y *= -1.0f;
       viewMatrixCopy.r[1].z *= -1.0f;
@@ -869,15 +886,17 @@ namespace
       }
     }
   }
-namespace
-{
+  namespace
+  {
     /**
      * Resolves the MeshLOD associated with one batch bucket.
      *
      * The batch key's `mLod` lane (`MeshBatchKey` +0x08) stores the owning
      * `MeshLOD*` directly (the binary reads `key.lod` at 0x007DFCDC).
      */
-    [[nodiscard]] MeshLOD* MeshBatchEntryLod(const MeshBatchBucket& bucket) noexcept
+    [[nodiscard]] MeshLOD* MeshBatchEntryLod(
+      const MeshBatchBucket& bucket
+    ) noexcept
     {
       return bucket.first.mLod;
     }
@@ -889,7 +908,9 @@ namespace
      * skinned batch path when non-zero (the binary reads `*(node + 0x10)`,
      * i.e. the key byte inside the node payload at +0x0C).
      */
-    [[nodiscard]] bool MeshBatchEntryIsSkinned(const MeshBatchBucket& bucket) noexcept
+    [[nodiscard]] bool MeshBatchEntryIsSkinned(
+      const MeshBatchBucket& bucket
+    ) noexcept
     {
       return bucket.first.mIsStaticPose != 0;
     }
@@ -919,7 +940,9 @@ namespace
      * released. The key compare only reads that pointer's value, and every
      * consumer of the map skips empty buckets before touching the LOD.
      */
-    void RecycleBatchBuckets(MeshBatchBucketTree& buckets)
+    void RecycleBatchBuckets(
+      MeshBatchBucketTree& buckets
+    )
     {
       constexpr unsigned kPruneEveryNthBatch = 64u;
       static unsigned sBatchesSincePrune = 0u;
@@ -944,16 +967,17 @@ namespace
      * effect's `renderStage` integer annotation on first use and caching the
      * result back into `mShaderIndex` (binary: the `mMat.mVal < 0` block).
      */
-    [[nodiscard]] std::int32_t ResolveMaterialRenderStage(CD3DEffect* const effect, MeshMaterial& material)
+    [[nodiscard]] std::int32_t ResolveMaterialRenderStage(
+      CD3DEffect* const effect,
+      MeshMaterial& material
+    )
     {
       if (material.mShaderIndex < 0) {
-        material.mShaderIndex =
-          effect->GetIntegerAnnotation(material.mShaderAnnotation, fa::string("renderStage"), 0);
+        material.mShaderIndex = effect->GetIntegerAnnotation(material.mShaderAnnotation, fa::string("renderStage"), 0);
       }
       return material.mShaderIndex;
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x007DFF30 (FUN_007DFF30, ?RenderCartographic@MeshRenderer@Moho@@QAEXMMMABVGeomCamera3@2@AAV?$map@...@Z)
@@ -1125,7 +1149,9 @@ namespace
    * (`(int)this + 660` is GeomCamera3::viewport.r[1] at 0x294) and the batch
    * tree off `a2`.
    */
-  void MeshRenderer::RenderSilhouette(const GeomCamera3& camera)
+  void MeshRenderer::RenderSilhouette(
+    const GeomCamera3& camera
+  )
   {
     CD3DDevice* const device = D3D_GetDevice();
 
@@ -1150,32 +1176,31 @@ namespace
     // The two passes walk the same tree but gate on different per-LOD bytes
     // (0x007E0913 reads MeshLOD+0xAD, 0x007E0A93 reads +0xAE), so a mesh can
     // occlude without being outlined and vice versa.
-    const auto drawPass =
-      [&](const char* const technique, std::uint8_t MeshLOD::* const gate) {
-        device->SelectTechnique(technique);
-        for (const MeshBatchBucket& bucket : meshes) {
-          // See RecycleBatchBuckets: an empty bucket's LOD may be released.
-          if (bucket.second.empty()) {
-            continue;
-          }
-          MeshLOD* const lod = MeshBatchEntryLod(bucket);
-          if (!(lod->*gate)) {
-            continue;
-          }
-
-          tv.albedoTexture.GetTexture(lod->mat.mAlbedoSheet);
-
-          boost::shared_ptr<MeshBatch> batchHandle;
-          if (MeshBatchEntryIsSkinned(bucket)) {
-            lod->GetSkinnedBatch(batchHandle);
-          } else {
-            lod->GetStaticBatch(batchHandle);
-          }
-          if (batchHandle) {
-            batchHandle->Render(bucket.second, false);
-          }
+    const auto drawPass = [&](const char* const technique, std::uint8_t MeshLOD::* const gate) {
+      device->SelectTechnique(technique);
+      for (const MeshBatchBucket& bucket : meshes) {
+        // See RecycleBatchBuckets: an empty bucket's LOD may be released.
+        if (bucket.second.empty()) {
+          continue;
         }
-      };
+        MeshLOD* const lod = MeshBatchEntryLod(bucket);
+        if (!(lod->*gate)) {
+          continue;
+        }
+
+        tv.albedoTexture.GetTexture(lod->mat.mAlbedoSheet);
+
+        boost::shared_ptr<MeshBatch> batchHandle;
+        if (MeshBatchEntryIsSkinned(bucket)) {
+          lod->GetSkinnedBatch(batchHandle);
+        } else {
+          lod->GetStaticBatch(batchHandle);
+        }
+        if (batchHandle) {
+          batchHandle->Render(bucket.second, false);
+        }
+      }
+    };
 
     drawPass("Occlude", &MeshLOD::occlude);
     drawPass("Silhouette", &MeshLOD::silhouette);
@@ -1204,7 +1229,9 @@ namespace
   bool gMeshDepthSkipsTraced = false;
   bool gMeshDepthSkipsAlpha = false;
 
-  bool MeshMaterialTraced(MeshMaterial& material)
+  bool MeshMaterialTraced(
+    MeshMaterial& material
+  )
   {
     CD3DDevice* const device = D3D_GetDevice();
     CD3DEffect* const meshEffect = (device != nullptr) ? device->GetResources()->FindEffect("mesh") : nullptr;
@@ -1220,7 +1247,9 @@ namespace
     return std::string_view(material.mDepthTechnique.c_str()) == "Depth" && !MeshMaterialUnderConstruction(material);
   }
 
-  bool MeshMaterialUnderConstruction(const MeshMaterial& material)
+  bool MeshMaterialUnderConstruction(
+    const MeshMaterial& material
+  )
   {
     // The build shaders (UEFBuild, CybranBuild, AeonBuild..., SeraphimBuild) draw the finished unit see-through over
     // the part built so far, but their depth pass is the plain "Depth" of the whole finished shape. Traced, that
@@ -1228,7 +1257,9 @@ namespace
     return std::string_view(material.mShaderAnnotation.c_str()).find("Build") != std::string_view::npos;
   }
 
-  bool MeshMaterialAlphaTraced(MeshMaterial& material)
+  bool MeshMaterialAlphaTraced(
+    MeshMaterial& material
+  )
   {
     // MeshMaterialTraced resolves the depth technique (and says no for materials outside the depth pass).
     if (MeshMaterialTraced(material) || material.mDepthTechnique.empty()) {
@@ -1238,7 +1269,10 @@ namespace
     return technique == "DepthClip" || technique == "UndulatingDepthClip";
   }
 
-  void MeshRenderer::RenderDepth(const GeomCamera3& camera, MeshBatchBucketTree& meshMap)
+  void MeshRenderer::RenderDepth(
+    const GeomCamera3& camera,
+    MeshBatchBucketTree& meshMap
+  )
   {
     // Nothing to draw when the batch tree is empty (binary: `if (*(arg4+8))`).
     if (meshMap.empty()) {
@@ -1321,8 +1355,10 @@ namespace
 
       // Engine addition (ren_RayTracedShadows): with rays on, opaque materials shadow by ray (RayScene.cpp)
       // and the map keeps only what the scene lacks.
-      if (gMeshDepthSkipsTraced && std::string_view(material.mDepthTechnique.c_str()) == "Depth" &&
-          !MeshMaterialUnderConstruction(material)) {
+      if (
+        gMeshDepthSkipsTraced && std::string_view(material.mDepthTechnique.c_str()) == "Depth" &&
+        !MeshMaterialUnderConstruction(material)
+      ) {
         continue;
       }
       if (gMeshDepthSkipsAlpha) {
@@ -1425,8 +1461,7 @@ namespace
 
       // Pass stage filter (binary: `!v13 || v13==2 ||
       // ((val & (a3&0x30)) && (val & (a3&0xC)))`).
-      const bool passesStageFilter =
-        meshFlags == 0 || meshFlags == 2 ||
+      const bool passesStageFilter = meshFlags == 0 || meshFlags == 2 ||
         (((renderStage & stageMaskHigh) != 0) && ((renderStage & stageMaskLow) != 0));
       if (!passesStageFilter) {
         continue;
@@ -1447,8 +1482,9 @@ namespace
       // the stored word is the one the binary stores.
       if (!material.mEnvironmentSheet) {
         if (terrainRes != nullptr) {
-          const fa::string environmentKey =
-            meshEffect->GetStringAnnotation(material.mShaderAnnotation, fa::string("environment"), fa::string("<default>"));
+          const fa::string environmentKey = meshEffect->GetStringAnnotation(
+            material.mShaderAnnotation, fa::string("environment"), fa::string("<default>")
+          );
           material.mEnvironmentSheet = terrainRes->GetEnvLookup(environmentKey);
         } else {
           material.mEnvironmentSheet = meshEnvironmentTex;
@@ -1559,7 +1595,9 @@ namespace
    * Forwards depth rendering to the batch-map overload using this renderer's
    * persistent `meshes` tree.
    */
-  void MeshRenderer::RenderDepth(const GeomCamera3& camera)
+  void MeshRenderer::RenderDepth(
+    const GeomCamera3& camera
+  )
   {
     RenderDepth(camera, meshes);
   }
@@ -1571,7 +1609,11 @@ namespace
    * Forwards one standard render call to the batch-map overload using this
    * renderer's persistent `meshes` tree.
    */
-  void MeshRenderer::Render(const std::int32_t meshFlags, const GeomCamera3& camera, Shadow* const shadow)
+  void MeshRenderer::Render(
+    const std::int32_t meshFlags,
+    const GeomCamera3& camera,
+    Shadow* const shadow
+  )
   {
     Render(meshFlags, camera, shadow, meshes);
   }
@@ -1679,19 +1721,13 @@ namespace
 
     // Camera forward direction = negated third row of the inverse-view matrix.
     // Used as the spatial-DB support/selector axis for the collect volume.
-    const Wm3::Vec3f cameraForward(
-      -camera.inverseView.r[2].x,
-      -camera.inverseView.r[2].y,
-      -camera.inverseView.r[2].z
-    );
+    const Wm3::Vec3f cameraForward(-camera.inverseView.r[2].x, -camera.inverseView.r[2].y, -camera.inverseView.r[2].z);
 
     // Collect every renderable instance whose bounds intersect the camera
     // frustum solid. SpatialDB<MeshInstance> yields its own payload type, so
     // these slots no longer have to be laundered through UserEntity*.
     gpg::fastvector<MeshInstance*> collected;
-    meshSpatialDb.CollectAllInVolume(
-      collected, &const_cast<GeomCamera3&>(camera).solid2, cameraForward, fadePlane
-    );
+    meshSpatialDb.CollectAllInVolume(collected, &const_cast<GeomCamera3&>(camera).solid2, cameraForward, fadePlane);
 
     // Engine change (ren_MeshParallelInterp): the instances the walk below would place, placed first on
     // the worker pool. The gates are the walk's own, so the same instances are updated either way.
@@ -1713,14 +1749,15 @@ namespace
       constexpr std::size_t kParallelInterpMin = 64U;
       constexpr std::size_t kParallelInterpGrain = 32U;
       if (sStale.size() >= kParallelInterpMin) {
-        CUserWorkerPool::Get().ParallelFor(sStale.size(), kParallelInterpGrain, [&](const std::size_t begin, const std::size_t end) {
+        CUserWorkerPool::Get().ParallelFor(
+          sStale.size(), kParallelInterpGrain, [&](const std::size_t begin, const std::size_t end) {
           for (std::size_t index = begin; index < end; ++index) {
             sStale[index]->UpdateInterpolatedFields();
           }
-        });
+        }
+        );
       }
     }
-
 
     for (MeshInstance* const instance : collected) {
 
@@ -1748,10 +1785,7 @@ namespace
       // the camera pushed units and props to low LODs or past their cutoff.
       const Wm3::Vec3f& worldPos = instance->interpolatedPosition;
       const float distance =
-        worldPos.z * fadePlane.z
-        + worldPos.y * fadePlane.y
-        + fadePlane.x * worldPos.x
-        + fadePlane.w;
+        worldPos.z * fadePlane.z + worldPos.y * fadePlane.y + fadePlane.x * worldPos.x + fadePlane.w;
 
       // Engine change: the instance holds its mesh, so this walk needs no counted copy per instance.
       Mesh* const mesh = instance->mesh.get();
@@ -1823,7 +1857,9 @@ namespace
    * effect reads its skinning palette from there. Each Batch call starts the
    * texture over: the draws of the previous map have all been issued by then.
    */
-  void MeshRenderer::SaveBatch(std::vector<SavedBucket>& out) const
+  void MeshRenderer::SaveBatch(
+    std::vector<SavedBucket>& out
+  ) const
   {
     std::size_t used = 0U;
     for (const MeshBatchBucket& bucket : meshes) {
@@ -1841,7 +1877,10 @@ namespace
   }
 
   void MeshRenderer::BatchFromSaved(
-    const std::int32_t gameTick, const float deltaFrameArg, const GeomCamera3& camera, const std::vector<SavedBucket>& saved
+    const std::int32_t gameTick,
+    const float deltaFrameArg,
+    const GeomCamera3& camera,
+    const std::vector<SavedBucket>& saved
   )
   {
     RecycleBatchBuckets(meshes);
@@ -1893,8 +1932,8 @@ namespace
     }
     HardwareMeshBatch::UploadBonePalettes();
   }
-namespace
-{
+  namespace
+  {
     /**
      * The distance fog parameters of a mesh effect compiled with
      * FAF_BONE_TEXTURE (see MeshRenderer::SetDistanceFog).
@@ -1918,8 +1957,7 @@ namespace
       static DistanceFogShaderVars* const vars = new DistanceFogShaderVars();
       return *vars;
     }
-}
-
+  } // namespace
 
   /**
    * FAF addition, not in the shipped binary.
@@ -1966,5 +2004,4 @@ namespace
     };
     SetShaderVarMem(vars.color, 3u, color);
   }
-}
-
+} // namespace moho

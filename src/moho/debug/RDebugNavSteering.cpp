@@ -54,7 +54,9 @@ namespace moho
   /**
    * Address: 0x00650AA0 (FUN_00650AA0, Moho::RDebugNavSteering::OnTick)
    */
-  void RDebugNavSteering::Tick(Sim* const sim)
+  void RDebugNavSteering::Tick(
+    Sim* const sim
+  )
   {
     if (sim == nullptr || sim->mEntityDB == nullptr) {
       return;

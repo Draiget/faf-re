@@ -32,9 +32,15 @@ namespace faf::remote
     /** The client acknowledged `frameId` (its newest decoded frame). Older acknowledgements are ignored. */
     void Ack(std::uint32_t frameId);
 
-    [[nodiscard]] std::size_t Kept() const noexcept { return mFrames.size(); }
+    [[nodiscard]] std::size_t Kept() const noexcept
+    {
+      return mFrames.size();
+    }
     /** Frames sent in full after the first: no acknowledged frame was left to encode against. */
-    [[nodiscard]] std::uint64_t FullFrames() const noexcept { return mFullFrames; }
+    [[nodiscard]] std::uint64_t FullFrames() const noexcept
+    {
+      return mFullFrames;
+    }
 
   private:
     std::deque<wire::SViewFrame> mFrames; // sent, oldest first; the front is the acknowledged one once there is one
@@ -50,12 +56,20 @@ namespace faf::remote
      * Decodes one frame against the kept frame its header names (or none for a full frame) and
      * keeps it. False for a frame whose baseline is not kept, or that does not decode.
      */
-    [[nodiscard]] bool Decode(std::span<const std::uint8_t> bytes, const wire::SFrameCodec& codec, wire::SViewFrame& out);
+    [[nodiscard]] bool
+    Decode(std::span<const std::uint8_t> bytes, const wire::SFrameCodec& codec, wire::SViewFrame& out);
 
     /** The newest frame decoded (what the client acknowledges), or `kNoBaseline`. */
-    [[nodiscard]] std::uint32_t Newest() const noexcept { return mFrames.empty() ? wire::kNoBaseline : mFrames.back().frameId; }
-    /** The newest frame kept, which the next frame is decoded against; null before one. For damage on purpose (WPR.31). */
-    [[nodiscard]] wire::SViewFrame* NewestFrame() noexcept { return mFrames.empty() ? nullptr : &mFrames.back(); }
+    [[nodiscard]] std::uint32_t Newest() const noexcept
+    {
+      return mFrames.empty() ? wire::kNoBaseline : mFrames.back().frameId;
+    }
+    /** The newest frame kept, which the next frame is decoded against; null before one. For damage on purpose (WPR.31).
+     */
+    [[nodiscard]] wire::SViewFrame* NewestFrame() noexcept
+    {
+      return mFrames.empty() ? nullptr : &mFrames.back();
+    }
 
   private:
     std::deque<wire::SViewFrame> mFrames; // decoded, oldest first

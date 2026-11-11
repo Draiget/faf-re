@@ -18,7 +18,9 @@ namespace faf::server
   {
     constexpr std::size_t kMaxArmies = 64; // the id's source bits allow 255; a game has at most 16 armies and civilians
 
-    [[nodiscard]] bool IsCommander(const moho::REntityBlueprint* const blueprint)
+    [[nodiscard]] bool IsCommander(
+      const moho::REntityBlueprint* const blueprint
+    )
     {
       if (blueprint == nullptr) {
         return false;
@@ -31,7 +33,9 @@ namespace faf::server
       return false;
     }
 
-    [[nodiscard]] std::string Number(const double value)
+    [[nodiscard]] std::string Number(
+      const double value
+    )
     {
       if (!std::isfinite(value)) {
         return "null";
@@ -45,7 +49,11 @@ namespace faf::server
       return out == "-0" ? "0" : out;
     }
 
-    [[nodiscard]] double NumberIn(LuaPlus::LuaObject table, const char* const key, const double otherwise)
+    [[nodiscard]] double NumberIn(
+      LuaPlus::LuaObject table,
+      const char* const key,
+      const double otherwise
+    )
     {
       if (!table.IsTable()) {
         return otherwise;
@@ -55,7 +63,9 @@ namespace faf::server
     }
   } // namespace
 
-  CArmyBoard::SArmy& CArmyBoard::Army(const std::size_t index)
+  CArmyBoard::SArmy& CArmyBoard::Army(
+    const std::size_t index
+  )
   {
     if (index >= mArmies.size()) {
       mArmies.resize(index + 1u);
@@ -63,7 +73,9 @@ namespace faf::server
     return mArmies[index];
   }
 
-  void CArmyBoard::ReadPacket(const moho::SSyncData& packet)
+  void CArmyBoard::ReadPacket(
+    const moho::SSyncData& packet
+  )
   {
     std::size_t index = 0;
     for (const moho::SSTIArmyVariableData& update : packet.mArmyUpdates) {
@@ -86,7 +98,8 @@ namespace faf::server
       const std::size_t armyIndex = ArmyOfEntity(unit.mEntityId);
       if (armyIndex < kMaxArmies && IsCommander(unit.mBlueprint)) {
         SArmy& army = Army(armyIndex);
-        if (!army.acuSeen || !army.acuAlive) { // the first commander; a later one (a second ACU) doesn't replace a live one
+        if (!army.acuSeen || !army.acuAlive) { // the first commander; a later one (a second ACU) doesn't replace a live
+                                               // one
           army.acu = unit.mEntityId;
           army.acuSeen = true;
           army.acuAlive = true;
@@ -116,7 +129,9 @@ namespace faf::server
     }
   }
 
-  void CArmyBoard::ReadSync(const LuaPlus::LuaObject& syncIn)
+  void CArmyBoard::ReadSync(
+    const LuaPlus::LuaObject& syncIn
+  )
   {
     LuaPlus::LuaObject sync = syncIn;
     if (!sync.IsTable()) {
@@ -129,7 +144,10 @@ namespace faf::server
       while (!it.m_isDone) {
         const LuaPlus::LuaObject key = it.GetKey();
         LuaPlus::LuaObject entry = it.GetValue();
-        if (key.IsNumber() && key.GetNumber() >= 1.0 && key.GetNumber() <= static_cast<double>(kMaxArmies) && entry.IsTable()) {
+        if (
+          key.IsNumber() && key.GetNumber() >= 1.0 && key.GetNumber() <= static_cast<double>(kMaxArmies) &&
+          entry.IsTable()
+        ) {
           SArmy& army = Army(static_cast<std::size_t>(key.GetNumber()) - 1u);
           LuaPlus::LuaObject general = entry["general"];
           army.scoreSeen = true;
@@ -167,7 +185,10 @@ namespace faf::server
     }
   }
 
-  std::string CArmyBoard::Json(const int beat, const std::vector<SPlayer>& players) const
+  std::string CArmyBoard::Json(
+    const int beat,
+    const std::vector<SPlayer>& players
+  ) const
   {
     std::string out = "\"beat\":" + std::to_string(beat) + ",\"armies\":[";
     const std::size_t count = std::max(players.size(), mArmies.size());
@@ -192,9 +213,10 @@ namespace faf::server
       if (army.economySeen) {
         // Income is per tick in the sim (`GetEconomyIncome`); the game's UI shows it per second, ten ticks.
         out += ",\"mass\":{\"stored\":" + Number(army.massStored) + ",\"income\":" + Number(army.massIncome * 10.0) +
-               ",\"storage\":" + std::to_string(army.massStorage) + "}";
-        out += ",\"energy\":{\"stored\":" + Number(army.energyStored) + ",\"income\":" + Number(army.energyIncome * 10.0) +
-               ",\"storage\":" + std::to_string(army.energyStorage) + "}";
+          ",\"storage\":" + std::to_string(army.massStorage) + "}";
+        out += ",\"energy\":{\"stored\":" + Number(army.energyStored) +
+          ",\"income\":" + Number(army.energyIncome * 10.0) + ",\"storage\":" + std::to_string(army.energyStorage) +
+          "}";
       } else {
         out += ",\"mass\":null,\"energy\":null";
       }
@@ -204,8 +226,9 @@ namespace faf::server
         out += ",\"units\":null";
       }
       if (army.acuSeen) {
-        out += ",\"acu\":{\"alive\":" + std::string(army.acuAlive ? "true" : "false") + ",\"health\":" + Number(army.acuHealth) +
-               ",\"max_health\":" + Number(army.acuMaxHealth) + ",\"enhancements\":[";
+        out += ",\"acu\":{\"alive\":" + std::string(army.acuAlive ? "true" : "false") +
+          ",\"health\":" + Number(army.acuHealth) + ",\"max_health\":" + Number(army.acuMaxHealth) +
+          ",\"enhancements\":[";
         if (const auto found = mEnhancements.find(army.acu); found != mEnhancements.end()) {
           for (std::size_t n = 0; n < found->second.size(); ++n) {
             out += (n == 0 ? "" : ",") + JsonString(found->second[n]);
@@ -216,7 +239,8 @@ namespace faf::server
         out += ",\"acu\":null";
       }
       out += ",\"defeated\":" + std::string(army.defeated || army.outOfGame ? "true" : "false");
-      out += ",\"result\":" + (player != nullptr && !player->result.empty() ? JsonString(player->result) : std::string("null"));
+      out += ",\"result\":" +
+        (player != nullptr && !player->result.empty() ? JsonString(player->result) : std::string("null"));
       out += "}";
     }
     out += "]";

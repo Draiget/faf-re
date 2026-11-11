@@ -31,16 +31,19 @@ namespace
   [[maybe_unused]] constexpr float kPi = 3.1415927f;
   constexpr std::int16_t kInvalidCellPosComponent = static_cast<std::int16_t>(0x8000);
 
-  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  [[nodiscard]] moho::ETaskState NextTaskState(
+    const moho::ETaskState state
+  ) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
 
-  [[nodiscard]] bool IsValidCellPos(const moho::SOCellPos& cellPos) noexcept
+  [[nodiscard]] bool IsValidCellPos(
+    const moho::SOCellPos& cellPos
+  ) noexcept
   {
     return cellPos.x != kInvalidCellPosComponent && cellPos.z != kInvalidCellPosComponent;
   }
-
 
 } // namespace
 
@@ -117,108 +120,108 @@ namespace moho
 
     IAiTransport* const transport = transportUnit->AiTransport;
     switch (mTaskState) {
-      case TASKSTATE_Preparing: {
-        const bool transportLoading = transportUnit->IsUnitState(UNITSTATE_TransportLoading);
-        const bool commandHeadsMatch =
-          transportUnit->CommandQueue->GetCurrentCommand() == mUnit->CommandQueue->GetCurrentCommand();
-        const bool transportAssistMoving = transportUnit->IsUnitState(UNITSTATE_AssistMoving);
-        if (transportLoading && (commandHeadsMatch || transportAssistMoving)) {
-          mTaskState = NextTaskState(mTaskState);
-          return 3;
-        }
-        return 10;
+    case TASKSTATE_Preparing: {
+      const bool transportLoading = transportUnit->IsUnitState(UNITSTATE_TransportLoading);
+      const bool commandHeadsMatch =
+        transportUnit->CommandQueue->GetCurrentCommand() == mUnit->CommandQueue->GetCurrentCommand();
+      const bool transportAssistMoving = transportUnit->IsUnitState(UNITSTATE_AssistMoving);
+      if (transportLoading && (commandHeadsMatch || transportAssistMoving)) {
+        mTaskState = NextTaskState(mTaskState);
+        return 3;
       }
+      return 10;
+    }
 
-      case TASKSTATE_Waiting: {
-        if (!transport->TransportIsUnitAssignedForPickup(mUnit)) {
-          return -1;
-        }
-
-        mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskWaitingForTransport;
-        if (transport->TransportIsReadyForUnit(mUnit)) {
-          SOCellPos pickupCell = transportUnit->GetFootprint().ToCellPos(transportUnit->GetPosition());
-
-          bool hasMeleeSpace = false;
-          if (transportUnit->IsMobile()) {
-            const SFootprint& transportFootprint = transportUnit->GetFootprint();
-            std::uint8_t transportSize = transportFootprint.mSizeZ;
-            if (transportFootprint.mSizeX > transportFootprint.mSizeZ) {
-              transportSize = transportFootprint.mSizeX;
-            }
-
-            if (transportSize > 1u) {
-              hasMeleeSpace = mUnit->HasMeleeSpaceAroundLargeTarget(transportUnit, &pickupCell, 1);
-            } else {
-              hasMeleeSpace = mUnit->HasMeleeSpaceAroundSmallTarget(transportUnit, &pickupCell);
-            }
-          } else {
-            hasMeleeSpace = mUnit->HasMeleeSpaceAroundSmallTarget(transportUnit, &pickupCell);
-          }
-
-          if (!hasMeleeSpace || !IsValidCellPos(pickupCell)) {
-            return -1;
-          }
-
-          const Wm3::Vector3f pickupWorldPos = COORDS_ToWorldPos(mSim->mMapData, pickupCell, mUnit->GetFootprint());
-          const SCoordsVec2 pickupPosXZ{pickupWorldPos.x, pickupWorldPos.z};
-          gpg::Rect2i pickupRect{};
-          (void)COORDS_ToGridRect(&pickupRect, pickupPosXZ, mUnit->GetFootprint());
-          mUnit->ReserveOgridRect(pickupRect);
-          mTaskState = NextTaskState(mTaskState);
-          mIsOccupying = true;
-          NewMoveTask(SNavGoal(pickupCell), this, 0, nullptr, 0);
-        }
-        return 10;
-      }
-
-      case TASKSTATE_Starting: {
-        if (transport->TransportIsReadyForUnit(mUnit)) {
-          static constexpr Wm3::Vector3f kZeroFacing{0.0f, 0.0f, 0.0f};
-          mUnit->UnitMotion->SetFacing(kZeroFacing);
-          mUnit->UnitMotion->mHeight = gpg::pInf;
-
-          mSourceTransform = mUnit->GetTransform();
-          mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
-          mUnit->StartTransportBeamUp(mTargetTransportUnit, transport->TransportGetAttachBone(mUnit));
-          mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskTeleporting;
-          mTaskState = NextTaskState(mTaskState);
-        }
-        return 1;
-      }
-
-      case TASKSTATE_Processing: {
-        if (mBeamupTime > 1.0f) {
-          const float blend = (fa::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
-          mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
-          if (const RUnitBlueprint* const blueprint = mUnit->GetBlueprint(); blueprint != nullptr) {
-            mDestinationTransform.pos_.y -= blueprint->mSizeY;
-          }
-
-          VTransform interpolated{};
-          interpolated.pos_.x =
-            mSourceTransform.pos_.x + ((mDestinationTransform.pos_.x - mSourceTransform.pos_.x) * blend);
-          interpolated.pos_.y =
-            mSourceTransform.pos_.y + ((mDestinationTransform.pos_.y - mSourceTransform.pos_.y) * blend);
-          interpolated.pos_.z =
-            mSourceTransform.pos_.z + ((mDestinationTransform.pos_.z - mSourceTransform.pos_.z) * blend);
-          (void)SLERP(&mDestinationTransform.orient_, &mSourceTransform.orient_, &interpolated.orient_, blend);
-
-          mUnit->SetPendingTransform(interpolated, 1.0f);
-          mUnit->AdvanceCoords();
-          mBeamupTime -= 1.0f;
-          return 1;
-        }
-
-        (void)mUnit->RunScript("OnStopTransportBeamUp");
-        mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTeleporting;
-        if (transport->TransportAttachUnit(mUnit)) {
-          mHasBeamupDestination = true;
-        }
+    case TASKSTATE_Waiting: {
+      if (!transport->TransportIsUnitAssignedForPickup(mUnit)) {
         return -1;
       }
 
-      default:
+      mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskWaitingForTransport;
+      if (transport->TransportIsReadyForUnit(mUnit)) {
+        SOCellPos pickupCell = transportUnit->GetFootprint().ToCellPos(transportUnit->GetPosition());
+
+        bool hasMeleeSpace = false;
+        if (transportUnit->IsMobile()) {
+          const SFootprint& transportFootprint = transportUnit->GetFootprint();
+          std::uint8_t transportSize = transportFootprint.mSizeZ;
+          if (transportFootprint.mSizeX > transportFootprint.mSizeZ) {
+            transportSize = transportFootprint.mSizeX;
+          }
+
+          if (transportSize > 1u) {
+            hasMeleeSpace = mUnit->HasMeleeSpaceAroundLargeTarget(transportUnit, &pickupCell, 1);
+          } else {
+            hasMeleeSpace = mUnit->HasMeleeSpaceAroundSmallTarget(transportUnit, &pickupCell);
+          }
+        } else {
+          hasMeleeSpace = mUnit->HasMeleeSpaceAroundSmallTarget(transportUnit, &pickupCell);
+        }
+
+        if (!hasMeleeSpace || !IsValidCellPos(pickupCell)) {
+          return -1;
+        }
+
+        const Wm3::Vector3f pickupWorldPos = COORDS_ToWorldPos(mSim->mMapData, pickupCell, mUnit->GetFootprint());
+        const SCoordsVec2 pickupPosXZ{pickupWorldPos.x, pickupWorldPos.z};
+        gpg::Rect2i pickupRect{};
+        (void)COORDS_ToGridRect(&pickupRect, pickupPosXZ, mUnit->GetFootprint());
+        mUnit->ReserveOgridRect(pickupRect);
+        mTaskState = NextTaskState(mTaskState);
+        mIsOccupying = true;
+        NewMoveTask(SNavGoal(pickupCell), this, 0, nullptr, 0);
+      }
+      return 10;
+    }
+
+    case TASKSTATE_Starting: {
+      if (transport->TransportIsReadyForUnit(mUnit)) {
+        static constexpr Wm3::Vector3f kZeroFacing{0.0f, 0.0f, 0.0f};
+        mUnit->UnitMotion->SetFacing(kZeroFacing);
+        mUnit->UnitMotion->mHeight = gpg::pInf;
+
+        mSourceTransform = mUnit->GetTransform();
+        mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
+        mUnit->StartTransportBeamUp(mTargetTransportUnit, transport->TransportGetAttachBone(mUnit));
+        mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskTeleporting;
+        mTaskState = NextTaskState(mTaskState);
+      }
+      return 1;
+    }
+
+    case TASKSTATE_Processing: {
+      if (mBeamupTime > 1.0f) {
+        const float blend = (fa::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
+        mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
+        if (const RUnitBlueprint* const blueprint = mUnit->GetBlueprint(); blueprint != nullptr) {
+          mDestinationTransform.pos_.y -= blueprint->mSizeY;
+        }
+
+        VTransform interpolated{};
+        interpolated.pos_.x =
+          mSourceTransform.pos_.x + ((mDestinationTransform.pos_.x - mSourceTransform.pos_.x) * blend);
+        interpolated.pos_.y =
+          mSourceTransform.pos_.y + ((mDestinationTransform.pos_.y - mSourceTransform.pos_.y) * blend);
+        interpolated.pos_.z =
+          mSourceTransform.pos_.z + ((mDestinationTransform.pos_.z - mSourceTransform.pos_.z) * blend);
+        (void)SLERP(&mDestinationTransform.orient_, &mSourceTransform.orient_, &interpolated.orient_, blend);
+
+        mUnit->SetPendingTransform(interpolated, 1.0f);
+        mUnit->AdvanceCoords();
+        mBeamupTime -= 1.0f;
         return 1;
+      }
+
+      (void)mUnit->RunScript("OnStopTransportBeamUp");
+      mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTeleporting;
+      if (transport->TransportAttachUnit(mUnit)) {
+        mHasBeamupDestination = true;
+      }
+      return -1;
+    }
+
+    default:
+      return 1;
     }
   }
 
@@ -250,7 +253,10 @@ namespace moho
    * weak pointer, snapshots source/destination transforms, and sets owner-unit
    * transport-pending state.
    */
-  CUnitCallLandTransport::CUnitCallLandTransport(CCommandTask* const parentTask, Unit* const transportUnit)
+  CUnitCallLandTransport::CUnitCallLandTransport(
+    CCommandTask* const parentTask,
+    Unit* const transportUnit
+  )
     : CCommandTask(parentTask)
     , mTargetTransportUnit(transportUnit)
   {
@@ -277,7 +283,11 @@ namespace moho
    * What it does:
    * Loads base command-task state plus land-transport serialization fields.
    */
-  void CUnitCallLandTransport::MemberDeserialize(gpg::ReadArchive* const archive, int, const gpg::RRef&)
+  void CUnitCallLandTransport::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    int,
+    const gpg::RRef&
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -300,7 +310,11 @@ namespace moho
    * What it does:
    * Saves base command-task state plus land-transport serialization fields.
    */
-  void CUnitCallLandTransport::MemberSerialize(gpg::WriteArchive* const archive, int, const gpg::RRef&) const
+  void CUnitCallLandTransport::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    int,
+    const gpg::RRef&
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -328,7 +342,10 @@ namespace gpg
    * Builds one typed reflection reference for `moho::CUnitCallLandTransport*`,
    * preserving dynamic-derived ownership and base-offset adjustment.
    */
-  gpg::RRef* RRef_CUnitCallLandTransport(gpg::RRef* const outRef, moho::CUnitCallLandTransport* const value)
+  gpg::RRef* RRef_CUnitCallLandTransport(
+    gpg::RRef* const outRef,
+    moho::CUnitCallLandTransport* const value
+  )
   {
     return gpg::WriteDerivedRef(outRef, value);
   }

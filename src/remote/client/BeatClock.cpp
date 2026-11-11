@@ -13,7 +13,10 @@ namespace faf::remote::client
   } // namespace
 
   void CBeatClock::OnFrame(
-    const std::uint32_t beat, const std::int32_t simRate, const std::uint32_t serverMs, const double localSeconds
+    const std::uint32_t beat,
+    const std::int32_t simRate,
+    const std::uint32_t serverMs,
+    const double localSeconds
   ) noexcept
   {
     if (mFrames != 0u && beat > mLastBeat) {

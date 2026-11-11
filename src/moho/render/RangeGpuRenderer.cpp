@@ -83,11 +83,15 @@ namespace moho
         desc.stencil.writeMask = 0x7FU;
         desc.stencil.reference = 0xFFU;
         desc.stencil.front = {
-          gpg::gal::GpuStencilOp::Zero, gpg::gal::GpuStencilOp::Increment, gpg::gal::GpuStencilOp::Keep,
+          gpg::gal::GpuStencilOp::Zero,
+          gpg::gal::GpuStencilOp::Increment,
+          gpg::gal::GpuStencilOp::Keep,
           gpg::gal::GpuCompare::NotEqual
         };
         desc.stencil.back = {
-          gpg::gal::GpuStencilOp::Keep, gpg::gal::GpuStencilOp::Decrement, gpg::gal::GpuStencilOp::Keep,
+          gpg::gal::GpuStencilOp::Keep,
+          gpg::gal::GpuStencilOp::Decrement,
+          gpg::gal::GpuStencilOp::Keep,
           gpg::gal::GpuCompare::NotEqual
         };
         mProgram = device->CreateGpuProgram(desc);
@@ -97,7 +101,9 @@ namespace moho
     return mSupported;
   }
 
-  bool RangeGpuRenderer::RefreshCylinder(RangeRenderer& renderer)
+  bool RangeGpuRenderer::RefreshCylinder(
+    RangeRenderer& renderer
+  )
   {
     gpg::gal::VertexBuffer* const source = renderer.mGeometry.mVertexBuffer.get();
     if (source == nullptr) {
@@ -126,7 +132,10 @@ namespace moho
     return mCylinder != nullptr;
   }
 
-  bool RangeGpuRenderer::Upload(RangeRenderer& renderer, const std::span<const SRangeExtractionPayload> payloads)
+  bool RangeGpuRenderer::Upload(
+    RangeRenderer& renderer,
+    const std::span<const SRangeExtractionPayload> payloads
+  )
   {
     if (!mSupported || mDevice == nullptr || renderer.mGeometry.mIndexBuffer == nullptr || !RefreshCylinder(renderer)) {
       return false;
@@ -139,7 +148,10 @@ namespace moho
   }
 
   void RangeGpuRenderer::Cast(
-    const RangeRenderer& renderer, const GeomCamera3& camera, const std::uint32_t first, const std::uint32_t count
+    const RangeRenderer& renderer,
+    const GeomCamera3& camera,
+    const std::uint32_t first,
+    const std::uint32_t count
   )
   {
     if (count == 0U || mPayloadBuffer == nullptr) {

@@ -13,7 +13,9 @@ namespace faf::editor
 {
   namespace
   {
-    int Grow(ImGuiInputTextCallbackData* const data)
+    int Grow(
+      ImGuiInputTextCallbackData* const data
+    )
     {
       if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
         auto* const text = static_cast<std::string*>(data->UserData);
@@ -24,27 +26,29 @@ namespace faf::editor
     }
 
     // Colours as VS Code's dark theme has them, which most mappers know.
-    ImU32 ColourOf(const LuaSpanKind kind)
+    ImU32 ColourOf(
+      const LuaSpanKind kind
+    )
     {
       switch (kind) {
-        case LuaSpanKind::Keyword:
-          return IM_COL32(197, 134, 192, 255);
-        case LuaSpanKind::Constant:
-          return IM_COL32(86, 156, 214, 255);
-        case LuaSpanKind::String:
-          return IM_COL32(206, 145, 120, 255);
-        case LuaSpanKind::Comment:
-          return IM_COL32(106, 153, 85, 255);
-        case LuaSpanKind::Number:
-          return IM_COL32(181, 206, 168, 255);
-        case LuaSpanKind::Call:
-          return IM_COL32(220, 220, 170, 255);
-        case LuaSpanKind::Engine:
-          return IM_COL32(78, 201, 176, 255);
-        case LuaSpanKind::Operator:
-          return IM_COL32(180, 180, 180, 255);
-        default:
-          return IM_COL32(212, 212, 212, 255);
+      case LuaSpanKind::Keyword:
+        return IM_COL32(197, 134, 192, 255);
+      case LuaSpanKind::Constant:
+        return IM_COL32(86, 156, 214, 255);
+      case LuaSpanKind::String:
+        return IM_COL32(206, 145, 120, 255);
+      case LuaSpanKind::Comment:
+        return IM_COL32(106, 153, 85, 255);
+      case LuaSpanKind::Number:
+        return IM_COL32(181, 206, 168, 255);
+      case LuaSpanKind::Call:
+        return IM_COL32(220, 220, 170, 255);
+      case LuaSpanKind::Engine:
+        return IM_COL32(78, 201, 176, 255);
+      case LuaSpanKind::Operator:
+        return IM_COL32(180, 180, 180, 255);
+      default:
+        return IM_COL32(212, 212, 212, 255);
       }
     }
 
@@ -60,12 +64,19 @@ namespace faf::editor
     int gScrollTo = 0;
   } // namespace
 
-  void LuaCodeScrollTo(const int line)
+  void LuaCodeScrollTo(
+    const int line
+  )
   {
     gScrollTo = line;
   }
 
-  bool LuaCodeInput(const char* const id, std::string& text, const int errorLine, const float height)
+  bool LuaCodeInput(
+    const char* const id,
+    std::string& text,
+    const int errorLine,
+    const float height
+  )
   {
     static Cache cache;
     ImGui::PushFont(gMonoFont, 0.0f);
@@ -85,12 +96,20 @@ namespace faf::editor
     // A code editor's dark ground (the theme's blue frame is for fields), the selection as VS Code shows it.
     ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(30, 30, 30, 255));
     ImGui::PushStyleColor(ImGuiCol_TextSelectedBg, IM_COL32(38, 79, 120, 255));
-    const bool changed = ImGui::InputTextMultiline(id, text.data(), text.capacity() + 1, ImVec2(-1.0f, height),
-                                                   ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize, &Grow, &text);
+    const bool changed = ImGui::InputTextMultiline(
+      id,
+      text.data(),
+      text.capacity() + 1,
+      ImVec2(-1.0f, height),
+      ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
+      &Grow,
+      &text
+    );
     ImGui::PopStyleColor(4);
     const ImGuiID inputId = ImGui::GetItemID();
 
-    // Its child window (InputTextMultiline's own, named as BeginChildEx names it): where the text lies and how far scrolled.
+    // Its child window (InputTextMultiline's own, named as BeginChildEx names it): where the text lies and how far
+    // scrolled.
     ImGuiWindow* const parent = ImGui::GetCurrentWindow();
     char childName[512];
     ImFormatString(childName, sizeof(childName), "%s/%s_%08X", parent->Name, id, inputId);
@@ -122,26 +141,34 @@ namespace faf::editor
     if (const ImGuiInputTextState* const state = ImGui::GetInputTextState(inputId); state != nullptr) {
       scrollX = state->Scroll.x;
     }
-    const ImVec2 origin(child->Pos.x + style.FramePadding.x - scrollX, child->Pos.y + style.FramePadding.y - child->Scroll.y);
+    const ImVec2 origin(
+      child->Pos.x + style.FramePadding.x - scrollX, child->Pos.y + style.FramePadding.y - child->Scroll.y
+    );
     const ImRect clip = child->InnerClipRect;
     ImDrawList* const dl = child->DrawList;
     ImFont* const font = ImGui::GetFont();
     const float size = ImGui::GetFontSize();
     dl->PushClipRect(clip.Min, clip.Max, false);
     const int first = std::max(0, static_cast<int>((child->Scroll.y - style.FramePadding.y) / lineHeight));
-    const int last = std::min(static_cast<int>(cache.lineStarts.size()) - 1, first + static_cast<int>(height / lineHeight) + 2);
+    const int last =
+      std::min(static_cast<int>(cache.lineStarts.size()) - 1, first + static_cast<int>(height / lineHeight) + 2);
     // The first span reaching the first visible line.
     std::size_t s = 0;
     if (first <= last && !cache.spans.empty()) {
       const std::size_t from = cache.lineStarts[static_cast<std::size_t>(first)];
-      s = static_cast<std::size_t>(std::upper_bound(cache.spans.begin(), cache.spans.end(), from,
-                                                    [](const std::size_t at, const LuaSpan& span) { return at < span.end; }) -
-                                   cache.spans.begin());
+      s =
+        static_cast<std::size_t>(
+          std::upper_bound(cache.spans.begin(), cache.spans.end(), from, [](const std::size_t at, const LuaSpan& span) {
+        return at < span.end;
+      }) - cache.spans.begin()
+        );
     }
     const char* const base = text.c_str();
     for (int line = first; line <= last; ++line) {
       const std::size_t lineStart = cache.lineStarts[static_cast<std::size_t>(line)];
-      std::size_t lineEnd = line + 1 < static_cast<int>(cache.lineStarts.size()) ? cache.lineStarts[static_cast<std::size_t>(line) + 1] - 1 : text.size();
+      std::size_t lineEnd = line + 1 < static_cast<int>(cache.lineStarts.size())
+        ? cache.lineStarts[static_cast<std::size_t>(line) + 1] - 1
+        : text.size();
       lineEnd = std::min(lineEnd, text.size());
       const float y = origin.y + static_cast<float>(line) * lineHeight;
       if (line + 1 == errorLine) {
@@ -155,7 +182,15 @@ namespace faf::editor
         if (b > a) {
           const float width = font->CalcTextSizeA(size, FLT_MAX, 0.0f, base + a, base + b).x;
           if (x + width >= clip.Min.x && x <= clip.Max.x) {
-            font->RenderText(dl, size, ImVec2(x, y), ColourOf(span.kind), ImVec4(clip.Min.x, clip.Min.y, clip.Max.x, clip.Max.y), base + a, base + b);
+            font->RenderText(
+              dl,
+              size,
+              ImVec2(x, y),
+              ColourOf(span.kind),
+              ImVec4(clip.Min.x, clip.Min.y, clip.Max.x, clip.Max.y),
+              base + a,
+              base + b
+            );
           }
           x += width;
         }
@@ -169,13 +204,18 @@ namespace faf::editor
 
     // Line numbers, beside the visible lines.
     ImDrawList* const gutter = ImGui::GetWindowDrawList();
-    gutter->PushClipRect(ImVec2(gutterAt.x, child->Pos.y), ImVec2(gutterAt.x + gutterWidth, child->Pos.y + child->Size.y), true);
+    gutter->PushClipRect(
+      ImVec2(gutterAt.x, child->Pos.y), ImVec2(gutterAt.x + gutterWidth, child->Pos.y + child->Size.y), true
+    );
     for (int line = first; line <= last; ++line) {
       const std::string number = std::to_string(line + 1);
       const float y = origin.y + static_cast<float>(line) * lineHeight;
       const float w = ImGui::CalcTextSize(number.c_str()).x;
-      gutter->AddText(ImVec2(gutterAt.x + gutterWidth - 8.0f - w, y),
-                      line + 1 == errorLine ? IM_COL32(240, 110, 90, 255) : IM_COL32(110, 118, 129, 255), number.c_str());
+      gutter->AddText(
+        ImVec2(gutterAt.x + gutterWidth - 8.0f - w, y),
+        line + 1 == errorLine ? IM_COL32(240, 110, 90, 255) : IM_COL32(110, 118, 129, 255),
+        number.c_str()
+      );
     }
     gutter->PopClipRect();
     ImGui::PopFont();

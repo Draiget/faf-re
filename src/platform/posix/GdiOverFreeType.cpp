@@ -44,7 +44,11 @@ namespace
 
   struct GdiObject
   {
-    explicit GdiObject(const GdiKind kind) : mKind(kind) {}
+    explicit GdiObject(
+      const GdiKind kind
+    )
+      : mKind(kind)
+    {}
     virtual ~GdiObject() = default;
     const GdiKind mKind;
   };
@@ -62,7 +66,9 @@ namespace
 
   struct FontObject final : GdiObject
   {
-    FontObject() : GdiObject(GdiKind::Font) {}
+    FontObject()
+      : GdiObject(GdiKind::Font)
+    {}
     ~FontObject() override
     {
       if (mFace != nullptr) {
@@ -80,7 +86,9 @@ namespace
 
   struct BitmapObject final : GdiObject
   {
-    BitmapObject() : GdiObject(GdiKind::Bitmap) {}
+    BitmapObject()
+      : GdiObject(GdiKind::Bitmap)
+    {}
     int mWidth = 0;
     int mHeight = 0;
     std::vector<std::uint32_t> mPixels; // B, G, R, X bytes, as a 32-bit DIB
@@ -88,7 +96,9 @@ namespace
 
   struct DcObject final : GdiObject
   {
-    DcObject() : GdiObject(GdiKind::Dc) {}
+    DcObject()
+      : GdiObject(GdiKind::Dc)
+    {}
     FontObject* mFont = nullptr;
     BitmapObject* mBitmap = nullptr;
     UINT mAlign = 0;
@@ -98,7 +108,12 @@ namespace
 
   struct BrushObject final : GdiObject
   {
-    explicit BrushObject(const COLORREF color) : GdiObject(GdiKind::Brush), mColor(color) {}
+    explicit BrushObject(
+      const COLORREF color
+    )
+      : GdiObject(GdiKind::Brush)
+      , mColor(color)
+    {}
     const COLORREF mColor;
   };
 
@@ -115,13 +130,18 @@ namespace
   }
 
   template <class T>
-  [[nodiscard]] T* As(void* const handle, const GdiKind kind)
+  [[nodiscard]] T* As(
+    void* const handle,
+    const GdiKind kind
+  )
   {
     auto* const object = static_cast<GdiObject*>(handle);
     return object != nullptr && object->mKind == kind ? static_cast<T*>(object) : nullptr;
   }
 
-  [[nodiscard]] std::string Lower(std::string text)
+  [[nodiscard]] std::string Lower(
+    std::string text
+  )
   {
     for (char& character : text) {
       if (character >= 'A' && character <= 'Z') {
@@ -132,7 +152,9 @@ namespace
   }
 
   /// A 'name' table string: UTF-16BE for the Windows and Unicode platforms, single bytes otherwise.
-  [[nodiscard]] std::wstring DecodeName(const FT_SfntName& name)
+  [[nodiscard]] std::wstring DecodeName(
+    const FT_SfntName& name
+  )
   {
     std::wstring text;
     if (name.platform_id == TT_PLATFORM_MICROSOFT || name.platform_id == TT_PLATFORM_APPLE_UNICODE) {
@@ -147,7 +169,9 @@ namespace
     return text;
   }
 
-  [[nodiscard]] std::string Narrow(const std::wstring& text)
+  [[nodiscard]] std::string Narrow(
+    const std::wstring& text
+  )
   {
     std::string narrow;
     for (const wchar_t character : text) {
@@ -156,7 +180,10 @@ namespace
     return narrow;
   }
 
-  void AddName(std::vector<std::string>& names, const std::string& name)
+  void AddName(
+    std::vector<std::string>& names,
+    const std::string& name
+  )
   {
     const std::string lower = Lower(name);
     if (!lower.empty() && std::find(names.begin(), names.end(), lower) == names.end()) {
@@ -164,18 +191,26 @@ namespace
     }
   }
 
-  [[nodiscard]] FT_Face OpenFace(const std::vector<unsigned char>& bytes, const FT_Long index)
+  [[nodiscard]] FT_Face OpenFace(
+    const std::vector<unsigned char>& bytes,
+    const FT_Long index
+  )
   {
     FT_Face face = nullptr;
-    if (Library() == nullptr ||
-        FT_New_Memory_Face(Library(), bytes.data(), static_cast<FT_Long>(bytes.size()), index, &face) != 0) {
+    if (
+      Library() == nullptr ||
+      FT_New_Memory_Face(Library(), bytes.data(), static_cast<FT_Long>(bytes.size()), index, &face) != 0
+    ) {
       return nullptr;
     }
     return face;
   }
 
   /// Registers every face in `bytes`; returns how many.
-  DWORD RegisterFaces(const void* const registration, std::shared_ptr<const std::vector<unsigned char>> bytes)
+  DWORD RegisterFaces(
+    const void* const registration,
+    std::shared_ptr<const std::vector<unsigned char>> bytes
+  )
   {
     const FT_Face first = OpenFace(*bytes, 0);
     if (first == nullptr) {
@@ -205,7 +240,10 @@ namespace
           const std::wstring decoded = DecodeName(name);
           AddName(entry.mNames, Narrow(decoded));
           // GDI reports the Windows-platform family name (ID 1).
-          if (name.name_id == TT_NAME_ID_FONT_FAMILY && (entry.mFamily.empty() || name.platform_id == TT_PLATFORM_MICROSOFT)) {
+          if (
+            name.name_id == TT_NAME_ID_FONT_FAMILY &&
+            (entry.mFamily.empty() || name.platform_id == TT_PLATFORM_MICROSOFT)
+          ) {
             entry.mFamily = decoded;
           }
         }
@@ -226,7 +264,9 @@ namespace
   }
 
   /// A registered face of `family`, upright and regular when there is one.
-  [[nodiscard]] const RegisteredFace* FindFace(const std::string& family)
+  [[nodiscard]] const RegisteredFace* FindFace(
+    const std::string& family
+  )
   {
     const std::string wanted = Lower(family);
     const RegisteredFace* styled = nullptr;
@@ -245,7 +285,9 @@ namespace
   }
 
   /// Windows' core fonts are not on Linux: their metric-compatible stand-ins, then any sans face.
-  [[nodiscard]] const RegisteredFace* FindSystemFace(const std::string& family)
+  [[nodiscard]] const RegisteredFace* FindSystemFace(
+    const std::string& family
+  )
   {
     static const char* const kCandidates[] = {
       "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
@@ -286,17 +328,24 @@ namespace
     return gFaces.empty() ? nullptr : &gFaces.front();
   }
 
-  [[nodiscard]] LONG Scaled(const double units, const double scale)
+  [[nodiscard]] LONG Scaled(
+    const double units,
+    const double scale
+  )
   {
     return static_cast<LONG>(std::lround(units * scale));
   }
 
   /// GDI's TEXTMETRIC for a TrueType face at `emPixels`.
-  void ComputeMetrics(FontObject& font, const int emPixels)
+  void ComputeMetrics(
+    FontObject& font,
+    const int emPixels
+  )
   {
     const FT_Face face = font.mFace;
     TEXTMETRICW& metrics = font.mMetrics;
-    const double scale = static_cast<double>(emPixels) / static_cast<double>(face->units_per_EM != 0 ? face->units_per_EM : 2048);
+    const double scale =
+      static_cast<double>(emPixels) / static_cast<double>(face->units_per_EM != 0 ? face->units_per_EM : 2048);
     const auto* const os2 = static_cast<const TT_OS2*>(FT_Get_Sfnt_Table(face, FT_SFNT_OS2));
     const auto* const hhea = static_cast<const TT_HoriHeader*>(FT_Get_Sfnt_Table(face, FT_SFNT_HHEA));
 
@@ -323,7 +372,8 @@ namespace
     const FT_ULong firstChar = FT_Get_First_Char(face, &glyphIndex);
     metrics.tmFirstChar = static_cast<WCHAR>((std::min<FT_ULong>)(firstChar, 0xFFFFu));
     FT_ULong lastChar = firstChar;
-    for (FT_ULong code = firstChar; glyphIndex != 0 && code <= 0xFFFFu; code = FT_Get_Next_Char(face, code, &glyphIndex)) {
+    for (FT_ULong code = firstChar; glyphIndex != 0 && code <= 0xFFFFu;
+         code = FT_Get_Next_Char(face, code, &glyphIndex)) {
       lastChar = code;
     }
     metrics.tmLastChar = static_cast<WCHAR>(lastChar);
@@ -331,17 +381,22 @@ namespace
     metrics.tmBreakChar = static_cast<WCHAR>(0x20u);
     metrics.tmItalic = (face->style_flags & FT_STYLE_FLAG_ITALIC) != 0 ? 1u : 0u;
     // Bit 0 set means a variable-pitch font (the name is GDI's, the meaning inverted).
-    metrics.tmPitchAndFamily = static_cast<BYTE>(TMPF_TRUETYPE | TMPF_VECTOR | (FT_IS_FIXED_WIDTH(face) ? 0u : TMPF_FIXED_PITCH));
+    metrics.tmPitchAndFamily =
+      static_cast<BYTE>(TMPF_TRUETYPE | TMPF_VECTOR | (FT_IS_FIXED_WIDTH(face) ? 0u : TMPF_FIXED_PITCH));
     metrics.tmCharSet = 1u; // DEFAULT_CHARSET, as CreateFontA asked
   }
 
-  [[nodiscard]] std::uint16_t ReadU16(const unsigned char* const bytes)
+  [[nodiscard]] std::uint16_t ReadU16(
+    const unsigned char* const bytes
+  )
   {
     return static_cast<std::uint16_t>((bytes[0] << 8) | bytes[1]);
   }
 
   /// The 'kern' table's horizontal format-0 pairs, per character, scaled to pixels.
-  void ReadKerning(FontObject& font)
+  void ReadKerning(
+    FontObject& font
+  )
   {
     font.mKerningRead = true;
     const FT_Face face = font.mFace;
@@ -396,7 +451,10 @@ namespace
   constexpr FT_Int32 kLoadFlags = FT_LOAD_TARGET_LIGHT;
 
   /// A character's advance in whole pixels, as GDI reports it.
-  [[nodiscard]] int Advance(const FT_Face face, const wchar_t character)
+  [[nodiscard]] int Advance(
+    const FT_Face face,
+    const wchar_t character
+  )
   {
     if (FT_Load_Char(face, static_cast<FT_ULong>(character), kLoadFlags) != 0) {
       return 0;
@@ -404,7 +462,9 @@ namespace
     return static_cast<int>((face->glyph->advance.x + 32) >> 6);
   }
 
-  [[nodiscard]] std::uint32_t ToPixel(const COLORREF color)
+  [[nodiscard]] std::uint32_t ToPixel(
+    const COLORREF color
+  )
   {
     const std::uint32_t red = color & 0xFFu;
     const std::uint32_t green = (color >> 8) & 0xFFu;
@@ -412,17 +472,30 @@ namespace
     return blue | (green << 8) | (red << 16);
   }
 
-  void Fill(BitmapObject& bitmap, const int left, const int top, const int right, const int bottom, const std::uint32_t pixel)
+  void Fill(
+    BitmapObject& bitmap,
+    const int left,
+    const int top,
+    const int right,
+    const int bottom,
+    const std::uint32_t pixel
+  )
   {
     for (int y = (std::max)(top, 0); y < (std::min)(bottom, bitmap.mHeight); ++y) {
       for (int x = (std::max)(left, 0); x < (std::min)(right, bitmap.mWidth); ++x) {
-        bitmap.mPixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(bitmap.mWidth) + static_cast<std::size_t>(x)] = pixel;
+        bitmap.mPixels
+          [static_cast<std::size_t>(y) * static_cast<std::size_t>(bitmap.mWidth) + static_cast<std::size_t>(x)] = pixel;
       }
     }
   }
 
   /// Draws `character` with its origin at (penX, baseline): coverage blends the text colour over the background.
-  void DrawGlyph(DcObject& dc, const int penX, const int baseline, const wchar_t character)
+  void DrawGlyph(
+    DcObject& dc,
+    const int penX,
+    const int baseline,
+    const wchar_t character
+  )
   {
     BitmapObject& bitmap = *dc.mBitmap;
     const FT_Face face = dc.mFont->mFace;
@@ -432,11 +505,13 @@ namespace
     const FT_GlyphSlot slot = face->glyph;
     const FT_Bitmap& glyph = slot->bitmap;
     const int text[3] = {
-      static_cast<int>(dc.mTextColor & 0xFFu), static_cast<int>((dc.mTextColor >> 8) & 0xFFu),
+      static_cast<int>(dc.mTextColor & 0xFFu),
+      static_cast<int>((dc.mTextColor >> 8) & 0xFFu),
       static_cast<int>((dc.mTextColor >> 16) & 0xFFu)
     };
     const int background[3] = {
-      static_cast<int>(dc.mBkColor & 0xFFu), static_cast<int>((dc.mBkColor >> 8) & 0xFFu),
+      static_cast<int>(dc.mBkColor & 0xFFu),
+      static_cast<int>((dc.mBkColor >> 8) & 0xFFu),
       static_cast<int>((dc.mBkColor >> 16) & 0xFFu)
     };
     for (unsigned int row = 0; row < glyph.rows; ++row) {
@@ -463,14 +538,20 @@ namespace
         for (int index = 0; index < 3; ++index) {
           channel[index] = (text[index] * coverage + background[index] * (255 - coverage) + 127) / 255;
         }
-        bitmap.mPixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(bitmap.mWidth) + static_cast<std::size_t>(x)] =
+        bitmap.mPixels
+          [static_cast<std::size_t>(y) * static_cast<std::size_t>(bitmap.mWidth) + static_cast<std::size_t>(x)] =
           ToPixel(RGB(channel[0], channel[1], channel[2]));
       }
     }
   }
 } // namespace
 
-HANDLE AddFontMemResourceEx(void* const fontData, const DWORD size, void* const reserved, DWORD* const fontCount)
+HANDLE AddFontMemResourceEx(
+  void* const fontData,
+  const DWORD size,
+  void* const reserved,
+  DWORD* const fontCount
+)
 {
   (void)reserved;
   if (fontData == nullptr || size == 0u || fontCount == nullptr) {
@@ -486,7 +567,9 @@ HANDLE AddFontMemResourceEx(void* const fontData, const DWORD size, void* const 
   return *fontCount != 0u ? const_cast<void*>(registration) : nullptr;
 }
 
-BOOL RemoveFontMemResourceEx(const HANDLE fontHandle)
+BOOL RemoveFontMemResourceEx(
+  const HANDLE fontHandle
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   const auto removed = std::remove_if(gFaces.begin(), gFaces.end(), [fontHandle](const RegisteredFace& face) {
@@ -498,9 +581,20 @@ BOOL RemoveFontMemResourceEx(const HANDLE fontHandle)
 }
 
 HFONT CreateFontA(
-  const int height, const int width, const int escapement, const int orientation, const int weight, const DWORD italic,
-  const DWORD underline, const DWORD strikeOut, const DWORD charSet, const DWORD outPrecision, const DWORD clipPrecision,
-  const DWORD quality, const DWORD pitchAndFamily, const char* const faceName
+  const int height,
+  const int width,
+  const int escapement,
+  const int orientation,
+  const int weight,
+  const DWORD italic,
+  const DWORD underline,
+  const DWORD strikeOut,
+  const DWORD charSet,
+  const DWORD outPrecision,
+  const DWORD clipPrecision,
+  const DWORD quality,
+  const DWORD pitchAndFamily,
+  const char* const faceName
 )
 {
   // The width, angles, weight, styles and precisions CD3DFont passes are all GDI's defaults.
@@ -528,8 +622,9 @@ HFONT CreateFontA(
   if (height > 0) {
     const auto* const os2 = static_cast<const TT_OS2*>(FT_Get_Sfnt_Table(font->mFace, FT_SFNT_OS2));
     const double cellUnits = os2 != nullptr && os2->version != 0xFFFFu ? os2->usWinAscent + os2->usWinDescent
-                                                                      : font->mFace->ascender - font->mFace->descender;
-    emPixels = (std::max)(1, static_cast<int>(std::lround(height * static_cast<double>(font->mFace->units_per_EM) / cellUnits)));
+                                                                       : font->mFace->ascender - font->mFace->descender;
+    emPixels =
+      (std::max)(1, static_cast<int>(std::lround(height * static_cast<double>(font->mFace->units_per_EM) / cellUnits)));
   }
   if (FT_Set_Pixel_Sizes(font->mFace, 0, static_cast<FT_UInt>(emPixels)) != 0) {
     return nullptr;
@@ -538,13 +633,21 @@ HFONT CreateFontA(
   return font.release();
 }
 
-HDC CreateCompatibleDC(const HDC dc)
+HDC CreateCompatibleDC(
+  const HDC dc
+)
 {
   (void)dc;
   return new DcObject();
 }
 
-HBITMAP CreateBitmap(const int width, const int height, const UINT planes, const UINT bitsPerPixel, const void* const bits)
+HBITMAP CreateBitmap(
+  const int width,
+  const int height,
+  const UINT planes,
+  const UINT bitsPerPixel,
+  const void* const bits
+)
 {
   if (width <= 0 || height <= 0 || planes != 1u || bitsPerPixel != 32u) {
     return nullptr; // the only kind CD3DFont makes
@@ -559,7 +662,10 @@ HBITMAP CreateBitmap(const int width, const int height, const UINT planes, const
   return bitmap;
 }
 
-HGDIOBJ SelectObject(const HDC dcHandle, const HGDIOBJ object)
+HGDIOBJ SelectObject(
+  const HDC dcHandle,
+  const HGDIOBJ object
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   DcObject* const dc = As<DcObject>(dcHandle, GdiKind::Dc);
@@ -585,19 +691,23 @@ namespace
   BrushObject gWhiteBrush(RGB(255, 255, 255));
 } // namespace
 
-HGDIOBJ GetStockObject(const int object)
+HGDIOBJ GetStockObject(
+  const int object
+)
 {
   switch (object) {
-    case BLACK_BRUSH:
-      return &gBlackBrush;
-    case 0: // WHITE_BRUSH
-      return &gWhiteBrush;
-    default:
-      return nullptr;
+  case BLACK_BRUSH:
+    return &gBlackBrush;
+  case 0: // WHITE_BRUSH
+    return &gWhiteBrush;
+  default:
+    return nullptr;
   }
 }
 
-BOOL DeleteObject(const HGDIOBJ object)
+BOOL DeleteObject(
+  const HGDIOBJ object
+)
 {
   if (object == nullptr || object == &gBlackBrush || object == &gWhiteBrush) {
     return object != nullptr ? TRUE : FALSE;
@@ -607,12 +717,18 @@ BOOL DeleteObject(const HGDIOBJ object)
   return TRUE;
 }
 
-BOOL DeleteDC(const HDC dc)
+BOOL DeleteDC(
+  const HDC dc
+)
 {
   return DeleteObject(dc);
 }
 
-int GetObjectW(const HGDIOBJ object, const int size, void* const out)
+int GetObjectW(
+  const HGDIOBJ object,
+  const int size,
+  void* const out
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   const BitmapObject* const bitmap = As<BitmapObject>(object, GdiKind::Bitmap);
@@ -629,7 +745,10 @@ int GetObjectW(const HGDIOBJ object, const int size, void* const out)
   return static_cast<int>(sizeof(info));
 }
 
-BOOL GetTextMetricsW(const HDC dcHandle, TEXTMETRICW* const metrics)
+BOOL GetTextMetricsW(
+  const HDC dcHandle,
+  TEXTMETRICW* const metrics
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   const DcObject* const dc = As<DcObject>(dcHandle, GdiKind::Dc);
@@ -640,7 +759,11 @@ BOOL GetTextMetricsW(const HDC dcHandle, TEXTMETRICW* const metrics)
   return TRUE;
 }
 
-int GetTextFaceW(const HDC dcHandle, const int count, wchar_t* const face)
+int GetTextFaceW(
+  const HDC dcHandle,
+  const int count,
+  wchar_t* const face
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   const DcObject* const dc = As<DcObject>(dcHandle, GdiKind::Dc);
@@ -660,7 +783,13 @@ int GetTextFaceW(const HDC dcHandle, const int count, wchar_t* const face)
   return static_cast<int>(copied) + 1; // with the terminator, as GDI counts
 }
 
-DWORD GetFontData(const HDC dcHandle, const DWORD table, const DWORD offset, void* const buffer, const DWORD size)
+DWORD GetFontData(
+  const HDC dcHandle,
+  const DWORD table,
+  const DWORD offset,
+  void* const buffer,
+  const DWORD size
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   const DcObject* const dc = As<DcObject>(dcHandle, GdiKind::Dc);
@@ -668,8 +797,8 @@ DWORD GetFontData(const HDC dcHandle, const DWORD table, const DWORD offset, voi
     return GDI_ERROR;
   }
   // GDI takes the tag as its bytes in file order read little-endian; FreeType as a big-endian number.
-  const FT_ULong tag = table == 0u ? 0u
-                                   : ((table & 0xFFu) << 24) | ((table & 0xFF00u) << 8) | ((table >> 8) & 0xFF00u) | (table >> 24);
+  const FT_ULong tag =
+    table == 0u ? 0u : ((table & 0xFFu) << 24) | ((table & 0xFF00u) << 8) | ((table >> 8) & 0xFF00u) | (table >> 24);
   FT_ULong length = 0;
   if (FT_Load_Sfnt_Table(dc->mFont->mFace, tag, 0, nullptr, &length) != 0 || offset > length) {
     return GDI_ERROR;
@@ -679,13 +808,19 @@ DWORD GetFontData(const HDC dcHandle, const DWORD table, const DWORD offset, voi
     return static_cast<DWORD>(available);
   }
   FT_ULong wanted = (std::min<FT_ULong>)(available, size);
-  if (FT_Load_Sfnt_Table(dc->mFont->mFace, tag, static_cast<FT_Long>(offset), static_cast<FT_Byte*>(buffer), &wanted) != 0) {
+  if (
+    FT_Load_Sfnt_Table(dc->mFont->mFace, tag, static_cast<FT_Long>(offset), static_cast<FT_Byte*>(buffer), &wanted) != 0
+  ) {
     return GDI_ERROR;
   }
   return static_cast<DWORD>(wanted);
 }
 
-DWORD GetKerningPairsW(const HDC dcHandle, const DWORD count, KERNINGPAIR* const pairs)
+DWORD GetKerningPairsW(
+  const HDC dcHandle,
+  const DWORD count,
+  KERNINGPAIR* const pairs
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   const DcObject* const dc = As<DcObject>(dcHandle, GdiKind::Dc);
@@ -704,7 +839,10 @@ DWORD GetKerningPairsW(const HDC dcHandle, const DWORD count, KERNINGPAIR* const
   return static_cast<DWORD>(copied);
 }
 
-UINT SetTextAlign(const HDC dcHandle, const UINT align)
+UINT SetTextAlign(
+  const HDC dcHandle,
+  const UINT align
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   DcObject* const dc = As<DcObject>(dcHandle, GdiKind::Dc);
@@ -716,7 +854,10 @@ UINT SetTextAlign(const HDC dcHandle, const UINT align)
   return previous;
 }
 
-COLORREF SetTextColor(const HDC dcHandle, const COLORREF color)
+COLORREF SetTextColor(
+  const HDC dcHandle,
+  const COLORREF color
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   DcObject* const dc = As<DcObject>(dcHandle, GdiKind::Dc);
@@ -728,7 +869,10 @@ COLORREF SetTextColor(const HDC dcHandle, const COLORREF color)
   return previous;
 }
 
-COLORREF SetBkColor(const HDC dcHandle, const COLORREF color)
+COLORREF SetBkColor(
+  const HDC dcHandle,
+  const COLORREF color
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   DcObject* const dc = As<DcObject>(dcHandle, GdiKind::Dc);
@@ -740,7 +884,11 @@ COLORREF SetBkColor(const HDC dcHandle, const COLORREF color)
   return previous;
 }
 
-int FillRect(const HDC dcHandle, const RECT* const rect, const HBRUSH brushHandle)
+int FillRect(
+  const HDC dcHandle,
+  const RECT* const rect,
+  const HBRUSH brushHandle
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   DcObject* const dc = As<DcObject>(dcHandle, GdiKind::Dc);
@@ -752,7 +900,13 @@ int FillRect(const HDC dcHandle, const RECT* const rect, const HBRUSH brushHandl
   return 1;
 }
 
-int DrawTextW(const HDC dcHandle, const wchar_t* const text, const int count, RECT* const rect, const UINT format)
+int DrawTextW(
+  const HDC dcHandle,
+  const wchar_t* const text,
+  const int count,
+  RECT* const rect,
+  const UINT format
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   DcObject* const dc = As<DcObject>(dcHandle, GdiKind::Dc);
@@ -780,7 +934,14 @@ int DrawTextW(const HDC dcHandle, const wchar_t* const text, const int count, RE
   const bool baselineAligned = (dc->mAlign & TA_BASELINE) == TA_BASELINE;
   const int baseline = baselineAligned ? rect->top : rect->top + metrics.tmAscent;
   // GDI's default opaque background: the text cell takes the background colour first.
-  Fill(*dc->mBitmap, rect->left, baseline - metrics.tmAscent, rect->left + width, baseline + metrics.tmDescent, ToPixel(dc->mBkColor));
+  Fill(
+    *dc->mBitmap,
+    rect->left,
+    baseline - metrics.tmAscent,
+    rect->left + width,
+    baseline + metrics.tmDescent,
+    ToPixel(dc->mBkColor)
+  );
   int penX = rect->left;
   for (std::size_t index = 0; index < length; ++index) {
     DrawGlyph(*dc, penX, baseline, text[index]);
@@ -789,19 +950,30 @@ int DrawTextW(const HDC dcHandle, const wchar_t* const text, const int count, RE
   return metrics.tmHeight;
 }
 
-COLORREF GetPixel(const HDC dcHandle, const int x, const int y)
+COLORREF GetPixel(
+  const HDC dcHandle,
+  const int x,
+  const int y
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   const DcObject* const dc = As<DcObject>(dcHandle, GdiKind::Dc);
-  if (dc == nullptr || dc->mBitmap == nullptr || x < 0 || y < 0 || x >= dc->mBitmap->mWidth || y >= dc->mBitmap->mHeight) {
+  if (
+    dc == nullptr || dc->mBitmap == nullptr || x < 0 || y < 0 || x >= dc->mBitmap->mWidth || y >= dc->mBitmap->mHeight
+  ) {
     return 0xFFFFFFFFu; // CLR_INVALID
   }
   const std::uint32_t pixel =
-    dc->mBitmap->mPixels[static_cast<std::size_t>(y) * static_cast<std::size_t>(dc->mBitmap->mWidth) + static_cast<std::size_t>(x)];
+    dc->mBitmap->mPixels
+      [static_cast<std::size_t>(y) * static_cast<std::size_t>(dc->mBitmap->mWidth) + static_cast<std::size_t>(x)];
   return RGB((pixel >> 16) & 0xFFu, (pixel >> 8) & 0xFFu, pixel & 0xFFu);
 }
 
-LONG GetBitmapBits(const HBITMAP bitmapHandle, const LONG size, void* const bits)
+LONG GetBitmapBits(
+  const HBITMAP bitmapHandle,
+  const LONG size,
+  void* const bits
+)
 {
   const std::lock_guard<std::mutex> lock(gLock);
   const BitmapObject* const bitmap = As<BitmapObject>(bitmapHandle, GdiKind::Bitmap);

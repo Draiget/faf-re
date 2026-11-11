@@ -28,14 +28,11 @@ namespace moho
     constexpr std::int32_t kTimeBarHistoryCapacity = 10000;
     constexpr std::uint32_t kDefaultThreadColorTag = 0xFFFFFFFFu;
 
-
     struct TimeBarTrackLayout
     {
       const char* mName;
       float mRowY;
     };
-
-
 
     struct TimeBarState
     {
@@ -63,13 +60,20 @@ namespace moho
     TimeBarState* gTimeBarState = nullptr;
     std::once_flag gTimeBarStateInitOnce;
 
-    [[nodiscard]] std::int64_t CombineCycles(const std::uint32_t lo, const std::uint32_t hi) noexcept
+    [[nodiscard]] std::int64_t CombineCycles(
+      const std::uint32_t lo,
+      const std::uint32_t hi
+    ) noexcept
     {
       const std::uint64_t value = (static_cast<std::uint64_t>(hi) << 32) | lo;
       return static_cast<std::int64_t>(value);
     }
 
-    void SplitCycles(const std::int64_t cycles, std::uint32_t& lo, std::uint32_t& hi) noexcept
+    void SplitCycles(
+      const std::int64_t cycles,
+      std::uint32_t& lo,
+      std::uint32_t& hi
+    ) noexcept
     {
       lo = static_cast<std::uint32_t>(cycles & 0xFFFFFFFFll);
       hi = static_cast<std::uint32_t>((static_cast<std::uint64_t>(cycles) >> 32) & 0xFFFFFFFFull);
@@ -106,7 +110,9 @@ namespace moho
       return *gTimeBarState;
     }
 
-    void UnlinkThreadInfoNoLock(STimeBarThreadInfo* const info) noexcept
+    void UnlinkThreadInfoNoLock(
+      STimeBarThreadInfo* const info
+    ) noexcept
     {
       if (!info) {
         return;
@@ -115,7 +121,9 @@ namespace moho
       info->ListUnlink();
     }
 
-    void ReleaseThreadInfo(STimeBarThreadInfo* info) noexcept
+    void ReleaseThreadInfo(
+      STimeBarThreadInfo* info
+    ) noexcept
     {
       if (!info) {
         return;
@@ -129,7 +137,6 @@ namespace moho
 
       delete info;
     }
-
 
     /**
      * Address: 0x004E7130 (FUN_004E7130, boost::thread_specific_ptr<
@@ -162,12 +169,17 @@ namespace moho
 
     thread_local TimeBarThreadSlot gThreadSlot;
 
-    void LinkThreadInfoNoLock(TimeBarState& state, STimeBarThreadInfo* const info) noexcept
+    void LinkThreadInfoNoLock(
+      TimeBarState& state,
+      STimeBarThreadInfo* const info
+    ) noexcept
     {
       info->ListLinkAfter(&state.mThreadListSentinel);
     }
 
-    [[nodiscard]] STimeBarThreadInfo* GetOrCreateThreadInfo(TimeBarState& state)
+    [[nodiscard]] STimeBarThreadInfo* GetOrCreateThreadInfo(
+      TimeBarState& state
+    )
     {
       if (gThreadSlot.mInfo) {
         return gThreadSlot.mInfo;
@@ -214,7 +226,10 @@ namespace moho
      * Pushes one event record into the fixed-size history ring while holding
      * the time-bar mutex and advancing oldest/newest indices on wrap.
      */
-    void PushHistoryRecord(TimeBarState& state, const STimeBarEventRecord& record)
+    void PushHistoryRecord(
+      TimeBarState& state,
+      const STimeBarEventRecord& record
+    )
     {
       std::lock_guard<std::mutex> guard(state.mLock);
 
@@ -226,11 +241,6 @@ namespace moho
       (void)PushTimeBarHistoryRecordAndAdvanceWriteIndex(state, record);
     }
 
-
-
-
-
-
   } // namespace
 
   std::int64_t CTimeBarSection::GetStartCycle() const noexcept
@@ -238,7 +248,9 @@ namespace moho
     return CombineCycles(mStartCycleLo, mStartCycleHi);
   }
 
-  void CTimeBarSection::SetStartCycle(const std::int64_t cycles) noexcept
+  void CTimeBarSection::SetStartCycle(
+    const std::int64_t cycles
+  ) noexcept
   {
     SplitCycles(cycles, mStartCycleLo, mStartCycleHi);
   }
@@ -252,7 +264,9 @@ namespace moho
    * What it does:
    * Opens a scoped time-bar section on the current thread and snapshots the parent segment.
    */
-  CTimeBarSection::CTimeBarSection(const char* const name)
+  CTimeBarSection::CTimeBarSection(
+    const char* const name
+  )
   {
     TimeBarState& state = GetTimeBarState();
     STimeBarThreadInfo* const threadInfo = GetOrCreateThreadInfo(state);
@@ -314,7 +328,9 @@ namespace moho
    * What it does:
    * Emits an instantaneous named marker event into the global time-bar history.
    */
-  void TIME_TimeBarEvent(const char* const name)
+  void TIME_TimeBarEvent(
+    const char* const name
+  )
   {
     TimeBarState& state = GetTimeBarState();
     STimeBarThreadInfo* const threadInfo = GetOrCreateThreadInfo(state);
@@ -337,7 +353,9 @@ namespace moho
    * What it does:
    * Updates the current thread's time-bar color tag used for subsequent samples.
    */
-  void TIME_SetTimeBarColor(const std::uint32_t colorTag)
+  void TIME_SetTimeBarColor(
+    const std::uint32_t colorTag
+  )
   {
     TimeBarState& state = GetTimeBarState();
     STimeBarThreadInfo* const threadInfo = GetOrCreateThreadInfo(state);
@@ -353,7 +371,10 @@ namespace moho
    * What it does:
    * Captures active sections plus recent history events into `outEvents`, newest-first.
    */
-  void TIME_CollectTimeBarEvents(fa::vector<STimeBarEventRecord>& outEvents, const float maxAgeSeconds)
+  void TIME_CollectTimeBarEvents(
+    fa::vector<STimeBarEventRecord>& outEvents,
+    const float maxAgeSeconds
+  )
   {
     TimeBarState& state = GetTimeBarState();
 
@@ -364,7 +385,8 @@ namespace moho
 
     std::lock_guard<std::mutex> guard(state.mLock);
 
-    for (auto* node = static_cast<STimeBarThreadInfo*>(state.mThreadListSentinel.mNext); node != &state.mThreadListSentinel;
+    for (auto* node = static_cast<STimeBarThreadInfo*>(state.mThreadListSentinel.mNext);
+         node != &state.mThreadListSentinel;
          node = static_cast<STimeBarThreadInfo*>(node->mNext)) {
       if (!node->mCurrentSection) {
         continue;

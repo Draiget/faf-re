@@ -81,8 +81,7 @@ namespace
 
     return static_cast<moho::CUIWorldMesh*>(upcast.mObj);
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x0086BB30 (FUN_0086BB30, cfunc_InternalCreateWorldMesh)

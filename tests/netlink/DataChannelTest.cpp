@@ -22,7 +22,10 @@ namespace
 {
   int gFailures = 0;
 
-  void Check(const bool ok, const char* what)
+  void Check(
+    const bool ok,
+    const char* what
+  )
   {
     std::printf("%s %s\n", ok ? "ok  " : "FAIL", what);
     if (!ok) {
@@ -30,7 +33,11 @@ namespace
     }
   }
 
-  template <class Pred> bool WaitFor(Pred pred, const std::chrono::milliseconds limit)
+  template <class Pred>
+  bool WaitFor(
+    Pred pred,
+    const std::chrono::milliseconds limit
+  )
   {
     const auto deadline = std::chrono::steady_clock::now() + limit;
     while (!pred()) {
@@ -43,7 +50,10 @@ namespace
   }
 } // namespace
 
-int main(int argc, char** argv)
+int main(
+  int argc,
+  char** argv
+)
 {
   rtc::Configuration config;
   for (int i = 1; i + 1 < argc; ++i) {
@@ -57,10 +67,18 @@ int main(int argc, char** argv)
   auto answerer = std::make_shared<rtc::PeerConnection>(config);
 
   // Signalling: each side's description and candidates go straight to the other.
-  offerer->onLocalDescription([answerer](rtc::Description d) { answerer->setRemoteDescription(d); });
-  offerer->onLocalCandidate([answerer](rtc::Candidate c) { answerer->addRemoteCandidate(c); });
-  answerer->onLocalDescription([offerer](rtc::Description d) { offerer->setRemoteDescription(d); });
-  answerer->onLocalCandidate([offerer](rtc::Candidate c) { offerer->addRemoteCandidate(c); });
+  offerer->onLocalDescription([answerer](rtc::Description d) {
+    answerer->setRemoteDescription(d);
+  });
+  offerer->onLocalCandidate([answerer](rtc::Candidate c) {
+    answerer->addRemoteCandidate(c);
+  });
+  answerer->onLocalDescription([offerer](rtc::Description d) {
+    offerer->setRemoteDescription(d);
+  });
+  answerer->onLocalCandidate([offerer](rtc::Candidate c) {
+    offerer->addRemoteCandidate(c);
+  });
 
   constexpr int kDatagrams = 2000;
   std::atomic<int> atAnswerer{0};
@@ -83,14 +101,23 @@ int main(int argc, char** argv)
   init.reliability.maxRetransmits = 0;
   auto channel = offerer->createDataChannel("game", init);
   std::atomic<bool> open{false};
-  channel->onOpen([&] { open = true; });
+  channel->onOpen([&] {
+    open = true;
+  });
   channel->onMessage([&](rtc::message_variant m) {
     if (std::holds_alternative<rtc::binary>(m)) {
       ++atOfferer;
     }
   });
 
-  Check(WaitFor([&] { return open.load(); }, std::chrono::seconds(15)), "data channel open");
+  Check(
+    WaitFor(
+      [&] {
+    return open.load();
+  }, std::chrono::seconds(15)
+    ),
+    "data channel open"
+  );
   if (open) {
     const rtc::Reliability r = channel->reliability();
     Check(r.unordered && r.maxRetransmits && *r.maxRetransmits == 0, "unordered, no retransmissions");
@@ -102,7 +129,9 @@ int main(int argc, char** argv)
         std::this_thread::sleep_for(std::chrono::milliseconds(5)); // keep inside the SCTP buffer
       }
     }
-    WaitFor([&] { return atOfferer.load() >= kDatagrams; }, std::chrono::seconds(10));
+    WaitFor([&] {
+      return atOfferer.load() >= kDatagrams;
+    }, std::chrono::seconds(10));
     std::printf("  sent %d, answerer got %d, echoes back %d\n", kDatagrams, atAnswerer.load(), atOfferer.load());
     // Unreliable on purpose; over loopback nothing should be lost.
     Check(atAnswerer.load() >= kDatagrams * 99 / 100, "answerer received the datagrams");

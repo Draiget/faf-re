@@ -50,7 +50,9 @@ namespace moho::sfd
     }
   };
 
-  AudioSink::AudioSink(IDirectSound* const device)
+  AudioSink::AudioSink(
+    IDirectSound* const device
+  )
     : impl(std::make_unique<Impl>())
   {
     if (device == nullptr) {
@@ -93,7 +95,9 @@ namespace moho::sfd
     }
   }
 
-  std::size_t AudioSink::Write(const std::span<const std::int16_t> stereo)
+  std::size_t AudioSink::Write(
+    const std::span<const std::int16_t> stereo
+  )
   {
     Impl& s = *impl;
     s.Refresh();
@@ -109,7 +113,9 @@ namespace moho::sfd
     return static_cast<std::size_t>(bytes / sizeof(std::int16_t));
   }
 
-  void AudioSink::Pause(const bool paused)
+  void AudioSink::Pause(
+    const bool paused
+  )
   {
     Pump();
     Impl& s = *impl;
@@ -134,7 +140,9 @@ namespace moho::sfd
     s.written = 0;
   }
 
-  void AudioSink::SetVolume(const long attenuation)
+  void AudioSink::SetVolume(
+    const long attenuation
+  )
   {
     // Hundredths of a decibel, -10000 (-100 dB) to 0, as DirectSound's SetVolume takes them.
     const double decibels = static_cast<double>(std::clamp(attenuation, -10000L, 0L)) / 100.0;

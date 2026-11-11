@@ -46,7 +46,10 @@ namespace faf::server
      * Plan WP17.9, before `Start`: a request with a token not allowed yet is held, not refused, until the organiser
      * answers (`AllowToken`, `RefuseToken`) or 5 minutes pass. Each one is reported once (`TakeRequests`).
      */
-    void HoldUnknownTokens() noexcept { mHoldUnknown = true; }
+    void HoldUnknownTokens() noexcept
+    {
+      mHoldUnknown = true;
+    }
     struct SRequest
     {
       std::string token;
@@ -54,9 +57,15 @@ namespace faf::server
     };
     [[nodiscard]] std::vector<SRequest> TakeRequests();
     /** Watching now. */
-    [[nodiscard]] std::size_t Observers() const noexcept { return mObservers.load(std::memory_order_relaxed); }
+    [[nodiscard]] std::size_t Observers() const noexcept
+    {
+      return mObservers.load(std::memory_order_relaxed);
+    }
     /** The game's replay is finished and every observer has had all of it (or none is watching). */
-    [[nodiscard]] bool AllSent() const noexcept { return mAllSent.load(std::memory_order_relaxed); }
+    [[nodiscard]] bool AllSent() const noexcept
+    {
+      return mAllSent.load(std::memory_order_relaxed);
+    }
     /** Lines worth the console: who started watching, a refused request, who has seen it all. */
     [[nodiscard]] std::vector<std::string> TakeNews();
 
@@ -73,7 +82,7 @@ namespace faf::server
     std::atomic<bool> mStop{false};
     std::atomic<std::size_t> mObservers{0};
     std::atomic<bool> mAllSent{false};
-    std::mutex mLock;           // the tokens and the news
+    std::mutex mLock; // the tokens and the news
     std::set<std::string> mTokens;
     std::set<std::string> mRefused;
     std::set<std::string> mReferees;

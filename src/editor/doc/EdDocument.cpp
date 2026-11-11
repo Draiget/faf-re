@@ -71,7 +71,9 @@ namespace faf::editor
 
   namespace
   {
-    [[nodiscard]] std::string StringOf(const LuaPlus::LuaObject& object)
+    [[nodiscard]] std::string StringOf(
+      const LuaPlus::LuaObject& object
+    )
     {
       if (!object.IsString()) {
         return {};
@@ -81,7 +83,9 @@ namespace faf::editor
     }
 
     /** The text without a leading localization tag (`<LOC key>`), which the game swaps for a translation. */
-    [[nodiscard]] std::string WithoutLocTag(std::string text)
+    [[nodiscard]] std::string WithoutLocTag(
+      std::string text
+    )
     {
       if (text.rfind("<LOC", 0) == 0) {
         if (const std::size_t end = text.find('>'); end != std::string::npos) {
@@ -91,13 +95,18 @@ namespace faf::editor
       return text;
     }
 
-    [[nodiscard]] int IntOf(const LuaPlus::LuaObject& object)
+    [[nodiscard]] int IntOf(
+      const LuaPlus::LuaObject& object
+    )
     {
       return object.IsNumber() ? static_cast<int>(object.GetNumber()) : 0;
     }
 
     /** Runs `path` with a fresh table as its globals (after the game's data helpers) and returns the table. */
-    [[nodiscard]] LuaPlus::LuaObject RunInTable(LuaPlus::LuaState* const state, const std::string& path)
+    [[nodiscard]] LuaPlus::LuaObject RunInTable(
+      LuaPlus::LuaState* const state,
+      const std::string& path
+    )
     {
       LuaPlus::LuaObject env(state);
       env.AssignNewTable(state, 0, 0);
@@ -108,7 +117,10 @@ namespace faf::editor
       return env;
     }
 
-    void ReadScenario(const LuaPlus::LuaObject& scenario, MapFacts& facts)
+    void ReadScenario(
+      const LuaPlus::LuaObject& scenario,
+      MapFacts& facts
+    )
     {
       facts.name = WithoutLocTag(StringOf(scenario["name"]));
       facts.description = WithoutLocTag(StringOf(scenario["description"]));
@@ -132,7 +144,10 @@ namespace faf::editor
       }
     }
 
-    void ReadSave(const LuaPlus::LuaObject& save, MapFacts& facts)
+    void ReadSave(
+      const LuaPlus::LuaObject& save,
+      MapFacts& facts
+    )
     {
       const LuaPlus::LuaObject markers = save["MasterChain"]["_MASTERCHAIN_"]["Markers"];
       if (!markers.IsTable()) {
@@ -145,7 +160,10 @@ namespace faf::editor
       }
     }
 
-    void ReadMap(moho::CWldMap& map, MapFacts& facts)
+    void ReadMap(
+      moho::CWldMap& map,
+      MapFacts& facts
+    )
     {
       moho::IWldTerrainRes* const terrain = map.mTerrainRes;
       if (terrain == nullptr) {
@@ -165,9 +183,15 @@ namespace faf::editor
       moho::StratumMaterial& strata = terrain->GetStratumMaterial();
       facts.terrainShader = strata.mShaderName.c_str();
       const moho::CStratumMaterial* const albedo[] = {
-        &strata.mLowerAlbedoTexture,    &strata.mStratum0AlbedoTexture, &strata.mStratum1AlbedoTexture,
-        &strata.mStratum2AlbedoTexture, &strata.mStratum3AlbedoTexture, &strata.mStratum4AlbedoTexture,
-        &strata.mStratum5AlbedoTexture, &strata.mStratum6AlbedoTexture, &strata.mStratum7AlbedoTexture,
+        &strata.mLowerAlbedoTexture,
+        &strata.mStratum0AlbedoTexture,
+        &strata.mStratum1AlbedoTexture,
+        &strata.mStratum2AlbedoTexture,
+        &strata.mStratum3AlbedoTexture,
+        &strata.mStratum4AlbedoTexture,
+        &strata.mStratum5AlbedoTexture,
+        &strata.mStratum6AlbedoTexture,
+        &strata.mStratum7AlbedoTexture,
         &strata.mUpperAlbedoTexture,
       };
       for (const moho::CStratumMaterial* const layer : albedo) {
@@ -188,9 +212,17 @@ namespace faf::editor
         }
         if (facts.decals > 0) {
           const DecalState first = CaptureDecal(*decals->GetDecal(0));
-          gpg::Logf("editor: decals: %s; the first: %s, scale %.1f %.1f %.1f, turn %.2f, cutoff %.0f, near %.0f", counts.c_str(),
-                    first.names[0].c_str(), first.scale[0], first.scale[1], first.scale[2], first.orientation[1], first.cutoff,
-                    first.nearCutoff);
+          gpg::Logf(
+            "editor: decals: %s; the first: %s, scale %.1f %.1f %.1f, turn %.2f, cutoff %.0f, near %.0f",
+            counts.c_str(),
+            first.names[0].c_str(),
+            first.scale[0],
+            first.scale[1],
+            first.scale[2],
+            first.orientation[1],
+            first.cutoff,
+            first.nearCutoff
+          );
         }
       }
       if (map.mProps != nullptr) {
@@ -206,7 +238,9 @@ namespace faf::editor
     Close();
   }
 
-  void EdDocument::Run(Load& load)
+  void EdDocument::Run(
+    Load& load
+  )
   {
     const auto start = std::chrono::steady_clock::now();
     if (load.create) {
@@ -232,7 +266,11 @@ namespace faf::editor
       return lua;
     }
 
-    bool WriteText(const std::filesystem::path& file, const std::string& text, std::string& error)
+    bool WriteText(
+      const std::filesystem::path& file,
+      const std::string& text,
+      std::string& error
+    )
     {
       std::ofstream out(file, std::ios::binary);
       out.write(text.data(), static_cast<std::streamsize>(text.size()));
@@ -247,7 +285,9 @@ namespace faf::editor
     [[nodiscard]] std::string BaseOfFolder(const std::string& folder);
   } // namespace
 
-  void EdDocument::RunCreate(Load& load)
+  void EdDocument::RunCreate(
+    Load& load
+  )
   {
     try {
       load.lua = NewDocumentState();
@@ -264,7 +304,11 @@ namespace faf::editor
         return;
       }
       const auto word = static_cast<std::uint16_t>(std::clamp(std::lround(settings.height * 128.0f), 0L, 65535L));
-      std::fill(field->data, field->data + static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height), word);
+      std::fill(
+        field->data,
+        field->data + static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height),
+        word
+      );
       field->SetElevationRectRaw(gpg::Rect2i{0, 0, field->width - 1, field->height - 1}, field->data, field->width);
       moho::STIMap& terrain = *map->mTerrainRes->mMap;
       terrain.mWaterEnabled = settings.sea ? 1u : 0u;
@@ -285,10 +329,12 @@ namespace faf::editor
 
       const std::string base = BaseOfFolder(settings.folder);
       std::string error;
-      if (!WriteMapFile(*map, records, load.createFolder / (base + ".scmap"), error) ||
-          !WriteText(load.createFolder / (base + "_scenario.lua"), NewMapScenarioText(settings, base), error) ||
-          !WriteText(load.createFolder / (base + "_save.lua"), NewMapSaveText(settings), error) ||
-          !WriteText(load.createFolder / (base + "_script.lua"), NewMapScriptText(), error)) {
+      if (
+        !WriteMapFile(*map, records, load.createFolder / (base + ".scmap"), error) ||
+        !WriteText(load.createFolder / (base + "_scenario.lua"), NewMapScenarioText(settings, base), error) ||
+        !WriteText(load.createFolder / (base + "_save.lua"), NewMapSaveText(settings), error) ||
+        !WriteText(load.createFolder / (base + "_script.lua"), NewMapScriptText(), error)
+      ) {
         load.error = error;
         return;
       }
@@ -300,7 +346,9 @@ namespace faf::editor
     }
   }
 
-  void EdDocument::RunSteps(Load& load)
+  void EdDocument::RunSteps(
+    Load& load
+  )
   {
     try {
       load.lua = NewDocumentState();
@@ -342,20 +390,25 @@ namespace faf::editor
       if (!facts.scriptPath.empty()) {
         (void)ReadGameFile(facts.scriptPath, load.script);
         // An adaptive map's tables: the file its script imports.
-        if (const std::string tables = AdaptiveTablesPath(load.script); !tables.empty() && ReadGameFile(tables, load.tables)) {
+        if (
+          const std::string tables = AdaptiveTablesPath(load.script);
+          !tables.empty() && ReadGameFile(tables, load.tables)
+        ) {
           facts.tablesPath = tables;
         }
       }
       // Else the tables beside the scenario (made in the editor before the adaptive script was put in).
       if (facts.tablesPath.empty() && load.scenarioPath.size() > std::string("_scenario.lua").size()) {
-        const std::string beside = load.scenarioPath.substr(0, load.scenarioPath.size() - std::string("_scenario.lua").size()) + "_tables.lua";
+        const std::string beside =
+          load.scenarioPath.substr(0, load.scenarioPath.size() - std::string("_scenario.lua").size()) + "_tables.lua";
         if (ReadGameFile(beside, load.tables)) {
           facts.tablesPath = beside;
         }
       }
       // The lobby options beside the scenario (the game reads `<base>_options.lua` there).
       if (load.scenarioPath.size() > std::string("_scenario.lua").size()) {
-        const std::string beside = load.scenarioPath.substr(0, load.scenarioPath.size() - std::string("_scenario.lua").size()) + "_options.lua";
+        const std::string beside =
+          load.scenarioPath.substr(0, load.scenarioPath.size() - std::string("_scenario.lua").size()) + "_options.lua";
         if (ReadGameFile(beside, load.options)) {
           facts.optionsPath = beside;
         }
@@ -376,7 +429,9 @@ namespace faf::editor
     }
   }
 
-  bool EdDocument::Open(const std::string& scenarioPath)
+  bool EdDocument::Open(
+    const std::string& scenarioPath
+  )
   {
     if (mState == State::Loading) {
       return false;
@@ -386,17 +441,25 @@ namespace faf::editor
     mState = State::Loading;
     mLoad = std::make_unique<Load>();
     mLoad->scenarioPath = scenarioPath;
-    mThread = std::thread([load = mLoad.get()] { Run(*load); });
+    mThread = std::thread([load = mLoad.get()] {
+      Run(*load);
+    });
     return true;
   }
 
-  bool EdDocument::CreateNew(const NewMapSettings& settings, std::string& message)
+  bool EdDocument::CreateNew(
+    const NewMapSettings& settings,
+    std::string& message
+  )
   {
     if (mState == State::Loading) {
       message = "A map is still opening.";
       return false;
     }
-    if (settings.folder.empty() || settings.folder.find_first_of("\\/:*?\"<>|") != std::string::npos || settings.folder[0] == '.') {
+    if (
+      settings.folder.empty() || settings.folder.find_first_of("\\/:*?\"<>|") != std::string::npos ||
+      settings.folder[0] == '.'
+    ) {
       message = "\"" + settings.folder + "\" can't be a folder name.";
       return false;
     }
@@ -422,7 +485,9 @@ namespace faf::editor
     mLoad->create = true;
     mLoad->settings = settings;
     mLoad->createFolder = target;
-    mThread = std::thread([load = mLoad.get()] { Run(*load); });
+    mThread = std::thread([load = mLoad.get()] {
+      Run(*load);
+    });
     message = "Making " + target.string();
     return true;
   }
@@ -451,7 +516,9 @@ namespace faf::editor
     return std::nullopt;
   }
 
-  void EdDocument::SetPlayableArea(const std::optional<PlayableRect>& area)
+  void EdDocument::SetPlayableArea(
+    const std::optional<PlayableRect>& area
+  )
   {
     if (!area) {
       mScript = WithScriptPlayableArea(mScript, "");
@@ -472,7 +539,9 @@ namespace faf::editor
     mModified = true;
   }
 
-  void EdDocument::SetExtraArmies(const std::vector<std::string>& armies)
+  void EdDocument::SetExtraArmies(
+    const std::vector<std::string>& armies
+  )
   {
     mScenario = WithScenarioExtraArmies(mScenario, armies);
     for (const std::string& army : armies) {
@@ -487,14 +556,18 @@ namespace faf::editor
     mModified = true;
   }
 
-  void EdDocument::SetTeams(const std::vector<ScenarioTeam>& teams)
+  void EdDocument::SetTeams(
+    const std::vector<ScenarioTeam>& teams
+  )
   {
     mScenario = WithScenarioTeams(mScenario, teams);
     mFacts.armies = Armies();
     mModified = true;
   }
 
-  void EdDocument::AddArmy(const std::string& name)
+  void EdDocument::AddArmy(
+    const std::string& name
+  )
   {
     // A new army joins the first team (a map's one FFA team).
     std::vector<ScenarioTeam> teams = Teams();
@@ -518,7 +591,9 @@ namespace faf::editor
     mModified = true;
   }
 
-  void EdDocument::RemoveArmy(const std::string& name)
+  void EdDocument::RemoveArmy(
+    const std::string& name
+  )
   {
     // From whichever team has it.
     std::vector<ScenarioTeam> teams = Teams();
@@ -529,13 +604,25 @@ namespace faf::editor
     const std::vector<std::string> extra = ExtraArmies();
     if (std::find(extra.begin(), extra.end(), name) == extra.end()) {
       auto& entries = mSave.Armies();
-      entries.erase(std::remove_if(entries.begin(), entries.end(), [&](const SaveEntry& entry) { return entry.name == name; }), entries.end());
+      entries.erase(
+        std::remove_if(
+          entries.begin(),
+          entries.end(),
+          [&](const SaveEntry& entry) {
+        return entry.name == name;
+      }
+        ),
+        entries.end()
+      );
     }
     mFacts.armies = Armies();
     mModified = true;
   }
 
-  void EdDocument::RenameArmy(const std::string& from, const std::string& to)
+  void EdDocument::RenameArmy(
+    const std::string& from,
+    const std::string& to
+  )
   {
     std::vector<ScenarioTeam> teams = Teams();
     for (ScenarioTeam& team : teams) {
@@ -553,11 +640,23 @@ namespace faf::editor
 
   EdDocument::SaveSnapshot EdDocument::SaveDataNow() const
   {
-    return {mSave.Markers(), mSave.Areas(), mScript,   mSave.Armies(), mTables, mFacts.tablesPath, mScenario, mSave.Chains(),
-            mOptions,         mFacts.optionsPath};
+    return {
+      mSave.Markers(),
+      mSave.Areas(),
+      mScript,
+      mSave.Armies(),
+      mTables,
+      mFacts.tablesPath,
+      mScenario,
+      mSave.Chains(),
+      mOptions,
+      mFacts.optionsPath
+    };
   }
 
-  void EdDocument::RestoreSaveData(const SaveSnapshot& snapshot)
+  void EdDocument::RestoreSaveData(
+    const SaveSnapshot& snapshot
+  )
   {
     mSave.Markers() = snapshot.markers;
     mSave.Areas() = snapshot.areas;
@@ -573,7 +672,9 @@ namespace faf::editor
     mModified = true;
   }
 
-  void EdDocument::SetRecentMapsFile(std::string file)
+  void EdDocument::SetRecentMapsFile(
+    std::string file
+  )
   {
     mRecentMapsFile = std::move(file);
     mRecentMaps = ReadRecentMaps(mRecentMapsFile);
@@ -587,7 +688,9 @@ namespace faf::editor
     }
   }
 
-  void EdDocument::ApplyWaterBodies(const std::vector<WaterBody>& bodies)
+  void EdDocument::ApplyWaterBodies(
+    const std::vector<WaterBody>& bodies
+  )
   {
     const std::string scenario = WithWaterBodies(mScenario, bodies);
     if (scenario != mScenario) {
@@ -596,12 +699,15 @@ namespace faf::editor
     }
   }
 
-  void EdDocument::SetTablesText(const std::string& text)
+  void EdDocument::SetTablesText(
+    const std::string& text
+  )
   {
     SaveSnapshot before = SaveDataNow();
     if (mFacts.tablesPath.empty()) {
       // The map becomes adaptive: the tables beside the scenario, and the scenario's flag.
-      const std::size_t cut = mFacts.scenarioPath.size() - std::min(mFacts.scenarioPath.size(), std::string("_scenario.lua").size());
+      const std::size_t cut =
+        mFacts.scenarioPath.size() - std::min(mFacts.scenarioPath.size(), std::string("_scenario.lua").size());
       mFacts.tablesPath = mFacts.scenarioPath.substr(0, cut) + "_tables.lua";
       mScenario = WithScenarioAdaptive(mScenario);
     }
@@ -609,18 +715,23 @@ namespace faf::editor
     SaveDataEdited(std::move(before));
   }
 
-  void EdDocument::SetOptionsText(const std::string& text)
+  void EdDocument::SetOptionsText(
+    const std::string& text
+  )
   {
     SaveSnapshot before = SaveDataNow();
     if (mFacts.optionsPath.empty()) {
-      const std::size_t cut = mFacts.scenarioPath.size() - std::min(mFacts.scenarioPath.size(), std::string("_scenario.lua").size());
+      const std::size_t cut =
+        mFacts.scenarioPath.size() - std::min(mFacts.scenarioPath.size(), std::string("_scenario.lua").size());
       mFacts.optionsPath = mFacts.scenarioPath.substr(0, cut) + "_options.lua";
     }
     mOptions = text;
     SaveDataEdited(std::move(before));
   }
 
-  void EdDocument::SaveDataEdited(SaveSnapshot before)
+  void EdDocument::SaveDataEdited(
+    SaveSnapshot before
+  )
   {
     mSaveUndo.emplace_back(std::move(before), SaveDataNow());
     EditEnded(EditKind::SaveData);
@@ -640,7 +751,10 @@ namespace faf::editor
     mScript = WithScriptEffects(mScript, effects);
   }
 
-  bool EdDocument::WriteLuaFiles(const std::filesystem::path& folder, std::string& error)
+  bool EdDocument::WriteLuaFiles(
+    const std::filesystem::path& folder,
+    std::string& error
+  )
   {
     const auto write = [&](const std::string& gamePath, const std::string& text) {
       const std::filesystem::path file = folder / gamePath.substr(gamePath.find_last_of('/') + 1);
@@ -700,7 +814,9 @@ namespace faf::editor
     return snapshot;
   }
 
-  void EdDocument::RestoreProps(const PropSnapshot& props)
+  void EdDocument::RestoreProps(
+    const PropSnapshot& props
+  )
   {
     if (mMap == nullptr || mMap->mProps == nullptr) {
       return;
@@ -713,7 +829,9 @@ namespace faf::editor
     mModified = true;
   }
 
-  void EdDocument::PropsEdited(PropSnapshot before)
+  void EdDocument::PropsEdited(
+    PropSnapshot before
+  )
   {
     mPropUndo.emplace_back(std::move(before), PropsNow());
     // A long session keeps the newest 200 prop edits (a 5000-prop map is about 0.3 MB a step, twice).
@@ -772,7 +890,10 @@ namespace faf::editor
     return issues;
   }
 
-  CheckIssue EdDocument::CheckLuaText(const std::string& text, const std::string& name) const
+  CheckIssue EdDocument::CheckLuaText(
+    const std::string& text,
+    const std::string& name
+  ) const
   {
     CheckIssue issue;
     issue.file = name;
@@ -818,7 +939,8 @@ namespace faf::editor
   std::vector<WaveRecord> EdDocument::WavesNow() const
   {
     std::vector<WaveRecord> waves;
-    moho::WaveSystem* const system = mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetWaveSystem() : nullptr;
+    moho::WaveSystem* const system =
+      mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetWaveSystem() : nullptr;
     if (system == nullptr) {
       return waves;
     }
@@ -882,12 +1004,16 @@ namespace faf::editor
         totals.energy += row.energy;
       }
     }
-    std::sort(totals.rows.begin(), totals.rows.end(),
-              [](const ReclaimRow& a, const ReclaimRow& b) { return a.mass * static_cast<float>(a.count) > b.mass * static_cast<float>(b.count); });
+    std::sort(totals.rows.begin(), totals.rows.end(), [](const ReclaimRow& a, const ReclaimRow& b) {
+      return a.mass * static_cast<float>(a.count) > b.mass * static_cast<float>(b.count);
+    });
     return totals;
   }
 
-  std::uint8_t* EdDocument::TerrainTypeCells(int& width, int& height) const
+  std::uint8_t* EdDocument::TerrainTypeCells(
+    int& width,
+    int& height
+  ) const
   {
     width = 0;
     height = 0;
@@ -905,11 +1031,14 @@ namespace faf::editor
     int width = 0;
     int height = 0;
     const std::uint8_t* const cells = TerrainTypeCells(width, height);
-    return cells != nullptr ? std::vector<std::uint8_t>(cells, cells + static_cast<std::size_t>(width) * static_cast<std::size_t>(height))
-                            : std::vector<std::uint8_t>();
+    return cells != nullptr
+      ? std::vector<std::uint8_t>(cells, cells + static_cast<std::size_t>(width) * static_cast<std::size_t>(height))
+      : std::vector<std::uint8_t>();
   }
 
-  void EdDocument::ApplyTerrainTypes(const std::vector<std::uint8_t>& cells)
+  void EdDocument::ApplyTerrainTypes(
+    const std::vector<std::uint8_t>& cells
+  )
   {
     int width = 0;
     int height = 0;
@@ -922,7 +1051,9 @@ namespace faf::editor
     mModified = true;
   }
 
-  void EdDocument::TerrainTypesEdited(std::vector<std::uint8_t> before)
+  void EdDocument::TerrainTypesEdited(
+    std::vector<std::uint8_t> before
+  )
   {
     mTerrainTypesUndo.emplace_back(std::move(before), TerrainTypesNow());
     // A megabyte a side on a 20 km map: a few steps.
@@ -935,7 +1066,11 @@ namespace faf::editor
 
   namespace
   {
-    std::uint64_t Fnv(const void* const data, const std::size_t size, std::uint64_t hash = 1469598103934665603ULL)
+    std::uint64_t Fnv(
+      const void* const data,
+      const std::size_t size,
+      std::uint64_t hash = 1469598103934665603ULL
+    )
     {
       const auto* const bytes = static_cast<const unsigned char*>(data);
       for (std::size_t i = 0; i < size; ++i) {
@@ -947,10 +1082,14 @@ namespace faf::editor
 
   std::uint64_t EdDocument::HeightsHash() const
   {
-    const moho::CHeightField* const field = mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    const moho::CHeightField* const field =
+      mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     return field != nullptr && field->data != nullptr
-             ? Fnv(field->data, static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height) * sizeof(field->data[0]))
-             : 0U;
+      ? Fnv(
+          field->data,
+          static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height) * sizeof(field->data[0])
+        )
+      : 0U;
   }
 
   std::uint64_t EdDocument::MasksHash() const
@@ -977,7 +1116,7 @@ namespace faf::editor
     const bool heights = HeightsHash() == mHeightsAtLoad;
     const WaterState water = WaterNow();
     const bool levels = water.enabled == mWaterAtLoad.enabled && water.elevation == mWaterAtLoad.elevation &&
-                        water.deep == mWaterAtLoad.deep && water.abyss == mWaterAtLoad.abyss;
+      water.deep == mWaterAtLoad.deep && water.abyss == mWaterAtLoad.abyss;
     const bool masks = !mMasksReadSet || MasksHash() == mMasksAtRead;
     for (std::size_t i = 0; i < count; ++i) {
       mFileRecords.keepImages[i] = i + 1 == count ? heights && levels : i + 3 >= count ? masks : heights;
@@ -986,13 +1125,17 @@ namespace faf::editor
 
   int EdDocument::WaveCount() const
   {
-    moho::WaveSystem* const system = mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetWaveSystem() : nullptr;
+    moho::WaveSystem* const system =
+      mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetWaveSystem() : nullptr;
     return system != nullptr ? static_cast<int>(system->mWaveGenerators.end_ - system->mWaveGenerators.start_) : 0;
   }
 
-  void EdDocument::ApplyWaves(const std::vector<WaveRecord>& waves)
+  void EdDocument::ApplyWaves(
+    const std::vector<WaveRecord>& waves
+  )
   {
-    moho::WaveSystem* const system = mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetWaveSystem() : nullptr;
+    moho::WaveSystem* const system =
+      mMap != nullptr && mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetWaveSystem() : nullptr;
     const moho::CHeightField* const field = system != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
     if (field == nullptr) {
       return;
@@ -1007,7 +1150,9 @@ namespace faf::editor
     mModified = true;
   }
 
-  void EdDocument::WavesEdited(std::vector<WaveRecord> before)
+  void EdDocument::WavesEdited(
+    std::vector<WaveRecord> before
+  )
   {
     mWavesUndo.emplace_back(std::move(before), WavesNow());
     // A retail map has thousands; a few steps are enough.
@@ -1058,7 +1203,9 @@ namespace faf::editor
     return sky;
   }
 
-  void EdDocument::ApplySkybox(const SkyboxState& sky)
+  void EdDocument::ApplySkybox(
+    const SkyboxState& sky
+  )
   {
     if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
       return;
@@ -1091,7 +1238,9 @@ namespace faf::editor
     mModified = true;
   }
 
-  void EdDocument::SkyboxEdited(SkyboxState before)
+  void EdDocument::SkyboxEdited(
+    SkyboxState before
+  )
   {
     mSkyboxUndo.emplace_back(std::move(before), SkyboxNow());
     if (mSkyboxUndo.size() > 50) {
@@ -1134,7 +1283,9 @@ namespace faf::editor
     return lighting;
   }
 
-  void EdDocument::ApplyLighting(const LightingState& lighting)
+  void EdDocument::ApplyLighting(
+    const LightingState& lighting
+  )
   {
     if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
       return;
@@ -1147,9 +1298,14 @@ namespace faf::editor
     mModified = true;
   }
 
-  void EdDocument::LightingInto(moho::IWldTerrainRes& terrain, const LightingState& lighting)
+  void EdDocument::LightingInto(
+    moho::IWldTerrainRes& terrain,
+    const LightingState& lighting
+  )
   {
-    const auto vec = [](const float (&v)[3]) { return Wm3::Vector3f(v[0], v[1], v[2]); };
+    const auto vec = [](const float (&v)[3]) {
+      return Wm3::Vector3f(v[0], v[1], v[2]);
+    };
     terrain.SetLightingMultiplier(lighting.multiplier);
     terrain.SetSunDirection(vec(lighting.sunDirection));
     terrain.SetSunAmbience(vec(lighting.sunAmbience));
@@ -1171,7 +1327,9 @@ namespace faf::editor
     terrain.SetFogInfo(fog);
   }
 
-  void EdDocument::LightingEdited(LightingState before)
+  void EdDocument::LightingEdited(
+    LightingState before
+  )
   {
     mLightingUndo.emplace_back(before, LightingNow());
     if (mLightingUndo.size() > 200) {
@@ -1192,8 +1350,13 @@ namespace faf::editor
     water.elevation = map.mWaterElevation;
     water.deep = map.mWaterElevationDeep;
     water.abyss = map.mWaterElevationAbyss;
-    if (const moho::CWaterShaderProperties* const shader = mMap->mTerrainRes->GetWaterShaderProperties(); shader != nullptr) {
-      static_assert(sizeof(WaterNumbers) == sizeof(moho::WaterShaderNumericState), "WaterNumbers mirrors WaterShaderNumericState");
+    if (
+      const moho::CWaterShaderProperties* const shader = mMap->mTerrainRes->GetWaterShaderProperties();
+      shader != nullptr
+    ) {
+      static_assert(
+        sizeof(WaterNumbers) == sizeof(moho::WaterShaderNumericState), "WaterNumbers mirrors WaterShaderNumericState"
+      );
       std::memcpy(&water.shader, &shader->mNumericState, sizeof(water.shader));
       water.textures[0] = shader->mWaterCubemap.c_str();
       water.textures[1] = shader->mWaterRamp.c_str();
@@ -1204,7 +1367,9 @@ namespace faf::editor
     return water;
   }
 
-  void EdDocument::ApplyWater(const WaterState& water)
+  void EdDocument::ApplyWater(
+    const WaterState& water
+  )
   {
     if (mMap == nullptr || mMap->mTerrainRes == nullptr || mMap->mTerrainRes->mMap == nullptr) {
       return;
@@ -1222,29 +1387,43 @@ namespace faf::editor
     mModified = true;
   }
 
-  void EdDocument::WaterInto(moho::IWldTerrainRes& terrainRes, const WaterState& water, const bool warnTextures)
+  void EdDocument::WaterInto(
+    moho::IWldTerrainRes& terrainRes,
+    const WaterState& water,
+    const bool warnTextures
+  )
   {
     moho::IWldTerrainRes* const terrain = &terrainRes;
     const moho::STIMap& map = *terrain->mMap;
     const bool levelsChanged = (map.mWaterEnabled != 0u) != water.enabled || map.mWaterElevation != water.elevation ||
-                               map.mWaterElevationDeep != water.deep || map.mWaterElevationAbyss != water.abyss;
+      map.mWaterElevationDeep != water.deep || map.mWaterElevationAbyss != water.abyss;
     terrain->WaterEnabled(water.enabled);
     terrain->SetWaterElevation(water.elevation);
     terrain->SetWaterElevationDeep(water.deep);
     terrain->SetWaterElevationAbyss(water.abyss);
     if (moho::CWaterShaderProperties* const shader = terrain->GetWaterShaderProperties(); shader != nullptr) {
       std::memcpy(&shader->mNumericState, &water.shader, sizeof(water.shader));
-      // The textures: new names, and the loaded ones dropped; the water's draw loads each again the next time it binds it
-      // (GetCubeMap 0x0089FC40, GetWaterRamp 0x0089FD70, GetNormalMap 0x0089FB00 load a slot that is empty).
-      fa::string* const paths[6] = {&shader->mWaterCubemap, &shader->mWaterRamp, &shader->mShaderNames[0], &shader->mShaderNames[1],
-                                    &shader->mShaderNames[2], &shader->mShaderNames[3]};
+      // The textures: new names, and the loaded ones dropped; the water's draw loads each again the next time it binds
+      // it (GetCubeMap 0x0089FC40, GetWaterRamp 0x0089FD70, GetNormalMap 0x0089FB00 load a slot that is empty).
+      fa::string* const paths[6] = {
+        &shader->mWaterCubemap,
+        &shader->mWaterRamp,
+        &shader->mShaderNames[0],
+        &shader->mShaderNames[1],
+        &shader->mShaderNames[2],
+        &shader->mShaderNames[3]
+      };
       bool texturesChanged = false;
       for (int i = 0; i < 6; ++i) {
         if (water.textures[i] != paths[i]->c_str()) {
           paths[i]->assign(water.textures[i].c_str());
           texturesChanged = true;
-          if (std::string probe; warnTextures && !water.textures[i].empty() && !ReadGameFile(water.textures[i], probe)) {
-            gpg::Warnf("editor: water texture %s isn't in the game's files; the game draws a stand-in", water.textures[i].c_str());
+          if (
+            std::string probe; warnTextures && !water.textures[i].empty() && !ReadGameFile(water.textures[i], probe)
+          ) {
+            gpg::Warnf(
+              "editor: water texture %s isn't in the game's files; the game draws a stand-in", water.textures[i].c_str()
+            );
           }
         }
       }
@@ -1258,7 +1437,9 @@ namespace faf::editor
     }
   }
 
-  void EdDocument::WaterEdited(WaterState before)
+  void EdDocument::WaterEdited(
+    WaterState before
+  )
   {
     mWaterUndo.emplace_back(std::move(before), WaterNow());
     if (mWaterUndo.size() > 200) {
@@ -1279,7 +1460,9 @@ namespace faf::editor
     return decals != nullptr ? CaptureDecals(*decals) : DecalSnapshot{};
   }
 
-  void EdDocument::RestoreDecals(const DecalSnapshot& decals)
+  void EdDocument::RestoreDecals(
+    const DecalSnapshot& decals
+  )
   {
     if (moho::IDecalManager* const manager = Decals(); manager != nullptr) {
       const DecalSnapshot before = LiveDecals() != nullptr ? DecalsNow() : DecalSnapshot{};
@@ -1294,7 +1477,10 @@ namespace faf::editor
     return mLiveMap != nullptr && mLiveMap->mTerrainRes != nullptr ? mLiveMap->mTerrainRes->GetDecalManager() : nullptr;
   }
 
-  void EdDocument::MirrorDecalsLive(const DecalSnapshot& before, const DecalSnapshot& after)
+  void EdDocument::MirrorDecalsLive(
+    const DecalSnapshot& before,
+    const DecalSnapshot& after
+  )
   {
     moho::IDecalManager* const live = LiveDecals();
     if (live == nullptr) {
@@ -1302,12 +1488,19 @@ namespace faf::editor
     }
     const DecalMirror done = MirrorDecals(*live, before, after);
     if (done.removed + done.added + done.missing > 0) {
-      gpg::Logf("editor: decals into the play: %d removed, %d added%s (%d there now)", done.removed, done.added,
-                done.missing > 0 ? (", " + std::to_string(done.missing) + " to remove weren't in it").c_str() : "", live->GetDecalCount());
+      gpg::Logf(
+        "editor: decals into the play: %d removed, %d added%s (%d there now)",
+        done.removed,
+        done.added,
+        done.missing > 0 ? (", " + std::to_string(done.missing) + " to remove weren't in it").c_str() : "",
+        live->GetDecalCount()
+      );
     }
   }
 
-  void EdDocument::DecalsEdited(DecalSnapshot before)
+  void EdDocument::DecalsEdited(
+    DecalSnapshot before
+  )
   {
     DecalSnapshot now = DecalsNow();
     MirrorDecalsLive(before, now);
@@ -1320,7 +1513,10 @@ namespace faf::editor
     mModified = true;
   }
 
-  void EdDocument::SetPropRecord(const std::size_t index, const PropRecord& record)
+  void EdDocument::SetPropRecord(
+    const std::size_t index,
+    const PropRecord& record
+  )
   {
     if (mMap == nullptr || mMap->mProps == nullptr || index >= mMap->mProps->mEntries.size()) {
       return;
@@ -1329,7 +1525,10 @@ namespace faf::editor
     mFileRecords.props[index] = record;
   }
 
-  void EdDocument::AddProp(const moho::CWldPropEntry& entry, const PropRecord& record)
+  void EdDocument::AddProp(
+    const moho::CWldPropEntry& entry,
+    const PropRecord& record
+  )
   {
     if (mMap == nullptr || mMap->mProps == nullptr) {
       return;
@@ -1341,7 +1540,9 @@ namespace faf::editor
     mFileRecords.props.push_back(record);
   }
 
-  void EdDocument::DeletePropAt(const std::size_t index)
+  void EdDocument::DeletePropAt(
+    const std::size_t index
+  )
   {
     if (mMap == nullptr || mMap->mProps == nullptr || index >= mMap->mProps->mEntries.size()) {
       return;
@@ -1352,7 +1553,9 @@ namespace faf::editor
     }
   }
 
-  void EdDocument::EditEnded(const EditKind kind)
+  void EdDocument::EditEnded(
+    const EditKind kind
+  )
   {
     mUndoOrder.push_back(kind);
     mRedoOrder.clear();
@@ -1369,7 +1572,9 @@ namespace faf::editor
     mTerrainTypesRedo.clear();
   }
 
-  bool EdDocument::PopUndo(EditKind& kind)
+  bool EdDocument::PopUndo(
+    EditKind& kind
+  )
   {
     if (mUndoOrder.empty()) {
       return false;
@@ -1379,7 +1584,9 @@ namespace faf::editor
     return true;
   }
 
-  bool EdDocument::PopRedo(EditKind& kind)
+  bool EdDocument::PopRedo(
+    EditKind& kind
+  )
   {
     if (mRedoOrder.empty()) {
       return false;
@@ -1389,7 +1596,10 @@ namespace faf::editor
     return true;
   }
 
-  bool EdDocument::TakeCreated(std::filesystem::path& folder, std::string& scenarioPath)
+  bool EdDocument::TakeCreated(
+    std::filesystem::path& folder,
+    std::string& scenarioPath
+  )
   {
     if (mCreatedScenario.empty()) {
       return false;
@@ -1449,27 +1659,57 @@ namespace faf::editor
     mScenarioRead = mScenario;
     // The markers the save's text gives, against those its Lua gave (every map should agree).
     if (mSave.Loaded() && static_cast<int>(mSave.Markers().size()) != load->facts.markerCount) {
-      gpg::Warnf("editor: %s: %zu markers in the save's text, %d in its Lua", load->facts.savePath.c_str(), mSave.Markers().size(),
-                 load->facts.markerCount);
+      gpg::Warnf(
+        "editor: %s: %zu markers in the save's text, %d in its Lua",
+        load->facts.savePath.c_str(),
+        mSave.Markers().size(),
+        load->facts.markerCount
+      );
     }
     mLua = std::move(load->lua);
     // A missing save keeps the map open: the editor still has its terrain, props and decals.
     mState = mMap != nullptr ? State::Open : State::Failed;
     mModified = false;
     if (mState == State::Open) {
-      if (const moho::CHeightField* const field = mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr) {
+      if (
+        const moho::CHeightField* const field =
+          mMap->mTerrainRes != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr
+      ) {
         mHeights.Reset(field->width, field->height);
       }
-      gpg::Logf("editor: opened %s in %.2f s: %d x %d, %zu layers named, %d props, %d decals, %d markers, %zu armies%s%s",
-                mPath.c_str(), mFacts.loadSeconds, mFacts.fieldWidth, mFacts.fieldHeight,
-                static_cast<std::size_t>(std::count_if(mFacts.layers.begin(), mFacts.layers.end(),
-                                                       [](const std::string& layer) { return !layer.empty(); })),
-                mFacts.props, mFacts.decals, mFacts.markerCount, mFacts.armies.size(), mError.empty() ? "" : "; ",
-                mError.c_str());
-      gpg::Logf("editor: water: %s, level %.2f, deep %.2f, abyss %.2f", mFacts.water ? "on" : "off",
-                static_cast<double>(mFacts.waterElevation), static_cast<double>(mFacts.waterDeep), static_cast<double>(mFacts.waterAbyss));
-      gpg::Logf("editor: symmetry from the heights: mode %d, %d turns (%.1f%% of points match)", static_cast<int>(mFacts.symmetry.symmetry),
-                mFacts.symmetry.turns, static_cast<double>(mFacts.symmetry.matched) * 100.0);
+      gpg::Logf(
+        "editor: opened %s in %.2f s: %d x %d, %zu layers named, %d props, %d decals, %d markers, %zu armies%s%s",
+        mPath.c_str(),
+        mFacts.loadSeconds,
+        mFacts.fieldWidth,
+        mFacts.fieldHeight,
+        static_cast<std::size_t>(std::count_if(
+          mFacts.layers.begin(),
+          mFacts.layers.end(),
+          [](const std::string& layer) {
+        return !layer.empty();
+      }
+        )),
+        mFacts.props,
+        mFacts.decals,
+        mFacts.markerCount,
+        mFacts.armies.size(),
+        mError.empty() ? "" : "; ",
+        mError.c_str()
+      );
+      gpg::Logf(
+        "editor: water: %s, level %.2f, deep %.2f, abyss %.2f",
+        mFacts.water ? "on" : "off",
+        static_cast<double>(mFacts.waterElevation),
+        static_cast<double>(mFacts.waterDeep),
+        static_cast<double>(mFacts.waterAbyss)
+      );
+      gpg::Logf(
+        "editor: symmetry from the heights: mode %d, %d turns (%.1f%% of points match)",
+        static_cast<int>(mFacts.symmetry.symmetry),
+        mFacts.symmetry.turns,
+        static_cast<double>(mFacts.symmetry.matched) * 100.0
+      );
       mRecentMaps = WithRecentMap(mRecentMaps, mPath);
       if (!mRecentMapsFile.empty() && !WriteRecentMaps(mRecentMapsFile, mRecentMaps)) {
         gpg::Warnf("editor: the recent maps list %s could not be written", mRecentMapsFile.c_str());
@@ -1480,17 +1720,24 @@ namespace faf::editor
     return true;
   }
 
-
   namespace
   {
-    [[nodiscard]] std::string Lower(std::string text)
+    [[nodiscard]] std::string Lower(
+      std::string text
+    )
     {
-      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return text;
     }
 
     /** `text` with every `from` replaced by `to`, ignoring case. */
-    [[nodiscard]] std::string ReplaceNoCase(const std::string& text, const std::string& from, const std::string& to)
+    [[nodiscard]] std::string ReplaceNoCase(
+      const std::string& text,
+      const std::string& from,
+      const std::string& to
+    )
     {
       if (from.empty()) {
         return text;
@@ -1499,7 +1746,8 @@ namespace faf::editor
       const std::string lowerFrom = Lower(from);
       std::string out;
       std::size_t at = 0;
-      for (std::size_t found = lowerText.find(lowerFrom); found != std::string::npos; found = lowerText.find(lowerFrom, at)) {
+      for (std::size_t found = lowerText.find(lowerFrom); found != std::string::npos;
+           found = lowerText.find(lowerFrom, at)) {
         out.append(text, at, found - at);
         out += to;
         at = found + from.size();
@@ -1509,11 +1757,17 @@ namespace faf::editor
     }
 
     /** The folder name without FAF's version suffix (`seton.v0003` -> `seton`). */
-    [[nodiscard]] std::string WithoutVersion(const std::string& folder)
+    [[nodiscard]] std::string WithoutVersion(
+      const std::string& folder
+    )
     {
       const std::size_t dot = Lower(folder).rfind(".v");
-      if (dot != std::string::npos && dot + 2 < folder.size() &&
-          std::all_of(folder.begin() + static_cast<std::ptrdiff_t>(dot + 2), folder.end(), [](const unsigned char c) { return std::isdigit(c) != 0; })) {
+      if (
+        dot != std::string::npos && dot + 2 < folder.size() &&
+        std::all_of(folder.begin() + static_cast<std::ptrdiff_t>(dot + 2), folder.end(), [](const unsigned char c) {
+        return std::isdigit(c) != 0;
+      })
+      ) {
         return folder.substr(0, dot);
       }
       return folder;
@@ -1523,7 +1777,9 @@ namespace faf::editor
 
   namespace
   {
-    std::string BaseOfFolder(const std::string& folder)
+    std::string BaseOfFolder(
+      const std::string& folder
+    )
     {
       return WithoutVersion(folder);
     }
@@ -1553,7 +1809,10 @@ namespace faf::editor
     return base + suffix;
   }
 
-  bool EdDocument::SaveAsNewFolder(const std::string& folder, std::string& message)
+  bool EdDocument::SaveAsNewFolder(
+    const std::string& folder,
+    std::string& message
+  )
   {
     if (mState != State::Open || mMap == nullptr) {
       message = "No map is open.";
@@ -1591,8 +1850,23 @@ namespace faf::editor
     if (vfs != nullptr) {
       // By file type: the engine's wildcard match never matches a pattern that ends in '*' ("*", "*.*";
       // gpg::STR_MatchWildcard's case-sensitive lane, which the file system uses).
-      static constexpr const char* kTypes[] = {"*.lua", "*.scmap", "*.dds", "*.png", "*.jpg", "*.jpeg", "*.txt", "*.md",
-                                               "*.bp", "*.scm", "*.sca", "*.json", "*.xwb", "*.xsb", "*.sfx"};
+      static constexpr const char* kTypes[] = {
+        "*.lua",
+        "*.scmap",
+        "*.dds",
+        "*.png",
+        "*.jpg",
+        "*.jpeg",
+        "*.txt",
+        "*.md",
+        "*.bp",
+        "*.scm",
+        "*.sca",
+        "*.json",
+        "*.xwb",
+        "*.xsb",
+        "*.sfx"
+      };
       for (const char* const type : kTypes) {
         fa::vector<fa::string> found;
         vfs->EnumerateFiles(("/maps/" + oldFolder).c_str(), type, true, &found);
@@ -1606,12 +1880,20 @@ namespace faf::editor
       return false;
     }
     // Tables made in the editor and not saved yet are copied too.
-    if (!mFacts.tablesPath.empty() && !mTables.empty() &&
-        std::none_of(files.begin(), files.end(), [&](const fa::string& file) { return Lower(file.c_str()) == Lower(mFacts.tablesPath); })) {
+    if (
+      !mFacts.tablesPath.empty() && !mTables.empty() &&
+      std::none_of(files.begin(), files.end(), [&](const fa::string& file) {
+      return Lower(file.c_str()) == Lower(mFacts.tablesPath);
+    })
+    ) {
       files.push_back(fa::string(mFacts.tablesPath.c_str()));
     }
-    if (!mFacts.optionsPath.empty() && !mOptions.empty() &&
-        std::none_of(files.begin(), files.end(), [&](const fa::string& file) { return Lower(file.c_str()) == Lower(mFacts.optionsPath); })) {
+    if (
+      !mFacts.optionsPath.empty() && !mOptions.empty() &&
+      std::none_of(files.begin(), files.end(), [&](const fa::string& file) {
+      return Lower(file.c_str()) == Lower(mFacts.optionsPath);
+    })
+    ) {
       files.push_back(fa::string(mFacts.optionsPath.c_str()));
     }
     std::filesystem::create_directories(target, error);
@@ -1698,10 +1980,16 @@ namespace faf::editor
     mTablesRead = mTables;
     mOptionsRead = mOptions;
     for (std::string* const path :
-         {&mFacts.mapPath, &mFacts.savePath, &mFacts.scriptPath, &mFacts.scenarioPath, &mFacts.tablesPath, &mFacts.optionsPath}) {
+         {&mFacts.mapPath,
+          &mFacts.savePath,
+          &mFacts.scriptPath,
+          &mFacts.scenarioPath,
+          &mFacts.tablesPath,
+          &mFacts.optionsPath}) {
       *path = ReplaceNoCase(ReplaceNoCase(*path, oldPrefix + oldBase, newPrefix + newBase), oldPrefix, newPrefix);
     }
-    message = "Saved as " + target.string() + " (" + std::to_string(copied + 1) + " files); the game lists it from its next start";
+    message = "Saved as " + target.string() + " (" + std::to_string(copied + 1) +
+      " files); the game lists it from its next start";
     return true;
   }
 
@@ -1724,7 +2012,10 @@ namespace faf::editor
     const std::filesystem::path folder = file.parent_path();
     std::string scenario;
     for (const std::string& name : FilesUnder(folder)) {
-      if (name.find('/') == std::string::npos && name.size() > 13 && name.compare(name.size() - 13, 13, "_scenario.lua") == 0) {
+      if (
+        name.find('/') == std::string::npos && name.size() > 13 &&
+        name.compare(name.size() - 13, 13, "_scenario.lua") == 0
+      ) {
         std::ifstream in(folder / name, std::ios::binary);
         scenario.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
       }
@@ -1736,7 +2027,11 @@ namespace faf::editor
     return plan;
   }
 
-  bool EdDocument::WritePackage(const PackagePlan& plan, std::filesystem::path& written, std::string& message) const
+  bool EdDocument::WritePackage(
+    const PackagePlan& plan,
+    std::filesystem::path& written,
+    std::string& message
+  ) const
   {
     const std::filesystem::path file = MapDiskFile();
     if (file.empty() || !plan.errors.empty()) {
@@ -1751,7 +2046,9 @@ namespace faf::editor
         message = "can't read " + (folder / name).string();
         return false;
       }
-      entries.push_back({plan.folder + "/" + name, std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>())});
+      entries.push_back(
+        {plan.folder + "/" + name, std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>())}
+      );
     }
     const std::string zip = WriteZip(entries);
     std::error_code error;
@@ -1764,11 +2061,14 @@ namespace faf::editor
       message = "can't write " + written.string();
       return false;
     }
-    message = "packaged " + std::to_string(entries.size()) + " files, " + std::to_string(zip.size()) + " bytes, as " + written.string();
+    message = "packaged " + std::to_string(entries.size()) + " files, " + std::to_string(zip.size()) + " bytes, as " +
+      written.string();
     return true;
   }
 
-  bool EdDocument::Save(std::string& message)
+  bool EdDocument::Save(
+    std::string& message
+  )
   {
     if (mState != State::Open || mMap == nullptr) {
       message = "No map is open.";
@@ -1776,13 +2076,15 @@ namespace faf::editor
     }
     const std::filesystem::path file = MapDiskFile();
     if (file.empty()) {
-      message = "This map is inside the game's archives and has no file of its own to save over; save it as a new map folder.";
+      message =
+        "This map is inside the game's archives and has no file of its own to save over; save it as a new map folder.";
       return false;
     }
     // Only a map in the vault's maps folder is written over; the game's own maps stay as installed.
     std::error_code ignored;
     const std::filesystem::path vaultMaps = std::filesystem::weakly_canonical(mVault / "maps", ignored);
-    const std::filesystem::path relative = std::filesystem::relative(std::filesystem::weakly_canonical(file, ignored), vaultMaps, ignored);
+    const std::filesystem::path relative =
+      std::filesystem::relative(std::filesystem::weakly_canonical(file, ignored), vaultMaps, ignored);
     if (mVault.empty() || relative.empty() || relative.native().rfind(L"..", 0) == 0) {
       message = "This map isn't in your vault (" + (mVault / "maps").string() + "); save it as a new map folder there.";
       return false;
@@ -1803,7 +2105,9 @@ namespace faf::editor
       const std::filesystem::path backup = file.parent_path() / ".editor_backup" / stamp;
       std::filesystem::create_directories(backup, error);
       if (!error) {
-        std::filesystem::copy_file(file, backup / file.filename(), std::filesystem::copy_options::overwrite_existing, error);
+        std::filesystem::copy_file(
+          file, backup / file.filename(), std::filesystem::copy_options::overwrite_existing, error
+        );
       }
       if (error) {
         message = "The backup of " + file.string() + " failed (" + error.message() + "); nothing was saved.";

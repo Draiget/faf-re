@@ -28,7 +28,9 @@ namespace faf::editor
     constexpr int kSheetFormat = 2;
   } // namespace
 
-  std::uint64_t EdPropThumbnails::Get(const std::string& blueprintPath)
+  std::uint64_t EdPropThumbnails::Get(
+    const std::string& blueprintPath
+  )
   {
     const auto found = mEntries.find(blueprintPath);
     if (found == mEntries.end()) {
@@ -46,7 +48,11 @@ namespace faf::editor
     return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(texture.get()));
   }
 
-  bool EdPropThumbnails::Save(const std::string& name, const std::string& file, std::string& blueprint)
+  bool EdPropThumbnails::Save(
+    const std::string& name,
+    const std::string& file,
+    std::string& blueprint
+  )
   {
     for (auto& [path, entry] : mEntries) {
       if (path.find(name) == std::string::npos || entry.failed || !entry.sheet) {
@@ -59,7 +65,9 @@ namespace faf::editor
       }
       // A bottom-up 32-bit BMP: the sheet's rows from the last.
       std::vector<std::uint8_t> out(54 + static_cast<std::size_t>(kSide) * kSide * 4, 0);
-      const auto put32 = [&](const std::size_t at, const std::uint32_t value) { std::memcpy(out.data() + at, &value, 4); };
+      const auto put32 = [&](const std::size_t at, const std::uint32_t value) {
+        std::memcpy(out.data() + at, &value, 4);
+      };
       out[0] = 'B';
       out[1] = 'M';
       put32(2, static_cast<std::uint32_t>(out.size()));
@@ -70,8 +78,11 @@ namespace faf::editor
       out[26] = 1;
       out[28] = 32;
       for (int y = 0; y < kSide; ++y) {
-        std::memcpy(out.data() + 54 + static_cast<std::size_t>(kSide - 1 - y) * kSide * 4,
-                    static_cast<const std::uint8_t*>(bits) + static_cast<std::size_t>(y) * pitch, static_cast<std::size_t>(kSide) * 4);
+        std::memcpy(
+          out.data() + 54 + static_cast<std::size_t>(kSide - 1 - y) * kSide * 4,
+          static_cast<const std::uint8_t*>(bits) + static_cast<std::size_t>(y) * pitch,
+          static_cast<std::size_t>(kSide) * 4
+        );
       }
       (void)entry.sheet->Unlock();
       std::ofstream stream(file, std::ios::binary | std::ios::trunc);
@@ -82,7 +93,9 @@ namespace faf::editor
     return false;
   }
 
-  void EdPropThumbnails::Pump(int count)
+  void EdPropThumbnails::Pump(
+    int count
+  )
   {
     moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
     moho::CD3DDevice* const device = moho::D3D_GetDevice();
@@ -102,7 +115,8 @@ namespace faf::editor
       const fa::string full(path.c_str());
       gpg::STR_CopyFilename(&id.name, &full);
       const moho::RPropBlueprint* const blueprint = rules->GetPropBlueprint(id);
-      const moho::RMeshBlueprint* const mesh = blueprint != nullptr ? rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint) : nullptr;
+      const moho::RMeshBlueprint* const mesh =
+        blueprint != nullptr ? rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint) : nullptr;
       if (mesh == nullptr) {
         entry.failed = true;
         continue;
@@ -123,7 +137,9 @@ namespace faf::editor
       // A three-quarter view: turned 35 degrees about the vertical (w, x, y, z).
       const float half = 0.5f * 35.0f * 3.14159265f / 180.0f;
       const Wm3::Quatf turn(std::cos(half), 0.0f, std::sin(half), 0.0f);
-      (void)moho::REN_RequestThumbnail(mesh, turn, 0xFFFFFFFFu, Wm3::Vec3f{1.0f, 1.0f, 1.0f}, sheet, gpg::Rect2f{0.0f, 0.0f, 1.0f, 1.0f});
+      (void)moho::REN_RequestThumbnail(
+        mesh, turn, 0xFFFFFFFFu, Wm3::Vec3f{1.0f, 1.0f, 1.0f}, sheet, gpg::Rect2f{0.0f, 0.0f, 1.0f, 1.0f}
+      );
       entry.sheet = std::move(sheet);
     }
   }

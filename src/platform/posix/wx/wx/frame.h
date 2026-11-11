@@ -18,7 +18,7 @@
 #define wxRESIZE_BORDER 0x00000040
 #define wxCLOSE_BOX 0x1000
 #define wxCLIP_CHILDREN 0x00400000
-#define wxDEFAULT_FRAME_STYLE \
+#define wxDEFAULT_FRAME_STYLE                                                                                          \
   (wxSYSTEM_MENU | wxRESIZE_BORDER | wxMINIMIZE_BOX | wxMAXIMIZE_BOX | wxCAPTION | wxCLIP_CHILDREN)
 #define wxSIZE_USE_EXISTING 0x0000
 #define wxBITMAP_TYPE_ICO_RESOURCE 4
@@ -29,7 +29,10 @@ class wxIcon : public wxBitmap
 {
 public:
   wxIcon() = default;
-  wxIcon(const wchar_t* const name, const long type)
+  wxIcon(
+    const wchar_t* const name,
+    const long type
+  )
   {
     (void)name;
     (void)type;
@@ -53,29 +56,75 @@ public:
   );
 
   virtual void Maximize(bool maximize = true);
-  virtual bool IsMaximized() const { return m_maximized; }
+  virtual bool IsMaximized() const
+  {
+    return m_maximized;
+  }
   virtual void Iconize(bool iconize = true);
-  virtual bool IsIconized() const { return m_iconized; }
+  virtual bool IsIconized() const
+  {
+    return m_iconized;
+  }
   virtual bool ShowFullScreen(bool show, long style = 0);
-  virtual bool IsFullScreen() const { return m_fullScreen; }
-  virtual void SetIcon(const wxIcon& icon) { (void)icon; }
+  virtual bool IsFullScreen() const
+  {
+    return m_fullScreen;
+  }
+  virtual void SetIcon(
+    const wxIcon& icon
+  )
+  {
+    (void)icon;
+  }
   virtual void SetTitle(const wxString& title);
-  virtual wxString GetTitle() const { return m_title; }
+  virtual wxString GetTitle() const
+  {
+    return m_title;
+  }
 
   // What the window system reports (WxStandIn.cpp's event delivery).
-  void NoteMaximized(const bool maximized) { m_maximized = maximized; }
-  void NoteIconized(const bool iconized) { m_iconized = iconized; }
+  void NoteMaximized(
+    const bool maximized
+  )
+  {
+    m_maximized = maximized;
+  }
+  void NoteIconized(
+    const bool iconized
+  )
+  {
+    m_iconized = iconized;
+  }
 
-  void SetSizeHints(const int minWidth, const int minHeight, const int maxWidth = -1, const int maxHeight = -1)
+  void SetSizeHints(
+    const int minWidth,
+    const int minHeight,
+    const int maxWidth = -1,
+    const int maxHeight = -1
+  )
   {
     m_minWidth = minWidth;
     m_minHeight = minHeight;
     (void)maxWidth;
     (void)maxHeight;
   }
-  void SetClientSize(const int width, const int height) { SetSize(width, height); }
-  void SetWindowStyleFlag(const long style) { m_windowStyle = style; }
-  long GetWindowStyleFlag() const { return m_windowStyle; }
+  void SetClientSize(
+    const int width,
+    const int height
+  )
+  {
+    SetSize(width, height);
+  }
+  void SetWindowStyleFlag(
+    const long style
+  )
+  {
+    m_windowStyle = style;
+  }
+  long GetWindowStyleFlag() const
+  {
+    return m_windowStyle;
+  }
 
 private:
   wxString m_title;

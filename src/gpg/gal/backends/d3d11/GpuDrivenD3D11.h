@@ -21,9 +21,18 @@ namespace gpg::gal
     GpuBufferD3D11(ID3D11Device* device, const GpuBufferDesc& desc);
     ~GpuBufferD3D11() override;
 
-    [[nodiscard]] ID3D11Buffer* Buffer() const noexcept { return mBuffer.Get(); }
-    [[nodiscard]] ID3D11ShaderResourceView* ShaderView() const noexcept { return mShaderView.Get(); }
-    [[nodiscard]] ID3D11UnorderedAccessView* WriteView() const noexcept { return mWriteView.Get(); }
+    [[nodiscard]] ID3D11Buffer* Buffer() const noexcept
+    {
+      return mBuffer.Get();
+    }
+    [[nodiscard]] ID3D11ShaderResourceView* ShaderView() const noexcept
+    {
+      return mShaderView.Get();
+    }
+    [[nodiscard]] ID3D11UnorderedAccessView* WriteView() const noexcept
+    {
+      return mWriteView.Get();
+    }
 
   private:
     Microsoft::WRL::ComPtr<ID3D11Buffer> mBuffer;
@@ -56,7 +65,10 @@ namespace gpg::gal
     GpuDrivenD3D11(const GpuDrivenD3D11&) = delete;
     GpuDrivenD3D11& operator=(const GpuDrivenD3D11&) = delete;
 
-    [[nodiscard]] std::uint32_t Features() const noexcept { return mFeatures; }
+    [[nodiscard]] std::uint32_t Features() const noexcept
+    {
+      return mFeatures;
+    }
 
     [[nodiscard]] boost::shared_ptr<GpuBuffer> CreateBuffer(const GpuBufferDesc& desc);
     void UpdateBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, const void* data);

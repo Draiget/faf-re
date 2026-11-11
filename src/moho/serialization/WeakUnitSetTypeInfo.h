@@ -12,7 +12,7 @@ namespace moho
   {
   public:
     /**
-       * Address: 0x006D2B10 (FUN_006D2B10)
+     * Address: 0x006D2B10 (FUN_006D2B10)
      *
      * What it does:
      * Constructs/preregisters RTTI metadata for `WeakEntitySetTemplate<Unit>`.

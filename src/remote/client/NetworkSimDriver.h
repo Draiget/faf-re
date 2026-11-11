@@ -37,7 +37,7 @@ namespace moho
   class LaunchInfoBase;
   class RRuleGameRules;
   struct SSTIArmyConstantData;
-}
+} // namespace moho
 
 namespace LuaPlus
 {
@@ -55,8 +55,13 @@ namespace faf::remote::client
      * map's, as loaded (the server's terrain edits go on a copy); may be null.
      */
     CNetworkSimDriver(
-      moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch, const char* playerName, int clientIndex, std::int32_t uid,
-      unsigned int sourceId, const moho::CHeightField* heights
+      moho::RRuleGameRules& rules,
+      const moho::LaunchInfoBase& launch,
+      const char* playerName,
+      int clientIndex,
+      std::int32_t uid,
+      unsigned int sourceId,
+      const moho::CHeightField* heights
     );
     ~CNetworkSimDriver() override;
 
@@ -79,42 +84,55 @@ namespace faf::remote::client
     void RequestPause(std::int32_t* outCommandCookie) override;
     void Resume(std::int32_t* outCommandCookie) override;
     moho::CmdId SingleStep() override;
-    moho::CmdId CreateUnit(uint32_t armyIndex, const moho::RResId& id, const moho::SCoordsVec2& pos, float heading)
-      override;
+    moho::CmdId
+    CreateUnit(uint32_t armyIndex, const moho::RResId& id, const moho::SCoordsVec2& pos, float heading) override;
     moho::CmdId CreateProp(const char* id, const Wm3::Vec3f& loc) override;
     moho::CmdId DestroyEntity(moho::EntId entityId) override;
     moho::CmdId WarpEntity(moho::EntId entityId, const moho::VTransform& transform) override;
     moho::CmdId ProcessInfoPair(moho::EntId entityId, gpg::StrArg key, gpg::StrArg val) override;
     moho::CmdId IssueCommand(
-      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities, const moho::SSTICommandIssueData& data, bool clear
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities,
+      const moho::SSTICommandIssueData& data,
+      bool clear
     ) override;
     moho::CmdId IssueFactoryCommand(
-      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities, const moho::SSTICommandIssueData& data, bool clear
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities,
+      const moho::SSTICommandIssueData& data,
+      bool clear
     ) override;
     moho::CmdId IncreaseCommandCount(moho::CmdId id, int count) override;
     moho::CmdId DecreaseCommandCount(moho::CmdId id, int count) override;
     moho::CmdId SetCommandTarget(moho::CmdId id, const moho::SSTITarget& target) override;
     moho::CmdId SetCommandType(moho::CmdId id, moho::EUnitCommandType type) override;
     moho::CmdId SetCommandCells(
-      moho::CmdId id, const gpg::core::FastVector<moho::SOCellPos>& cells, const Wm3::Vector3<float>& target
+      moho::CmdId id,
+      const gpg::core::FastVector<moho::SOCellPos>& cells,
+      const Wm3::Vector3<float>& target
     ) override;
     moho::CmdId RemoveCommandFromUnitQueue(moho::CmdId id, moho::EntId unitId) override;
     moho::CmdId ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args) override;
     moho::CmdId LuaSimCallback(
-      const char* fnName, const LuaPlus::LuaObject& args, const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
+      const char* fnName,
+      const LuaPlus::LuaObject& args,
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
     ) override;
     moho::CmdId ExecuteDebugCommand(
-      const char* command, const Wm3::Vector3<float>& worldPos, uint32_t focusArmy,
+      const char* command,
+      const Wm3::Vector3<float>& worldPos,
+      uint32_t focusArmy,
       const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
     ) override;
     /** No sim on this side: null (`WEmitterWx` and the other callers check). */
     moho::Sim* ProcessEvents() override;
     void ReleaseInterlockRef() override;
     void RequestSaveGame(moho::ISaveRequest* request) override;
-    void DrawNetworkStats(moho::CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY)
-      override;
+    void
+    DrawNetworkStats(moho::CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY) override;
 
-    [[nodiscard]] const CServerViewClient* Views() const noexcept { return mViews.get(); }
+    [[nodiscard]] const CServerViewClient* Views() const noexcept
+    {
+      return mViews.get();
+    }
 
   private:
     /** One message from the server for the session. */
@@ -128,7 +146,8 @@ namespace faf::remote::client
     /** The beat a command just sent will be applied at, as best this side knows: the newest shown plus one. */
     [[nodiscard]] moho::CmdId IssueBeat() const noexcept;
     void LogSummary(const char* when) const;
-    /** Plan WP11.4: chat for a roster client goes through the server; for this player's own client, straight to its UI. */
+    /** Plan WP11.4: chat for a roster client goes through the server; for this player's own client, straight to its UI.
+     */
     void SendChat(int clientIndex, const gpg::MemBuffer<const char>& data);
     /** A chat line the server relayed, from the client `senderIndex`, to the UI as a lockstep peer's would come. */
     void DeliverChat(int senderIndex, std::span<const std::uint8_t> payload);
@@ -137,12 +156,12 @@ namespace faf::remote::client
     CRemoteClientManager mClientManager;
     moho::CMarshaller mMarshaller;
     std::unique_ptr<CServerViewClient> mViews;
-    CSpeedMeter mSpeedMeter;              // plan WP10.7: what applying a view costs
+    CSpeedMeter mSpeedMeter; // plan WP10.7: what applying a view costs
     static constexpr int kNoFocusGranted = -1000;
-    std::atomic<int> mFocusGranted{kNoFocusGranted};  // plan WP11.1: the army the server granted; none: GameInfo's
+    std::atomic<int> mFocusGranted{kNoFocusGranted}; // plan WP11.1: the army the server granted; none: GameInfo's
     std::chrono::steady_clock::time_point mCamerasSentAt{};
     std::uint64_t mCamerasSent = 0;
-    std::array<std::uint64_t, 5> mLaneBytes{}; // plan WP10.10: bytes taken by lane (EServerLane order)
+    std::array<std::uint64_t, 5> mLaneBytes{};        // plan WP10.10: bytes taken by lane (EServerLane order)
     std::unique_ptr<LuaPlus::LuaState> mEmptySyncLua; // makes the `Sync` table's bytes for a view with no Lua lane
     std::vector<std::uint8_t> mEmptySync;
     // Every army's constants (index, names, civilian), as the sim's first packet gives them (`Sim::Sync`
@@ -173,7 +192,8 @@ namespace faf::remote::client
     std::uint64_t mLuaMissing = 0;
     HANDLE mAvailable = nullptr;
     // Plan WP11.5 (#178): the server's beats as they arrive and as the session shows them; `GetSimSpeed` is its skew,
-    // so the display keeps `kTargetBacklog` beats in hand against arrival jitter, neither ahead of the views nor behind.
+    // so the display keeps `kTargetBacklog` beats in hand against arrival jitter, neither ahead of the views nor
+    // behind.
     static constexpr std::int64_t kTargetBacklog = 1;
     CBeatClock mClock{kTargetBacklog};
     std::int32_t mLastBeat = -1;
@@ -186,10 +206,11 @@ namespace faf::remote::client
     // Plan WP3.7 (#99): the beat a command's UI edits last until is the beat the server applies it in, which its
     // `CommandAnswer` tells later. Each command sent remembers the beat shown then; each answer gives how far ahead
     // of it the command went in, and an issued command's beat is the shown beat plus the largest of the last answers'.
-    std::deque<std::int32_t> mSentAtShown;   // per command sent, unanswered: the beat shown when it went
-    std::deque<std::int32_t> mRecentLeads;   // the last answers' beat minus beat shown at sending
+    std::deque<std::int32_t> mSentAtShown; // per command sent, unanswered: the beat shown when it went
+    std::deque<std::int32_t> mRecentLeads; // the last answers' beat minus beat shown at sending
     std::int32_t mIssueLead = kDefaultIssueLead;
-    std::uint64_t mAnswersPastEstimate = 0;  // applied after the beat its command was given (the UI dropped its edit early)
+    std::uint64_t mAnswersPastEstimate =
+      0; // applied after the beat its command was given (the UI dropped its edit early)
     std::int32_t mLargestLead = 0;
     static constexpr std::int32_t kDefaultIssueLead = 10; // a second of beats, until answers say otherwise
     static constexpr std::size_t kLeadWindow = 32;
@@ -212,6 +233,8 @@ namespace faf::remote::client
   [[nodiscard]] bool HasServerLaunch() noexcept;
   /** `WLD_DoLoading`, in a server session: the driver, over the session's rules and its map's heights (may be null). */
   [[nodiscard]] moho::ISTIDriver* CreateServerSessionDriver(
-    moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch, const moho::CHeightField* heights
+    moho::RRuleGameRules& rules,
+    const moho::LaunchInfoBase& launch,
+    const moho::CHeightField* heights
   );
 } // namespace faf::remote::client

@@ -137,7 +137,11 @@ namespace moho
      * Initializes TCP connection object and links it into connector list.
      */
     CNetTCPConnection(
-      CNetTCPConnector* connector, platform::net::Socket socket, u_long address, u_short port, ENetConnectionState state
+      CNetTCPConnector* connector,
+      platform::net::Socket socket,
+      u_long address,
+      u_short port,
+      ENetConnectionState state
     );
 
     /**
@@ -174,28 +178,28 @@ namespace moho
     int SelectSocket(void* eventHandle);
 
   public:
-    CNetTCPConnector* mConnector{nullptr};        // +0x418
-    platform::net::Socket mSocket{platform::net::kInvalidSocket};               // +0x41C
-    u_long mAddr{0};                              // +0x420
-    u_short mPort{0};                             // +0x424
-    std::uint16_t mPad0x426{0};                   // +0x426
-    ENetConnectionState mState{kNetStatePending}; // +0x428
-    std::uint32_t mPad0x42C{0};                   // +0x42C
-    gpg::time::Timer mTimer;                      // +0x430
-    gpg::PipeStream mInputStream;                 // +0x438
-    gpg::PipeStream mOutputStream;                // +0x480
-    char mSendBuffer[kNetIoBufferSize]{};         // +0x4C8
-    std::uint32_t mSendBufferSize{0};             // +0xCC8
-    std::uint8_t mHasShutdownOutput{0};           // +0xCCC
-    std::uint8_t mPad0xCCD[3]{};                  // +0xCCD
-    CMessage mDatagram;                           // +0xCD0 (+0xD24 is its tail padding)
-    std::uint8_t mPushFailed{0};                  // +0xD28
-    std::uint8_t mPullFailed{0};                  // +0xD29
-    std::uint8_t mScheduleDestroy{0};             // +0xD2A
+    CNetTCPConnector* mConnector{nullptr};                        // +0x418
+    platform::net::Socket mSocket{platform::net::kInvalidSocket}; // +0x41C
+    u_long mAddr{0};                                              // +0x420
+    u_short mPort{0};                                             // +0x424
+    std::uint16_t mPad0x426{0};                                   // +0x426
+    ENetConnectionState mState{kNetStatePending};                 // +0x428
+    std::uint32_t mPad0x42C{0};                                   // +0x42C
+    gpg::time::Timer mTimer;                                      // +0x430
+    gpg::PipeStream mInputStream;                                 // +0x438
+    gpg::PipeStream mOutputStream;                                // +0x480
+    char mSendBuffer[kNetIoBufferSize]{};                         // +0x4C8
+    std::uint32_t mSendBufferSize{0};                             // +0xCC8
+    std::uint8_t mHasShutdownOutput{0};                           // +0xCCC
+    std::uint8_t mPad0xCCD[3]{};                                  // +0xCCD
+    CMessage mDatagram;                                           // +0xCD0 (+0xD24 is its tail padding)
+    std::uint8_t mPushFailed{0};                                  // +0xD28
+    std::uint8_t mPullFailed{0};                                  // +0xD29
+    std::uint8_t mScheduleDestroy{0};                             // +0xD2A
     // Set once the locally injected LOBMSG_ConnMade has been dispatched; the
     // binary leaves +0xD2B unwritten.
-    std::uint8_t mDispatchedConnMade{0};          // +0xD2B
-    std::uint8_t mPad0xD2C[4]{};                  // +0xD2C
+    std::uint8_t mDispatchedConnMade{0}; // +0xD2B
+    std::uint8_t mPad0xD2C[4]{};         // +0xD2C
   };
   static_assert(sizeof(CNetTCPConnection) == 0xD30, "CNetTCPConnection size must be 0xD30");
 } // namespace moho

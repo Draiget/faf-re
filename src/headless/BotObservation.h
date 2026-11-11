@@ -87,10 +87,10 @@ namespace faf::headless
     struct SEntity
     {
       std::string blueprint;
-      std::string icon;             // the blueprint's strategic icon name
+      std::string icon; // the blueprint's strategic icon name
       bool blip = false;
-      bool mobile = true;           // as the client's UserUnit::IsMobile
-      bool blueprintMobile = true;  // as REntityBlueprint::IsMobile, which picks the generic icon
+      bool mobile = true;          // as the client's UserUnit::IsMobile
+      bool blueprintMobile = true; // as REntityBlueprint::IsMobile, which picks the generic icon
       std::int32_t layer = 0;
       bool dead = false;
       std::int32_t visibilityMode = 0;

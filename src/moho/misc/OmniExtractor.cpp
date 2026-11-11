@@ -14,7 +14,9 @@ namespace moho
    * Address: 0x007ECEB0 (FUN_007ECEB0, Moho::OmniExtractor::Range)
    */
   bool OmniExtractor::Range(
-    SRangeExtractionPayload* const outRange, const RUnitBlueprint* const unitBlueprint, const Wm3::Vec3f& center
+    SRangeExtractionPayload* const outRange,
+    const RUnitBlueprint* const unitBlueprint,
+    const Wm3::Vec3f& center
   ) const
   {
     if (!outRange || !unitBlueprint) {
@@ -29,7 +31,9 @@ namespace moho
    * Address: 0x007ECDF0 (FUN_007ECDF0, Moho::OmniExtractor::Extract)
    */
   bool OmniExtractor::Extract(
-    SRangeExtractionPayload* const outRange, const UserEntity* const userEntity, const float interpolationAlpha
+    SRangeExtractionPayload* const outRange,
+    const UserEntity* const userEntity,
+    const float interpolationAlpha
   ) const
   {
     if (!outRange || !userEntity) {

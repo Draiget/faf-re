@@ -11,7 +11,9 @@ namespace
    * What it does:
    * Registers one debug-overlay descriptor pair for world-grid rendering.
    */
-  void RegisterRDebugGridOverlayClass(moho::RDebugOverlayClass* const typeInfo)
+  void RegisterRDebugGridOverlayClass(
+    moho::RDebugOverlayClass* const typeInfo
+  )
   {
     typeInfo->RegisterOverlayClass("Display the world grid", "Grid");
   }
@@ -65,7 +67,9 @@ namespace moho
   /**
    * Address: 0x0064EAE0 (FUN_0064EAE0, Moho::RDebugGridTypeInfo::CtrRef)
    */
-  gpg::RRef RDebugGridTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef RDebugGridTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     return debug_reflection::CtrRef<RDebugGrid>(objectStorage, RDebugGrid::sType);
   }
@@ -73,7 +77,9 @@ namespace moho
   /**
    * Address: 0x0064EAC0 (FUN_0064EAC0, Moho::RDebugGridTypeInfo::Delete)
    */
-  void RDebugGridTypeInfo::Delete(void* const objectStorage)
+  void RDebugGridTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     debug_reflection::Delete<RDebugGrid>(objectStorage);
   }
@@ -81,7 +87,9 @@ namespace moho
   /**
    * Address: 0x0064EB20 (FUN_0064EB20, Moho::RDebugGridTypeInfo::Destruct)
    */
-  void RDebugGridTypeInfo::Destruct(void* const objectStorage)
+  void RDebugGridTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     debug_reflection::Destruct<RDebugGrid>(objectStorage);
   }
@@ -89,7 +97,9 @@ namespace moho
   /**
    * Address: 0x0064F030 (FUN_0064F030, Moho::RDebugGridTypeInfo::AddBase_RDebugOverlay)
    */
-  void RDebugGridTypeInfo::AddBase_RDebugOverlay(gpg::RType* const typeInfo)
+  void RDebugGridTypeInfo::AddBase_RDebugOverlay(
+    gpg::RType* const typeInfo
+  )
   {
     debug_reflection::AddBaseRDebugOverlay(typeInfo);
   }

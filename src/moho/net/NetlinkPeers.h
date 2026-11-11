@@ -24,12 +24,12 @@ namespace moho
   {
     std::int64_t id = 0;
     std::string login;
-    std::string state;      // netlink::LinkStateName
+    std::string state; // netlink::LinkStateName
     bool connected = false;
-    std::string localType;  // the selected pair's candidate types ("host", "srflx", "prflx", "relay")
+    std::string localType; // the selected pair's candidate types ("host", "srflx", "prflx", "relay")
     std::string remoteType;
-    double rttMs = -1;      // the offerer's echo, else the lane's RTT; -1 when neither has a sample
-    bool onLane = false;    // the redundant lane (#240)
+    double rttMs = -1;          // the offerer's echo, else the lane's RTT; -1 when neither has a sample
+    bool onLane = false;        // the redundant lane (#240)
     bool laneEncrypted = false; // #289
     std::uint32_t attempts = 0;
     faf::netlink::PathChoice choice; // the path picked in the panel (#322)

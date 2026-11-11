@@ -10,28 +10,30 @@ namespace difffuzz
   namespace
   {
     constexpr std::uint32_t kEdgeBits[] = {
-      0x00000000u, 0x80000000u,             // +-0
-      0x7F800000u, 0xFF800000u,             // +-inf
+      0x00000000u, 0x80000000u,              // +-0
+      0x7F800000u, 0xFF800000u,              // +-inf
       0x7FC00000u, 0xFFC00000u, 0x7FC12345u, // qNaN, x86 "indefinite", payload
-      0x00800000u, 0x80800000u,             // +-FLT_MIN
-      0x00000001u, 0x80000001u,             // +-smallest denormal
-      0x007FFFFFu, 0x807FFFFFu,             // +-largest denormal
-      0x7F7FFFFFu, 0xFF7FFFFFu,             // +-FLT_MAX
-      0x3F800000u, 0xBF800000u,             // +-1
-      0x3F000000u, 0xBF000000u,             // +-0.5
-      0x40000000u, 0xC0000000u,             // +-2
-      0x358637BDu, 0xB58637BDu,             // +-1e-6
-      0x3A83126Fu, 0xBA83126Fu,             // +-1e-3
-      0x3FC90FDBu, 0xBFC90FDBu,             // +-pi/2
-      0x40490FDBu, 0xC0490FDBu,             // +-pi
-      0x40C90FDBu, 0xC0C90FDBu,             // +-2pi
-      0x1E3CE508u, 0x60AD78ECu,             // 1e-20, 1e20
-      0x3F800001u, 0x3F7FFFFFu,             // 1 +- 1ulp
-      0x5F800000u, 0x1F800000u,             // 2^64, 2^-64 (x87 range probes)
+      0x00800000u, 0x80800000u,              // +-FLT_MIN
+      0x00000001u, 0x80000001u,              // +-smallest denormal
+      0x007FFFFFu, 0x807FFFFFu,              // +-largest denormal
+      0x7F7FFFFFu, 0xFF7FFFFFu,              // +-FLT_MAX
+      0x3F800000u, 0xBF800000u,              // +-1
+      0x3F000000u, 0xBF000000u,              // +-0.5
+      0x40000000u, 0xC0000000u,              // +-2
+      0x358637BDu, 0xB58637BDu,              // +-1e-6
+      0x3A83126Fu, 0xBA83126Fu,              // +-1e-3
+      0x3FC90FDBu, 0xBFC90FDBu,              // +-pi/2
+      0x40490FDBu, 0xC0490FDBu,              // +-pi
+      0x40C90FDBu, 0xC0C90FDBu,              // +-2pi
+      0x1E3CE508u, 0x60AD78ECu,              // 1e-20, 1e20
+      0x3F800001u, 0x3F7FFFFFu,              // 1 +- 1ulp
+      0x5F800000u, 0x1F800000u,              // 2^64, 2^-64 (x87 range probes)
     };
     constexpr std::uint32_t kEdgeCount = sizeof(kEdgeBits) / sizeof(kEdgeBits[0]);
 
-    [[nodiscard]] float Sanitize(std::uint32_t u) noexcept
+    [[nodiscard]] float Sanitize(
+      std::uint32_t u
+    ) noexcept
     {
       const bool nan = (u & 0x7F800000u) == 0x7F800000u && (u & 0x007FFFFFu) != 0;
       if (nan && !gAllowSnan) {
@@ -40,12 +42,18 @@ namespace difffuzz
       return FromBits(u);
     }
 
-    [[nodiscard]] float Sign(Rng& rng, const double v) noexcept
+    [[nodiscard]] float Sign(
+      Rng& rng,
+      const double v
+    ) noexcept
     {
       return static_cast<float>(rng.Chance(50) ? -v : v);
     }
 
-    void NormalizeD(double* v, const int n) noexcept
+    void NormalizeD(
+      double* v,
+      const int n
+    ) noexcept
     {
       double s = 0.0;
       for (int i = 0; i < n; ++i) {
@@ -57,7 +65,9 @@ namespace difffuzz
       }
     }
 
-    [[nodiscard]] double Perturbation(Rng& rng) noexcept
+    [[nodiscard]] double Perturbation(
+      Rng& rng
+    ) noexcept
     {
       static constexpr double kEps[] = {0.0, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2};
       const double eps = kEps[rng.Below(8)]; // one draw per statement: see GenFloat
@@ -65,12 +75,17 @@ namespace difffuzz
     }
   } // namespace
 
-  float GenEdge(Rng& rng)
+  float GenEdge(
+    Rng& rng
+  )
   {
     return Sanitize(kEdgeBits[rng.Below(kEdgeCount)]);
   }
 
-  float GenPlain(Rng& rng, const float lim)
+  float GenPlain(
+    Rng& rng,
+    const float lim
+  )
   {
     return static_cast<float>(rng.Range(-lim, lim));
   }
@@ -80,7 +95,9 @@ namespace difffuzz
   // and so is the order of a binary operator's operands (cl and clang differ).
   // faf_math_dump compares the platforms' and retail's streams. Each ldexp
   // draws its exponent first, the order the Windows builds always used.
-  float GenFloat(Rng& rng)
+  float GenFloat(
+    Rng& rng
+  )
   {
     switch (rng.Below(12)) {
     case 0:
@@ -116,7 +133,10 @@ namespace difffuzz
     }
   }
 
-  void GenUnitVec3(Rng& rng, float* v)
+  void GenUnitVec3(
+    Rng& rng,
+    float* v
+  )
   {
     double d[3];
     do {
@@ -130,7 +150,10 @@ namespace difffuzz
     }
   }
 
-  void GenVec3(Rng& rng, float* v)
+  void GenVec3(
+    Rng& rng,
+    float* v
+  )
   {
     const std::uint32_t mode = rng.Below(100);
     if (mode < 35) {
@@ -158,7 +181,11 @@ namespace difffuzz
     }
   }
 
-  void GenVecPair(Rng& rng, float* v1, float* v2)
+  void GenVecPair(
+    Rng& rng,
+    float* v1,
+    float* v2
+  )
   {
     GenVec3(rng, v1);
     const std::uint32_t mode = rng.Below(100);
@@ -177,7 +204,10 @@ namespace difffuzz
     }
   }
 
-  void GenQuat(Rng& rng, float* q)
+  void GenQuat(
+    Rng& rng,
+    float* q
+  )
   {
     const std::uint32_t mode = rng.Below(100);
     if (mode < 45 || mode >= 85) {
@@ -208,7 +238,11 @@ namespace difffuzz
     }
   }
 
-  void GenQuatPair(Rng& rng, float* q1, float* q2)
+  void GenQuatPair(
+    Rng& rng,
+    float* q1,
+    float* q2
+  )
   {
     GenQuat(rng, q1);
     const std::uint32_t mode = rng.Below(100);
@@ -222,7 +256,9 @@ namespace difffuzz
     }
   }
 
-  float GenAngle(Rng& rng)
+  float GenAngle(
+    Rng& rng
+  )
   {
     const std::uint32_t mode = rng.Below(100);
     if (mode < 40) {
@@ -241,14 +277,18 @@ namespace difffuzz
     return GenFloat(rng);
   }
 
-  float GenT(Rng& rng)
+  float GenT(
+    Rng& rng
+  )
   {
     const std::uint32_t mode = rng.Below(100);
     if (mode < 50) {
       return static_cast<float>(rng.Unit());
     }
     if (mode < 65) {
-      static constexpr std::uint32_t kT[] = {0x00000000u, 0x80000000u, 0x3F800000u, 0x3F000000u, 0x3F7FFFFFu, 0x00000001u};
+      static constexpr std::uint32_t kT[] = {
+        0x00000000u, 0x80000000u, 0x3F800000u, 0x3F000000u, 0x3F7FFFFFu, 0x00000001u
+      };
       return FromBits(kT[rng.Below(6)]);
     }
     if (mode < 80) {

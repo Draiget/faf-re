@@ -60,7 +60,9 @@ namespace
   // What the beats a save holds wrote into the recording, for this client's own replay.
   std::vector<CMessage> sReplayHistory;
 
-  [[nodiscard]] std::int32_t ReadInt32Payload(CMessage& message)
+  [[nodiscard]] std::int32_t ReadInt32Payload(
+    CMessage& message
+  )
   {
     CMessageStream stream(message, CMessageStream::Access::kReadOnly);
     gpg::BinaryReader reader(&stream);
@@ -69,7 +71,9 @@ namespace
     return value;
   }
 
-  [[nodiscard]] std::uint8_t ReadSourcePayload(CMessage& message)
+  [[nodiscard]] std::uint8_t ReadSourcePayload(
+    CMessage& message
+  )
   {
     if (message.GetMessageSize() < 1) {
       return kInvalidCommandSource;
@@ -84,7 +88,10 @@ namespace
   // Rejoin's messages travel as `CLIMSG_PeerFeatures`: a kind, then their payload.
   constexpr std::size_t kKindBytes = 1u;
 
-  [[nodiscard]] bool IsPeerMessage(CMessage& message, const EPeerMessageKind kind)
+  [[nodiscard]] bool IsPeerMessage(
+    CMessage& message,
+    const EPeerMessageKind kind
+  )
   {
     return message.GetType().raw() == static_cast<std::uint8_t>(EClientMsg::CLIMSG_PeerFeatures) &&
       message.GetMessageSize() >= static_cast<int>(kKindBytes) &&
@@ -92,7 +99,11 @@ namespace
   }
 
   /// The answer to a peer's challenge: this seat's key signs it for that peer.
-  [[nodiscard]] CMessage MakeProofMessage(const SRejoinNonce& nonce, const int source, const int peerIndex)
+  [[nodiscard]] CMessage MakeProofMessage(
+    const SRejoinNonce& nonce,
+    const int source,
+    const int peerIndex
+  )
   {
     const SRejoinSignature signature = REJOIN_SignChallenge(nonce, source, peerIndex);
     CMessage proof(EClientMsg::CLIMSG_PeerFeatures);
@@ -103,14 +114,19 @@ namespace
   }
 
   /// The client index a backlog message names.
-  [[nodiscard]] std::uint8_t BacklogIndex(CMessage& message)
+  [[nodiscard]] std::uint8_t BacklogIndex(
+    CMessage& message
+  )
   {
     return message.GetMessageSize() > static_cast<int>(kKindBytes)
       ? static_cast<std::uint8_t>(message.mBuff.start_[3 + kKindBytes])
       : kInvalidCommandSource;
   }
 
-  [[nodiscard]] CMessage MakeStatusMessage(const ERejoinStage stage, const float progress)
+  [[nodiscard]] CMessage MakeStatusMessage(
+    const ERejoinStage stage,
+    const float progress
+  )
   {
     CMessage message(EClientMsg::CLIMSG_PeerFeatures);
     CMessageStream stream(message);
@@ -120,7 +136,10 @@ namespace
     return message;
   }
 
-  void WriteAdvance(CClientBase& client, const std::int32_t beatDelta)
+  void WriteAdvance(
+    CClientBase& client,
+    const std::int32_t beatDelta
+  )
   {
     CMessage advance(ECmdStreamOp::CMDST_Advance);
     CMessageStream stream(advance);
@@ -171,7 +190,9 @@ CRejoinFeed::CRejoinFeed(
 
 CRejoinFeed::~CRejoinFeed() = default;
 
-void CRejoinFeed::SkipRecordedBeats(const std::int32_t beats)
+void CRejoinFeed::SkipRecordedBeats(
+  const std::int32_t beats
+)
 {
   sReplayHistory.clear();
   while (mReadBeat < beats && mMessage.Read(mRecording.get())) {
@@ -231,7 +252,8 @@ void CRejoinFeed::Pump()
     }
 
     // The peer has to say how far the recording counts before any of it is read.
-    while (mCatchingUp && mBacklogComplete && static_cast<std::int32_t>(mLocal->mQueuedBeat - mLocal->mDispatchedBeat) <= 0) {
+    while (mCatchingUp && mBacklogComplete &&
+           static_cast<std::int32_t>(mLocal->mQueuedBeat - mLocal->mDispatchedBeat) <= 0) {
       if (mReadBeat >= mMergedBeat) {
         FinishCatchUp();
         return;
@@ -306,7 +328,9 @@ void CRejoinFeed::ReportStatus()
   }
 }
 
-bool CRejoinFeed::Route(CMessage& msg)
+bool CRejoinFeed::Route(
+  CMessage& msg
+)
 {
   const std::uint8_t type = msg.GetType().raw();
 
@@ -327,7 +351,10 @@ bool CRejoinFeed::Route(CMessage& msg)
   return false;
 }
 
-bool CRejoinFeed::TakeIncoming(CNetClient& client, CMessage& msg)
+bool CRejoinFeed::TakeIncoming(
+  CNetClient& client,
+  CMessage& msg
+)
 {
   if (!mLive || !mCatchingUp) {
     return false;
@@ -363,7 +390,10 @@ bool CRejoinFeed::TakeIncoming(CNetClient& client, CMessage& msg)
   return true;
 }
 
-void CRejoinFeed::NotePeerReport(const CNetClient& peer, CMessage& msg)
+void CRejoinFeed::NotePeerReport(
+  const CNetClient& peer,
+  CMessage& msg
+)
 {
   const auto peerIndex = static_cast<std::size_t>(peer.GetIndex());
   CMessageStream stream(msg, CMessageStream::Access::kReadOnly);
@@ -415,7 +445,10 @@ void CRejoinFeed::NotePeerReport(const CNetClient& peer, CMessage& msg)
   mMergedBeat = mPeerDispatched[static_cast<std::size_t>(mRecordingPeer)];
   mBacklogComplete = true;
   gpg::Logf(
-    "REJOIN: %d peers reported: recording holds to beat %d, this client's old stream ends at beat %d", peers, mMergedBeat, cut
+    "REJOIN: %d peers reported: recording holds to beat %d, this client's old stream ends at beat %d",
+    peers,
+    mMergedBeat,
+    cut
   );
 
   CMessage cutMessage(EClientMsg::CLIMSG_PeerFeatures);
@@ -430,7 +463,11 @@ void CRejoinFeed::NotePeerReport(const CNetClient& peer, CMessage& msg)
 }
 
 int32_t CRejoinFeed::QueueBacklog(
-  CClientBase& client, gpg::PipeStream& backlog, const std::int32_t startBeat, const std::int32_t skipThrough, const std::int32_t stopAt
+  CClientBase& client,
+  gpg::PipeStream& backlog,
+  const std::int32_t startBeat,
+  const std::int32_t skipThrough,
+  const std::int32_t stopAt
 )
 {
   std::int32_t beat = startBeat;
@@ -486,14 +523,23 @@ void CRejoinFeed::FinishCatchUp()
         client->CClientBase::Process(advance);
         NoteAcks(client->GetIndex(), static_cast<std::int32_t>(client->mQueuedBeat));
         gpg::Logf(
-          "REJOIN: client %d's stream was at beat %d past the recording's %d: %d empty beats", client->GetIndex(), start, merged, empty
+          "REJOIN: client %d's stream was at beat %d past the recording's %d: %d empty beats",
+          client->GetIndex(),
+          start,
+          merged,
+          empty
         );
       }
     }
     QueueBacklog(*client, *mBacklog[recordingPeer][index], start, merged, stopAt);
     if (client != mLocal && index != recordingPeer && dynamic_cast<CNetClient*>(client) != nullptr) {
-      ownCopyEnd[index] =
-        QueueBacklog(*client, *mBacklog[index][index], copyStart(index, index, mPeerDispatched[index]), recordingQueued[index], kNoStop);
+      ownCopyEnd[index] = QueueBacklog(
+        *client,
+        *mBacklog[index][index],
+        copyStart(index, index, mPeerDispatched[index]),
+        recordingQueued[index],
+        kNoStop
+      );
     }
   }
 
@@ -502,7 +548,9 @@ void CRejoinFeed::FinishCatchUp()
   mBackAt = std::chrono::steady_clock::now();
   ReportStatus();
   gpg::Logf(
-    "REJOIN: caught up: recording to beat %d, local client queued to beat %u (cut at %d)", mReadBeat, mLocal->mQueuedBeat,
+    "REJOIN: caught up: recording to beat %d, local client queued to beat %u (cut at %d)",
+    mReadBeat,
+    mLocal->mQueuedBeat,
     mHandoverBeat
   );
 
@@ -551,7 +599,9 @@ void CRejoinFeed::FinishCatchUp()
   mHeldIncoming.clear();
 }
 
-bool CRejoinFeed::HoldIssue(std::int32_t& nextIssueBeat)
+bool CRejoinFeed::HoldIssue(
+  std::int32_t& nextIssueBeat
+)
 {
   if (mCatchingUp) {
     return true;
@@ -618,7 +668,9 @@ void CRejoinFeed::DeliverLocalBeat()
   }
 }
 
-void CRejoinFeed::DeliverLocalBeats(const std::int32_t beatDelta)
+void CRejoinFeed::DeliverLocalBeats(
+  const std::int32_t beatDelta
+)
 {
   ++mDriverAdvances;
   mDriverBeats += beatDelta;
@@ -638,7 +690,10 @@ void CRejoinFeed::DeliverLocalBeats(const std::int32_t beatDelta)
   }
 }
 
-void CRejoinFeed::NoteAcks(const int clientIndex, const std::int32_t beat)
+void CRejoinFeed::NoteAcks(
+  const int clientIndex,
+  const std::int32_t beat
+)
 {
   CMessage ack(EClientMsg::CLIMSG_Ack);
   CMessageStream stream(ack);
@@ -661,7 +716,9 @@ void CRejoinFeed::EndOfRecording()
   mHandoverPending = true;
 
   gpg::Logf(
-    "REJOIN: recording ended at beat %d; the driver issued %d beats in %d advances", mReadBeat, mDriverBeats,
+    "REJOIN: recording ended at beat %d; the driver issued %d beats in %d advances",
+    mReadBeat,
+    mDriverBeats,
     mDriverAdvances
   );
 
@@ -705,7 +762,8 @@ CClientManagerImpl* moho::REJOIN_CreateRehearsalManager(
       manager->CreateNullClient(sources[index].mName.c_str(), client, client, static_cast<std::uint32_t>(client));
     }
   }
-  manager->mRejoinFeed = std::make_unique<CRejoinFeed>(*manager, std::move(recording), handoverBeat, false, -1, skipBeats);
+  manager->mRejoinFeed =
+    std::make_unique<CRejoinFeed>(*manager, std::move(recording), handoverBeat, false, -1, skipBeats);
   return manager;
 }
 
@@ -724,8 +782,16 @@ namespace
     ~CRecordingTee() override;
 
     void VirtWrite(const char* data, size_t size) override;
-    void VirtFlush() override { mSink->VirtFlush(); }
-    void VirtClose(const Mode mode) override { mSink->VirtClose(mode); }
+    void VirtFlush() override
+    {
+      mSink->VirtFlush();
+    }
+    void VirtClose(
+      const Mode mode
+    ) override
+    {
+      mSink->VirtClose(mode);
+    }
 
     void Seal();
     void Copy(std::vector<char>& bytes, int& beats);
@@ -742,7 +808,9 @@ namespace
   std::mutex sRecordingLock;
   CRecordingTee* sRecording = nullptr;
 
-  CRecordingTee::CRecordingTee(std::unique_ptr<gpg::Stream> sink)
+  CRecordingTee::CRecordingTee(
+    std::unique_ptr<gpg::Stream> sink
+  )
     : mSink(std::move(sink))
   {
     std::scoped_lock lock(sRecordingLock);
@@ -757,7 +825,10 @@ namespace
     }
   }
 
-  void CRecordingTee::VirtWrite(const char* const data, const size_t size)
+  void CRecordingTee::VirtWrite(
+    const char* const data,
+    const size_t size
+  )
   {
     mSink->Write(data, size);
 
@@ -765,7 +836,10 @@ namespace
     mBytes.insert(mBytes.end(), data, data + size);
     // After the header, `CDecoder` writes whole messages, one to a call.
     constexpr size_t kAdvanceBytes = 3u + sizeof(std::int32_t);
-    if (mSealed && size >= kAdvanceBytes && static_cast<std::uint8_t>(data[0]) == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)) {
+    if (
+      mSealed && size >= kAdvanceBytes &&
+      static_cast<std::uint8_t>(data[0]) == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)
+    ) {
       std::int32_t delta = 0;
       std::memcpy(&delta, data + 3, sizeof(delta));
       mBeats += delta;
@@ -778,13 +852,19 @@ namespace
     mSealed = true;
   }
 
-  void CRecordingTee::Copy(std::vector<char>& bytes, int& beats)
+  void CRecordingTee::Copy(
+    std::vector<char>& bytes,
+    int& beats
+  )
   {
     bytes = mBytes;
     beats = mBeats;
   }
 
-  [[nodiscard]] bool CopyRecording(std::vector<char>& bytes, int& beats)
+  [[nodiscard]] bool CopyRecording(
+    std::vector<char>& bytes,
+    int& beats
+  )
   {
     std::scoped_lock lock(sRecordingLock);
     if (sRecording == nullptr) {
@@ -820,7 +900,9 @@ namespace
   constexpr int kRejoinZstdLevel = 3;
 
   /// Only for a link whose far end runs this build: see `CNetUDPConnection::SetWindow`.
-  void WidenRejoinLink(INetConnection* const link)
+  void WidenRejoinLink(
+    INetConnection* const link
+  )
   {
     if (auto* const udp = dynamic_cast<CNetUDPConnection*>(link)) {
       udp->SetWindow(static_cast<std::uint16_t>(std::clamp(net_RejoinWindow, 32, 4096)));
@@ -831,23 +913,32 @@ namespace
   class CBootReceiver final : public IMessageReceiver
   {
   public:
-    void ReceiveMessage(CMessage* const message, CMessageDispatcher* const) override
+    void ReceiveMessage(
+      CMessage* const message,
+      CMessageDispatcher* const
+    ) override
     {
       mHeard = true;
-      if (IsPeerMessage(*message, EPeerMessageKind::RejoinBacklog) &&
-          (BacklogIndex(*message) == kRecordingBacklog || BacklogIndex(*message) == kKeyframeBacklog)) {
+      if (
+        IsPeerMessage(*message, EPeerMessageKind::RejoinBacklog) &&
+        (BacklogIndex(*message) == kRecordingBacklog || BacklogIndex(*message) == kKeyframeBacklog)
+      ) {
         const auto* const payload = message->mBuff.start_ + 5;
         std::vector<char>& bytes = BacklogIndex(*message) == kRecordingBacklog ? mRecording : mKeyframe;
         bytes.insert(bytes.end(), payload, payload + (message->GetMessageSize() - 2));
         return;
       }
-      if (IsPeerMessage(*message, EPeerMessageKind::RejoinRecordingSize) &&
-          message->GetMessageSize() >= static_cast<int>(kKindBytes + sizeof(mRecordingSize))) {
+      if (
+        IsPeerMessage(*message, EPeerMessageKind::RejoinRecordingSize) &&
+        message->GetMessageSize() >= static_cast<int>(kKindBytes + sizeof(mRecordingSize))
+      ) {
         std::memcpy(&mRecordingSize, message->mBuff.start_ + 3 + kKindBytes, sizeof(mRecordingSize));
         return;
       }
-      if (IsPeerMessage(*message, EPeerMessageKind::RejoinChallenge) &&
-          message->GetMessageSize() >= static_cast<int>(kKindBytes + sizeof(SRejoinNonce)) && mLink != nullptr) {
+      if (
+        IsPeerMessage(*message, EPeerMessageKind::RejoinChallenge) &&
+        message->GetMessageSize() >= static_cast<int>(kKindBytes + sizeof(SRejoinNonce)) && mLink != nullptr
+      ) {
         SRejoinNonce nonce{};
         std::memcpy(nonce.data(), message->mBuff.start_ + 3 + kKindBytes, nonce.size());
         CMessage proof = MakeProofMessage(nonce, mLocalSource, mPeerSource);
@@ -872,7 +963,11 @@ namespace
     }
 
     /// Where to answer a challenge from this peer, and for which seat.
-    void SetProofTarget(INetConnection* const link, const int localSource, const int peerSource)
+    void SetProofTarget(
+      INetConnection* const link,
+      const int localSource,
+      const int peerSource
+    )
     {
       mLink = link;
       mLocalSource = localSource;
@@ -885,15 +980,39 @@ namespace
       return mRecordingSize > 0 ? static_cast<float>(ReceivedBytes()) / static_cast<float>(mRecordingSize) : -1.0f;
     }
 
-    [[nodiscard]] std::size_t ReceivedBytes() const { return mRecording.size() + mKeyframe.size(); }
-    [[nodiscard]] const std::vector<char>& Keyframe() const { return mKeyframe; }
+    [[nodiscard]] std::size_t ReceivedBytes() const
+    {
+      return mRecording.size() + mKeyframe.size();
+    }
+    [[nodiscard]] const std::vector<char>& Keyframe() const
+    {
+      return mKeyframe;
+    }
 
-    [[nodiscard]] bool Reported() const { return mReported; }
-    [[nodiscard]] bool Refused() const { return mRefused; }
-    [[nodiscard]] ERejoinRefusal Refusal() const { return mRefusal; }
-    [[nodiscard]] bool Heard() const { return mHeard; }
-    [[nodiscard]] const std::vector<char>& Recording() const { return mRecording; }
-    [[nodiscard]] std::vector<CMessage>& Held() { return mHeld; }
+    [[nodiscard]] bool Reported() const
+    {
+      return mReported;
+    }
+    [[nodiscard]] bool Refused() const
+    {
+      return mRefused;
+    }
+    [[nodiscard]] ERejoinRefusal Refusal() const
+    {
+      return mRefusal;
+    }
+    [[nodiscard]] bool Heard() const
+    {
+      return mHeard;
+    }
+    [[nodiscard]] const std::vector<char>& Recording() const
+    {
+      return mRecording;
+    }
+    [[nodiscard]] std::vector<CMessage>& Held()
+    {
+      return mHeld;
+    }
 
   private:
     std::vector<char> mRecording;
@@ -909,12 +1028,22 @@ namespace
     int mPeerSource{-1};
   };
 
-  void ApplyCut(CClientManagerImpl& manager, CClientBase& peer, const std::int32_t cutBeat)
+  void ApplyCut(
+    CClientManagerImpl& manager,
+    CClientBase& peer,
+    const std::int32_t cutBeat
+  )
   {
     const std::int32_t held = static_cast<std::int32_t>(peer.mQueuedBeat);
     std::int32_t beat = static_cast<std::int32_t>(peer.mDispatchedBeat);
     if (cutBeat < beat || cutBeat > held) {
-      gpg::Warnf("REJOIN: ignoring a cut at beat %d from client %d: it has run to %d, held to %d", cutBeat, peer.GetIndex(), beat, held);
+      gpg::Warnf(
+        "REJOIN: ignoring a cut at beat %d from client %d: it has run to %d, held to %d",
+        cutBeat,
+        peer.GetIndex(),
+        beat,
+        held
+      );
       return;
     }
 
@@ -945,7 +1074,9 @@ namespace
         client->mLatestAckReceived[peerIndex] = cutBeat;
       }
     }
-    gpg::Logf("REJOIN: client %d's old stream cut at beat %d, %d beats dropped", peer.GetIndex(), cutBeat, held - cutBeat);
+    gpg::Logf(
+      "REJOIN: client %d's old stream cut at beat %d, %d beats dropped", peer.GetIndex(), cutBeat, held - cutBeat
+    );
   }
 } // namespace
 
@@ -1007,7 +1138,9 @@ namespace
     return sKeyframeState == EKeyframeState::Ready;
   }
 
-  void FinishKeyframe(std::vector<char> bytes)
+  void FinishKeyframe(
+    std::vector<char> bytes
+  )
   {
     std::scoped_lock lock(sKeyframeLock);
     sKeyframeBytes = std::move(bytes);
@@ -1022,7 +1155,9 @@ namespace
   class CRejoinKeyframeRequest final : public ISaveRequest
   {
   public:
-    explicit CRejoinKeyframeRequest(const Sim& sim)
+    explicit CRejoinKeyframeRequest(
+      const Sim& sim
+    )
       : mSim(sim)
     {}
 
@@ -1039,11 +1174,14 @@ namespace
       if (!SIM_WriteKeyframeHeader(mFile.get(), header)) {
         throw std::runtime_error("cannot write the save's header");
       }
-      mArchive = net_RejoinFastSave != 0 ? gpg::CreateFastBinaryWriteArchive(mFile) : gpg::CreateBinaryWriteArchive(mFile);
+      mArchive =
+        net_RejoinFastSave != 0 ? gpg::CreateFastBinaryWriteArchive(mFile) : gpg::CreateBinaryWriteArchive(mFile);
       return mArchive;
     }
 
-    void Save(const SSaveGameDispatchData& data) override
+    void Save(
+      const SSaveGameDispatchData& data
+    ) override
     {
       delete mArchive;
       mArchive = nullptr;
@@ -1088,7 +1226,11 @@ namespace
       if (packing == ERejoinPacking::Zstd) {
         packed.resize(kPackedHeaderBytes + ZSTD_compressBound(raw.size()));
         packedSize = ZSTD_compress(
-          packed.data() + kPackedHeaderBytes, packed.size() - kPackedHeaderBytes, raw.data(), raw.size(), kRejoinZstdLevel
+          packed.data() + kPackedHeaderBytes,
+          packed.size() - kPackedHeaderBytes,
+          raw.data(),
+          raw.size(),
+          kRejoinZstdLevel
         );
         if (ZSTD_isError(packedSize) != 0u) {
           return {};
@@ -1096,10 +1238,15 @@ namespace
       } else {
         uLongf zlibSize = SIM_KeyframePackBound(static_cast<uLong>(raw.size()));
         packed.resize(kPackedHeaderBytes + zlibSize);
-        if (compress2(
-              reinterpret_cast<Bytef*>(packed.data() + kPackedHeaderBytes), &zlibSize, raw.data(),
-              static_cast<uLong>(raw.size()), Z_DEFAULT_COMPRESSION
-            ) != Z_OK) {
+        if (
+          compress2(
+            reinterpret_cast<Bytef*>(packed.data() + kPackedHeaderBytes),
+            &zlibSize,
+            raw.data(),
+            static_cast<uLong>(raw.size()),
+            Z_DEFAULT_COMPRESSION
+          ) != Z_OK
+        ) {
           return {};
         }
         packedSize = zlibSize;
@@ -1110,9 +1257,12 @@ namespace
 
       const auto now = std::chrono::steady_clock::now();
       gpg::Logf(
-        "REJOIN: saved the game at beat %u: %llu bytes, %llu packed, %.1f s, %.1f s of it packing", mBeat,
-        static_cast<unsigned long long>(rawSize), static_cast<unsigned long long>(packedSize),
-        std::chrono::duration<double>(now - mStart).count(), std::chrono::duration<double>(now - packStart).count()
+        "REJOIN: saved the game at beat %u: %llu bytes, %llu packed, %.1f s, %.1f s of it packing",
+        mBeat,
+        static_cast<unsigned long long>(rawSize),
+        static_cast<unsigned long long>(packedSize),
+        std::chrono::duration<double>(now - mStart).count(),
+        std::chrono::duration<double>(now - packStart).count()
       );
       return packed;
     }
@@ -1132,7 +1282,9 @@ namespace
   SSimKeyframeHeader sRestoreHeader{};
 } // namespace
 
-void moho::REJOIN_MainFrame(ISTIDriver& driver)
+void moho::REJOIN_MainFrame(
+  ISTIDriver& driver
+)
 {
   {
     std::scoped_lock lock(sKeyframeLock);
@@ -1152,7 +1304,9 @@ void moho::REJOIN_MainFrame(ISTIDriver& driver)
   driver.RequestSaveGame(new CRejoinKeyframeRequest(*sim));
 }
 
-void moho::REJOIN_PrepareRestore(SWldSessionInfo& sessionInfo)
+void moho::REJOIN_PrepareRestore(
+  SWldSessionInfo& sessionInfo
+)
 {
   if (sRestoreFile.get() == nullptr) {
     return;
@@ -1178,17 +1332,22 @@ void moho::REJOIN_PrepareRestore(SWldSessionInfo& sessionInfo)
   gSimBeatOrigin.store(0);
   sessionInfo.mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(loadInfo);
   gpg::Logf(
-    "REJOIN: loading the save of beat %u, %.1f s after starting", sRestoreHeader.beat,
+    "REJOIN: loading the save of beat %u, %.1f s after starting",
+    sRestoreHeader.beat,
     std::chrono::duration<double>(std::chrono::steady_clock::now() - sRejoinStart).count()
   );
 }
 
-std::unique_ptr<gpg::Stream> moho::REJOIN_WrapRecording(std::unique_ptr<gpg::Stream> sink)
+std::unique_ptr<gpg::Stream> moho::REJOIN_WrapRecording(
+  std::unique_ptr<gpg::Stream> sink
+)
 {
   return std::make_unique<CRecordingTee>(std::move(sink));
 }
 
-void moho::REJOIN_SealRecordingHeader(gpg::Stream* const stream)
+void moho::REJOIN_SealRecordingHeader(
+  gpg::Stream* const stream
+)
 {
   if (auto* const tee = dynamic_cast<CRecordingTee*>(stream)) {
     tee->Seal();
@@ -1204,7 +1363,12 @@ void moho::REJOIN_SealRecordingHeader(gpg::Stream* const stream)
 namespace
 {
   /// Sends `bytes` as backlog messages, in pieces a message can hold.
-  void SendBacklogBytes(CNetClient& peer, const std::uint8_t index, const char* const bytes, const std::size_t size)
+  void SendBacklogBytes(
+    CNetClient& peer,
+    const std::uint8_t index,
+    const char* const bytes,
+    const std::size_t size
+  )
   {
     constexpr std::size_t kChunkBytes = 60000u;
     for (std::size_t sent = 0; sent < size;) {
@@ -1220,7 +1384,10 @@ namespace
   }
 
   /// Everything queued and not yet run, and this client's report, to `peer`.
-  void SendBacklog(CClientManagerImpl& manager, CNetClient& peer)
+  void SendBacklog(
+    CClientManagerImpl& manager,
+    CNetClient& peer
+  )
   {
     // A restarted peer has forgotten what this client supports.
     manager.mPeerFeatures->AnnounceTo(manager, peer);
@@ -1287,7 +1454,10 @@ namespace
 
 namespace
 {
-  void WriteRefusal(INetConnection& link, const ERejoinRefusal why)
+  void WriteRefusal(
+    INetConnection& link,
+    const ERejoinRefusal why
+  )
   {
     CMessage refusal(EClientMsg::CLIMSG_PeerFeatures);
     CMessageStream stream(refusal);
@@ -1315,7 +1485,11 @@ namespace
       Failed,
     };
 
-    CRejoinCandidate(CClientManagerImpl& manager, CNetClient& seat, INetConnection* const link)
+    CRejoinCandidate(
+      CClientManagerImpl& manager,
+      CNetClient& seat,
+      INetConnection* const link
+    )
       : mManager(manager)
       , mSeat(seat)
       , mLink(link)
@@ -1327,7 +1501,10 @@ namespace
       dispatcher->PushReceiver(MSGTYPE_LobbyBase, MSGTYPE_LobbyEnd, this);
     }
 
-    void ReceiveMessage(CMessage* const message, CMessageDispatcher* const) override
+    void ReceiveMessage(
+      CMessage* const message,
+      CMessageDispatcher* const
+    ) override
     {
       std::scoped_lock lock(mManager.mLock);
       if (mState == EState::Proven) {
@@ -1340,14 +1517,34 @@ namespace
       }
     }
 
-    [[nodiscard]] CClientManagerImpl& Manager() const { return mManager; }
-    [[nodiscard]] CNetClient& Seat() const { return mSeat; }
-    [[nodiscard]] EState State() const { return mState; }
-    [[nodiscard]] bool Expired() const { return std::chrono::steady_clock::now() >= mDeadline; }
-    [[nodiscard]] const SPendingServe& Serve() const { return mServe; }
-    [[nodiscard]] std::vector<CMessage>& AfterProof() { return mAfterProof; }
+    [[nodiscard]] CClientManagerImpl& Manager() const
+    {
+      return mManager;
+    }
+    [[nodiscard]] CNetClient& Seat() const
+    {
+      return mSeat;
+    }
+    [[nodiscard]] EState State() const
+    {
+      return mState;
+    }
+    [[nodiscard]] bool Expired() const
+    {
+      return std::chrono::steady_clock::now() >= mDeadline;
+    }
+    [[nodiscard]] const SPendingServe& Serve() const
+    {
+      return mServe;
+    }
+    [[nodiscard]] std::vector<CMessage>& AfterProof()
+    {
+      return mAfterProof;
+    }
 
-    void Refuse(const ERejoinRefusal why)
+    void Refuse(
+      const ERejoinRefusal why
+    )
     {
       WriteRefusal(*mLink, why);
       mState = EState::Failed;
@@ -1366,7 +1563,9 @@ namespace
   private:
     static constexpr std::chrono::seconds kProofWait{30};
 
-    void TakeRequest(CMessage& message)
+    void TakeRequest(
+      CMessage& message
+    )
     {
       std::int32_t value = 0;
       if (message.GetMessageSize() < static_cast<int>(kKindBytes + sizeof(value))) {
@@ -1408,7 +1607,9 @@ namespace
       mLink->Write(&span);
     }
 
-    void TakeProof(CMessage& message)
+    void TakeProof(
+      CMessage& message
+    )
     {
       SRejoinSignature signature{};
       if (!mHasRequest || message.GetMessageSize() < static_cast<int>(kKindBytes + signature.size())) {
@@ -1437,7 +1638,9 @@ namespace
   std::vector<std::unique_ptr<CRejoinCandidate>> sCandidates;
 
   /// A candidate has had its answer, or its time: it takes the seat, or its link closes.
-  void SettleCandidates(CClientManagerImpl& manager)
+  void SettleCandidates(
+    CClientManagerImpl& manager
+  )
   {
     for (std::size_t index = 0; index < sCandidates.size();) {
       CRejoinCandidate& candidate = *sCandidates[index];
@@ -1448,7 +1651,10 @@ namespace
         continue;
       }
       // The vote came between its proof and now: the seat is no longer there to take.
-      if (candidate.State() == CRejoinCandidate::EState::Proven && (candidate.Seat().mEjectPending || candidate.Seat().mEjected)) {
+      if (
+        candidate.State() == CRejoinCandidate::EState::Proven &&
+        (candidate.Seat().mEjectPending || candidate.Seat().mEjected)
+      ) {
         candidate.Refuse(ERejoinRefusal::Ejected);
       }
       const auto state = candidate.State();
@@ -1479,17 +1685,24 @@ namespace
   }
 } // namespace
 
-bool moho::REJOIN_BacklogPending(const CNetClient& seat)
+bool moho::REJOIN_BacklogPending(
+  const CNetClient& seat
+)
 {
   return std::any_of(sPendingServes.begin(), sPendingServes.end(), [&seat](const SPendingServe& pending) {
     return pending.peer == &seat;
   });
 }
 
-void moho::REJOIN_NoteSeatEjected(CClientManagerImpl& manager, CNetClient& seat)
+void moho::REJOIN_NoteSeatEjected(
+  CClientManagerImpl& manager,
+  CNetClient& seat
+)
 {
   INetConnection& link = *seat.mConnection;
-  manager.mPeerFeatures->NoteRejoinEjected(seat.GetIndex(), static_cast<std::uint32_t>(link.GetAddr()), static_cast<std::uint16_t>(link.GetPort()));
+  manager.mPeerFeatures->NoteRejoinEjected(
+    seat.GetIndex(), static_cast<std::uint32_t>(link.GetAddr()), static_cast<std::uint16_t>(link.GetPort())
+  );
 
   const ERejoinStage stage = manager.mPeerFeatures->RejoinStatus(seat.GetIndex()).stage;
   if (stage == ERejoinStage::Transfer || stage == ERejoinStage::Loading || stage == ERejoinStage::CatchingUp) {
@@ -1497,7 +1710,9 @@ void moho::REJOIN_NoteSeatEjected(CClientManagerImpl& manager, CNetClient& seat)
   }
 }
 
-void moho::REJOIN_ServeRestartedPeers(CClientManagerImpl& manager)
+void moho::REJOIN_ServeRestartedPeers(
+  CClientManagerImpl& manager
+)
 {
   SettleCandidates(manager);
 
@@ -1508,15 +1723,18 @@ void moho::REJOIN_ServeRestartedPeers(CClientManagerImpl& manager)
     CNetClient* peer = nullptr;
     for (CClientBase* const client : manager.mClients) {
       auto* const net = dynamic_cast<CNetClient*>(client);
-      if (net != nullptr && net->mConnection != nullptr && !net->mEjectPending && !net->mEjected &&
-          net->mConnection->GetAddr() == address && net->mConnection->GetPort() == port) {
+      if (
+        net != nullptr && net->mConnection != nullptr && !net->mEjectPending && !net->mEjected &&
+        net->mConnection->GetAddr() == address && net->mConnection->GetPort() == port
+      ) {
         peer = net;
         break;
       }
     }
     if (peer == nullptr) {
       // Voted out here: the seat's link is gone, and its player is told so rather than left to wait.
-      const int ejected = manager.mPeerFeatures->FindEjectedSeat(static_cast<std::uint32_t>(address), static_cast<std::uint16_t>(port));
+      const int ejected =
+        manager.mPeerFeatures->FindEjectedSeat(static_cast<std::uint32_t>(address), static_cast<std::uint16_t>(port));
       peer = ejected >= 0 ? dynamic_cast<CNetClient*>(manager.mClients[static_cast<std::size_t>(ejected)]) : nullptr;
     }
     if (peer == nullptr) {
@@ -1586,21 +1804,31 @@ void moho::REJOIN_ServeRestartedPeers(CClientManagerImpl& manager)
         SendBacklogBytes(*pending.peer, kRecordingBacklog, bytes.data(), bytes.size());
         SendBacklogBytes(*pending.peer, kKeyframeBacklog, keyframe.data(), keyframe.size());
         gpg::Logf(
-          "REJOIN: sending client %d the recording: %d beats, %u bytes, and a save of %u bytes", pending.peer->GetIndex(),
-          beats, static_cast<unsigned int>(bytes.size()), static_cast<unsigned int>(keyframe.size())
+          "REJOIN: sending client %d the recording: %d beats, %u bytes, and a save of %u bytes",
+          pending.peer->GetIndex(),
+          beats,
+          static_cast<unsigned int>(bytes.size()),
+          static_cast<unsigned int>(keyframe.size())
         );
       }
     }
     SendBacklog(manager, *pending.peer);
     gpg::Logf(
-      "REJOIN: client %d:%s served: dispatched to beat %d, its data held to beat %u", pending.peer->GetIndex(),
-      pending.peer->GetNickname().c_str(), manager.mDispatchedBeat, pending.peer->mQueuedBeat
+      "REJOIN: client %d:%s served: dispatched to beat %d, its data held to beat %u",
+      pending.peer->GetIndex(),
+      pending.peer->GetNickname().c_str(),
+      manager.mDispatchedBeat,
+      pending.peer->mQueuedBeat
     );
     sPendingServes.erase(sPendingServes.begin() + static_cast<std::ptrdiff_t>(index));
   }
 }
 
-void moho::REJOIN_HandlePeerMessage(CClientManagerImpl& manager, CNetClient& peer, CMessage& msg)
+void moho::REJOIN_HandlePeerMessage(
+  CClientManagerImpl& manager,
+  CNetClient& peer,
+  CMessage& msg
+)
 {
   std::int32_t value = 0;
   if (msg.GetMessageSize() < static_cast<int>(kKindBytes + sizeof(value))) {
@@ -1753,7 +1981,10 @@ float moho::REJOIN_SetupProgress()
   return sSetup != nullptr ? sSetup->list.front()->receiver.RecordingProgress() : -1.0f;
 }
 
-fa::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(fa::string* const failureReason, bool* const failed)
+fa::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(
+  fa::string* const failureReason,
+  bool* const failed
+)
 {
   SSetup& setup = *sSetup;
   INetConnector* const connector = setup.connector;
@@ -1791,7 +2022,8 @@ fa::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(fa::string* const failureRe
       return refuse(
         peer->receiver.Refusal() == ERejoinRefusal::Ejected
           ? "A player voted to eject you, so you cannot take your seat back."
-          : "The other players did not accept this computer's key for that seat. If the seat is yours, its key file has changed or gone."
+          : "The other players did not accept this computer's key for that seat. If the seat is yours, its key file "
+            "has changed or gone."
       );
     }
     complete = complete && peer->receiver.Reported();
@@ -1808,12 +2040,14 @@ fa::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(fa::string* const failureRe
     // whose first attempt fails takes up to 15 s of checks and 5 s before the next offer, and
     // a relay one longer (issue #275, two-machine runs fx1 and fx7): room for a second attempt.
     constexpr std::chrono::seconds kSilentPeerWait{60};
-    const bool silentPeer = now - sRejoinStart >= kSilentPeerWait && std::any_of(list.begin(), list.end(), [](const auto& peer) {
+    const bool silentPeer =
+      now - sRejoinStart >= kSilentPeerWait && std::any_of(list.begin(), list.end(), [](const auto& peer) {
       return !peer->receiver.Heard();
     });
     if (silentPeer || now >= setup.deadline) {
       return refuse(
-        "Not every player answered. The game may be over, a player may have left it, or the players may not allow coming back to a game."
+        "Not every player answered. The game may be over, a player may have left it, or the players may not allow "
+        "coming back to a game."
       );
     }
     return fa::auto_ptr<SWldSessionInfo>();
@@ -1827,8 +2061,10 @@ fa::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(fa::string* const failureRe
   );
   std::unique_ptr<gpg::Stream> recording;
   fa::auto_ptr<SWldSessionInfo> sessionInfo = VCR_SetupReplaySessionFromStream(
-    std::make_unique<gpg::MemBufferStream>(gpg::CopyMemBuffer(bytes.data(), bytes.size())), "the peer's recording",
-    failureReason, &recording
+    std::make_unique<gpg::MemBufferStream>(gpg::CopyMemBuffer(bytes.data(), bytes.size())),
+    "the peer's recording",
+    failureReason,
+    &recording
   );
   if (sessionInfo.get() == nullptr) {
     return refuse(nullptr);
@@ -1850,13 +2086,19 @@ fa::auto_ptr<SWldSessionInfo> moho::REJOIN_PollSetup(fa::string* const failureRe
       unpacked = ZSTD_decompress(raw.data(), raw.size(), body, bodySize) == raw.size();
     } else {
       uLongf unpackedSize = static_cast<uLongf>(raw.size());
-      unpacked = uncompress(raw.data(), &unpackedSize, reinterpret_cast<const Bytef*>(body), static_cast<uLong>(bodySize)) == Z_OK;
+      unpacked =
+        uncompress(raw.data(), &unpackedSize, reinterpret_cast<const Bytef*>(body), static_cast<uLong>(bodySize)) ==
+        Z_OK;
     }
-    if (unpacked && std::fwrite(raw.data(), raw.size(), 1u, file.get()) == 1u && std::fflush(file.get()) == 0 &&
-        std::fseek(file.get(), 0, SEEK_SET) == 0 && SIM_ReadKeyframeHeader(file.get(), sRestoreHeader)) {
+    if (
+      unpacked && std::fwrite(raw.data(), raw.size(), 1u, file.get()) == 1u && std::fflush(file.get()) == 0 &&
+      std::fseek(file.get(), 0, SEEK_SET) == 0 && SIM_ReadKeyframeHeader(file.get(), sRestoreHeader)
+    ) {
       sRestoreFile = file;
       skipBeats = static_cast<int>(sRestoreHeader.beat) - 1;
-      gpg::Logf("REJOIN: received a save of beat %u, %llu bytes", sRestoreHeader.beat, static_cast<unsigned long long>(rawSize));
+      gpg::Logf(
+        "REJOIN: received a save of beat %u, %llu bytes", sRestoreHeader.beat, static_cast<unsigned long long>(rawSize)
+      );
     } else {
       gpg::Warnf("REJOIN: the save that came could not be read");
       return refuse("The save of the game could not be read.");

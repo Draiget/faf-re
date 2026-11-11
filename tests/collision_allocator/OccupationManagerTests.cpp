@@ -25,10 +25,19 @@ namespace
     bool overflow = false;
     AllocationTrace* previous = activeTrace;
 
-    AllocationTrace() { activeTrace = this; }
-    ~AllocationTrace() { activeTrace = previous; }
+    AllocationTrace()
+    {
+      activeTrace = this;
+    }
+    ~AllocationTrace()
+    {
+      activeTrace = previous;
+    }
 
-    void RecordNew(void* pointer, bool array)
+    void RecordNew(
+      void* pointer,
+      bool array
+    )
     {
       if (size == 256) {
         overflow = true;
@@ -39,7 +48,10 @@ namespace
       ++size;
     }
 
-    void RecordDelete(void* pointer, bool array)
+    void RecordDelete(
+      void* pointer,
+      bool array
+    )
     {
       // The newest allocation at this address is the one being freed.
       for (int i = size - 1; i >= 0; --i) {
@@ -50,15 +62,18 @@ namespace
       }
     }
 
-    const Entry* Find(const void* pointer) const
+    const Entry* Find(
+      const void* pointer
+    ) const
     {
       for (int i = size - 1; i >= 0; --i) {
-        if (entries[i].pointer == pointer) return &entries[i];
+        if (entries[i].pointer == pointer)
+          return &entries[i];
       }
       return nullptr;
     }
   };
-}
+} // namespace
 
 // GNU/LLVM linker wrapping observes which overload a call site selects without
 // replacing the engine's allocator. Every call goes on to the real function.
@@ -66,32 +81,44 @@ extern "C" void* __real__Znwm(std::size_t);
 extern "C" void* __real__Znam(std::size_t);
 extern "C" void __real__ZdlPv(void*) noexcept;
 extern "C" void __real__ZdaPv(void*) noexcept;
-extern "C" void* __wrap__Znwm(std::size_t bytes)
+extern "C" void* __wrap__Znwm(
+  std::size_t bytes
+)
 {
   ++traceDepth;
   void* const pointer = __real__Znwm(bytes);
   --traceDepth;
-  if (activeTrace && traceDepth == 0) activeTrace->RecordNew(pointer, false);
+  if (activeTrace && traceDepth == 0)
+    activeTrace->RecordNew(pointer, false);
   return pointer;
 }
-extern "C" void* __wrap__Znam(std::size_t bytes)
+extern "C" void* __wrap__Znam(
+  std::size_t bytes
+)
 {
   ++traceDepth;
   void* const pointer = __real__Znam(bytes);
   --traceDepth;
-  if (activeTrace && traceDepth == 0) activeTrace->RecordNew(pointer, true);
+  if (activeTrace && traceDepth == 0)
+    activeTrace->RecordNew(pointer, true);
   return pointer;
 }
-extern "C" void __wrap__ZdlPv(void* pointer) noexcept
+extern "C" void __wrap__ZdlPv(
+  void* pointer
+) noexcept
 {
-  if (activeTrace && traceDepth == 0) activeTrace->RecordDelete(pointer, false);
+  if (activeTrace && traceDepth == 0)
+    activeTrace->RecordDelete(pointer, false);
   ++traceDepth;
   __real__ZdlPv(pointer);
   --traceDepth;
 }
-extern "C" void __wrap__ZdaPv(void* pointer) noexcept
+extern "C" void __wrap__ZdaPv(
+  void* pointer
+) noexcept
 {
-  if (activeTrace && traceDepth == 0) activeTrace->RecordDelete(pointer, true);
+  if (activeTrace && traceDepth == 0)
+    activeTrace->RecordDelete(pointer, true);
   ++traceDepth;
   __real__ZdaPv(pointer);
   --traceDepth;
@@ -101,7 +128,9 @@ extern "C" void __wrap__ZdaPv(void* pointer) noexcept
 namespace
 {
   // These cases execute the actual engine manager and its ordinary allocator.
-  void CheckBucketsChunksAndRepeatedGrowth(const int requested)
+  void CheckBucketsChunksAndRepeatedGrowth(
+    const int requested
+  )
   {
     moho::EntityOccupationManager manager(128, 256);
     EXPECT_EQ(manager.mWidth, 32);
@@ -135,7 +164,10 @@ namespace
   // A plain loop rather than INSTANTIATE_TEST_SUITE_P: gtest 1.15's macro
   // declares a tuple it only reads in decltype, which clang reports as
   // -Wunused-variable on Linux, where gtest's headers are not system headers.
-  TEST(OccupationManagerGrowth, BucketsChunksAndRepeatedGrowth)
+  TEST(
+    OccupationManagerGrowth,
+    BucketsChunksAndRepeatedGrowth
+  )
   {
     for (const int requested : {0, 1, 16385, 155649}) {
       SCOPED_TRACE(::testing::Message() << "request=" << requested);
@@ -143,7 +175,10 @@ namespace
     }
   }
 
-  TEST(OccupationManagerLifecycle, RepeatedConstructionAndDestruction)
+  TEST(
+    OccupationManagerLifecycle,
+    RepeatedConstructionAndDestruction
+  )
   {
     for (int i = 0; i < 32; ++i) {
       moho::EntityOccupationManager manager(128, 128);
@@ -152,7 +187,10 @@ namespace
     }
   }
 
-  TEST(OccupationManagerLifecycle, IncreasingRequestsPreserveTheExistingFreeList)
+  TEST(
+    OccupationManagerLifecycle,
+    IncreasingRequestsPreserveTheExistingFreeList
+  )
   {
     moho::EntityOccupationManager manager(128, 128);
     for (const int requested : {1, 8193, 16385, 155649}) {
@@ -181,7 +219,10 @@ namespace
   // Retail allocates the three bucket arrays (0x004FCD60/82/A4) and every node
   // block (0x004FCEA5) with operator new[] (0x00A82130) and frees all four in
   // the destructor with operator delete[] (0x00A82542, 0x004FCE15..0x004FCE4C).
-  TEST(OccupationManagerDeallocation, EveryArrayAllocationUsesArrayDelete)
+  TEST(
+    OccupationManagerDeallocation,
+    EveryArrayAllocationUsesArrayDelete
+  )
   {
     for (const int requested : {0, 1, 16385, 155649}) {
       AllocationTrace trace;
@@ -194,7 +235,8 @@ namespace
         watched[watchedCount++] = manager.mUnitBuckets;
         watched[watchedCount++] = manager.mPropBuckets;
         watched[watchedCount++] = manager.mEntityBuckets;
-        for (auto* block : manager.mAllBlocks) watched[watchedCount++] = block;
+        for (auto* block : manager.mAllBlocks)
+          watched[watchedCount++] = block;
       }
       // Stop observing before assertion reporting can allocate or reuse memory.
       activeTrace = trace.previous;
@@ -209,4 +251,4 @@ namespace
     }
   }
 #endif
-}
+} // namespace

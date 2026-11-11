@@ -7,9 +7,9 @@ namespace faf::editor
 {
   /**
    * An adaptive map's `_tables.lua` (the "Ultimate maps" script by CookieNoob and KeyBlue that FAF's adaptive maps use;
-   * FAForeverMapEditor writes the same file): which mass and hydrocarbon markers spawn with which army, and which belong
-   * to the lobby options' groups. The script reads each entry as a marker's number ("Mass 07" is 7, "Mass 12" is 12,
-   * MassString/HydroString) or a string put after the type's name. Here entries are kept as the markers' names.
+   * FAForeverMapEditor writes the same file): which mass and hydrocarbon markers spawn with which army, and which
+   * belong to the lobby options' groups. The script reads each entry as a marker's number ("Mass 07" is 7, "Mass 12" is
+   * 12, MassString/HydroString) or a string put after the type's name. Here entries are kept as the markers' names.
    */
   struct AdaptiveTables
   {
@@ -24,10 +24,12 @@ namespace faf::editor
     std::vector<std::string> forwardCrazyrush;
     std::vector<std::string> crazyrushOne;
 
-    bool operator==(const AdaptiveTables& other) const
+    bool operator==(
+      const AdaptiveTables& other
+    ) const
     {
-      return maxPlayers == other.maxPlayers && mexArmy == other.mexArmy && hydroArmy == other.hydroArmy && options == other.options &&
-             forwardCrazyrush == other.forwardCrazyrush && crazyrushOne == other.crazyrushOne;
+      return maxPlayers == other.maxPlayers && mexArmy == other.mexArmy && hydroArmy == other.hydroArmy &&
+        options == other.options && forwardCrazyrush == other.forwardCrazyrush && crazyrushOne == other.crazyrushOne;
     }
   };
 
@@ -54,7 +56,8 @@ namespace faf::editor
   /** `_scenario.lua` with `AdaptiveMap = true` in its ScenarioInfo (set where it is, else added first). */
   std::string WithScenarioAdaptive(const std::string& scenario);
 
-  /** The entry the script reads for a marker: 7 for "Mass 07", 12 for "Mass 12", '7' for "Mass 7"; empty when not that type. */
+  /** The entry the script reads for a marker: 7 for "Mass 07", 12 for "Mass 12", '7' for "Mass 7"; empty when not that
+   * type. */
   std::string AdaptiveEntry(const std::string& markerName, bool hydro);
   /** The marker an entry names ("7" gives "Mass 07", "'7'" gives "Mass 7"). */
   std::string AdaptiveMarkerName(const std::string& entry, bool hydro);
@@ -79,14 +82,24 @@ namespace faf::editor
    * 1 (none) to groups + 1 (all of them). An option already there is replaced where it is, keeping its default when it
    * is still one of the values; else it is added at the end of `options`. An empty `text` gives a new file.
    */
-  std::string WithLobbyOption(const std::string& text, const std::string& key, const std::string& label, bool hydro,
-                              const std::vector<int>& groupSizes);
+  std::string WithLobbyOption(
+    const std::string& text,
+    const std::string& key,
+    const std::string& label,
+    bool hydro,
+    const std::vector<int>& groupSizes
+  );
   /**
    * The text with option `key` written with these values (text and help each, keys 1, 2, ...), replaced where it is
    * (keeping its default when that is still a value) or added at the end of `options`.
    */
-  std::string WithLobbyOptionValues(const std::string& text, const std::string& key, const std::string& label, const std::string& help,
-                                    const std::vector<std::pair<std::string, std::string>>& values);
+  std::string WithLobbyOptionValues(
+    const std::string& text,
+    const std::string& key,
+    const std::string& label,
+    const std::string& help,
+    const std::vector<std::pair<std::string, std::string>>& values
+  );
   /** One value of a lobby option as written: its key as a Lua literal (`2`, `'on'`), its text and help. */
   struct LobbyValueText
   {
@@ -98,8 +111,14 @@ namespace faf::editor
    * The text with option `key` written whole: label, help, `default` (an index into the values from 1, as FAF's lobby
    * reads it) and the values with their own keys; replaced where it is, else added at the end of `options`.
    */
-  std::string WithLobbyOptionWritten(const std::string& text, const std::string& key, const std::string& label, const std::string& help,
-                                     int defaultIndex, const std::vector<LobbyValueText>& values);
+  std::string WithLobbyOptionWritten(
+    const std::string& text,
+    const std::string& key,
+    const std::string& label,
+    const std::string& help,
+    int defaultIndex,
+    const std::vector<LobbyValueText>& values
+  );
   /** The text without option `key` (unchanged when it has none). */
   std::string WithoutLobbyOption(const std::string& text, const std::string& key);
 } // namespace faf::editor

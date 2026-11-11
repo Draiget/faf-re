@@ -11,7 +11,9 @@ namespace faf::editor
     constexpr float kDegToRad = kPi / 180.0f;
   } // namespace
 
-  std::string UnitsToScunits(const std::vector<SaveUnit>& units)
+  std::string UnitsToScunits(
+    const std::vector<SaveUnit>& units
+  )
   {
     float centre[3] = {0.0f, 0.0f, 0.0f};
     std::string out = "{\n    \"Units\": [";
@@ -23,7 +25,9 @@ namespace faf::editor
         centre[a] += pos[a];
       }
       // UnitInstance.RotationFromScmapRotation.
-      const float degrees[3] = {unit.orientation[0] * kRadToDeg, -unit.orientation[1] * kRadToDeg, unit.orientation[2] * kRadToDeg};
+      const float degrees[3] = {
+        unit.orientation[0] * kRadToDeg, -unit.orientation[1] * kRadToDeg, unit.orientation[2] * kRadToDeg
+      };
       float rot[4];
       UnityEulerToQuaternion(degrees, rot);
       out += i == 0 ? "\n" : ",\n";
@@ -45,7 +49,12 @@ namespace faf::editor
     return out + "}";
   }
 
-  bool UnitsFromScunits(const std::string& text, std::vector<SaveUnit>& units, float (&centre)[3], std::string& error)
+  bool UnitsFromScunits(
+    const std::string& text,
+    std::vector<SaveUnit>& units,
+    float (&centre)[3],
+    std::string& error
+  )
   {
     std::string array;
     if (!JsonValue(text, "Units", array) || array.empty() || array.front() != '[') {
@@ -78,11 +87,17 @@ namespace faf::editor
     return true;
   }
 
-  bool FitUnitsOnMap(std::vector<SaveUnit>& units, const float (&centre)[3], const float width, const float height)
+  bool FitUnitsOnMap(
+    std::vector<SaveUnit>& units,
+    const float (&centre)[3],
+    const float width,
+    const float height
+  )
   {
     bool off = false;
     for (const SaveUnit& unit : units) {
-      off = off || unit.position[0] < 0.0f || unit.position[2] < 0.0f || unit.position[0] > width || unit.position[2] > height;
+      off = off || unit.position[0] < 0.0f || unit.position[2] < 0.0f || unit.position[0] > width ||
+        unit.position[2] > height;
     }
     if (!off) {
       return false;

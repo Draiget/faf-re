@@ -10,7 +10,9 @@ using namespace moho;
 
 namespace
 {
-  [[nodiscard]] bool IsLuaCallableFunction(const LuaPlus::LuaObject& object) noexcept
+  [[nodiscard]] bool IsLuaCallableFunction(
+    const LuaPlus::LuaObject& object
+  ) noexcept
   {
     // Recovered from LuaObject::IsFunction: (tt | 1) == LUA_TFUNCTION.
     return object.m_state != nullptr && ((object.m_object.tt | 1) == LUA_TFUNCTION);
@@ -28,7 +30,10 @@ namespace
  * Calls Lua global `LOC` with `key` and returns copied string result.
  * On exception, logs warning and returns the original `key`.
  */
-fa::string moho::Loc(LuaPlus::LuaState* const state, const gpg::StrArg key)
+fa::string moho::Loc(
+  LuaPlus::LuaState* const state,
+  const gpg::StrArg key
+)
 {
   const char* const input = key ? key : "";
 

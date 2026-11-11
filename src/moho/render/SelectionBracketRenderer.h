@@ -27,14 +27,14 @@ namespace moho
    */
   struct BlinkyBox final : TDatListItem<BlinkyBox, void>
   {
-    WeakPtr<UserEntity> mUnit;         // +0x08
-    std::uint8_t mIsOn;                // +0x10
-    std::uint8_t pad_11_13[3]{};       // +0x11
-    float mCurDuration;                // +0x14
-    float mCurCycleTime;               // +0x18
-    float mOnTime;                     // +0x1C
-    float mOffTime;                    // +0x20
-    float mTotalTime;                  // +0x24
+    WeakPtr<UserEntity> mUnit;   // +0x08
+    std::uint8_t mIsOn;          // +0x10
+    std::uint8_t pad_11_13[3]{}; // +0x11
+    float mCurDuration;          // +0x14
+    float mCurCycleTime;         // +0x18
+    float mOnTime;               // +0x1C
+    float mOffTime;              // +0x20
+    float mTotalTime;            // +0x24
   };
 
   static_assert(sizeof(BlinkyBox) == 0x28, "BlinkyBox size must be 0x28");

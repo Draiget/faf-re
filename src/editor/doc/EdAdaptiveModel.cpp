@@ -8,14 +8,19 @@
 
 namespace faf::editor
 {
-  std::string ReadableKey(const std::string& key)
+  std::string ReadableKey(
+    const std::string& key
+  )
   {
     std::string text;
     for (std::size_t i = 0; i < key.size(); ++i) {
       const char c = key[i];
       if (c == '_') {
         text += ' ';
-      } else if (i > 0 && std::isupper(static_cast<unsigned char>(c)) != 0 && std::islower(static_cast<unsigned char>(key[i - 1])) != 0) {
+      } else if (
+        i > 0 && std::isupper(static_cast<unsigned char>(c)) != 0 &&
+        std::islower(static_cast<unsigned char>(key[i - 1])) != 0
+      ) {
         text += ' ';
         text += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
       } else {
@@ -28,14 +33,19 @@ namespace faf::editor
     return text;
   }
 
-  std::vector<AdaptiveOption> AdaptiveOptionsOf(const std::string& script, const std::vector<LobbyOptionInfo>& lobby, const AdaptiveTables& tables,
-                                                const bool adaptiveScript)
+  std::vector<AdaptiveOption> AdaptiveOptionsOf(
+    const std::string& script,
+    const std::vector<LobbyOptionInfo>& lobby,
+    const AdaptiveTables& tables,
+    const bool adaptiveScript
+  )
   {
     std::vector<AdaptiveOption> out;
     const std::vector<ScriptGroupLoop> loops = ScriptGroupLoops(script);
     // The keys the script reads (local x = ScenarioInfo.Options.key, or the key itself).
     const auto scriptReads = [&](const std::string& key) {
-      return script.find("Options." + key) != std::string::npos || script.find("Options['" + key + "']") != std::string::npos;
+      return script.find("Options." + key) != std::string::npos ||
+        script.find("Options['" + key + "']") != std::string::npos;
     };
     const auto tableOf = [&](const std::string& key) -> const OptionTable* {
       for (const OptionTable& table : KnownOptionTables()) {
@@ -68,7 +78,9 @@ namespace faf::editor
       return option;
     };
     const auto have = [&](const std::string& key) {
-      return std::any_of(out.begin(), out.end(), [&](const AdaptiveOption& o) { return o.key == key; });
+      return std::any_of(out.begin(), out.end(), [&](const AdaptiveOption& o) {
+        return o.key == key;
+      });
     };
     for (std::size_t i = 0; i < lobby.size(); ++i) {
       if (!have(lobby[i].key)) {
@@ -77,7 +89,9 @@ namespace faf::editor
     }
     // Option tables with groups the lobby lacks (they never spawn until it has them).
     for (const auto& [name, groups] : tables.options) {
-      const bool any = std::any_of(groups.begin(), groups.end(), [](const std::vector<std::string>& g) { return !g.empty(); });
+      const bool any = std::any_of(groups.begin(), groups.end(), [](const std::vector<std::string>& g) {
+        return !g.empty();
+      });
       const std::string key = AdaptiveOptionKey(name);
       if ((any || groups.size() > 1) && !have(key)) {
         out.push_back(make(key, -1));
@@ -91,7 +105,10 @@ namespace faf::editor
     return out;
   }
 
-  std::string WithOption(const std::string& optionsText, const LobbyOptionInfo& option)
+  std::string WithOption(
+    const std::string& optionsText,
+    const LobbyOptionInfo& option
+  )
   {
     std::vector<LobbyValueText> values;
     for (const LobbyOptionInfo::Value& value : option.values) {
@@ -107,11 +124,19 @@ namespace faf::editor
       text.help = value.help;
       values.push_back(std::move(text));
     }
-    return WithLobbyOptionWritten(optionsText, option.key, option.label.empty() ? ReadableKey(option.key) : option.label, option.help,
-                                  option.defaultIndex, values);
+    return WithLobbyOptionWritten(
+      optionsText,
+      option.key,
+      option.label.empty() ? ReadableKey(option.key) : option.label,
+      option.help,
+      option.defaultIndex,
+      values
+    );
   }
 
-  int TableGroupOfChoice(const LobbyOptionInfo::Value& value)
+  int TableGroupOfChoice(
+    const LobbyOptionInfo::Value& value
+  )
   {
     if (!value.number) {
       return -1;
@@ -120,7 +145,10 @@ namespace faf::editor
     return key >= 2 ? key - 2 : -1;
   }
 
-  std::string LoopGroupOfChoice(const ScriptGroupLoop& loop, const LobbyOptionInfo::Value& value)
+  std::string LoopGroupOfChoice(
+    const ScriptGroupLoop& loop,
+    const LobbyOptionInfo::Value& value
+  )
   {
     if (!value.number) {
       return {};
@@ -129,8 +157,12 @@ namespace faf::editor
     return key >= loop.from ? loop.prefix + std::to_string(key) : std::string();
   }
 
-  std::vector<MadeGroup> GroupsMadeByChoice(const std::string& script, const std::vector<LobbyOptionInfo>& lobby, const std::string& key,
-                                            const int valueIndex)
+  std::vector<MadeGroup> GroupsMadeByChoice(
+    const std::string& script,
+    const std::vector<LobbyOptionInfo>& lobby,
+    const std::string& key,
+    const int valueIndex
+  )
   {
     std::vector<MadeGroup> made;
     std::vector<std::string> names;
@@ -167,7 +199,10 @@ namespace faf::editor
     return made;
   }
 
-  LobbyOptionInfo::Value NextLevelValue(const LobbyOptionInfo& option, const std::string& text)
+  LobbyOptionInfo::Value NextLevelValue(
+    const LobbyOptionInfo& option,
+    const std::string& text
+  )
   {
     LobbyOptionInfo::Value value;
     double highest = 0.0;

@@ -32,7 +32,10 @@ namespace
    * What it does:
    * Appends one visible decal payload into the pending publish vector.
    */
-  void AppendVisibleDecal(fa::vector<SDecalInfo>& visibleDecals, const SDecalInfo& decalInfo)
+  void AppendVisibleDecal(
+    fa::vector<SDecalInfo>& visibleDecals,
+    const SDecalInfo& decalInfo
+  )
   {
 #if defined(_M_X64) || defined(__x86_64__)
     // 6 entries of 0x90 bytes land in the binary's 896-byte class (0x0077ACC0).
@@ -49,7 +52,9 @@ namespace
   }
 
   [[nodiscard]]
-  std::uint32_t AllocateDecalObjectId(IdPool& pool)
+  std::uint32_t AllocateDecalObjectId(
+    IdPool& pool
+  )
   {
     if (pool.mReleasedLows.mWords.Empty()) {
       const std::uint32_t nextId = static_cast<std::uint32_t>(pool.mNextLowId);
@@ -63,7 +68,10 @@ namespace
   }
 
   [[nodiscard]]
-  std::size_t ResolveArmyCount(CArmyImpl* const* const armiesBegin, CArmyImpl* const* const armiesEnd) noexcept
+  std::size_t ResolveArmyCount(
+    CArmyImpl* const* const armiesBegin,
+    CArmyImpl* const* const armiesEnd
+  ) noexcept
   {
     if (!armiesBegin || !armiesEnd || armiesEnd < armiesBegin) {
       return 0u;
@@ -71,7 +79,10 @@ namespace
     return static_cast<std::size_t>(armiesEnd - armiesBegin);
   }
 
-  void SetArmyVisibilityFlag(CDecalHandle& handle, const std::size_t armyIndex) noexcept
+  void SetArmyVisibilityFlag(
+    CDecalHandle& handle,
+    const std::size_t armyIndex
+  ) noexcept
   {
     if (armyIndex < 32u) {
       handle.mArmyVisibilityFlags |= (1u << static_cast<std::uint32_t>(armyIndex));
@@ -113,12 +124,14 @@ CDecalBuffer::CDecalBuffer()
 {}
 
 /**
-    * Alias of FUN_00779170 (non-canonical helper lane).
+ * Alias of FUN_00779170 (non-canonical helper lane).
  *
  * What it does:
  * Initializes decal runtime storage bound to a Sim owner.
  */
-CDecalBuffer::CDecalBuffer(Sim* const sim)
+CDecalBuffer::CDecalBuffer(
+  Sim* const sim
+)
   : mSim(sim)
   , mReserved04(0)
   , mPool()
@@ -162,7 +175,10 @@ CDecalBuffer::~CDecalBuffer()
  * Swaps runtime storage pointers for both decal publish vectors:
  * visible decals and pending hide object-id lanes.
  */
-void CDecalBuffer::SwapVectors(fa::vector<SDecalInfo>* const addDecals, fa::vector<std::uint32_t>* const removeDecals)
+void CDecalBuffer::SwapVectors(
+  fa::vector<SDecalInfo>* const addDecals,
+  fa::vector<std::uint32_t>* const removeDecals
+)
 {
   // Exchanging all three lanes pairwise is vector::swap.
   mVisibleDecals.swap(*addDecals);
@@ -179,7 +195,9 @@ void CDecalBuffer::SwapVectors(fa::vector<SDecalInfo>* const addDecals, fa::vect
  * binary gates its `sub_77A250`/`sub_77A930` call pair), and initializes
  * per-army visibility flags for the new decal.
  */
-CDecalHandle* CDecalBuffer::CreateHandle(const SDecalInfo& info)
+CDecalHandle* CDecalBuffer::CreateHandle(
+  const SDecalInfo& info
+)
 {
   if (!mSim) {
     return nullptr;
@@ -255,7 +273,9 @@ CDecalHandle* CDecalBuffer::CreateHandle(const SDecalInfo& info)
  * The owner reference is re-zeroed before every read, matching the binary
  * clearing `mObj`/`mType` at 0x00779D88 and again at 0x00779E13.
  */
-void CDecalBuffer::ReadDecalHandles(gpg::ReadArchive* const ar)
+void CDecalBuffer::ReadDecalHandles(
+  gpg::ReadArchive* const ar
+)
 {
   for (;;) {
     gpg::RRef ownerRef{};
@@ -288,7 +308,9 @@ void CDecalBuffer::ReadDecalHandles(gpg::ReadArchive* const ar)
  * are both recovered, cited on `legacy/containers/RbTree.h`'s canonical
  * insert member for this map/set instantiation.
  */
-void CDecalBuffer::DestroyHandle(CDecalHandle* const handleOpaque)
+void CDecalBuffer::DestroyHandle(
+  CDecalHandle* const handleOpaque
+)
 {
   if (!handleOpaque) {
     return;
@@ -322,7 +344,11 @@ void CDecalBuffer::AdvanceIdPoolWindow()
  * What it does:
  * Computes world-space XZ AABB bounds for a rotated decal quad.
  */
-void CDecalBuffer::ProjectDecalToBoundsXZ(const SDecalInfo& info, Wm3::Vec2f& outMax, Wm3::Vec2f& outMin)
+void CDecalBuffer::ProjectDecalToBoundsXZ(
+  const SDecalInfo& info,
+  Wm3::Vec2f& outMax,
+  Wm3::Vec2f& outMin
+)
 {
   const float c = std::cos(info.mRot.y);
   const float s = std::sin(info.mRot.y);
@@ -350,14 +376,18 @@ void CDecalBuffer::ProjectDecalToBoundsXZ(const SDecalInfo& info, Wm3::Vec2f& ou
  * Tests whether an observer army may currently detect a decal owned by `sourceArmy`.
  */
 bool CDecalBuffer::IsDecalVisibleForArmy(
-  const CArmyImpl* const sourceArmy, const SDecalInfo& info, CArmyImpl* const observerArmy
+  const CArmyImpl* const sourceArmy,
+  const SDecalInfo& info,
+  CArmyImpl* const observerArmy
 ) const
 {
   if (!observerArmy) {
     return false;
   }
 
-  if (sourceArmy && observerArmy->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(sourceArmy->mConstDat.mArmyIndex))) {
+  if (
+    sourceArmy && observerArmy->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(sourceArmy->mConstDat.mArmyIndex))
+  ) {
     return true;
   }
 

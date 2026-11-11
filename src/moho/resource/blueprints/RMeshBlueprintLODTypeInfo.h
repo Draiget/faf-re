@@ -83,4 +83,3 @@ namespace moho
 
   static_assert(sizeof(RMeshBlueprintLODTypeInfo) == 0x64, "RMeshBlueprintLODTypeInfo size must be 0x64");
 } // namespace moho
-

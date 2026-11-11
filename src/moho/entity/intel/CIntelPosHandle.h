@@ -98,9 +98,8 @@ namespace moho
      * Builds a new `CIntelPosHandle` for an archive load and hands it back unowned; its
      * members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00770000 (FUN_00770000, Moho::CIntelPosHandle::MemberDeserialize)

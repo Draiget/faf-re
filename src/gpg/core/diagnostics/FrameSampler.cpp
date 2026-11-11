@@ -75,9 +75,10 @@ namespace gpg::diag
       std::atomic<std::uint64_t> written{0}; // samples taken so far (ring index = written % size)
       std::mutex windowsLock;
       std::deque<Window> windows;
-      std::unordered_map<std::uintptr_t, std::pair<std::uintptr_t, std::string>> symbols; // address -> function start, name
-      std::string dumpPath;                                 // FAF_FRAME_SAMPLER_DUMP, empty when off
-      int dumpPhase = 0;                                    // the phase `folded` counts belong to
+      std::unordered_map<std::uintptr_t, std::pair<std::uintptr_t, std::string>>
+        symbols;                                             // address -> function start, name
+      std::string dumpPath;                                  // FAF_FRAME_SAMPLER_DUMP, empty when off
+      int dumpPhase = 0;                                     // the phase `folded` counts belong to
       std::unordered_map<std::string, std::uint32_t> folded; // whole stack, root first -> samples
     };
 
@@ -95,7 +96,10 @@ namespace gpg::diag
     }
 
     /** Walks the suspended thread's stack from `context`. Must not allocate: the target may hold the heap lock. */
-    std::uint32_t Walk(CONTEXT& context, std::uintptr_t* const frames)
+    std::uint32_t Walk(
+      CONTEXT& context,
+      std::uintptr_t* const frames
+    )
     {
 #if defined(_M_X64)
       std::uint32_t depth = 0;
@@ -123,7 +127,10 @@ namespace gpg::diag
     }
 
     /** Walk under SEH: a stack in an unusual state must cost the sample, not the process. */
-    std::uint32_t GuardedWalk(CONTEXT& context, std::uintptr_t* const frames)
+    std::uint32_t GuardedWalk(
+      CONTEXT& context,
+      std::uintptr_t* const frames
+    )
     {
       __try {
         return Walk(context, frames);
@@ -132,7 +139,9 @@ namespace gpg::diag
       }
     }
 
-    void TakeSample(SamplerState& state)
+    void TakeSample(
+      SamplerState& state
+    )
     {
       if (::SuspendThread(state.target) == static_cast<DWORD>(-1)) {
         return;
@@ -147,7 +156,10 @@ namespace gpg::diag
       state.written.store(index + 1U, std::memory_order_release);
     }
 
-    const std::pair<std::uintptr_t, std::string>& Resolve(SamplerState& state, const std::uintptr_t address)
+    const std::pair<std::uintptr_t, std::string>& Resolve(
+      SamplerState& state,
+      const std::uintptr_t address
+    )
     {
       auto found = state.symbols.find(address);
       if (found != state.symbols.end()) {
@@ -173,7 +185,10 @@ namespace gpg::diag
       return state.symbols.emplace(address, std::move(entry)).first->second;
     }
 
-    void Report(SamplerState& state, const Window& window)
+    void Report(
+      SamplerState& state,
+      const Window& window
+    )
     {
       std::unordered_map<std::uintptr_t, std::uint32_t> inclusive;
       std::unordered_map<std::uintptr_t, std::uint32_t> self;
@@ -215,16 +230,24 @@ namespace gpg::diag
       if (samples == 0U) {
         return;
       }
-      const auto print = [&](const char* const kind, std::unordered_map<std::uintptr_t, std::uint32_t>& counts, const std::size_t top) {
+      const auto print =
+        [&](const char* const kind, std::unordered_map<std::uintptr_t, std::uint32_t>& counts, const std::size_t top) {
         std::vector<std::pair<std::uint32_t, std::uintptr_t>> sorted;
         sorted.reserve(counts.size());
         for (const auto& [function, count] : counts) {
           sorted.emplace_back(count, function);
         }
-        std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+        std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+          return a.first > b.first;
+        });
         for (std::size_t index = 0; index < sorted.size() && index < top; ++index) {
-          gpg::Logf("[FRAMESAMPLE]   %s %5.1f%% %4u  %s", kind, 100.0 * sorted[index].first / samples, sorted[index].first,
-            names[sorted[index].second]->c_str());
+          gpg::Logf(
+            "[FRAMESAMPLE]   %s %5.1f%% %4u  %s",
+            kind,
+            100.0 * sorted[index].first / samples,
+            sorted[index].first,
+            names[sorted[index].second]->c_str()
+          );
         }
       };
       print("incl", inclusive, kTopInclusive);
@@ -234,21 +257,32 @@ namespace gpg::diag
       for (const auto& [function, count] : self) {
         leaves.emplace_back(count, function);
       }
-      std::sort(leaves.begin(), leaves.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+      std::sort(leaves.begin(), leaves.end(), [](const auto& a, const auto& b) {
+        return a.first > b.first;
+      });
       for (std::size_t leaf = 0; leaf < leaves.size() && leaf < kTopCallerLeaves; ++leaf) {
         std::vector<std::pair<std::uint32_t, const std::string*>> chains;
         for (const auto& [chain, count] : callers[leaves[leaf].second]) {
           chains.emplace_back(count, &chain);
         }
-        std::sort(chains.begin(), chains.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+        std::sort(chains.begin(), chains.end(), [](const auto& a, const auto& b) {
+          return a.first > b.first;
+        });
         for (std::size_t index = 0; index < chains.size() && index < kChainsPerLeaf; ++index) {
-          gpg::Logf("[FRAMESAMPLE]   path %4u  %s%s", chains[index].first, names[leaves[leaf].second]->c_str(), chains[index].second->c_str());
+          gpg::Logf(
+            "[FRAMESAMPLE]   path %4u  %s%s",
+            chains[index].first,
+            names[leaves[leaf].second]->c_str(),
+            chains[index].second->c_str()
+          );
         }
       }
     }
 
     /** Adds the newest sample's stack to the phase's counts, root first, one entry per function. */
-    void FoldLastSample(SamplerState& state)
+    void FoldLastSample(
+      SamplerState& state
+    )
     {
       const std::uint64_t written = state.written.load(std::memory_order_acquire);
       if (written == 0U) {
@@ -277,7 +311,9 @@ namespace gpg::diag
     }
 
     /** Appends the finished phase's counts to `<path>.<phase>.folded` and clears them. */
-    void FlushFolded(SamplerState& state)
+    void FlushFolded(
+      SamplerState& state
+    )
     {
       if (state.folded.empty()) {
         return;
@@ -294,7 +330,9 @@ namespace gpg::diag
       state.folded.clear();
     }
 
-    DWORD WINAPI SamplerThread(LPVOID)
+    DWORD WINAPI SamplerThread(
+      LPVOID
+    )
     {
       SamplerState& state = State();
       {
@@ -308,7 +346,10 @@ namespace gpg::diag
       // A one-millisecond sleep needs the one-millisecond timer resolution.
       using TimeBeginPeriod = UINT(WINAPI*)(UINT);
       if (HMODULE const winmm = ::LoadLibraryA("winmm.dll"); winmm != nullptr) {
-        if (auto const begin = reinterpret_cast<TimeBeginPeriod>(::GetProcAddress(winmm, "timeBeginPeriod")); begin != nullptr) {
+        if (
+          auto const begin = reinterpret_cast<TimeBeginPeriod>(::GetProcAddress(winmm, "timeBeginPeriod"));
+          begin != nullptr
+        ) {
           (void)begin(1U);
         }
       }
@@ -361,8 +402,17 @@ namespace gpg::diag
       ::QueryPerformanceFrequency(&frequency);
       state.frequency = frequency.QuadPart;
       state.thresholdMs = threshold;
-      if (::DuplicateHandle(::GetCurrentProcess(), ::GetCurrentThread(), ::GetCurrentProcess(), &state.target,
-            THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, 0U) == FALSE) {
+      if (
+        ::DuplicateHandle(
+          ::GetCurrentProcess(),
+          ::GetCurrentThread(),
+          ::GetCurrentProcess(),
+          &state.target,
+          THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION,
+          FALSE,
+          0U
+        ) == FALSE
+      ) {
         state.target = nullptr;
         return;
       }
@@ -377,7 +427,8 @@ namespace gpg::diag
       return;
     }
 
-    const double milliseconds = 1000.0 * static_cast<double>(now - state.lastMark) / static_cast<double>(state.frequency);
+    const double milliseconds =
+      1000.0 * static_cast<double>(now - state.lastMark) / static_cast<double>(state.frequency);
     if (milliseconds >= state.thresholdMs) {
       {
         const std::lock_guard<std::mutex> lock(state.windowsLock);

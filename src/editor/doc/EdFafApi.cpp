@@ -26,7 +26,10 @@ namespace faf::editor
     void (*gFafLog)(const char*) = nullptr;
 
     /** A line to the editor's log, when it set one (SetFafLog). */
-    void FafLog(const char* const format, ...)
+    void FafLog(
+      const char* const format,
+      ...
+    )
     {
       if (gFafLog == nullptr) {
         return;
@@ -52,7 +55,10 @@ namespace faf::editor
         }
       }
 
-      static void PutUtf8(std::string& out, std::uint32_t code)
+      static void PutUtf8(
+        std::string& out,
+        std::uint32_t code
+      )
       {
         if (code < 0x80u) {
           out += static_cast<char>(code);
@@ -71,7 +77,9 @@ namespace faf::editor
         }
       }
 
-      bool Hex4(std::uint32_t& code)
+      bool Hex4(
+        std::uint32_t& code
+      )
       {
         if (at + 4 > text.size()) {
           return false;
@@ -81,7 +89,9 @@ namespace faf::editor
         return true;
       }
 
-      bool String(std::string& out)
+      bool String(
+        std::string& out
+      )
       {
         ++at; // the opening quote
         while (at < text.size()) {
@@ -98,11 +108,21 @@ namespace faf::editor
           }
           const char e = text[at++];
           switch (e) {
-          case 'n': out += '\n'; break;
-          case 't': out += '\t'; break;
-          case 'r': out += '\r'; break;
-          case 'b': out += '\b'; break;
-          case 'f': out += '\f'; break;
+          case 'n':
+            out += '\n';
+            break;
+          case 't':
+            out += '\t';
+            break;
+          case 'r':
+            out += '\r';
+            break;
+          case 'b':
+            out += '\b';
+            break;
+          case 'f':
+            out += '\f';
+            break;
           case 'u': {
             std::uint32_t code = 0;
             if (!Hex4(code)) {
@@ -120,14 +140,19 @@ namespace faf::editor
             PutUtf8(out, code);
             break;
           }
-          default: out += e; break;
+          default:
+            out += e;
+            break;
           }
         }
         error = "a string doesn't end";
         return false;
       }
 
-      bool Value(JsonNode& node, const int depth)
+      bool Value(
+        JsonNode& node,
+        const int depth
+      )
       {
         if (depth > 128) {
           error = "nested too deep";
@@ -235,7 +260,10 @@ namespace faf::editor
     };
 
     /** `included`'s resource of this type and id, or null. */
-    const JsonNode* Included(const JsonNode& root, const JsonNode* const reference)
+    const JsonNode* Included(
+      const JsonNode& root,
+      const JsonNode* const reference
+    )
     {
       const JsonNode* const included = root.Get("included");
       const JsonNode* const data = reference != nullptr ? reference->Get("data") : nullptr;
@@ -252,7 +280,9 @@ namespace faf::editor
       return nullptr;
     }
 
-    std::string Form(const std::vector<std::pair<std::string, std::string>>& fields)
+    std::string Form(
+      const std::vector<std::pair<std::string, std::string>>& fields
+    )
     {
       std::string out;
       for (const auto& [key, value] : fields) {
@@ -262,8 +292,13 @@ namespace faf::editor
     }
 
     /** A POST to Hydra's token or device endpoint. */
-    bool PostForm(const std::string& path, const std::vector<std::pair<std::string, std::string>>& fields, long& status, JsonNode& answer,
-                  std::string& error)
+    bool PostForm(
+      const std::string& path,
+      const std::vector<std::pair<std::string, std::string>>& fields,
+      long& status,
+      JsonNode& answer,
+      std::string& error
+    )
     {
       HttpCall call;
       call.method = "POST";
@@ -282,12 +317,16 @@ namespace faf::editor
     }
   } // namespace
 
-  void SetFafLog(void (*log)(const char*)) noexcept
+  void SetFafLog(
+    void (*log)(const char*)
+  ) noexcept
   {
     gFafLog = log;
   }
 
-  const JsonNode* JsonNode::Get(const std::string& key) const
+  const JsonNode* JsonNode::Get(
+    const std::string& key
+  ) const
   {
     for (const auto& [name, value] : members) {
       if (name == key) {
@@ -297,7 +336,9 @@ namespace faf::editor
     return nullptr;
   }
 
-  std::string JsonNode::String(const std::string& key) const
+  std::string JsonNode::String(
+    const std::string& key
+  ) const
   {
     const JsonNode* const value = Get(key);
     if (value == nullptr) {
@@ -310,19 +351,28 @@ namespace faf::editor
     return value->kind == Kind::String ? value->text : std::string();
   }
 
-  double JsonNode::Number(const std::string& key, const double fallback) const
+  double JsonNode::Number(
+    const std::string& key,
+    const double fallback
+  ) const
   {
     const JsonNode* const value = Get(key);
     return value != nullptr && value->kind == Kind::Number ? value->number : fallback;
   }
 
-  bool JsonNode::Bool(const std::string& key) const
+  bool JsonNode::Bool(
+    const std::string& key
+  ) const
   {
     const JsonNode* const value = Get(key);
     return value != nullptr && value->kind == Kind::Bool && value->boolean;
   }
 
-  bool ParseJson(const std::string& text, JsonNode& out, std::string& error)
+  bool ParseJson(
+    const std::string& text,
+    JsonNode& out,
+    std::string& error
+  )
   {
     JsonReader reader{text, 0, {}};
     out = JsonNode{};
@@ -341,7 +391,9 @@ namespace faf::editor
   namespace
   {
     /** Text for a quoted RSQL value: quotes and backslashes left out. */
-    std::string Unquoted(const std::string& text)
+    std::string Unquoted(
+      const std::string& text
+    )
     {
       std::string out;
       for (const char c : text) {
@@ -353,7 +405,9 @@ namespace faf::editor
     }
 
     /** "YYYY-MM-DD", checked. */
-    bool IsDate(const std::string& text)
+    bool IsDate(
+      const std::string& text
+    )
     {
       if (text.size() != 10 || text[4] != '-' || text[7] != '-') {
         return false;
@@ -366,7 +420,9 @@ namespace faf::editor
       return true;
     }
 
-    std::string Sizes(const unsigned bits)
+    std::string Sizes(
+      const unsigned bits
+    )
     {
       std::string out;
       for (int k = 0; k < 7; ++k) {
@@ -377,7 +433,9 @@ namespace faf::editor
       return out;
     }
 
-    std::string Number(const float value)
+    std::string Number(
+      const float value
+    )
     {
       char text[32];
       (void)std::snprintf(text, sizeof(text), "%g", static_cast<double>(value));
@@ -385,9 +443,12 @@ namespace faf::editor
     }
   } // namespace
 
-  std::string VaultQueryFilter(const VaultQuery& query)
+  std::string VaultQueryFilter(
+    const VaultQuery& query
+  )
   {
-    // The FAF client's filters in its order, each condition as its QBuilder writes it, then the hidden versions left out.
+    // The FAF client's filters in its order, each condition as its QBuilder writes it, then the hidden versions left
+    // out.
     std::vector<std::string> conditions;
     if (const std::string name = Unquoted(query.text); !name.empty()) {
       conditions.push_back("displayName==\"*" + name + "*\"");
@@ -430,14 +491,21 @@ namespace faf::editor
     return filter;
   }
 
-  std::string VaultSearchUrl(const VaultQuery& query, const int page)
+  std::string VaultSearchUrl(
+    const VaultQuery& query,
+    const int page
+  )
   {
-    const std::string sort = (query.descending ? "-" : "") + (query.sortProperty.empty() ? std::string("gamesPlayed") : query.sortProperty);
-    return std::string(kFafApiUrl) + "/data/map?filter=" + UrlEncode(VaultQueryFilter(query)) + "&include=latestVersion,author&sort=" + sort +
-           "&page%5Bsize%5D=30&page%5Bnumber%5D=" + std::to_string(std::max(page, 1)) + "&page%5Btotals%5D";
+    const std::string sort =
+      (query.descending ? "-" : "") + (query.sortProperty.empty() ? std::string("gamesPlayed") : query.sortProperty);
+    return std::string(kFafApiUrl) + "/data/map?filter=" + UrlEncode(VaultQueryFilter(query)) +
+      "&include=latestVersion,author&sort=" + sort +
+      "&page%5Bsize%5D=30&page%5Bnumber%5D=" + std::to_string(std::max(page, 1)) + "&page%5Btotals%5D";
   }
 
-  std::string VaultQueryText(const VaultQuery& q)
+  std::string VaultQueryText(
+    const VaultQuery& q
+  )
   {
     // key=value separated by tabs (no field holds a tab: the panel's fields are single lines).
     const auto clean = [](std::string text) {
@@ -446,13 +514,18 @@ namespace faf::editor
       }
       return text;
     };
-    return "name=" + clean(q.text) + "\tauthor=" + clean(q.author) + "\tfrom=" + clean(q.uploadedFrom) + "\tto=" + clean(q.uploadedTo) +
-           "\twidths=" + std::to_string(q.widths) + "\theights=" + std::to_string(q.heights) + "\tplayersFrom=" + std::to_string(q.minPlayers) +
-           "\tplayersTo=" + std::to_string(q.maxPlayers) + "\tscoreFrom=" + Number(q.minScore) + "\tscoreTo=" + Number(q.maxScore) +
-           "\tranked=" + (q.rankedOnly ? "1" : "0") + "\tsort=" + clean(q.sortProperty) + "\tdescending=" + (q.descending ? "1" : "0");
+    return "name=" + clean(q.text) + "\tauthor=" + clean(q.author) + "\tfrom=" + clean(q.uploadedFrom) +
+      "\tto=" + clean(q.uploadedTo) + "\twidths=" + std::to_string(q.widths) +
+      "\theights=" + std::to_string(q.heights) + "\tplayersFrom=" + std::to_string(q.minPlayers) +
+      "\tplayersTo=" + std::to_string(q.maxPlayers) + "\tscoreFrom=" + Number(q.minScore) +
+      "\tscoreTo=" + Number(q.maxScore) + "\tranked=" + (q.rankedOnly ? "1" : "0") + "\tsort=" + clean(q.sortProperty) +
+      "\tdescending=" + (q.descending ? "1" : "0");
   }
 
-  bool VaultQueryFromText(const std::string& text, VaultQuery& out)
+  bool VaultQueryFromText(
+    const std::string& text,
+    VaultQuery& out
+  )
   {
     VaultQuery q;
     bool any = false;
@@ -502,7 +575,12 @@ namespace faf::editor
     return any;
   }
 
-  bool ParseVaultSearch(const std::string& json, std::vector<VaultMap>& maps, int& pages, std::string& error)
+  bool ParseVaultSearch(
+    const std::string& json,
+    std::vector<VaultMap>& maps,
+    int& pages,
+    std::string& error
+  )
   {
     JsonNode root;
     if (!ParseJson(json, root, error)) {
@@ -529,7 +607,8 @@ namespace faf::editor
       VaultMap map;
       map.name = attributes->String("displayName");
       map.gamesPlayed = static_cast<int>(attributes->Number("gamesPlayed"));
-      const JsonNode* const version = relationships != nullptr ? Included(root, relationships->Get("latestVersion")) : nullptr;
+      const JsonNode* const version =
+        relationships != nullptr ? Included(root, relationships->Get("latestVersion")) : nullptr;
       if (version == nullptr || version->Get("attributes") == nullptr) {
         continue; // no version to download
       }
@@ -545,7 +624,9 @@ namespace faf::editor
       map.width = static_cast<int>(v.Number("width"));
       map.height = static_cast<int>(v.Number("height"));
       map.ranked = v.Bool("ranked");
-      if (const JsonNode* const author = relationships != nullptr ? Included(root, relationships->Get("author")) : nullptr) {
+      if (
+        const JsonNode* const author = relationships != nullptr ? Included(root, relationships->Get("author")) : nullptr
+      ) {
         if (const JsonNode* const a = author->Get("attributes")) {
           map.author = a->String("login");
         }
@@ -573,12 +654,16 @@ namespace faf::editor
     }
   }
 
-  void EdFafSession::Run(std::function<void()> job)
+  void EdFafSession::Run(
+    std::function<void()> job
+  )
   {
     mThreads.emplace_back(std::move(job));
   }
 
-  void EdFafSession::SetMessage(std::string text)
+  void EdFafSession::SetMessage(
+    std::string text
+  )
   {
     if (!text.empty()) {
       FafLog("editor: FAF: %s", text.c_str());
@@ -595,7 +680,8 @@ namespace faf::editor
 
   int EdFafSession::SecondsLeft() const
   {
-    const long long now = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    const long long now =
+      std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
     return static_cast<int>(std::max<long long>(0, mCodeExpires.load() - now));
   }
 
@@ -653,7 +739,9 @@ namespace faf::editor
     return mVerifyUrl;
   }
 
-  void EdFafSession::SetTokenFile(std::filesystem::path file)
+  void EdFafSession::SetTokenFile(
+    std::filesystem::path file
+  )
   {
     mTokenFile = std::move(file);
     std::ifstream in(mTokenFile, std::ios::binary);
@@ -692,7 +780,9 @@ namespace faf::editor
     }
   }
 
-  bool EdFafSession::RefreshAccess(std::string& error)
+  bool EdFafSession::RefreshAccess(
+    std::string& error
+  )
   {
     std::string refresh;
     {
@@ -705,8 +795,13 @@ namespace faf::editor
     }
     long status = 0;
     JsonNode answer;
-    if (!PostForm("/oauth2/token", {{"grant_type", "refresh_token"}, {"refresh_token", refresh}, {"client_id", kFafClientId}}, status, answer,
-                  error)) {
+    if (!PostForm(
+          "/oauth2/token",
+          {{"grant_type", "refresh_token"}, {"refresh_token", refresh}, {"client_id", kFafClientId}},
+          status,
+          answer,
+          error
+        )) {
       return false;
     }
     if (status != 200 || answer.String("access_token").empty()) {
@@ -762,7 +857,10 @@ namespace faf::editor
       long status = 0;
       JsonNode device;
       std::string error;
-      if (!PostForm("/oauth2/device/auth", {{"client_id", kFafClientId}, {"scope", kFafScopes}}, status, device, error) || status != 200) {
+      if (
+        !PostForm("/oauth2/device/auth", {{"client_id", kFafClientId}, {"scope", kFafScopes}}, status, device, error) ||
+        status != 200
+      ) {
         mState = State::LoggedOut;
         SetMessage(error.empty() ? "FAF's login answered " + std::to_string(status) : error);
         return;
@@ -782,7 +880,8 @@ namespace faf::editor
       mState = State::WaitingForApproval;
       SetMessage("Approve the editor on FAF's page in your browser (code " + UserCode() + ")");
       int interval = std::max(1, static_cast<int>(device.Number("interval", 5.0)));
-      const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(static_cast<int>(device.Number("expires_in", 600.0)));
+      const auto until =
+        std::chrono::steady_clock::now() + std::chrono::seconds(static_cast<int>(device.Number("expires_in", 600.0)));
       mCodeExpires = std::chrono::duration_cast<std::chrono::seconds>(until.time_since_epoch()).count();
       std::string lastPoll;
       while (!mStop.load() && !mCancel.load() && std::chrono::steady_clock::now() < until) {
@@ -794,8 +893,14 @@ namespace faf::editor
         }
         JsonNode token;
         const bool answered = PostForm(
-          "/oauth2/token", {{"grant_type", "urn:ietf:params:oauth:grant-type:device_code"}, {"device_code", deviceCode}, {"client_id", kFafClientId}},
-          status, token, error);
+          "/oauth2/token",
+          {{"grant_type", "urn:ietf:params:oauth:grant-type:device_code"},
+           {"device_code", deviceCode},
+           {"client_id", kFafClientId}},
+          status,
+          token,
+          error
+        );
         // Each new kind of answer once in the log, so a login that never ends says why.
         const std::string poll = std::to_string(status) + " " + (answered ? token.String("error") : error);
         if (poll != lastPoll) {
@@ -849,7 +954,10 @@ namespace faf::editor
     SetMessage("Logged out of FAF");
   }
 
-  void EdFafSession::Search(const VaultQuery& query, const int page)
+  void EdFafSession::Search(
+    const VaultQuery& query,
+    const int page
+  )
   {
     if (mState.load() != State::LoggedIn || mSearching.exchange(true)) {
       return;
@@ -907,7 +1015,10 @@ namespace faf::editor
     });
   }
 
-  bool EdFafSession::TakeResults(std::vector<VaultMap>& maps, int& pages)
+  bool EdFafSession::TakeResults(
+    std::vector<VaultMap>& maps,
+    int& pages
+  )
   {
     std::lock_guard<std::mutex> lock(mLock);
     if (!mHaveResults) {
@@ -919,7 +1030,9 @@ namespace faf::editor
     return true;
   }
 
-  std::string EdFafSession::Picture(const std::string& url)
+  std::string EdFafSession::Picture(
+    const std::string& url
+  )
   {
     if (url.empty()) {
       return {};
@@ -956,8 +1069,10 @@ namespace faf::editor
           };
           char programData[MAX_PATH] = "";
           (void)::GetEnvironmentVariableA("ProgramData", programData, MAX_PATH);
-          const std::filesystem::path client = std::filesystem::path(programData) / "FAForever" / "cache" / "maps" / size / file;
-          const std::filesystem::path own = mPictureCache.empty() ? std::filesystem::path() : mPictureCache / size / file;
+          const std::filesystem::path client =
+            std::filesystem::path(programData) / "FAForever" / "cache" / "maps" / size / file;
+          const std::filesystem::path own =
+            mPictureCache.empty() ? std::filesystem::path() : mPictureCache / size / file;
           bool ok = (programData[0] != '\0' && readFile(client)) || (!own.empty() && readFile(own));
           if (!ok) {
             HttpCall call;

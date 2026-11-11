@@ -23,7 +23,8 @@ namespace moho
   TConVar<int> gTConVar_ren_GpuSelectBrackets(
     "ren_GpuSelectBrackets",
     "Draw selection brackets with one instanced draw per view from a persistent GPU buffer instead of the "
-    "prim batcher. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
+    "prim batcher. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 "
+    "never.",
     &ren_GpuSelectBrackets
   );
 
@@ -97,7 +98,9 @@ namespace moho
     return mSupported;
   }
 
-  SelectionBracketGpuRenderer::ViewStream& SelectionBracketGpuRenderer::StreamFor(const void* const viewKey)
+  SelectionBracketGpuRenderer::ViewStream& SelectionBracketGpuRenderer::StreamFor(
+    const void* const viewKey
+  )
   {
     for (ViewStream& stream : mStreams) {
       if (stream.mViewKey == viewKey) {
@@ -105,7 +108,9 @@ namespace moho
         return stream;
       }
     }
-    std::erase_if(mStreams, [this](const ViewStream& stream) { return mDraws - stream.mLastUsedDraw > kStreamIdleDraws; });
+    std::erase_if(mStreams, [this](const ViewStream& stream) {
+      return mDraws - stream.mLastUsedDraw > kStreamIdleDraws;
+    });
     ViewStream& stream = mStreams.emplace_back();
     stream.mViewKey = viewKey;
     stream.mLastUsedDraw = mDraws;
@@ -131,8 +136,10 @@ namespace moho
     // The atlas rectangle `CD3DPrimBatcher::SetTexture` would use; a texture
     // the batcher sends around the atlas is left to the batcher.
     CD3DTextureBatcher& atlas = *batcher.mTextureBatcher;
-    if (texture->mWidth >= (static_cast<std::uint32_t>(atlas.mWidth) >> 1U) ||
-        texture->mHeight >= (static_cast<std::uint32_t>(atlas.mHeight) >> 1U)) {
+    if (
+      texture->mWidth >= (static_cast<std::uint32_t>(atlas.mWidth) >> 1U) ||
+      texture->mHeight >= (static_cast<std::uint32_t>(atlas.mHeight) >> 1U)
+    ) {
       return false;
     }
     const gpg::Rect2f* rect = atlas.AddTexture(texture);

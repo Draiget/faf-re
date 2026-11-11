@@ -21,7 +21,9 @@ namespace faf::editor
   namespace
   {
     /** COORDS_Orient's look turned into a view orientation, as CameraImpl::UpdateCoords does (ViewOrientFromLook). */
-    Wm3::Quaternionf ViewOrient(const Wm3::Quaternionf& look)
+    Wm3::Quaternionf ViewOrient(
+      const Wm3::Quaternionf& look
+    )
     {
       Wm3::Quaternionf orient{};
       orient.w = -look.y;
@@ -31,49 +33,72 @@ namespace faf::editor
       return orient;
     }
 
-    std::uint32_t Background(const int kind)
+    std::uint32_t Background(
+      const int kind
+    )
     {
       switch (kind) {
-      case 1: return 0xFF5A5F66u;
-      case 2: return 0xFF86A9CCu;
-      case 3: return 0xFF000000u;
-      default: return 0xFF14171Du;
+      case 1:
+        return 0xFF5A5F66u;
+      case 2:
+        return 0xFF86A9CCu;
+      case 3:
+        return 0xFF000000u;
+      default:
+        return 0xFF14171Du;
       }
     }
   } // namespace
 
-  void EdParticleViewport::SetSize(const int width, const int height)
+  void EdParticleViewport::SetSize(
+    const int width,
+    const int height
+  )
   {
     // In steps of 32, so a slowly resized panel doesn't make a new target every frame.
     mWidth = std::clamp((width + 31) / 32 * 32, 64, 2048);
     mHeight = std::clamp((height + 31) / 32 * 32, 64, 2048);
   }
 
-  void EdParticleViewport::Turn(const float dx, const float dy)
+  void EdParticleViewport::Turn(
+    const float dx,
+    const float dy
+  )
   {
     mHeading += dx * 0.01f;
     mPitch = std::clamp(mPitch + dy * 0.01f, -0.2f, 1.55f);
   }
 
-  void EdParticleViewport::Zoom(const float steps)
+  void EdParticleViewport::Zoom(
+    const float steps
+  )
   {
     mDistance = std::clamp(mDistance * std::pow(0.87f, steps), 2.0f, 400.0f);
   }
 
-  void EdParticleViewport::Look(const float heading, const float pitch)
+  void EdParticleViewport::Look(
+    const float heading,
+    const float pitch
+  )
   {
     mHeading = heading;
     mPitch = pitch;
   }
 
-  void EdParticleViewport::Reset(const float size)
+  void EdParticleViewport::Reset(
+    const float size
+  )
   {
     mHeading = 2.4f;
     mPitch = 0.45f;
     mDistance = std::clamp(size * 2.5f, 6.0f, 200.0f);
   }
 
-  void EdParticleViewport::Render(const int headWidth, const int headHeight, const float frameSeconds)
+  void EdParticleViewport::Render(
+    const int headWidth,
+    const int headHeight,
+    const float frameSeconds
+  )
   {
     if (!std::exchange(mShown, false)) {
       return; // no panel showed it last frame
@@ -108,11 +133,14 @@ namespace faf::editor
     const float fov = 0.9f;
     const float nearClip = -std::max(mDistance * 0.01f, 0.05f);
     const float farClip = -(mDistance + 2000.0f); // short of the next spot (3000 away)
-    const moho::VMatrix4 projection =
-      moho::VEC_D3DProjectionMatrixFOV(fov, fov, nearClip, farClip, static_cast<float>(mHeight) / static_cast<float>(mWidth));
+    const moho::VMatrix4 projection = moho::VEC_D3DProjectionMatrixFOV(
+      fov, fov, nearClip, farClip, static_cast<float>(mHeight) / static_cast<float>(mWidth)
+    );
     moho::GeomCamera3 camera(view, projection);
 
-    device->SetRenderTarget1(mTarget.get(), mDepth.get(), true, static_cast<int>(Background(mOptions.background)), 1.0f, 0);
+    device->SetRenderTarget1(
+      mTarget.get(), mDepth.get(), true, static_cast<int>(Background(mOptions.background)), 1.0f, 0
+    );
     Wm3::Vector2i origin{0, 0};
     Wm3::Vector2i size{mWidth, mHeight};
     device->SetViewport(&origin, &size, 0.0f, 1.0f);
@@ -134,10 +162,12 @@ namespace faf::editor
       constexpr float kHalf = 60.0f;
       if (mOptions.ground) {
         const std::uint32_t ground = mOptions.background == 2 ? 0xFF5F6B52u : 0xFF2E3238u;
-        const moho::CD3DPrimBatcher::Vertex quad[4] = {vertex(kPlaceX - kHalf, kPlaceY, kPlaceZ - kHalf, ground),
-                                                        vertex(kPlaceX + kHalf, kPlaceY, kPlaceZ - kHalf, ground),
-                                                        vertex(kPlaceX + kHalf, kPlaceY, kPlaceZ + kHalf, ground),
-                                                        vertex(kPlaceX - kHalf, kPlaceY, kPlaceZ + kHalf, ground)};
+        const moho::CD3DPrimBatcher::Vertex quad[4] = {
+          vertex(kPlaceX - kHalf, kPlaceY, kPlaceZ - kHalf, ground),
+          vertex(kPlaceX + kHalf, kPlaceY, kPlaceZ - kHalf, ground),
+          vertex(kPlaceX + kHalf, kPlaceY, kPlaceZ + kHalf, ground),
+          vertex(kPlaceX - kHalf, kPlaceY, kPlaceZ + kHalf, ground)
+        };
         batcher->DrawQuads(quad, 1);
       }
       if (mOptions.grid) {
@@ -145,14 +175,24 @@ namespace faf::editor
         for (int i = -static_cast<int>(kHalf); i <= static_cast<int>(kHalf); ++i) {
           const std::uint32_t color = i == 0 ? 0xC0D0D0D0u : (i % 5 == 0 ? 0x80A0A0A0u : 0x40808080u);
           const float o = static_cast<float>(i);
-          batcher->DrawLine(vertex(kPlaceX + o, y, kPlaceZ - kHalf, color), vertex(kPlaceX + o, y, kPlaceZ + kHalf, color));
-          batcher->DrawLine(vertex(kPlaceX - kHalf, y, kPlaceZ + o, color), vertex(kPlaceX + kHalf, y, kPlaceZ + o, color));
+          batcher->DrawLine(
+            vertex(kPlaceX + o, y, kPlaceZ - kHalf, color), vertex(kPlaceX + o, y, kPlaceZ + kHalf, color)
+          );
+          batcher->DrawLine(
+            vertex(kPlaceX - kHalf, y, kPlaceZ + o, color), vertex(kPlaceX + kHalf, y, kPlaceZ + o, color)
+          );
         }
         // The emitter's spot, and its height above the ground when raised.
         const float h = kPlaceY + mOptions.height;
-        batcher->DrawLine(vertex(kPlaceX, kPlaceY, kPlaceZ, 0xFFF0B040u), vertex(kPlaceX, h + 0.01f, kPlaceZ, 0xFFF0B040u));
-        batcher->DrawLine(vertex(kPlaceX - 0.5f, h, kPlaceZ, 0xFFF0B040u), vertex(kPlaceX + 0.5f, h, kPlaceZ, 0xFFF0B040u));
-        batcher->DrawLine(vertex(kPlaceX, h, kPlaceZ - 0.5f, 0xFFF0B040u), vertex(kPlaceX, h, kPlaceZ + 0.5f, 0xFFF0B040u));
+        batcher->DrawLine(
+          vertex(kPlaceX, kPlaceY, kPlaceZ, 0xFFF0B040u), vertex(kPlaceX, h + 0.01f, kPlaceZ, 0xFFF0B040u)
+        );
+        batcher->DrawLine(
+          vertex(kPlaceX - 0.5f, h, kPlaceZ, 0xFFF0B040u), vertex(kPlaceX + 0.5f, h, kPlaceZ, 0xFFF0B040u)
+        );
+        batcher->DrawLine(
+          vertex(kPlaceX, h, kPlaceZ - 0.5f, 0xFFF0B040u), vertex(kPlaceX, h, kPlaceZ + 0.5f, 0xFFF0B040u)
+        );
       }
       batcher->Flush();
     }

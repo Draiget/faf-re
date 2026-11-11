@@ -58,17 +58,18 @@ namespace gpg::gal
      * Records `value` for `state`. False only when the cache already holds
      * exactly that value, i.e. when the device call can be skipped.
      */
-    bool Update(const state_type& state, const value_type& value)
+    bool Update(
+      const state_type& state,
+      const value_type& value
+    )
     {
       const typename fa::map<state_type, value_type>::iterator it = tree_.find(state);
-      if (it == tree_.end())
-      {
+      if (it == tree_.end()) {
         tree_[state] = value;
         return true;
       }
 
-      if (value == it->second)
-      {
+      if (value == it->second) {
         return false;
       }
 

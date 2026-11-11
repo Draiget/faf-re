@@ -22,13 +22,18 @@ namespace faf::headless
     {
     public:
       template <typename T>
-      void Add(const T& value) noexcept
+      void Add(
+        const T& value
+      ) noexcept
       {
         static_assert(std::is_arithmetic_v<T> || std::is_enum_v<T>);
         Bytes(&value, sizeof(value));
       }
 
-      void Bytes(const void* const data, const std::size_t size) noexcept
+      void Bytes(
+        const void* const data,
+        const std::size_t size
+      ) noexcept
       {
         const auto* const bytes = static_cast<const unsigned char*>(data);
         for (std::size_t i = 0; i < size; ++i) {
@@ -37,15 +42,26 @@ namespace faf::headless
         }
       }
 
-      void Text(const char* const text) noexcept { Bytes(text, text != nullptr ? std::strlen(text) + 1u : 0u); }
+      void Text(
+        const char* const text
+      ) noexcept
+      {
+        Bytes(text, text != nullptr ? std::strlen(text) + 1u : 0u);
+      }
 
-      [[nodiscard]] std::uint64_t Value() const noexcept { return mHash; }
+      [[nodiscard]] std::uint64_t Value() const noexcept
+      {
+        return mHash;
+      }
 
     private:
       std::uint64_t mHash = 0xCBF29CE484222325ull;
     };
 
-    void AddTransform(CStateDigest& digest, const moho::VTransform& transform) noexcept
+    void AddTransform(
+      CStateDigest& digest,
+      const moho::VTransform& transform
+    ) noexcept
     {
       digest.Add(transform.orient_.x);
       digest.Add(transform.orient_.y);
@@ -57,7 +73,9 @@ namespace faf::headless
     }
   } // namespace
 
-  [[nodiscard]] std::uint64_t DigestPublishedState(const moho::SSyncData& packet)
+  [[nodiscard]] std::uint64_t DigestPublishedState(
+    const moho::SSyncData& packet
+  )
   {
     CStateDigest digest;
     digest.Add(packet.mCurBeat);
@@ -134,8 +152,12 @@ namespace faf::headless
     }
     for (const moho::SSTIArmyVariableData& army : packet.mArmyUpdates) {
       const moho::SEconTotals& economy = army.mEconomyTotals;
-      for (const auto* pair : {&economy.mStored, &economy.mIncome, &economy.mReclaimed, &economy.mLastUseRequested,
-                               &economy.mLastUseActual}) {
+      for (const auto* pair :
+           {&economy.mStored,
+            &economy.mIncome,
+            &economy.mReclaimed,
+            &economy.mLastUseRequested,
+            &economy.mLastUseActual}) {
         digest.Add(pair->ENERGY);
         digest.Add(pair->MASS);
       }

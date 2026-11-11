@@ -63,7 +63,9 @@ namespace moho
    * What it does:
    * Copies retained vertex-buffer ownership into caller storage.
    */
-  CD3DVertexStream::BufferHandle& CD3DVertexStream::GetBuffer(BufferHandle& outBuffer)
+  CD3DVertexStream::BufferHandle& CD3DVertexStream::GetBuffer(
+    BufferHandle& outBuffer
+  )
   {
     outBuffer = mBuffer;
     return outBuffer;

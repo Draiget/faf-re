@@ -36,7 +36,12 @@ namespace
    * the linker folds both `T` instantiations of the resize-fill routine
    * together.
    */
-  void LoadFastVectorEntId(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorEntId(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -66,7 +71,12 @@ namespace
    * Writes one reflected `fastvector<Moho::EntId>` payload as archive count
    * plus per-lane reflected `EntId` serialization.
    */
-  void SaveFastVectorEntId(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorEntId(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const storage = reinterpret_cast<void*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -152,7 +162,9 @@ const char* gpg::RFastVectorType<moho::EntId>::GetName() const
 /**
  * Address: 0x00552F30 (FUN_00552F30, gpg::RFastVectorType_EntId::GetLexical)
  */
-fa::string gpg::RFastVectorType<moho::EntId>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RFastVectorType<moho::EntId>::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -171,7 +183,10 @@ const gpg::RIndexed* gpg::RFastVectorType<moho::EntId>::IsIndexed() const
  */
 void gpg::RFastVectorType<moho::EntId>::Init()
 {
-  static_assert(sizeof(gpg::core::FastVectorInline<moho::EntId>) == 0x10, "gpg::core::FastVectorInline<moho::EntId> is 0x10 bytes on x86");
+  static_assert(
+    sizeof(gpg::core::FastVectorInline<moho::EntId>) == 0x10,
+    "gpg::core::FastVectorInline<moho::EntId> is 0x10 bytes on x86"
+  );
   size_ = sizeof(gpg::core::FastVectorInline<moho::EntId>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorEntId;
@@ -186,7 +201,10 @@ void gpg::RFastVectorType<moho::EntId>::Init()
  * The retail body performs no bounds/null check before indexing (unlike the
  * `unsigned int` sibling), so this is left unconditional to match.
  */
-gpg::RRef gpg::RFastVectorType<moho::EntId>::SubscriptIndex(void* obj, const int ind) const
+gpg::RRef gpg::RFastVectorType<moho::EntId>::SubscriptIndex(
+  void* obj,
+  const int ind
+) const
 {
   auto& elements = *static_cast<gpg::core::FastVectorInline<unsigned int>*>(obj);
   gpg::RRef out{};
@@ -197,7 +215,9 @@ gpg::RRef gpg::RFastVectorType<moho::EntId>::SubscriptIndex(void* obj, const int
 /**
  * Address: 0x00552FD0 (FUN_00552FD0, gpg::RFastVectorType_EntId::GetCount)
  */
-size_t gpg::RFastVectorType<moho::EntId>::GetCount(void* obj) const
+size_t gpg::RFastVectorType<moho::EntId>::GetCount(
+  void* obj
+) const
 {
   const auto& elements = *static_cast<const gpg::core::FastVectorInline<unsigned int>*>(obj);
   return elements.Size();
@@ -206,7 +226,10 @@ size_t gpg::RFastVectorType<moho::EntId>::GetCount(void* obj) const
 /**
  * Address: 0x00552FE0 (FUN_00552FE0, gpg::RFastVectorType_EntId::SetCount)
  */
-void gpg::RFastVectorType<moho::EntId>::SetCount(void* obj, const int count) const
+void gpg::RFastVectorType<moho::EntId>::SetCount(
+  void* obj,
+  const int count
+) const
 {
   constexpr unsigned int kInvalidEntIdFill = 0xF0000000u;
   gpg::FastVectorUIntResize(&kInvalidEntIdFill, static_cast<unsigned int>(count), obj);

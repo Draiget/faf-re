@@ -32,7 +32,9 @@ namespace faf::editor
       double n = 0.0;
     };
 
-    std::vector<Tok> Lex(const std::string& t)
+    std::vector<Tok> Lex(
+      const std::string& t
+    )
     {
       std::vector<Tok> out;
       const std::size_t n = t.size();
@@ -95,9 +97,14 @@ namespace faf::editor
           i = j < n ? j + 1 : n;
           continue;
         }
-        if (std::isdigit(static_cast<unsigned char>(c)) != 0 || (c == '.' && i + 1 < n && std::isdigit(static_cast<unsigned char>(t[i + 1])) != 0)) {
+        if (
+          std::isdigit(static_cast<unsigned char>(c)) != 0 ||
+          (c == '.' && i + 1 < n && std::isdigit(static_cast<unsigned char>(t[i + 1])) != 0)
+        ) {
           std::size_t j = i;
-          while (j < n && (std::isalnum(static_cast<unsigned char>(t[j])) != 0 || (t[j] == '.' && !(j + 1 < n && t[j + 1] == '.')))) {
+          while (
+            j < n &&
+            (std::isalnum(static_cast<unsigned char>(t[j])) != 0 || (t[j] == '.' && !(j + 1 < n && t[j + 1] == '.')))) {
             ++j;
           }
           const std::string text = t.substr(i, j - i);
@@ -129,19 +136,29 @@ namespace faf::editor
       return out;
     }
 
-    bool IsName(const Tok& t, const char* const s)
+    bool IsName(
+      const Tok& t,
+      const char* const s
+    )
     {
       return t.k == Tok::K::Name && t.s == s;
     }
-    bool IsOp(const Tok& t, const char* const s)
+    bool IsOp(
+      const Tok& t,
+      const char* const s
+    )
     {
       return t.k == Tok::K::Op && t.s == s;
     }
-    bool Opens(const Tok& t)
+    bool Opens(
+      const Tok& t
+    )
     {
       return IsOp(t, "(") || IsOp(t, "{") || IsOp(t, "[");
     }
-    bool Closes(const Tok& t)
+    bool Closes(
+      const Tok& t
+    )
     {
       return IsOp(t, ")") || IsOp(t, "}") || IsOp(t, "]");
     }
@@ -154,15 +171,23 @@ namespace faf::editor
       Yes,
       Maybe,
     };
-    Tri And(const Tri a, const Tri b)
+    Tri And(
+      const Tri a,
+      const Tri b
+    )
     {
       return a == Tri::No || b == Tri::No ? Tri::No : a == Tri::Yes && b == Tri::Yes ? Tri::Yes : Tri::Maybe;
     }
-    Tri Or(const Tri a, const Tri b)
+    Tri Or(
+      const Tri a,
+      const Tri b
+    )
     {
       return a == Tri::Yes || b == Tri::Yes ? Tri::Yes : a == Tri::No && b == Tri::No ? Tri::No : Tri::Maybe;
     }
-    Tri Not(const Tri a)
+    Tri Not(
+      const Tri a
+    )
     {
       return a == Tri::Yes ? Tri::No : a == Tri::No ? Tri::Yes : Tri::Maybe;
     }
@@ -184,27 +209,35 @@ namespace faf::editor
       /** An unknown value can still be known to be true or false (`x or true`). */
       Tri truth = Tri::Maybe;
 
-      static Val Unknown(const Tri truth = Tri::Maybe)
+      static Val Unknown(
+        const Tri truth = Tri::Maybe
+      )
       {
         Val v;
         v.truth = truth;
         return v;
       }
-      static Val Bool(const bool b)
+      static Val Bool(
+        const bool b
+      )
       {
         Val v;
         v.k = K::Bool;
         v.b = b;
         return v;
       }
-      static Val Num(const double n)
+      static Val Num(
+        const double n
+      )
       {
         Val v;
         v.k = K::Num;
         v.n = n;
         return v;
       }
-      static Val Str(std::string s)
+      static Val Str(
+        std::string s
+      )
       {
         Val v;
         v.k = K::Str;
@@ -219,21 +252,25 @@ namespace faf::editor
       }
     };
 
-    Tri Truth(const Val& v)
+    Tri Truth(
+      const Val& v
+    )
     {
       switch (v.k) {
-        case Val::K::Unknown:
-          return v.truth;
-        case Val::K::Nil:
-          return Tri::No;
-        case Val::K::Bool:
-          return v.b ? Tri::Yes : Tri::No;
-        default:
-          return Tri::Yes;
+      case Val::K::Unknown:
+        return v.truth;
+      case Val::K::Nil:
+        return Tri::No;
+      case Val::K::Bool:
+        return v.b ? Tri::Yes : Tri::No;
+      default:
+        return Tri::Yes;
       }
     }
 
-    std::string NumberText(const double n)
+    std::string NumberText(
+      const double n
+    )
     {
       char text[32];
       (void)std::snprintf(text, sizeof(text), "%.14g", n);
@@ -257,7 +294,17 @@ namespace faf::editor
     class Eval
     {
     public:
-      Eval(const std::vector<Tok>& t, const std::size_t p, const std::size_t e, const Env& env) : mT(t), mP(p), mE(e), mEnv(env) {}
+      Eval(
+        const std::vector<Tok>& t,
+        const std::size_t p,
+        const std::size_t e,
+        const Env& env
+      )
+        : mT(t)
+        , mP(p)
+        , mE(e)
+        , mEnv(env)
+      {}
 
       Val Run()
       {
@@ -270,11 +317,15 @@ namespace faf::editor
         static const Tok kEnd;
         return mP < mE ? mT[mP] : kEnd;
       }
-      bool AtName(const char* const s) const
+      bool AtName(
+        const char* const s
+      ) const
       {
         return IsName(Peek(), s);
       }
-      bool AtOp(const char* const s) const
+      bool AtOp(
+        const char* const s
+      ) const
       {
         return IsOp(Peek(), s);
       }
@@ -333,7 +384,11 @@ namespace faf::editor
           a = Compared(op, a, b);
         }
       }
-      static Val Compared(const std::string& op, const Val& a, const Val& b)
+      static Val Compared(
+        const std::string& op,
+        const Val& a,
+        const Val& b
+      )
       {
         if (a.k == Val::K::Unknown || b.k == Val::K::Unknown) {
           return Val::Unknown();
@@ -341,7 +396,10 @@ namespace faf::editor
         if (op == "==" || op == "~=") {
           bool same = a.k == b.k;
           if (same) {
-            same = a.k == Val::K::Num ? a.n == b.n : a.k == Val::K::Str ? a.s == b.s : a.k == Val::K::Bool ? a.b == b.b : true;
+            same = a.k == Val::K::Num ? a.n == b.n
+              : a.k == Val::K::Str    ? a.s == b.s
+              : a.k == Val::K::Bool   ? a.b == b.b
+                                      : true;
           }
           return Val::Bool(op == "==" ? same : !same);
         }
@@ -398,7 +456,11 @@ namespace faf::editor
           if (a.k != Val::K::Num || b.k != Val::K::Num || (op != '*' && b.n == 0.0)) {
             a = Val::Unknown();
           } else {
-            a = Val::Num(op == '*' ? a.n * b.n : op == '/' ? a.n / b.n : a.n - b.n * static_cast<double>(static_cast<long long>(a.n / b.n)));
+            a = Val::Num(
+              op == '*'     ? a.n * b.n
+                : op == '/' ? a.n / b.n
+                            : a.n - b.n * static_cast<double>(static_cast<long long>(a.n / b.n))
+            );
           }
         }
         return a;
@@ -457,8 +519,10 @@ namespace faf::editor
         } else if (t.k == Tok::K::Name) {
           ++mP;
           // ScenarioInfo.Options.<key>: the lobby's value.
-          if (t.s == "ScenarioInfo" && AtOp(".") && mP + 3 < mE && IsName(mT[mP + 1], "Options") && IsOp(mT[mP + 2], ".") &&
-              mT[mP + 3].k == Tok::K::Name) {
+          if (
+            t.s == "ScenarioInfo" && AtOp(".") && mP + 3 < mE && IsName(mT[mP + 1], "Options") &&
+            IsOp(mT[mP + 2], ".") && mT[mP + 3].k == Tok::K::Name
+          ) {
             const std::string key = mT[mP + 3].s;
             mP += 4;
             if (mEnv.touched != nullptr) {
@@ -521,7 +585,7 @@ namespace faf::editor
         Plain, // do ... end, repeat ... until
       };
       Kind kind = Kind::Plain;
-      std::string name; // a function's (its last part: `ScenarioUtils.CreateResources` is CreateResources)
+      std::string name;          // a function's (its last part: `ScenarioUtils.CreateResources` is CreateResources)
       std::vector<Range> priors; // an if's earlier conditions (false where this branch runs)
       Range cond;
       bool inElse = false;
@@ -553,7 +617,9 @@ namespace faf::editor
       std::vector<std::string> keyOrder;
     };
 
-    Site SiteOf(const std::vector<Frame>& stack)
+    Site SiteOf(
+      const std::vector<Frame>& stack
+    )
     {
       Site site;
       std::size_t from = 0;
@@ -569,7 +635,11 @@ namespace faf::editor
     }
 
     /** Ranges split at the commas outside brackets in [b, e). */
-    std::vector<Range> SplitCommas(const std::vector<Tok>& t, const std::size_t b, const std::size_t e)
+    std::vector<Range> SplitCommas(
+      const std::vector<Tok>& t,
+      const std::size_t b,
+      const std::size_t e
+    )
     {
       std::vector<Range> parts{{b, b}};
       int depth = 0;
@@ -589,7 +659,11 @@ namespace faf::editor
     }
 
     /** The index of the next `word` keyword from `i` (or the last token). */
-    std::size_t FindWord(const std::vector<Tok>& t, std::size_t i, const char* const word)
+    std::size_t FindWord(
+      const std::vector<Tok>& t,
+      std::size_t i,
+      const char* const word
+    )
     {
       while (i + 1 < t.size() && !IsName(t[i], word)) {
         ++i;
@@ -597,15 +671,17 @@ namespace faf::editor
       return i;
     }
 
-    Script ReadScript(const std::string& text)
+    Script ReadScript(
+      const std::string& text
+    )
     {
       Script s;
       s.toks = Lex(text);
       const std::vector<Tok>& t = s.toks;
       // The options the script reads, anywhere (conditions too): `x = ScenarioInfo.Options.key or <default>` names x.
       for (std::size_t i = 0; i + 4 < t.size(); ++i) {
-        if (!(IsName(t[i], "ScenarioInfo") && IsOp(t[i + 1], ".") && IsName(t[i + 2], "Options") && IsOp(t[i + 3], ".") &&
-              t[i + 4].k == Tok::K::Name)) {
+        if (!(IsName(t[i], "ScenarioInfo") && IsOp(t[i + 1], ".") && IsName(t[i + 2], "Options") &&
+              IsOp(t[i + 3], ".") && t[i + 4].k == Tok::K::Name)) {
           continue;
         }
         const std::string key = t[i + 4].s;
@@ -725,59 +801,84 @@ namespace faf::editor
     }
 
     /** Whether the code at `site` runs, lifted through the calls of its function (a few levels). */
-    Tri SiteRuns(const Script& s, const Site& site, const Env& env, const std::string& loopVar, const double loopValue, bool useLoop, int depth);
+    Tri SiteRuns(
+      const Script& s,
+      const Site& site,
+      const Env& env,
+      const std::string& loopVar,
+      const double loopValue,
+      bool useLoop,
+      int depth
+    );
 
-    Tri FramesRun(const Script& s, const std::vector<Frame>& frames, Env env, const std::string& loopVar, const double loopValue, const bool useLoop)
+    Tri FramesRun(
+      const Script& s,
+      const std::vector<Frame>& frames,
+      Env env,
+      const std::string& loopVar,
+      const double loopValue,
+      const bool useLoop
+    )
     {
       Tri runs = Tri::Yes;
-      const auto eval = [&](const Range r) { return Eval(s.toks, r.b, r.e, env).Run(); };
+      const auto eval = [&](const Range r) {
+        return Eval(s.toks, r.b, r.e, env).Run();
+      };
       for (const Frame& f : frames) {
         switch (f.kind) {
-          case Frame::Kind::If:
-            for (const Range& prior : f.priors) {
-              runs = And(runs, Not(Truth(eval(prior))));
-            }
-            if (!f.inElse) {
-              runs = And(runs, Truth(eval(f.cond)));
-            }
-            break;
-          case Frame::Kind::While:
+        case Frame::Kind::If:
+          for (const Range& prior : f.priors) {
+            runs = And(runs, Not(Truth(eval(prior))));
+          }
+          if (!f.inElse) {
             runs = And(runs, Truth(eval(f.cond)));
-            break;
-          case Frame::Kind::GenFor:
+          }
+          break;
+        case Frame::Kind::While:
+          runs = And(runs, Truth(eval(f.cond)));
+          break;
+        case Frame::Kind::GenFor:
+          runs = And(runs, Tri::Maybe);
+          break;
+        case Frame::Kind::NumFor: {
+          const Val from = eval(f.from);
+          const Val to = f.to.e > f.to.b ? eval(f.to) : Val::Unknown();
+          const Val step = f.step.e > f.step.b ? eval(f.step) : Val::Num(1.0);
+          if (from.k != Val::K::Num || to.k != Val::K::Num || step.k != Val::K::Num || step.n == 0.0) {
             runs = And(runs, Tri::Maybe);
-            break;
-          case Frame::Kind::NumFor: {
-            const Val from = eval(f.from);
-            const Val to = f.to.e > f.to.b ? eval(f.to) : Val::Unknown();
-            const Val step = f.step.e > f.step.b ? eval(f.step) : Val::Num(1.0);
-            if (from.k != Val::K::Num || to.k != Val::K::Num || step.k != Val::K::Num || step.n == 0.0) {
-              runs = And(runs, Tri::Maybe);
-              env.vars[f.var] = Val::Unknown();
-              break;
-            }
-            const double lo = step.n > 0.0 ? from.n : to.n;
-            const double hi = step.n > 0.0 ? to.n : from.n;
-            if (useLoop && f.var == loopVar) {
-              // The group's name takes this loop's variable: made only on the turn it equals the name's number.
-              const double turns = (loopValue - from.n) / step.n;
-              const bool onTurn = turns >= 0.0 && turns == static_cast<double>(static_cast<long long>(turns));
-              runs = And(runs, loopValue >= lo && loopValue <= hi && onTurn ? Tri::Yes : Tri::No);
-              env.vars[f.var] = Val::Num(loopValue);
-            } else {
-              runs = And(runs, lo <= hi ? Tri::Yes : Tri::No);
-              env.vars[f.var] = Val::Unknown();
-            }
+            env.vars[f.var] = Val::Unknown();
             break;
           }
-          default:
-            break;
+          const double lo = step.n > 0.0 ? from.n : to.n;
+          const double hi = step.n > 0.0 ? to.n : from.n;
+          if (useLoop && f.var == loopVar) {
+            // The group's name takes this loop's variable: made only on the turn it equals the name's number.
+            const double turns = (loopValue - from.n) / step.n;
+            const bool onTurn = turns >= 0.0 && turns == static_cast<double>(static_cast<long long>(turns));
+            runs = And(runs, loopValue >= lo && loopValue <= hi && onTurn ? Tri::Yes : Tri::No);
+            env.vars[f.var] = Val::Num(loopValue);
+          } else {
+            runs = And(runs, lo <= hi ? Tri::Yes : Tri::No);
+            env.vars[f.var] = Val::Unknown();
+          }
+          break;
+        }
+        default:
+          break;
         }
       }
       return runs;
     }
 
-    Tri SiteRuns(const Script& s, const Site& site, const Env& env, const std::string& loopVar, const double loopValue, const bool useLoop, const int depth)
+    Tri SiteRuns(
+      const Script& s,
+      const Site& site,
+      const Env& env,
+      const std::string& loopVar,
+      const double loopValue,
+      const bool useLoop,
+      const int depth
+    )
     {
       Tri runs = FramesRun(s, site.frames, env, loopVar, loopValue, useLoop);
       if (runs == Tri::No || site.function.empty() || depth >= 4) {
@@ -803,7 +904,12 @@ namespace faf::editor
       Tri made = Tri::No;
       Tri wreck = Tri::No;
     };
-    Made CreationMakes(const Script& s, const Creation& c, const Env& env, const std::string& group)
+    Made CreationMakes(
+      const Script& s,
+      const Creation& c,
+      const Env& env,
+      const std::string& group
+    )
     {
       Made result;
       const std::vector<Tok>& t = s.toks;
@@ -850,18 +956,24 @@ namespace faf::editor
       return result;
     }
 
-    Val KeyValue(const LobbyOptionInfo::Value& value)
+    Val KeyValue(
+      const LobbyOptionInfo::Value& value
+    )
     {
       return value.number ? Val::Num(value.numberKey) : Val::Str(value.key);
     }
 
-    std::string Quoted(const std::string& text)
+    std::string Quoted(
+      const std::string& text
+    )
     {
       return "\"" + text + "\"";
     }
   } // namespace
 
-  std::vector<LobbyOptionInfo> ParseLobbyOptions(const std::string& optionsText)
+  std::vector<LobbyOptionInfo> ParseLobbyOptions(
+    const std::string& optionsText
+  )
   {
     std::vector<LobbyOptionInfo> options;
     const std::vector<Tok> t = Lex(optionsText);
@@ -955,7 +1067,9 @@ namespace faf::editor
 
   bool GroupLobbyRule::Never() const
   {
-    return std::all_of(cases.begin(), cases.end(), [](const Case& c) { return c.made == Made::No; });
+    return std::all_of(cases.begin(), cases.end(), [](const Case& c) {
+      return c.made == Made::No;
+    });
   }
 
   namespace
@@ -963,131 +1077,148 @@ namespace faf::editor
     GroupLobbyRule RuleOf(const Script& s, const std::vector<LobbyOptionInfo>& options, const std::string& group);
   }
 
-  GroupLobbyRule LobbyRuleOfGroup(const std::string& scriptText, const std::vector<LobbyOptionInfo>& options, const std::string& group)
+  GroupLobbyRule LobbyRuleOfGroup(
+    const std::string& scriptText,
+    const std::vector<LobbyOptionInfo>& options,
+    const std::string& group
+  )
   {
     return RuleOf(ReadScript(scriptText), options, group);
   }
 
   namespace
   {
-  GroupLobbyRule RuleOf(const Script& s, const std::vector<LobbyOptionInfo>& options, const std::string& group)
-  {
-    GroupLobbyRule rule;
-    std::vector<const Creation*> naming;
-    // The creations that can name it: 'Name' exactly, or 'Name_' .. something with the group's name starting so.
-    for (const Creation& c : s.creations) {
-      if (c.name.e <= c.name.b || s.toks[c.name.b].k != Tok::K::Str) {
-        continue;
-      }
-      const std::string& head = s.toks[c.name.b].s;
-      const bool exact = c.name.e == c.name.b + 1;
-      if (exact ? head == group : IsOp(s.toks[c.name.b + 1], "..") && group.rfind(head, 0) == 0) {
-        naming.push_back(&c);
-      }
-    }
-    if (naming.empty()) {
-      return rule;
-    }
-    // Which options decide: those read while every option is unknown.
-    std::set<std::string> touched;
-    Env probe;
-    probe.varKeys = &s.varKeys;
-    probe.touched = &touched;
-    for (const Creation* c : naming) {
-      (void)CreationMakes(s, *c, probe, group);
-    }
-    rule.scriptNames = true;
-    for (const std::string& key : s.keyOrder) {
-      if (touched.count(key) != 0) {
-        rule.keys.push_back(key);
-      }
-    }
-    for (const std::string& key : rule.keys) {
-      int index = -1;
-      for (std::size_t o = 0; o < options.size(); ++o) {
-        if (options[o].key == key) {
-          index = static_cast<int>(o);
+    GroupLobbyRule RuleOf(
+      const Script& s,
+      const std::vector<LobbyOptionInfo>& options,
+      const std::string& group
+    )
+    {
+      GroupLobbyRule rule;
+      std::vector<const Creation*> naming;
+      // The creations that can name it: 'Name' exactly, or 'Name_' .. something with the group's name starting so.
+      for (const Creation& c : s.creations) {
+        if (c.name.e <= c.name.b || s.toks[c.name.b].k != Tok::K::Str) {
+          continue;
+        }
+        const std::string& head = s.toks[c.name.b].s;
+        const bool exact = c.name.e == c.name.b + 1;
+        if (exact ? head == group : IsOp(s.toks[c.name.b + 1], "..") && group.rfind(head, 0) == 0) {
+          naming.push_back(&c);
         }
       }
-      rule.optionIndex.push_back(index);
-      std::string fallback;
-      for (const auto& [var, varKey] : s.varKeys) {
-        if (varKey == key) {
-          if (const auto d = s.varDefaults.find(var); d != s.varDefaults.end()) {
-            fallback = s.toks[d->second.b].s;
-          }
+      if (naming.empty()) {
+        return rule;
+      }
+      // Which options decide: those read while every option is unknown.
+      std::set<std::string> touched;
+      Env probe;
+      probe.varKeys = &s.varKeys;
+      probe.touched = &touched;
+      for (const Creation* c : naming) {
+        (void)CreationMakes(s, *c, probe, group);
+      }
+      rule.scriptNames = true;
+      for (const std::string& key : s.keyOrder) {
+        if (touched.count(key) != 0) {
+          rule.keys.push_back(key);
         }
       }
-      rule.scriptDefault.push_back(fallback);
-    }
-    // Every combination of the deciding options' values.
-    std::vector<int> counts;
-    std::size_t total = 1;
-    for (const int index : rule.optionIndex) {
-      const int count = index < 0 ? 1 : std::max(1, static_cast<int>(options[static_cast<std::size_t>(index)].values.size()));
-      counts.push_back(count);
-      total *= static_cast<std::size_t>(count);
-    }
-    total = std::min<std::size_t>(total, 256);
-    for (std::size_t n = 0; n < total; ++n) {
-      GroupLobbyRule::Case c;
-      Env env;
-      env.varKeys = &s.varKeys;
-      std::size_t rest = n;
-      for (std::size_t k = 0; k < rule.keys.size(); ++k) {
-        const int pick = static_cast<int>(rest % static_cast<std::size_t>(counts[k]));
-        rest /= static_cast<std::size_t>(counts[k]);
-        const int index = rule.optionIndex[k];
-        const auto& values = index < 0 ? std::vector<LobbyOptionInfo::Value>{} : options[static_cast<std::size_t>(index)].values;
-        // The lobby's value; an option the lobby doesn't offer is nil (the script's `or` default then).
-        const Val lobby = values.empty() ? Val::Nil() : KeyValue(values[static_cast<std::size_t>(pick)]);
-        c.picks.push_back(values.empty() ? -1 : pick);
-        env.options[rule.keys[k]] = lobby;
-        for (const auto& [var, key] : s.varKeys) {
-          if (key != rule.keys[k]) {
-            continue;
+      for (const std::string& key : rule.keys) {
+        int index = -1;
+        for (std::size_t o = 0; o < options.size(); ++o) {
+          if (options[o].key == key) {
+            index = static_cast<int>(o);
           }
-          Val value = lobby;
-          if (value.k == Val::K::Nil) {
+        }
+        rule.optionIndex.push_back(index);
+        std::string fallback;
+        for (const auto& [var, varKey] : s.varKeys) {
+          if (varKey == key) {
             if (const auto d = s.varDefaults.find(var); d != s.varDefaults.end()) {
-              const Tok& tok = s.toks[d->second.b];
-              value = tok.k == Tok::K::Num ? Val::Num(tok.n) : Val::Str(tok.s);
+              fallback = s.toks[d->second.b].s;
             }
           }
-          env.vars[var] = value;
         }
+        rule.scriptDefault.push_back(fallback);
       }
-      Tri made = Tri::No;
-      for (const Creation* creation : naming) {
-        const Made m = CreationMakes(s, *creation, env, group);
-        made = Or(made, m.made);
-        if (m.made != Tri::No) {
-          c.asWreck = c.asWreck || m.wreck != Tri::No;
-          c.asUnit = c.asUnit || m.wreck != Tri::Yes;
+      // Every combination of the deciding options' values.
+      std::vector<int> counts;
+      std::size_t total = 1;
+      for (const int index : rule.optionIndex) {
+        const int count =
+          index < 0 ? 1 : std::max(1, static_cast<int>(options[static_cast<std::size_t>(index)].values.size()));
+        counts.push_back(count);
+        total *= static_cast<std::size_t>(count);
+      }
+      total = std::min<std::size_t>(total, 256);
+      for (std::size_t n = 0; n < total; ++n) {
+        GroupLobbyRule::Case c;
+        Env env;
+        env.varKeys = &s.varKeys;
+        std::size_t rest = n;
+        for (std::size_t k = 0; k < rule.keys.size(); ++k) {
+          const int pick = static_cast<int>(rest % static_cast<std::size_t>(counts[k]));
+          rest /= static_cast<std::size_t>(counts[k]);
+          const int index = rule.optionIndex[k];
+          const auto& values =
+            index < 0 ? std::vector<LobbyOptionInfo::Value>{} : options[static_cast<std::size_t>(index)].values;
+          // The lobby's value; an option the lobby doesn't offer is nil (the script's `or` default then).
+          const Val lobby = values.empty() ? Val::Nil() : KeyValue(values[static_cast<std::size_t>(pick)]);
+          c.picks.push_back(values.empty() ? -1 : pick);
+          env.options[rule.keys[k]] = lobby;
+          for (const auto& [var, key] : s.varKeys) {
+            if (key != rule.keys[k]) {
+              continue;
+            }
+            Val value = lobby;
+            if (value.k == Val::K::Nil) {
+              if (const auto d = s.varDefaults.find(var); d != s.varDefaults.end()) {
+                const Tok& tok = s.toks[d->second.b];
+                value = tok.k == Tok::K::Num ? Val::Num(tok.n) : Val::Str(tok.s);
+              }
+            }
+            env.vars[var] = value;
+          }
         }
+        Tri made = Tri::No;
+        for (const Creation* creation : naming) {
+          const Made m = CreationMakes(s, *creation, env, group);
+          made = Or(made, m.made);
+          if (m.made != Tri::No) {
+            c.asWreck = c.asWreck || m.wreck != Tri::No;
+            c.asUnit = c.asUnit || m.wreck != Tri::Yes;
+          }
+        }
+        c.made = made == Tri::Yes ? GroupLobbyRule::Made::Yes
+          : made == Tri::No       ? GroupLobbyRule::Made::No
+                                  : GroupLobbyRule::Made::Maybe;
+        rule.cases.push_back(std::move(c));
       }
-      c.made = made == Tri::Yes ? GroupLobbyRule::Made::Yes : made == Tri::No ? GroupLobbyRule::Made::No : GroupLobbyRule::Made::Maybe;
-      rule.cases.push_back(std::move(c));
+      return rule;
     }
-    return rule;
-  }
   } // namespace
 
-  std::vector<std::string> DescribeLobbyRule(const GroupLobbyRule& rule, const std::vector<LobbyOptionInfo>& options)
+  std::vector<std::string> DescribeLobbyRule(
+    const GroupLobbyRule& rule,
+    const std::vector<LobbyOptionInfo>& options
+  )
   {
     std::vector<std::string> lines;
     if (!rule.scriptNames) {
       return lines;
     }
     const auto outcome = [](const GroupLobbyRule::Case& c) {
-      const std::string as = c.asWreck && c.asUnit ? "as wrecks or live units" : c.asWreck ? "as wrecks" : "as live units";
+      const std::string as = c.asWreck && c.asUnit ? "as wrecks or live units"
+        : c.asWreck                                ? "as wrecks"
+                                                   : "as live units";
       switch (c.made) {
-        case GroupLobbyRule::Made::No:
-          return std::string("not created");
-        case GroupLobbyRule::Made::Yes:
-          return "created " + as;
-        default:
-          return "maybe created " + as + " (it also depends on the game: slots, factions)";
+      case GroupLobbyRule::Made::No:
+        return std::string("not created");
+      case GroupLobbyRule::Made::Yes:
+        return "created " + as;
+      default:
+        return "maybe created " + as + " (it also depends on the game: slots, factions)";
       }
     };
     const auto valueText = [&](const std::size_t k, const int pick) {
@@ -1111,18 +1242,23 @@ namespace faf::editor
       return (option.label.empty() ? option.key : Quoted(option.label)) + " (" + option.key + ")";
     };
     if (rule.keys.empty()) {
-      lines.push_back(rule.cases.empty() || rule.cases[0].made == GroupLobbyRule::Made::No
-                          ? "No lobby option decides it: the script never creates it."
-                      : rule.cases[0].made == GroupLobbyRule::Made::Yes
-                          ? "No lobby option decides it: the script creates it in every game."
-                          : "No lobby option decides it; the script creates it only in some games (slots, factions).");
+      lines.push_back(
+        rule.cases.empty() || rule.cases[0].made == GroupLobbyRule::Made::No
+          ? "No lobby option decides it: the script never creates it."
+          : rule.cases[0].made == GroupLobbyRule::Made::Yes
+          ? "No lobby option decides it: the script creates it in every game."
+          : "No lobby option decides it; the script creates it only in some games (slots, factions)."
+      );
       return lines;
     }
     // Options the script reads that this map's lobby doesn't offer: always the script's default.
     for (std::size_t k = 0; k < rule.keys.size(); ++k) {
       if (rule.optionIndex[k] < 0) {
-        lines.push_back("The script reads the option " + rule.keys[k] + ", which this map's _options.lua doesn't offer, so it is always " +
-                        (rule.scriptDefault[k].empty() ? std::string("nil") : rule.scriptDefault[k]) + " (the script's default).");
+        lines.push_back(
+          "The script reads the option " + rule.keys[k] +
+          ", which this map's _options.lua doesn't offer, so it is always " +
+          (rule.scriptDefault[k].empty() ? std::string("nil") : rule.scriptDefault[k]) + " (the script's default)."
+        );
       }
     }
     if (rule.Never()) {
@@ -1162,14 +1298,19 @@ namespace faf::editor
     return lines;
   }
 
-  std::vector<ScriptGroupLoop> ScriptGroupLoops(const std::string& script)
+  std::vector<ScriptGroupLoop> ScriptGroupLoops(
+    const std::string& script
+  )
   {
     std::vector<ScriptGroupLoop> loops;
     const Script s = ReadScript(script);
     const std::vector<Tok>& t = s.toks;
     for (const Creation& c : s.creations) {
       // 'Name_' .. w, w a numeric for's variable whose end is an option.
-      if (c.name.e != c.name.b + 3 || t[c.name.b].k != Tok::K::Str || !IsOp(t[c.name.b + 1], "..") || t[c.name.b + 2].k != Tok::K::Name) {
+      if (
+        c.name.e != c.name.b + 3 || t[c.name.b].k != Tok::K::Str || !IsOp(t[c.name.b + 1], "..") ||
+        t[c.name.b + 2].k != Tok::K::Name
+      ) {
         continue;
       }
       for (const Frame& f : c.site.frames) {
@@ -1199,7 +1340,9 @@ namespace faf::editor
             break;
           }
         }
-        const bool known = std::any_of(loops.begin(), loops.end(), [&](const ScriptGroupLoop& l) { return l.prefix == loop.prefix && l.key == loop.key; });
+        const bool known = std::any_of(loops.begin(), loops.end(), [&](const ScriptGroupLoop& l) {
+          return l.prefix == loop.prefix && l.key == loop.key;
+        });
         if (!known) {
           loops.push_back(std::move(loop));
         }
@@ -1208,7 +1351,10 @@ namespace faf::editor
     return loops;
   }
 
-  std::string LobbyRuleWhen(const GroupLobbyRule& rule, const std::vector<LobbyOptionInfo>& options)
+  std::string LobbyRuleWhen(
+    const GroupLobbyRule& rule,
+    const std::vector<LobbyOptionInfo>& options
+  )
   {
     if (!rule.scriptNames) {
       return "the script doesn't create it";
@@ -1239,7 +1385,7 @@ namespace faf::editor
       }
       const LobbyOptionInfo& option = options[static_cast<std::size_t>(index)];
       settings += (settings.empty() ? "" : ", ") + (option.label.empty() ? option.key : option.label) + " = " +
-                  Quoted(option.values[static_cast<std::size_t>(first->picks[k])].text);
+        Quoted(option.values[static_cast<std::size_t>(first->picks[k])].text);
     }
     if (settings.empty()) {
       settings = "every game";
@@ -1250,7 +1396,9 @@ namespace faf::editor
   namespace
   {
     /** "Optional naval wreckage" from optional_naval_wreckage. */
-    std::string LabelOfKey(const std::string& key)
+    std::string LabelOfKey(
+      const std::string& key
+    )
     {
       std::string label = key;
       std::replace(label.begin(), label.end(), '_', ' ');
@@ -1261,7 +1409,9 @@ namespace faf::editor
     }
 
     /** An option's values have the keys 1, 2, ... in order (so values can be added after them). */
-    bool CountedKeys(const LobbyOptionInfo& option)
+    bool CountedKeys(
+      const LobbyOptionInfo& option
+    )
     {
       for (std::size_t v = 0; v < option.values.size(); ++v) {
         if (!option.values[v].number || option.values[v].numberKey != static_cast<double>(v + 1)) {
@@ -1275,8 +1425,14 @@ namespace faf::editor
      * `_options.lua` with what makes `group` spawn: values added to its one option (up to three), or the option
      * written when the lobby lacks it (disabled, then up to eight levels); empty when neither does it.
      */
-    std::string OptionsThatMake(const Script& s, const std::string& optionsText, const std::vector<LobbyOptionInfo>& options,
-                                const GroupLobbyRule& rule, const std::string& group, std::string& change)
+    std::string OptionsThatMake(
+      const Script& s,
+      const std::string& optionsText,
+      const std::vector<LobbyOptionInfo>& options,
+      const GroupLobbyRule& rule,
+      const std::string& group,
+      std::string& change
+    )
     {
       if (rule.keys.size() != 1) {
         return {};
@@ -1299,10 +1455,12 @@ namespace faf::editor
           const std::string text = "level " + std::to_string(values.size());
           values.emplace_back(text, "Also spawns " + group + ".");
           added += (added.empty() ? "" : ", ") + Quoted(text);
-          const std::string with = WithLobbyOptionValues(optionsText, key, option.label.empty() ? LabelOfKey(key) : option.label, option.help, values);
+          const std::string with = WithLobbyOptionValues(
+            optionsText, key, option.label.empty() ? LabelOfKey(key) : option.label, option.help, values
+          );
           if (creates(with)) {
             change = "adds " + std::string(more == 1 ? "the value " : "the values ") + added + " to " +
-                     Quoted(option.label.empty() ? key : option.label);
+              Quoted(option.label.empty() ? key : option.label);
             return with;
           }
         }
@@ -1312,10 +1470,12 @@ namespace faf::editor
       std::vector<std::pair<std::string, std::string>> values{{"disabled", "None of these groups."}};
       for (int level = 1; level <= 8; ++level) {
         values.emplace_back("level " + std::to_string(level), "Spawns level " + std::to_string(level) + ".");
-        const std::string with = WithLobbyOptionValues(optionsText, key, LabelOfKey(key), "Added by the map editor for the script's " + key + ".", values);
+        const std::string with = WithLobbyOptionValues(
+          optionsText, key, LabelOfKey(key), "Added by the map editor for the script's " + key + ".", values
+        );
         if (creates(with)) {
           change = "adds the lobby option " + Quoted(LabelOfKey(key)) + " (" + key + ": disabled, level 1" +
-                   (level > 1 ? " to " + std::to_string(level) : std::string()) + ")";
+            (level > 1 ? " to " + std::to_string(level) : std::string()) + ")";
           return with;
         }
       }
@@ -1323,8 +1483,12 @@ namespace faf::editor
     }
   } // namespace
 
-  std::vector<SpawnTarget> SpawnTargets(const std::string& script, const std::string& optionsText, const std::string& army,
-                                        const std::vector<std::vector<std::string>>& groupPaths)
+  std::vector<SpawnTarget> SpawnTargets(
+    const std::string& script,
+    const std::string& optionsText,
+    const std::string& army,
+    const std::vector<std::vector<std::string>>& groupPaths
+  )
   {
     const Script s = ReadScript(script);
     const std::vector<LobbyOptionInfo> options = ParseLobbyOptions(optionsText);

@@ -31,7 +31,10 @@ namespace faf::editor
 
     /** Its ImGui window's name: a floating window (it doesn't dock), cut out of the game view's region like a popup. */
     static constexpr const char* kWindowName = "Maps###mapbrowser";
-    void Show() noexcept { mOpen = true; }
+    void Show() noexcept
+    {
+      mOpen = true;
+    }
     /** Shown on its FAF vault tab. */
     void ShowVault() noexcept
     {
@@ -40,7 +43,10 @@ namespace faf::editor
     }
     /** The list's filter text (`/browser <filter>` in test runs). */
     void SetFilter(const std::string& text);
-    [[nodiscard]] bool& Open() noexcept { return mOpen; }
+    [[nodiscard]] bool& Open() noexcept
+    {
+      return mOpen;
+    }
     /** Each frame, shown or not: a finished download mounted and opened. */
     void Update();
     void Draw();
@@ -52,13 +58,19 @@ namespace faf::editor
      */
     void OpenFromDisk(const std::filesystem::path& scenarioFile);
     /** The FAF login and vault search (its token file set by the app). */
-    [[nodiscard]] EdFafSession& Faf() noexcept { return mFaf; }
+    [[nodiscard]] EdFafSession& Faf() noexcept
+    {
+      return mFaf;
+    }
     /** Test runs (`/vaultsearch <text>`): a search once logged in; its results go to the log. */
     void AskSearch(const std::string& text);
     /** Test runs (`/vaultquery <sort>,<players>,<size>,<ranked>`): the filters' choices by their index. */
     void SetFilters(int sort, int players, int size, bool ranked);
     /** The panel's "Open from a folder..." asked for a file (the app shows the dialog). */
-    [[nodiscard]] bool TakeOpenFileAsk() noexcept { return std::exchange(mOpenFileAsk, false); }
+    [[nodiscard]] bool TakeOpenFileAsk() noexcept
+    {
+      return std::exchange(mOpenFileAsk, false);
+    }
 
   private:
     struct Details

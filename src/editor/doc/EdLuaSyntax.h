@@ -27,6 +27,7 @@ namespace faf::editor
     LuaSpanKind kind = LuaSpanKind::Plain;
   };
 
-  /** The text cut into coloured spans, in order and covering it (a span may run over lines: long comments and strings). */
+  /** The text cut into coloured spans, in order and covering it (a span may run over lines: long comments and strings).
+   */
   std::vector<LuaSpan> LuaSpans(const std::string& text);
 } // namespace faf::editor

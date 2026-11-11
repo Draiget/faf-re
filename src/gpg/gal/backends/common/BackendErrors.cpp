@@ -12,12 +12,20 @@
 
 namespace gpg::gal::backend
 {
-  void ThrowError(const char* const file, const int line, const char* const message)
+  void ThrowError(
+    const char* const file,
+    const int line,
+    const char* const message
+  )
   {
     throw Error(fa::string(file != nullptr ? file : ""), line, fa::string(message != nullptr ? message : ""));
   }
 
-  void ThrowHresult(const char* const file, const int line, const HRESULT result)
+  void ThrowHresult(
+    const char* const file,
+    const int line,
+    const HRESULT result
+  )
   {
     char message[256]{};
     std::snprintf(
@@ -48,7 +56,9 @@ namespace gpg::gal::backend
     return cull;
   }
 
-  bool SetupFailureRequested(const char* const name)
+  bool SetupFailureRequested(
+    const char* const name
+  )
   {
     const char* const value = std::getenv("FAF_GAL_FAIL_SETUP");
     if (value == nullptr || value[0] == '\0' || name == nullptr) {

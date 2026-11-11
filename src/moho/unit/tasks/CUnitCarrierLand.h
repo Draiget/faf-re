@@ -104,7 +104,10 @@ namespace moho
   };
 
   static_assert(sizeof(CUnitCarrierLand) == 0x68, "CUnitCarrierLand size must be 0x68");
-  static_assert(offsetof(CUnitCarrierLand, mTargetCarrier) == 0x30, "CUnitCarrierLand::mTargetCarrier offset must be 0x30");
+  static_assert(
+    offsetof(CUnitCarrierLand, mTargetCarrier) == 0x30,
+    "CUnitCarrierLand::mTargetCarrier offset must be 0x30"
+  );
   static_assert(
     offsetof(CUnitCarrierLand, mHasLoadedIntoCarrier) == 0x38,
     "CUnitCarrierLand::mHasLoadedIntoCarrier offset must be 0x38"
@@ -113,7 +116,10 @@ namespace moho
     offsetof(CUnitCarrierLand, mReservationResult) == 0x3C,
     "CUnitCarrierLand::mReservationResult offset must be 0x3C"
   );
-  static_assert(offsetof(CUnitCarrierLand, mCarrierHeight) == 0x40, "CUnitCarrierLand::mCarrierHeight offset must be 0x40");
+  static_assert(
+    offsetof(CUnitCarrierLand, mCarrierHeight) == 0x40,
+    "CUnitCarrierLand::mCarrierHeight offset must be 0x40"
+  );
   static_assert(
     offsetof(CUnitCarrierLand, mCarrierAttachPos) == 0x44,
     "CUnitCarrierLand::mCarrierAttachPos offset must be 0x44"
@@ -127,4 +133,3 @@ namespace moho
     "CUnitCarrierLand::mCarrierApproachPos offset must be 0x5C"
   );
 } // namespace moho
-

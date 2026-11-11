@@ -39,7 +39,6 @@ namespace moho
   // WM_MOUSEWHEEL delta. True when the panel took it: a press on the panel, and
   // the release that ends that press. Moves are never taken. `window` is the
   // HWND, for the clipboard. Main thread.
-  [[nodiscard]] bool NETPANEL_OnMouse(
-    void* window, unsigned message, int x, int y, int clientWidth, int clientHeight, int wheel
-  );
+  [[nodiscard]] bool
+  NETPANEL_OnMouse(void* window, unsigned message, int x, int y, int clientWidth, int clientHeight, int wheel);
 } // namespace moho

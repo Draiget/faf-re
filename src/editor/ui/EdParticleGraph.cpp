@@ -24,13 +24,19 @@ namespace faf::editor
 {
   namespace
   {
-    std::string LowerName(std::string text)
+    std::string LowerName(
+      std::string text
+    )
     {
-      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return text;
     }
 
-    std::string FileBase(const std::string& path)
+    std::string FileBase(
+      const std::string& path
+    )
     {
       std::string name = path.substr(path.find_last_of("/\\") + 1);
       if (const std::size_t dot = name.rfind(".bp"); dot != std::string::npos) {
@@ -40,10 +46,15 @@ namespace faf::editor
     }
 
     /** The curve a Curve, Constant, Random Range or Over Time node holds on its own (its square's plot). */
-    bool OwnCurve(const GraphNode& node, EmitterCurve& out)
+    bool OwnCurve(
+      const GraphNode& node,
+      EmitterCurve& out
+    )
     {
       const std::string& type = node.type->name;
-      const auto f = [&](const std::size_t i) { return node.params[i].value[0]; };
+      const auto f = [&](const std::size_t i) {
+        return node.params[i].value[0];
+      };
       out = {};
       out.xRange = 10.0f;
       if (type == kCurveNode) {
@@ -62,7 +73,14 @@ namespace faf::editor
     }
 
     /** A curve's plot in a rectangle: its band (the spread) and its line. */
-    void PlotCurve(ImDrawList* dl, const EmitterCurve& curve, const float x0, const float y0, const float x1, const float y1)
+    void PlotCurve(
+      ImDrawList* dl,
+      const EmitterCurve& curve,
+      const float x0,
+      const float y0,
+      const float x1,
+      const float y1
+    )
     {
       dl->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1), IM_COL32(20, 22, 26, 255));
       float low = 1e9f;
@@ -98,31 +116,38 @@ namespace faf::editor
         const float s0 = EmitterCurveValue(curve, t0, 1.0f) - y0v;
         const float s1 = EmitterCurveValue(curve, t1, 1.0f) - y1v;
         if (std::fabs(s0) > 1e-5f || std::fabs(s1) > 1e-5f) {
-          dl->AddQuadFilled(at(t0, y0v - s0), at(t1, y1v - s1), at(t1, y1v + s1), at(t0, y0v + s0), IM_COL32(110, 200, 120, 60));
+          dl->AddQuadFilled(
+            at(t0, y0v - s0), at(t1, y1v - s1), at(t1, y1v + s1), at(t0, y0v + s0), IM_COL32(110, 200, 120, 60)
+          );
         }
         dl->AddLine(at(t0, y0v), at(t1, y1v), IM_COL32(110, 200, 120, 255), 2.0f);
       }
     }
   } // namespace
 
-  void EdParticleEditor::SetGraph(const std::string& effectName, const std::vector<std::pair<std::string, EmitterBlueprint>>& emitters,
-                                  const std::string& gamePaths)
+  void EdParticleEditor::SetGraph(
+    const std::string& effectName,
+    const std::vector<std::pair<std::string, EmitterBlueprint>>& emitters,
+    const std::string& gamePaths
+  )
   {
     if (!mGraph) {
       mGraph = std::make_unique<NodeGraph>(EffectNodeTypes());
       // Curves show their plot in the node's square, textures their picture; the Emitter and math nodes have none.
       mCanvas.SetHasSquare([](const NodeType& type) {
-        return type.name == kCurveNode || type.name == kConstantNode || type.name == kTextureNode || type.name == "CurveRandom" ||
-               type.name == "CurveOverLife";
+        return type.name == kCurveNode || type.name == kConstantNode || type.name == kTextureNode ||
+          type.name == "CurveRandom" || type.name == "CurveOverLife";
       });
-      mCanvas.SetDrawSquare([](const GraphNode& node, ImDrawList* dl, const float x0, const float y0, const float x1, const float y1) {
+      mCanvas.SetDrawSquare(
+        [](const GraphNode& node, ImDrawList* dl, const float x0, const float y0, const float x1, const float y1) {
         EmitterCurve curve;
         if (!OwnCurve(node, curve)) {
           return false;
         }
         PlotCurve(dl, curve, x0, y0, x1, y1);
         return true;
-      });
+      }
+      );
       mCanvas.SetThumbnails([this](const GraphNode& node) -> std::uint64_t {
         return node.type->name == kTextureNode ? mLibrary.Thumbnail(node.params[0].text, true) : 0;
       });
@@ -171,7 +196,9 @@ namespace faf::editor
     }
   }
 
-  bool EdParticleEditor::OpenTemplate(const EffectTemplate& effect)
+  bool EdParticleEditor::OpenTemplate(
+    const EffectTemplate& effect
+  )
   {
     std::vector<std::pair<std::string, EmitterBlueprint>> emitters;
     std::string paths;
@@ -203,11 +230,15 @@ namespace faf::editor
     std::string text;
     if (ReadGameFile("/lua/EffectTemplates.lua", text)) {
       mTemplates = ParseEffectTemplates(text);
-      std::sort(mTemplates.begin(), mTemplates.end(), [](const EffectTemplate& a, const EffectTemplate& b) { return LowerName(a.name) < LowerName(b.name); });
+      std::sort(mTemplates.begin(), mTemplates.end(), [](const EffectTemplate& a, const EffectTemplate& b) {
+        return LowerName(a.name) < LowerName(b.name);
+      });
     }
   }
 
-  bool EdParticleEditor::TestTemplate(const std::string& name)
+  bool EdParticleEditor::TestTemplate(
+    const std::string& name
+  )
   {
     ListTemplates();
     for (const EffectTemplate& effect : mTemplates) {
@@ -221,7 +252,10 @@ namespace faf::editor
 
   void EdParticleEditor::GraphSnapshot()
   {
-    if (!mGraph || mGraph->Changes() == mGraphSnap || ImGui::IsMouseDown(ImGuiMouseButton_Left) || ImGui::IsAnyItemActive()) {
+    if (
+      !mGraph || mGraph->Changes() == mGraphSnap || ImGui::IsMouseDown(ImGuiMouseButton_Left) ||
+      ImGui::IsAnyItemActive()
+    ) {
       return;
     }
     const std::string text = mGraph->Save();
@@ -237,7 +271,9 @@ namespace faf::editor
     mGraphUndoAt = mGraphUndo.size() - 1;
   }
 
-  void EdParticleEditor::GraphUndo(const bool redo)
+  void EdParticleEditor::GraphUndo(
+    const bool redo
+  )
   {
     if (!mGraph || (redo ? mGraphUndoAt + 1 >= mGraphUndo.size() : mGraphUndoAt == 0)) {
       return;
@@ -249,7 +285,9 @@ namespace faf::editor
     mGraphClean = ~std::uint64_t{0};
   }
 
-  bool EdParticleEditor::SaveGraph(const std::string& effectName)
+  bool EdParticleEditor::SaveGraph(
+    const std::string& effectName
+  )
   {
     SyncGraph();
     if (mFxEmitters.empty()) {
@@ -305,7 +343,11 @@ namespace faf::editor
       }
     }
     const float previewWidth = std::max(ImGui::GetContentRegionAvail().x * 0.3f, 300.0f);
-    if (ImGui::BeginTable("##graphlayout", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail())) {
+    if (
+      ImGui::BeginTable(
+        "##graphlayout", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail()
+      )
+    ) {
       ImGui::TableSetupColumn("left", ImGuiTableColumnFlags_WidthFixed, previewWidth);
       ImGui::TableSetupColumn("graph", ImGuiTableColumnFlags_WidthStretch);
       ImGui::TableSetupColumn("palette", ImGuiTableColumnFlags_WidthFixed, 200.0f);
@@ -320,14 +362,23 @@ namespace faf::editor
       // The graph, and a line of what it makes.
       ImGui::TableSetColumnIndex(1);
       const float statsHeight = ImGui::GetTextLineHeightWithSpacing() * 1.6f;
-      if (ImGui::BeginChild("##fxgraph", ImVec2(0.0f, ImGui::GetContentRegionAvail().y - statsHeight), ImGuiChildFlags_Borders,
-                            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove)) {
+      if (
+        ImGui::BeginChild(
+          "##fxgraph",
+          ImVec2(0.0f, ImGui::GetContentRegionAvail().y - statsHeight),
+          ImGuiChildFlags_Borders,
+          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoMove
+        )
+      ) {
         (void)mCanvas.Draw(*mGraph);
       }
       ImGui::EndChild();
       SyncGraph();
-      ImGui::TextDisabled("%zu emitter(s) linked to the Effect output, %zu nodes; Ctrl+Z / Ctrl+Y undo; right-click the graph for nodes",
-                          mFxEmitters.size(), mGraph->Nodes().size());
+      ImGui::TextDisabled(
+        "%zu emitter(s) linked to the Effect output, %zu nodes; Ctrl+Z / Ctrl+Y undo; right-click the graph for nodes",
+        mFxEmitters.size(),
+        mGraph->Nodes().size()
+      );
       // The palette.
       ImGui::TableSetColumnIndex(2);
       if (ImGui::BeginChild("##fxpalette", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
@@ -346,7 +397,10 @@ namespace faf::editor
     std::map<std::string, std::vector<const NodeType*>> byCategory;
     const std::string filter = LowerName(mPaletteFilter);
     for (const auto& type : mGraph->Registry().All()) {
-      if (type->isOutput || (!filter.empty() && LowerName(type->title + " " + type->category).find(filter) == std::string::npos)) {
+      if (
+        type->isOutput ||
+        (!filter.empty() && LowerName(type->title + " " + type->category).find(filter) == std::string::npos)
+      ) {
         continue;
       }
       byCategory[type->category].push_back(type.get());
@@ -374,9 +428,11 @@ namespace faf::editor
     const std::set<int>& selection = mCanvas.Selection();
     GraphNode* node = selection.size() == 1 ? mGraph->Find(*selection.begin()) : nullptr;
     if (node == nullptr) {
-      ImGui::TextWrapped("Select a node. An effect is its emitters played together: each Emitter node takes its curves from the "
-                         "nodes linked to its pins (a Constant is one value with a random spread, a Curve changes over the emitter's "
-                         "time) and its texture and colour ramp from Texture nodes.");
+      ImGui::TextWrapped(
+        "Select a node. An effect is its emitters played together: each Emitter node takes its curves from the "
+        "nodes linked to its pins (a Constant is one value with a random spread, a Curve changes over the emitter's "
+        "time) and its texture and colour ramp from Texture nodes."
+      );
       return;
     }
     const NodeType& type = *node->type;
@@ -476,7 +532,11 @@ namespace faf::editor
     mLibrary.Pump(4);
   }
 
-  bool EdParticleEditor::DrawCurveKeys(std::vector<EmitterKey>& keys, float& range, const EmitterCurveInfo* info)
+  bool EdParticleEditor::DrawCurveKeys(
+    std::vector<EmitterKey>& keys,
+    float& range,
+    const EmitterCurveInfo* info
+  )
   {
     bool changed = false;
     ImGui::SetNextItemWidth(Em(120.0f));
@@ -493,7 +553,10 @@ namespace faf::editor
     low -= margin;
     high += margin;
     const ImVec2 origin = ImGui::GetCursorScreenPos();
-    const ImVec2 size(std::max(ImGui::GetContentRegionAvail().x, 80.0f), std::clamp(ImGui::GetContentRegionAvail().y * 0.6f, 120.0f, 400.0f));
+    const ImVec2 size(
+      std::max(ImGui::GetContentRegionAvail().x, 80.0f),
+      std::clamp(ImGui::GetContentRegionAvail().y * 0.6f, 120.0f, 400.0f)
+    );
     ImGui::InvisibleButton("##curvekeys", size, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
     const bool hovered = ImGui::IsItemHovered();
     ImDrawList* dl = ImGui::GetWindowDrawList();
@@ -501,7 +564,9 @@ namespace faf::editor
       return ImVec2(origin.x + x / span * size.x, origin.y + (1.0f - (y - low) / (high - low)) * size.y);
     };
     EmitterCurve curve{span, keys};
-    std::stable_sort(curve.keys.begin(), curve.keys.end(), [](const EmitterKey& a, const EmitterKey& b) { return a.x < b.x; });
+    std::stable_sort(curve.keys.begin(), curve.keys.end(), [](const EmitterKey& a, const EmitterKey& b) {
+      return a.x < b.x;
+    });
     PlotCurve(dl, curve, origin.x, origin.y, origin.x + size.x, origin.y + size.y);
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     int hoverKey = -1;
@@ -527,7 +592,11 @@ namespace faf::editor
       }
     }
     if (hovered && hoverKey < 0 && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-      keys.push_back({std::clamp((mouse.x - origin.x) / size.x * span, 0.0f, span), low + (1.0f - (mouse.y - origin.y) / size.y) * (high - low), 0.0f});
+      keys.push_back(
+        {std::clamp((mouse.x - origin.x) / size.x * span, 0.0f, span),
+         low + (1.0f - (mouse.y - origin.y) / size.y) * (high - low),
+         0.0f}
+      );
       changed = true;
     }
     if (hovered && hoverKey >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && keys.size() > 1) {
@@ -537,7 +606,11 @@ namespace faf::editor
     }
     for (std::size_t k = 0; k < keys.size(); ++k) {
       const bool lit = static_cast<int>(k) == mKeySelected || static_cast<int>(k) == hoverKey;
-      dl->AddCircleFilled(toScreen(keys[k].x, keys[k].y), lit ? 6.0f : 4.5f, lit ? IM_COL32(255, 230, 120, 255) : IM_COL32(250, 250, 250, 255));
+      dl->AddCircleFilled(
+        toScreen(keys[k].x, keys[k].y),
+        lit ? 6.0f : 4.5f,
+        lit ? IM_COL32(255, 230, 120, 255) : IM_COL32(250, 250, 250, 255)
+      );
     }
     if (hovered) {
       ImGui::SetTooltip("%s", hoverKey >= 0 ? "Drag to move; right-click removes" : "Double-click to add a key");
@@ -557,7 +630,9 @@ namespace faf::editor
     }
     // In time order once no key is being dragged (sorting under a drag would swap which key the mouse holds).
     if (mKeyDrag < 0) {
-      std::stable_sort(keys.begin(), keys.end(), [](const EmitterKey& a, const EmitterKey& b) { return a.x < b.x; });
+      std::stable_sort(keys.begin(), keys.end(), [](const EmitterKey& a, const EmitterKey& b) {
+        return a.x < b.x;
+      });
     }
     return changed;
   }

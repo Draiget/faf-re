@@ -341,22 +341,10 @@ namespace moho
     [[nodiscard]] const wchar_t* SeverityPrefix() const noexcept;
   };
 
-  static_assert(
-    offsetof(CWinLogLine, isReplayEntry) == 0x0,
-    "moho::CWinLogLine::isReplayEntry offset must be 0x0"
-  );
-  static_assert(
-    offsetof(CWinLogLine, sequenceIndex) == 0x4,
-    "moho::CWinLogLine::sequenceIndex offset must be 0x4"
-  );
-  static_assert(
-    offsetof(CWinLogLine, categoryMask) == 0x8,
-    "moho::CWinLogLine::categoryMask offset must be 0x8"
-  );
-  static_assert(
-    offsetof(CWinLogLine, text) == 0xC,
-    "moho::CWinLogLine::text offset must be 0xC"
-  );
+  static_assert(offsetof(CWinLogLine, isReplayEntry) == 0x0, "moho::CWinLogLine::isReplayEntry offset must be 0x0");
+  static_assert(offsetof(CWinLogLine, sequenceIndex) == 0x4, "moho::CWinLogLine::sequenceIndex offset must be 0x4");
+  static_assert(offsetof(CWinLogLine, categoryMask) == 0x8, "moho::CWinLogLine::categoryMask offset must be 0x8");
+  static_assert(offsetof(CWinLogLine, text) == 0xC, "moho::CWinLogLine::text offset must be 0xC");
   static_assert(sizeof(CWinLogLine) == 0x28, "moho::CWinLogLine size must be 0x28");
 
   /**
@@ -448,18 +436,12 @@ namespace moho
     void AppendPendingLine(const CWinLogLine& line);
   };
 
-  static_assert(
-    offsetof(CWinLogTarget, dialog) == 0x8,
-    "moho::CWinLogTarget::dialog offset must be 0x8"
-  );
+  static_assert(offsetof(CWinLogTarget, dialog) == 0x8, "moho::CWinLogTarget::dialog offset must be 0x8");
   static_assert(
     offsetof(CWinLogTarget, mCommittedLines) == 0xC,
     "moho::CWinLogTarget::mCommittedLines offset must be 0xC"
   );
-  static_assert(
-    offsetof(CWinLogTarget, lock) == 0x1C,
-    "moho::CWinLogTarget::lock offset must be 0x1C"
-  );
+  static_assert(offsetof(CWinLogTarget, lock) == 0x1C, "moho::CWinLogTarget::lock offset must be 0x1C");
   static_assert(
     offsetof(CWinLogTarget, mPendingLines) == 0x24,
     "moho::CWinLogTarget::mPendingLines offset must be 0x24"
@@ -644,23 +626,19 @@ namespace moho
   class WWxInputBox : public wxDialog
   {
   public:
-    wxTextCtrl* mTextCtrl;         // +0x170
-    fa::string* mResultString;  // +0x174
+    wxTextCtrl* mTextCtrl;     // +0x170
+    fa::string* mResultString; // +0x174
 
     /**
-     * Address: 0x004FC040 (FUN_004FC040, ??0WWxInputBox@Moho@@QAE@PBDPBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@msvc8@@00PAV40@@Z)
+     * Address: 0x004FC040 (FUN_004FC040,
+     * ??0WWxInputBox@Moho@@QAE@PBDPBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@msvc8@@00PAV40@@Z)
      *
      * What it does:
      * Creates the dialog (wxDEFAULT_DIALOG_STYLE, the title widened from
      * UTF-8) and lays it out: the label, the text control seeded with the
      * default value, and OK/Cancel below them, at least 500 wide.
      */
-    WWxInputBox(
-      const char* dialogTitle,
-      const char* defaultValue,
-      const char* labelText,
-      fa::string* resultString
-    );
+    WWxInputBox(const char* dialogTitle, const char* defaultValue, const char* labelText, fa::string* resultString);
 
     /**
      * Address: 0x004FC7B0 (FUN_004FC7B0, vtable +0xDC)
@@ -676,14 +654,12 @@ namespace moho
   };
 
   static_assert(offsetof(WWxInputBox, mTextCtrl) == 0x170, "moho::WWxInputBox::mTextCtrl offset must be 0x170");
-  static_assert(
-    offsetof(WWxInputBox, mResultString) == 0x174,
-    "moho::WWxInputBox::mResultString offset must be 0x174"
-  );
+  static_assert(offsetof(WWxInputBox, mResultString) == 0x174, "moho::WWxInputBox::mResultString offset must be 0x174");
   static_assert(sizeof(WWxInputBox) == 0x178, "moho::WWxInputBox size must be 0x178");
 
   /**
-   * Address: 0x004FC870 (FUN_004FC870, ?WxInputBox@Moho@@YA_NPBD0PAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@msvc8@@@Z)
+   * Address: 0x004FC870 (FUN_004FC870,
+   * ?WxInputBox@Moho@@YA_NPBD0PAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@msvc8@@@Z)
    *
    * What it does:
    * Helper that allocates one heap-resident `WWxInputBox`, runs the modal
@@ -693,12 +669,8 @@ namespace moho
    * dialog. Returns `true` when the user accepted (wxID_OK) and `false`
    * for cancel / window-close.
    */
-  [[nodiscard]] bool WxInputBox(
-    const char* dialogTitle,
-    const char* defaultValue,
-    const char* labelText,
-    fa::string* resultString
-  );
+  [[nodiscard]] bool
+  WxInputBox(const char* dialogTitle, const char* defaultValue, const char* labelText, fa::string* resultString);
 
   /**
    * Address: 0x004FC900 (FUN_004FC900, ?CON_WxInputBox@Moho@@YAXPAX@Z)
@@ -895,19 +867,19 @@ namespace moho
       std::wstring text;
     };
 
-    bool mIsInitializingControls;                // +0x174
-    CWinLogTarget* mOwnerTarget;                 // +0x178
-    wxTextCtrl* mOutputTextControl;              // +0x17C
-    wxTextCtrl* mFilterTextControl;              // +0x180
-    std::uint32_t mEnabledCategoriesMask;        // +0x184
-    fa::string mFilterText;                   // +0x188
-    wxCheckBox* mDebugCategoryCheckBox;          // +0x1A4
-    wxCheckBox* mInfoCategoryCheckBox;           // +0x1A8
-    wxCheckBox* mWarnCategoryCheckBox;           // +0x1AC
-    wxCheckBox* mErrorCategoryCheckBox;          // +0x1B0
-    wxCheckBox* mCustomCategoryCheckBox;         // +0x1B4
-    fa::vector<fa::string> mBufferedLines; // +0x1B8
-    std::uint32_t mFirstVisibleLine;             // +0x1C8
+    bool mIsInitializingControls;                 // +0x174
+    CWinLogTarget* mOwnerTarget;                  // +0x178
+    wxTextCtrl* mOutputTextControl;               // +0x17C
+    wxTextCtrl* mFilterTextControl;               // +0x180
+    std::uint32_t mEnabledCategoriesMask;         // +0x184
+    fa::string mFilterText;                       // +0x188
+    wxCheckBox* mDebugCategoryCheckBox;           // +0x1A4
+    wxCheckBox* mInfoCategoryCheckBox;            // +0x1A8
+    wxCheckBox* mWarnCategoryCheckBox;            // +0x1AC
+    wxCheckBox* mErrorCategoryCheckBox;           // +0x1B0
+    wxCheckBox* mCustomCategoryCheckBox;          // +0x1B4
+    fa::vector<fa::string> mBufferedLines;        // +0x1B8
+    std::uint32_t mFirstVisibleLine;              // +0x1C8
     std::vector<PendingOutputRun> mPendingOutput; // +0x1CC, engine addition (see AppendOutput)
 
     DECLARE_EVENT_TABLE()
@@ -917,7 +889,10 @@ namespace moho
     offsetof(WWinLogWindow, mIsInitializingControls) == 0x174,
     "moho::WWinLogWindow::mIsInitializingControls offset must be 0x174"
   );
-  static_assert(offsetof(WWinLogWindow, mOwnerTarget) == 0x178, "moho::WWinLogWindow::mOwnerTarget offset must be 0x178");
+  static_assert(
+    offsetof(WWinLogWindow, mOwnerTarget) == 0x178,
+    "moho::WWinLogWindow::mOwnerTarget offset must be 0x178"
+  );
   static_assert(
     offsetof(WWinLogWindow, mOutputTextControl) == 0x17C,
     "moho::WWinLogWindow::mOutputTextControl offset must be 0x17C"
@@ -1010,4 +985,6 @@ namespace moho
 } // namespace moho
 
 // wxGetApp(), from the IMPLEMENT_APP_NO_MAIN(moho::MohoApp) in WinApp.cpp.
-DECLARE_APP(moho::MohoApp)
+DECLARE_APP(
+  moho::MohoApp
+)

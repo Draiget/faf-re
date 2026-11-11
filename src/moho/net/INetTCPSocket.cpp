@@ -32,7 +32,10 @@ INetTCPSocket::INetTCPSocket() = default;
  * What it does:
  * Opens and connects a TCP stream socket to `address:port`.
  */
-INetTCPSocket* moho::NET_TCPConnect(const u_long address, const u_short port)
+INetTCPSocket* moho::NET_TCPConnect(
+  const u_long address,
+  const u_short port
+)
 {
   if (!NET_Init()) {
     return nullptr;

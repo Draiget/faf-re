@@ -31,7 +31,9 @@ namespace gpg
       : mSlots(kInitialSlots, 0u)
     {}
 
-    [[nodiscard]] Entry* Find(const RRef& key) noexcept
+    [[nodiscard]] Entry* Find(
+      const RRef& key
+    ) noexcept
     {
       const std::size_t mask = mSlots.size() - 1u;
       for (std::size_t slot = Hash(key) & mask;; slot = (slot + 1u) & mask) {
@@ -47,7 +49,10 @@ namespace gpg
     }
 
     /** `key` must not be in the index. */
-    Entry& Insert(const RRef& key, const WriteArchive::TrackedPointerRecord& record)
+    Entry& Insert(
+      const RRef& key,
+      const WriteArchive::TrackedPointerRecord& record
+    )
     {
       if ((mCount + 1u) * 2u > mSlots.size()) {
         Grow();
@@ -68,7 +73,9 @@ namespace gpg
       return mCount;
     }
 
-    [[nodiscard]] Entry& At(const std::uint32_t index) noexcept
+    [[nodiscard]] Entry& At(
+      const std::uint32_t index
+    ) noexcept
     {
       return mChunks[index >> kChunkBits][index & ((1u << kChunkBits) - 1u)];
     }
@@ -84,7 +91,9 @@ namespace gpg
     static constexpr std::size_t kInitialSlots = std::size_t{1} << 16;
     static constexpr std::uint32_t kChunkBits = 14u;
 
-    [[nodiscard]] static std::size_t Hash(const RRef& key) noexcept
+    [[nodiscard]] static std::size_t Hash(
+      const RRef& key
+    ) noexcept
     {
       const std::uint64_t object = reinterpret_cast<std::uintptr_t>(key.mObj);
       const std::uint64_t type = reinterpret_cast<std::uintptr_t>(key.mType);
@@ -93,7 +102,10 @@ namespace gpg
     }
 
     /** `stored` is the entry's position plus one, as 0 marks an empty slot. */
-    void Place(const RRef& key, const std::uint32_t stored) noexcept
+    void Place(
+      const RRef& key,
+      const std::uint32_t stored
+    ) noexcept
     {
       const std::size_t mask = mSlots.size() - 1u;
       std::size_t slot = Hash(key) & mask;

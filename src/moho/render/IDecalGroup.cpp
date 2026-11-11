@@ -11,7 +11,9 @@ namespace moho
      * Represents the compiler-emitted base-vtable reset lane used by the public
      * `IDecalGroup` constructor.
      */
-    void ResetIDecalGroupBaseVtable(IDecalGroup* const object)
+    void ResetIDecalGroupBaseVtable(
+      IDecalGroup* const object
+    )
     {
       // Recovered C++ constructor prologues already perform this vtable install.
       (void)object;

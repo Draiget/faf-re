@@ -25,7 +25,7 @@ namespace moho
       std::size_t mIndex;                  // into SSyncData::mUnitUpdates
       const SSTIUnitVariableData* mSource; // the payload passed to the queue call
       SUnitUpdateOverrides mOverrides;
-      bool mHeapDeferred;                  // sim_ParallelSyncHeap: the allocating half too
+      bool mHeapDeferred; // sim_ParallelSyncHeap: the allocating half too
     };
 
     // Static, so recording a fill never allocates (that would shift the sim heap). A packet with
@@ -41,7 +41,7 @@ namespace moho
       std::size_t mIndex;                    // into SSyncData::mEntityUpdates
       const SSTIEntityVariableData* mSource; // the payload passed to the queue call
       std::uint8_t mRequestRefreshUI;        // the source's value when queued
-      bool mHasScrollOverride;              // endpoints captured in the queued record
+      bool mHasScrollOverride;               // endpoints captured in the queued record
       const SPerArmyReconInfo* mReconOverrides;
     };
     SEntityUpdateFill sEntityUpdateFills[kMaxUnitUpdateFills];
@@ -53,10 +53,14 @@ namespace moho
     constexpr std::size_t kUnitUpdateFillGrain = 128;
   } // namespace
 
-  CUnitUpdateFills::CUnitUpdateFills(SSyncData* const syncData)
+  CUnitUpdateFills::CUnitUpdateFills(
+    SSyncData* const syncData
+  )
   {
-    if (syncData == nullptr || sActiveUnitUpdateFills != nullptr || !sim_ParallelSync ||
-        !CSimWorkerPool::ParallelEnabled()) {
+    if (
+      syncData == nullptr || sActiveUnitUpdateFills != nullptr || !sim_ParallelSync ||
+      !CSimWorkerPool::ParallelEnabled()
+    ) {
       return;
     }
     mSyncData = syncData;
@@ -95,13 +99,13 @@ namespace moho
       // the other.
       CSimWorkerPool::Get().ParallelFor(
         count + entityCount, kUnitUpdateFillGrain, [this, count](const std::size_t begin, const std::size_t end) {
-          if (begin < count) {
-            FillRange(begin, end < count ? end : count);
-          }
-          if (end > count) {
-            FillEntityRange(begin > count ? begin - count : 0u, end - count);
-          }
+        if (begin < count) {
+          FillRange(begin, end < count ? end : count);
         }
+        if (end > count) {
+          FillEntityRange(begin > count ? begin - count : 0u, end - count);
+        }
+      }
       );
       sUnitUpdateFillCount = 0;
       sEntityUpdateFillCount = 0;
@@ -109,19 +113,24 @@ namespace moho
       return;
     }
     CSimWorkerPool::Get().ParallelFor(
-      count, kUnitUpdateFillGrain, [this](const std::size_t begin, const std::size_t end) { FillRange(begin, end); }
+      count, kUnitUpdateFillGrain, [this](const std::size_t begin, const std::size_t end) {
+      FillRange(begin, end);
+    }
     );
     CSimWorkerPool::Get().ParallelFor(
       entityCount, kUnitUpdateFillGrain, [this](const std::size_t begin, const std::size_t end) {
-        FillEntityRange(begin, end);
-      }
+      FillEntityRange(begin, end);
+    }
     );
     sUnitUpdateFillCount = 0;
     sEntityUpdateFillCount = 0;
     mSyncData = nullptr;
   }
 
-  void CUnitUpdateFills::FillRange(const std::size_t begin, const std::size_t end) const
+  void CUnitUpdateFills::FillRange(
+    const std::size_t begin,
+    const std::size_t end
+  ) const
   {
     for (std::size_t i = begin; i < end; ++i) {
       const SUnitUpdateFill& fill = sUnitUpdateFills[i];
@@ -168,7 +177,10 @@ namespace moho
     return &entry;
   }
 
-  void CUnitUpdateFills::FillEntityRange(const std::size_t begin, const std::size_t end) const
+  void CUnitUpdateFills::FillEntityRange(
+    const std::size_t begin,
+    const std::size_t end
+  ) const
   {
     for (std::size_t i = begin; i < end; ++i) {
       const SEntityUpdateFill& fill = sEntityUpdateFills[i];
@@ -197,11 +209,15 @@ namespace moho
   }
 
   SEntityVariableUpdateEntry* QueueEntityVariableUpdateDeferred(
-    SSyncData* const syncData, const EntId entityId, const SSTIEntityVariableData& variableData
+    SSyncData* const syncData,
+    const EntId entityId,
+    const SSTIEntityVariableData& variableData
   )
   {
-    if (!sim_ParallelEntitySync || syncData == nullptr || syncData != sActiveSyncData ||
-        sEntityUpdateFillCount == kMaxUnitUpdateFills) {
+    if (
+      !sim_ParallelEntitySync || syncData == nullptr || syncData != sActiveSyncData ||
+      sEntityUpdateFillCount == kMaxUnitUpdateFills
+    ) {
       return nullptr;
     }
 
@@ -216,7 +232,10 @@ namespace moho
     return &entry;
   }
 
-  void OverrideEntityUpdateScroll(SSyncData* const syncData, const SSTIEntityVariableData& source)
+  void OverrideEntityUpdateScroll(
+    SSyncData* const syncData,
+    const SSTIEntityVariableData& source
+  )
   {
     if (syncData == nullptr || syncData->mEntityUpdates.empty()) {
       return;
@@ -232,7 +251,10 @@ namespace moho
     }
   }
 
-  bool OverrideDeferredEntityUpdateFromRecon(SSyncData* const syncData, const SPerArmyReconInfo* const reconInfo)
+  bool OverrideDeferredEntityUpdateFromRecon(
+    SSyncData* const syncData,
+    const SPerArmyReconInfo* const reconInfo
+  )
   {
     if (syncData == nullptr || syncData != sActiveSyncData || sEntityUpdateFillCount == 0u) {
       return false;

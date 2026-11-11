@@ -13,14 +13,19 @@
 #define COINIT_MULTITHREADED 0x0u
 #define COINIT_APARTMENTTHREADED 0x2u
 
-inline HRESULT CoInitializeEx(void* const reserved, const DWORD flags) noexcept
+inline HRESULT CoInitializeEx(
+  void* const reserved,
+  const DWORD flags
+) noexcept
 {
   (void)reserved;
   (void)flags;
   return S_OK;
 }
 
-inline HRESULT CoInitialize(void* const reserved) noexcept
+inline HRESULT CoInitialize(
+  void* const reserved
+) noexcept
 {
   return CoInitializeEx(reserved, COINIT_APARTMENTTHREADED);
 }

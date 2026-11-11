@@ -24,14 +24,20 @@ namespace moho
     std::uint16_t mDosTime = 0;             // +0x06
     std::uint32_t mCompressedSize = 0;      // +0x08
     std::uint32_t mUncompressedSize = 0;    // +0x0C
-    fa::string mName{};                  // +0x10
+    fa::string mName{};                     // +0x10
     std::uint32_t mLocalHeaderOffset = 0;   // +0x2C
     std::int32_t mCachedDataOffset = -1;    // +0x30
   };
 
   static_assert(offsetof(CZipFileEntry, mName) == 0x10, "CZipFileEntry::mName offset must be 0x10");
-  static_assert(offsetof(CZipFileEntry, mLocalHeaderOffset) == 0x2C, "CZipFileEntry::mLocalHeaderOffset offset must be 0x2C");
-  static_assert(offsetof(CZipFileEntry, mCachedDataOffset) == 0x30, "CZipFileEntry::mCachedDataOffset offset must be 0x30");
+  static_assert(
+    offsetof(CZipFileEntry, mLocalHeaderOffset) == 0x2C,
+    "CZipFileEntry::mLocalHeaderOffset offset must be 0x2C"
+  );
+  static_assert(
+    offsetof(CZipFileEntry, mCachedDataOffset) == 0x30,
+    "CZipFileEntry::mCachedDataOffset offset must be 0x30"
+  );
   static_assert(sizeof(CZipFileEntry) == 0x34, "CZipFileEntry size must be 0x34");
 
   struct SZipFileCachedEntry
@@ -50,7 +56,10 @@ namespace moho
    */
   struct ZipEntryNameLess
   {
-    [[nodiscard]] bool operator()(const fa::string& lhs, const fa::string& rhs) const
+    [[nodiscard]] bool operator()(
+      const fa::string& lhs,
+      const fa::string& rhs
+    ) const
     {
       return gpg::STR_CompareNoCase(lhs.c_str(), rhs.c_str()) < 0;
     }
@@ -68,9 +77,7 @@ namespace moho
   using SZipFileNameIndexMap = fa::map<fa::string, std::uint32_t, ZipEntryNameLess>;
 
   static_assert(sizeof(SZipFileNameIndexMap) == 0x0C, "SZipFileNameIndexMap size must be 0x0C");
-  static_assert(
-    sizeof(SZipFileNameIndexMap::value_type) == 0x20, "SZipFileNameIndexMap::value_type size must be 0x20"
-  );
+  static_assert(sizeof(SZipFileNameIndexMap::value_type) == 0x20, "SZipFileNameIndexMap::value_type size must be 0x20");
 
 #pragma pack(push, 1)
   struct SZipLocalFileHeader
@@ -89,8 +96,14 @@ namespace moho
   };
 #pragma pack(pop)
 
-  static_assert(offsetof(SZipLocalFileHeader, mFileNameLength) == 0x1A, "SZipLocalFileHeader::mFileNameLength offset must be 0x1A");
-  static_assert(offsetof(SZipLocalFileHeader, mExtraFieldLength) == 0x1C, "SZipLocalFileHeader::mExtraFieldLength offset must be 0x1C");
+  static_assert(
+    offsetof(SZipLocalFileHeader, mFileNameLength) == 0x1A,
+    "SZipLocalFileHeader::mFileNameLength offset must be 0x1A"
+  );
+  static_assert(
+    offsetof(SZipLocalFileHeader, mExtraFieldLength) == 0x1C,
+    "SZipLocalFileHeader::mExtraFieldLength offset must be 0x1C"
+  );
   static_assert(sizeof(SZipLocalFileHeader) == 0x1E, "SZipLocalFileHeader size must be 0x1E");
 
   /**
@@ -231,10 +244,10 @@ namespace moho
 #endif
 
   public:
-    fa::string mPath{};                           // +0x00
-    fa::vector<SZipFileCachedEntry> mEntries{};  // +0x1C
+    fa::string mPath{};                         // +0x00
+    fa::vector<SZipFileCachedEntry> mEntries{}; // +0x1C
 #if FAF_RETAIL_LAYOUT
-    SZipFileNameIndexMap mEntryByCanonicalPath{};   // +0x2C
+    SZipFileNameIndexMap mEntryByCanonicalPath{}; // +0x2C
 #else
     // Engine change: entry indices sorted by name, in place of the binary's map. The map keeps a
     // second copy of every name and a node per entry, for lookups only this file makes.
@@ -243,7 +256,10 @@ namespace moho
   };
 
   static_assert(offsetof(CZipFile, mEntries) == 0x1C, "CZipFile::mEntries offset must be 0x1C");
-  static_assert(offsetof(CZipFile, mEntryByCanonicalPath) == 0x2C, "CZipFile::mEntryByCanonicalPath offset must be 0x2C");
+  static_assert(
+    offsetof(CZipFile, mEntryByCanonicalPath) == 0x2C,
+    "CZipFile::mEntryByCanonicalPath offset must be 0x2C"
+  );
   static_assert(sizeof(CZipFile) == 0x38, "CZipFile size must be 0x38");
 
 } // namespace moho

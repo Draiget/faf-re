@@ -20,7 +20,9 @@ namespace gpg::gal
   {
   public:
     RenderTargetD3D11(
-      ID3D11Texture2D* texture, ID3D11RenderTargetView* renderTargetView, ID3D11ShaderResourceView* shaderResourceView
+      ID3D11Texture2D* texture,
+      ID3D11RenderTargetView* renderTargetView,
+      ID3D11ShaderResourceView* shaderResourceView
     );
     ~RenderTargetD3D11() override;
 

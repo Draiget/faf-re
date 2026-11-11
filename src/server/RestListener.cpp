@@ -27,14 +27,20 @@ namespace faf::server
       return errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR;
     }
 
-    [[nodiscard]] std::string Lower(std::string_view text)
+    [[nodiscard]] std::string Lower(
+      std::string_view text
+    )
     {
       std::string out(text);
-      std::transform(out.begin(), out.end(), out.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(out.begin(), out.end(), out.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return out;
     }
 
-    [[nodiscard]] std::string_view Trim(std::string_view text) noexcept
+    [[nodiscard]] std::string_view Trim(
+      std::string_view text
+    ) noexcept
     {
       while (!text.empty() && (text.front() == ' ' || text.front() == '\t')) {
         text.remove_prefix(1);
@@ -45,28 +51,45 @@ namespace faf::server
       return text;
     }
 
-    [[nodiscard]] const char* StatusText(const int status) noexcept
+    [[nodiscard]] const char* StatusText(
+      const int status
+    ) noexcept
     {
       switch (status) {
-      case 200: return "OK";
-      case 204: return "No Content";
-      case 400: return "Bad Request";
-      case 401: return "Unauthorized";
-      case 404: return "Not Found";
-      case 405: return "Method Not Allowed";
-      case 413: return "Payload Too Large";
-      default: return "Error";
+      case 200:
+        return "OK";
+      case 204:
+        return "No Content";
+      case 400:
+        return "Bad Request";
+      case 401:
+        return "Unauthorized";
+      case 404:
+        return "Not Found";
+      case 405:
+        return "Method Not Allowed";
+      case 413:
+        return "Payload Too Large";
+      default:
+        return "Error";
       }
     }
 
     /** An op name as a path segment: lowercase letters and underscores. */
-    [[nodiscard]] bool ValidOp(std::string_view op) noexcept
+    [[nodiscard]] bool ValidOp(
+      std::string_view op
+    ) noexcept
     {
-      return !op.empty() && op.size() <= 32 && std::all_of(op.begin(), op.end(), [](const char c) { return (c >= 'a' && c <= 'z') || c == '_'; });
+      return !op.empty() && op.size() <= 32 && std::all_of(op.begin(), op.end(), [](const char c) {
+        return (c >= 'a' && c <= 'z') || c == '_';
+      });
     }
   } // namespace
 
-  bool TokensEqual(const std::string_view given, const std::string_view expected) noexcept
+  bool TokensEqual(
+    const std::string_view given,
+    const std::string_view expected
+  ) noexcept
   {
     // Every byte of the expected token is looked at whatever the given one is, so the time says only its length.
     unsigned char difference = given.size() == expected.size() ? 0u : 1u;
@@ -82,11 +105,11 @@ namespace faf::server
     int socket = -1;
     std::string peer;
     std::uint64_t acceptedUs = 0;
-    std::string in;          // what arrived of the request
-    std::string out;         // what the socket hasn't taken yet
-    std::string origin;      // the request's Origin header
-    bool handled = false;    // its request was read whole
-    bool events = false;     // an event stream: stays open
+    std::string in;       // what arrived of the request
+    std::string out;      // what the socket hasn't taken yet
+    std::string origin;   // the request's Origin header
+    bool handled = false; // its request was read whole
+    bool events = false;  // an event stream: stays open
     bool closeWhenSent = false;
     std::int64_t waitingId = 0; // a control request handed out and not answered yet (0: none)
   };
@@ -105,7 +128,12 @@ namespace faf::server
     }
   }
 
-  bool CRestListener::Open(const remote::net::SEndpoint& at, std::string token, std::string corsOrigin, std::string& error)
+  bool CRestListener::Open(
+    const remote::net::SEndpoint& at,
+    std::string token,
+    std::string corsOrigin,
+    std::string& error
+  )
   {
     if (token.size() < 16u) {
       error = "rest: the admin token needs at least 16 characters";
@@ -124,7 +152,10 @@ namespace faf::server
     address.sin_family = AF_INET;
     address.sin_port = htons(at.port);
     address.sin_addr.s_addr = htonl(at.ip);
-    if (::bind(mListenSocket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 || ::listen(mListenSocket, 16) != 0) {
+    if (
+      ::bind(mListenSocket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 ||
+      ::listen(mListenSocket, 16) != 0
+    ) {
       error = "rest: can't listen on " + at.Text();
       ::close(mListenSocket);
       mListenSocket = -1;
@@ -141,16 +172,22 @@ namespace faf::server
     });
   }
 
-  std::string CRestListener::CorsHeaders(const SConnection& connection) const
+  std::string CRestListener::CorsHeaders(
+    const SConnection& connection
+  ) const
   {
     if (mCorsOrigin.empty() || connection.origin != mCorsOrigin) {
       return {};
     }
-    return "Access-Control-Allow-Origin: " + mCorsOrigin + "\r\nVary: Origin\r\nAccess-Control-Allow-Headers: Authorization, Content-Type\r\n"
-           "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n";
+    return "Access-Control-Allow-Origin: " + mCorsOrigin +
+      "\r\nVary: Origin\r\nAccess-Control-Allow-Headers: Authorization, Content-Type\r\n"
+      "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n";
   }
 
-  void CRestListener::Close(SConnection& connection, const char* why)
+  void CRestListener::Close(
+    SConnection& connection,
+    const char* why
+  )
   {
     if (connection.socket < 0) {
       return;
@@ -162,7 +199,9 @@ namespace faf::server
     connection.socket = -1;
   }
 
-  void CRestListener::Flush(SConnection& connection)
+  void CRestListener::Flush(
+    SConnection& connection
+  )
   {
     while (connection.socket >= 0 && !connection.out.empty()) {
       const ssize_t sent = ::send(connection.socket, connection.out.data(), connection.out.size(), MSG_NOSIGNAL);
@@ -179,10 +218,14 @@ namespace faf::server
     }
   }
 
-  void CRestListener::Respond(SConnection& connection, const int status, const std::string_view json)
+  void CRestListener::Respond(
+    SConnection& connection,
+    const int status,
+    const std::string_view json
+  )
   {
-    std::string head = "HTTP/1.1 " + std::to_string(status) + " " + StatusText(status) + "\r\n" + CorsHeaders(connection)
-                     + "Cache-Control: no-store\r\nConnection: close\r\n";
+    std::string head = "HTTP/1.1 " + std::to_string(status) + " " + StatusText(status) + "\r\n" +
+      CorsHeaders(connection) + "Cache-Control: no-store\r\nConnection: close\r\n";
     if (status == 204) {
       head += "\r\n";
     } else {
@@ -194,7 +237,11 @@ namespace faf::server
     Flush(connection);
   }
 
-  void CRestListener::Answer(const std::int64_t id, const bool ok, const std::string_view json)
+  void CRestListener::Answer(
+    const std::int64_t id,
+    const bool ok,
+    const std::string_view json
+  )
   {
     for (const std::unique_ptr<SConnection>& connection : mConnections) {
       if (connection->waitingId == id && connection->socket >= 0) {
@@ -205,7 +252,10 @@ namespace faf::server
     }
   }
 
-  void CRestListener::Event(const std::string_view name, const std::string_view json)
+  void CRestListener::Event(
+    const std::string_view name,
+    const std::string_view json
+  )
   {
     const std::string message = "event: " + std::string(name) + "\ndata: " + std::string(json) + "\n\n";
     for (const std::unique_ptr<SConnection>& connection : mConnections) {
@@ -222,7 +272,10 @@ namespace faf::server
   }
 
   void CRestListener::Handle(
-    SConnection& connection, const std::string_view method, const std::string_view path, const std::string_view body,
+    SConnection& connection,
+    const std::string_view method,
+    const std::string_view path,
+    const std::string_view body,
     std::vector<SControlRequest>& requests
   )
   {
@@ -250,8 +303,8 @@ namespace faf::server
         return;
       }
       connection.events = true;
-      connection.out += "HTTP/1.1 200 OK\r\n" + CorsHeaders(connection)
-                      + "Content-Type: text/event-stream\r\nCache-Control: no-store\r\nConnection: keep-alive\r\n\r\n: events\n\n";
+      connection.out += "HTTP/1.1 200 OK\r\n" + CorsHeaders(connection) +
+        "Content-Type: text/event-stream\r\nCache-Control: no-store\r\nConnection: keep-alive\r\n\r\n: events\n\n";
       Flush(connection);
       mNews.push_back("rest: " + connection.peer + " opened an event stream");
       return;
@@ -266,7 +319,9 @@ namespace faf::server
         return;
       }
     } else {
-      Respond(connection, 404, "{\"ok\":false,\"error\":\"no such path: /api/v1/status, /api/v1/ops/<op>, /api/v1/events\"}");
+      Respond(
+        connection, 404, "{\"ok\":false,\"error\":\"no such path: /api/v1/status, /api/v1/ops/<op>, /api/v1/events\"}"
+      );
       return;
     }
     // The fields from the body (a JSON object, or nothing), with the op from the path.
@@ -295,7 +350,11 @@ namespace faf::server
     requests.push_back(std::move(*request));
   }
 
-  void CRestListener::Read(SConnection& connection, std::vector<SControlRequest>& requests, const std::uint64_t nowUs)
+  void CRestListener::Read(
+    SConnection& connection,
+    std::vector<SControlRequest>& requests,
+    const std::uint64_t nowUs
+  )
   {
     char buffer[4096];
     for (;;) {
@@ -332,7 +391,8 @@ namespace faf::server
     const std::size_t lineEnd = head.find("\r\n");
     const std::string_view requestLine = head.substr(0, lineEnd);
     const std::size_t space1 = requestLine.find(' ');
-    const std::size_t space2 = space1 == std::string_view::npos ? std::string_view::npos : requestLine.find(' ', space1 + 1);
+    const std::size_t space2 =
+      space1 == std::string_view::npos ? std::string_view::npos : requestLine.find(' ', space1 + 1);
     if (space2 == std::string_view::npos) {
       connection.handled = true;
       Respond(connection, 400, "{\"ok\":false,\"error\":\"not an HTTP request\"}");
@@ -382,7 +442,8 @@ namespace faf::server
     const std::string_view body(connection.in.data() + headerEnd + 4u, contentLength);
     if (method != "OPTIONS") {
       constexpr std::string_view kBearer = "Bearer ";
-      const bool bearer = authorization.size() > kBearer.size() && Lower(authorization.substr(0, kBearer.size())) == "bearer ";
+      const bool bearer =
+        authorization.size() > kBearer.size() && Lower(authorization.substr(0, kBearer.size())) == "bearer ";
       if (!bearer || !TokensEqual(std::string_view(authorization).substr(kBearer.size()), mToken)) {
         Respond(connection, 401, "{\"ok\":false,\"error\":\"this needs Authorization: Bearer <admin token>\"}");
         mNews.push_back("rest: " + connection.peer + " refused: no admin token, or a wrong one");
@@ -392,7 +453,10 @@ namespace faf::server
     Handle(connection, method, path, body, requests);
   }
 
-  void CRestListener::Poll(std::vector<SControlRequest>& requests, const std::uint64_t nowUs)
+  void CRestListener::Poll(
+    std::vector<SControlRequest>& requests,
+    const std::uint64_t nowUs
+  )
   {
     if (mListenSocket < 0) {
       return;
@@ -400,16 +464,21 @@ namespace faf::server
     for (;;) {
       sockaddr_in from{};
       socklen_t size = sizeof(from);
-      const int socket = ::accept4(mListenSocket, reinterpret_cast<sockaddr*>(&from), &size, SOCK_NONBLOCK | SOCK_CLOEXEC);
+      const int socket =
+        ::accept4(mListenSocket, reinterpret_cast<sockaddr*>(&from), &size, SOCK_NONBLOCK | SOCK_CLOEXEC);
       if (socket < 0) {
         break;
       }
       remote::net::SEndpoint peer;
       peer.ip = ntohl(from.sin_addr.s_addr);
       peer.port = ntohs(from.sin_port);
-      std::erase_if(mConnections, [](const std::unique_ptr<SConnection>& connection) { return connection->socket < 0; });
+      std::erase_if(mConnections, [](const std::unique_ptr<SConnection>& connection) {
+        return connection->socket < 0;
+      });
       if (mConnections.size() >= kMaxRestConnections) {
-        mNews.push_back("rest: " + peer.Text() + " refused: " + std::to_string(kMaxRestConnections) + " connections are open");
+        mNews.push_back(
+          "rest: " + peer.Text() + " refused: " + std::to_string(kMaxRestConnections) + " connections are open"
+        );
         ::close(socket);
         continue;
       }
@@ -429,6 +498,8 @@ namespace faf::server
         Flush(*connection);
       }
     }
-    std::erase_if(mConnections, [](const std::unique_ptr<SConnection>& connection) { return connection->socket < 0; });
+    std::erase_if(mConnections, [](const std::unique_ptr<SConnection>& connection) {
+      return connection->socket < 0;
+    });
   }
 } // namespace faf::server

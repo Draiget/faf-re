@@ -25,15 +25,19 @@ namespace faf::editor::memtrace
   {
     HANDLE gHeap = nullptr; // the tracker's own records, never through malloc_0
 
-    template<class T>
+    template <class T>
     struct PrivateAllocator
     {
       using value_type = T;
       PrivateAllocator() = default;
-      template<class U>
-      PrivateAllocator(const PrivateAllocator<U>&) noexcept
+      template <class U>
+      PrivateAllocator(
+        const PrivateAllocator<U>&
+      ) noexcept
       {}
-      T* allocate(const std::size_t n)
+      T* allocate(
+        const std::size_t n
+      )
       {
         void* const block = ::HeapAlloc(gHeap, 0, n * sizeof(T));
         if (block == nullptr) {
@@ -41,14 +45,24 @@ namespace faf::editor::memtrace
         }
         return static_cast<T*>(block);
       }
-      void deallocate(T* const p, std::size_t) noexcept { ::HeapFree(gHeap, 0, p); }
-      template<class U>
-      bool operator==(const PrivateAllocator<U>&) const noexcept
+      void deallocate(
+        T* const p,
+        std::size_t
+      ) noexcept
+      {
+        ::HeapFree(gHeap, 0, p);
+      }
+      template <class U>
+      bool operator==(
+        const PrivateAllocator<U>&
+      ) const noexcept
       {
         return true;
       }
-      template<class U>
-      bool operator!=(const PrivateAllocator<U>&) const noexcept
+      template <class U>
+      bool operator!=(
+        const PrivateAllocator<U>&
+      ) const noexcept
       {
         return false;
       }
@@ -67,9 +81,15 @@ namespace faf::editor::memtrace
     struct Tracker
     {
       SRWLOCK lock = SRWLOCK_INIT;
-      std::unordered_map<void*, Block, std::hash<void*>, std::equal_to<>, PrivateAllocator<std::pair<void* const, Block>>> blocks;
-      std::unordered_map<std::uint64_t, std::uint32_t, std::hash<std::uint64_t>, std::equal_to<>,
-                         PrivateAllocator<std::pair<const std::uint64_t, std::uint32_t>>>
+      std::
+        unordered_map<void*, Block, std::hash<void*>, std::equal_to<>, PrivateAllocator<std::pair<void* const, Block>>>
+          blocks;
+      std::unordered_map<
+        std::uint64_t,
+        std::uint32_t,
+        std::hash<std::uint64_t>,
+        std::equal_to<>,
+        PrivateAllocator<std::pair<const std::uint64_t, std::uint32_t>>>
         stackIds;
       std::vector<Frames, PrivateAllocator<Frames>> stacks;
     };
@@ -78,7 +98,11 @@ namespace faf::editor::memtrace
     std::atomic<std::uint32_t> gPlay{0};
     thread_local int tInside = 0;
 
-    void Hook(const int op, const int size, ...)
+    void Hook(
+      const int op,
+      const int size,
+      ...
+    )
     {
       if (tInside != 0 || gTracker == nullptr) {
         return;
@@ -99,11 +123,13 @@ namespace faf::editor::memtrace
           hash = (hash ^ reinterpret_cast<std::uintptr_t>(frames[i])) * 1099511628211ULL;
         }
         ::AcquireSRWLockExclusive(&gTracker->lock);
-        auto [found, inserted] = gTracker->stackIds.try_emplace(hash, static_cast<std::uint32_t>(gTracker->stacks.size()));
+        auto [found, inserted] =
+          gTracker->stackIds.try_emplace(hash, static_cast<std::uint32_t>(gTracker->stacks.size()));
         if (inserted) {
           gTracker->stacks.push_back(frames);
         }
-        gTracker->blocks[block] = Block{static_cast<std::uint32_t>(size), gPlay.load(std::memory_order_relaxed), found->second};
+        gTracker->blocks[block] =
+          Block{static_cast<std::uint32_t>(size), gPlay.load(std::memory_order_relaxed), found->second};
         ::ReleaseSRWLockExclusive(&gTracker->lock);
       } else {
         ::AcquireSRWLockExclusive(&gTracker->lock);
@@ -114,7 +140,9 @@ namespace faf::editor::memtrace
     }
 
     /** "Function (file:line)" for one return address, or the module and offset. */
-    std::string Describe(void* const address)
+    std::string Describe(
+      void* const address
+    )
     {
       const HANDLE process = ::GetCurrentProcess();
       alignas(SYMBOL_INFO) char buffer[sizeof(SYMBOL_INFO) + 512] = {};
@@ -135,16 +163,29 @@ namespace faf::editor::memtrace
       DWORD lineDisplacement = 0;
       if (::SymGetLineFromAddr64(process, reinterpret_cast<DWORD64>(address), &lineDisplacement, &line)) {
         const char* const file = std::strrchr(line.FileName, '\\');
-        text += " (" + std::string(file != nullptr ? file + 1 : line.FileName) + ":" + std::to_string(line.LineNumber) + ")";
+        text +=
+          " (" + std::string(file != nullptr ? file + 1 : line.FileName) + ":" + std::to_string(line.LineNumber) + ")";
       }
       return text;
     }
 
     /** The allocator's own frames, skipped in reports. */
-    bool IsAllocatorFrame(const std::string& text)
+    bool IsAllocatorFrame(
+      const std::string& text
+    )
     {
-      static const char* const kSkip[] = {"malloc_0", "malloc_crt", "free_0", "realloc_0", "operator new", "Hook",
-                                          "std::_Allocate", "std::allocator", "_Allocate_manually_vector_aligned", "malloc"};
+      static const char* const kSkip[] = {
+        "malloc_0",
+        "malloc_crt",
+        "free_0",
+        "realloc_0",
+        "operator new",
+        "Hook",
+        "std::_Allocate",
+        "std::allocator",
+        "_Allocate_manually_vector_aligned",
+        "malloc"
+      };
       for (const char* skip : kSkip) {
         if (text.rfind(skip, 0) == 0 || text.find(std::string("::") + skip) != std::string::npos) {
           return true;
@@ -178,7 +219,10 @@ namespace faf::editor::memtrace
     return gPlay.fetch_add(1) + 1;
   }
 
-  void Report(const std::uint32_t play, const int count)
+  void Report(
+    const std::uint32_t play,
+    const int count
+  )
   {
     if (gTracker == nullptr) {
       return;
@@ -194,7 +238,13 @@ namespace faf::editor::memtrace
     std::uint64_t totalBytes = 0;
     std::uint32_t totalBlocks = 0;
     {
-      std::unordered_map<std::uint32_t, Site, std::hash<std::uint32_t>, std::equal_to<>, PrivateAllocator<std::pair<const std::uint32_t, Site>>> byStack;
+      std::unordered_map<
+        std::uint32_t,
+        Site,
+        std::hash<std::uint32_t>,
+        std::equal_to<>,
+        PrivateAllocator<std::pair<const std::uint32_t, Site>>>
+        byStack;
       ::AcquireSRWLockShared(&gTracker->lock);
       for (const auto& [address, block] : gTracker->blocks) {
         if (block.play != play) {
@@ -211,9 +261,15 @@ namespace faf::editor::memtrace
         sites.push_back(site);
       }
     }
-    std::sort(sites.begin(), sites.end(), [](const Site& a, const Site& b) { return a.bytes > b.bytes; });
-    gpg::Logf("memtrace: play %u left %.2f MB in %u blocks alive; the largest call sites:", play,
-              static_cast<double>(totalBytes) / 1048576.0, totalBlocks);
+    std::sort(sites.begin(), sites.end(), [](const Site& a, const Site& b) {
+      return a.bytes > b.bytes;
+    });
+    gpg::Logf(
+      "memtrace: play %u left %.2f MB in %u blocks alive; the largest call sites:",
+      play,
+      static_cast<double>(totalBytes) / 1048576.0,
+      totalBlocks
+    );
     for (int i = 0; i < count && i < static_cast<int>(sites.size()); ++i) {
       Frames frames{};
       ::AcquireSRWLockShared(&gTracker->lock);
@@ -232,8 +288,12 @@ namespace faf::editor::memtrace
         where += (shown == 0 ? "" : " < ") + text;
         ++shown;
       }
-      gpg::Logf("memtrace:   %8.1f KB in %6u blocks: %s", static_cast<double>(sites[static_cast<std::size_t>(i)].bytes) / 1024.0,
-                sites[static_cast<std::size_t>(i)].blocks, where.c_str());
+      gpg::Logf(
+        "memtrace:   %8.1f KB in %6u blocks: %s",
+        static_cast<double>(sites[static_cast<std::size_t>(i)].bytes) / 1024.0,
+        sites[static_cast<std::size_t>(i)].blocks,
+        where.c_str()
+      );
     }
     --tInside;
   }

@@ -24,7 +24,9 @@ namespace faf::editor
 {
   namespace
   {
-    const char* KindName(const SelectionProperties::Kind kind)
+    const char* KindName(
+      const SelectionProperties::Kind kind
+    )
     {
       switch (kind) {
       case SelectionProperties::Kind::Marker:
@@ -40,7 +42,9 @@ namespace faf::editor
       }
     }
 
-    ImVec4 KindColour(const SelectionProperties::Kind kind)
+    ImVec4 KindColour(
+      const SelectionProperties::Kind kind
+    )
     {
       switch (kind) {
       case SelectionProperties::Kind::Marker:
@@ -118,8 +122,9 @@ namespace faf::editor
       if (!picture.empty()) {
         mTools.Library().Pump(2);
         const float side = ImGui::GetFrameHeight() * 2.6f;
-        const std::uint64_t image = now.kind == SelectionProperties::Kind::Prop ? mTools.PropPicture(picture)
-                                                                                 : mTools.Library().Thumbnail(picture, true);
+        const std::uint64_t image = now.kind == SelectionProperties::Kind::Prop
+          ? mTools.PropPicture(picture)
+          : mTools.Library().Thumbnail(picture, true);
         const ImVec2 at = ImGui::GetCursorScreenPos();
         if (image != 0U) {
           ImGui::Image(static_cast<ImTextureID>(image), ImVec2(side, side));
@@ -156,8 +161,10 @@ namespace faf::editor
       ImGui::SameLine();
       if (now.kind == SelectionProperties::Kind::Marker) {
         ImGui::SetNextItemWidth(-1.0f);
-        if (ImGui::InputText("##name", mPropertiesName, sizeof(mPropertiesName), ImGuiInputTextFlags_EnterReturnsTrue) &&
-            now.name != mPropertiesName && mPropertiesName[0] != '\0') {
+        if (
+          ImGui::InputText("##name", mPropertiesName, sizeof(mPropertiesName), ImGuiInputTextFlags_EnterReturnsTrue) &&
+          now.name != mPropertiesName && mPropertiesName[0] != '\0'
+        ) {
           PropertyEdit change;
           change.what = PropertyEdit::What::Name;
           change.value = mPropertiesName;
@@ -237,7 +244,8 @@ namespace faf::editor
           ImGui::TextDisabled("In the game: %s", use);
           ImGui::PopTextWrapPos();
         }
-        // Each field edited as its value: a number, a tick, a colour, a vector or text; written back in the save's form.
+        // Each field edited as its value: a number, a tick, a colour, a vector or text; written back in the save's
+        // form.
         mPropertiesFields.resize(now.fields.size());
         for (std::size_t i = 0; i < now.fields.size(); ++i) {
           const auto& [key, value] = now.fields[i];
@@ -286,12 +294,20 @@ namespace faf::editor
           } else if (held.rfind("STRING(", 0) == 0 && key == "color" && ValueString(held).size() == 8) {
             // A colour: the save's `aarrggbb` hex.
             const unsigned long argb = std::strtoul(ValueString(held).c_str(), nullptr, 16);
-            float colour[4] = {static_cast<float>((argb >> 16) & 0xFF) / 255.0f, static_cast<float>((argb >> 8) & 0xFF) / 255.0f,
-                               static_cast<float>(argb & 0xFF) / 255.0f, static_cast<float>((argb >> 24) & 0xFF) / 255.0f};
+            float colour[4] = {
+              static_cast<float>((argb >> 16) & 0xFF) / 255.0f,
+              static_cast<float>((argb >> 8) & 0xFF) / 255.0f,
+              static_cast<float>(argb & 0xFF) / 255.0f,
+              static_cast<float>((argb >> 24) & 0xFF) / 255.0f
+            };
             if (ImGui::ColorEdit4("##colour", colour, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_DisplayHex)) {
-              const auto byte = [](const float c) { return static_cast<unsigned>(std::lround(std::clamp(c, 0.0f, 1.0f) * 255.0f)); };
+              const auto byte = [](const float c) {
+                return static_cast<unsigned>(std::lround(std::clamp(c, 0.0f, 1.0f) * 255.0f));
+              };
               char hex[16];
-              (void)std::snprintf(hex, sizeof(hex), "%02x%02x%02x%02x", byte(colour[3]), byte(colour[0]), byte(colour[1]), byte(colour[2]));
+              (void)std::snprintf(
+                hex, sizeof(hex), "%02x%02x%02x%02x", byte(colour[3]), byte(colour[0]), byte(colour[1]), byte(colour[2])
+              );
               held = StringValue(hex);
             }
             if (ImGui::IsItemDeactivatedAfterEdit()) {
@@ -321,7 +337,10 @@ namespace faf::editor
         }
       }
       // An adaptive map: which army this resource spawns with, which option group it belongs to (_tables.lua).
-      if ((now.type == "Mass" || now.type == "Hydrocarbon") && ImGui::CollapsingHeader("Adaptive map", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (
+        (now.type == "Mass" || now.type == "Hydrocarbon") &&
+        ImGui::CollapsingHeader("Adaptive map", ImGuiTreeNodeFlags_DefaultOpen)
+      ) {
         const bool hydro = now.type == "Hydrocarbon";
         const std::vector<ScenarioTeam> teams = mDocument.Teams();
         const int slots = teams.empty() ? 0 : static_cast<int>(teams.front().armies.size());
@@ -331,10 +350,14 @@ namespace faf::editor
         if (adaptive && !ParseAdaptiveTables(mDocument.TablesText(), tables, error)) {
           ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.35f, 1.0f), "_tables.lua doesn't read: %s", error.c_str());
         } else if (!adaptive) {
-          HelpNote("Not an adaptive map. Adaptive maps (FAF's \"Ultimate maps\" script by CookieNoob and KeyBlue) spawn each "
-                   "player's resources only when that player is in the game, and let the lobby's options add or remove groups of "
-                   "resources. The editor writes the _tables.lua; the script's _script.lua and _options.lua come from an adaptive "
-                   "map (copy them into this map's folder).");
+          HelpNote(
+            "Not an adaptive map. Adaptive maps (FAF's \"Ultimate maps\" script by CookieNoob and KeyBlue) spawn each "
+            "player's resources only when that player is in the game, and let the lobby's options add or remove groups "
+            "of "
+            "resources. The editor writes the _tables.lua; the script's _script.lua and _options.lua come from an "
+            "adaptive "
+            "map (copy them into this map's folder)."
+          );
           if (ImGui::Button("Make this map adaptive", ImVec2(-1.0f, 0.0f))) {
             AdaptiveTables fresh;
             fresh.maxPlayers = std::max(slots, 1);
@@ -343,8 +366,13 @@ namespace faf::editor
             mDocument.SetTablesText(WithAdaptiveTables("", fresh));
           }
         } else if (AdaptiveEntry(now.name, hydro).empty()) {
-          // The script finds resources by name ("Mass 07" for the entry 7): a marker named otherwise can't be in a table.
-          ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "The script finds resources by name: \"%s 07\".", hydro ? "Hydrocarbon" : "Mass");
+          // The script finds resources by name ("Mass 07" for the entry 7): a marker named otherwise can't be in a
+          // table.
+          ImGui::TextColored(
+            ImVec4(0.95f, 0.75f, 0.30f, 1.0f),
+            "The script finds resources by name: \"%s 07\".",
+            hydro ? "Hydrocarbon" : "Mass"
+          );
           int highest = 0;
           const std::string prefix = hydro ? "Hydrocarbon " : "Mass ";
           for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
@@ -364,8 +392,11 @@ namespace faf::editor
           // Tables without the script that reads them do nothing in the game.
           if (AdaptiveTablesPath(mDocument.Script()).empty()) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
-            ImGui::TextWrapped("This map's _script.lua doesn't read its tables yet: put the adaptive _script.lua and "
-                               "_options.lua in its folder, importing %s.", mDocument.Facts().tablesPath.c_str());
+            ImGui::TextWrapped(
+              "This map's _script.lua doesn't read its tables yet: put the adaptive _script.lua and "
+              "_options.lua in its folder, importing %s.",
+              mDocument.Facts().tablesPath.c_str()
+            );
             ImGui::PopStyleColor();
           }
           // The edit: a copy of the tables changed, written into the file's text as one undo step.
@@ -389,7 +420,9 @@ namespace faf::editor
             }
           }
           const int armyCount = std::max({changed.maxPlayers, slots, static_cast<int>(byArmy.size())});
-          const auto armyName = [&](const int a) { return a == 0 ? std::string("Always (any players)") : "ARMY_" + std::to_string(a); };
+          const auto armyName = [&](const int a) {
+            return a == 0 ? std::string("Always (any players)") : "ARMY_" + std::to_string(a);
+          };
           row("Spawns with");
           if (ImGui::BeginCombo("##adaptivearmy", armyName(army).c_str())) {
             for (int a = 0; a <= armyCount; ++a) {
@@ -409,7 +442,8 @@ namespace faf::editor
             ImGui::EndCombo();
           }
 
-          // Option group: one table of the lobby's options and its group (the option's key k removes groups k and above).
+          // Option group: one table of the lobby's options and its group (the option's key k removes groups k and
+          // above).
           std::string table;
           int group = 0;
           for (const auto& [name, groups] : changed.options) {
@@ -435,7 +469,9 @@ namespace faf::editor
               }
             }
             if (!toTable.empty()) {
-              auto found = std::find_if(changed.options.begin(), changed.options.end(), [&](const auto& entry) { return entry.first == toTable; });
+              auto found = std::find_if(changed.options.begin(), changed.options.end(), [&](const auto& entry) {
+                return entry.first == toTable;
+              });
               if (found == changed.options.end()) {
                 changed.options.emplace_back(toTable, std::vector<std::vector<std::string>>{});
                 found = std::prev(changed.options.end());
@@ -453,7 +489,9 @@ namespace faf::editor
               place("", 0);
             }
             for (const OptionTable& option : KnownOptionTables()) {
-              if (option.hydro == hydro && ImGui::Selectable(option.label, table == option.name) && table != option.name) {
+              if (
+                option.hydro == hydro && ImGui::Selectable(option.label, table == option.name) && table != option.name
+              ) {
                 place(option.name, 1);
               }
             }
@@ -467,8 +505,10 @@ namespace faf::editor
             }
           }
           if (!hydro) {
-            bool forward = std::find(changed.forwardCrazyrush.begin(), changed.forwardCrazyrush.end(), now.name) != changed.forwardCrazyrush.end();
-            bool one = std::find(changed.crazyrushOne.begin(), changed.crazyrushOne.end(), now.name) != changed.crazyrushOne.end();
+            bool forward = std::find(changed.forwardCrazyrush.begin(), changed.forwardCrazyrush.end(), now.name) !=
+              changed.forwardCrazyrush.end();
+            bool one = std::find(changed.crazyrushOne.begin(), changed.crazyrushOne.end(), now.name) !=
+              changed.crazyrushOne.end();
             row("Crazyrush");
             if (ImGui::Checkbox("Forward", &forward)) {
               if (!remove(changed.forwardCrazyrush)) {
@@ -489,13 +529,19 @@ namespace faf::editor
             changed.maxPlayers = std::max(changed.maxPlayers, slots);
             mDocument.SetTablesText(WithAdaptiveTables(mDocument.TablesText(), changed));
           }
-          HelpNote("Spawns with: the resource is there only when that army's player is in the game. Option: the lobby's option "
-                   "of that name removes groups from its key up, so group 1 goes first. Written to _tables.lua as one undo step.");
+          HelpNote(
+            "Spawns with: the resource is there only when that army's player is in the game. Option: the lobby's "
+            "option "
+            "of that name removes groups from its key up, so group 1 goes first. Written to _tables.lua as one undo "
+            "step."
+          );
           if (ImGui::Button("The whole map's adaptive setup (Map panel)", ImVec2(-1.0f, 0.0f))) {
             mShowMap = true;
             ImGui::SetWindowFocus("Map");
           }
-          ImGui::SetItemTooltip("Every army's resources, the option tables and their groups, and the lobby options in _options.lua");
+          ImGui::SetItemTooltip(
+            "Every army's resources, the option tables and their groups, and the lobby options in _options.lua"
+          );
         }
       }
       break;
@@ -533,7 +579,9 @@ namespace faf::editor
     default:
       break;
     }
-    HelpNote("Drag a value or type one (Enter); each change is one undo step. With several selected, the first is edited.");
+    HelpNote(
+      "Drag a value or type one (Enter); each change is one undo step. With several selected, the first is edited."
+    );
     mPropertiesEditing = active;
     ImGui::End();
   }

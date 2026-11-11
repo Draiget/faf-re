@@ -33,7 +33,8 @@ namespace faf::remote::net
    * after it; `datagram` holds kHeaderSize + payloadSize + kTagSize bytes and its header is
    * already written (with kFlagEncrypted).
    */
-  void SealDatagram(const ChannelKey& key, std::uint32_t sequence, std::uint8_t* datagram, std::size_t payloadSize) noexcept;
+  void
+  SealDatagram(const ChannelKey& key, std::uint32_t sequence, std::uint8_t* datagram, std::size_t payloadSize) noexcept;
 
   /**
    * Checks the tag of a `size`-byte sealed datagram and decrypts its payload into `plain`
@@ -41,7 +42,11 @@ namespace faf::remote::net
    * is too short or was not sealed with `key` and `sequence` exactly as received.
    */
   [[nodiscard]] bool OpenDatagram(
-    const ChannelKey& key, std::uint32_t sequence, const std::uint8_t* datagram, std::size_t size, std::uint8_t* plain
+    const ChannelKey& key,
+    std::uint32_t sequence,
+    const std::uint8_t* datagram,
+    std::size_t size,
+    std::uint8_t* plain
   ) noexcept;
 
   /** Overwrites key material so it does not linger in freed memory. */

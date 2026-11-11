@@ -71,9 +71,14 @@ namespace faf::editor
 
   /**
    * The bodies as the game fills them (`STIMap::InstallWaterBodies`, the same defaults and the same skips), with the
-   * game's lines for the skipped ones in `log`. `deepBelow` and `abyssBelow` are the sea's distances below its level, or
-   * 2.5 and 15 on a map without a sea. `bodyOf`, when given, gets the index in `bodies` of each one returned.
+   * game's lines for the skipped ones in `log`. `deepBelow` and `abyssBelow` are the sea's distances below its level,
+   * or 2.5 and 15 on a map without a sea. `bodyOf`, when given, gets the index in `bodies` of each one returned.
    */
-  std::vector<moho::SWaterBodyDesc> WaterBodyDescs(const std::vector<WaterBody>& bodies, float deepBelow, float abyssBelow,
-                                                   std::vector<std::string>& log, std::vector<std::size_t>* bodyOf = nullptr);
+  std::vector<moho::SWaterBodyDesc> WaterBodyDescs(
+    const std::vector<WaterBody>& bodies,
+    float deepBelow,
+    float abyssBelow,
+    std::vector<std::string>& log,
+    std::vector<std::size_t>* bodyOf = nullptr
+  );
 } // namespace faf::editor

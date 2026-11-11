@@ -7,7 +7,9 @@
 
 namespace faf::editor
 {
-  std::vector<TerrainTypeInfo> ParseTerrainTypes(const std::string& lua)
+  std::vector<TerrainTypeInfo> ParseTerrainTypes(
+    const std::string& lua
+  )
   {
     std::vector<TerrainTypeInfo> types;
     const std::regex head(R"(Name\s*=\s*'([^']*)'\s*,\s*TypeCode\s*=\s*(\d+))");
@@ -41,7 +43,12 @@ namespace faf::editor
     return types;
   }
 
-  std::vector<TerrainTypeRun> TerrainTypeRuns(const std::uint8_t* const grid, const int width, const int height, const std::uint8_t skip)
+  std::vector<TerrainTypeRun> TerrainTypeRuns(
+    const std::uint8_t* const grid,
+    const int width,
+    const int height,
+    const std::uint8_t skip
+  )
   {
     std::vector<TerrainTypeRun> runs;
     if (grid == nullptr) {
@@ -65,8 +72,15 @@ namespace faf::editor
     return runs;
   }
 
-  int PaintTerrainType(std::uint8_t* const grid, const int width, const int height, const float x, const float z, const float radius,
-                       const std::uint8_t code)
+  int PaintTerrainType(
+    std::uint8_t* const grid,
+    const int width,
+    const int height,
+    const float x,
+    const float z,
+    const float radius,
+    const std::uint8_t code
+  )
   {
     if (grid == nullptr || radius <= 0.0f) {
       return 0;
@@ -83,7 +97,8 @@ namespace faf::editor
         if (dx * dx + dz * dz > radius * radius) {
           continue;
         }
-        std::uint8_t& cell = grid[static_cast<std::size_t>(cz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(cx)];
+        std::uint8_t& cell =
+          grid[static_cast<std::size_t>(cz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(cx)];
         if (cell != code) {
           cell = code;
           ++changed;

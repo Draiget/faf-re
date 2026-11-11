@@ -43,9 +43,7 @@ namespace moho
      * Initializes receiver links, steals optional stream ownership, and stores
      * sink/rules/lua decode dependencies.
      */
-    CDecoder(
-      ICommandSink* sink, fa::auto_ptr<gpg::Stream>& stream, RRuleGameRules* rules, LuaPlus::LuaState* luaState
-    );
+    CDecoder(ICommandSink* sink, fa::auto_ptr<gpg::Stream>& stream, RRuleGameRules* rules, LuaPlus::LuaState* luaState);
 
     /**
      * Address: 0x006E40A0 (FUN_006E40A0)
@@ -234,7 +232,7 @@ namespace moho
     void DecodeLuaObject(gpg::BinaryReader& reader, LuaPlus::LuaObject& out);
 
   public:
-    ICommandSink* mSink = nullptr;          // +0x0C  the sim
+    ICommandSink* mSink = nullptr; // +0x0C  the sim
     // +0x10  the replay recording: every received message is appended to it,
     // flushed at each `CMDST_Advance` and closed at `CMDST_EndGame`. Null when
     // the session does not record.

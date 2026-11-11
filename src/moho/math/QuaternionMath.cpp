@@ -14,7 +14,9 @@ namespace moho
    * its three rows, storing the rotated vector in `dest`.
    */
   Wm3::Vector3f* MultQuadVec(
-    Wm3::Vector3f* const dest, const Wm3::Vector3f* const vec, const Wm3::Quaternionf* const quat
+    Wm3::Vector3f* const dest,
+    const Wm3::Vector3f* const vec,
+    const Wm3::Quaternionf* const quat
   )
   {
     Wm3::Vector3f rows[3]{};
@@ -41,7 +43,10 @@ namespace moho
    * single trailing subtraction. Float addition does not associate, so the
    * grouping is kept rather than normalised.
    */
-  Wm3::Quaternionf MultiplyQuat(const Wm3::Quaternionf& a, const Wm3::Quaternionf& b) noexcept
+  Wm3::Quaternionf MultiplyQuat(
+    const Wm3::Quaternionf& a,
+    const Wm3::Quaternionf& b
+  ) noexcept
   {
     Wm3::Quaternionf result{};
     result.w = ((a.w * b.w - a.x * b.x) - a.y * b.y) - a.z * b.z;
@@ -57,7 +62,9 @@ namespace moho
    * Scalar-first conjugate: keep `.w`, negate `.x`/`.y`/`.z`, exactly as
    * `VTransform::Inverse` (0x0046FBF0) does at 0x0046FBFB..0x0046FC12.
    */
-  Wm3::Quaternionf ConjugateQuat(const Wm3::Quaternionf& q) noexcept
+  Wm3::Quaternionf ConjugateQuat(
+    const Wm3::Quaternionf& q
+  ) noexcept
   {
     Wm3::Quaternionf result{};
     result.w = q.w;
@@ -119,7 +126,9 @@ namespace moho
    * What it does:
    * Wraps an angle in radians into the signed range `[-pi, pi]`.
    */
-  float NormalizeAngleSignedRadians(const float angleRadians) noexcept
+  float NormalizeAngleSignedRadians(
+    const float angleRadians
+  ) noexcept
   {
     // A float argument is exact in double, and the remainder of two floats is
     // a float, so the inlined form's extra precision never shows here.
@@ -130,7 +139,9 @@ namespace moho
    * Inlined form of 0x0062FB50 (e.g. 0x00630CC5..0x00630CFD in
    * CAimManipulator::SetFiringArc), on an argument still on the x87 stack.
    */
-  float NormalizeAngleSignedRadiansX87(const double angleRadians) noexcept
+  float NormalizeAngleSignedRadiansX87(
+    const double angleRadians
+  ) noexcept
   {
     constexpr float kPi = 3.1415927f;
     constexpr float kTwoPi = 6.2831855f;
@@ -207,13 +218,14 @@ namespace moho
    * Returns true when every quaternion lane differs by at most 1e-6 from the
    * corresponding lane in rhs.
    */
-  bool QuatsNearEqual(const Wm3::Quaternionf& lhs, const Wm3::Quaternionf& rhs) noexcept
+  bool QuatsNearEqual(
+    const Wm3::Quaternionf& lhs,
+    const Wm3::Quaternionf& rhs
+  ) noexcept
   {
     constexpr float kEps = 1.0e-6f;
-    return std::fabs(lhs.x - rhs.x) <= kEps
-        && std::fabs(lhs.y - rhs.y) <= kEps
-        && std::fabs(lhs.z - rhs.z) <= kEps
-        && std::fabs(lhs.w - rhs.w) <= kEps;
+    return std::fabs(lhs.x - rhs.x) <= kEps && std::fabs(lhs.y - rhs.y) <= kEps && std::fabs(lhs.z - rhs.z) <= kEps &&
+      std::fabs(lhs.w - rhs.w) <= kEps;
   }
 
   /**
@@ -227,14 +239,16 @@ namespace moho
    * 1e-6) every lane is zeroed instead of being reset to identity, matching
    * the binary precisely.
    */
-  void NormalizeQuatInPlace(Wm3::Quaternionf* const quat) noexcept
+  void NormalizeQuatInPlace(
+    Wm3::Quaternionf* const quat
+  ) noexcept
   {
     constexpr float kEps = 1.0e-6f;
 
     // The binary adds squared lanes in storage order (w, x, y, z).
     // Changing that order changes the rounded length and simulation rotations.
-    const float length = std::sqrt(
-        (quat->w * quat->w) + (quat->x * quat->x) + (quat->y * quat->y) + (quat->z * quat->z));
+    const float length =
+      std::sqrt((quat->w * quat->w) + (quat->x * quat->x) + (quat->y * quat->y) + (quat->z * quat->z));
 
     // `fcompi` + `jbe` at 0x004EDAF6..0x004EDAFA: a NaN length zeroes too.
     if (!(length > kEps)) {
@@ -263,7 +277,10 @@ namespace moho
    * Converts one 3x3 basis matrix (three row vectors) into a quaternion using
    * the binary trace/max-diagonal branch logic.
    */
-  Wm3::Quaternionf* MatrixToQuat(const Wm3::Vector3f* const matrixRows, Wm3::Quaternionf* const out) noexcept
+  Wm3::Quaternionf* MatrixToQuat(
+    const Wm3::Vector3f* const matrixRows,
+    Wm3::Quaternionf* const out
+  ) noexcept
   {
     const auto lane = [matrixRows](const int row, const int col) noexcept -> float {
       const Wm3::Vector3f& r = matrixRows[row];
@@ -320,8 +337,10 @@ namespace moho
    * Converts one 3x3 basis matrix (row lanes) into quaternion output using
    * the canonical trace/dominant-axis branch variant.
    */
-  Wm3::Quaternionf*
-  MatrixRowsToQuatCanonical(const Wm3::Vector3f* const matrixRows, Wm3::Quaternionf* const out) noexcept
+  Wm3::Quaternionf* MatrixRowsToQuatCanonical(
+    const Wm3::Vector3f* const matrixRows,
+    Wm3::Quaternionf* const out
+  ) noexcept
   {
     const auto lane = [matrixRows](const int row, const int col) noexcept -> float {
       const Wm3::Vector3f& r = matrixRows[row];
@@ -357,9 +376,7 @@ namespace moho
     const int axisB = kCrossShuffle[dominantAxis];
     const int axisC = kCrossShuffle[axisB];
     // 0x004F0D91..0x004F0DA0 subtracts the other diagonal lanes separately.
-    const float root = std::sqrt(
-      ((lane(dominantAxis, dominantAxis) - lane(axisB, axisB)) - lane(axisC, axisC)) + 1.0f
-    );
+    const float root = std::sqrt(((lane(dominantAxis, dominantAxis) - lane(axisB, axisB)) - lane(axisC, axisC)) + 1.0f);
     const float invRoot = 0.5f / root;
 
     float vectorComponents[3] = {0.0f, 0.0f, 0.0f};
@@ -381,8 +398,10 @@ namespace moho
    * Thin thunk alias that forwards one row-major 3x3 matrix conversion request
    * to the canonical matrix-to-quaternion path.
    */
-  [[maybe_unused]] Wm3::Quaternionf*
-  MatrixRowsToQuatCanonicalThunk(const Wm3::Vector3f* const matrixRows, Wm3::Quaternionf* const out) noexcept
+  [[maybe_unused]] Wm3::Quaternionf* MatrixRowsToQuatCanonicalThunk(
+    const Wm3::Vector3f* const matrixRows,
+    Wm3::Quaternionf* const out
+  ) noexcept
   {
     return MatrixRowsToQuatCanonical(matrixRows, out);
   }
@@ -394,8 +413,10 @@ namespace moho
    * Transposes one 3x3 matrix from column lanes into row lanes, then converts
    * the transposed rows with `MatrixRowsToQuatCanonical`.
    */
-  Wm3::Quaternionf*
-  MatrixColumnsToQuatCanonical(const Wm3::Vector3f* const matrixColumns, Wm3::Quaternionf* const out) noexcept
+  Wm3::Quaternionf* MatrixColumnsToQuatCanonical(
+    const Wm3::Vector3f* const matrixColumns,
+    Wm3::Quaternionf* const out
+  ) noexcept
   {
     Wm3::Vector3f rows[3]{};
     rows[0] = {matrixColumns[0].x, matrixColumns[1].x, matrixColumns[2].x};
@@ -481,10 +502,11 @@ namespace moho
    * of q1 into the output. Writes the result into *out and returns it.
    */
   Wm3::Quaternionf* SLERP(
-      const Wm3::Quaternionf* const q2,
-      const Wm3::Quaternionf* const q1,
-      Wm3::Quaternionf* const out,
-      const float t) noexcept
+    const Wm3::Quaternionf* const q2,
+    const Wm3::Quaternionf* const q1,
+    Wm3::Quaternionf* const out,
+    const float t
+  ) noexcept
   {
     // Coincident endpoints: copy the first input lane-for-lane and exit.
     if (QuatsNearEqual(*q1, *q2)) {
@@ -529,8 +551,10 @@ namespace moho
     if ((1.0f - dot) > kSpreadEpsilon) {
       const double angleExact = fa::acos(static_cast<double>(dot));
       const float angle = static_cast<float>(angleExact);
-      if (angleExact >= static_cast<double>(kSpreadEpsilon) && (kPi - angle) >= kSpreadEpsilon
-          && std::isfinite(angleExact)) {
+      if (
+        angleExact >= static_cast<double>(kSpreadEpsilon) && (kPi - angle) >= kSpreadEpsilon &&
+        std::isfinite(angleExact)
+      ) {
         // 0x004EBD95..0x004EBDF2: the sines, `1/sin(angle)`, both weights
         // and every `q1*w1 + rhs*w2` stay on the x87 stack (24-bit mantissa,
         // extended exponent) until the one float store per lane. Rounding
@@ -552,7 +576,6 @@ namespace moho
     return out;
   }
 
-
   /**
    * Address: 0x004EB740 (FUN_004EB740, fun_RotateQuat)
    *
@@ -564,7 +587,10 @@ namespace moho
    * axis by the given angle (radians). Returns false and leaves the quaternion
    * unchanged if the half-angle exceeds pi/2 or the axis component is too short.
    */
-  bool RotateQuatByAngle(Wm3::Quaternionf* quat, float rads)
+  bool RotateQuatByAngle(
+    Wm3::Quaternionf* quat,
+    float rads
+  )
   {
     constexpr float kHalfPi = 1.5707964f;
 
@@ -631,7 +657,11 @@ namespace moho
    * not: `RotateQuatByAngle` writes cos/sin scalar-first, `QuatCrossAdd`
    * (0x0044F880) now does too, and this body consumes both that way.
    */
-  void QuatFromVecRot(Wm3::Quaternionf* quat, const Wm3::Vector3f* refAxis, float rads)
+  void QuatFromVecRot(
+    Wm3::Quaternionf* quat,
+    const Wm3::Vector3f* refAxis,
+    float rads
+  )
   {
     const Wm3::Vector3f refVec{refAxis->x, refAxis->y, refAxis->z};
 
@@ -722,7 +752,10 @@ namespace moho
    * Converts one axis-angle vector into a quaternion. The vector direction is
    * normalized to become the axis and the magnitude becomes the rotation angle.
    */
-  Wm3::Quaternionf* QuatFromAxisAngleVector(Wm3::Quaternionf* const quat, Wm3::Vector3f axisAngle) noexcept
+  Wm3::Quaternionf* QuatFromAxisAngleVector(
+    Wm3::Quaternionf* const quat,
+    Wm3::Vector3f axisAngle
+  ) noexcept
   {
     const float angle = Wm3::Vector3f::Normalize(&axisAngle);
     const float halfAngle = angle * 0.5f;
@@ -816,7 +849,9 @@ namespace moho
    * consecutive `Wm3::Vector3f` rows. `result` must not alias `a` or `b`.
    */
   Wm3::Vector3f* Multiply3x3RowMatrices(
-    Wm3::Vector3f* const result, const Wm3::Vector3f* const a, const Wm3::Vector3f* const b
+    Wm3::Vector3f* const result,
+    const Wm3::Vector3f* const a,
+    const Wm3::Vector3f* const b
   ) noexcept
   {
     // 0x006D26D2..0x006D26FA: each element starts from a `+0.0` accumulator
@@ -847,7 +882,10 @@ namespace moho
    * heading/pitch/roll Euler angles in radians: `outMatrix = headingY * pitchX * rollZ`.
    */
   Wm3::Vector3f* BuildRotationMatrixFromEulerHPR(
-    Wm3::Vector3f* const outMatrix, const float heading, const float pitch, const float roll
+    Wm3::Vector3f* const outMatrix,
+    const float heading,
+    const float pitch,
+    const float roll
   ) noexcept
   {
     const float ch = fa::cosf(heading);
@@ -907,7 +945,10 @@ namespace moho
    * Float addition does not associate; the diagonal sums keep the binary's
    * operand order (`zz+yy`, `zz+xx`, `yy+xx`).
    */
-  Wm3::Vector3f* QuatToMatrix(const Wm3::Quaternionf* const quat, Wm3::Vector3f* const outMatrix) noexcept
+  Wm3::Vector3f* QuatToMatrix(
+    const Wm3::Quaternionf* const quat,
+    Wm3::Vector3f* const outMatrix
+  ) noexcept
   {
     const float w = quat->w;
     const float x = quat->x;
@@ -950,7 +991,9 @@ namespace moho
      * path. Its only caller in the binary is `BuildTiltShortestArcDelta`
      * below, which is why it travelled with it out of `Entity.cpp`.
      */
-    [[nodiscard]] double CoordsAbsFloat(const float value) noexcept
+    [[nodiscard]] double CoordsAbsFloat(
+      const float value
+    ) noexcept
     {
       return std::fabs(static_cast<double>(value));
     }
@@ -969,7 +1012,13 @@ namespace moho
      * together: `outA = a / sqrt(lengthSq)`, `outB = b / sqrt(lengthSq)`.
      * Same single caller as `CoordsAbsFloat`.
      */
-    void CoordsScaleByInvSqrt(const float lengthSq, const float a, const float b, float& outA, float& outB) noexcept
+    void CoordsScaleByInvSqrt(
+      const float lengthSq,
+      const float a,
+      const float b,
+      float& outA,
+      float& outB
+    ) noexcept
     {
       const float lanes[3] = {a, b, 0.0f};
       float scaled[3];
@@ -1000,7 +1049,9 @@ namespace moho
    * (see `CoordsScaleByInvSqrt`).
    */
   Wm3::Quaternionf* BuildTiltShortestArcDelta(
-    const Wm3::Vector3f& targetNormal, Wm3::Quaternionf* const outDelta, const Wm3::Vector3f& currentUp
+    const Wm3::Vector3f& targetNormal,
+    Wm3::Quaternionf* const outDelta,
+    const Wm3::Vector3f& currentUp
   ) noexcept
   {
     if (outDelta == nullptr) {

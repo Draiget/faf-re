@@ -33,7 +33,9 @@ namespace
    * Walks one weak-selection set, classifies live units by movement layer, and
    * returns formation-type lane `0` (surface), `1` (air), or `2` (mixed).
    */
-  std::int32_t DetermineSelectionFormationType(moho::WeakSet<moho::UserUnit>& selection)
+  std::int32_t DetermineSelectionFormationType(
+    moho::WeakSet<moho::UserUnit>& selection
+  )
   {
     constexpr std::int32_t kFormationTypeSurface = 0;
     constexpr std::int32_t kFormationTypeAir = 1;
@@ -147,7 +149,10 @@ namespace moho
    * and pushes it into the live formation instance via SetOrientation, unless
    * the UI reports NIS mode (in which case the formation is reset).
    */
-  void CFormation::UpdateOrientation(const Wm3::Vector3f& mouseWorldPos, CFormation* const formation)
+  void CFormation::UpdateOrientation(
+    const Wm3::Vector3f& mouseWorldPos,
+    CFormation* const formation
+  )
   {
     if (!formation->mReady || formation->mCurInstance == nullptr) {
       return;
@@ -188,9 +193,7 @@ namespace moho
     formation->mMousePos = mouseWorldPos;
 
     const Wm3::Vector3f directionVector(
-      mouseWorldPos.x - formation->mFinish.x,
-      0.0f,
-      mouseWorldPos.z - formation->mFinish.z
+      mouseWorldPos.x - formation->mFinish.x, 0.0f, mouseWorldPos.z - formation->mFinish.z
     );
     formation->mDirection = COORDS_Orient(directionVector);
 

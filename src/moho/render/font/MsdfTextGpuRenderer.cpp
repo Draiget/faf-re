@@ -187,7 +187,9 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
     return mSupported;
   }
 
-  void MsdfTextGpuRenderer::PrepareFor(CD3DPrimBatcher& batcher)
+  void MsdfTextGpuRenderer::PrepareFor(
+    CD3DPrimBatcher& batcher
+  )
   {
     if (!mPending.empty() && (mBatcher != &batcher || mAlphaMultiplier != batcher.mAlphaMultiplier)) {
       Flush();
@@ -200,7 +202,9 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
     }
   }
 
-  void MsdfTextGpuRenderer::Push(const MsdfUiQuad& quad)
+  void MsdfTextGpuRenderer::Push(
+    const MsdfUiQuad& quad
+  )
   {
     if (mPending.size() >= kMaxPendingQuads) {
       Flush();
@@ -209,7 +213,10 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
     gMsdfTextPending = true;
   }
 
-  bool MsdfTextGpuRenderer::BeginString(CD3DPrimBatcher& batcher, const boost::shared_ptr<CD3DDynamicTextureSheet>& page)
+  bool MsdfTextGpuRenderer::BeginString(
+    CD3DPrimBatcher& batcher,
+    const boost::shared_ptr<CD3DDynamicTextureSheet>& page
+  )
   {
     ID3DTextureSheet::TextureHandle texture;
     (void)page->GetTexture(texture);
@@ -230,14 +237,19 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
     return true;
   }
 
-  void MsdfTextGpuRenderer::AddGlyph(const MsdfUiQuad& glyph)
+  void MsdfTextGpuRenderer::AddGlyph(
+    const MsdfUiQuad& glyph
+  )
   {
     Push(glyph);
   }
 
   bool MsdfTextGpuRenderer::QueueImageQuad(
-    CD3DPrimBatcher& batcher, const CD3DPrimBatcher::Vertex& topLeft, const CD3DPrimBatcher::Vertex& topRight,
-    const CD3DPrimBatcher::Vertex& bottomRight, const CD3DPrimBatcher::Vertex& bottomLeft
+    CD3DPrimBatcher& batcher,
+    const CD3DPrimBatcher::Vertex& topLeft,
+    const CD3DPrimBatcher::Vertex& topRight,
+    const CD3DPrimBatcher::Vertex& bottomRight,
+    const CD3DPrimBatcher::Vertex& bottomLeft
   )
   {
     if (!ren_GpuUiQuads) {
@@ -254,8 +266,9 @@ float4 MsdfTextPS(QuadVertex input) : SV_Target
     }
     if (mCheckedTechnique.get() != effect->mCurrentTechnique.get()) {
       mCheckedTechnique = effect->mCurrentTechnique;
-      mCheckedTechniqueAllowsQuads = mCheckedTechnique && IsActive() && std::strcmp(effect->mName.c_str(), "primbatcher") == 0
-        && std::strcmp(mCheckedTechnique->GetName()->c_str(), kUiTechnique) == 0;
+      mCheckedTechniqueAllowsQuads = mCheckedTechnique && IsActive() &&
+        std::strcmp(effect->mName.c_str(), "primbatcher") == 0 &&
+        std::strcmp(mCheckedTechnique->GetName()->c_str(), kUiTechnique) == 0;
     }
     if (!mCheckedTechniqueAllowsQuads) {
       return false;

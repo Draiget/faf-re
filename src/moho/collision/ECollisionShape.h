@@ -59,4 +59,4 @@ namespace moho
    * Runs `ECollisionShape` type preregistration.
    */
   void register_ECollisionShapeTypeInfo();
-}
+} // namespace moho

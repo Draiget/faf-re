@@ -65,7 +65,9 @@ const char* CAiAttackerImplTypeInfo::GetName() const
 /**
  * Address: 0x005DE970 (FUN_005DE970, Moho::CAiAttackerImplTypeInfo::AddBase_IAiAttacker)
  */
-void CAiAttackerImplTypeInfo::AddBase_IAiAttacker(gpg::RType* const typeInfo)
+void CAiAttackerImplTypeInfo::AddBase_IAiAttacker(
+  gpg::RType* const typeInfo
+)
 {
   gpg::AddBaseIfPresent(typeInfo, gpg::RTypeOf<IAiAttacker>(), 0x00);
 }
@@ -75,9 +77,13 @@ void CAiAttackerImplTypeInfo::AddBase_IAiAttacker(gpg::RType* const typeInfo)
  *
  * Offset 0x0C: CScriptObject is the second base, after IAiAttacker at 0.
  */
-void CAiAttackerImplTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
+void CAiAttackerImplTypeInfo::AddBase_CScriptObject(
+  gpg::RType* const typeInfo
+)
 {
-  gpg::AddBaseIfPresent(typeInfo, gpg::RTypeOf<CScriptObject>(), gpg::BaseSubobjectOffset<CAiAttackerImpl, CScriptObject>());
+  gpg::AddBaseIfPresent(
+    typeInfo, gpg::RTypeOf<CScriptObject>(), gpg::BaseSubobjectOffset<CAiAttackerImpl, CScriptObject>()
+  );
 }
 
 /**
@@ -109,4 +115,7 @@ void moho::register_CAiAttackerImplTypeInfo()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAiAttackerImplTypeInfo_5671da, moho::register_CAiAttackerImplTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAiAttackerImplTypeInfo_5671da,
+  moho::register_CAiAttackerImplTypeInfo
+)

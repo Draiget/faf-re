@@ -141,16 +141,18 @@ namespace moho
     std::uint8_t mPad05_07[0x03]{};
     /** The read-back copy of the colour target, 512 x 512 (EnsureTargets). */
     boost::shared_ptr<gpg::gal::Texture> mThumbnailTexture; // +0x08
-    boost::shared_ptr<ID3DRenderTarget> mColorTarget;  // +0x10
-    boost::shared_ptr<ID3DDepthStencil> mDepthStencil; // +0x18
-    std::uint32_t mNextRequestId;                      // +0x20
-    MeshThumbnailQueue mPendingRequests;               // +0x24
-    MeshThumbnailQueue mCompletedRequests;             // +0x30
+    boost::shared_ptr<ID3DRenderTarget> mColorTarget;       // +0x10
+    boost::shared_ptr<ID3DDepthStencil> mDepthStencil;      // +0x18
+    std::uint32_t mNextRequestId;                           // +0x20
+    MeshThumbnailQueue mPendingRequests;                    // +0x24
+    MeshThumbnailQueue mCompletedRequests;                  // +0x30
   };
 
   /**
-   * Address: 0x007FA620 (FUN_007FA620, ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z)
-   * Mangled: ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z
+   * Address: 0x007FA620 (FUN_007FA620,
+   * ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z)
+   * Mangled:
+   * ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z
    *
    * What it does:
    * Forwards one thumbnail request into the active global viewport renderer queue.
@@ -164,12 +166,17 @@ namespace moho
     const gpg::Rect2f& outputRect
   );
 
-  static_assert(sizeof(boost::shared_ptr<gpg::gal::Texture>) == 0x08, "boost::shared_ptr<gpg::gal::Texture> size must be 0x08");
   static_assert(
-    sizeof(boost::shared_ptr<ID3DRenderTarget>) == 0x08, "boost::shared_ptr<ID3DRenderTarget> size must be 0x08"
+    sizeof(boost::shared_ptr<gpg::gal::Texture>) == 0x08,
+    "boost::shared_ptr<gpg::gal::Texture> size must be 0x08"
   );
   static_assert(
-    sizeof(boost::shared_ptr<ID3DDepthStencil>) == 0x08, "boost::shared_ptr<ID3DDepthStencil> size must be 0x08"
+    sizeof(boost::shared_ptr<ID3DRenderTarget>) == 0x08,
+    "boost::shared_ptr<ID3DRenderTarget> size must be 0x08"
+  );
+  static_assert(
+    sizeof(boost::shared_ptr<ID3DDepthStencil>) == 0x08,
+    "boost::shared_ptr<ID3DDepthStencil> size must be 0x08"
   );
   static_assert(offsetof(MeshThumbnailNode, next) == 0x00, "MeshThumbnailNode::next offset must be 0x00");
   static_assert(offsetof(MeshThumbnailNode, prev) == 0x04, "MeshThumbnailNode::prev offset must be 0x04");
@@ -188,13 +195,16 @@ namespace moho
     "MeshThumbnailRenderer::mThumbnailTexture offset must be 0x08"
   );
   static_assert(
-    offsetof(MeshThumbnailRenderer, mColorTarget) == 0x10, "MeshThumbnailRenderer::mColorTarget offset must be 0x10"
+    offsetof(MeshThumbnailRenderer, mColorTarget) == 0x10,
+    "MeshThumbnailRenderer::mColorTarget offset must be 0x10"
   );
   static_assert(
-    offsetof(MeshThumbnailRenderer, mDepthStencil) == 0x18, "MeshThumbnailRenderer::mDepthStencil offset must be 0x18"
+    offsetof(MeshThumbnailRenderer, mDepthStencil) == 0x18,
+    "MeshThumbnailRenderer::mDepthStencil offset must be 0x18"
   );
   static_assert(
-    offsetof(MeshThumbnailRenderer, mNextRequestId) == 0x20, "MeshThumbnailRenderer::mNextRequestId offset must be 0x20"
+    offsetof(MeshThumbnailRenderer, mNextRequestId) == 0x20,
+    "MeshThumbnailRenderer::mNextRequestId offset must be 0x20"
   );
   static_assert(
     offsetof(MeshThumbnailRenderer, mPendingRequests) == 0x24,

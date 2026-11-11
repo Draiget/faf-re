@@ -46,7 +46,10 @@ namespace moho
    * this engine's scalar-first convention (it is copied byte-for-byte to/from
    * `VTransform::orient_` both here and in `SetTransform`, below).
    */
-  VTransform* BuildTransformFromSPhysBody(VTransform* const outTransform, const SPhysBody* const body)
+  VTransform* BuildTransformFromSPhysBody(
+    VTransform* const outTransform,
+    const SPhysBody* const body
+  )
   {
     if (!outTransform || !body) {
       return outTransform;
@@ -171,9 +174,7 @@ namespace moho
 
     const float massScale = params->mass;
     const Wm3::Vec3f scaledInertia{
-      params->inertiaTensor.x * massScale,
-      params->inertiaTensor.y * massScale,
-      params->inertiaTensor.z * massScale
+      params->inertiaTensor.x * massScale, params->inertiaTensor.y * massScale, params->inertiaTensor.z * massScale
     };
     (void)ReciprocalVectorLanes(&body->mInvInertiaTensor, &scaledInertia);
     return params;
@@ -214,7 +215,9 @@ namespace moho
    * Computes one scale factor as `(lane34 * 0.5f) / ((lane24*lane28) - (lane2C*lane20))`,
    * returning `0.0f` when the denominator is zero.
    */
-  [[maybe_unused]] [[nodiscard]] float ComputeHalfScaleOverCrossDeterminant(const float* const laneBase) noexcept
+  [[maybe_unused]] [[nodiscard]] float ComputeHalfScaleOverCrossDeterminant(
+    const float* const laneBase
+  ) noexcept
   {
     const float denominator = (laneBase[9] * laneBase[10]) - (laneBase[11] * laneBase[8]);
     if (denominator == 0.0f) {
@@ -231,7 +234,10 @@ namespace moho
    * Initializes one body from constants + physical params, seeding identity
    * orientation and zeroed position/velocity/impulse lanes.
    */
-  SPhysBody::SPhysBody(SPhysConstants* const constants, const SPhysBodyParams& params)
+  SPhysBody::SPhysBody(
+    SPhysConstants* const constants,
+    const SPhysBodyParams& params
+  )
     : mConstants(nullptr)
     , mMass(1.0f)
     , mInvInertiaTensor(1.0f, 1.0f, 1.0f)
@@ -258,7 +264,9 @@ namespace moho
    * generic `Wm3::MultiplyQuaternionVector` -- same quaternion-convention
    * mismatch as `BuildTransformFromSPhysBody`, above.
    */
-  void SPhysBody::SetTransform(const VTransform& transform)
+  void SPhysBody::SetTransform(
+    const VTransform& transform
+  )
   {
     mOrientation = transform.orient_;
 
@@ -285,7 +293,10 @@ namespace moho
    * file"; the same lane-0-kept shape appears in `VTransform::Inverse`
    * (0x0046FBF0) and `IntegrateAngularImpulse` (0x006978D0).
    */
-  [[maybe_unused]] Wm3::Vec3f* ComputeWorldImpulseFromInertiaTensor(const SPhysBody* const body, Wm3::Vec3f* const out)
+  [[maybe_unused]] Wm3::Vec3f* ComputeWorldImpulseFromInertiaTensor(
+    const SPhysBody* const body,
+    Wm3::Vec3f* const out
+  )
   {
     if (body == nullptr || out == nullptr) {
       return out;
@@ -324,7 +335,9 @@ namespace moho
    * way (it constructs `VAxes3` and reads its members directly), so no
    * code change was needed once the constructor itself was corrected.
    */
-  Wm3::Vec3f* SPhysBody::GetImpulse(Wm3::Vec3f* const out) const
+  Wm3::Vec3f* SPhysBody::GetImpulse(
+    Wm3::Vec3f* const out
+  ) const
   {
     if (!out) {
       return nullptr;
@@ -380,11 +393,7 @@ namespace moho
     body->mVelocity.y += velocityDeltaY;
     body->mVelocity.z += velocityDeltaZ;
 
-    const Wm3::Vec3f lever{
-      worldPoint.x - body->mPos.x,
-      worldPoint.y - body->mPos.y,
-      worldPoint.z - body->mPos.z
-    };
+    const Wm3::Vec3f lever{worldPoint.x - body->mPos.x, worldPoint.y - body->mPos.y, worldPoint.z - body->mPos.z};
 
     body->mWorldImpulse.x += (lever.y * worldImpulse.z) - (lever.z * worldImpulse.y);
     body->mWorldImpulse.y += (lever.z * worldImpulse.x) - (lever.x * worldImpulse.z);
@@ -409,7 +418,10 @@ namespace moho
    * `.Rotate()`-based body also silently dropped the collision-offset term
    * that `BuildTransformFromSPhysBody` folds into its transform's position.
    */
-  void SPhysBody::AddLocalImpulse(const Wm3::Vec3f& localImpulse, const Wm3::Vec3f& localPoint)
+  void SPhysBody::AddLocalImpulse(
+    const Wm3::Vec3f& localImpulse,
+    const Wm3::Vec3f& localPoint
+  )
   {
     VTransform transform{};
     BuildTransformFromSPhysBody(&transform, this);
@@ -417,9 +429,7 @@ namespace moho
     Wm3::Vec3f rotatedPoint{};
     MultQuadVec(&rotatedPoint, &localPoint, &transform.orient_);
     const Wm3::Vec3f worldPoint{
-      rotatedPoint.x + transform.pos_.x,
-      rotatedPoint.y + transform.pos_.y,
-      rotatedPoint.z + transform.pos_.z
+      rotatedPoint.x + transform.pos_.x, rotatedPoint.y + transform.pos_.y, rotatedPoint.z + transform.pos_.z
     };
 
     Wm3::Vec3f worldImpulse{};
@@ -439,7 +449,11 @@ namespace moho
    * mGravity` into `mVelocity` over `dt`, midpoint-integrates `mPos` from the
    * old/new velocity average, then tail-calls `IntegrateAngularImpulse`.
    */
-  void SPhysBody::IntegrateFreefallStep(const Wm3::Vec3f& force, const float dt, const Wm3::Vec3f& angularImpulse)
+  void SPhysBody::IntegrateFreefallStep(
+    const Wm3::Vec3f& force,
+    const float dt,
+    const Wm3::Vec3f& angularImpulse
+  )
   {
     const Wm3::Vec3f oldVelocity = mVelocity;
     const float dtOverMass = dt / mMass;
@@ -480,7 +494,10 @@ namespace moho
    * right/second operand -- not `operator*` (same upstream `.w`-scalar
    * formula as `Multiply`).
    */
-  void SPhysBody::IntegrateAngularImpulse(const Wm3::Vec3f& angularImpulse, const float dt)
+  void SPhysBody::IntegrateAngularImpulse(
+    const Wm3::Vec3f& angularImpulse,
+    const float dt
+  )
   {
     const Wm3::Vec3f oldWorldImpulse = mWorldImpulse;
     mWorldImpulse.x += angularImpulse.x * dt;
@@ -498,9 +515,7 @@ namespace moho
     Wm3::Vec3f localImpulse{};
     MultQuadVec(&localImpulse, &avgWorldImpulse, &conjugateOrientation);
     const Wm3::Vec3f scaledImpulse{
-      mInvInertiaTensor.x * localImpulse.x,
-      mInvInertiaTensor.y * localImpulse.y,
-      mInvInertiaTensor.z * localImpulse.z
+      mInvInertiaTensor.x * localImpulse.x, mInvInertiaTensor.y * localImpulse.y, mInvInertiaTensor.z * localImpulse.z
     };
 
     Wm3::Quaternionf deltaOrientation{};
@@ -514,14 +529,18 @@ namespace moho
     // Preserve this integration lane's SSE accumulation order. The generic
     // product helper groups the same terms differently and changes sim bits.
     const Wm3::Quaternionf orientation = mOrientation;
-    mOrientation.w = ((orientation.w * deltaOrientation.w - orientation.x * deltaOrientation.x)
-                       - orientation.y * deltaOrientation.y) - orientation.z * deltaOrientation.z;
-    mOrientation.x = ((orientation.y * deltaOrientation.z + orientation.w * deltaOrientation.x)
-                       + orientation.x * deltaOrientation.w) - orientation.z * deltaOrientation.y;
-    mOrientation.y = ((orientation.z * deltaOrientation.x + orientation.w * deltaOrientation.y)
-                       + orientation.y * deltaOrientation.w) - orientation.x * deltaOrientation.z;
-    mOrientation.z = ((orientation.x * deltaOrientation.y + orientation.w * deltaOrientation.z)
-                       + orientation.z * deltaOrientation.w) - orientation.y * deltaOrientation.x;
+    mOrientation.w =
+      ((orientation.w * deltaOrientation.w - orientation.x * deltaOrientation.x) - orientation.y * deltaOrientation.y) -
+      orientation.z * deltaOrientation.z;
+    mOrientation.x =
+      ((orientation.y * deltaOrientation.z + orientation.w * deltaOrientation.x) + orientation.x * deltaOrientation.w) -
+      orientation.z * deltaOrientation.y;
+    mOrientation.y =
+      ((orientation.z * deltaOrientation.x + orientation.w * deltaOrientation.y) + orientation.y * deltaOrientation.w) -
+      orientation.x * deltaOrientation.z;
+    mOrientation.z =
+      ((orientation.x * deltaOrientation.y + orientation.w * deltaOrientation.z) + orientation.z * deltaOrientation.w) -
+      orientation.y * deltaOrientation.x;
     NormalizeQuatInPlace(&mOrientation);
   }
 
@@ -533,7 +552,9 @@ namespace moho
    *
    * What it does: see header.
    */
-  void SPhysBody::ApplyGroundCollisionResponse(const gpg::fastvector_n<GroundPenetrationSample, 8>& samples)
+  void SPhysBody::ApplyGroundCollisionResponse(
+    const gpg::fastvector_n<GroundPenetrationSample, 8>& samples
+  )
   {
     Wm3::Vec3f angularVelocity{};
     GetImpulse(&angularVelocity);
@@ -611,7 +632,9 @@ namespace moho
    * Clears reflected base/field vector lanes for one `SPhysBodyTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroySPhysBodyTypeInfoBody(SPhysBodyTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void DestroySPhysBodyTypeInfoBody(
+    SPhysBodyTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -666,11 +689,19 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SPhysBodyTypeInfo_dc3862, moho::register_SPhysBodyTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SPhysBodyTypeInfo_dc3862,
+  moho::register_SPhysBodyTypeInfo
+)
 
 namespace moho
 {
-  void SPhysBody::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void SPhysBody::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     SPhysConstants* constants = nullptr;
     const gpg::RRef owner{};
@@ -684,7 +715,10 @@ namespace moho
    * Address: 0x006980D0 (FUN_006980D0)
    */
   void SPhysBody::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     archive.WritePointer(mConstants, gpg::TrackedPointerState::Unowned, gpg::RRef{});
@@ -731,7 +765,9 @@ namespace moho
   /**
    * Address: 0x00698A60 (FUN_00698A60, serializer load body)
    */
-  void SPhysBody::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SPhysBody::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -750,7 +786,9 @@ namespace moho
   /**
    * Address: 0x00698BC0 (FUN_00698BC0, serializer save body)
    */
-  void SPhysBody::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SPhysBody::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;

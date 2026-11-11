@@ -61,7 +61,9 @@ namespace moho
       return *state;
     }
 
-    void ReleaseLevels(std::vector<WaterBodySurfaces::Level>& levels)
+    void ReleaseLevels(
+      std::vector<WaterBodySurfaces::Level>& levels
+    )
     {
       for (WaterBodySurfaces::Level& level : levels) {
         for (WaterBodySurfaces::Chunk& chunk : level.chunks) {
@@ -129,7 +131,10 @@ namespace moho
       return true;
     }
 
-    void Build(const STIMap& map, std::vector<WaterBodySurfaces::Level>& levels)
+    void Build(
+      const STIMap& map,
+      std::vector<WaterBodySurfaces::Level>& levels
+    )
     {
       const CHeightField* const field = map.mHeightField.get();
       const std::int32_t texelsX = (field->width - 1) >> 1;
@@ -175,7 +180,11 @@ namespace moho
     }
   } // namespace
 
-  SWaterOfBlock WaterOfBlock(const STIMap& map, const std::int32_t x, const std::int32_t z) noexcept
+  SWaterOfBlock WaterOfBlock(
+    const STIMap& map,
+    const std::int32_t x,
+    const std::int32_t z
+  ) noexcept
   {
     const bool sea = map.mWaterEnabled != 0u;
     SWaterOfBlock water{
@@ -195,18 +204,24 @@ namespace moho
     return water;
   }
 
-  std::uint32_t WaterBodiesGeneration(const STIMap& map) noexcept
+  std::uint32_t WaterBodiesGeneration(
+    const STIMap& map
+  ) noexcept
   {
     return map.HasWaterBodies() ? map.mWaterBodies->Generation() : 0u;
   }
 
-  float WaterBodyTerrainShaderLevel(const STIMap& map) noexcept
+  float WaterBodyTerrainShaderLevel(
+    const STIMap& map
+  ) noexcept
   {
     const float sea = map.mWaterEnabled != 0u ? map.mWaterElevation : kWaterBodyNoWater;
     return map.HasWaterBodies() ? std::max(sea, map.mWaterBodies->HighestLevel()) : sea;
   }
 
-  const std::vector<WaterBodySurfaces::Level>* WaterBodySurfaces::For(IWldTerrainRes* const terrainRes)
+  const std::vector<WaterBodySurfaces::Level>* WaterBodySurfaces::For(
+    IWldTerrainRes* const terrainRes
+  )
   {
     SState& state = State();
     const STIMap* const map = terrainRes != nullptr ? terrainRes->mMap : nullptr;
@@ -239,7 +254,9 @@ namespace moho
     state.emptyTarget.reset();
   }
 
-  boost::shared_ptr<ID3DRenderTarget> WaterBodySurfaces::ReflectionFor(const float level)
+  boost::shared_ptr<ID3DRenderTarget> WaterBodySurfaces::ReflectionFor(
+    const float level
+  )
   {
     const SState& state = State();
     if (state.mirrored && state.mirroredLevel == level && state.bodyTarget) {

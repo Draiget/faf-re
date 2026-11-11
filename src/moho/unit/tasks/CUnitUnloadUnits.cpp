@@ -39,12 +39,16 @@ namespace
   constexpr std::int16_t kInvalidCellPosComponent = static_cast<std::int16_t>(0x8000);
   constexpr std::uint32_t kGroundTargetEntityIdTag = 0xF0000000u;
 
-  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  [[nodiscard]] moho::ETaskState NextTaskState(
+    const moho::ETaskState state
+  ) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
 
-  [[nodiscard]] bool IsUsableDetachedUnit(const moho::Unit* const unit) noexcept
+  [[nodiscard]] bool IsUsableDetachedUnit(
+    const moho::Unit* const unit
+  ) noexcept
   {
     const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(unit);
     return raw != 0u && raw != kEntitySetInvalidEntry;
@@ -113,7 +117,9 @@ namespace moho
    * Reads base command-task state, unload-goal payload, task-state booleans,
    * and loaded-unit entity-set lanes from archive storage.
    */
-  void CUnitUnloadUnits::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitUnloadUnits::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -134,7 +140,9 @@ namespace moho
    * Writes base command-task state, unload-goal payload, task-state booleans,
    * and loaded-unit entity-set lanes into archive storage.
    */
-  void CUnitUnloadUnits::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitUnloadUnits::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -221,179 +229,178 @@ namespace moho
     }
 
     switch (mTaskState) {
-      case TASKSTATE_Preparing: {
-        const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
-        if (
-          blueprint != nullptr
-          && blueprint->Physics.MotionType == RULEUMT_SurfacingSub
-          && mUnit->mVarDat.mLayerMask == LAYER_Sub
-        ) {
-          SNavGoal surfacingGoal(mUnit->GetFootprint().ToCellPos(mUnit->GetPosition()));
-          surfacingGoal.mLayer = LAYER_Water;
-          if (mUnit->AiCommandDispatch != nullptr) {
-            mUnit->AiCommandDispatch->SetNewTargetLayer(surfacingGoal);
-          }
-          mTaskState = NextTaskState(mTaskState);
-          return 1;
+    case TASKSTATE_Preparing: {
+      const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
+      if (
+        blueprint != nullptr && blueprint->Physics.MotionType == RULEUMT_SurfacingSub &&
+        mUnit->mVarDat.mLayerMask == LAYER_Sub
+      ) {
+        SNavGoal surfacingGoal(mUnit->GetFootprint().ToCellPos(mUnit->GetPosition()));
+        surfacingGoal.mLayer = LAYER_Water;
+        if (mUnit->AiCommandDispatch != nullptr) {
+          mUnit->AiCommandDispatch->SetNewTargetLayer(surfacingGoal);
         }
-
-        mTaskState = TASKSTATE_Starting;
-        return 0;
+        mTaskState = NextTaskState(mTaskState);
+        return 1;
       }
 
-      case TASKSTATE_Waiting:
-        if (mUnit->mVarDat.mLayerMask != LAYER_Water) {
-          return 1;
-        }
-        mTaskState = TASKSTATE_Starting;
-        return 0;
+      mTaskState = TASKSTATE_Starting;
+      return 0;
+    }
 
-      case TASKSTATE_Starting: {
-        if (!mIsStagingPlatform && mUnit->IsMobile()) {
-          mUnloadGoal.aux4 = static_cast<std::int32_t>(LAYER_Land);
-          NewMoveTask(mUnloadGoal, this, 0, mOwnerCommandLinkLane.GetObjectPtr(), 0);
+    case TASKSTATE_Waiting:
+      if (mUnit->mVarDat.mLayerMask != LAYER_Water) {
+        return 1;
+      }
+      mTaskState = TASKSTATE_Starting;
+      return 0;
+
+    case TASKSTATE_Starting: {
+      if (!mIsStagingPlatform && mUnit->IsMobile()) {
+        mUnloadGoal.aux4 = static_cast<std::int32_t>(LAYER_Land);
+        NewMoveTask(mUnloadGoal, this, 0, mOwnerCommandLinkLane.GetObjectPtr(), 0);
+      }
+
+      mTaskState = NextTaskState(mTaskState);
+      return 0;
+    }
+
+    case TASKSTATE_Processing: {
+      EntitySetTemplate<Unit> detachedUnits{};
+      if (mLoadedUnits.Empty()) {
+        detachedUnits = mUnit->AiTransport->TransportDetachAllUnits(false);
+      } else {
+        // The shipped loop loads the cursor once and re-reads the set's end
+        // pointer out of the task member on every iteration
+        // (`do { ... ++Mysize; } while (Mysize != this->v13)` in
+        // FUN_00626390). That matters because `TransportDetachUnit` runs the
+        // `OnTransportDetach` script, and a script that destroys or re-issues
+        // orders to the unit it just unloaded can shorten this very set. A
+        // cached end then steps past the live range into the slot the removal
+        // vacated.
+        for (Entity* const* entry = mLoadedUnits.mVec.begin(); entry != mLoadedUnits.mVec.end(); ++entry) {
+          Unit* const candidate = static_cast<Unit*>(*entry);
+          if (!IsUsableDetachedUnit(candidate)) {
+            continue;
+          }
+
+          if (mUnit->AiTransport->TransportDetachUnit(candidate)) {
+            (void)detachedUnits.Add(candidate);
+          }
+        }
+      }
+
+      if (!mIsStagingPlatform && mUnit->mIsAir) {
+        if (CUnitMotion* const motion = mUnit->UnitMotion; motion != nullptr) {
+          const Wm3::Vector3f zeroSteering{0.0f, 0.0f, 0.0f};
+          motion->SetTarget(mUnit->GetPosition(), zeroSteering, LAYER_Air);
         }
 
         mTaskState = NextTaskState(mTaskState);
         return 0;
       }
 
-      case TASKSTATE_Processing: {
-        EntitySetTemplate<Unit> detachedUnits{};
-        if (mLoadedUnits.Empty()) {
-          detachedUnits = mUnit->AiTransport->TransportDetachAllUnits(false);
-        } else {
-          // The shipped loop loads the cursor once and re-reads the set's end
-          // pointer out of the task member on every iteration
-          // (`do { ... ++Mysize; } while (Mysize != this->v13)` in
-          // FUN_00626390). That matters because `TransportDetachUnit` runs the
-          // `OnTransportDetach` script, and a script that destroys or re-issues
-          // orders to the unit it just unloaded can shorten this very set. A
-          // cached end then steps past the live range into the slot the removal
-          // vacated.
-          for (Entity* const* entry = mLoadedUnits.mVec.begin(); entry != mLoadedUnits.mVec.end(); ++entry) {
-            Unit* const candidate = static_cast<Unit*>(*entry);
-            if (!IsUsableDetachedUnit(candidate)) {
-              continue;
-            }
-
-            if (mUnit->AiTransport->TransportDetachUnit(candidate)) {
-              (void)detachedUnits.Add(candidate);
-            }
-          }
+      for (Unit* detachedUnit : detachedUnits) {
+        if (!IsUsableDetachedUnit(detachedUnit)) {
+          continue;
         }
 
-        if (!mIsStagingPlatform && mUnit->mIsAir) {
-          if (CUnitMotion* const motion = mUnit->UnitMotion; motion != nullptr) {
-            const Wm3::Vector3f zeroSteering{0.0f, 0.0f, 0.0f};
-            motion->SetTarget(mUnit->GetPosition(), zeroSteering, LAYER_Air);
+        if (mIsStagingPlatform) {
+          if (detachedUnit->mIsAir && detachedUnit->UnitMotion != nullptr) {
+            detachedUnit->UnitMotion->mHeight = gpg::pInf;
           }
-
-          mTaskState = NextTaskState(mTaskState);
-          return 0;
+          continue;
         }
 
-        for (Unit* detachedUnit : detachedUnits) {
-          if (!IsUsableDetachedUnit(detachedUnit)) {
-            continue;
-          }
+        const VTransform transportTransform = mUnit->GetTransform();
+        SOCellPos unloadCell{kInvalidCellPosComponent, kInvalidCellPosComponent};
 
-          if (mIsStagingPlatform) {
-            if (detachedUnit->mIsAir && detachedUnit->UnitMotion != nullptr) {
-              detachedUnit->UnitMotion->mHeight = gpg::pInf;
-            }
-            continue;
-          }
+        bool foundMeleeSpace = false;
+        if (mUnit->IsMobile()) {
+          const SFootprint& transportFootprint = mUnit->GetFootprint();
+          const int transportSize = std::max<int>(transportFootprint.mSizeX, transportFootprint.mSizeZ);
 
-          const VTransform transportTransform = mUnit->GetTransform();
-          SOCellPos unloadCell{kInvalidCellPosComponent, kInvalidCellPosComponent};
-
-          bool foundMeleeSpace = false;
-          if (mUnit->IsMobile()) {
-            const SFootprint& transportFootprint = mUnit->GetFootprint();
-            const int transportSize = std::max<int>(transportFootprint.mSizeX, transportFootprint.mSizeZ);
-
-            if (transportSize > 1) {
-              const SFootprint& unloadedFootprint = detachedUnit->GetFootprint();
-              const int unloadedSize = std::max<int>(unloadedFootprint.mSizeX, unloadedFootprint.mSizeZ);
-              foundMeleeSpace = detachedUnit->HasMeleeSpaceAroundLargeTarget(mUnit, &unloadCell, 2 * unloadedSize);
-            } else {
-              foundMeleeSpace = detachedUnit->HasMeleeSpaceAroundSmallTarget(mUnit, &unloadCell);
-            }
+          if (transportSize > 1) {
+            const SFootprint& unloadedFootprint = detachedUnit->GetFootprint();
+            const int unloadedSize = std::max<int>(unloadedFootprint.mSizeX, unloadedFootprint.mSizeZ);
+            foundMeleeSpace = detachedUnit->HasMeleeSpaceAroundLargeTarget(mUnit, &unloadCell, 2 * unloadedSize);
           } else {
             foundMeleeSpace = detachedUnit->HasMeleeSpaceAroundSmallTarget(mUnit, &unloadCell);
           }
-
-          Wm3::Vector3f unloadWorldPos{};
-          if (foundMeleeSpace) {
-            unloadWorldPos = COORDS_ToWorldPos(mUnit->SimulationRef->mMapData, unloadCell, detachedUnit->GetFootprint());
-          } else {
-            unloadWorldPos = detachedUnit->GetPosition();
-            gpg::Rect2f moveSkirt{0.0f, 0.0f, 0.0f, 0.0f};
-            const bool useWholeMap = mUnit->ArmyRef != nullptr && mUnit->ArmyRef->UseWholeMap();
-            (void)PrepareMove(1, detachedUnit, &unloadWorldPos, &moveSkirt, useWholeMap);
-          }
-
-          VTransform unloadTransform = transportTransform;
-          unloadTransform.pos_ = unloadWorldPos;
-
-          if (CUnitMotion* const unitMotion = detachedUnit->UnitMotion; unitMotion != nullptr) {
-            unitMotion->Warp(unloadTransform);
-          }
-
-          const SCoordsVec2 unloadCenter{unloadWorldPos.x, unloadWorldPos.z};
-          gpg::Rect2i reservationRect{};
-          (void)COORDS_ToGridRect(&reservationRect, unloadCenter, detachedUnit->GetFootprint());
-          detachedUnit->ReserveOgridRect(reservationRect);
+        } else {
+          foundMeleeSpace = detachedUnit->HasMeleeSpaceAroundSmallTarget(mUnit, &unloadCell);
         }
 
-        if (!mIsStagingPlatform) {
-          for (Unit* detachedUnit : detachedUnits) {
-            if (IsUsableDetachedUnit(detachedUnit)) {
-              detachedUnit->FreeOgridRect();
-            }
-          }
+        Wm3::Vector3f unloadWorldPos{};
+        if (foundMeleeSpace) {
+          unloadWorldPos = COORDS_ToWorldPos(mUnit->SimulationRef->mMapData, unloadCell, detachedUnit->GetFootprint());
+        } else {
+          unloadWorldPos = detachedUnit->GetPosition();
+          gpg::Rect2f moveSkirt{0.0f, 0.0f, 0.0f, 0.0f};
+          const bool useWholeMap = mUnit->ArmyRef != nullptr && mUnit->ArmyRef->UseWholeMap();
+          (void)PrepareMove(1, detachedUnit, &unloadWorldPos, &moveSkirt, useWholeMap);
         }
 
-        if (mIsStagingPlatform || !mUnit->IsMobile()) {
-          const SOCellPos unloadCell{
-            static_cast<std::int16_t>(mUnloadGoal.minX),
-            static_cast<std::int16_t>(mUnloadGoal.minZ),
-          };
-          const SFootprint& footprint = mUnit->GetFootprint();
-          const Wm3::Vector3f unloadWorldPos = COORDS_ToWorldPos(
-            mUnit->SimulationRef->mMapData,
-            unloadCell,
-            static_cast<ELayer>(footprint.mOccupancyCaps),
-            static_cast<int>(footprint.mSizeX),
-            static_cast<int>(footprint.mSizeZ)
-          );
+        VTransform unloadTransform = transportTransform;
+        unloadTransform.pos_ = unloadWorldPos;
 
-          SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Move);
-          commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
-          commandIssueData.mTarget.mEntityId = kGroundTargetEntityIdTag;
-          commandIssueData.mTarget.mPos = unloadWorldPos;
-          // 0x006269A3-0x006269E6: unk38 = 0, mOri = the zero quaternion
-          // (lazy static at 0x010C7A58), unk4C = 1.0f.
-          commandIssueData.unk38 = 0;
-          commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
-          commandIssueData.unk4C = 1.0f;
-
-          // 0x006269EB-0x006269FC: UNIT_IssueCommand (0x006F12C0) on the
-          // detached set itself with clearQueue = 1, unconditionally -- no
-          // empty-selection guard and no Sim::IssueCommand round trip.
-          (void)IssueCommandToSelectedUnits(mUnit->SimulationRef, detachedUnits, commandIssueData, true);
+        if (CUnitMotion* const unitMotion = detachedUnit->UnitMotion; unitMotion != nullptr) {
+          unitMotion->Warp(unloadTransform);
         }
 
-        mTaskState = NextTaskState(mTaskState);
-        return 0;
+        const SCoordsVec2 unloadCenter{unloadWorldPos.x, unloadWorldPos.z};
+        gpg::Rect2i reservationRect{};
+        (void)COORDS_ToGridRect(&reservationRect, unloadCenter, detachedUnit->GetFootprint());
+        detachedUnit->ReserveOgridRect(reservationRect);
       }
 
-      case TASKSTATE_Complete:
-        return -1;
+      if (!mIsStagingPlatform) {
+        for (Unit* detachedUnit : detachedUnits) {
+          if (IsUsableDetachedUnit(detachedUnit)) {
+            detachedUnit->FreeOgridRect();
+          }
+        }
+      }
 
-      default:
-        return 1;
+      if (mIsStagingPlatform || !mUnit->IsMobile()) {
+        const SOCellPos unloadCell{
+          static_cast<std::int16_t>(mUnloadGoal.minX),
+          static_cast<std::int16_t>(mUnloadGoal.minZ),
+        };
+        const SFootprint& footprint = mUnit->GetFootprint();
+        const Wm3::Vector3f unloadWorldPos = COORDS_ToWorldPos(
+          mUnit->SimulationRef->mMapData,
+          unloadCell,
+          static_cast<ELayer>(footprint.mOccupancyCaps),
+          static_cast<int>(footprint.mSizeX),
+          static_cast<int>(footprint.mSizeZ)
+        );
+
+        SSTICommandIssueData commandIssueData(EUnitCommandType::UNITCOMMAND_Move);
+        commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
+        commandIssueData.mTarget.mEntityId = kGroundTargetEntityIdTag;
+        commandIssueData.mTarget.mPos = unloadWorldPos;
+        // 0x006269A3-0x006269E6: unk38 = 0, mOri = the zero quaternion
+        // (lazy static at 0x010C7A58), unk4C = 1.0f.
+        commandIssueData.unk38 = 0;
+        commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
+        commandIssueData.unk4C = 1.0f;
+
+        // 0x006269EB-0x006269FC: UNIT_IssueCommand (0x006F12C0) on the
+        // detached set itself with clearQueue = 1, unconditionally -- no
+        // empty-selection guard and no Sim::IssueCommand round trip.
+        (void)IssueCommandToSelectedUnits(mUnit->SimulationRef, detachedUnits, commandIssueData, true);
+      }
+
+      mTaskState = NextTaskState(mTaskState);
+      return 0;
+    }
+
+    case TASKSTATE_Complete:
+      return -1;
+
+    default:
+      return 1;
     }
   }
 
@@ -479,8 +486,7 @@ namespace moho
    *    (0x00628890/0x00628080) were likewise confirmed dead and removed.)
    */
   class CUnitUnloadUnitsSerializer : public gpg::SerSaveLoadHelper<CUnitUnloadUnits>
-  {
-  };
+  {};
   static_assert(sizeof(CUnitUnloadUnitsSerializer) == 0x14, "CUnitUnloadUnitsSerializer size must be 0x14");
 } // namespace moho
 

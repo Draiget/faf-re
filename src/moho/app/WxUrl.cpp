@@ -34,13 +34,18 @@ namespace moho
 {
   namespace
   {
-    bool ProtocolNamesEqual(const wxString& protocolName, const std::wstring& allowedProtocol)
+    bool ProtocolNamesEqual(
+      const wxString& protocolName,
+      const std::wstring& allowedProtocol
+    )
     {
       return ::_wcsicmp(protocolName.c_str(), allowedProtocol.c_str()) == 0;
     }
-  }
+  } // namespace
 
-  void OpenAllowedUrlByWx(const std::wstring& url)
+  void OpenAllowedUrlByWx(
+    const std::wstring& url
+  )
   {
     const wxString parsedUrlText(url.c_str());
     const wxURL parsedUrl(parsedUrlText);
@@ -63,7 +68,9 @@ namespace moho
 {
   // The Linux client (issue #255) has no wxURL: the same check on the URL's scheme, the text before
   // its first ':' (a letter, then letters, digits, '+', '-' or '.'), then the desktop opens it.
-  void OpenAllowedUrlByWx(const std::wstring& url)
+  void OpenAllowedUrlByWx(
+    const std::wstring& url
+  )
   {
     const std::size_t colon = url.find(L':');
     if (colon == 0 || colon == std::wstring::npos || !std::iswalpha(static_cast<std::wint_t>(url[0]))) {
@@ -71,7 +78,10 @@ namespace moho
     }
     for (std::size_t index = 1; index < colon; ++index) {
       const wchar_t character = url[index];
-      if (!std::iswalnum(static_cast<std::wint_t>(character)) && character != L'+' && character != L'-' && character != L'.') {
+      if (
+        !std::iswalnum(static_cast<std::wint_t>(character)) && character != L'+' && character != L'-' &&
+        character != L'.'
+      ) {
         return;
       }
     }

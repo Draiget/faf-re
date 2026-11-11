@@ -29,14 +29,22 @@ namespace faf::editor
     bool gameUnits = true;
     std::set<std::string> hiddenMarkerTypes;
 
-    bool operator==(const ViewState& other) const
+    bool operator==(
+      const ViewState& other
+    ) const
     {
-      return tool == other.tool && grid == other.grid && snap == other.snap && gridStep == other.gridStep && keepOnGround == other.keepOnGround &&
-             slope == other.slope && kmGrid == other.kmGrid && terrainTypes == other.terrainTypes && pathing == other.pathing &&
-             pathingLayer == other.pathingLayer && layerWeight == other.layerWeight && differences == other.differences &&
-             props == other.props && units == other.units && gameUnits == other.gameUnits && hiddenMarkerTypes == other.hiddenMarkerTypes;
+      return tool == other.tool && grid == other.grid && snap == other.snap && gridStep == other.gridStep &&
+        keepOnGround == other.keepOnGround && slope == other.slope && kmGrid == other.kmGrid &&
+        terrainTypes == other.terrainTypes && pathing == other.pathing && pathingLayer == other.pathingLayer &&
+        layerWeight == other.layerWeight && differences == other.differences && props == other.props &&
+        units == other.units && gameUnits == other.gameUnits && hiddenMarkerTypes == other.hiddenMarkerTypes;
     }
-    bool operator!=(const ViewState& other) const { return !(*this == other); }
+    bool operator!=(
+      const ViewState& other
+    ) const
+    {
+      return !(*this == other);
+    }
   };
 
   std::string WriteViewState(const ViewState& state);

@@ -19,9 +19,18 @@ namespace faf::editor
      * Draws the field for `path` with the textures in `choices` (game paths); true when the user picked another.
      * `withAlpha` shows the pictures with their alpha (particles: their shape) over a dark ground.
      */
-    bool Field(const char* id, std::string& path, const std::vector<std::string>& choices, EdTextureLibrary& library, bool withAlpha);
+    bool Field(
+      const char* id,
+      std::string& path,
+      const std::vector<std::string>& choices,
+      EdTextureLibrary& library,
+      bool withAlpha
+    );
     /** Test runs: the next field drawn opens its browser. */
-    void AskOpen() noexcept { mOpenAsk = true; }
+    void AskOpen() noexcept
+    {
+      mOpenAsk = true;
+    }
 
   private:
     bool mOpenAsk = false;

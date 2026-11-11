@@ -8,12 +8,12 @@ namespace
   struct SReconOverlap
   {
     Sim* mSim = nullptr;
-    std::size_t mEnd = 0;  // armies [0, mEnd) are being refreshed
+    std::size_t mEnd = 0; // armies [0, mEnd) are being refreshed
     bool mPending = false;
     std::uint64_t mStarted = 0;
     std::uint64_t mEndedEarly = 0;
   } sReconOverlap;
-}
+} // namespace
 
 namespace
 {
@@ -32,7 +32,10 @@ namespace
    * its `MD5UpdateBatch`; the bytes handed to `Update` are unchanged.
    */
   template <class TChecksumSink>
-  void UpdateChecksumWithNullableCString(TChecksumSink& context, const char* const text)
+  void UpdateChecksumWithNullableCString(
+    TChecksumSink& context,
+    const char* const text
+  )
   {
     if (text != nullptr) {
       context.Update(text, std::strlen(text) + 1u);
@@ -50,7 +53,10 @@ namespace
     return &moho::DebugLuaHook;
   }
 
-  void RulesUpdateLuaState(RRuleGameRules* rules, LuaPlus::LuaState* luaState)
+  void RulesUpdateLuaState(
+    RRuleGameRules* rules,
+    LuaPlus::LuaState* luaState
+  )
   {
     if (!rules) {
       return;
@@ -59,7 +65,9 @@ namespace
     rules->UpdateLuaState(luaState);
   }
 
-  void TickTaskStage(CTaskStage* stage)
+  void TickTaskStage(
+    CTaskStage* stage
+  )
   {
     if (!stage) {
       return;
@@ -68,7 +76,10 @@ namespace
     stage->UserFrame();
   }
 
-  void UpdatePaths(PathTables* pathTables, const int budget)
+  void UpdatePaths(
+    PathTables* pathTables,
+    const int budget
+  )
   {
     if (!pathTables) {
       return;
@@ -78,7 +89,9 @@ namespace
     pathTables->UpdateBackground(&pathBudget);
   }
 
-  void TickEffectManager(CEffectManagerImpl* effectManager)
+  void TickEffectManager(
+    CEffectManagerImpl* effectManager
+  )
   {
     if (!effectManager) {
       return;
@@ -87,7 +100,9 @@ namespace
     effectManager->Tick();
   }
 
-  void PurgeDestroyedEffects(CEffectManagerImpl* effectManager)
+  void PurgeDestroyedEffects(
+    CEffectManagerImpl* effectManager
+  )
   {
     if (!effectManager) {
       return;
@@ -96,7 +111,9 @@ namespace
     effectManager->PurgeDestroyedEffects();
   }
 
-  void UpdateFormationDb(CAiFormationDBImpl* formationDb)
+  void UpdateFormationDb(
+    CAiFormationDBImpl* formationDb
+  )
   {
     if (!formationDb) {
       return;
@@ -113,7 +130,9 @@ namespace
    * another entity or anything the shared halves write, so the result is the serial loop's.
    * Returns false (nothing done) when the serial loop should run.
    */
-  bool AdvanceCoordsParallel(Sim& sim)
+  bool AdvanceCoordsParallel(
+    Sim& sim
+  )
   {
     constexpr std::size_t kMinParallelEntities = 256u;
     constexpr std::size_t kGrain = 64u;
@@ -157,7 +176,9 @@ namespace
    * and writes only the unit's own block, which only the unit's own SyncInterface reads, and the
    * walk's own refresh then finds nothing left to do. So the packet is the serial one.
    */
-  void RefreshUnitSyncBlocksParallel(std::vector<Unit*>& units)
+  void RefreshUnitSyncBlocksParallel(
+    std::vector<Unit*>& units
+  )
   {
     constexpr std::size_t kMinParallelUnits = 128u;
     constexpr std::size_t kGrain = 32u;
@@ -185,21 +206,29 @@ namespace
     }
   }
 
-  void CleanupDecals(CDecalBuffer* decalBuffer)
+  void CleanupDecals(
+    CDecalBuffer* decalBuffer
+  )
   {
     if (decalBuffer) {
       decalBuffer->CleanupTick();
     }
   }
 
-  void TickDebugOverlay(RDebugOverlay* overlay, Sim* sim)
+  void TickDebugOverlay(
+    RDebugOverlay* overlay,
+    Sim* sim
+  )
   {
     if (!overlay || !sim) {
       return;
     }
     overlay->Tick(sim);
   }
-  void AppendLegacyStringToStd(std::string& out, const fa::string& value)
+  void AppendLegacyStringToStd(
+    std::string& out,
+    const fa::string& value
+  )
   {
     out.append(value.c_str(), value.size());
   }
@@ -214,7 +243,9 @@ namespace
    * which is the interlocked compare-exchange loop on `mPrimaryValueBits`
    * (+0x24) the binary open-codes here.
    */
-  void StoreSyncEntityCountStat(const std::int32_t syncedEntityCount)
+  void StoreSyncEntityCountStat(
+    const std::int32_t syncedEntityCount
+  )
   {
     static moho::StatItem* sEngineStatSyncEntityCount = nullptr;
     if (sEngineStatSyncEntityCount == nullptr) {
@@ -230,8 +261,7 @@ namespace
       (void)sEngineStatSyncEntityCount->SetInt(&syncedEntityCount);
     }
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x007474B0 (FUN_007474B0)
@@ -243,7 +273,10 @@ namespace
  * Partial lift. Keeps filter-transfer behavior and minimal beat packet publication
  * so CSimDriver queue/event flow stays consistent while full body recovery is pending.
  */
-void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
+void Sim::Sync(
+  const SSyncFilter& filter,
+  SSyncData*& outSyncData
+)
 {
   // 0x007474EC..0x00747506: the focus army is compared BEFORE the incoming
   // filter is adopted - `a3a[0] = mFocusArmy != v4` reads the old value off
@@ -368,7 +401,6 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   mAllyUpgradeNotifications.swap(outSyncData->mAllyUpgradeNotifications);
   mPendingPoseCopies.swap(outSyncData->mPoseUpdates);
 
-
   // 0x00747635..0x0074764C: hand the beat's queued audio requests to the
   // packet and reset the sim-side queue back to its inline storage. Without
   // this the packet's audio lane stayed empty for every beat, so nothing the
@@ -376,7 +408,6 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   if (mSoundManager != nullptr) {
     mSoundManager->DrainRequests(outSyncData->mAudioRequests);
   }
-
 
   // 0x00747A54: the army roster is published exactly once, on the first sync.
   // `CWldSession::DoBeat` turns each entry into a `UserArmy` and files it by
@@ -509,7 +540,8 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     std::string armyStatsXml;
     armyStatsXml.append("<?xml version=\"1.0\" ?>\n");
     armyStatsXml.append(
-      "<GameStats xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n"
+      "<GameStats xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" "
+      "xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">\n"
     );
 
     const fa::string armyIndent("  ");
@@ -746,7 +778,9 @@ namespace
   class MD5UpdateBatch
   {
   public:
-    explicit MD5UpdateBatch(gpg::MD5Context& context) noexcept
+    explicit MD5UpdateBatch(
+      gpg::MD5Context& context
+    ) noexcept
       : mContext(context)
     {}
 
@@ -758,7 +792,10 @@ namespace
       Flush();
     }
 
-    void Update(const void* const data, const std::size_t size)
+    void Update(
+      const void* const data,
+      const std::size_t size
+    )
     {
       if (!sim_ChecksumBatching) {
         Flush();
@@ -791,8 +828,7 @@ namespace
     std::size_t mUsed = 0u;
     std::array<std::uint8_t, 1024> mBytes;
   };
-}
-
+} // namespace
 
 /**
  * Address: 0x0074A640 (FUN_0074A640, sub_74A640)
@@ -985,7 +1021,10 @@ bool Sim::IsSyncLogOn() const noexcept
  * Copies one retained beat checksum out of the 128-entry rolling ring when
  * the requested beat is still available.
  */
-bool Sim::GetBeatChecksum(gpg::MD5Digest* const outChecksum, const CSeqNo beat) const
+bool Sim::GetBeatChecksum(
+  gpg::MD5Digest* const outChecksum,
+  const CSeqNo beat
+) const
 {
   const int delta = static_cast<int>(beat) - static_cast<int>(mCurBeat);
   if (delta + 128 < 0 || delta >= 0) {
@@ -1005,7 +1044,11 @@ namespace
 
   /// Refreshes the recon DBs of armies [begin, end) on the pool, then applies their deferred
   /// handle assignments on this thread in army order, exactly where the serial loop would have.
-  void RefreshReconArmyRange(Sim& sim, const std::size_t begin, const std::size_t end)
+  void RefreshReconArmyRange(
+    Sim& sim,
+    const std::size_t begin,
+    const std::size_t end
+  )
   {
     if (begin >= end) {
       return;
@@ -1048,7 +1091,9 @@ namespace
   /// The heavy tick's Lua is about to call `function` (null: collect garbage). The Lua libraries
   /// touch only Lua values and ReconBlip:GetSource only reads the blip, so those calls keep the
   /// overlap; anything else may reach what the refreshes read, so they finish first.
-  void ReconOverlapGate(const LuaCFunctionPtr function)
+  void ReconOverlapGate(
+    const LuaCFunctionPtr function
+  )
   {
     if (function != nullptr && (function == &cfunc_ReconBlipGetSource || LUA_IsLibraryCFunction(function))) {
       return;
@@ -1069,7 +1114,9 @@ namespace
   ///
   /// sim_ReconQueryCache: the same job also computes its main loop's unit queries ahead (chunks
   /// after the armies), and the gate stops serving them the same way.
-  void RunReconPhaseParallel(Sim& sim)
+  void RunReconPhaseParallel(
+    Sim& sim
+  )
   {
     const std::size_t armyCount = sim.mArmiesList.size();
     const std::size_t reconTickIndex = static_cast<std::size_t>(sim.mCurTick) % armyCount;
@@ -1081,21 +1128,19 @@ namespace
       sReconOverlap.mSim = &sim;
       sReconOverlap.mEnd = reconTickIndex;
       const bool running = CSimWorkerPool::Get().StartAsync(
-        reconTickIndex + queryChunks, 1u,
-        [](void* const context, const std::size_t first, const std::size_t last) {
-          Sim& owner = *static_cast<Sim*>(context);
-          for (std::size_t i = first; i < last; ++i) {
-            if (i >= sReconOverlap.mEnd) {
-              RECON_FillQueryCache(i - sReconOverlap.mEnd, i - sReconOverlap.mEnd + 1u);
-              continue;
-            }
-            CArmyImpl* const army = owner.mArmiesList[i];
-            if (CAiReconDBImpl* const reconDb = army ? army->GetReconDB() : nullptr; reconDb != nullptr) {
-              reconDb->RefreshDeferringHandles(sReconRefreshFixups[i]);
-            }
+        reconTickIndex + queryChunks, 1u, [](void* const context, const std::size_t first, const std::size_t last) {
+        Sim& owner = *static_cast<Sim*>(context);
+        for (std::size_t i = first; i < last; ++i) {
+          if (i >= sReconOverlap.mEnd) {
+            RECON_FillQueryCache(i - sReconOverlap.mEnd, i - sReconOverlap.mEnd + 1u);
+            continue;
           }
-        },
-        &sim
+          CArmyImpl* const army = owner.mArmiesList[i];
+          if (CAiReconDBImpl* const reconDb = army ? army->GetReconDB() : nullptr; reconDb != nullptr) {
+            reconDb->RefreshDeferringHandles(sReconRefreshFixups[i]);
+          }
+        }
+      }, &sim
       );
       sReconOverlap.mPending = true;
       if (running) {
@@ -1117,8 +1162,7 @@ namespace
         {
           try {
             FinishReconOverlap();
-          } catch (...) {
-          }
+          } catch (...) {}
         }
       } finishOnExit;
       heavyDb->ReconTick(static_cast<int>(armyCount));
@@ -1131,7 +1175,7 @@ namespace
     }
     RefreshReconArmyRange(sim, reconTickIndex + 1u, armyCount);
   }
-}
+} // namespace
 
 // Engine addition (moho/sim/SimEditorHook.h): the map editor's per-beat hook, never set in the game.
 void (*moho::gSimBeforeBeat)(Sim& sim) = nullptr;
@@ -1153,7 +1197,9 @@ void (*moho::gSimBeforeBeat)(Sim& sim) = nullptr;
  * Partial high-fidelity lift. Core beat staging is restored, with one
  * additional sync-filter packing pass still tracked for follow-up evidence.
  */
-void Sim::AdvanceBeat(const int amt)
+void Sim::AdvanceBeat(
+  const int amt
+)
 {
   (void)amt; // Binary implementation does not consume this parameter at 0x00749F40.
 
@@ -1229,33 +1275,34 @@ void Sim::AdvanceBeat(const int amt)
         RefreshBlips();
       }
 
-    if (!mArmiesList.empty() && sim_ParallelRecon && mArmiesList.size() <= kMaxParallelReconArmies &&
-        CSimWorkerPool::ParallelEnabled()) {
-      FAF_PROFILE_ZONE_NAMED("Recon::Parallel");
-      RunReconPhaseParallel(*this);
-    } else if (!mArmiesList.empty()) {
-      FAF_PROFILE_ZONE_NAMED("Recon::Serial");
-      const std::size_t armyCount = mArmiesList.size();
-      const std::size_t reconTickIndex = static_cast<std::size_t>(mCurTick) % armyCount;
-      for (std::size_t i = 0; i < armyCount; ++i) {
-        CArmyImpl* army = mArmiesList[i];
-        if (!army) {
-          continue;
-        }
+      if (
+        !mArmiesList.empty() && sim_ParallelRecon && mArmiesList.size() <= kMaxParallelReconArmies &&
+        CSimWorkerPool::ParallelEnabled()
+      ) {
+        FAF_PROFILE_ZONE_NAMED("Recon::Parallel");
+        RunReconPhaseParallel(*this);
+      } else if (!mArmiesList.empty()) {
+        FAF_PROFILE_ZONE_NAMED("Recon::Serial");
+        const std::size_t armyCount = mArmiesList.size();
+        const std::size_t reconTickIndex = static_cast<std::size_t>(mCurTick) % armyCount;
+        for (std::size_t i = 0; i < armyCount; ++i) {
+          CArmyImpl* army = mArmiesList[i];
+          if (!army) {
+            continue;
+          }
 
-        CAiReconDBImpl* reconDb = army->GetReconDB();
-        if (!reconDb) {
-          continue;
-        }
+          CAiReconDBImpl* reconDb = army->GetReconDB();
+          if (!reconDb) {
+            continue;
+          }
 
-        if (i == reconTickIndex) {
-          reconDb->ReconTick(static_cast<int>(armyCount));
-        } else {
-          reconDb->ReconRefresh();
+          if (i == reconTickIndex) {
+            reconDb->ReconTick(static_cast<int>(armyCount));
+          } else {
+            reconDb->ReconRefresh();
+          }
         }
       }
-    }
-
     }
 
     {

@@ -35,7 +35,10 @@
 
 namespace
 {
-  std::string Environment(const char* const name, const char* const fallback)
+  std::string Environment(
+    const char* const name,
+    const char* const fallback
+  )
   {
 #if defined(_MSC_VER)
     // The MSVC runtime marks getenv unsafe (-Wdeprecated-declarations); _dupenv_s is its own.
@@ -53,7 +56,9 @@ namespace
 #endif
   }
 
-  std::vector<std::string> Split(const std::string& text)
+  std::vector<std::string> Split(
+    const std::string& text
+  )
   {
     std::vector<std::string> items;
     std::stringstream stream(text);
@@ -66,7 +71,9 @@ namespace
     return items;
   }
 
-  std::string Quoted(const std::filesystem::path& path)
+  std::string Quoted(
+    const std::filesystem::path& path
+  )
   {
     return "\"" + path.string() + "\"";
   }
@@ -74,15 +81,17 @@ namespace
   struct SRun
   {
     int exitCode = -1;
-    std::string beats;   // the beats= line: how far the playback got
-    std::string verdict; // the VERDICT line
-    std::string tail;    // the last lines, for a failure message
-    std::string output;  // everything printed, for the checks' summaries
+    std::string beats;                  // the beats= line: how far the playback got
+    std::string verdict;                // the VERDICT line
+    std::string tail;                   // the last lines, for a failure message
+    std::string output;                 // everything printed, for the checks' summaries
     std::vector<std::string> keyframes; // "keyframes: N taken, M failed, ..." lines, one per session
     int seeks = 0;                      // "seek N: at beat" lines: moves that arrived
   };
 
-  SRun Play(const std::string& commandLine)
+  SRun Play(
+    const std::string& commandLine
+  )
   {
     SRun run;
 #if defined(_WIN32)
@@ -164,20 +173,26 @@ namespace
     return logs;
   }
 
-  SRun PlayReplay(const SReplay& replay, const std::string& label, const std::string& extraArguments)
+  SRun PlayReplay(
+    const SReplay& replay,
+    const std::string& label,
+    const std::string& extraArguments
+  )
   {
     EXPECT_TRUE(std::filesystem::exists(replay.init)) << replay.init.string();
     EXPECT_TRUE(std::filesystem::exists(replay.replay)) << replay.replay.string();
     const std::string command = Quoted(FAF_HEADLESS_EXE) + " --label " + label + " --replay " + Quoted(replay.replay) +
-                                " /init " + Quoted(replay.init) + " /nobugreport /nosound /log " +
-                                Quoted(LogFolder() / (label + ".log")) + extraArguments;
+      " /init " + Quoted(replay.init) + " /nobugreport /nosound /log " + Quoted(LogFolder() / (label + ".log")) +
+      extraArguments;
     const SRun run = Play(command);
     std::printf("%s%s", run.beats.c_str(), run.verdict.c_str());
     return run;
   }
 
   /** Every recorded checksum matched, nothing crashed, and the playback reached the game-over beat. */
-  void ExpectMatchedToTheEnd(const SRun& run)
+  void ExpectMatchedToTheEnd(
+    const SRun& run
+  )
   {
     EXPECT_EQ(run.exitCode, 0) << "headless exit code (1 mismatch, 2 incomplete, 3 crash, 4 bad input)\n" << run.tail;
     // VERDICT's `ended` is the game's own Lua GameEnded, which a game without a victory never sets
@@ -188,7 +203,10 @@ namespace
   }
 } // namespace
 
-TEST(ReplayPlayback, RecordedChecksumsMatch)
+TEST(
+  ReplayPlayback,
+  RecordedChecksumsMatch
+)
 {
   const std::vector<SReplay> replays = Replays();
   if (replays.empty()) {
@@ -203,7 +221,10 @@ TEST(ReplayPlayback, RecordedChecksumsMatch)
 // The replay viewer's rewind (docs/REPLAY_VIEWER.md): the first replay played with a keyframe every 300 beats and
 // moved through FAF_REPLAY_SEEK (default 3000,900,6000: a jump back, then forward past several keyframes). Each
 // move restarts from a keyframe, and the recorded checksums after it still have to match.
-TEST(ReplayPlayback, KeyframeSeeksKeepTheChecksums)
+TEST(
+  ReplayPlayback,
+  KeyframeSeeksKeepTheChecksums
+)
 {
   const std::vector<SReplay> replays = Replays();
   if (replays.empty()) {
@@ -214,7 +235,8 @@ TEST(ReplayPlayback, KeyframeSeeksKeepTheChecksums)
   const std::filesystem::path keyframes = LogFolder() / ("keyframes_" + replay.id);
   std::filesystem::create_directories(keyframes);
   const SRun run = PlayReplay(
-    replay, "ctest_seek_" + replay.id,
+    replay,
+    "ctest_seek_" + replay.id,
     " --keyframe-every 300 --keyframe-dir " + Quoted(keyframes) + " --seek " +
       Environment("FAF_REPLAY_SEEK", "3000,900,6000")
   );
@@ -231,7 +253,10 @@ TEST(ReplayPlayback, KeyframeSeeksKeepTheChecksums)
 // The rehearsal of a rejoin (issue #275, CRejoinFeed): the first replay played as one command source of a live game,
 // every other client fed from the recording, and this client's own driver issuing its beats after the handover beat.
 // The recorded checksums have to match through the handover to the end.
-TEST(ReplayPlayback, RejoinRehearsalKeepsTheChecksums)
+TEST(
+  ReplayPlayback,
+  RejoinRehearsalKeepsTheChecksums
+)
 {
   const std::vector<SReplay> replays = Replays();
   if (replays.empty()) {
@@ -246,7 +271,8 @@ TEST(ReplayPlayback, RejoinRehearsalKeepsTheChecksums)
   }
   ASSERT_EQ(plan.size(), 3u) << "FAF_REPLAY_REJOIN is source:army:beat";
   const SRun run = PlayReplay(
-    replay, "ctest_rejoin_" + replay.id,
+    replay,
+    "ctest_rejoin_" + replay.id,
     " --rejoin-source " + plan[0] + " --focus " + plan[1] + " --rejoin-beat " + plan[2]
   );
   ExpectMatchedToTheEnd(run);
@@ -257,7 +283,10 @@ TEST(ReplayPlayback, RejoinRehearsalKeepsTheChecksums)
 // sim's Lua objects, and drives building, factories, upgrades, transports, missiles, reclaim, repair, capture and an
 // AI platoon. The zoo changes the game, so the recorded checksums no longer apply (headless exits 1 for them); the
 // run has to reach the zoo's last step without a crash and play to the end.
-TEST(ReplayPlayback, UnitZooRunsEveryUnitAndCall)
+TEST(
+  ReplayPlayback,
+  UnitZooRunsEveryUnitAndCall
+)
 {
   const std::vector<SReplay> replays = Replays();
   if (replays.empty()) {
@@ -330,7 +359,10 @@ TEST(ReplayPlayback, UnitZooRunsEveryUnitAndCall)
 // A rejoin from a save (issue #275: a client that lost a heavy game loads one instead of running from beat 0): the
 // first replay saved every 3000 beats, then played again from the beat-3000 save as command source 0, its own
 // driver issuing beats after 4500. The recorded checksums after the save have to match.
-TEST(ReplayPlayback, RejoinFromAKeyframeKeepsTheChecksums)
+TEST(
+  ReplayPlayback,
+  RejoinFromAKeyframeKeepsTheChecksums
+)
 {
   const std::vector<SReplay> replays = Replays();
   if (replays.empty()) {
@@ -350,7 +382,8 @@ TEST(ReplayPlayback, RejoinFromAKeyframeKeepsTheChecksums)
   ASSERT_TRUE(std::filesystem::exists(save)) << "no " << save.string();
 
   const SRun run = PlayReplay(
-    replay, "ctest_rejoinkf_" + replay.id,
+    replay,
+    "ctest_rejoinkf_" + replay.id,
     " --resume-from " + Quoted(save) + " --rejoin-source 0 --focus 0 --rejoin-beat 4500"
   );
   ExpectMatchedToTheEnd(run);
@@ -362,7 +395,10 @@ TEST(ReplayPlayback, RejoinFromAKeyframeKeepsTheChecksums)
 // view and moves it to army 1 at beat 3000, as a player's client does, keeps what only a client reads, and writes
 // the checksum digests, the published state, the Sync keys, the sync lanes, the bones, the blueprint order, the Lua
 // pairs order and every file it touched. None of that may change the recorded checksums, and every file is written.
-TEST(ReplayPlayback, AnalysisModesWriteTheirFilesAndKeepTheChecksums)
+TEST(
+  ReplayPlayback,
+  AnalysisModesWriteTheirFilesAndKeepTheChecksums
+)
 {
   const std::vector<SReplay> replays = Replays();
   if (replays.empty()) {
@@ -375,9 +411,15 @@ TEST(ReplayPlayback, AnalysisModesWriteTheirFilesAndKeepTheChecksums)
   std::filesystem::remove_all(out, ignored); // files from an earlier run would hide a missing one
   std::filesystem::create_directories(out);
   const std::vector<std::pair<std::string, std::string>> files = {
-    {"--digests", "digests.txt"},     {"--state-digests", "state.txt"}, {"--sync-keys", "keys.txt"},
-    {"--lane-sizes", "lanes.csv"},    {"--bone-stats", "bones.csv"},    {"--blueprint-order", "blueprints.txt"},
-    {"--lua-pairs", "pairs.txt"},     {"--disk-trace", "disk.txt"},     {"--sync-dump", "sync.bin"},
+    {"--digests", "digests.txt"},
+    {"--state-digests", "state.txt"},
+    {"--sync-keys", "keys.txt"},
+    {"--lane-sizes", "lanes.csv"},
+    {"--bone-stats", "bones.csv"},
+    {"--blueprint-order", "blueprints.txt"},
+    {"--lua-pairs", "pairs.txt"},
+    {"--disk-trace", "disk.txt"},
+    {"--sync-dump", "sync.bin"},
   };
   std::string arguments = " --focus 0 --focus-switch 3000:1 --keep-client-data --fpu-report";
   for (const auto& [option, name] : files) {
@@ -407,7 +449,11 @@ TEST(ReplayPlayback, AnalysisModesWriteTheirFilesAndKeepTheChecksums)
 namespace
 {
   /** The first replay played once with one server check; its summary must hold every `expected` text. */
-  void ExpectServerCheck(const std::string& tag, const std::string& arguments, const std::vector<std::string>& expected)
+  void ExpectServerCheck(
+    const std::string& tag,
+    const std::string& arguments,
+    const std::vector<std::string>& expected
+  )
   {
     const std::vector<SReplay> replays = Replays();
     if (replays.empty()) {
@@ -422,14 +468,19 @@ namespace
     }
   }
 
-  std::string OutputFile(const std::string& name)
+  std::string OutputFile(
+    const std::string& name
+  )
   {
     return Quoted(LogFolder() / name);
   }
 } // namespace
 
 // The replay's launch rebuilt from its header as the server builds it (BuildLaunchInfo) and compared; nothing played.
-TEST(ReplayPlaybackServer, LaunchRebuildsFromTheHeader)
+TEST(
+  ReplayPlaybackServer,
+  LaunchRebuildsFromTheHeader
+)
 {
   const std::vector<SReplay> replays = Replays();
   if (replays.empty()) {
@@ -446,14 +497,20 @@ TEST(ReplayPlaybackServer, LaunchRebuildsFromTheHeader)
 
 // Every command through the game server's seats, one per command source, each decoded and marshalled again as a
 // client sends it.
-TEST(ReplayPlaybackServer, SeatsCarryEveryCommandUnchanged)
+TEST(
+  ReplayPlaybackServer,
+  SeatsCarryEveryCommandUnchanged
+)
 {
   ExpectServerCheck("seats", " --seats --command-check", {"command check:", " 0 differing, 0 not marshalled again"});
 }
 
 // The visibility oracle for army 0 against what the sim publishes, every entity and beat, and the spatial oracle
 // against brute force.
-TEST(ReplayPlaybackServer, VisibilityOracleAgreesWithTheSim)
+TEST(
+  ReplayPlaybackServer,
+  VisibilityOracleAgreesWithTheSim
+)
 {
   ExpectServerCheck(
     "oracle", " --focus 0 --oracle-check", {"oracle check:", " 0 entity-beats differ", " 0 differ from brute force"}
@@ -461,52 +518,77 @@ TEST(ReplayPlaybackServer, VisibilityOracleAgreesWithTheSim)
 }
 
 // The sync walk's change set against its packet, every beat.
-TEST(ReplayPlaybackServer, ChangeSetCoversEveryPacketEntry)
+TEST(
+  ReplayPlaybackServer,
+  ChangeSetCoversEveryPacketEntry
+)
 {
   ExpectServerCheck("changeset", " --changeset-check", {"change-set check:", "(0 failures)"});
 }
 
 // Every army's view frame encoded and decoded again, with per-view ids, every command sent back through the view ids,
 // and the spy checking that no frame names what its client does not hold.
-TEST(ReplayPlaybackServer, ViewFramesRoundTrip)
+TEST(
+  ReplayPlaybackServer,
+  ViewFramesRoundTrip
+)
 {
   ExpectServerCheck(
-    "frames", " --view-frames " + OutputFile("ctest_frames.csv") + " --view-ids --inbound-check --spy",
-    {"view frames:", " 0 encode failures, 0 round-trip failures", "inbound check:", " 0 differing",
+    "frames",
+    " --view-frames " + OutputFile("ctest_frames.csv") + " --view-ids --inbound-check --spy",
+    {"view frames:",
+     " 0 encode failures, 0 round-trip failures",
+     "inbound check:",
+     " 0 differing",
      "not mapping back to their family and source: 0"}
   );
 }
 
 // The view frames over a simulated channel that loses 5 % of them and acknowledges 3 beats late, as a real link does:
 // each frame is encoded against the newest acknowledged one and must decode exactly (CClientFrameWindow).
-TEST(ReplayPlaybackServer, ViewFramesSurviveALossyLateAckChannel)
+TEST(
+  ReplayPlaybackServer,
+  ViewFramesSurviveALossyLateAckChannel
+)
 {
   ExpectServerCheck(
-    "lossy", " --view-frames " + OutputFile("ctest_lossy.csv") + " --view-loss 5 --view-ack-delay 3",
+    "lossy",
+    " --view-frames " + OutputFile("ctest_lossy.csv") + " --view-loss 5 --view-ack-delay 3",
     {"view frames:", " 0 encode failures, 0 round-trip failures", "channel: 0 frames arrived and did not decode"}
   );
 }
 
 // Every packet through the wire format and the game client's rebuild of it (remote/client), with dead reckoning in
 // 1/64-unit steps: what the client builds must be what the sim published.
-TEST(ReplayPlaybackServer, LoopbackClientRebuildsEveryPacket)
+TEST(
+  ReplayPlaybackServer,
+  LoopbackClientRebuildsEveryPacket
+)
 {
   ExpectServerCheck(
-    "loopback", " --loopback --loopback-dr 4 --loopback-turns 64",
-    {"loopback end:", "encode failures 0, decode failures 0, rebuild failures 0", "packet creations not rebuilt 0",
-     "erase mismatches 0, delete mismatches 0", "army lane", "(failures 0, records other than sent 0)"}
+    "loopback",
+    " --loopback --loopback-dr 4 --loopback-turns 64",
+    {"loopback end:",
+     "encode failures 0, decode failures 0, rebuild failures 0",
+     "packet creations not rebuilt 0",
+     "erase mismatches 0, delete mismatches 0",
+     "army lane",
+     "(failures 0, records other than sent 0)"}
   );
 }
 
 // The server's view work as a bench: every view's kept frame against one built whole, the Lua lane routed (view 0
 // moved to army 1 at beat 2000, view 1 resynced as after a reconnect at 3000, each view's Sync written), the session
 // tables and pose lane, two pipeline threads and team views.
-TEST(ReplayPlaybackServer, ViewBenchFramesMatchWholeFrames)
+TEST(
+  ReplayPlaybackServer,
+  ViewBenchFramesMatchWholeFrames
+)
 {
   ExpectServerCheck(
     "bench",
-    " --view-bench " + OutputFile("ctest_bench.csv") +
-      " --view-bench-check --lua-routing --lua-routing-dump " + OutputFile("ctest_routing") +
+    " --view-bench " + OutputFile("ctest_bench.csv") + " --view-bench-check --lua-routing --lua-routing-dump " +
+      OutputFile("ctest_routing") +
       " --lua-move-view 2000:0:1 --lua-resync 3000:1 --view-tables --view-poses --view-pipeline 2 --view-teams --spy",
     {"view bench:", " 0 encode failures, 0 check differences"}
   );
@@ -514,7 +596,10 @@ TEST(ReplayPlaybackServer, ViewBenchFramesMatchWholeFrames)
 
 // Army 0's packet digests twice: rebuilt from the sync walk's change set (unfocused) and the sim's own packet (focused
 // on army 0). The server's rebuild must be byte for byte what the sim sends.
-TEST(ReplayPlaybackServer, ChangeSetRebuildsTheSimsOwnPacket)
+TEST(
+  ReplayPlaybackServer,
+  ChangeSetRebuildsTheSimsOwnPacket
+)
 {
   const std::vector<SReplay> replays = Replays();
   if (replays.empty()) {
@@ -530,7 +615,8 @@ TEST(ReplayPlaybackServer, ChangeSetRebuildsTheSimsOwnPacket)
     std::filesystem::remove(path, ignored);
   }
   const SRun unfocused = PlayReplay(
-    replay, "ctest_packets_" + replay.id,
+    replay,
+    "ctest_packets_" + replay.id,
     " --view-packets 0 " + Quoted(rebuilt) + " --view-packets-entries " + Quoted(entries) +
       " --view-packets-entries-every 50"
   );
@@ -571,7 +657,10 @@ TEST(ReplayPlaybackServer, ChangeSetRebuildsTheSimsOwnPacket)
 }
 
 // The wire format's entities lane run on every beat beside the sim.
-TEST(ReplayPlaybackServer, WireStatsRunOnEveryBeat)
+TEST(
+  ReplayPlaybackServer,
+  WireStatsRunOnEveryBeat
+)
 {
   const std::filesystem::path stats = LogFolder() / "ctest_wire.csv";
   std::error_code ignored;
@@ -585,7 +674,10 @@ TEST(ReplayPlaybackServer, WireStatsRunOnEveryBeat)
 // (sim_DesyncTestNudgeBeat, docs/SWITCHES.md "Desync recorder"), so the recorded checksums stop matching from
 // there. Headless must report the mismatch with exit code 1, and /desyncdump must write the desync dump for
 // beat 1500 next to the log.
-TEST(ReplayPlayback, DeliberateDesyncIsCaughtAndDumped)
+TEST(
+  ReplayPlayback,
+  DeliberateDesyncIsCaughtAndDumped
+)
 {
   const std::vector<SReplay> replays = Replays();
   if (replays.empty()) {

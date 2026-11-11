@@ -3,7 +3,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/unit/tasks/CUnitGetBuiltTask.h"
+#include "moho/unit/tasks/CUnitGetBuiltTask.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -76,7 +77,9 @@ namespace moho
    * What it does:
    * Registers `CCommandTask` as reflection base for `CUnitGetBuiltTask`.
    */
-  void __stdcall CUnitGetBuiltTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitGetBuiltTaskTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -101,7 +104,9 @@ namespace moho
    * Constructs one `CUnitGetBuiltTask` in caller-provided storage and tags it
    * with the reflected runtime type descriptor.
    */
-  gpg::RRef CUnitGetBuiltTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitGetBuiltTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = gpg::ConstructInStorage<CUnitGetBuiltTask>(objectStorage);
     return gpg::RRef{task, gpg::RTypeOf<moho::CUnitGetBuiltTask>()};
@@ -113,7 +118,9 @@ namespace moho
    * What it does:
    * Deletes a `CUnitGetBuiltTask` through its deleting-destructor path.
    */
-  void CUnitGetBuiltTaskTypeInfo::Delete(void* const objectStorage)
+  void CUnitGetBuiltTaskTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitGetBuiltTask*>(objectStorage);
   }
@@ -125,7 +132,9 @@ namespace moho
    * Runs the non-deleting `CUnitGetBuiltTask` destructor body on placement
    * storage.
    */
-  void CUnitGetBuiltTaskTypeInfo::Destruct(void* const objectStorage)
+  void CUnitGetBuiltTaskTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     static_cast<CUnitGetBuiltTask*>(objectStorage)->~CUnitGetBuiltTask();
   }
@@ -139,7 +148,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitGetBuiltTaskTypeInfo_9f28d3, moho::register_CUnitGetBuiltTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitGetBuiltTaskTypeInfo_9f28d3,
+  moho::register_CUnitGetBuiltTaskTypeInfo
+)

@@ -11,7 +11,7 @@ namespace gpg
 {
   class BinaryReader;
   class BinaryWriter;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -162,9 +162,9 @@ namespace moho
     void ReadFromStream(gpg::BinaryReader& reader, int version) override;
 
   public:
-    std::int32_t mIndex = 0;                // +0x04
-    fa::string mName{};                  // +0x08
-    fa::vector<std::int32_t> mDecals{};  // +0x24
+    std::int32_t mIndex = 0;            // +0x04
+    fa::string mName{};                 // +0x08
+    fa::vector<std::int32_t> mDecals{}; // +0x24
   };
 
   static_assert(offsetof(CDecalGroup, mIndex) == 0x04, "CDecalGroup::mIndex offset must be 0x04");

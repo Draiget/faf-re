@@ -19,7 +19,13 @@ namespace
     return sInstance;
   }
 
-  struct Bootstrap { Bootstrap() { moho::register_ESTITargetTypeTypeInfoStartup(); } };
+  struct Bootstrap
+  {
+    Bootstrap()
+    {
+      moho::register_ESTITargetTypeTypeInfoStartup();
+    }
+  };
   Bootstrap gBootstrap;
 
   /**
@@ -81,7 +87,10 @@ ESTITargetTypeTypeInfo::ESTITargetTypeTypeInfo()
 ESTITargetTypeTypeInfo::~ESTITargetTypeTypeInfo() = default;
 
 /** Address: 0x0055AEF0 (FUN_0055AEF0) */
-const char* ESTITargetTypeTypeInfo::GetName() const { return "ESTITargetType"; }
+const char* ESTITargetTypeTypeInfo::GetName() const
+{
+  return "ESTITargetType";
+}
 
 /**
  * Address: 0x0055AED0 (FUN_0055AED0)
@@ -104,7 +113,9 @@ void ESTITargetTypeTypeInfo::Init()
  * What it does:
  * Sets enum prefix `STITARGET_` and registers None=0, Entity=1, Position=2.
  */
-void ESTITargetTypeTypeInfo::AddEnums(gpg::REnumType* const enumType)
+void ESTITargetTypeTypeInfo::AddEnums(
+  gpg::REnumType* const enumType
+)
 {
   enumType->mPrefix = "STITARGET_";
   enumType->AddEnum(enumType->StripPrefix("STITARGET_None"), 0);
@@ -120,7 +131,9 @@ void moho::register_ESTITargetTypeTypeInfoStartup()
   (void)Acquire();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_ESTITargetTypeTypeInfoStartup_11d329, moho::register_ESTITargetTypeTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_ESTITargetTypeTypeInfoStartup_11d329,
+  moho::register_ESTITargetTypeTypeInfoStartup
+)

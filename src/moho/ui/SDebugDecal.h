@@ -15,11 +15,11 @@ namespace moho
    */
   struct SDebugDecal
   {
-    Wm3::Vec3f corner0;     // +0x00
-    Wm3::Vec3f corner1;     // +0x0C
-    Wm3::Vec3f corner2;     // +0x18
-    Wm3::Vec3f corner3;     // +0x24
-    std::uint32_t color;    // +0x30
+    Wm3::Vec3f corner0;  // +0x00
+    Wm3::Vec3f corner1;  // +0x0C
+    Wm3::Vec3f corner2;  // +0x18
+    Wm3::Vec3f corner3;  // +0x24
+    std::uint32_t color; // +0x30
   };
 
   static_assert(offsetof(SDebugDecal, corner0) == 0x00, "SDebugDecal::corner0 offset must be 0x00");

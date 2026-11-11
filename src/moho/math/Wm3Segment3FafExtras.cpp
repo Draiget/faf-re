@@ -17,7 +17,10 @@ namespace Wm3
    * the half vector only when the extent is positive. The origin is
    * `start + half`, not `(start + end) / 2`.
    */
-  Segment3f MakeSegment3fFromEndpoints(const Vector3f& start, const Vector3f& end) noexcept
+  Segment3f MakeSegment3fFromEndpoints(
+    const Vector3f& start,
+    const Vector3f& end
+  ) noexcept
   {
     const Vector3f half{(end.x - start.x) * 0.5f, (end.y - start.y) * 0.5f, (end.z - start.z) * 0.5f};
     const float extent = std::sqrt((half.y * half.y) + (half.z * half.z) + (half.x * half.x));

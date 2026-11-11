@@ -32,7 +32,9 @@ namespace
    * Registers `CScriptObject` as the reflected base of `CPlatoon`, at
    * offset 0.
    */
-  void AddBase_CSCcriptObject(gpg::RType* const typeInfo)
+  void AddBase_CSCcriptObject(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CScriptObject>(typeInfo);
   }
@@ -43,7 +45,9 @@ namespace
    * What it does:
    * Forwards to `AddBase_CSCcriptObject`.
    */
-  [[maybe_unused]] void AddBase_CSCcriptObjectThunk(gpg::RType* const typeInfo)
+  [[maybe_unused]] void AddBase_CSCcriptObjectThunk(
+    gpg::RType* const typeInfo
+  )
   {
     AddBase_CSCcriptObject(typeInfo);
   }
@@ -109,7 +113,7 @@ namespace
     terminatorRef.mType = gpg::RTypeOf<moho::CSquad>();
     gpg::WriteRawPointer(archive, terminatorRef, gpg::TrackedPointerState::Unowned, ownerRef);
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -134,7 +138,9 @@ namespace moho
     return &instance;
   }
 
-  LuaPlus::LuaObject CScrLuaMetatableFactory<CPlatoon>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CPlatoon>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -194,27 +200,33 @@ namespace moho
     , mHasLuaList(false)
     , mPad_0x109{0u, 0u, 0u, 0u, 0u, 0u, 0u}
   {}
-namespace
-{
-    [[nodiscard]] LuaPlus::LuaObject ResolvePlatoonLuaClassForCtor(LuaPlus::LuaState* const state)
+  namespace
+  {
+    [[nodiscard]] LuaPlus::LuaObject ResolvePlatoonLuaClassForCtor(
+      LuaPlus::LuaState* const state
+    )
     {
       LuaPlus::LuaObject platoonClass{};
       (void)func_LoadPlatoon(state, &platoonClass);
       return platoonClass;
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x00724CC0 (FUN_00724CC0, Moho::CPlatoon::CPlatoon)
    */
-  CPlatoon::CPlatoon(Sim* const sim, CArmyImpl* const army, const char* const platoonName, const char* const aiPlan)
+  CPlatoon::CPlatoon(
+    Sim* const sim,
+    CArmyImpl* const army,
+    const char* const platoonName,
+    const char* const aiPlan
+  )
     : CScriptObject(
-      ResolvePlatoonLuaClassForCtor(sim ? sim->mLuaState : nullptr),
-      LuaPlus::LuaObject{},
-      LuaPlus::LuaObject{},
-      LuaPlus::LuaObject{}
-    )
+        ResolvePlatoonLuaClassForCtor(sim ? sim->mLuaState : nullptr),
+        LuaPlus::LuaObject{},
+        LuaPlus::LuaObject{},
+        LuaPlus::LuaObject{}
+      )
     , mSim(sim)
     , mArmy(army)
     , mUnknown_0x03C(0u)
@@ -248,7 +260,12 @@ namespace
   /**
    * Address: 0x0072A0D0 (FUN_0072A0D0, sub_72A0D0)
    */
-  void CPlatoon::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CPlatoon::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CPlatoon()), 0u);
   }
@@ -260,7 +277,9 @@ namespace
    * Loads `mSim`, `mUnits`, `mSquadClass`, `mName`, then `mCats` in binary
    * archive order.
    */
-  void CSquad::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CSquad::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     gpg::RRef ownerRef{};
     archive->ReadPointer(&mSim, &ownerRef);
@@ -281,7 +300,9 @@ namespace
    * Saves `mSim`, `mUnits`, `mSquadClass`, `mName`, then `mCats` in binary
    * archive order.
    */
-  void CSquad::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CSquad::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     gpg::RRef ownerRef{};
     gpg::RRef simRef{};
@@ -289,7 +310,9 @@ namespace
     gpg::WriteRawPointer(archive, simRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     ownerRef = {};
-    archive->Write(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), const_cast<EntitySetTemplate<Unit>*>(&mUnits), ownerRef);
+    archive->Write(
+      gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), const_cast<EntitySetTemplate<Unit>*>(&mUnits), ownerRef
+    );
 
     ownerRef = {};
     archive->Write(gpg::RTypeOf<moho::ESquadClass>(), const_cast<ESquadClass*>(&mSquadClass), ownerRef);
@@ -297,9 +320,7 @@ namespace
 
     ownerRef = {};
     archive->Write(
-      gpg::RTypeOf<fa::vector<moho::EntityCategorySet>>(),
-      const_cast<fa::vector<EntityCategorySet>*>(&mCats),
-      ownerRef
+      gpg::RTypeOf<fa::vector<moho::EntityCategorySet>>(), const_cast<fa::vector<EntityCategorySet>*>(&mCats), ownerRef
     );
   }
 
@@ -310,7 +331,9 @@ namespace
    * Loads `CScriptObject` base state, sim/army pointers, squad list, name
    * strings, and lifetime stats, in archive order.
    */
-  void CPlatoon::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CPlatoon::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     gpg::RRef ownerRef{};
     archive->Read(gpg::RTypeOf<moho::CScriptObject>(), this, ownerRef);
@@ -356,7 +379,9 @@ namespace
    * Saves `CScriptObject` base state, sim/army pointers, squad list, name
    * strings, and lifetime stats, in archive order.
    */
-  void CPlatoon::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CPlatoon::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     gpg::RRef ownerRef{};
     archive->Write(gpg::RTypeOf<moho::CScriptObject>(), const_cast<CPlatoon*>(this), ownerRef);
@@ -388,7 +413,9 @@ namespace
       archive->WriteBool(mHasLuaList);
       if (mHasLuaList) {
         ownerRef = {};
-        archive->Write(gpg::LookupRType(typeid(LuaPlus::LuaObject)), &const_cast<CPlatoon*>(this)->mLuaUnitList, ownerRef);
+        archive->Write(
+          gpg::LookupRType(typeid(LuaPlus::LuaObject)), &const_cast<CPlatoon*>(this)->mLuaUnitList, ownerRef
+        );
       }
     }
   }
@@ -412,7 +439,9 @@ namespace
   /**
    * Address: 0x00725630 (FUN_00725630, Moho::CPlatoon::GetSquad)
    */
-  CSquad* CPlatoon::GetSquad(const ESquadClass squadClass) const
+  CSquad* CPlatoon::GetSquad(
+    const ESquadClass squadClass
+  ) const
   {
     for (CSquad* const squad : mSquadList) {
       if (squad->mSquadClass == squadClass) {
@@ -440,7 +469,9 @@ namespace
   /**
    * Address: 0x00725660 (FUN_00725660, Moho::CPlatoon::CountUnassignedUnitsWithBP)
    */
-  int CPlatoon::CountUnassignedUnitsWithBP(const char* const blueprintId)
+  int CPlatoon::CountUnassignedUnitsWithBP(
+    const char* const blueprintId
+  )
   {
     const CSquad* const squad = GetSquad(ESquadClass::Unassigned);
     return squad != nullptr ? squad->CountUnitsWithBP(blueprintId) : 0;
@@ -449,7 +480,9 @@ namespace
   /**
    * Address: 0x007256A0 (FUN_007256A0, Moho::CPlatoon::CountUnassignedUnitsInCategory)
    */
-  int CPlatoon::CountUnassignedUnitsInCategory(const EntityCategorySet* const categorySet)
+  int CPlatoon::CountUnassignedUnitsInCategory(
+    const EntityCategorySet* const categorySet
+  )
   {
     const CSquad* const squad = GetSquad(ESquadClass::Unassigned);
     return squad != nullptr ? squad->CountUnitsInCategory(categorySet) : 0;
@@ -459,7 +492,9 @@ namespace
    * Address: 0x007256E0 (FUN_007256E0, Moho::CPlatoon::GetUnassignedUnitsInCategory)
    */
   void CPlatoon::GetUnassignedUnitsInCategory(
-    const EntityCategorySet* const categorySet, const int maxCount, EntitySetTemplate<Unit>& outUnits
+    const EntityCategorySet* const categorySet,
+    const int maxCount,
+    EntitySetTemplate<Unit>& outUnits
   )
   {
     if (CSquad* const squad = GetSquad(ESquadClass::Unassigned)) {
@@ -471,7 +506,9 @@ namespace
    * Address: 0x00725730 (FUN_00725730, Moho::CPlatoon::GetUnassignedUnitsWithBP)
    */
   void CPlatoon::GetUnassignedUnitsWithBP(
-    const char* const blueprintId, const int maxCount, EntitySetTemplate<Unit>& outUnits
+    const char* const blueprintId,
+    const int maxCount,
+    EntitySetTemplate<Unit>& outUnits
   )
   {
     if (CSquad* const squad = GetSquad(ESquadClass::Unassigned)) {
@@ -494,7 +531,9 @@ namespace
   /**
    * Address: 0x007253B0 (FUN_007253B0, Moho::CPlatoon::RemoveUnit)
    */
-  void CPlatoon::RemoveUnit(Unit* const unit)
+  void CPlatoon::RemoveUnit(
+    Unit* const unit
+  )
   {
     mHasLuaList = false;
     for (CSquad* const squad : mSquadList) {
@@ -508,7 +547,9 @@ namespace
   /**
    * Address: 0x007251D0 (FUN_007251D0, Moho::CPlatoon::IsInPlatoon)
    */
-  bool CPlatoon::IsInPlatoon(const Unit* const unit) const
+  bool CPlatoon::IsInPlatoon(
+    const Unit* const unit
+  ) const
   {
     for (const CSquad* const squad : mSquadList) {
       if (squad->HasUnit(unit)) {
@@ -521,7 +562,9 @@ namespace
   /**
    * Address: 0x00725220 (FUN_00725220, Moho::CPlatoon::GetSquadClass)
    */
-  ESquadClass CPlatoon::GetSquadClass(const Unit* const unit) const
+  ESquadClass CPlatoon::GetSquadClass(
+    const Unit* const unit
+  ) const
   {
     for (const CSquad* const squad : mSquadList) {
       if (squad->HasUnit(unit)) {
@@ -534,7 +577,10 @@ namespace
   /**
    * Address: 0x007241F0 (FUN_007241F0)
    */
-  void CPlatoon::AppendUnitsToSquad(CSquad* const squad, const EntitySetTemplate<Unit>& units)
+  void CPlatoon::AppendUnitsToSquad(
+    CSquad* const squad,
+    const EntitySetTemplate<Unit>& units
+  )
   {
     squad->mUnits.AddRange(units.mVec.begin(), units.mVec.end());
     mHasLuaList = false;
@@ -543,7 +589,10 @@ namespace
   /**
    * Address: 0x00725280 (FUN_00725280, sub_725280)
    */
-  void CPlatoon::AppendUnitsToSquad(const ESquadClass squadClass, const EntitySetTemplate<Unit>& units)
+  void CPlatoon::AppendUnitsToSquad(
+    const ESquadClass squadClass,
+    const EntitySetTemplate<Unit>& units
+  )
   {
     if (CSquad* const squad = GetSquad(squadClass)) {
       AppendUnitsToSquad(squad, units);
@@ -554,7 +603,10 @@ namespace
   /**
    * Address: 0x007252D0 (FUN_007252D0, sub_7252D0)
    */
-  void CPlatoon::AppendUnitToSquad(const ESquadClass squadClass, Unit* const unit)
+  void CPlatoon::AppendUnitToSquad(
+    const ESquadClass squadClass,
+    Unit* const unit
+  )
   {
     EntitySetTemplate<Unit> singleUnitSet{};
     (void)singleUnitSet.Add(unit);
@@ -565,7 +617,8 @@ namespace
    * Address: 0x00725990 (FUN_00725990, sub_725990)
    */
   void CPlatoon::SetPrioritizedTargetList(
-    const ESquadClass squadClass, const fa::vector<EntityCategorySet>& categories
+    const ESquadClass squadClass,
+    const fa::vector<EntityCategorySet>& categories
   )
   {
     if (CSquad* const squad = GetSquad(squadClass)) {
@@ -581,7 +634,11 @@ namespace
    * being scanned, so with the all-classes selector (no squad has class 6)
    * the answer is always false. Kept as the binary has it.
    */
-  bool CPlatoon::SquadHasState(const ESquadClass squadClass, CPlatoon* const platoon, const EUnitState state)
+  bool CPlatoon::SquadHasState(
+    const ESquadClass squadClass,
+    CPlatoon* const platoon,
+    const EUnitState state
+  )
   {
     for (std::int32_t checkedClass = 1; checkedClass < static_cast<std::int32_t>(kAllSquadClasses); ++checkedClass) {
       if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != checkedClass) {
@@ -599,7 +656,9 @@ namespace
   /**
    * Address: 0x007261B0 (FUN_007261B0, Moho::CPlatoon::Stop)
    */
-  void CPlatoon::Stop(const ESquadClass squadClass)
+  void CPlatoon::Stop(
+    const ESquadClass squadClass
+  )
   {
     if (squadClass == kAllSquadClasses) {
       for (CSquad* const squad : mSquadList) {
@@ -620,7 +679,9 @@ namespace
    * per transport, issues `UNITCOMMAND_TransportLoadUnits`, and returns issued
    * command weak-links.
    */
-  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::LoadUnits(const EntityCategorySet* const categorySet)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::LoadUnits(
+    const EntityCategorySet* const categorySet
+  )
   {
     constexpr const char* kTransportationCategoryName = "TRANSPORTATION";
 
@@ -642,8 +703,10 @@ namespace
           continue;
         }
 
-        if (!unit->IsInCategory(kTransportationCategoryName)
-            && EntityCategory::HasBlueprint(unit->GetBlueprint(), categorySet)) {
+        if (
+          !unit->IsInCategory(kTransportationCategoryName) &&
+          EntityCategory::HasBlueprint(unit->GetBlueprint(), categorySet)
+        ) {
           (void)unitsToLoad.Add(unit);
         }
       }
@@ -743,7 +806,9 @@ namespace
    * Replaces platoon plan string and dispatches script `OnDestroy/OnCreate`
    * when the plan text changes.
    */
-  void CPlatoon::SwitchAIPlan(const char* const planName)
+  void CPlatoon::SwitchAIPlan(
+    const char* const planName
+  )
   {
     const char* const normalizedPlan = (planName != nullptr) ? planName : "";
     if (mPlan == normalizedPlan) {
@@ -819,7 +884,9 @@ namespace
   /**
    * Address: 0x00736D70 (FUN_00736D70, sub_736D70)
    */
-  CPlatoon* CPlatoon::AddDamageDealt(const float amount)
+  CPlatoon* CPlatoon::AddDamageDealt(
+    const float amount
+  )
   {
     mDamageDealt += amount;
     return this;
@@ -828,7 +895,9 @@ namespace
   /**
    * Address: 0x00736D90 (FUN_00736D90, sub_736D90)
    */
-  CPlatoon* CPlatoon::AddDamageReceived(const float amount)
+  CPlatoon* CPlatoon::AddDamageReceived(
+    const float amount
+  )
   {
     mDamageReceived += amount;
     return this;
@@ -837,7 +906,9 @@ namespace
   /**
    * Address: 0x0072B730 (FUN_0072B730, Moho::CPlatoon::SetPlatoonFormationOverride)
    */
-  void CPlatoon::SetPlatoonFormationOverride(const fa::string& formationName)
+  void CPlatoon::SetPlatoonFormationOverride(
+    const fa::string& formationName
+  )
   {
     mFormation = formationName;
   }
@@ -854,7 +925,9 @@ namespace
    * instead handed the units to `SimArmy::AssignUnitsToPlatoon(units,
    * "ArmyPool")` and left the squads alive; the binary never calls it.
    */
-  void CPlatoon::ReturnUnitsTo(CPlatoon* const armyPool)
+  void CPlatoon::ReturnUnitsTo(
+    CPlatoon* const armyPool
+  )
   {
     mHasLuaList = false;
 
@@ -908,7 +981,8 @@ namespace
     const EAlliance alliance,
     const bool canAttack,
     const Wm3::Vector3f& center,
-    const float radius)
+    const float radius
+  )
   {
     // Resolve the squad for `squadClass`; it supplies the priority list and
     // gates candidates via CanAttackTarget.
@@ -930,12 +1004,8 @@ namespace
     // Gather every unit within `radius` of `center` ("ALLUNITS", alliance-filtered).
     EntitySetTemplate<Unit> gatheredUnits{};
     (void)CollectUnitsAroundPointFiltered(
-      mArmy->GetArmyBrain(),
-      &gatheredUnits,
-      mSim->mRules->GetEntityCategory("ALLUNITS"),
-      center,
-      radius,
-      alliance);
+      mArmy->GetArmyBrain(), &gatheredUnits, mSim->mRules->GetEntityCategory("ALLUNITS"), center, radius, alliance
+    );
 
     // "no best yet" sentinels so the first admissible candidate always wins.
     constexpr int kBestRankUnset = 99999;
@@ -975,7 +1045,8 @@ namespace
       const float dx = center.x - unitPos.x;
       const float dy = center.y - unitPos.y;
       const float dz = center.z - unitPos.z;
-      // (dy*dy + dz*dz) + dx*dx: a sum in another order can round differently and pick the other of two near-equal units.
+      // (dy*dy + dz*dz) + dx*dx: a sum in another order can round differently and pick the other of two near-equal
+      // units.
       const float distSq = (dy * dy + dz * dz) + dx * dx;
 
       if (rank < bestRank || (rank == bestRank && bestDistSq > distSq)) {
@@ -1009,7 +1080,8 @@ namespace
     const ESquadClass squadClass,
     const EAlliance alliance,
     const bool canAttack,
-    const Wm3::Vector3f& pos)
+    const Wm3::Vector3f& pos
+  )
   {
     // flt_E4F6E8: negative sentinel so the first admissible candidate always wins.
     constexpr float kBestValueUnset = -1.0f;
@@ -1049,69 +1121,67 @@ namespace
 
       float candidateValue = 0.0f;
       switch (cmpType) {
-        case COMPARE_Closest:
-        case COMPARE_Furthest: {
-          const Wm3::Vector3f& unitPos = unit->GetPosition();
-          const float dx = unitPos.x - pos.x;
-          const float dy = unitPos.y - pos.y;
-          const float dz = unitPos.z - pos.z;
-          // 0x00725E8F: (dy*dy + dz*dz) + dx*dx; a sum in another order can round differently and pick the other of two
-          // near-equal units (26902525 at beat 16871: 12825.258 and 12825.259).
-          candidateValue = (dy * dy + dz * dz) + dx * dx;
-          const bool better = (cmpType == COMPARE_Closest) ? (bestValue > candidateValue)
-                                                           : (candidateValue > bestValue);
-          if (!better && bestValue >= 0.0f) {
-            continue;
-          }
-          break;
-        }
-        case COMPARE_HighestValue: {
-          candidateValue = blueprint->Economy.BuildCostMass + blueprint->Economy.BuildCostEnergy;
-          if (candidateValue <= bestValue && bestValue >= 0.0f) {
-            continue;
-          }
-          break;
-        }
-        case COMPARE_LeastDefended: {
-          // Not reached at runtime (no caller passes COMPARE_LeastDefended); recovered
-          // for 1:1 completeness. Score = summed build value of nearby armed allies.
-          const SFootprint& footprint = unitEntity->GetFootprint();
-          std::uint8_t maxDimension = footprint.mSizeX;
-          if (footprint.mSizeZ > maxDimension) {
-            maxDimension = footprint.mSizeZ;
-          }
-          const float gatherRadius = static_cast<float>(maxDimension) * kLeastDefendedRadiusScale;
-
-          EntitySetTemplate<Unit> nearbyDefenders{};
-          (void)CollectUnitsAroundPointFiltered(
-            unitEntity->ArmyRef->GetArmyBrain(),
-            &nearbyDefenders,
-            category,
-            unit->GetPosition(),
-            gatherRadius,
-            ALLIANCE_Ally);
-
-          candidateValue = 0.0f;
-          for (Entity* const* defenderSlot = nearbyDefenders.mVec.begin();
-               defenderSlot != nearbyDefenders.mVec.end();
-               ++defenderSlot) {
-            const Unit* const defender = static_cast<Unit*>(*defenderSlot);
-            if (defender == nullptr) {
-              continue;
-            }
-            const RUnitBlueprint* const defenderBlueprint = defender->GetBlueprint();
-            if (!defenderBlueprint->Weapons.WeaponBlueprints.empty()) {
-              candidateValue +=
-                defenderBlueprint->Economy.BuildCostMass + defenderBlueprint->Economy.BuildCostEnergy;
-            }
-          }
-          if (bestValue <= candidateValue && bestValue >= 0.0f) {
-            continue;
-          }
-          break;
-        }
-        default:
+      case COMPARE_Closest:
+      case COMPARE_Furthest: {
+        const Wm3::Vector3f& unitPos = unit->GetPosition();
+        const float dx = unitPos.x - pos.x;
+        const float dy = unitPos.y - pos.y;
+        const float dz = unitPos.z - pos.z;
+        // 0x00725E8F: (dy*dy + dz*dz) + dx*dx; a sum in another order can round differently and pick the other of two
+        // near-equal units (26902525 at beat 16871: 12825.258 and 12825.259).
+        candidateValue = (dy * dy + dz * dz) + dx * dx;
+        const bool better = (cmpType == COMPARE_Closest) ? (bestValue > candidateValue) : (candidateValue > bestValue);
+        if (!better && bestValue >= 0.0f) {
           continue;
+        }
+        break;
+      }
+      case COMPARE_HighestValue: {
+        candidateValue = blueprint->Economy.BuildCostMass + blueprint->Economy.BuildCostEnergy;
+        if (candidateValue <= bestValue && bestValue >= 0.0f) {
+          continue;
+        }
+        break;
+      }
+      case COMPARE_LeastDefended: {
+        // Not reached at runtime (no caller passes COMPARE_LeastDefended); recovered
+        // for 1:1 completeness. Score = summed build value of nearby armed allies.
+        const SFootprint& footprint = unitEntity->GetFootprint();
+        std::uint8_t maxDimension = footprint.mSizeX;
+        if (footprint.mSizeZ > maxDimension) {
+          maxDimension = footprint.mSizeZ;
+        }
+        const float gatherRadius = static_cast<float>(maxDimension) * kLeastDefendedRadiusScale;
+
+        EntitySetTemplate<Unit> nearbyDefenders{};
+        (void)CollectUnitsAroundPointFiltered(
+          unitEntity->ArmyRef->GetArmyBrain(),
+          &nearbyDefenders,
+          category,
+          unit->GetPosition(),
+          gatherRadius,
+          ALLIANCE_Ally
+        );
+
+        candidateValue = 0.0f;
+        for (Entity* const* defenderSlot = nearbyDefenders.mVec.begin(); defenderSlot != nearbyDefenders.mVec.end();
+             ++defenderSlot) {
+          const Unit* const defender = static_cast<Unit*>(*defenderSlot);
+          if (defender == nullptr) {
+            continue;
+          }
+          const RUnitBlueprint* const defenderBlueprint = defender->GetBlueprint();
+          if (!defenderBlueprint->Weapons.WeaponBlueprints.empty()) {
+            candidateValue += defenderBlueprint->Economy.BuildCostMass + defenderBlueprint->Economy.BuildCostEnergy;
+          }
+        }
+        if (bestValue <= candidateValue && bestValue >= 0.0f) {
+          continue;
+        }
+        break;
+      }
+      default:
+        continue;
       }
 
       if (canAttack && !squad->CanAttackTarget(unit)) {
@@ -1141,7 +1211,8 @@ namespace
     const ECompareType cmpType,
     const ESquadClass squadClass,
     const EAlliance alliance,
-    const bool canAttack)
+    const bool canAttack
+  )
   {
     CSquad* squad = nullptr;
     for (CSquad* const candidate : mSquadList) {
@@ -1191,9 +1262,9 @@ namespace
     commandIssueData.mTarget.mPos.z = 0.0f;
 
     if (useFormation) {
-      commandIssueData.unk38 = formationScriptIndex;  // formation script index
+      commandIssueData.unk38 = formationScriptIndex; // formation script index
       commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
-      commandIssueData.unk4C = 1.0f;                   // FormAttack orientation weight
+      commandIssueData.unk4C = 1.0f; // FormAttack orientation weight
     }
 
     CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
@@ -1218,7 +1289,10 @@ namespace
    * Each set is issued as FormAttack when a formation script resolves and it holds
    * more than one unit, else a plain Attack. Returns the issued command weak-links.
    */
-  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::AttackTarget(Entity* const target, const ESquadClass squadClass)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::AttackTarget(
+    Entity* const target,
+    const ESquadClass squadClass
+  )
   {
     fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
@@ -1275,9 +1349,9 @@ namespace
     commandIssueData.mTarget.mPos.z = 0.0f;
 
     if (useFormation) {
-      commandIssueData.unk38 = formationScriptIndex;  // formation script index
+      commandIssueData.unk38 = formationScriptIndex; // formation script index
       commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
-      commandIssueData.unk4C = 1.0f;                   // FormMove orientation weight
+      commandIssueData.unk4C = 1.0f; // FormMove orientation weight
     }
 
     CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
@@ -1305,7 +1379,9 @@ namespace
    * Returns the issued command weak-links.
    */
   fa::vector<WeakPtr<CUnitCommand>> CPlatoon::MoveToTarget(
-    Entity* const target, const bool useTransports, const ESquadClass squadClass
+    Entity* const target,
+    const bool useTransports,
+    const ESquadClass squadClass
   )
   {
     fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
@@ -1395,9 +1471,9 @@ namespace
     commandIssueData.mTarget.mPos = target;
 
     if (useFormation) {
-      commandIssueData.unk38 = formationScriptIndex;  // formation script index
+      commandIssueData.unk38 = formationScriptIndex; // formation script index
       commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
-      commandIssueData.unk4C = 1.0f;                   // FormMove orientation weight
+      commandIssueData.unk4C = 1.0f; // FormMove orientation weight
     }
 
     CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
@@ -1426,7 +1502,9 @@ namespace
    * Returns the issued command weak-links.
    */
   fa::vector<WeakPtr<CUnitCommand>> CPlatoon::MoveToLocation(
-    Wm3::Vector3f& pos, const bool useTransports, const ESquadClass squadClass
+    Wm3::Vector3f& pos,
+    const bool useTransports,
+    const ESquadClass squadClass
   )
   {
     // Snap the requested point to the terrain (or water, when higher) surface.
@@ -1520,9 +1598,10 @@ namespace
     commandIssueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
     commandIssueData.mTarget.mEnt = static_cast<std::uint32_t>(kGroundTargetEntitySentinel);
     commandIssueData.mTarget.mPos = pos;
-    commandIssueData.unk38 = formationScriptIndex > 0 ? formationScriptIndex : 0;  // formation script index, clamped to >= 0
+    commandIssueData.unk38 =
+      formationScriptIndex > 0 ? formationScriptIndex : 0; // formation script index, clamped to >= 0
     commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
-    commandIssueData.unk4C = 1.0f;                                                 // orientation weight
+    commandIssueData.unk4C = 1.0f; // orientation weight
 
     CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
     if (issuedCommand != nullptr) {
@@ -1546,7 +1625,10 @@ namespace
    * formation script, else a plain AggressiveMove. Returns the issued command
    * weak-links.
    */
-  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::AggressiveMoveToLocation(Wm3::Vector3f& pos, const ESquadClass squadClass)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::AggressiveMoveToLocation(
+    Wm3::Vector3f& pos,
+    const ESquadClass squadClass
+  )
   {
     // Snap the requested point to the terrain (or water, when higher) surface.
     STIMap* const mapData = mSim->mMapData;
@@ -1590,14 +1672,17 @@ namespace
    * (and alive, not-being-built) units across all squad classes, and issues a
    * single `UNITCOMMAND_Ferry` to that ground point.
    */
-  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::FerryToLocation(Wm3::Vector3f& targetPos)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::FerryToLocation(
+    Wm3::Vector3f& targetPos
+  )
   {
     fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
     // Snap the requested point to the terrain (or water, when higher) surface.
     STIMap* const mapData = mSim->mMapData;
     float surfaceElevation = mapData->mHeightField->GetElevation(targetPos.x, targetPos.z);
-    const float waterElevation = mapData->GetWaterElevationAt(targetPos.x, targetPos.z); // engine addition: per position
+    const float waterElevation =
+      mapData->GetWaterElevationAt(targetPos.x, targetPos.z); // engine addition: per position
     if (waterElevation > surfaceElevation) {
       surfaceElevation = waterElevation;
     }
@@ -1651,7 +1736,10 @@ namespace
    * carrier itself is added too. Finally issues one
    * UNITCOMMAND_TransportUnloadSpecificUnits to the snapped ground point.
    */
-  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::UnloadUnitsAtLocation(const EntityCategorySet* const category, Wm3::Vector3f& pos)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::UnloadUnitsAtLocation(
+    const EntityCategorySet* const category,
+    Wm3::Vector3f& pos
+  )
   {
     fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
@@ -1718,7 +1806,9 @@ namespace
    * Collects transport/carrier units (alive, not-being-built) across all squad
    * classes and issues one `UNITCOMMAND_TransportUnloadUnits` to `targetPos`.
    */
-  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::UnloadAllAtLocation(const Wm3::Vector3f& targetPos)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::UnloadAllAtLocation(
+    const Wm3::Vector3f& targetPos
+  )
   {
     fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
@@ -1778,9 +1868,9 @@ namespace
     commandIssueData.mTarget.mPos = target;
 
     if (useFormation) {
-      commandIssueData.unk38 = formationScriptIndex;  // formation script index
+      commandIssueData.unk38 = formationScriptIndex; // formation script index
       commandIssueData.mOri = Zeroed<Wm3::Quaternionf>();
-      commandIssueData.unk4C = 1.0f;                   // FormPatrol orientation weight
+      commandIssueData.unk4C = 1.0f; // FormPatrol orientation weight
     }
 
     (void)IssueCommandToSelectedUnits(sim, units, commandIssueData, false);
@@ -1802,7 +1892,10 @@ namespace
    * FormPatrol when a formation script resolves and it holds more than one unit,
    * else a plain Patrol.
    */
-  void CPlatoon::Patrol(Wm3::Vector3f& target, const ESquadClass squadClass)
+  void CPlatoon::Patrol(
+    Wm3::Vector3f& target,
+    const ESquadClass squadClass
+  )
   {
     // Snap the requested point to the terrain (or water, when higher) surface.
     STIMap* const mapData = mSim->mMapData;
@@ -1840,7 +1933,10 @@ namespace
   /**
    * Address: 0x00728420 (FUN_00728420, func_IssueGuardTargetToPlatoon)
    */
-  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::GuardTarget(Unit* const guardTarget, const ESquadClass squadClass)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::GuardTarget(
+    Unit* const guardTarget,
+    const ESquadClass squadClass
+  )
   {
     fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
@@ -1880,12 +1976,15 @@ namespace
   /**
    * Address: 0x00726210 (FUN_00726210, sub_726210)
    */
-  void CPlatoon::DestroySquads(const ESquadClass squadClass)
+  void CPlatoon::DestroySquads(
+    const ESquadClass squadClass
+  )
   {
     mHasLuaList = false;
 
     EntitySetTemplate<Unit> doomedUnits{};
-    for (std::int32_t squadClassIndex = 1; squadClassIndex < static_cast<std::int32_t>(kAllSquadClasses); ++squadClassIndex) {
+    for (std::int32_t squadClassIndex = 1; squadClassIndex < static_cast<std::int32_t>(kAllSquadClasses);
+         ++squadClassIndex) {
       if (squadClass != kAllSquadClasses && static_cast<std::int32_t>(squadClass) != squadClassIndex) {
         continue;
       }
@@ -1920,7 +2019,9 @@ namespace
    * the entity set). The decompiler mislabels the result as `std::map_uint_Entity`;
    * it is the intrusive unit set the callback then exposes to Lua.
    */
-  void CPlatoon::GetFerryBeacons(EntitySetTemplate<Unit>& outBeacons)
+  void CPlatoon::GetFerryBeacons(
+    EntitySetTemplate<Unit>& outBeacons
+  )
   {
     EntitySetTemplate<Unit> platoonUnits = GetPlatoonUnits();
 
@@ -1949,7 +2050,10 @@ namespace
    * `category` into a single set, then issues one UNITCOMMAND_TransportLoadUnits
    * targeted at the ferry-beacon entity so those units load onto the beacon.
    */
-  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::UseFerryBeacon(const EntityCategorySet* const category, Unit* const beacon)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::UseFerryBeacon(
+    const EntityCategorySet* const category,
+    Unit* const beacon
+  )
   {
     fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
@@ -1999,7 +2103,10 @@ namespace
    * single `UNITCOMMAND_TransportLoadUnits` targeting the teleporter. Returns
    * the issued command weak-links.
    */
-  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::UseTeleporter(Unit* const teleporter, const ESquadClass squadClass)
+  fa::vector<WeakPtr<CUnitCommand>> CPlatoon::UseTeleporter(
+    Unit* const teleporter,
+    const ESquadClass squadClass
+  )
   {
     fa::vector<WeakPtr<CUnitCommand>> issuedCommands{};
 
@@ -2046,11 +2153,15 @@ namespace
   moho::CScrLuaInitForm* register_moho_platoon_methods()
   {
     static moho::CScrLuaClassBinder binder(
-      SimLuaInitSet(), "moho.platoon_methods", &moho::CScrLuaMetatableFactory<moho::CPlatoon>::Instance(), "CPlatoon", ""
+      SimLuaInitSet(),
+      "moho.platoon_methods",
+      &moho::CScrLuaMetatableFactory<moho::CPlatoon>::Instance(),
+      "CPlatoon",
+      ""
     );
     return &binder;
   }
-}
+} // namespace moho
 
 namespace
 {
@@ -2135,14 +2246,19 @@ namespace
   };
 
   const CPlatoonLuaFuncDefBootstrap gCPlatoonLuaFuncDefBootstrap{};
-}
+} // namespace
 
 namespace moho
 {
   /**
    * Address: 0x00724920 (FUN_00724920)
    */
-  void CSquad::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CSquad::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CSquad()), 0u);
   }
@@ -2172,7 +2288,7 @@ namespace moho
    */
   struct CSquadSerializer : gpg::SerSaveLoadHelper<CSquad>
   {};
-}
+} // namespace moho
 
 namespace
 {
@@ -2181,7 +2297,7 @@ namespace
 
   // Address: 0x010B9820 -- process-global `CSquadSerializer` singleton.
   moho::CSquadSerializer gCSquadSerializer;
-}
+} // namespace
 
 namespace moho
 {
@@ -2210,7 +2326,7 @@ namespace moho
    */
   struct CPlatoonSerializer : gpg::SerSaveLoadHelper<CPlatoon>
   {};
-}
+} // namespace moho
 
 namespace
 {
@@ -2219,5 +2335,4 @@ namespace
 
   // Address: 0x010B969C -- process-global `CPlatoonSerializer` singleton.
   moho::CPlatoonSerializer gCPlatoonSerializer;
-}
-
+} // namespace

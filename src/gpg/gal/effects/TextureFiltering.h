@@ -21,15 +21,21 @@ namespace gpg::gal::effects
   /** Anisotropy for tiled trilinear textures, 2 to 16; 0 or 1 leaves every sampler as its effect wrote it. */
   extern int gTextureAnisotropy;
 
-  [[nodiscard]] inline SamplerDesc WithTextureAnisotropy(SamplerDesc desc)
+  [[nodiscard]] inline SamplerDesc WithTextureAnisotropy(
+    SamplerDesc desc
+  )
   {
     constexpr std::uint32_t kMinMagMipLinear = 0x15U;
     constexpr std::uint32_t kAnisotropic = 0x55U;
     constexpr std::uint8_t kWrap = 1U;
     std::string texture = desc.texture;
-    std::transform(texture.begin(), texture.end(), texture.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    if (gTextureAnisotropy > 1 && desc.filter == kMinMagMipLinear && desc.addressU == kWrap && desc.addressV == kWrap &&
-        texture.find("lookup") == std::string::npos) {
+    std::transform(texture.begin(), texture.end(), texture.begin(), [](const unsigned char c) {
+      return static_cast<char>(std::tolower(c));
+    });
+    if (
+      gTextureAnisotropy > 1 && desc.filter == kMinMagMipLinear && desc.addressU == kWrap && desc.addressV == kWrap &&
+      texture.find("lookup") == std::string::npos
+    ) {
       desc.filter = kAnisotropic;
       desc.maxAnisotropy = static_cast<std::uint32_t>(std::min(gTextureAnisotropy, 16));
     }

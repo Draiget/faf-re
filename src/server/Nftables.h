@@ -4,11 +4,11 @@
 #include <string>
 #include <vector>
 
-// Engine addition, dedicated server (plan WPR.45, WPR.47, WPR.48): the kernel's half of the address allowlist. The server
-// writes an nftables ruleset for its port from the match's `MatchAddresses` (`--nftables-out <file>`, `--nftables-only`
-// to write it and stop), which the deployment loads (`nft -f <file>`) before the server opens the port. The process
-// keeps its own checks (`CGameLinks::AllowAddress`, the unlisted handshake budget, AEAD): the ruleset is what keeps a
-// flood from an unlisted address from reaching the process at all.
+// Engine addition, dedicated server (plan WPR.45, WPR.47, WPR.48): the kernel's half of the address allowlist. The
+// server writes an nftables ruleset for its port from the match's `MatchAddresses` (`--nftables-out <file>`,
+// `--nftables-only` to write it and stop), which the deployment loads (`nft -f <file>`) before the server opens the
+// port. The process keeps its own checks (`CGameLinks::AllowAddress`, the unlisted handshake budget, AEAD): the ruleset
+// is what keeps a flood from an unlisted address from reaching the process at all.
 //
 // Listed addresses pass. Unlisted ones either never reach the process (`unlistedPerSourcePps` 0: a strict list) or
 // pass two kernel rate limits, one per source address and one for all of them, into the server's stateless challenge,
@@ -27,22 +27,27 @@ namespace faf::server
     std::uint32_t unlistedTotalPps = 0;     // all unlisted sources together; 0: no total cap
   };
 
-  [[nodiscard]] inline std::string NftablesAddressText(const std::uint32_t ip)
+  [[nodiscard]] inline std::string NftablesAddressText(
+    const std::uint32_t ip
+  )
   {
-    return std::to_string((ip >> 24) & 0xFFu) + "." + std::to_string((ip >> 16) & 0xFFu) + "." + std::to_string((ip >> 8) & 0xFFu) + "." +
-           std::to_string(ip & 0xFFu);
+    return std::to_string((ip >> 24) & 0xFFu) + "." + std::to_string((ip >> 16) & 0xFFu) + "." +
+      std::to_string((ip >> 8) & 0xFFu) + "." + std::to_string(ip & 0xFFu);
   }
 
   /**
    * The ruleset: its own table, `inet faf_server_<port>` (deleted and made again, so loading it twice is the same as
    * once), an input chain ahead of the usual filter (priority -10) that only looks at UDP to the port.
    */
-  [[nodiscard]] inline std::string MakeNftablesRuleset(const SNftablesConfig& config)
+  [[nodiscard]] inline std::string MakeNftablesRuleset(
+    const SNftablesConfig& config
+  )
   {
     const std::string port = std::to_string(config.port);
     const std::string table = "faf_server_" + port;
     std::string out;
-    out += "# Written by the dedicated server for UDP port " + port + " (plan WPR.45): load with nft -f before the server starts.\n";
+    out += "# Written by the dedicated server for UDP port " + port +
+      " (plan WPR.45): load with nft -f before the server starts.\n";
     out += "table inet " + table + "\n";
     out += "delete table inet " + table + "\n";
     out += "table inet " + table + " {\n";
@@ -60,11 +65,11 @@ namespace faf::server
     if (config.unlistedPerSourcePps > 0) {
       if (config.unlistedTotalPps > 0) {
         out += "    udp dport " + port + " limit rate over " + std::to_string(config.unlistedTotalPps) +
-               "/second counter drop comment \"unlisted, over the total\"\n";
+          "/second counter drop comment \"unlisted, over the total\"\n";
       }
       const std::string perSource = std::to_string(config.unlistedPerSourcePps);
-      out += "    udp dport " + port + " meter " + table + "_unlisted4 { ip saddr limit rate " + perSource + "/second burst " + perSource +
-             " packets } counter accept comment \"unlisted, into the challenge\"\n";
+      out += "    udp dport " + port + " meter " + table + "_unlisted4 { ip saddr limit rate " + perSource +
+        "/second burst " + perSource + " packets } counter accept comment \"unlisted, into the challenge\"\n";
     }
     out += "    udp dport " + port + " counter drop comment \"unlisted\"\n";
     out += "  }\n}\n";

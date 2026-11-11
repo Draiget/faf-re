@@ -92,7 +92,9 @@ namespace moho
      * point - the control throws `XBackgroundTaskAborted` when a stop has been
      * requested, which unwinds the worker out of the load.
      */
-    void AdvanceLoadingProgress(CBackgroundTaskControl* const loadControl)
+    void AdvanceLoadingProgress(
+      CBackgroundTaskControl* const loadControl
+    )
     {
       if (loadControl != nullptr && loadControl->mHandle != nullptr) {
         loadControl->mHandle->UpdateLoadingProgress();
@@ -105,7 +107,10 @@ namespace moho
      * `scr_CoreInits` / `scr_UserInits` directly; the sets are registered by
      * name here, and a missing set means nothing was linked into it.
      */
-    void RunLuaInitFormSet(const char* const setName, LuaPlus::LuaState* const state)
+    void RunLuaInitFormSet(
+      const char* const setName,
+      LuaPlus::LuaState* const state
+    )
     {
       if (CScrLuaInitFormSet* const set = SCR_FindLuaInitFormSet(setName); set != nullptr) {
         set->RunInits(state);
@@ -118,7 +123,10 @@ namespace moho
      * Steps 2 and 3 of the session load: the session's own Lua state, with the same two binding
      * sets the front end gets, in the same order: engine core bindings first, then user ones.
      */
-    void CreateSessionLuaState(SWldScenarioInfo* const scenario, CBackgroundTaskControl* const loadControl)
+    void CreateSessionLuaState(
+      SWldScenarioInfo* const scenario,
+      CBackgroundTaskControl* const loadControl
+    )
     {
       {
         const std::string marker(" World Session Load 2", 21u);
@@ -126,11 +134,12 @@ namespace moho
       }
 
       auto* const createdState = new LuaPlus::LuaState(
-        LuaPlus::LuaState::LIB_BASE,
-        static_cast<int>(moho::lua_incremental::ELuaVmRole::SessionUi)
+        LuaPlus::LuaState::LIB_BASE, static_cast<int>(moho::lua_incremental::ELuaVmRole::SessionUi)
       );
-      if (LuaPlus::LuaState* const previousState = scenario->mState;
-          createdState != previousState && previousState != nullptr) {
+      if (
+        LuaPlus::LuaState* const previousState = scenario->mState;
+        createdState != previousState && previousState != nullptr
+      ) {
         delete previousState;
       }
       scenario->mState = createdState;
@@ -160,7 +169,10 @@ namespace moho
     class EarlyMapLoad
     {
     public:
-      EarlyMapLoad(SWldScenarioInfo* const scenario, CBackgroundTaskControl* const loadControl)
+      EarlyMapLoad(
+        SWldScenarioInfo* const scenario,
+        CBackgroundTaskControl* const loadControl
+      )
         : mMap(new CWldMap())
       {
         mThread = std::thread([this, scenario, loadControl] {
@@ -202,7 +214,10 @@ namespace moho
     };
 
     /// The scenario takes the loaded map, dropping one it had.
-    void AcceptMap(SWldScenarioInfo* const scenario, CWldMap* const acceptedMap)
+    void AcceptMap(
+      SWldScenarioInfo* const scenario,
+      CWldMap* const acceptedMap
+    )
     {
       if (CWldMap* const previousMap = scenario->mWldMap; acceptedMap != previousMap && previousMap != nullptr) {
         delete previousMap;
@@ -236,7 +251,10 @@ namespace moho
      * background-task control the worker threads through the load, which is the
      * same word seen without the one-pointer struct around it.
      */
-    void WorldSessionUserLoad(SWldScenarioInfo* const scenario, CBackgroundTaskControl* const loadControl)
+    void WorldSessionUserLoad(
+      SWldScenarioInfo* const scenario,
+      CBackgroundTaskControl* const loadControl
+    )
     {
       if (scenario == nullptr) {
         return;
@@ -268,8 +286,10 @@ namespace moho
 
       // Engine addition (RULE_SetKeepBetweenSessions): the last session's rules when the editor keeps them.
       RRuleGameRules* const createdRules = RULE_TakeOrCreate(scenario->mGameMods, loadControl);
-      if (RRuleGameRules* const previousRules = scenario->mGameRules;
-          createdRules != previousRules && previousRules != nullptr) {
+      if (
+        RRuleGameRules* const previousRules = scenario->mGameRules;
+        createdRules != previousRules && previousRules != nullptr
+      ) {
         delete previousRules;
       }
       scenario->mGameRules = createdRules;
@@ -335,7 +355,10 @@ namespace moho
         RULE_ReleaseDeferredScriptBlueprints(scenario->mGameRules); // the session and the sim both have their copy
       } else {
         fa::auto_ptr<CWldMap> loadedMap(earlyMap ? loadedEarly : new CWldMap());
-        if (earlyMap ? loadedEarly != nullptr : loadedMap->MapLoad(scenario->mMapName.c_str(), scenario->mState, false, *loadControl)) {
+        if (
+          earlyMap ? loadedEarly != nullptr
+                   : loadedMap->MapLoad(scenario->mMapName.c_str(), scenario->mState, false, *loadControl)
+        ) {
           AcceptMap(scenario, loadedMap.release());
         }
       }
@@ -348,17 +371,23 @@ namespace moho
 
   } // namespace
 
-  void WLD_SetSessionKeepsBlueprints(const bool keep) noexcept
+  void WLD_SetSessionKeepsBlueprints(
+    const bool keep
+  ) noexcept
   {
     gSessionKeepsBlueprints = keep;
   }
 
-  void WLD_HoldSessionScripts(const bool hold) noexcept
+  void WLD_HoldSessionScripts(
+    const bool hold
+  ) noexcept
   {
     gSessionScriptsHeld.store(hold, std::memory_order_release);
   }
 
-  void WLD_HoldDeviceUse(const bool hold) noexcept
+  void WLD_HoldDeviceUse(
+    const bool hold
+  ) noexcept
   {
     gDeviceUseHolder.store(std::this_thread::get_id(), std::memory_order_relaxed);
     gDeviceUseHeld.store(hold, std::memory_order_release);
@@ -373,7 +402,9 @@ namespace moho
   }
 
   bool WLD_GetEarlySimInputs(
-    const SWldScenarioInfo* const scenario, RRuleGameRules** const outRules, CWldMap** const outMap
+    const SWldScenarioInfo* const scenario,
+    RRuleGameRules** const outRules,
+    CWldMap** const outMap
   ) noexcept
   {
     if (scenario == nullptr || gEarlySimScenario.load(std::memory_order_acquire) != scenario) {
@@ -417,8 +448,10 @@ namespace moho
   /**
    * Address: 0x00886200 (FUN_00886200, func_GetScenarioInfo)
    */
-  SWldScenarioInfo*
-  CWldSessionLoaderImpl::FindOrCreateScenarioInfo(const char* const mapName, const fa::string& gameMods)
+  SWldScenarioInfo* CWldSessionLoaderImpl::FindOrCreateScenarioInfo(
+    const char* const mapName,
+    const fa::string& gameMods
+  )
   {
     const fa::string loweredMap = gpg::STR_ToLower(mapName ? mapName : "");
 
@@ -438,7 +471,9 @@ namespace moho
    * Address: 0x008858A0 (FUN_008858A0)
    */
   SWldScenarioInfo* CWldSessionLoaderImpl::GetScenarioInfo(
-    const char* const mapName, fa::string* const gameMods, const bool setGameData
+    const char* const mapName,
+    fa::string* const gameMods,
+    const bool setGameData
   )
   {
     SetCreated();
@@ -463,7 +498,10 @@ namespace moho
   /**
    * Address: 0x00885920 (FUN_00885920)
    */
-  SWldScenarioInfo* CWldSessionLoaderImpl::CreateScenarioInfo(const char* const mapName, fa::string* const gameMods)
+  SWldScenarioInfo* CWldSessionLoaderImpl::CreateScenarioInfo(
+    const char* const mapName,
+    fa::string* const gameMods
+  )
   {
     SetCreated();
 
@@ -503,7 +541,10 @@ namespace moho
   /**
    * Address: 0x00886170 (FUN_00886170, func_MoveGameData)
    */
-  SWldGameData* CWldSessionLoaderImpl::MoveGameData(SWldScenarioInfo* const source, SWldGameData* const outData)
+  SWldGameData* CWldSessionLoaderImpl::MoveGameData(
+    SWldScenarioInfo* const source,
+    SWldGameData* const outData
+  )
   {
     if (!outData) {
       return nullptr;
@@ -543,7 +584,9 @@ namespace moho
   /**
    * Address: 0x008859B0 (FUN_008859B0)
    */
-  SWldGameData* CWldSessionLoaderImpl::LoadGameData(SWldGameData* const outData)
+  SWldGameData* CWldSessionLoaderImpl::LoadGameData(
+    SWldGameData* const outData
+  )
   {
     // When no scenario has populated the game data yet, release any handles the
     // caller was already carrying in `outData` before zeroing the slot. The
@@ -741,7 +784,7 @@ namespace moho
   }
 
   /**
-    * Alias of FUN_008855B0 (non-canonical helper lane).
+   * Alias of FUN_008855B0 (non-canonical helper lane).
    */
   CWldSessionLoaderImpl* GetWldSessionLoader()
   {

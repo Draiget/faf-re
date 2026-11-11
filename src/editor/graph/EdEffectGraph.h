@@ -37,14 +37,19 @@ namespace faf::editor
    */
   int AddEmitterNodes(NodeGraph& graph, const EmitterBlueprint& emitter, const std::string& name, float x, float y);
   /** A whole graph for an effect of these emitters (name, blueprint): the Effect output fed by each. */
-  void BuildEffectGraph(NodeGraph& graph, const std::string& effectName, const std::vector<std::pair<std::string, EmitterBlueprint>>& emitters);
+  void BuildEffectGraph(
+    NodeGraph& graph,
+    const std::string& effectName,
+    const std::vector<std::pair<std::string, EmitterBlueprint>>& emitters
+  );
 
   /**
    * The emitters the graph makes, in the Effect output's pin order (name, blueprint): every curve pin evaluated
    * through its nodes to keys, an unlinked one given the curve's starting key (as retail's editor gives a new emitter).
    * False with `error` when the graph has no output or nothing linked to it.
    */
-  bool GraphEmitters(const NodeGraph& graph, std::vector<std::pair<std::string, EmitterBlueprint>>& out, std::string& error);
+  bool
+  GraphEmitters(const NodeGraph& graph, std::vector<std::pair<std::string, EmitterBlueprint>>& out, std::string& error);
 
   /** One effect template of FAF's lua/EffectTemplates.lua: its name and its emitter files' paths. */
   struct EffectTemplate

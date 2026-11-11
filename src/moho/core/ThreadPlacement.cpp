@@ -53,24 +53,34 @@ namespace moho
     bool sProcessCpusLocked = false;
 
     /// The `RelationProcessorCore` / `RelationNumaNode` records, or an empty buffer.
-    [[nodiscard]] std::vector<unsigned char> QueryProcessorRelation(const LOGICAL_PROCESSOR_RELATIONSHIP relation)
+    [[nodiscard]] std::vector<unsigned char> QueryProcessorRelation(
+      const LOGICAL_PROCESSOR_RELATIONSHIP relation
+    )
     {
       DWORD length = 0;
       (void)::GetLogicalProcessorInformationEx(relation, nullptr, &length);
       std::vector<unsigned char> buffer(length);
-      if (length == 0 || !::GetLogicalProcessorInformationEx(
-            relation, reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data()), &length)) {
+      if (
+        length == 0 ||
+        !::GetLogicalProcessorInformationEx(
+          relation, reinterpret_cast<SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data()), &length
+        )
+      ) {
         buffer.clear();
       }
       return buffer;
     }
 
     template <class Visitor>
-    void ForEachProcessorRecord(const std::vector<unsigned char>& buffer, Visitor&& visit)
+    void ForEachProcessorRecord(
+      const std::vector<unsigned char>& buffer,
+      Visitor&& visit
+    )
     {
       std::size_t offset = 0;
       while (offset + sizeof(DWORD) * 2u <= buffer.size()) {
-        const auto* const record = reinterpret_cast<const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data() + offset);
+        const auto* const record =
+          reinterpret_cast<const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*>(buffer.data() + offset);
         if (record->Size == 0u) {
           break;
         }
@@ -79,7 +89,10 @@ namespace moho
       }
     }
 
-    [[nodiscard]] std::string FormatCpu(const SLogicalCpu& cpu, const bool multiGroup)
+    [[nodiscard]] std::string FormatCpu(
+      const SLogicalCpu& cpu,
+      const bool multiGroup
+    )
     {
       char text[32];
       if (multiGroup) {
@@ -150,7 +163,8 @@ namespace moho
         gpg::Logf(
           "ThreadPlacement: %zu physical cores / %d logical processors: too few to give the main, sim and issue "
           "threads a core each, threads stay where the OS puts them",
-          cores.size(), logicalCount
+          cores.size(),
+          logicalCount
         );
         return;
       }
@@ -176,8 +190,13 @@ namespace moho
         "ThreadPlacement: mode %d, %zu physical cores / %d logical processors; main cpu %s, sim cpu %s, issue cpu %s "
         "(their SMT siblings left idle); worker cores (sim workers from the left, user workers from the right, "
         "siblings after '/'): %s",
-        sys_ThreadPlacement, cores.size(), logicalCount, FormatCpu(sPlan.mMain, multiGroup).c_str(),
-        FormatCpu(sPlan.mSim, multiGroup).c_str(), FormatCpu(sPlan.mIssue, multiGroup).c_str(), workers.c_str()
+        sys_ThreadPlacement,
+        cores.size(),
+        logicalCount,
+        FormatCpu(sPlan.mMain, multiGroup).c_str(),
+        FormatCpu(sPlan.mSim, multiGroup).c_str(),
+        FormatCpu(sPlan.mIssue, multiGroup).c_str(),
+        workers.c_str()
       );
     }
 
@@ -195,7 +214,10 @@ namespace moho
     }
 
     /// Worker `index` of a pool: one physical core per worker while cores last, then their siblings.
-    [[nodiscard]] SLogicalCpu WorkerCpu(const bool simPool, const unsigned int index)
+    [[nodiscard]] SLogicalCpu WorkerCpu(
+      const bool simPool,
+      const unsigned int index
+    )
     {
       const std::size_t coreCount = sPlan.mWorkerCores.size();
       const std::size_t slot = index % coreCount;
@@ -213,7 +235,9 @@ namespace moho
     &sys_ThreadPlacement
   );
 
-  bool AssignProcessCpus(const char* const cpuList)
+  bool AssignProcessCpus(
+    const char* const cpuList
+  )
   {
     DWORD_PTR wanted = 0;
     const char* cursor = cpuList;
@@ -269,7 +293,10 @@ namespace moho
     return sProcessCpusLocked;
   }
 
-  void PlaceCurrentThread(const EThreadRole role, const unsigned int index)
+  void PlaceCurrentThread(
+    const EThreadRole role,
+    const unsigned int index
+  )
   {
     const int mode = ResolvePlacementMode();
     if (mode != 1 && mode != 2) {
@@ -282,21 +309,21 @@ namespace moho
 
     SLogicalCpu cpu;
     switch (role) {
-      case EThreadRole::Main:
-        cpu = sPlan.mMain;
-        break;
-      case EThreadRole::Sim:
-        cpu = sPlan.mSim;
-        break;
-      case EThreadRole::Issue:
-        cpu = sPlan.mIssue;
-        break;
-      case EThreadRole::SimWorker:
-        cpu = WorkerCpu(true, index);
-        break;
-      case EThreadRole::UserWorker:
-        cpu = WorkerCpu(false, index);
-        break;
+    case EThreadRole::Main:
+      cpu = sPlan.mMain;
+      break;
+    case EThreadRole::Sim:
+      cpu = sPlan.mSim;
+      break;
+    case EThreadRole::Issue:
+      cpu = sPlan.mIssue;
+      break;
+    case EThreadRole::SimWorker:
+      cpu = WorkerCpu(true, index);
+      break;
+    case EThreadRole::UserWorker:
+      cpu = WorkerCpu(false, index);
+      break;
     }
 
     if (mode == 2) {

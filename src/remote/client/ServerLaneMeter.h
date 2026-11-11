@@ -26,7 +26,9 @@ namespace faf::remote::client
 
   inline constexpr std::size_t kServerLaneCount = static_cast<std::size_t>(EServerLane::Count);
 
-  [[nodiscard]] constexpr const char* ServerLaneName(const EServerLane lane) noexcept
+  [[nodiscard]] constexpr const char* ServerLaneName(
+    const EServerLane lane
+  ) noexcept
   {
     switch (lane) {
     case EServerLane::Entities:
@@ -47,7 +49,7 @@ namespace faf::remote::client
 
   struct SServerLaneSnapshot
   {
-    bool active = false;                                // a server-mode game has taken a view
+    bool active = false; // a server-mode game has taken a view
     std::uint64_t views = 0;
     std::array<std::uint64_t, kServerLaneCount> total{}; // bytes since the game started
     std::array<double, kServerLaneCount> perSecond{};    // bytes a second over the last whole seconds (up to 5)
@@ -80,7 +82,10 @@ namespace faf::remote::client
     }
 
     /** One view's bytes by lane, as taken at `now`. */
-    void Record(const std::array<std::uint64_t, kServerLaneCount>& bytes, const Clock::time_point now = Clock::now())
+    void Record(
+      const std::array<std::uint64_t, kServerLaneCount>& bytes,
+      const Clock::time_point now = Clock::now()
+    )
     {
       const std::lock_guard lock(mMutex);
       const auto second = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
@@ -97,7 +102,9 @@ namespace faf::remote::client
     }
 
     /** The totals, and the rate over the last whole seconds (the one under way left out). */
-    [[nodiscard]] SServerLaneSnapshot Snapshot(const Clock::time_point now = Clock::now())
+    [[nodiscard]] SServerLaneSnapshot Snapshot(
+      const Clock::time_point now = Clock::now()
+    )
     {
       const std::lock_guard lock(mMutex);
       SServerLaneSnapshot out;
@@ -131,7 +138,9 @@ namespace faf::remote::client
     CServerLaneMeter& operator=(const CServerLaneMeter&) = delete;
 
     /** Empties the buckets of the seconds since the last one seen (a bucket is reused every kWindowSeconds + 1). */
-    void Roll(const std::int64_t second)
+    void Roll(
+      const std::int64_t second
+    )
     {
       if (second <= mLastSecond) {
         return;

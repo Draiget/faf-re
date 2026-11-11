@@ -22,7 +22,9 @@ namespace faf::editor
     }
   }
 
-  void EdLog::WriteTimesTo(const std::string& path)
+  void EdLog::WriteTimesTo(
+    const std::string& path
+  )
   {
     const std::lock_guard<std::mutex> lock(mMutex);
     if (mTimesFile != nullptr) {

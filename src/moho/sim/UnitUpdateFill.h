@@ -100,9 +100,8 @@ namespace moho
    * The copy takes `variableData` as it is at `Finish`, except `mRequestRefreshUI`, which is
    * taken now (`Entity::Sync` clears it right after queueing).
    */
-  [[nodiscard]] SEntityVariableUpdateEntry* QueueEntityVariableUpdateDeferred(
-    SSyncData* syncData, EntId entityId, const SSTIEntityVariableData& variableData
-  );
+  [[nodiscard]] SEntityVariableUpdateEntry*
+  QueueEntityVariableUpdateDeferred(SSyncData* syncData, EntId entityId, const SSTIEntityVariableData& variableData);
 
   /**
    * Captures scroll endpoints into the newest queued entity record. When that

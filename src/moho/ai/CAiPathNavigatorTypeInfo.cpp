@@ -36,7 +36,9 @@ namespace
    * What it does:
    * Wires the full callback set used by `CAiPathNavigatorTypeInfo`.
    */
-  void BindCAiPathNavigatorTypeInfoCallbacks(CAiPathNavigatorTypeInfo& typeInfo)
+  void BindCAiPathNavigatorTypeInfoCallbacks(
+    CAiPathNavigatorTypeInfo& typeInfo
+  )
   {
     typeInfo.newRefFunc_ = &CAiPathNavigatorTypeInfo::NewRef;
     typeInfo.ctorRefFunc_ = &CAiPathNavigatorTypeInfo::CtrRef;
@@ -50,7 +52,10 @@ namespace
    * What it does:
    * Builds a reflected `RRef` for one `CAiPathNavigator` into caller storage.
    */
-  gpg::RRef* PopulateCAiPathNavigatorRef(gpg::RRef* const out, CAiPathNavigator* const value)
+  gpg::RRef* PopulateCAiPathNavigatorRef(
+    gpg::RRef* const out,
+    CAiPathNavigator* const value
+  )
   {
     gpg::RRef temp{};
     temp = gpg::MakeRRef<moho::CAiPathNavigator>(value);
@@ -110,7 +115,9 @@ void CAiPathNavigatorTypeInfo::Init()
 /**
  * Address: 0x005B0930 (FUN_005B0930, Moho::CAiPathNavigatorTypeInfo::AddBase_Listener_NavPath)
  */
-void __stdcall CAiPathNavigatorTypeInfo::AddBase_Listener_NavPath(gpg::RType* const typeInfo)
+void __stdcall CAiPathNavigatorTypeInfo::AddBase_Listener_NavPath(
+  gpg::RType* const typeInfo
+)
 {
   gpg::AddReflectedBase<moho::Listener<const moho::SNavPath&>>(typeInfo);
 }
@@ -137,7 +144,9 @@ gpg::RRef CAiPathNavigatorTypeInfo::NewRef()
  * Constructs one detached `CAiPathNavigator` in caller-provided storage and
  * returns a typed reflection reference for it.
  */
-gpg::RRef CAiPathNavigatorTypeInfo::CtrRef(void* const objectStorage)
+gpg::RRef CAiPathNavigatorTypeInfo::CtrRef(
+  void* const objectStorage
+)
 {
   auto* const navigator = gpg::ConstructInStorage<CAiPathNavigator>(objectStorage);
 
@@ -149,7 +158,9 @@ gpg::RRef CAiPathNavigatorTypeInfo::CtrRef(void* const objectStorage)
 /**
  * Address: 0x005B07C0 (FUN_005B07C0, Moho::CAiPathNavigatorTypeInfo::Delete)
  */
-void CAiPathNavigatorTypeInfo::Delete(void* const objectStorage)
+void CAiPathNavigatorTypeInfo::Delete(
+  void* const objectStorage
+)
 {
   GPG_NONVIRTUAL_DESTROY(delete static_cast<CAiPathNavigator*>(objectStorage));
 }
@@ -157,7 +168,9 @@ void CAiPathNavigatorTypeInfo::Delete(void* const objectStorage)
 /**
  * Address: 0x005B0850 (FUN_005B0850, Moho::CAiPathNavigatorTypeInfo::Destruct)
  */
-void CAiPathNavigatorTypeInfo::Destruct(void* const objectStorage)
+void CAiPathNavigatorTypeInfo::Destruct(
+  void* const objectStorage
+)
 {
   static_cast<CAiPathNavigator*>(objectStorage)->CAiPathNavigator::~CAiPathNavigator();
 }
@@ -189,4 +202,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAiPathNavigatorTypeInfo_7e1f6e, moho::register_CAiPathNavigatorTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAiPathNavigatorTypeInfo_7e1f6e,
+  moho::register_CAiPathNavigatorTypeInfo
+)

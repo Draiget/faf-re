@@ -16,7 +16,6 @@ namespace moho
   class Entity;
   class Unit;
 
-
   /**
    * Runtime owner for unit-capture command task state.
    */
@@ -109,34 +108,31 @@ namespace moho
     void DoCallback(bool start);
 
   public:
-    CUnitCommand* mCommand; // +0x40
-    WeakPtr<Entity> mTargetEntity; // +0x44
-    bool mHasStarted; // +0x4C
-    std::uint8_t mPad4D[0x03]; // +0x4D
-    std::int32_t mCaptureProgress; // +0x50
-    std::int32_t mCaptureTime; // +0x54
+    CUnitCommand* mCommand;         // +0x40
+    WeakPtr<Entity> mTargetEntity;  // +0x44
+    bool mHasStarted;               // +0x4C
+    std::uint8_t mPad4D[0x03];      // +0x4D
+    std::int32_t mCaptureProgress;  // +0x50
+    std::int32_t mCaptureTime;      // +0x54
     CEconRequest* mConsumptionData; // +0x58
-    SEconValue mCaptureRate; // +0x5C
+    SEconValue mCaptureRate;        // +0x5C
   };
 
   static_assert(sizeof(CUnitCaptureTask) == 0x64, "CUnitCaptureTask size must be 0x64");
   static_assert(offsetof(CUnitCaptureTask, mCommand) == 0x40, "CUnitCaptureTask::mCommand offset must be 0x40");
   static_assert(
-    offsetof(CUnitCaptureTask, mTargetEntity) == 0x44, "CUnitCaptureTask::mTargetEntity offset must be 0x44"
+    offsetof(CUnitCaptureTask, mTargetEntity) == 0x44,
+    "CUnitCaptureTask::mTargetEntity offset must be 0x44"
   );
+  static_assert(offsetof(CUnitCaptureTask, mHasStarted) == 0x4C, "CUnitCaptureTask::mHasStarted offset must be 0x4C");
   static_assert(
-    offsetof(CUnitCaptureTask, mHasStarted) == 0x4C, "CUnitCaptureTask::mHasStarted offset must be 0x4C"
+    offsetof(CUnitCaptureTask, mCaptureProgress) == 0x50,
+    "CUnitCaptureTask::mCaptureProgress offset must be 0x50"
   );
+  static_assert(offsetof(CUnitCaptureTask, mCaptureTime) == 0x54, "CUnitCaptureTask::mCaptureTime offset must be 0x54");
   static_assert(
-    offsetof(CUnitCaptureTask, mCaptureProgress) == 0x50, "CUnitCaptureTask::mCaptureProgress offset must be 0x50"
+    offsetof(CUnitCaptureTask, mConsumptionData) == 0x58,
+    "CUnitCaptureTask::mConsumptionData offset must be 0x58"
   );
-  static_assert(
-    offsetof(CUnitCaptureTask, mCaptureTime) == 0x54, "CUnitCaptureTask::mCaptureTime offset must be 0x54"
-  );
-  static_assert(
-    offsetof(CUnitCaptureTask, mConsumptionData) == 0x58, "CUnitCaptureTask::mConsumptionData offset must be 0x58"
-  );
-  static_assert(
-    offsetof(CUnitCaptureTask, mCaptureRate) == 0x5C, "CUnitCaptureTask::mCaptureRate offset must be 0x5C"
-  );
+  static_assert(offsetof(CUnitCaptureTask, mCaptureRate) == 0x5C, "CUnitCaptureTask::mCaptureRate offset must be 0x5C");
 } // namespace moho

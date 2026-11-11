@@ -14,7 +14,9 @@ namespace
   gpg::RType* gEntityType = nullptr;
   gpg::RType* gIUnitType = nullptr;
 
-  void ResetTypeInfoVectors(TypeInfo& typeInfo) noexcept
+  void ResetTypeInfoVectors(
+    TypeInfo& typeInfo
+  ) noexcept
   {
     typeInfo.fields_ = fa::vector<gpg::RField>{};
     typeInfo.bases_ = fa::vector<gpg::RField>{};
@@ -100,7 +102,9 @@ namespace moho
    * What it does:
    * Adds `Entity` as a reflected base at offset `8`.
    */
-  void UnitTypeInfo::AddBase_Entity(gpg::RType* const typeInfo)
+  void UnitTypeInfo::AddBase_Entity(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* baseType = gEntityType;
     if (!baseType) {
@@ -117,7 +121,9 @@ namespace moho
    * What it does:
    * Adds `IUnit` as a reflected base at offset `0`.
    */
-  void UnitTypeInfo::AddBase_IUnit(gpg::RType* const typeInfo)
+  void UnitTypeInfo::AddBase_IUnit(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* baseType = gIUnitType;
     if (!baseType) {
@@ -140,7 +146,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_UnitTypeInfo_fd4ea3, moho::register_UnitTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_UnitTypeInfo_fd4ea3,
+  moho::register_UnitTypeInfo
+)

@@ -31,8 +31,8 @@ namespace faf::server
     std::int64_t uid = 0;
     std::string reason;
     std::string address;
-    std::string options; // "Key=Value,Key=Value": `set_options`
-    std::string results; // "1=victory,2=defeat": `end`, by army number from 1
+    std::string options;    // "Key=Value,Key=Value": `set_options`
+    std::string results;    // "1=victory,2=defeat": `end`, by army number from 1
     std::int64_t count = 0; // `extend_timeouts`
     std::string token;      // `substitute`: the substitute's admission token
     std::string name;       // `substitute`: the substitute's name
@@ -59,7 +59,8 @@ namespace faf::server
      * Plan WP17.11: the same API over HTTP/JSON for a dashboard (RestListener.h), with `token` as the admin token;
      * its requests come out of `Poll` with negative ids, and `Reply`, `Refuse` and `Event` reach it too.
      */
-    [[nodiscard]] bool OpenRest(const remote::net::SEndpoint& at, std::string token, std::string corsOrigin, std::string& error);
+    [[nodiscard]] bool
+    OpenRest(const remote::net::SEndpoint& at, std::string token, std::string corsOrigin, std::string& error);
     /** Accepts, reads and writes what it can without waiting; the requests that came, in order. */
     void Poll(std::vector<SControlRequest>& requests, std::uint64_t nowUs);
     /**
@@ -93,7 +94,8 @@ namespace faf::server
     int mListenSocket = -1;
     std::vector<std::unique_ptr<SConnection>> mConnections;
     std::uint64_t mNextSerial = 1;
-    std::vector<std::pair<std::int64_t, std::uint64_t>> mWaiting; // requests handed out, not answered: id, connection serial
+    std::vector<std::pair<std::int64_t, std::uint64_t>>
+      mWaiting; // requests handed out, not answered: id, connection serial
     std::vector<std::string> mNews;
     std::unique_ptr<CRestListener> mRest; // plan WP17.11, with OpenRest
   };

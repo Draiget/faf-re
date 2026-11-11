@@ -35,22 +35,34 @@ namespace
   class RecordingBinder final : public effects::PassBinder
   {
   public:
-    void BindPass(effects::EffectProgram&, std::uint32_t technique, std::uint32_t pass) override
+    void BindPass(
+      effects::EffectProgram&,
+      std::uint32_t technique,
+      std::uint32_t pass
+    ) override
     {
       bound.emplace_back(technique, pass);
     }
-    void UnbindPass() override { ++unbound; }
+    void UnbindPass() override
+    {
+      ++unbound;
+    }
 
     std::vector<std::pair<std::uint32_t, std::uint32_t>> bound;
     int unbound = 0;
   };
 
-  std::shared_ptr<effects::EffectProgram> MakeProgram(const char* const source = faf_gal_tests::kDrawEffect)
+  std::shared_ptr<effects::EffectProgram> MakeProgram(
+    const char* const source = faf_gal_tests::kDrawEffect
+  )
   {
     return std::make_shared<effects::EffectProgram>("tests/draw.fx", source, effects::ShaderTarget::Dxil);
   }
 
-  std::uint32_t OffsetOf(const effects::EffectProgram& program, const char* const name)
+  std::uint32_t OffsetOf(
+    const effects::EffectProgram& program,
+    const char* const name
+  )
   {
     const std::int32_t parameter = program.FindParameter(name);
     const effects::ConstantSlot* const slot =
@@ -58,7 +70,9 @@ namespace
     return (slot != nullptr) ? slot->offset : 0xFFFFFFFFU;
   }
 
-  std::string ErrorMessage(const std::function<void()>& call)
+  std::string ErrorMessage(
+    const std::function<void()>& call
+  )
   {
     try {
       call();
@@ -69,7 +83,10 @@ namespace
   }
 } // namespace
 
-TEST(GalFnv1a64, MatchesThePublishedVectors)
+TEST(
+  GalFnv1a64,
+  MatchesThePublishedVectors
+)
 {
   // FNV-1a 64-bit reference values (Fowler, Noll, Vo; draft-eastlake-fnv test vectors).
   effects::Fnv1a64 empty;
@@ -96,7 +113,10 @@ TEST(GalFnv1a64, MatchesThePublishedVectors)
   EXPECT_NE(first.Value(), second.Value());
 }
 
-TEST(GalEffectProgram, BuildsTheDescriptionHlslAndParameters)
+TEST(
+  GalEffectProgram,
+  BuildsTheDescriptionHlslAndParameters
+)
 {
   const std::shared_ptr<effects::EffectProgram> program = MakeProgram();
   EXPECT_EQ(program->Name(), "tests/draw.fx");
@@ -136,10 +156,15 @@ TEST(GalEffectProgram, BuildsTheDescriptionHlslAndParameters)
   EXPECT_FALSE(missing.succeeded);
 }
 
-TEST(GalEffectProgram, OriginalSourceSuppliesTheAlphaTest)
+TEST(
+  GalEffectProgram,
+  OriginalSourceSuppliesTheAlphaTest
+)
 {
   const std::shared_ptr<effects::EffectProgram> program = std::make_shared<effects::EffectProgram>(
-    "tests/draw.fx", faf_gal_tests::kDrawEffect, effects::ShaderTarget::Spirv,
+    "tests/draw.fx",
+    faf_gal_tests::kDrawEffect,
+    effects::ShaderTarget::Spirv,
     "technique Draw { pass P0 { AlphaTestEnable = true; AlphaFunc = Greater; AlphaRef = 64; } pass P1 { } pass P2 { } }"
   );
   EXPECT_TRUE(program->Description().direct3D9PassStates);
@@ -149,12 +174,18 @@ TEST(GalEffectProgram, OriginalSourceSuppliesTheAlphaTest)
   EXPECT_EQ(program->Entries(0U, 1U).pixel, program->Entries(0U, 2U).pixel);
 }
 
-TEST(GalEffectProgram, UnstructuredSourceIsRefused)
+TEST(
+  GalEffectProgram,
+  UnstructuredSourceIsRefused
+)
 {
   EXPECT_THROW(MakeProgram("float4 PS() : COLOR0 { return 1;"), std::runtime_error);
 }
 
-TEST(GalProgramEffect, TechniquesAndVariablesResolveByName)
+TEST(
+  GalProgramEffect,
+  TechniquesAndVariablesResolveByName
+)
 {
   RecordingBinder binder;
   EffectContext context;
@@ -171,8 +202,18 @@ TEST(GalProgramEffect, TechniquesAndVariablesResolveByName)
   const boost::shared_ptr<EffectTechnique> draw = effect.GetTechnique("Draw");
   ASSERT_NE(draw.get(), nullptr);
   EXPECT_STREQ(draw->GetName()->c_str(), "Draw");
-  EXPECT_EQ(ErrorMessage([&] { static_cast<void>(effect.GetTechnique("Missing")); }), "invalid effect technique requested: Missing");
-  EXPECT_EQ(ErrorMessage([&] { static_cast<void>(effect.GetTechnique(nullptr)); }), "invalid effect technique requested: ");
+  EXPECT_EQ(
+    ErrorMessage([&] {
+    static_cast<void>(effect.GetTechnique("Missing"));
+  }),
+    "invalid effect technique requested: Missing"
+  );
+  EXPECT_EQ(
+    ErrorMessage([&] {
+    static_cast<void>(effect.GetTechnique(nullptr));
+  }),
+    "invalid effect technique requested: "
+  );
 
   const boost::shared_ptr<EffectVariable> tint = effect.GetVariable("Tint");
   ASSERT_NE(tint.get(), nullptr);
@@ -183,10 +224,18 @@ TEST(GalProgramEffect, TechniquesAndVariablesResolveByName)
   sampler->SetFloat(1.0f);
   bool flag = false;
   EXPECT_FALSE(sampler->GetAnnotationBool(&flag, fa::string("anything")));
-  EXPECT_EQ(ErrorMessage([&] { static_cast<void>(effect.GetVariable("Nope")); }), "invalid effect variable requested: Nope");
+  EXPECT_EQ(
+    ErrorMessage([&] {
+    static_cast<void>(effect.GetVariable("Nope"));
+  }),
+    "invalid effect variable requested: Nope"
+  );
 }
 
-TEST(GalProgramEffect, TechniqueAnnotationsReadAsD3DXDoes)
+TEST(
+  GalProgramEffect,
+  TechniqueAnnotationsReadAsD3DXDoes
+)
 {
   RecordingBinder binder;
   ProgramEffect effect(EffectContext{}, MakeProgram(), binder);
@@ -217,19 +266,40 @@ TEST(GalProgramEffect, TechniqueAnnotationsReadAsD3DXDoes)
   EXPECT_EQ(order, 2) << "a failed read leaves the output alone";
 }
 
-TEST(GalProgramEffect, PassesNeedABegunTechnique)
+TEST(
+  GalProgramEffect,
+  PassesNeedABegunTechnique
+)
 {
   RecordingBinder binder;
   ProgramEffect effect(EffectContext{}, MakeProgram(), binder);
   const boost::shared_ptr<EffectTechnique> draw = effect.GetTechnique("Draw");
-  EXPECT_EQ(ErrorMessage([&] { draw->BeginPass(0); }), "effect technique begin/end mismatch");
-  EXPECT_EQ(ErrorMessage([&] { draw->EndPass(); }), "effect technique begin/end mismatch");
-  EXPECT_EQ(ErrorMessage([&] { draw->EndTechnique(); }), "effect technique begin/end mismatch");
+  EXPECT_EQ(
+    ErrorMessage([&] {
+    draw->BeginPass(0);
+  }),
+    "effect technique begin/end mismatch"
+  );
+  EXPECT_EQ(
+    ErrorMessage([&] {
+    draw->EndPass();
+  }),
+    "effect technique begin/end mismatch"
+  );
+  EXPECT_EQ(
+    ErrorMessage([&] {
+    draw->EndTechnique();
+  }),
+    "effect technique begin/end mismatch"
+  );
   EXPECT_TRUE(binder.bound.empty());
   EXPECT_EQ(binder.unbound, 0);
 }
 
-TEST(GalProgramEffect, VariableSettersWriteTheParameterStore)
+TEST(
+  GalProgramEffect,
+  VariableSettersWriteTheParameterStore
+)
 {
   RecordingBinder binder;
   const std::shared_ptr<effects::EffectProgram> program = MakeProgram(R"fx(
@@ -244,7 +314,9 @@ float4x4 Bones[2];
 texture Base;
 )fx");
   ProgramEffect effect(EffectContext{}, program, binder);
-  const auto image = [&] { return program->Parameters().Constants(); };
+  const auto image = [&] {
+    return program->Parameters().Constants();
+  };
 
   const boost::shared_ptr<EffectVariable> scale = effect.GetVariable("Scale");
   scale->SetFloat(3.5f);
@@ -282,7 +354,8 @@ texture Base;
   effect.GetVariable("Weights")->SetFloatArray(4U, weights);
   EXPECT_FLOAT_EQ(FloatAt(image(), OffsetOf(*program, "Weights") + 48U), 3.5f);
   effect.GetVariable("Weights")->SetValue(colour, 8U);
-  EXPECT_FLOAT_EQ(FloatAt(image(), OffsetOf(*program, "Weights") + 16U), 0.2f) << "SetValue on float data converts as SetFloatArray";
+  EXPECT_FLOAT_EQ(FloatAt(image(), OffsetOf(*program, "Weights") + 16U), 0.2f)
+    << "SetValue on float data converts as SetFloatArray";
 
   Matrix world{};
   world.r[3].x = 7.0f;
@@ -302,10 +375,16 @@ texture Base;
   const boost::shared_ptr<EffectVariable> base = effect.GetVariable("Base");
   const boost::shared_ptr<Texture> texture(new faf_gal_tests::FakeTexture());
   base->SetTexture(texture);
-  EXPECT_EQ(program->Parameters().Binding(static_cast<std::uint32_t>(program->FindParameter("Base"))).texture.get(), texture.get());
+  EXPECT_EQ(
+    program->Parameters().Binding(static_cast<std::uint32_t>(program->FindParameter("Base"))).texture.get(),
+    texture.get()
+  );
   const boost::shared_ptr<RenderTarget> target(new faf_gal_tests::FakeRenderTarget());
   base->SetRenderTarget(target);
-  EXPECT_EQ(program->Parameters().Binding(static_cast<std::uint32_t>(program->FindParameter("Base"))).renderTarget.get(), target.get());
+  EXPECT_EQ(
+    program->Parameters().Binding(static_cast<std::uint32_t>(program->FindParameter("Base"))).renderTarget.get(),
+    target.get()
+  );
   base->SetCubeRenderTarget(boost::shared_ptr<CubeRenderTarget>());
   EXPECT_EQ(TakeDrawStatistics().stateChanges, 2U);
 }

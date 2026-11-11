@@ -257,9 +257,8 @@ namespace moho
    * Writes one registry value at `keyPath` using raw byte payload and explicit
    * registry value type.
    */
-  bool PLAT_SetRegistryValue(
-    const char* keyPath, const std::uint8_t* data, std::uint32_t dataSize, std::uint32_t valueType
-  );
+  bool
+  PLAT_SetRegistryValue(const char* keyPath, const std::uint8_t* data, std::uint32_t dataSize, std::uint32_t valueType);
 
   /**
    * Address: 0x004A2F60 (FUN_004A2F60)
@@ -452,6 +451,5 @@ namespace moho
    * Re-initializes the shared wakeup timer baseline used by the main loop.
    */
   void register_startTime();
-
 
 } // namespace moho

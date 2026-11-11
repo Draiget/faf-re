@@ -24,10 +24,11 @@ namespace moho
   class Unit;
   class UnitWeapon;
 
-  class MOHO_EMPTY_BASES CScriptObject : public gpg::RObject,
-                                         public WeakObject,
-                                         public boost::noncopyable_::noncopyable,
-                                         public InstanceCounter<CScriptObject>
+  class MOHO_EMPTY_BASES CScriptObject :
+    public gpg::RObject,
+    public WeakObject,
+    public boost::noncopyable_::noncopyable,
+    public InstanceCounter<CScriptObject>
   {
     // Legacy MSVC8 ABI places empty-base storage ahead of first data member.
     // With __declspec(empty_bases) this storage is removed, so add +4 only
@@ -95,7 +96,10 @@ namespace moho
      * Address: 0x004C70D0
      */
     void CreateLuaObject(
-      const LuaPlus::LuaObject&, const LuaPlus::LuaObject&, const LuaPlus::LuaObject&, const LuaPlus::LuaObject&
+      const LuaPlus::LuaObject&,
+      const LuaPlus::LuaObject&,
+      const LuaPlus::LuaObject&,
+      const LuaPlus::LuaObject&
     );
 
     /**
@@ -212,7 +216,7 @@ namespace moho
     void CallbackStr(const char* callback, const char** arg0, const char** arg1);
 
     /**
-       * Address: 0x006B0940 (FUN_006B0940)
+     * Address: 0x006B0940 (FUN_006B0940)
      *
      * Calls script callback with a single integer argument.
      */
@@ -246,7 +250,10 @@ namespace moho
      * slot; a callback that destroyed the object clears it.
      */
     template <class... Ts>
-    LuaPlus::LuaObject RunScript(const char* name, Ts... args)
+    LuaPlus::LuaObject RunScript(
+      const char* name,
+      Ts... args
+    )
     {
       const WeakPtr<CScriptObject> weakGuard(this);
 
@@ -541,7 +548,8 @@ namespace moho
      * returns the numeric absorption contribution from script.
      */
     [[nodiscard]]
-    float RunScriptOnGetDamageAbsorption(const WeakPtr<Entity>& sourceLink, float amount, const std::string& damageType);
+    float
+    RunScriptOnGetDamageAbsorption(const WeakPtr<Entity>& sourceLink, float amount, const std::string& damageType);
 
     /**
      * Address: 0x0073A4F0 (FUN_0073A4F0, Moho::CScriptObject::RunScript_EntityOnDamage)
@@ -662,7 +670,10 @@ namespace moho
      * Address: 0x00675CF0
      */
     void LuaInvoke3_DiscardReturn(
-      LuaPlus::LuaObject& func, LuaPlus::LuaObject& selfObj, const char* stringArg, LuaPlus::LuaObject& payloadObj
+      LuaPlus::LuaObject& func,
+      LuaPlus::LuaObject& selfObj,
+      const char* stringArg,
+      LuaPlus::LuaObject& payloadObj
     );
 
   public:

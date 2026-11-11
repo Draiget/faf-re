@@ -33,10 +33,13 @@ namespace moho
   extern float ren_FrameTimeSeconds;
 
   namespace
-{
+  {
     struct CaseInsensitiveCStringLess
     {
-      [[nodiscard]] bool operator()(const char* lhs, const char* rhs) const noexcept
+      [[nodiscard]] bool operator()(
+        const char* lhs,
+        const char* rhs
+      ) const noexcept
       {
         if (lhs == rhs) {
           return false;
@@ -88,10 +91,8 @@ namespace moho
         }
 
         const TimeBarTrackMap::iterator insertPos = outTracks.lower_bound(eventView.mRecord->mName);
-        const bool alreadyPresent =
-          insertPos != outTracks.end()
-          && insertPos->first != nullptr
-          && gpg::STR_CompareNoCase(insertPos->first, eventView.mRecord->mName) == 0;
+        const bool alreadyPresent = insertPos != outTracks.end() && insertPos->first != nullptr &&
+          gpg::STR_CompareNoCase(insertPos->first, eventView.mRecord->mName) == 0;
 
         if (!alreadyPresent) {
           (void)outTracks.insert(
@@ -115,7 +116,10 @@ namespace moho
         outMaxLabelWidth = std::max(outMaxLabelWidth, font.GetAdvance(name, -1) + kLabelPadding);
       }
     }
-    [[nodiscard]] std::int64_t CombineCycles(const std::uint32_t lo, const std::uint32_t hi) noexcept
+    [[nodiscard]] std::int64_t CombineCycles(
+      const std::uint32_t lo,
+      const std::uint32_t hi
+    ) noexcept
     {
       const std::uint64_t value = (static_cast<std::uint64_t>(hi) << 32) | lo;
       return static_cast<std::int64_t>(value);
@@ -144,7 +148,10 @@ namespace moho
       }
     }
 
-    void BuildEventViews(const fa::vector<STimeBarEventRecord>& events, std::vector<TimeBarEvent>& outEventViews)
+    void BuildEventViews(
+      const fa::vector<STimeBarEventRecord>& events,
+      std::vector<TimeBarEvent>& outEventViews
+    )
     {
       outEventViews.clear();
       outEventViews.reserve(events.size());
@@ -157,7 +164,11 @@ namespace moho
         outEventViews.push_back(view);
       }
     }
-    [[nodiscard]] CD3DPrimBatcher::Vertex MakeVertex(const float x, const float y, const std::uint32_t colorTag)
+    [[nodiscard]] CD3DPrimBatcher::Vertex MakeVertex(
+      const float x,
+      const float y,
+      const std::uint32_t colorTag
+    )
     {
       CD3DPrimBatcher::Vertex vertex{};
       vertex.mX = x;
@@ -208,7 +219,6 @@ namespace moho
   } // namespace
 } // namespace moho
 
-
 namespace moho
 {
   /**
@@ -221,7 +231,11 @@ namespace moho
    * Renders the time-bar panel background, labels, and clipped event timeline segments.
    */
   void TIME_RenderTimeBars(
-    CD3DPrimBatcher* const primBatcher, const float left, const float top, const float width, const float height
+    CD3DPrimBatcher* const primBatcher,
+    const float left,
+    const float top,
+    const float width,
+    const float height
   )
   {
     if (!primBatcher) {
@@ -297,7 +311,6 @@ namespace moho
 
       DrawPanelLine(*primBatcher, startX, rowY, endX, rowY, eventView.mRecord->mColorTag);
     }
-
 
     // `tracks` goes out of scope here. `~map()` is what the binary runs at
     // this point too, and MSVC emits it; naming it would be a second call.

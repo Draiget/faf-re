@@ -39,7 +39,8 @@ namespace faf::remote::wire
   };
 
   /** A bone's local transform and flags, quantised. */
-  [[nodiscard]] SPoseBone QuantizeBone(const float position[3], const float rotation[4], bool visible, bool skipInterp) noexcept;
+  [[nodiscard]] SPoseBone
+  QuantizeBone(const float position[3], const float rotation[4], bool visible, bool skipInterp) noexcept;
   /** The values back (the quaternion normalised). */
   void DequantizeBone(const SPoseBone& bone, float position[3], float rotation[4]) noexcept;
 

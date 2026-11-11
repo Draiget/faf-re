@@ -43,7 +43,8 @@ namespace faf::server
      * Listens at `at`. `token`: the admin token every request must carry (at least 16 characters); `corsOrigin`: the
      * one web origin a browser may call from (`Access-Control-Allow-Origin`), empty for none.
      */
-    [[nodiscard]] bool Open(const remote::net::SEndpoint& at, std::string token, std::string corsOrigin, std::string& error);
+    [[nodiscard]] bool
+    Open(const remote::net::SEndpoint& at, std::string token, std::string corsOrigin, std::string& error);
     /** Accepts, reads and writes what it can without waiting; the requests that came, in order. */
     void Poll(std::vector<SControlRequest>& requests, std::uint64_t nowUs);
     /** The answer to request `id` (negative), as `CControlListener::Reply`/`Refuse` make it. */
@@ -53,14 +54,22 @@ namespace faf::server
     /** Whether an event stream is open. */
     [[nodiscard]] bool Connected() const noexcept;
     /** Lines worth the console: a refused token, a malformed request, an event stream opened or closed. */
-    [[nodiscard]] std::vector<std::string> TakeNews() { return std::exchange(mNews, {}); }
+    [[nodiscard]] std::vector<std::string> TakeNews()
+    {
+      return std::exchange(mNews, {});
+    }
 
   private:
     struct SConnection;
     void Read(SConnection& connection, std::vector<SControlRequest>& requests, std::uint64_t nowUs);
     /** A whole request in `connection.in`: routed, answered at once, or handed out as a control request. */
-    void Handle(SConnection& connection, std::string_view method, std::string_view path, std::string_view body,
-                std::vector<SControlRequest>& requests);
+    void Handle(
+      SConnection& connection,
+      std::string_view method,
+      std::string_view path,
+      std::string_view body,
+      std::vector<SControlRequest>& requests
+    );
     void Respond(SConnection& connection, int status, std::string_view json);
     void Flush(SConnection& connection);
     void Close(SConnection& connection, const char* why);

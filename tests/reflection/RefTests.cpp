@@ -34,7 +34,9 @@ namespace
   // ---------------------------------------------------------------------------------------------
 
   template <class T>
-  std::string LexicalOf(T value)
+  std::string LexicalOf(
+    T value
+  )
   {
     const gpg::RRef ref{&value, gpg::RTypeOf<T>()};
     return std::string(ref.GetLexical().view());
@@ -42,7 +44,10 @@ namespace
 
   /** Parses `text` into a `T` that starts as `start`; returns whether it was taken and the value after. */
   template <class T>
-  std::pair<bool, T> Parse(const char* const text, const T start)
+  std::pair<bool, T> Parse(
+    const char* const text,
+    const T start
+  )
   {
     T value = start;
     const gpg::RRef ref{&value, gpg::RTypeOf<T>()};
@@ -50,7 +55,10 @@ namespace
     return {taken, value};
   }
 
-  TEST(ReflectionPrimitives, BoolTextIsTrueOrFalse)
+  TEST(
+    ReflectionPrimitives,
+    BoolTextIsTrueOrFalse
+  )
   {
     EXPECT_EQ(LexicalOf(true), "true");
     EXPECT_EQ(LexicalOf(false), "false");
@@ -67,7 +75,10 @@ namespace
     }
   }
 
-  TEST(ReflectionPrimitives, IntegerTextIsDecimal)
+  TEST(
+    ReflectionPrimitives,
+    IntegerTextIsDecimal
+  )
   {
     EXPECT_EQ(LexicalOf<char>(-5), "-5");
     EXPECT_EQ(LexicalOf<signed char>(-128), "-128");
@@ -81,7 +92,10 @@ namespace
     EXPECT_EQ(LexicalOf<unsigned long>(42UL), "42");
   }
 
-  TEST(ReflectionPrimitives, DISABLED_UnsignedTextUsesTheBinarysSignedFormat)
+  TEST(
+    ReflectionPrimitives,
+    DISABLED_UnsignedTextUsesTheBinarysSignedFormat
+  )
   {
     // Suspected deviation: the binary formats every integer type with "%d" (0x00E0425C; the unsigned int body
     // 0x008DEB40 pushes it too), so 0xFFFFFFFF reads "-1" there. RIntType<T>::GetLexical (RIntegerTypes.cpp)
@@ -91,7 +105,10 @@ namespace
     EXPECT_EQ(LexicalOf<unsigned long>(0x80000000UL), "-2147483648");
   }
 
-  TEST(ReflectionPrimitives, IntegerParserTakesDecimalHexAndOctal)
+  TEST(
+    ReflectionPrimitives,
+    IntegerParserTakesDecimalHexAndOctal
+  )
   {
     EXPECT_EQ(Parse<int>("123", 0), (std::pair<bool, int>{true, 123}));
     EXPECT_EQ(Parse<int>("-45", 0), (std::pair<bool, int>{true, -45}));
@@ -110,7 +127,10 @@ namespace
     EXPECT_EQ(Parse<char>("65", 0), (std::pair<bool, char>{true, 'A'}));
   }
 
-  TEST(ReflectionPrimitives, IntegerParserWrapsAtTheTypesWidth)
+  TEST(
+    ReflectionPrimitives,
+    IntegerParserWrapsAtTheTypesWidth
+  )
   {
     // 0x008DDACF: `imul dl` and `add al, cl`, so a char accumulates modulo 256.
     EXPECT_EQ(Parse<unsigned char>("300", 0), (std::pair<bool, unsigned char>{true, 44}));
@@ -118,7 +138,10 @@ namespace
     EXPECT_EQ(Parse<unsigned short>("65537", 0), (std::pair<bool, unsigned short>{true, 1}));
   }
 
-  TEST(ReflectionPrimitives, IntegerParserRefusesOtherTextAndKeepsTheValue)
+  TEST(
+    ReflectionPrimitives,
+    IntegerParserRefusesOtherTextAndKeepsTheValue
+  )
   {
     for (const char* const bad : {"", "-", "08", "0x", "0X10", "12z", "1.5", " 1", "+1", "0xg"}) {
       EXPECT_EQ(Parse<int>(bad, 77), (std::pair<bool, int>{false, 77})) << '"' << bad << '"';
@@ -126,14 +149,20 @@ namespace
     }
   }
 
-  TEST(ReflectionPrimitives, IntegerParserTakesAnUpperCaseAAsTheBinaryDoes)
+  TEST(
+    ReflectionPrimitives,
+    IntegerParserTakesAnUpperCaseAAsTheBinaryDoes
+  )
   {
     // 0x008DDABC: after 'a'..'z' only 'A' passes, and its digit is 'A' - 0x57 = -22.
     EXPECT_EQ(Parse<int>("1A", 0), (std::pair<bool, int>{true, 10 - 22}));
     EXPECT_EQ(Parse<int>("1B", 0), (std::pair<bool, int>{false, 0}));
   }
 
-  TEST(ReflectionPrimitives, FloatTextIsPrintfF)
+  TEST(
+    ReflectionPrimitives,
+    FloatTextIsPrintfF
+  )
   {
     EXPECT_EQ(LexicalOf(1.5f), "1.500000");
     EXPECT_EQ(LexicalOf(-0.25f), "-0.250000");
@@ -147,7 +176,10 @@ namespace
     EXPECT_EQ(Parse<float>("3.5abc", 0.0f), (std::pair<bool, float>{true, 3.5f}));
   }
 
-  TEST(ReflectionPrimitives, StringTextIsTheStringItself)
+  TEST(
+    ReflectionPrimitives,
+    StringTextIsTheStringItself
+  )
   {
     fa::string text("hello world");
     const gpg::RRef ref{&text, gpg::RTypeOf<fa::string>()};
@@ -163,7 +195,9 @@ namespace
   // ---------------------------------------------------------------------------------------------
 
   template <class T>
-  void ExpectIntegerLanes(const T sample)
+  void ExpectIntegerLanes(
+    const T sample
+  )
   {
     gpg::RType* const type = gpg::RTypeOf<T>();
     ASSERT_NE(type->newRefFunc_, nullptr) << type->GetName();
@@ -207,7 +241,10 @@ namespace
     fresh.Delete();
   }
 
-  TEST(ReflectionPrimitives, IntegerTypesCreateCopyMoveAndDeleteValues)
+  TEST(
+    ReflectionPrimitives,
+    IntegerTypesCreateCopyMoveAndDeleteValues
+  )
   {
     ExpectIntegerLanes<char>('x');
     ExpectIntegerLanes<signed char>(-3);
@@ -224,7 +261,10 @@ namespace
   // RRef
   // ---------------------------------------------------------------------------------------------
 
-  TEST(ReflectionRef, AnEmptyRefIsNamedNull)
+  TEST(
+    ReflectionRef,
+    AnEmptyRefIsNamedNull
+  )
   {
     const gpg::RRef empty;
     EXPECT_EQ(empty.mObj, nullptr);
@@ -243,7 +283,10 @@ namespace
     EXPECT_EQ(ref.GetCount(), 0u);
   }
 
-  TEST(ReflectionRef, TypedConstructorsPickThePrimitiveType)
+  TEST(
+    ReflectionRef,
+    TypedConstructorsPickThePrimitiveType
+  )
   {
     char c = 'a';
     short s = 1;
@@ -264,7 +307,10 @@ namespace
     EXPECT_STREQ(tokenRef.GetName(), "ArchiveToken");
   }
 
-  TEST(ReflectionRef, CheckedUpcastsReturnTheirOwnType)
+  TEST(
+    ReflectionRef,
+    CheckedUpcastsReturnTheirOwnType
+  )
   {
     char c = 0;
     short s = 0;
@@ -286,7 +332,9 @@ namespace
     EXPECT_EQ(gpg::MakeRRef(&ul).TryUpcastUnsignedLong(), &ul);
   }
 
-  std::string CastMessage(const std::function<void()>& cast)
+  std::string CastMessage(
+    const std::function<void()>& cast
+  )
   {
     try {
       cast();
@@ -296,39 +344,85 @@ namespace
     return "(no throw)";
   }
 
-  TEST(ReflectionRef, ACheckedUpcastOfAnotherTypeThrowsBadRefCast)
+  TEST(
+    ReflectionRef,
+    ACheckedUpcastOfAnotherTypeThrowsBadRefCast
+  )
   {
     // BadRefCast(nullptr, from, to) 0x008DD300 with the default prefix.
     float f = 1.0f;
     const gpg::RRef floatRef{&f, gpg::RTypeOf<float>()};
-    EXPECT_EQ(CastMessage([&] { (void)floatRef.TryUpcastInt(); }), "type error: can't convert float to int");
-    EXPECT_EQ(CastMessage([&] { (void)floatRef.TryUpcastChar(); }), "type error: can't convert float to char");
-    EXPECT_EQ(CastMessage([&] { (void)floatRef.TryUpcastShort(); }), "type error: can't convert float to short");
     EXPECT_EQ(
-      CastMessage([&] { (void)floatRef.TryUpcastUnsignedLong(); }), "type error: can't convert float to unsigned long"
+      CastMessage([&] {
+      (void)floatRef.TryUpcastInt();
+    }),
+      "type error: can't convert float to int"
+    );
+    EXPECT_EQ(
+      CastMessage([&] {
+      (void)floatRef.TryUpcastChar();
+    }),
+      "type error: can't convert float to char"
+    );
+    EXPECT_EQ(
+      CastMessage([&] {
+      (void)floatRef.TryUpcastShort();
+    }),
+      "type error: can't convert float to short"
+    );
+    EXPECT_EQ(
+      CastMessage([&] {
+      (void)floatRef.TryUpcastUnsignedLong();
+    }),
+      "type error: can't convert float to unsigned long"
     );
 
     int i = 0;
     const gpg::RRef intRef{&i, gpg::RTypeOf<int>()};
-    EXPECT_EQ(CastMessage([&] { (void)intRef.TryUpcastLong(); }), "type error: can't convert int to long");
     EXPECT_EQ(
-      CastMessage([&] { (void)intRef.TryUpcastUnsignedInt(); }), "type error: can't convert int to unsigned int"
+      CastMessage([&] {
+      (void)intRef.TryUpcastLong();
+    }),
+      "type error: can't convert int to long"
     );
     EXPECT_EQ(
-      CastMessage([&] { (void)intRef.TryUpcastSignedChar(); }), "type error: can't convert int to signed char"
+      CastMessage([&] {
+      (void)intRef.TryUpcastUnsignedInt();
+    }),
+      "type error: can't convert int to unsigned int"
     );
     EXPECT_EQ(
-      CastMessage([&] { (void)intRef.TryUpcastUnsignedChar(); }), "type error: can't convert int to unsigned char"
+      CastMessage([&] {
+      (void)intRef.TryUpcastSignedChar();
+    }),
+      "type error: can't convert int to signed char"
     );
     EXPECT_EQ(
-      CastMessage([&] { (void)intRef.TryUpcastUnsignedShort(); }), "type error: can't convert int to unsigned short"
+      CastMessage([&] {
+      (void)intRef.TryUpcastUnsignedChar();
+    }),
+      "type error: can't convert int to unsigned char"
+    );
+    EXPECT_EQ(
+      CastMessage([&] {
+      (void)intRef.TryUpcastUnsignedShort();
+    }),
+      "type error: can't convert int to unsigned short"
     );
 
     const gpg::RRef untyped{&i, nullptr};
-    EXPECT_EQ(CastMessage([&] { (void)untyped.TryUpcastInt(); }), "type error: can't convert null to int");
+    EXPECT_EQ(
+      CastMessage([&] {
+      (void)untyped.TryUpcastInt();
+    }),
+      "type error: can't convert null to int"
+    );
   }
 
-  TEST(ReflectionRef, BadRefCastMessages)
+  TEST(
+    ReflectionRef,
+    BadRefCastMessages
+  )
   {
     EXPECT_STREQ(gpg::BadRefCast("plain").what(), "plain");
     EXPECT_STREQ(gpg::BadRefCast(nullptr, "A", "B").what(), "type error: can't convert A to B");
@@ -340,7 +434,10 @@ namespace
     EXPECT_NE(dynamic_cast<const std::runtime_error*>(&asBase), nullptr);
   }
 
-  TEST(ReflectionRef, SerializationErrorMessages)
+  TEST(
+    ReflectionRef,
+    SerializationErrorMessages
+  )
   {
     EXPECT_STREQ(gpg::SerializationError("broken archive").what(), "broken archive");
     EXPECT_STREQ(gpg::SerializationError(std::runtime_error("wrapped")).what(), "wrapped");
@@ -351,7 +448,10 @@ namespace
     }
   }
 
-  TEST(ReflectionRef, DeleteOfANullObjectDoesNothing)
+  TEST(
+    ReflectionRef,
+    DeleteOfANullObjectDoesNothing
+  )
   {
     gpg::RRef none{nullptr, gpg::RTypeOf<int>()};
     none.Delete();
@@ -364,7 +464,10 @@ namespace
   // RRef adapters (ReflectionRefAdapters.cpp)
   // ---------------------------------------------------------------------------------------------
 
-  TEST(ReflectionRefAdapters, ValueAdaptersKeepTheObject)
+  TEST(
+    ReflectionRefAdapters,
+    ValueAdaptersKeepTheObject
+  )
   {
     gpg::RRef out{};
     int i = 1;
@@ -497,7 +600,10 @@ namespace
     // clang-format on
   }
 
-  TEST(ReflectionRefAdapters, NullObjectsKeepTheDeclaredType)
+  TEST(
+    ReflectionRefAdapters,
+    NullObjectsKeepTheDeclaredType
+  )
   {
     for (const AdapterCase& adapter : NullObjectCases()) {
       gpg::RRef out{reinterpret_cast<void*>(0x1), nullptr}; // overwritten
@@ -510,7 +616,9 @@ namespace
 
   template <class E>
   void ExpectEnumAdapter(
-    const char* const adapter, gpg::RRef* (*const call)(gpg::RRef*, E*), const char* const typeName
+    const char* const adapter,
+    gpg::RRef* (*const call)(gpg::RRef*, E*),
+    const char* const typeName
   )
   {
     E value = static_cast<E>(0);
@@ -523,7 +631,10 @@ namespace
     EXPECT_EQ(out.mType->size_, 4) << adapter;
   }
 
-  TEST(ReflectionRefAdapters, EnumAdaptersPointAtTheEnumType)
+  TEST(
+    ReflectionRefAdapters,
+    EnumAdaptersPointAtTheEnumType
+  )
   {
     ExpectEnumAdapter("AssignESTITargetTypeRef", &gpg::AssignESTITargetTypeRef, "ESTITargetType");
     ExpectEnumAdapter("AssignESquadClassRef", &gpg::AssignESquadClassRef, "ESquadClass");

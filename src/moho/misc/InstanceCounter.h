@@ -57,7 +57,9 @@ namespace moho
     /**
      * Copies count as a new live instance; the destructor will take them away.
      */
-    InstanceCounter(const InstanceCounter&) noexcept
+    InstanceCounter(
+      const InstanceCounter&
+    ) noexcept
       : InstanceCounter()
     {}
 

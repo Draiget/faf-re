@@ -9,14 +9,21 @@ namespace faf::editor
   namespace
   {
     // JsonUtility writes a Color as {r, g, b, a}.
-    std::string ColorText(const float (&rgb)[3], const std::string& indent)
+    std::string ColorText(
+      const float (&rgb)[3],
+      const std::string& indent
+    )
     {
       const std::string in = indent + "    ";
-      return "{\n" + in + "\"r\": " + JsonNumber(rgb[0]) + ",\n" + in + "\"g\": " + JsonNumber(rgb[1]) + ",\n" + in + "\"b\": " +
-             JsonNumber(rgb[2]) + ",\n" + in + "\"a\": 1.0\n" + indent + "}";
+      return "{\n" + in + "\"r\": " + JsonNumber(rgb[0]) + ",\n" + in + "\"g\": " + JsonNumber(rgb[1]) + ",\n" + in +
+        "\"b\": " + JsonNumber(rgb[2]) + ",\n" + in + "\"a\": 1.0\n" + indent + "}";
     }
 
-    void ReadColor(const std::string& text, const std::string& key, float (&rgb)[3])
+    void ReadColor(
+      const std::string& text,
+      const std::string& key,
+      float (&rgb)[3]
+    )
     {
       std::string object;
       if (!JsonValue(text, key, object)) {
@@ -27,7 +34,11 @@ namespace faf::editor
       (void)JsonFloat(object, "b", rgb[2]);
     }
 
-    void ReadInt(const std::string& text, const std::string& key, int& out)
+    void ReadInt(
+      const std::string& text,
+      const std::string& key,
+      int& out
+    )
     {
       std::string number;
       if (JsonValue(text, key, number)) {
@@ -36,20 +47,27 @@ namespace faf::editor
     }
   } // namespace
 
-  bool SkyboxState::operator==(const SkyboxState& other) const
+  bool SkyboxState::operator==(
+    const SkyboxState& other
+  ) const
   {
-    const auto same = [](const void* a, const void* b, const std::size_t size) { return std::memcmp(a, b, size) == 0; };
-    return same(position, other.position, sizeof(position)) && horizonHeight == other.horizonHeight && scale == other.scale &&
-           subtractHeight == other.subtractHeight && subdivisionsAxis == other.subdivisionsAxis &&
-           subdivisionsHeight == other.subdivisionsHeight && zenithHeight == other.zenithHeight &&
-           same(horizonColor, other.horizonColor, sizeof(horizonColor)) && same(zenithColor, other.zenithColor, sizeof(zenithColor)) &&
-           decalGlow == other.decalGlow && albedo == other.albedo && glow == other.glow && planets.size() == other.planets.size() &&
-           (planets.empty() || same(planets.data(), other.planets.data(), planets.size() * sizeof(SkyboxPlanet))) &&
-           cirrusMultiplier == other.cirrusMultiplier && same(cirrusColor, other.cirrusColor, sizeof(cirrusColor)) &&
-           cirrusTexture == other.cirrusTexture && same(cirrus, other.cirrus, sizeof(cirrus));
+    const auto same = [](const void* a, const void* b, const std::size_t size) {
+      return std::memcmp(a, b, size) == 0;
+    };
+    return same(position, other.position, sizeof(position)) && horizonHeight == other.horizonHeight &&
+      scale == other.scale && subtractHeight == other.subtractHeight && subdivisionsAxis == other.subdivisionsAxis &&
+      subdivisionsHeight == other.subdivisionsHeight && zenithHeight == other.zenithHeight &&
+      same(horizonColor, other.horizonColor, sizeof(horizonColor)) &&
+      same(zenithColor, other.zenithColor, sizeof(zenithColor)) && decalGlow == other.decalGlow &&
+      albedo == other.albedo && glow == other.glow && planets.size() == other.planets.size() &&
+      (planets.empty() || same(planets.data(), other.planets.data(), planets.size() * sizeof(SkyboxPlanet))) &&
+      cirrusMultiplier == other.cirrusMultiplier && same(cirrusColor, other.cirrusColor, sizeof(cirrusColor)) &&
+      cirrusTexture == other.cirrusTexture && same(cirrus, other.cirrus, sizeof(cirrus));
   }
 
-  std::string SkyboxToScmskybox(const SkyboxState& sky)
+  std::string SkyboxToScmskybox(
+    const SkyboxState& sky
+  )
   {
     // SkyboxValues' fields in its declaration order, inside SkyboxData's "Data".
     const std::string in = "        ";
@@ -82,7 +100,11 @@ namespace faf::editor
     }
     planets += sky.planets.empty() ? "]" : "\n" + in + "]";
     line("Planets", planets);
-    line("MidRgbColor", "{\n" + in + "    \"r\": 0,\n" + in + "    \"g\": 0,\n" + in + "    \"b\": 0,\n" + in + "    \"a\": 0\n" + in + "}");
+    line(
+      "MidRgbColor",
+      "{\n" + in + "    \"r\": 0,\n" + in + "    \"g\": 0,\n" + in + "    \"b\": 0,\n" + in + "    \"a\": 0\n" + in +
+        "}"
+    );
     line("CirrusMultiplier", JsonNumber(sky.cirrusMultiplier));
     line("CirrusColor", ColorText(sky.cirrusColor, in));
     line("CirrusTexture", JsonQuoted(sky.cirrusTexture));
@@ -101,11 +123,18 @@ namespace faf::editor
     return out + "    }\n}";
   }
 
-  bool SkyboxFromScmskybox(const std::string& text, SkyboxState& sky, std::string& error)
+  bool SkyboxFromScmskybox(
+    const std::string& text,
+    SkyboxState& sky,
+    std::string& error
+  )
   {
     std::string data;
     std::string probe;
-    if (!JsonValue(text, "Data", data) || !JsonValue(data, "SubdivisionsAxis", probe) || !JsonValue(data, "CirrusTexture", probe)) {
+    if (
+      !JsonValue(text, "Data", data) || !JsonValue(data, "SubdivisionsAxis", probe) ||
+      !JsonValue(data, "CirrusTexture", probe)
+    ) {
       error = "not a sky file (no Data with SubdivisionsAxis and CirrusTexture)";
       return false;
     }

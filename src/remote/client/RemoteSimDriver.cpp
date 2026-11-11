@@ -23,7 +23,9 @@ namespace faf::remote::client
   } // namespace
 
   template <class Send>
-  moho::CmdId CRemoteSimDriver::SendCommand(Send&& send)
+  moho::CmdId CRemoteSimDriver::SendCommand(
+    Send&& send
+  )
   {
     // WP11.1: the command goes as the message a networked client sends (`CMarshaller`), and the
     // stand-in server decodes it (`CDecoder`) before the session's lockstep driver takes it.
@@ -33,15 +35,19 @@ namespace faf::remote::client
     if (!mIntake.HaveCookie()) {
       ++mCommandsDropped; // the decoder refused it: the lockstep path would have sent it
       if (mCommandsDropped <= 10u) {
-        gpg::Logf("loopback: a command did not survive the round trip to the server (%llu so far)",
-                  static_cast<unsigned long long>(mCommandsDropped));
+        gpg::Logf(
+          "loopback: a command did not survive the round trip to the server (%llu so far)",
+          static_cast<unsigned long long>(mCommandsDropped)
+        );
       }
     }
     return mIntake.Cookie();
   }
 
   CRemoteSimDriver::CRemoteSimDriver(
-    std::unique_ptr<moho::ISTIDriver> server, moho::RRuleGameRules& rules, const wire::SFrameCodec& codec,
+    std::unique_ptr<moho::ISTIDriver> server,
+    moho::RRuleGameRules& rules,
+    const wire::SFrameCodec& codec,
     const SLoopbackOptions& options
   )
     : mServer(std::move(server))
@@ -50,18 +56,27 @@ namespace faf::remote::client
     , mCommandLua(new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE))
     , mServerDecoder(&mIntake, mNoRecording, &rules, mCommandLua.get())
     , mClientManager(
-        [this](moho::CMessage& message) { mServerDecoder.ReceiveMessage(&message, nullptr); }, mServer->GetClientManager()
+        [this](moho::CMessage& message) {
+          mServerDecoder.ReceiveMessage(&message, nullptr);
+        },
+        mServer->GetClientManager()
       )
     , mMarshaller(&mClientManager)
     , mOptions(options)
   {
     gpg::Logf(
       "loopback: remote driver on, %u blueprints, content hash %016llx, dead reckoning %s (%u steps, turns %u)",
-      mLink.Tables().blueprints.Size(), static_cast<unsigned long long>(mLink.Tables().Hash()),
-      mLink.DeadReckoning() ? "on" : "off", options.deadReckoningTolerance, options.orientationTolerance
+      mLink.Tables().blueprints.Size(),
+      static_cast<unsigned long long>(mLink.Tables().Hash()),
+      mLink.DeadReckoning() ? "on" : "off",
+      options.deadReckoningTolerance,
+      options.orientationTolerance
     );
     if (!mLink.Refusal().empty()) {
-      gpg::Logf("loopback: the client refused the server's hello (%s); the session runs on the sim's packets", mLink.Refusal().c_str());
+      gpg::Logf(
+        "loopback: the client refused the server's hello (%s); the session runs on the sim's packets",
+        mLink.Refusal().c_str()
+      );
     }
   }
 
@@ -70,7 +85,9 @@ namespace faf::remote::client
     LogSummary("end");
   }
 
-  void CRemoteSimDriver::LogSummary(const char* const when) const
+  void CRemoteSimDriver::LogSummary(
+    const char* const when
+  ) const
   {
     const std::string summary = mLink.Summary(when);
     const std::size_t split = summary.find('\n');
@@ -81,14 +98,20 @@ namespace faf::remote::client
     gpg::Logf(
       "loopback %s commands: %llu sent through CMarshaller and CDecoder, %llu dropped, %llu unexpected messages; "
       "army requests %llu (refused %llu), cameras %llu of %llu sent",
-      when, static_cast<unsigned long long>(mCommandsSent), static_cast<unsigned long long>(mCommandsDropped),
-      static_cast<unsigned long long>(mIntake.Unexpected()), static_cast<unsigned long long>(mArmyRequests),
-      static_cast<unsigned long long>(mArmyRefusals), static_cast<unsigned long long>(mCamsSent),
+      when,
+      static_cast<unsigned long long>(mCommandsSent),
+      static_cast<unsigned long long>(mCommandsDropped),
+      static_cast<unsigned long long>(mIntake.Unexpected()),
+      static_cast<unsigned long long>(mArmyRequests),
+      static_cast<unsigned long long>(mArmyRefusals),
+      static_cast<unsigned long long>(mCamsSent),
       static_cast<unsigned long long>(mCamsReceived)
     );
   }
 
-  void CRemoteSimDriver::PassThroughWire(moho::SSyncData& packet)
+  void CRemoteSimDriver::PassThroughWire(
+    moho::SSyncData& packet
+  )
   {
     moho::IClientManager* const standIn = mServer->GetClientManager();
     if (standIn != nullptr) {
@@ -148,7 +171,9 @@ namespace faf::remote::client
     return mServer->HasSyncData();
   }
 
-  void CRemoteSimDriver::GetSyncData(moho::SSyncData*& outSyncData)
+  void CRemoteSimDriver::GetSyncData(
+    moho::SSyncData*& outSyncData
+  )
   {
     mServer->GetSyncData(outSyncData);
     if (outSyncData != nullptr) {
@@ -167,19 +192,25 @@ namespace faf::remote::client
     return mLink.Refused() ? mServer->GetSimSpeed() : mLink.Clock().Skew();
   }
 
-  void CRemoteSimDriver::SetArmyIndex(const int armyIndex)
+  void CRemoteSimDriver::SetArmyIndex(
+    const int armyIndex
+  )
   {
     // A request: the server decides which army a client views (WP11.1, WP6.7).
     ++mArmyRequests;
     if (mOptions.lockedArmy != SLoopbackOptions::kNoArmyLock && armyIndex != mOptions.lockedArmy) {
       ++mArmyRefusals;
-      gpg::Logf("loopback: the server refused the view of army %d (the view is army %d)", armyIndex, mOptions.lockedArmy);
+      gpg::Logf(
+        "loopback: the server refused the view of army %d (the view is army %d)", armyIndex, mOptions.lockedArmy
+      );
       return;
     }
     mServer->SetArmyIndex(armyIndex);
   }
 
-  void CRemoteSimDriver::SetGeomCams(const fa::vector<moho::GeomCamera3>& geoCams)
+  void CRemoteSimDriver::SetGeomCams(
+    const fa::vector<moho::GeomCamera3>& geoCams
+  )
   {
     // Every frame hands the cameras over; the server needs them at a low rate only (WP11.1).
     ++mCamsReceived;
@@ -193,7 +224,9 @@ namespace faf::remote::client
     FlushGeomCams(false);
   }
 
-  void CRemoteSimDriver::FlushGeomCams(const bool force)
+  void CRemoteSimDriver::FlushGeomCams(
+    const bool force
+  )
   {
     if (!mHavePendingCams) {
       return;
@@ -208,32 +241,46 @@ namespace faf::remote::client
     ++mCamsSent;
   }
 
-  void CRemoteSimDriver::SetSyncFilterMaskA(const moho::SSyncFilterMaskBlock& block)
+  void CRemoteSimDriver::SetSyncFilterMaskA(
+    const moho::SSyncFilterMaskBlock& block
+  )
   {
     mServer->SetSyncFilterMaskA(block);
   }
 
-  void CRemoteSimDriver::SetSyncFilterMaskB(const moho::SSyncFilterMaskBlock& block)
+  void CRemoteSimDriver::SetSyncFilterMaskB(
+    const moho::SSyncFilterMaskBlock& block
+  )
   {
     mServer->SetSyncFilterMaskB(block);
   }
 
-  void CRemoteSimDriver::SetSyncFilterOptionFlag(const bool value)
+  void CRemoteSimDriver::SetSyncFilterOptionFlag(
+    const bool value
+  )
   {
     mServer->SetSyncFilterOptionFlag(value);
   }
 
-  void CRemoteSimDriver::RequestPause(std::int32_t* const outCommandCookie)
+  void CRemoteSimDriver::RequestPause(
+    std::int32_t* const outCommandCookie
+  )
   {
-    const moho::CmdId cookie = SendCommand([&] { mMarshaller.RequestPause(); });
+    const moho::CmdId cookie = SendCommand([&] {
+      mMarshaller.RequestPause();
+    });
     if (outCommandCookie != nullptr) {
       *outCommandCookie = cookie;
     }
   }
 
-  void CRemoteSimDriver::Resume(std::int32_t* const outCommandCookie)
+  void CRemoteSimDriver::Resume(
+    std::int32_t* const outCommandCookie
+  )
   {
-    const moho::CmdId cookie = SendCommand([&] { mMarshaller.Resume(); });
+    const moho::CmdId cookie = SendCommand([&] {
+      mMarshaller.Resume();
+    });
     if (outCommandCookie != nullptr) {
       *outCommandCookie = cookie;
     }
@@ -241,102 +288,177 @@ namespace faf::remote::client
 
   moho::CmdId CRemoteSimDriver::SingleStep()
   {
-    return SendCommand([&] { mMarshaller.SingleStep(); });
+    return SendCommand([&] {
+      mMarshaller.SingleStep();
+    });
   }
 
   moho::CmdId CRemoteSimDriver::CreateUnit(
-    const uint32_t armyIndex, const moho::RResId& id, const moho::SCoordsVec2& pos, const float heading
+    const uint32_t armyIndex,
+    const moho::RResId& id,
+    const moho::SCoordsVec2& pos,
+    const float heading
   )
   {
-    return SendCommand([&] { mMarshaller.CreateUnit(armyIndex, id, pos, heading); });
+    return SendCommand([&] {
+      mMarshaller.CreateUnit(armyIndex, id, pos, heading);
+    });
   }
 
-  moho::CmdId CRemoteSimDriver::CreateProp(const char* const id, const Wm3::Vec3f& loc)
+  moho::CmdId CRemoteSimDriver::CreateProp(
+    const char* const id,
+    const Wm3::Vec3f& loc
+  )
   {
-    return SendCommand([&] { mMarshaller.CreateProp(id, loc); });
+    return SendCommand([&] {
+      mMarshaller.CreateProp(id, loc);
+    });
   }
 
-  moho::CmdId CRemoteSimDriver::DestroyEntity(const moho::EntId entityId)
+  moho::CmdId CRemoteSimDriver::DestroyEntity(
+    const moho::EntId entityId
+  )
   {
-    return SendCommand([&] { mMarshaller.DestroyEntity(entityId); });
+    return SendCommand([&] {
+      mMarshaller.DestroyEntity(entityId);
+    });
   }
 
-  moho::CmdId CRemoteSimDriver::WarpEntity(const moho::EntId entityId, const moho::VTransform& transform)
+  moho::CmdId CRemoteSimDriver::WarpEntity(
+    const moho::EntId entityId,
+    const moho::VTransform& transform
+  )
   {
-    return SendCommand([&] { mMarshaller.WarpEntity(entityId, transform); });
+    return SendCommand([&] {
+      mMarshaller.WarpEntity(entityId, transform);
+    });
   }
 
-  moho::CmdId CRemoteSimDriver::ProcessInfoPair(const moho::EntId entityId, const gpg::StrArg key, const gpg::StrArg val)
+  moho::CmdId CRemoteSimDriver::ProcessInfoPair(
+    const moho::EntId entityId,
+    const gpg::StrArg key,
+    const gpg::StrArg val
+  )
   {
-    return SendCommand([&] { mMarshaller.ProcessInfoPair(entityId, key, val); });
+    return SendCommand([&] {
+      mMarshaller.ProcessInfoPair(entityId, key, val);
+    });
   }
 
   moho::CmdId CRemoteSimDriver::IssueCommand(
-    const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities, const moho::SSTICommandIssueData& data,
+    const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities,
+    const moho::SSTICommandIssueData& data,
     const bool clear
   )
   {
-    return SendCommand([&] { mMarshaller.IssueCommand(entities, data, clear); });
+    return SendCommand([&] {
+      mMarshaller.IssueCommand(entities, data, clear);
+    });
   }
 
   moho::CmdId CRemoteSimDriver::IssueFactoryCommand(
-    const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities, const moho::SSTICommandIssueData& data,
+    const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities,
+    const moho::SSTICommandIssueData& data,
     const bool clear
   )
   {
-    return SendCommand([&] { mMarshaller.IssueFactoryCommand(entities, data, clear); });
+    return SendCommand([&] {
+      mMarshaller.IssueFactoryCommand(entities, data, clear);
+    });
   }
 
-  moho::CmdId CRemoteSimDriver::IncreaseCommandCount(const moho::CmdId id, const int count)
+  moho::CmdId CRemoteSimDriver::IncreaseCommandCount(
+    const moho::CmdId id,
+    const int count
+  )
   {
-    return SendCommand([&] { mMarshaller.IncreaseCommandCount(id, count); });
+    return SendCommand([&] {
+      mMarshaller.IncreaseCommandCount(id, count);
+    });
   }
 
-  moho::CmdId CRemoteSimDriver::DecreaseCommandCount(const moho::CmdId id, const int count)
+  moho::CmdId CRemoteSimDriver::DecreaseCommandCount(
+    const moho::CmdId id,
+    const int count
+  )
   {
-    return SendCommand([&] { mMarshaller.DecreaseCommandCount(id, count); });
+    return SendCommand([&] {
+      mMarshaller.DecreaseCommandCount(id, count);
+    });
   }
 
-  moho::CmdId CRemoteSimDriver::SetCommandTarget(const moho::CmdId id, const moho::SSTITarget& target)
+  moho::CmdId CRemoteSimDriver::SetCommandTarget(
+    const moho::CmdId id,
+    const moho::SSTITarget& target
+  )
   {
-    return SendCommand([&] { mMarshaller.SetCommandTarget(id, target); });
+    return SendCommand([&] {
+      mMarshaller.SetCommandTarget(id, target);
+    });
   }
 
-  moho::CmdId CRemoteSimDriver::SetCommandType(const moho::CmdId id, const moho::EUnitCommandType type)
+  moho::CmdId CRemoteSimDriver::SetCommandType(
+    const moho::CmdId id,
+    const moho::EUnitCommandType type
+  )
   {
-    return SendCommand([&] { mMarshaller.SetCommandType(id, type); });
+    return SendCommand([&] {
+      mMarshaller.SetCommandType(id, type);
+    });
   }
 
   moho::CmdId CRemoteSimDriver::SetCommandCells(
-    const moho::CmdId id, const gpg::core::FastVector<moho::SOCellPos>& cells, const Wm3::Vector3<float>& target
+    const moho::CmdId id,
+    const gpg::core::FastVector<moho::SOCellPos>& cells,
+    const Wm3::Vector3<float>& target
   )
   {
-    return SendCommand([&] { mMarshaller.SetCommandCells(id, cells, target); });
+    return SendCommand([&] {
+      mMarshaller.SetCommandCells(id, cells, target);
+    });
   }
 
-  moho::CmdId CRemoteSimDriver::RemoveCommandFromUnitQueue(const moho::CmdId id, const moho::EntId unitId)
+  moho::CmdId CRemoteSimDriver::RemoveCommandFromUnitQueue(
+    const moho::CmdId id,
+    const moho::EntId unitId
+  )
   {
-    return SendCommand([&] { mMarshaller.RemoveCommandFromUnitQueue(id, unitId); });
+    return SendCommand([&] {
+      mMarshaller.RemoveCommandFromUnitQueue(id, unitId);
+    });
   }
 
-  moho::CmdId CRemoteSimDriver::ExecuteLuaInSim(const char* const lua, const LuaPlus::LuaObject& args)
+  moho::CmdId CRemoteSimDriver::ExecuteLuaInSim(
+    const char* const lua,
+    const LuaPlus::LuaObject& args
+  )
   {
-    return SendCommand([&] { mMarshaller.ExecuteLuaInSim(lua, args); });
+    return SendCommand([&] {
+      mMarshaller.ExecuteLuaInSim(lua, args);
+    });
   }
 
   moho::CmdId CRemoteSimDriver::LuaSimCallback(
-    const char* const fnName, const LuaPlus::LuaObject& args, const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
-  )
-  {
-    return SendCommand([&] { mMarshaller.LuaSimCallback(fnName, args, entities); });
-  }
-
-  moho::CmdId CRemoteSimDriver::ExecuteDebugCommand(
-    const char* const command, const Wm3::Vector3<float>& worldPos, const uint32_t focusArmy,
+    const char* const fnName,
+    const LuaPlus::LuaObject& args,
     const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
   )
   {
-    return SendCommand([&] { mMarshaller.ExecuteDebugCommand(command, worldPos, focusArmy, entities); });
+    return SendCommand([&] {
+      mMarshaller.LuaSimCallback(fnName, args, entities);
+    });
+  }
+
+  moho::CmdId CRemoteSimDriver::ExecuteDebugCommand(
+    const char* const command,
+    const Wm3::Vector3<float>& worldPos,
+    const uint32_t focusArmy,
+    const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
+  )
+  {
+    return SendCommand([&] {
+      mMarshaller.ExecuteDebugCommand(command, worldPos, focusArmy, entities);
+    });
   }
 
   moho::Sim* CRemoteSimDriver::ProcessEvents()
@@ -349,13 +471,18 @@ namespace faf::remote::client
     mServer->ReleaseInterlockRef();
   }
 
-  void CRemoteSimDriver::RequestSaveGame(moho::ISaveRequest* const request)
+  void CRemoteSimDriver::RequestSaveGame(
+    moho::ISaveRequest* const request
+  )
   {
     mServer->RequestSaveGame(request);
   }
 
   void CRemoteSimDriver::DrawNetworkStats(
-    moho::CD3DPrimBatcher* const batcher, const float anchorX, const float anchorY, const float scaleX,
+    moho::CD3DPrimBatcher* const batcher,
+    const float anchorX,
+    const float anchorY,
+    const float scaleX,
     const float scaleY
   )
   {
@@ -363,7 +490,9 @@ namespace faf::remote::client
   }
 
   moho::ISTIDriver* WrapForLoopback(
-    moho::ISTIDriver* const driver, moho::RRuleGameRules& rules, const Wm3::AxisAlignedBox3f& mapBounds,
+    moho::ISTIDriver* const driver,
+    moho::RRuleGameRules& rules,
+    const Wm3::AxisAlignedBox3f& mapBounds,
     const bool multiplayer
   )
   {
@@ -395,7 +524,9 @@ namespace faf::remote::client
       MakeLoopbackCodec(mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, options);
     return new CRemoteSimDriver(std::unique_ptr<moho::ISTIDriver>(driver), rules, codec, options);
   }
-  moho::ISTIDriver* LockstepDriverOf(moho::ISTIDriver* const driver) noexcept
+  moho::ISTIDriver* LockstepDriverOf(
+    moho::ISTIDriver* const driver
+  ) noexcept
   {
     auto* const remote = dynamic_cast<CRemoteSimDriver*>(driver);
     return remote != nullptr ? remote->Server() : driver;

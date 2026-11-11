@@ -123,15 +123,35 @@ namespace faf::editor
     void Close();
 
     /** Called just before the map is deleted (the viewport stops drawing it first). */
-    void SetBeforeDrop(std::function<void()> beforeDrop) { mBeforeDrop = std::move(beforeDrop); }
+    void SetBeforeDrop(
+      std::function<void()> beforeDrop
+    )
+    {
+      mBeforeDrop = std::move(beforeDrop);
+    }
 
-    [[nodiscard]] State GetState() const noexcept { return mState; }
-    [[nodiscard]] const MapFacts& Facts() const noexcept { return mFacts; }
-    [[nodiscard]] const std::string& Error() const noexcept { return mError; }
+    [[nodiscard]] State GetState() const noexcept
+    {
+      return mState;
+    }
+    [[nodiscard]] const MapFacts& Facts() const noexcept
+    {
+      return mFacts;
+    }
+    [[nodiscard]] const std::string& Error() const noexcept
+    {
+      return mError;
+    }
     /** The opening or open map's scenario path, "" when none. */
-    [[nodiscard]] const std::string& Path() const noexcept { return mPath; }
+    [[nodiscard]] const std::string& Path() const noexcept
+    {
+      return mPath;
+    }
     /** The loaded map, null unless open. */
-    [[nodiscard]] moho::CWldMap* Map() const noexcept { return mMap.get(); }
+    [[nodiscard]] moho::CWldMap* Map() const noexcept
+    {
+      return mMap.get();
+    }
     /**
      * Saves the map's `.scmap` over its own file, when it has one on disk (a map in the game's archives has
      * none; it is saved as a new folder instead). Before the first overwrite of a session the old file is
@@ -144,8 +164,16 @@ namespace faf::editor
      * The FAF vault (its `maps` folder holds the mapper's maps). Save writes over a map only there: the
      * game's own maps (its install folder) are saved as a new map folder instead.
      */
-    void SetVaultFolder(std::filesystem::path folder) { mVault = std::move(folder); }
-    [[nodiscard]] const std::filesystem::path& VaultFolder() const noexcept { return mVault; }
+    void SetVaultFolder(
+      std::filesystem::path folder
+    )
+    {
+      mVault = std::move(folder);
+    }
+    [[nodiscard]] const std::filesystem::path& VaultFolder() const noexcept
+    {
+      return mVault;
+    }
 
     /**
      * Saves the map as a new map folder `<vault>/maps/<folder>` (FAF names them `name.vNNNN`): every file
@@ -164,18 +192,25 @@ namespace faf::editor
     [[nodiscard]] std::filesystem::path MapDiskFile() const;
     /** The vault package of the map's folder as saved on disk (no folder: an error in the plan). */
     [[nodiscard]] PackagePlan PlanPackage() const;
-    /** Writes the plan's files as `<vault>/packages/<folder>.zip`, the folder at the zip's top; false with `message`. */
+    /** Writes the plan's files as `<vault>/packages/<folder>.zip`, the folder at the zip's top; false with `message`.
+     */
     bool WritePackage(const PackagePlan& plan, std::filesystem::path& written, std::string& message) const;
 
     /** What the map file stored that a save writes back as it was (the preview, unchanged props). */
-    [[nodiscard]] const MapFileRecords& FileRecords() const noexcept { return mFileRecords; }
+    [[nodiscard]] const MapFileRecords& FileRecords() const noexcept
+    {
+      return mFileRecords;
+    }
     /** Marks which of the file's images a save keeps: those whose sources are as they were at load. */
     void MarkKeptImages();
     /** The masks were read from the terrain (once): what they were then, to tell an edit from none. */
     void MasksRead();
 
     /** The height field's undo history, reset when a map opens. */
-    [[nodiscard]] HeightHistory& Heights() noexcept { return mHeights; }
+    [[nodiscard]] HeightHistory& Heights() noexcept
+    {
+      return mHeights;
+    }
 
     /** The stratum masks as the editor paints them (read from the map's textures when the view first shows it). */
     struct MaskGrid
@@ -184,8 +219,14 @@ namespace faf::editor
       int height = 0;
       std::vector<std::uint64_t> texels;
     };
-    [[nodiscard]] MaskGrid& Masks() noexcept { return mMasks; }
-    [[nodiscard]] MaskHistory& MaskUndo() noexcept { return mMaskHistory; }
+    [[nodiscard]] MaskGrid& Masks() noexcept
+    {
+      return mMasks;
+    }
+    [[nodiscard]] MaskHistory& MaskUndo() noexcept
+    {
+      return mMaskHistory;
+    }
 
     /** One undo order over every kind of edit: Ctrl+Z takes back the newest edit, whatever it changed. */
     enum class EditKind
@@ -202,16 +243,31 @@ namespace faf::editor
       Waves,
       TerrainTypes,
     };
-    /** The map's terrain type grid (a byte a cell, STIMap::mTerrainType, saved with the terrain): its cells, or null. */
+    /** The map's terrain type grid (a byte a cell, STIMap::mTerrainType, saved with the terrain): its cells, or null.
+     */
     [[nodiscard]] std::uint8_t* TerrainTypeCells(int& width, int& height) const;
     [[nodiscard]] std::vector<std::uint8_t> TerrainTypesNow() const;
     void ApplyTerrainTypes(const std::vector<std::uint8_t>& cells);
     void TerrainTypesEdited(std::vector<std::uint8_t> before);
     /** Counts each change to the grid, for the overlay. */
-    [[nodiscard]] int TerrainTypeRevision() const noexcept { return mTerrainTypeRevision; }
-    void TerrainTypesChanged() noexcept { ++mTerrainTypeRevision; }
-    [[nodiscard]] std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>>& TerrainTypesUndo() noexcept { return mTerrainTypesUndo; }
-    [[nodiscard]] std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>>& TerrainTypesRedo() noexcept { return mTerrainTypesRedo; }
+    [[nodiscard]] int TerrainTypeRevision() const noexcept
+    {
+      return mTerrainTypeRevision;
+    }
+    void TerrainTypesChanged() noexcept
+    {
+      ++mTerrainTypeRevision;
+    }
+    [[nodiscard]] std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>>&
+    TerrainTypesUndo() noexcept
+    {
+      return mTerrainTypesUndo;
+    }
+    [[nodiscard]] std::vector<std::pair<std::vector<std::uint8_t>, std::vector<std::uint8_t>>>&
+    TerrainTypesRedo() noexcept
+    {
+      return mTerrainTypesRedo;
+    }
     /** The map's wave generators (through the wave system's own Save, WaveSystem::Save 0x00889AD0). */
     [[nodiscard]] std::vector<WaveRecord> WavesNow() const;
     /** The map's prop reclaim, by blueprint (RPropBlueprint::Economy's ReclaimMassMax and ReclaimEnergyMax). */
@@ -240,35 +296,65 @@ namespace faf::editor
     /** Puts these generators on the map in place of its own (WaveSystem::Load 0x008899E0); no undo step. */
     void ApplyWaves(const std::vector<WaveRecord>& waves);
     void WavesEdited(std::vector<WaveRecord> before);
-    [[nodiscard]] std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>>& WavesUndo() noexcept { return mWavesUndo; }
-    [[nodiscard]] std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>>& WavesRedo() noexcept { return mWavesRedo; }
+    [[nodiscard]] std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>>& WavesUndo() noexcept
+    {
+      return mWavesUndo;
+    }
+    [[nodiscard]] std::vector<std::pair<std::vector<WaveRecord>, std::vector<WaveRecord>>>& WavesRedo() noexcept
+    {
+      return mWavesRedo;
+    }
     /** The map's sky now (SkyDome: the dome, horizon, planets, cirrus). */
     [[nodiscard]] SkyboxState SkyboxNow() const;
     /** Puts a sky on the map (its dome is rebuilt on the next frame); no undo step, SkyboxEdited records one. */
     void ApplySkybox(const SkyboxState& sky);
     void SkyboxEdited(SkyboxState before);
-    [[nodiscard]] std::vector<std::pair<SkyboxState, SkyboxState>>& SkyboxUndo() noexcept { return mSkyboxUndo; }
-    [[nodiscard]] std::vector<std::pair<SkyboxState, SkyboxState>>& SkyboxRedo() noexcept { return mSkyboxRedo; }
+    [[nodiscard]] std::vector<std::pair<SkyboxState, SkyboxState>>& SkyboxUndo() noexcept
+    {
+      return mSkyboxUndo;
+    }
+    [[nodiscard]] std::vector<std::pair<SkyboxState, SkyboxState>>& SkyboxRedo() noexcept
+    {
+      return mSkyboxRedo;
+    }
     /** The map's lighting now (sun, ambience, shadow, specular, bloom, fog). */
     [[nodiscard]] LightingState LightingNow() const;
     /** Puts a lighting state on the map at once (no undo step; LightingEdited records one). */
     void ApplyLighting(const LightingState& lighting);
     void LightingEdited(LightingState before);
-    [[nodiscard]] std::vector<std::pair<LightingState, LightingState>>& LightingUndo() noexcept { return mLightingUndo; }
-    [[nodiscard]] std::vector<std::pair<LightingState, LightingState>>& LightingRedo() noexcept { return mLightingRedo; }
+    [[nodiscard]] std::vector<std::pair<LightingState, LightingState>>& LightingUndo() noexcept
+    {
+      return mLightingUndo;
+    }
+    [[nodiscard]] std::vector<std::pair<LightingState, LightingState>>& LightingRedo() noexcept
+    {
+      return mLightingRedo;
+    }
     /** The map's sea now (on or off, its levels, the water shader's numbers). */
     [[nodiscard]] WaterState WaterNow() const;
-    /** Puts a water state on the map at once (no undo step: a drag applies it many times, then WaterEdited records it). */
+    /** Puts a water state on the map at once (no undo step: a drag applies it many times, then WaterEdited records it).
+     */
     void ApplyWater(const WaterState& water);
     /**
      * While the editor's view is in front of a play: that play's map (the session's), which lighting and water edits
      * go into as well (WPE.41); null otherwise.
      */
-    void SetLiveMap(moho::CWldMap* map) noexcept { mLiveMap = map; }
+    void SetLiveMap(
+      moho::CWldMap* map
+    ) noexcept
+    {
+      mLiveMap = map;
+    }
     /** A water edit ended: its before and the water now become the newest undo step. */
     void WaterEdited(WaterState before);
-    [[nodiscard]] std::vector<std::pair<WaterState, WaterState>>& WaterUndo() noexcept { return mWaterUndo; }
-    [[nodiscard]] std::vector<std::pair<WaterState, WaterState>>& WaterRedo() noexcept { return mWaterRedo; }
+    [[nodiscard]] std::vector<std::pair<WaterState, WaterState>>& WaterUndo() noexcept
+    {
+      return mWaterUndo;
+    }
+    [[nodiscard]] std::vector<std::pair<WaterState, WaterState>>& WaterRedo() noexcept
+    {
+      return mWaterRedo;
+    }
     /** The map's decals as a snapshot (every decal's saved fields), for undo. */
     using DecalSnapshot = std::vector<DecalState>;
     [[nodiscard]] DecalSnapshot DecalsNow() const;
@@ -276,25 +362,52 @@ namespace faf::editor
     void RestoreDecals(const DecalSnapshot& decals);
     /** A decal edit ended: its before and the decals now become the newest undo step. */
     void DecalsEdited(DecalSnapshot before);
-    [[nodiscard]] std::vector<std::pair<DecalSnapshot, DecalSnapshot>>& DecalUndo() noexcept { return mDecalUndo; }
-    [[nodiscard]] std::vector<std::pair<DecalSnapshot, DecalSnapshot>>& DecalRedo() noexcept { return mDecalRedo; }
+    [[nodiscard]] std::vector<std::pair<DecalSnapshot, DecalSnapshot>>& DecalUndo() noexcept
+    {
+      return mDecalUndo;
+    }
+    [[nodiscard]] std::vector<std::pair<DecalSnapshot, DecalSnapshot>>& DecalRedo() noexcept
+    {
+      return mDecalRedo;
+    }
     /** The terrain's decal manager, or null. */
     [[nodiscard]] moho::IDecalManager* Decals() const;
     /** The map's `_save.lua` (markers, areas) and `_script.lua` as the editor keeps them. */
-    [[nodiscard]] SaveFile& SaveData() noexcept { return mSave; }
-    [[nodiscard]] const SaveFile& SaveData() const noexcept { return mSave; }
-    [[nodiscard]] std::string& Script() noexcept { return mScript; }
-    [[nodiscard]] const std::string& Script() const noexcept { return mScript; }
+    [[nodiscard]] SaveFile& SaveData() noexcept
+    {
+      return mSave;
+    }
+    [[nodiscard]] const SaveFile& SaveData() const noexcept
+    {
+      return mSave;
+    }
+    [[nodiscard]] std::string& Script() noexcept
+    {
+      return mScript;
+    }
+    [[nodiscard]] const std::string& Script() const noexcept
+    {
+      return mScript;
+    }
     /** An adaptive map's `_tables.lua` as the editor keeps it (empty when the map has none yet). */
-    [[nodiscard]] const std::string& TablesText() const noexcept { return mTables; }
-    [[nodiscard]] bool Adaptive() const noexcept { return !mFacts.tablesPath.empty(); }
+    [[nodiscard]] const std::string& TablesText() const noexcept
+    {
+      return mTables;
+    }
+    [[nodiscard]] bool Adaptive() const noexcept
+    {
+      return !mFacts.tablesPath.empty();
+    }
     /**
      * Sets the tables' text as one undo step; on a map without tables, the map becomes adaptive: its tables file is
      * `<base>_tables.lua` beside the scenario and the scenario gets `AdaptiveMap = true`.
      */
     void SetTablesText(const std::string& text);
     /** The map's `_options.lua` as the editor keeps it (empty when it has none). */
-    [[nodiscard]] const std::string& OptionsText() const noexcept { return mOptions; }
+    [[nodiscard]] const std::string& OptionsText() const noexcept
+    {
+      return mOptions;
+    }
     /** Sets it as one undo step; a map without one gets `<base>_options.lua` beside the scenario. */
     void SetOptionsText(const std::string& text);
     /**
@@ -304,7 +417,10 @@ namespace faf::editor
     void ApplyWaterBodies(const std::vector<WaterBody>& bodies);
     /** The maps opened last, newest first (their scenario paths), kept in `file`; each map that opens goes first. */
     void SetRecentMapsFile(std::string file);
-    [[nodiscard]] const std::vector<std::string>& RecentMaps() const noexcept { return mRecentMaps; }
+    [[nodiscard]] const std::vector<std::string>& RecentMaps() const noexcept
+    {
+      return mRecentMaps;
+    }
     /** File > Open Recent > Clear: the list emptied, and its file with it. */
     void ClearRecentMaps();
     /**
@@ -314,18 +430,30 @@ namespace faf::editor
     [[nodiscard]] std::vector<CheckIssue> CheckScripts() const;
     /** One text compiled as the file `name` (`x_options.lua`): its syntax error, or an issue with an empty text. */
     [[nodiscard]] CheckIssue CheckLuaText(const std::string& text, const std::string& name) const;
-    [[nodiscard]] const std::string& Scenario() const noexcept { return mScenario; }
+    [[nodiscard]] const std::string& Scenario() const noexcept
+    {
+      return mScenario;
+    }
     /** The armies of the scenario's team list, in order (its extra armies are ExtraArmies). */
-    [[nodiscard]] std::vector<std::string> Armies() const { return ScenarioArmies(mScenario); }
+    [[nodiscard]] std::vector<std::string> Armies() const
+    {
+      return ScenarioArmies(mScenario);
+    }
     /**
      * Every army name taken, which a new start position can't have: the team list's, the extra armies (SCMP_009's
      * ARMY_9) and `_save.lua`'s Armies table.
      */
     [[nodiscard]] std::vector<std::string> ArmyNamesInUse() const;
     /** The scenario's teams; setting them rewrites its `teams` block. */
-    [[nodiscard]] std::vector<ScenarioTeam> Teams() const { return ScenarioTeams(mScenario); }
+    [[nodiscard]] std::vector<ScenarioTeam> Teams() const
+    {
+      return ScenarioTeams(mScenario);
+    }
     void SetTeams(const std::vector<ScenarioTeam>& teams);
-    [[nodiscard]] std::vector<std::string> ExtraArmies() const { return ScenarioExtraArmies(mScenario); }
+    [[nodiscard]] std::vector<std::string> ExtraArmies() const
+    {
+      return ScenarioExtraArmies(mScenario);
+    }
     void SetExtraArmies(const std::vector<std::string>& armies);
     /** An army added to the scenario's list and to `_save.lua`'s Armies (when it isn't there), removed, renamed. */
     void AddArmy(const std::string& name);
@@ -338,7 +466,12 @@ namespace faf::editor
       int z0 = 0;
       int x1 = 0;
       int z1 = 0;
-      bool operator==(const PlayableRect& other) const { return x0 == other.x0 && z0 == other.z0 && x1 == other.x1 && z1 == other.z1; }
+      bool operator==(
+        const PlayableRect& other
+      ) const
+      {
+        return x0 == other.x0 && z0 == other.z0 && x1 == other.x1 && z1 == other.z1;
+      }
     };
     /** The playable area the map's script sets (its area's rectangle, rounded as the game rounds it), or none. */
     [[nodiscard]] std::optional<PlayableRect> PlayableArea() const;
@@ -362,8 +495,14 @@ namespace faf::editor
     void RestoreSaveData(const SaveSnapshot& snapshot);
     /** A markers/areas/script edit ended: its before and now become the newest undo step. */
     void SaveDataEdited(SaveSnapshot before);
-    [[nodiscard]] std::vector<std::pair<SaveSnapshot, SaveSnapshot>>& SaveDataUndo() noexcept { return mSaveUndo; }
-    [[nodiscard]] std::vector<std::pair<SaveSnapshot, SaveSnapshot>>& SaveDataRedo() noexcept { return mSaveRedo; }
+    [[nodiscard]] std::vector<std::pair<SaveSnapshot, SaveSnapshot>>& SaveDataUndo() noexcept
+    {
+      return mSaveUndo;
+    }
+    [[nodiscard]] std::vector<std::pair<SaveSnapshot, SaveSnapshot>>& SaveDataRedo() noexcept
+    {
+      return mSaveRedo;
+    }
     /** The map's props as a whole, for undo: the entries and the records they were read with (same order). */
     struct PropSnapshot
     {
@@ -375,8 +514,14 @@ namespace faf::editor
     void RestoreProps(const PropSnapshot& props);
     /** A prop edit ended: its before and the props now become the newest undo step. */
     void PropsEdited(PropSnapshot before);
-    [[nodiscard]] std::vector<std::pair<PropSnapshot, PropSnapshot>>& PropUndo() noexcept { return mPropUndo; }
-    [[nodiscard]] std::vector<std::pair<PropSnapshot, PropSnapshot>>& PropRedo() noexcept { return mPropRedo; }
+    [[nodiscard]] std::vector<std::pair<PropSnapshot, PropSnapshot>>& PropUndo() noexcept
+    {
+      return mPropUndo;
+    }
+    [[nodiscard]] std::vector<std::pair<PropSnapshot, PropSnapshot>>& PropRedo() noexcept
+    {
+      return mPropRedo;
+    }
     /** A prop added at the end (with an empty record: it is saved from its transform) or removed at `index`. */
     void AddProp(const moho::CWldPropEntry& entry, const PropRecord& record);
     void SetPropRecord(std::size_t index, const PropRecord& record);
@@ -390,10 +535,19 @@ namespace faf::editor
       /** Edits made together (a layer set imported) share a non-zero batch and are one undo step. */
       int batch = 0;
     };
-    [[nodiscard]] std::vector<LayerEdit>& LayerUndo() noexcept { return mLayerUndo; }
-    [[nodiscard]] std::vector<LayerEdit>& LayerRedo() noexcept { return mLayerRedo; }
+    [[nodiscard]] std::vector<LayerEdit>& LayerUndo() noexcept
+    {
+      return mLayerUndo;
+    }
+    [[nodiscard]] std::vector<LayerEdit>& LayerRedo() noexcept
+    {
+      return mLayerRedo;
+    }
     /** The slot's albedo path in the facts the Info panel shows. */
-    void SetLayerFact(int slot, const std::string& albedo)
+    void SetLayerFact(
+      int slot,
+      const std::string& albedo
+    )
     {
       if (slot >= 0 && static_cast<std::size_t>(slot) < mFacts.layers.size()) {
         mFacts.layers[static_cast<std::size_t>(slot)] = albedo;
@@ -404,17 +558,44 @@ namespace faf::editor
     /** The kind of the edit Undo (Redo) takes back (gives back) next; false when there is none. */
     bool PopUndo(EditKind& kind);
     bool PopRedo(EditKind& kind);
-    void PushRedo(EditKind kind) { mRedoOrder.push_back(kind); }
-    void PushUndo(EditKind kind) { mUndoOrder.push_back(kind); }
+    void PushRedo(
+      EditKind kind
+    )
+    {
+      mRedoOrder.push_back(kind);
+    }
+    void PushUndo(
+      EditKind kind
+    )
+    {
+      mUndoOrder.push_back(kind);
+    }
     /** Whether there is an edit to undo (redo), for the toolbar. */
-    [[nodiscard]] bool CanUndo() const noexcept { return !mUndoOrder.empty(); }
-    [[nodiscard]] bool CanRedo() const noexcept { return !mRedoOrder.empty(); }
+    [[nodiscard]] bool CanUndo() const noexcept
+    {
+      return !mUndoOrder.empty();
+    }
+    [[nodiscard]] bool CanRedo() const noexcept
+    {
+      return !mRedoOrder.empty();
+    }
     /** Whether the map changed since it was opened (or last saved). */
-    [[nodiscard]] bool Modified() const noexcept { return mModified; }
-    void SetModified(bool modified) noexcept { mModified = modified; }
+    [[nodiscard]] bool Modified() const noexcept
+    {
+      return mModified;
+    }
+    void SetModified(
+      bool modified
+    ) noexcept
+    {
+      mModified = modified;
+    }
 
     /** The document's Lua state (scripts and objects made for the open map), null unless open. */
-    [[nodiscard]] LuaPlus::LuaState* Lua() const noexcept { return mLua.get(); }
+    [[nodiscard]] LuaPlus::LuaState* Lua() const noexcept
+    {
+      return mLua.get();
+    }
 
   private:
     struct Load;

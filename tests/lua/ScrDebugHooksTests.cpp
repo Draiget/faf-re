@@ -15,7 +15,9 @@
 
 namespace
 {
-  std::set<int> LinesOf(const char* const source)
+  std::set<int> LinesOf(
+    const char* const source
+  )
   {
     fa::vector<moho::ScrBreakpoint> found;
     moho::SCR_EnumerateBreakpoints(fa::string(source), found);
@@ -29,7 +31,10 @@ namespace
 
 // SCR_AddBreakpoint (0x004B4A30) keeps one entry per (file, line); SCR_EnumerateBreakpoints (0x004B4D20) lists one
 // file's while any breakpoint is enabled.
-TEST(ScrDebugHooks, BreakpointsAreAddedOncePerLineAndListedPerFile)
+TEST(
+  ScrDebugHooks,
+  BreakpointsAreAddedOncePerLineAndListedPerFile
+)
 {
   moho::SCR_RemoveAllBreakpoints();
   moho::SCR_AddBreakpoint(moho::ScrBreakpoint(fa::string("/lua/a.lua"), 10));
@@ -45,7 +50,10 @@ TEST(ScrDebugHooks, BreakpointsAreAddedOncePerLineAndListedPerFile)
 
 // SCR_EnableBreakpoint (0x004B4AC0) and SCR_EnableAllBreakpoints (0x004B4B50): with none enabled the enumeration is
 // empty; enabling any brings the file's whole list back, disabled entries included.
-TEST(ScrDebugHooks, NothingIsListedWhileEveryBreakpointIsDisabled)
+TEST(
+  ScrDebugHooks,
+  NothingIsListedWhileEveryBreakpointIsDisabled
+)
 {
   moho::SCR_RemoveAllBreakpoints();
   const moho::ScrBreakpoint first(fa::string("/lua/a.lua"), 3);
@@ -65,7 +73,7 @@ TEST(ScrDebugHooks, NothingIsListedWhileEveryBreakpointIsDisabled)
   moho::SCR_EnableAllBreakpoints(true);
   moho::SCR_RemoveBreakpoint(first);
   EXPECT_EQ(LinesOf("/lua/a.lua"), (std::set<int>{4}));
-  moho::SCR_RemoveBreakpoint(first);  // gone already: nothing happens
+  moho::SCR_RemoveBreakpoint(first); // gone already: nothing happens
   EXPECT_EQ(LinesOf("/lua/a.lua"), (std::set<int>{4}));
 
   moho::SCR_RemoveAllBreakpoints();
@@ -74,7 +82,10 @@ TEST(ScrDebugHooks, NothingIsListedWhileEveryBreakpointIsDisabled)
 
 // ScrBreakpoint::AsString (0x004B03A0) writes "enabled:line:name"; FromString (0x004B0240) reads exactly three
 // ':'-separated fields and leaves the breakpoint as it was otherwise.
-TEST(ScrDebugHooks, BreakpointTextRoundTrips)
+TEST(
+  ScrDebugHooks,
+  BreakpointTextRoundTrips
+)
 {
   moho::ScrBreakpoint written(fa::string("/lua/sim/unit.lua"), 42);
   written.enabled = false;
@@ -91,7 +102,7 @@ TEST(ScrDebugHooks, BreakpointTextRoundTrips)
   EXPECT_EQ(read.line, 7);
   EXPECT_STREQ(read.name.c_str(), "/x.lua");
 
-  read.FromString(fa::string("enabled:9"));  // two fields: unchanged
+  read.FromString(fa::string("enabled:9")); // two fields: unchanged
   EXPECT_EQ(read.line, 7);
   EXPECT_STREQ(read.name.c_str(), "/x.lua");
 
@@ -104,7 +115,10 @@ TEST(ScrDebugHooks, BreakpointTextRoundTrips)
 // (DebugLuaHook, 0x004B5B10) and the script runs on. SCR_UnhookState (0x004B49D0) drops the state again.
 using faf_lua_tests::LuaFixture;
 
-TEST_F(LuaFixture, HookedStateRunsWithoutADebugWindow)
+TEST_F(
+  LuaFixture,
+  HookedStateRunsWithoutADebugWindow
+)
 {
   ASSERT_FALSE(moho::SCR_IsDebugWindowActive());
   moho::SCR_AddBreakpoint(moho::ScrBreakpoint(fa::string("=chunk"), 1));

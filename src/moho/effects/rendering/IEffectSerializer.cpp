@@ -20,10 +20,13 @@ namespace
    * Emits one unowned tracked pointer lane for `IEffectManager*`.
    */
   gpg::WriteArchive* SerializeIEffectManagerPointer(
-    moho::IEffectManager** const managerField, gpg::WriteArchive* const archive
+    moho::IEffectManager** const managerField,
+    gpg::WriteArchive* const archive
   )
   {
-    archive->WritePointer<moho::IEffectManager>(managerField ? *managerField : nullptr, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+    archive->WritePointer<moho::IEffectManager>(
+      managerField ? *managerField : nullptr, gpg::TrackedPointerState::Unowned, gpg::RRef{}
+    );
     return archive;
   }
 
@@ -38,7 +41,9 @@ namespace moho
    * Loads `CScriptObject` base payload, then reads one unowned
    * `IEffectManager*` pointer lane and one trailing integer lane.
    */
-  void IEffect::MemberDeserialize(gpg::ReadArchive* const archive)
+  void IEffect::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     const gpg::RRef nullOwner{};
     archive->Read(gpg::RTypeOf<moho::CScriptObject>(), static_cast<moho::CScriptObject*>(this), nullOwner);
@@ -57,7 +62,9 @@ namespace moho
    * Saves `CScriptObject` base payload, then writes one unowned
    * `IEffectManager*` pointer lane and one trailing integer lane.
    */
-  void IEffect::MemberSerialize(gpg::WriteArchive* const archive) const
+  void IEffect::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef nullOwner{};
     archive->Write(gpg::RTypeOf<moho::CScriptObject>(), static_cast<const moho::CScriptObject*>(this), nullOwner);

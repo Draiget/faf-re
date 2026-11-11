@@ -208,7 +208,6 @@ namespace moho
    * `RRuleGameRulesImpl::mEntityCategoryLookup` handle (+0xC4); `out` is an
    * uninitialized category set built in place and returned for chaining.
    */
-  EntityCategorySet* ParseEntityCategory(
-    const void* categoryLookup, EntityCategorySet* out, const char* categoryExpression
-  );
+  EntityCategorySet*
+  ParseEntityCategory(const void* categoryLookup, EntityCategorySet* out, const char* categoryExpression);
 } // namespace moho

@@ -16,7 +16,9 @@ namespace faf::headless
     constexpr std::size_t kLoggedDifferences = 20;
     constexpr const char* kKindNames[] = {"units", "blips", "props", "projectiles", "other"};
 
-    [[nodiscard]] std::size_t KindOf(moho::Entity& entity)
+    [[nodiscard]] std::size_t KindOf(
+      moho::Entity& entity
+    )
     {
       if (entity.IsUnit() != nullptr) {
         return 0;
@@ -49,7 +51,10 @@ namespace faf::headless
     moho::Sim::SetSyncObserver(nullptr);
   }
 
-  void CReplayChangeSetCheck::OnBeatChanges(moho::Sim& sim, const moho::SSyncData& packet)
+  void CReplayChangeSetCheck::OnBeatChanges(
+    moho::Sim& sim,
+    const moho::SSyncData& packet
+  )
   {
     const std::lock_guard<std::mutex> guard(mLock);
     ++mBeats;
@@ -126,12 +131,16 @@ namespace faf::headless
     const std::lock_guard<std::mutex> guard(mLock);
     char text[320];
     std::snprintf(
-      text, sizeof(text),
+      text,
+      sizeof(text),
       "change-set check: %llu beats, %llu entities synced, %llu packet ids, %llu packet ids missing from the change "
       "set, %llu published entities with no packet record (%llu failures)",
-      static_cast<unsigned long long>(mBeats), static_cast<unsigned long long>(mChanged),
-      static_cast<unsigned long long>(mPacketRecords), static_cast<unsigned long long>(mPacketNotInSet),
-      static_cast<unsigned long long>(mPublishedSilent), static_cast<unsigned long long>(failures)
+      static_cast<unsigned long long>(mBeats),
+      static_cast<unsigned long long>(mChanged),
+      static_cast<unsigned long long>(mPacketRecords),
+      static_cast<unsigned long long>(mPacketNotInSet),
+      static_cast<unsigned long long>(mPublishedSilent),
+      static_cast<unsigned long long>(failures)
     );
     std::string summary = text;
     summary += "\n  synced but not published at this focus:";

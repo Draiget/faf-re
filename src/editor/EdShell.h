@@ -37,23 +37,56 @@ namespace faf::editor
     /** Builds this frame's UI. */
     void Draw();
     /** The map browser (on this computer, and the FAF vault). */
-    [[nodiscard]] EdMapBrowser& Browser() noexcept { return mBrowser; }
+    [[nodiscard]] EdMapBrowser& Browser() noexcept
+    {
+      return mBrowser;
+    }
 
     // What the window's menu bar shows and changes.
-    bool& ShowTools() noexcept { return mShowTools; }
-    bool& ShowMap() noexcept { return mShowMap; }
-    bool& ShowInfo() noexcept { return mShowInfo; }
-    bool& ShowMarkers() noexcept { return mShowMarkers; }
-    bool& ShowCheck() noexcept { return mShowCheck; }
-    bool& ShowScript() noexcept { return mShowScript; }
+    bool& ShowTools() noexcept
+    {
+      return mShowTools;
+    }
+    bool& ShowMap() noexcept
+    {
+      return mShowMap;
+    }
+    bool& ShowInfo() noexcept
+    {
+      return mShowInfo;
+    }
+    bool& ShowMarkers() noexcept
+    {
+      return mShowMarkers;
+    }
+    bool& ShowCheck() noexcept
+    {
+      return mShowCheck;
+    }
+    bool& ShowScript() noexcept
+    {
+      return mShowScript;
+    }
     /** While a play runs: the editor's view in front of it (true) or the game's (F6, the toolbar's switch). */
-    bool& EditorViewInPlay() noexcept { return mEditorViewInPlay; }
+    bool& EditorViewInPlay() noexcept
+    {
+      return mEditorViewInPlay;
+    }
     /** The panels' scale (1 at the screen's DPI): the toolbar's - / % / + at its right; kept in layout.ini. */
-    float& UiScale() noexcept { return mUiScale; }
+    float& UiScale() noexcept
+    {
+      return mUiScale;
+    }
     /** The Adaptive Map window (View > Adaptive Map). */
-    bool& ShowAdaptiveWindow() noexcept { return mShowAdaptiveWindow; }
-    /** Test runs (`/adaptivepreview <key>=<choice index>,...[;<players>]`): the window's preview on with those picks. */
-    void TestAdaptivePreview(const std::string& spec)
+    bool& ShowAdaptiveWindow() noexcept
+    {
+      return mShowAdaptiveWindow;
+    }
+    /** Test runs (`/adaptivepreview <key>=<choice index>,...[;<players>]`): the window's preview on with those picks.
+     */
+    void TestAdaptivePreview(
+      const std::string& spec
+    )
     {
       mShowAdaptiveWindow = true;
       mAdaptivePreview = true;
@@ -70,7 +103,9 @@ namespace faf::editor
       }
     }
     /** Shows it with an option picked (test runs: `/adaptivewindow <key>`). */
-    void OpenAdaptiveWindow(const std::string& key)
+    void OpenAdaptiveWindow(
+      const std::string& key
+    )
     {
       mShowAdaptiveWindow = true;
       mFocusAdaptiveWindow = true;
@@ -78,26 +113,65 @@ namespace faf::editor
         mAdaptivePick = key;
       }
     }
-    bool& ShowLighting() noexcept { return mShowLighting; }
+    bool& ShowLighting() noexcept
+    {
+      return mShowLighting;
+    }
     /** The material editor (View > Material Editor): node graphs that make terrain textures. */
-    bool& ShowMaterialEditor() noexcept { return mShowMaterialEditor; }
-    [[nodiscard]] EdMaterialEditor& MaterialEditor() noexcept { return mMaterialEditor; }
+    bool& ShowMaterialEditor() noexcept
+    {
+      return mShowMaterialEditor;
+    }
+    [[nodiscard]] EdMaterialEditor& MaterialEditor() noexcept
+    {
+      return mMaterialEditor;
+    }
     /** The particle editor (View > Particle Editor): the game's emitter blueprints, previewed live on the map. */
-    bool& ShowParticleEditor() noexcept { return mShowParticleEditor; }
+    bool& ShowParticleEditor() noexcept
+    {
+      return mShowParticleEditor;
+    }
     /** The Particle Browser (View > Particle Browser). */
-    bool& ShowParticleBrowser() noexcept { return mShowParticleBrowser; }
-    [[nodiscard]] EdParticleEditor& ParticleEditor() noexcept { return mParticleEditor; }
+    bool& ShowParticleBrowser() noexcept
+    {
+      return mShowParticleBrowser;
+    }
+    [[nodiscard]] EdParticleEditor& ParticleEditor() noexcept
+    {
+      return mParticleEditor;
+    }
     /** The Armies panel; the Markers tool's "Open the Armies panel" also brings it to the front. */
-    bool& ShowArmies() noexcept { return mShowArmies; }
+    bool& ShowArmies() noexcept
+    {
+      return mShowArmies;
+    }
     /** The Properties panel: the selected marker, unit, prop or decal, by kind (ui/EdPropertiesPanel.cpp). */
-    bool& ShowProperties() noexcept { return mShowProperties; }
+    bool& ShowProperties() noexcept
+    {
+      return mShowProperties;
+    }
     /** The Lighting panel's Import / Export buttons, taken by the app (it asks for the file). */
-    [[nodiscard]] bool TakeLightingImport() noexcept { return std::exchange(mLightingImport, false); }
-    [[nodiscard]] bool TakeLightingExport() noexcept { return std::exchange(mLightingExport, false); }
+    [[nodiscard]] bool TakeLightingImport() noexcept
+    {
+      return std::exchange(mLightingImport, false);
+    }
+    [[nodiscard]] bool TakeLightingExport() noexcept
+    {
+      return std::exchange(mLightingExport, false);
+    }
     /** The Lighting panel's sky Import / Export (FAFME's `.scmskybox`), taken by the app. */
-    [[nodiscard]] bool TakeSkyboxImport() noexcept { return std::exchange(mSkyboxImport, false); }
-    [[nodiscard]] std::string TakeLightingFromMap() { return std::exchange(mLightingFromMap, std::string()); }
-    [[nodiscard]] bool TakeSkyboxExport() noexcept { return std::exchange(mSkyboxExport, false); }
+    [[nodiscard]] bool TakeSkyboxImport() noexcept
+    {
+      return std::exchange(mSkyboxImport, false);
+    }
+    [[nodiscard]] std::string TakeLightingFromMap()
+    {
+      return std::exchange(mLightingFromMap, std::string());
+    }
+    [[nodiscard]] bool TakeSkyboxExport() noexcept
+    {
+      return std::exchange(mSkyboxExport, false);
+    }
     /**
      * A test run: the open map (as saved) played solo for 8 s of game time, then stopped; the Lua errors and other
      * warnings logged meanwhile join the Check's findings (`/testrun` for test runs).
@@ -114,20 +188,52 @@ namespace faf::editor
       mRunCheck = true;
     }
     /** Test runs (`/unitspawn <group>`): the selected unit's Spawns choice set to that group, as a pick in its list. */
-    void TestUnitSpawn(const std::string& group) { mSpawnAsk = group; }
-    bool& ShowLog() noexcept { return mShowLog; }
-    bool& ShowDemo() noexcept { return mShowDemo; }
-    bool& PanelsWhilePlaying() noexcept { return mPanelsWhilePlaying; }
-    void ResetLayout() noexcept { mResetLayout = true; }
+    void TestUnitSpawn(
+      const std::string& group
+    )
+    {
+      mSpawnAsk = group;
+    }
+    bool& ShowLog() noexcept
+    {
+      return mShowLog;
+    }
+    bool& ShowDemo() noexcept
+    {
+      return mShowDemo;
+    }
+    bool& PanelsWhilePlaying() noexcept
+    {
+      return mPanelsWhilePlaying;
+    }
+    void ResetLayout() noexcept
+    {
+      mResetLayout = true;
+    }
     /** File > Save as new map folder: the dialog asks for the folder's name. */
-    void OpenSaveAs() noexcept { mOpenSaveAs = true; }
+    void OpenSaveAs() noexcept
+    {
+      mOpenSaveAs = true;
+    }
     /** File > New map: the dialog asks for the map's name, size, players, height and sea. */
-    void OpenNewMap() noexcept { mOpenNewMap = true; }
+    void OpenNewMap() noexcept
+    {
+      mOpenNewMap = true;
+    }
     /** File > Package for the FAF vault: the checks, the file list, then the zip. */
-    void OpenPackage() noexcept { mOpenPackage = true; }
-    void RequestExit() noexcept { mExit = true; }
+    void OpenPackage() noexcept
+    {
+      mOpenPackage = true;
+    }
+    void RequestExit() noexcept
+    {
+      mExit = true;
+    }
 
-    [[nodiscard]] EdTools& Tools() noexcept { return mTools; }
+    [[nodiscard]] EdTools& Tools() noexcept
+    {
+      return mTools;
+    }
 
     /** A toolbar button the app carries out (it owns saving and the scene's undo); taken once per frame. */
     enum class Command
@@ -137,17 +243,27 @@ namespace faf::editor
       Undo,
       Redo,
     };
-    [[nodiscard]] Command TakeCommand() noexcept { return std::exchange(mCommand, Command::None); }
+    [[nodiscard]] Command TakeCommand() noexcept
+    {
+      return std::exchange(mCommand, Command::None);
+    }
 
     /** File > Exit was chosen. */
-    [[nodiscard]] bool ExitRequested() const noexcept { return mExit; }
+    [[nodiscard]] bool ExitRequested() const noexcept
+    {
+      return mExit;
+    }
 
     /** Where the game's picture goes: the dock layout's middle (x, y, width, height in the panels' pixels). */
-    [[nodiscard]] ImVec4 GameViewRect() const noexcept { return mGameView; }
+    [[nodiscard]] ImVec4 GameViewRect() const noexcept
+    {
+      return mGameView;
+    }
 
   private:
     void BuildDefaultLayout(unsigned int dockspaceId);
-    /** The toolbar over the panels: Play/Stop (F5) first, then New, Open, Save, Save as, Undo, Redo, and the open map. */
+    /** The toolbar over the panels: Play/Stop (F5) first, then New, Open, Save, Save as, Undo, Redo, and the open map.
+     */
     EdMapBrowser mBrowser;
     void DrawToolbar(float height);
     Command mCommand = Command::None;
@@ -157,36 +273,55 @@ namespace faf::editor
     /** The Play setup (opponents, AI, faction, start slot, fog, prebuilt units) and the in-play view switches. */
     void DrawPlaySetup();
     char mProfileName[64]{};
-    /** The open map: title, kind as chips, counts as cards, layers with thumbnails, armies, files (ui/EdInfoPanels.cpp). */
+    /** The open map: title, kind as chips, counts as cards, layers with thumbnails, armies, files
+     * (ui/EdInfoPanels.cpp). */
     void DrawInfoPanel();
     /** The map's markers as a tree by group and type: select, go to, hide a type (ui/EdInfoPanels.cpp). */
     void DrawMarkersPanel();
     /** The Check: runs the map's checks and lists what they found; a click goes to it (ui/EdInfoPanels.cpp). */
     void DrawCheckPanel();
-    /** The map's `_script.lua`, edited: Apply makes the change one undo step, Check compiles it (ui/EdInfoPanels.cpp). */
+    /** The map's `_script.lua`, edited: Apply makes the change one undo step, Check compiles it (ui/EdInfoPanels.cpp).
+     */
     void DrawScriptPanel();
     /** The map's lighting, edited live; Import / Export of FAFME's `.scmlighting` (ui/EdInfoPanels.cpp). */
     void DrawLightingPanel();
-    /** The Markers panel's chains: made, renamed, deleted, their markers added, ordered, taken out (ui/EdInfoPanels.cpp). */
+    /** The Markers panel's chains: made, renamed, deleted, their markers added, ordered, taken out
+     * (ui/EdInfoPanels.cpp). */
     void DrawChains();
     /** The player slots and extra armies as cards, and the chosen army's settings (ui/EdArmiesPanel.cpp). */
     void DrawArmiesPanel();
     void DrawPropertiesPanel();
-    /** A selected unit's group, what becomes of it in a game, its wreck's value, and the wreck switch (ui/EdUnitFatePanel.cpp). */
+    /** A selected unit's group, what becomes of it in a game, its wreck's value, and the wreck switch
+     * (ui/EdUnitFatePanel.cpp). */
     void DrawUnitFate(const SelectionProperties& unit);
-    /** The game's own units selected in front of a play: state, toggles, enhancements, actions (ui/EdLiveUnitPanel.cpp). */
+    /** The game's own units selected in front of a play: state, toggles, enhancements, actions
+     * (ui/EdLiveUnitPanel.cpp). */
     void DrawLiveUnitPanel();
     /** The unit's "Spawns" choice: the start groups, or a group a lobby setting makes the script create. */
-    void DrawUnitSpawn(const SelectionProperties& unit, const UnitGroup& root, const std::string& current, bool civilian, const std::string& fateText,
-                       const std::vector<std::string>& lobbyLines);
+    void DrawUnitSpawn(
+      const SelectionProperties& unit,
+      const UnitGroup& root,
+      const std::string& current,
+      bool civilian,
+      const std::string& fateText,
+      const std::vector<std::string>& lobbyLines
+    );
     std::string mSpawnAsk;
-    /** The Adaptive tool's panel: the files, the players' resources and the crazyrush lists (ui/EdAdaptivePanel.cpp). */
+    /** The Adaptive tool's panel: the files, the players' resources and the crazyrush lists (ui/EdAdaptivePanel.cpp).
+     */
     void DrawAdaptivePanel();
-    /** The Adaptive Map window: the lobby's options, each with its choices and what they put on the map (ui/EdAdaptiveWindow.cpp). */
+    /** The Adaptive Map window: the lobby's options, each with its choices and what they put on the map
+     * (ui/EdAdaptiveWindow.cpp). */
     void DrawAdaptiveWindow();
-    void DrawAdaptiveOption(const AdaptiveOption& option, const std::vector<LobbyOptionInfo>& lobby, const AdaptiveTables& tables,
-                            const std::vector<std::string>& selectedMass, const std::vector<std::string>& selectedHydro,
-                            const std::vector<std::string>& selectedUnits, const UnitGroup& army);
+    void DrawAdaptiveOption(
+      const AdaptiveOption& option,
+      const std::vector<LobbyOptionInfo>& lobby,
+      const AdaptiveTables& tables,
+      const std::vector<std::string>& selectedMass,
+      const std::vector<std::string>& selectedHydro,
+      const std::vector<std::string>& selectedUnits,
+      const UnitGroup& army
+    );
     bool mShowAdaptiveWindow = false;
     bool mEditorViewInPlay = false;
     float mUiScale = 1.0f;
@@ -213,16 +348,23 @@ namespace faf::editor
     bool mFocusAdaptiveWindow = false;
     /** The option the window shows (its key; "#players" for the players' resources). */
     std::string mAdaptivePick;
-    /** The window's preview of a game: on, each option's picked choice (index into its values), and the players in it (0: all). */
+    /** The window's preview of a game: on, each option's picked choice (index into its values), and the players in it
+     * (0: all). */
     bool mAdaptivePreview = false;
     std::map<std::string, int> mAdaptivePreviewPicks;
     int mAdaptivePreviewPlayers = 0;
     /** What the preview's hidden things were worked out for (cleared when the preview ends). */
     std::string mAdaptivePreviewDone;
     /** Works out what the preview hides and gives it to the view (ui/EdAdaptiveWindow.cpp). */
-    void UpdateAdaptivePreview(const std::vector<AdaptiveOption>& options, const std::vector<LobbyOptionInfo>& lobby, const AdaptiveTables& tables);
+    void UpdateAdaptivePreview(
+      const std::vector<AdaptiveOption>& options,
+      const std::vector<LobbyOptionInfo>& lobby,
+      const AdaptiveTables& tables
+    );
     /** View > Script on one of the map's Lua files (0 script, 1 lobby options, 2 adaptive tables). */
-    void ShowLuaFile(int file)
+    void ShowLuaFile(
+      int file
+    )
     {
       mScriptFile = file;
       mShowScript = true;

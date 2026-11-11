@@ -114,9 +114,14 @@ namespace
   [[maybe_unused]] ESiloTypeTypeInfoBootstrap gESiloTypeTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_ESiloTypeTypeInfo_9672e7, moho::register_ESiloTypeTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_ESiloTypeTypeInfo_9672e7,
+  moho::register_ESiloTypeTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_ESiloTypeTypeInfo_9672e7, moho::preregister_ESiloTypeTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_ESiloTypeTypeInfo_9672e7,
+  moho::preregister_ESiloTypeTypeInfo
+)

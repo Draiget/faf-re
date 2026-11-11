@@ -19,9 +19,9 @@ namespace moho
 
   struct SlabHeader
   {
-    std::uint32_t magic;           // 0x534C4142 ('SLAB')
-    FixedSlabPool* ownerPool;      // Owning pool
-    SlabHeader* nextSlab;          // Intrusive slab list links
+    std::uint32_t magic;      // 0x534C4142 ('SLAB')
+    FixedSlabPool* ownerPool; // Owning pool
+    SlabHeader* nextSlab;     // Intrusive slab list links
     SlabHeader* prevSlab;
     std::uint32_t allocatedBlocks; // Currently allocated blocks in this slab
     std::uint32_t totalBlocks;     // Total slots capacity in this slab

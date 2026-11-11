@@ -22,7 +22,8 @@ namespace
   gpg::RType* gLegacySBlackListInfoVectorType = nullptr;
 
   [[nodiscard]] moho::RUnitBlueprintWeapon* ReadRUnitBlueprintWeaponPointer(
-    gpg::ReadArchive* archive, const gpg::RRef& ownerRef
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef
   )
   {
     const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
@@ -39,17 +40,22 @@ namespace
       return static_cast<moho::RUnitBlueprintWeapon*>(upcast.mObj);
     }
 
-    const char* const expected = gpg::RTypeOf<moho::RUnitBlueprintWeapon>() ? gpg::RTypeOf<moho::RUnitBlueprintWeapon>()->GetName() : "RUnitBlueprintWeapon";
+    const char* const expected = gpg::RTypeOf<moho::RUnitBlueprintWeapon>()
+      ? gpg::RTypeOf<moho::RUnitBlueprintWeapon>()->GetName()
+      : "RUnitBlueprintWeapon";
     const char* const actual = source.GetTypeName();
     const fa::string msg = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
       expected ? expected : "RUnitBlueprintWeapon",
       actual ? actual : "null"
     );
     throw gpg::SerializationError(msg.c_str());
   }
 
-  [[nodiscard]] gpg::RRef MakeRUnitBlueprintWeaponRef(moho::RUnitBlueprintWeapon* value)
+  [[nodiscard]] gpg::RRef MakeRUnitBlueprintWeaponRef(
+    moho::RUnitBlueprintWeapon* value
+  )
   {
     gpg::RRef ref{};
     ref.mObj = value;
@@ -76,7 +82,9 @@ namespace moho
    * Loads the same `CWeaponAttributes` lanes as `FUN_006D3780`, but always
    * uses an empty owner-ref lane for the weapon-pointer read path.
    */
-  void CWeaponAttributes::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CWeaponAttributes::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
@@ -107,7 +115,9 @@ namespace moho
    * What it does:
    * Saves the reflected pointer/string/float lanes for `CWeaponAttributes`.
    */
-  void CWeaponAttributes::MemberSerialize(gpg::WriteArchive* const archive)
+  void CWeaponAttributes::MemberSerialize(
+    gpg::WriteArchive* const archive
+  )
   {
     const gpg::RRef owner{};
 
@@ -201,7 +211,11 @@ namespace
   }
 
   template <typename TObject>
-  void ReadObjectByCachedType(gpg::ReadArchive* const archive, void* const objectPtr, gpg::RRef* const ownerRef)
+  void ReadObjectByCachedType(
+    gpg::ReadArchive* const archive,
+    void* const objectPtr,
+    gpg::RRef* const ownerRef
+  )
   {
     if (archive == nullptr) {
       return;
@@ -305,7 +319,11 @@ namespace
    * Read-callback bridge that loads one reflected `CWeaponAttributes` payload
    * through cached RTTI lookup.
    */
-  [[maybe_unused]] void ReadCachedCWeaponAttributesCallback(gpg::ReadArchive* archive, void* objectPtr, gpg::RRef* ownerRef)
+  [[maybe_unused]] void ReadCachedCWeaponAttributesCallback(
+    gpg::ReadArchive* archive,
+    void* objectPtr,
+    gpg::RRef* ownerRef
+  )
   {
     ReadObjectByCachedType<moho::CWeaponAttributes>(archive, objectPtr, ownerRef);
   }

@@ -97,21 +97,26 @@ namespace gpg::gal
     std::uint32_t stride = 0U;   ///< bytes per element, a multiple of 4
     std::uint32_t capacity = 0U; ///< elements
     GpuBufferKind kind = GpuBufferKind::Structured;
-    bool shaderWrite = false;    ///< a compute shader writes it (u0..u1)
+    bool shaderWrite = false; ///< a compute shader writes it (u0..u1)
   };
 
   /** One GPU buffer. Contents persist until overwritten by `UpdateGpuBuffer` or a compute shader. */
   class GpuBuffer
   {
   public:
-    explicit GpuBuffer(const GpuBufferDesc& desc) noexcept
+    explicit GpuBuffer(
+      const GpuBufferDesc& desc
+    ) noexcept
       : mDesc(desc)
     {}
     virtual ~GpuBuffer() = default;
     GpuBuffer(const GpuBuffer&) = delete;
     GpuBuffer& operator=(const GpuBuffer&) = delete;
 
-    [[nodiscard]] const GpuBufferDesc& Desc() const noexcept { return mDesc; }
+    [[nodiscard]] const GpuBufferDesc& Desc() const noexcept
+    {
+      return mDesc;
+    }
 
   protected:
     GpuBufferDesc mDesc;
@@ -181,7 +186,7 @@ namespace gpg::gal
     const char* name = "";
     const char* source = nullptr;
     std::size_t sourceBytes = 0U;
-    const char* vertexEntry = nullptr;  ///< with `pixelEntry`: a draw program
+    const char* vertexEntry = nullptr; ///< with `pixelEntry`: a draw program
     const char* pixelEntry = nullptr;
     const char* computeEntry = nullptr; ///< alone: a compute program
     GpuBlend blend = GpuBlend::Opaque;
@@ -189,7 +194,7 @@ namespace gpg::gal
     bool depthTest = false;              ///< `depthFunc` against the bound depth target
     bool depthWrite = false;
     GpuCompare depthFunc = GpuCompare::LessEqual;
-    bool depthClip = true;               ///< clip to the near/far planes, as D3D9 always does
+    bool depthClip = true; ///< clip to the near/far planes, as D3D9 always does
     GpuStencil stencil{};
     /// Keep the depth-stencil state already bound instead of the four fields above: the program
     /// stands in for an effect pass that sets none of its own. D3D12/Vulkan, which bake depth into
@@ -216,10 +221,10 @@ namespace gpg::gal
 
   struct GpuBindings
   {
-    const void* constants = nullptr; ///< b0, copied at the call
-    std::uint32_t constantBytes = 0U; ///< a multiple of 16, at most `kGpuMaxConstantBytes`
-    GpuBuffer* readBuffers[kGpuMaxReadBuffers]{};   ///< t0..t3
-    Texture* textures[kGpuMaxTextures]{};           ///< t4..t5
+    const void* constants = nullptr;              ///< b0, copied at the call
+    std::uint32_t constantBytes = 0U;             ///< a multiple of 16, at most `kGpuMaxConstantBytes`
+    GpuBuffer* readBuffers[kGpuMaxReadBuffers]{}; ///< t0..t3
+    Texture* textures[kGpuMaxTextures]{};         ///< t4..t5
     /// t4..t5 where `textures` leaves the slot empty: a colour target's current buffer, read as a
     /// texture (Direct3D 12 and Vulkan). It must not be the target the call draws into.
     RenderTarget* targets[kGpuMaxTextures]{};

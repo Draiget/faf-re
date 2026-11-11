@@ -34,7 +34,9 @@ namespace moho
    * What it does:
    * Copies base form metadata and all binder-local fields.
    */
-  CScrLuaBinder::CScrLuaBinder(const CScrLuaBinder& other)
+  CScrLuaBinder::CScrLuaBinder(
+    const CScrLuaBinder& other
+  )
     : CScrLuaInitForm(other)
     , mFunction(other.mFunction)
     , mOwnerFactory(other.mOwnerFactory)
@@ -48,7 +50,9 @@ namespace moho
    * What it does:
    * Registers the bound function on either a factory-produced object table or Lua globals.
    */
-  void CScrLuaBinder::Run(LuaPlus::LuaState* const state)
+  void CScrLuaBinder::Run(
+    LuaPlus::LuaState* const state
+  )
   {
     if (mOwnerFactory) {
       LuaPlus::LuaObject owner = mOwnerFactory->Get(state);

@@ -38,8 +38,19 @@ namespace faf::editor
     };
 
     const char* const kFlags[kEmitterFlagCount] = {
-      "LocalVelocity", "LocalAcceleration", "Gravity", "AlignRotation", "AlignToBone", "Flat", "EmitIfVisible",
-      "CatchupEmit", "CreateIfVisible", "SnapToWaterline", "OnlyEmitOnWater", "ParticleResistance", "InterpolateEmission",
+      "LocalVelocity",
+      "LocalAcceleration",
+      "Gravity",
+      "AlignRotation",
+      "AlignToBone",
+      "Flat",
+      "EmitIfVisible",
+      "CatchupEmit",
+      "CreateIfVisible",
+      "SnapToWaterline",
+      "OnlyEmitOnWater",
+      "ParticleResistance",
+      "InterpolateEmission",
     };
 
     // ---- A Lua table literal, enough for blueprint files ----
@@ -47,7 +58,7 @@ namespace faf::editor
     struct Value;
     struct Field
     {
-      std::string key; // empty: a positional item
+      std::string key;          // empty: a positional item
       std::vector<Value> value; // one
     };
 
@@ -69,7 +80,9 @@ namespace faf::editor
       std::size_t begin = 0;
       std::size_t end = 0;
 
-      [[nodiscard]] const Value* Find(const char* key) const
+      [[nodiscard]] const Value* Find(
+        const char* key
+      ) const
       {
         for (const Field& field : fields) {
           if (field.key == key) {
@@ -83,11 +96,26 @@ namespace faf::editor
     class Reader
     {
     public:
-      explicit Reader(const std::string& text) : mText(text) {}
+      explicit Reader(
+        const std::string& text
+      )
+        : mText(text)
+      {}
 
-      bool Parse(Value& out, std::string& error) { return Parse(out, error, {"EmitterBlueprint"}, nullptr); }
+      bool Parse(
+        Value& out,
+        std::string& error
+      )
+      {
+        return Parse(out, error, {"EmitterBlueprint"}, nullptr);
+      }
 
-      bool Parse(Value& out, std::string& error, const std::vector<std::string>& names, std::string* found)
+      bool Parse(
+        Value& out,
+        std::string& error,
+        const std::vector<std::string>& names,
+        std::string* found
+      )
       {
         Skip();
         // `EmitterBlueprint { ... }` or `EmitterBlueprint({ ... })`.
@@ -97,7 +125,9 @@ namespace faf::editor
         }
         const std::string name = mText.substr(nameStart, mAt - nameStart);
         if (std::find(names.begin(), names.end(), name) == names.end()) {
-          return Fail("not a" + std::string(names.size() == 1 ? "n " + names.front() : " beam or trail") + " file", error);
+          return Fail(
+            "not a" + std::string(names.size() == 1 ? "n " + names.front() : " beam or trail") + " file", error
+          );
         }
         if (found != nullptr) {
           *found = name;
@@ -116,7 +146,10 @@ namespace faf::editor
       }
 
     private:
-      bool Fail(const std::string& what, std::string& error)
+      bool Fail(
+        const std::string& what,
+        std::string& error
+      )
       {
         int line = 1;
         for (std::size_t i = 0; i < mAt && i < mText.size(); ++i) {
@@ -126,7 +159,9 @@ namespace faf::editor
         return false;
       }
 
-      bool Eat(const char c)
+      bool Eat(
+        const char c
+      )
       {
         if (mAt < mText.size() && mText[mAt] == c) {
           ++mAt;
@@ -157,7 +192,9 @@ namespace faf::editor
         }
       }
 
-      bool ParseValue(Value& out)
+      bool ParseValue(
+        Value& out
+      )
       {
         Skip();
         out.begin = mAt;
@@ -179,14 +216,17 @@ namespace faf::editor
             const std::size_t save = mAt;
             if (std::isalpha(static_cast<unsigned char>(mText[mAt])) != 0 || mText[mAt] == '_') {
               std::size_t end = mAt;
-              while (end < mText.size() && (std::isalnum(static_cast<unsigned char>(mText[end])) != 0 || mText[end] == '_')) {
+              while (end < mText.size() &&
+                     (std::isalnum(static_cast<unsigned char>(mText[end])) != 0 || mText[end] == '_')) {
                 ++end;
               }
               std::size_t after = end;
               while (after < mText.size() && std::isspace(static_cast<unsigned char>(mText[after])) != 0) {
                 ++after;
               }
-              if (after < mText.size() && mText[after] == '=' && (after + 1 >= mText.size() || mText[after + 1] != '=')) {
+              if (
+                after < mText.size() && mText[after] == '=' && (after + 1 >= mText.size() || mText[after + 1] != '=')
+              ) {
                 field.key = mText.substr(mAt, end - mAt);
                 mAt = after + 1;
               } else {
@@ -270,7 +310,9 @@ namespace faf::editor
           mAt = static_cast<std::size_t>(end - mText.c_str());
         } else if (std::isalpha(static_cast<unsigned char>(c)) != 0 || c == '_') {
           std::size_t end = mAt;
-          while (end < mText.size() && (std::isalnum(static_cast<unsigned char>(mText[end])) != 0 || mText[end] == '_' || mText[end] == '.')) {
+          while (
+            end < mText.size() &&
+            (std::isalnum(static_cast<unsigned char>(mText[end])) != 0 || mText[end] == '_' || mText[end] == '.')) {
             ++end;
           }
           out.text = mText.substr(mAt, end - mAt);
@@ -309,7 +351,9 @@ namespace faf::editor
       std::string mError;
     };
 
-    float NumberOf(const Value& value)
+    float NumberOf(
+      const Value& value
+    )
     {
       if (value.kind == Value::Kind::Number) {
         return static_cast<float>(value.number);
@@ -320,12 +364,18 @@ namespace faf::editor
       return 0.0f;
     }
 
-    bool FlagOf(const Value& value)
+    bool FlagOf(
+      const Value& value
+    )
     {
       return value.kind == Value::Kind::Bool ? value.flag : value.kind == Value::Kind::Number && value.number != 0.0;
     }
 
-    void Append(std::string& out, const char* format, ...)
+    void Append(
+      std::string& out,
+      const char* format,
+      ...
+    )
     {
       char buffer[1024];
       va_list args;
@@ -341,27 +391,72 @@ namespace faf::editor
   namespace
   {
     const std::vector<FlatField> kBeamFields = {
-      {"BlueprintId", FlatValue::Kind::Text, 0.0f, {}, "FAF's blueprint loader replaces it with the file's path", false},
+      {"BlueprintId",
+       FlatValue::Kind::Text,
+       0.0f,
+       {},
+       "FAF's blueprint loader replaces it with the file's path",
+       false},
       {"Lifetime", FlatValue::Kind::Number, 1.0f, {}, "Ticks the beam shows (10 a second)", false},
       {"TextureName", FlatValue::Kind::Text, 0.0f, {}, "The beam's texture, along its length", true},
       {"Length", FlatValue::Kind::Number, 10.0f, {}, "Its length in game units", false},
       {"Thickness", FlatValue::Kind::Number, 1.0f, {}, "Its width in game units", false},
-      {"StartColor", FlatValue::Kind::Color, 0.0f, {1.0f, 1.0f, 1.0f, 0.0f}, "The colour at its start (alpha: as the blend mode reads it)", false},
+      {"StartColor",
+       FlatValue::Kind::Color,
+       0.0f,
+       {1.0f, 1.0f, 1.0f, 0.0f},
+       "The colour at its start (alpha: as the blend mode reads it)",
+       false},
       {"EndColor", FlatValue::Kind::Color, 0.0f, {1.0f, 1.0f, 1.0f, 0.0f}, "The colour at its end", false},
       {"UShift", FlatValue::Kind::Number, 0.0f, {}, "Texture scroll across, a tick", false},
       {"VShift", FlatValue::Kind::Number, 0.0f, {}, "Texture scroll along, a tick", false},
-      {"RepeatRate", FlatValue::Kind::Number, 0.0f, {}, "Texture repeats a game unit of length (0: once over the whole beam)", false},
-      {"Blendmode", FlatValue::Kind::Number, 3.0f, {}, "0 alpha, 1 modulate inverse, 2 modulate 2x inverse, 3 add, 4 premultiplied alpha", false},
+      {"RepeatRate",
+       FlatValue::Kind::Number,
+       0.0f,
+       {},
+       "Texture repeats a game unit of length (0: once over the whole beam)",
+       false},
+      {"Blendmode",
+       FlatValue::Kind::Number,
+       3.0f,
+       {},
+       "0 alpha, 1 modulate inverse, 2 modulate 2x inverse, 3 add, 4 premultiplied alpha",
+       false},
       {"LODCutoff", FlatValue::Kind::Number, 200.0f, {}, "The camera distance beyond which it isn't drawn", false},
     };
     const std::vector<FlatField> kTrailFields = {
-      {"BlueprintId", FlatValue::Kind::Text, 0.0f, {}, "FAF's blueprint loader replaces it with the file's path", false},
-      {"Lifetime", FlatValue::Kind::Number, 0.0f, {}, "Ticks the trail emitter lives; -1: as long as what carries it", false},
-      {"TrailLength", FlatValue::Kind::Number, 0.0f, {}, "Ticks each segment of the trail lasts: how long the trail is behind its emitter", false},
+      {"BlueprintId",
+       FlatValue::Kind::Text,
+       0.0f,
+       {},
+       "FAF's blueprint loader replaces it with the file's path",
+       false},
+      {"Lifetime",
+       FlatValue::Kind::Number,
+       0.0f,
+       {},
+       "Ticks the trail emitter lives; -1: as long as what carries it",
+       false},
+      {"TrailLength",
+       FlatValue::Kind::Number,
+       0.0f,
+       {},
+       "Ticks each segment of the trail lasts: how long the trail is behind its emitter",
+       false},
       {"Size", FlatValue::Kind::Number, 0.0f, {}, "The ribbon's width in game units", false},
       {"SortOrder", FlatValue::Kind::Number, 0.0f, {}, "Drawing order among effects", false},
-      {"BlendMode", FlatValue::Kind::Number, 0.0f, {}, "0 alpha, 1 modulate inverse, 2 modulate 2x inverse, 3 add, 4 premultiplied alpha", false},
-      {"TextureRepeatRate", FlatValue::Kind::Number, 0.0f, {}, "Texture repeats a game unit of the trail's length", false},
+      {"BlendMode",
+       FlatValue::Kind::Number,
+       0.0f,
+       {},
+       "0 alpha, 1 modulate inverse, 2 modulate 2x inverse, 3 add, 4 premultiplied alpha",
+       false},
+      {"TextureRepeatRate",
+       FlatValue::Kind::Number,
+       0.0f,
+       {},
+       "Texture repeats a game unit of the trail's length",
+       false},
       {"LODCutoff", FlatValue::Kind::Number, 100.0f, {}, "The camera distance beyond which it isn't drawn", false},
       {"EmitIfVisible", FlatValue::Kind::Bool, 1.0f, {}, "Emits only while a player can see it", false},
       {"CatchupEmit", FlatValue::Kind::Bool, 1.0f, {}, "Catches up with the ticks a hidden emitter missed", false},
@@ -369,7 +464,9 @@ namespace faf::editor
       {"RampTexture", FlatValue::Kind::Text, 0.0f, {}, "Colours the ribbon over its age", true},
     };
 
-    std::string Number(const float value)
+    std::string Number(
+      const float value
+    )
     {
       char text[48];
       (void)std::snprintf(text, sizeof(text), "%.6g", static_cast<double>(value));
@@ -377,7 +474,9 @@ namespace faf::editor
     }
   } // namespace
 
-  const FlatValue* FlatBlueprint::Find(const std::string& key) const
+  const FlatValue* FlatBlueprint::Find(
+    const std::string& key
+  ) const
   {
     for (const auto& [name, value] : fields) {
       if (name == key) {
@@ -387,7 +486,10 @@ namespace faf::editor
     return nullptr;
   }
 
-  void FlatBlueprint::Set(const std::string& key, const FlatValue& value)
+  void FlatBlueprint::Set(
+    const std::string& key,
+    const FlatValue& value
+  )
   {
     for (auto& [name, existing] : fields) {
       if (name == key) {
@@ -398,7 +500,10 @@ namespace faf::editor
     fields.emplace_back(key, value);
   }
 
-  float FlatBlueprint::Number(const std::string& key, const float fallback) const
+  float FlatBlueprint::Number(
+    const std::string& key,
+    const float fallback
+  ) const
   {
     const FlatValue* value = Find(key);
     if (value == nullptr) {
@@ -407,24 +512,35 @@ namespace faf::editor
     return value->kind == FlatValue::Kind::Bool ? (value->flag ? 1.0f : 0.0f) : value->number;
   }
 
-  std::string FlatBlueprint::Text(const std::string& key) const
+  std::string FlatBlueprint::Text(
+    const std::string& key
+  ) const
   {
     const FlatValue* value = Find(key);
     return value != nullptr ? value->text : std::string();
   }
 
-  std::array<float, 4> FlatBlueprint::Color(const std::string& key, const std::array<float, 4>& fallback) const
+  std::array<float, 4> FlatBlueprint::Color(
+    const std::string& key,
+    const std::array<float, 4>& fallback
+  ) const
   {
     const FlatValue* value = Find(key);
     return value != nullptr && value->kind == FlatValue::Kind::Color ? value->color : fallback;
   }
 
-  const std::vector<FlatField>& FlatFields(const std::string& kind)
+  const std::vector<FlatField>& FlatFields(
+    const std::string& kind
+  )
   {
     return kind == "BeamBlueprint" ? kBeamFields : kTrailFields;
   }
 
-  bool ParseFlatBlueprint(const std::string& text, FlatBlueprint& out, std::string& error)
+  bool ParseFlatBlueprint(
+    const std::string& text,
+    FlatBlueprint& out,
+    std::string& error
+  )
   {
     Value root;
     Reader reader(text);
@@ -477,7 +593,9 @@ namespace faf::editor
     return true;
   }
 
-  std::string WriteFlatBlueprint(const FlatBlueprint& blueprint)
+  std::string WriteFlatBlueprint(
+    const FlatBlueprint& blueprint
+  )
   {
     std::string out = blueprint.kind + " {\n";
     for (const auto& [key, value] : blueprint.fields) {
@@ -493,7 +611,8 @@ namespace faf::editor
         out += value.text.find(']') == std::string::npos ? "[[" + value.text + "]]" : "'" + value.text + "'";
         break;
       case FlatValue::Kind::Color:
-        out += "{x=" + Number(value.color[0]) + ",y=" + Number(value.color[1]) + ",z=" + Number(value.color[2]) + ",w=" + Number(value.color[3]) + "}";
+        out += "{x=" + Number(value.color[0]) + ",y=" + Number(value.color[1]) + ",z=" + Number(value.color[2]) +
+          ",w=" + Number(value.color[3]) + "}";
         break;
       case FlatValue::Kind::Raw:
         out += value.text;
@@ -507,18 +626,26 @@ namespace faf::editor
 
   namespace
   {
-    std::string BaseLower(const std::string& path)
+    std::string BaseLower(
+      const std::string& path
+    )
     {
       std::string name = path.substr(path.find_last_of("/\\") + 1);
-      std::transform(name.begin(), name.end(), name.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(name.begin(), name.end(), name.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return name;
     }
   } // namespace
 
-  int EffectFaction(const std::string& path)
+  int EffectFaction(
+    const std::string& path
+  )
   {
     const std::string name = BaseLower(path);
-    const auto starts = [&](const char* prefix) { return name.rfind(prefix, 0) == 0; };
+    const auto starts = [&](const char* prefix) {
+      return name.rfind(prefix, 0) == 0;
+    };
     if (starts("aeon_")) {
       return 1;
     }
@@ -534,7 +661,9 @@ namespace faf::editor
     return 5;
   }
 
-  int EffectKind(const std::string& path)
+  int EffectKind(
+    const std::string& path
+  )
   {
     const std::string name = BaseLower(path);
     // Words for each kind, tried in kEffectKinds' order (a muzzle's smoke is a muzzle effect).
@@ -563,12 +692,16 @@ namespace faf::editor
     return static_cast<int>(std::size(kEffectKinds)) - 1;
   }
 
-  const EmitterCurveInfo& CurveInfo(const int curve)
+  const EmitterCurveInfo& CurveInfo(
+    const int curve
+  )
   {
     return kCurves[curve < 0 || curve >= kEmitterCurveCount ? 0 : curve];
   }
 
-  const char* FlagName(const int flag)
+  const char* FlagName(
+    const int flag
+  )
   {
     return kFlags[flag < 0 || flag >= kEmitterFlagCount ? 0 : flag];
   }
@@ -590,7 +723,11 @@ namespace faf::editor
     return emitter;
   }
 
-  bool ParseEmitter(const std::string& text, EmitterBlueprint& out, std::string& error)
+  bool ParseEmitter(
+    const std::string& text,
+    EmitterBlueprint& out,
+    std::string& error
+  )
   {
     Value root;
     Reader reader(text);
@@ -677,14 +814,20 @@ namespace faf::editor
     return true;
   }
 
-  float EmitterCurveValue(const EmitterCurve& curve, const float t, const float random)
+  float EmitterCurveValue(
+    const EmitterCurve& curve,
+    const float t,
+    const float random
+  )
   {
     if (curve.keys.empty()) {
       return 0.0f;
     }
     // SEfxCurve keeps its keys sorted by x (BuildEmitterCurveFromBlueprint inserts them in order).
     std::vector<EmitterKey> keys = curve.keys;
-    std::stable_sort(keys.begin(), keys.end(), [](const EmitterKey& a, const EmitterKey& b) { return a.x < b.x; });
+    std::stable_sort(keys.begin(), keys.end(), [](const EmitterKey& a, const EmitterKey& b) {
+      return a.x < b.x;
+    });
     std::size_t at = 0;
     while (at < keys.size() && keys[at].x <= t) {
       ++at;
@@ -707,7 +850,9 @@ namespace faf::editor
     return (random - 0.5f) * z + y;
   }
 
-  std::string EmitterTypeTag(const EmitterBlueprint& e)
+  std::string EmitterTypeTag(
+    const EmitterBlueprint& e
+  )
   {
     const bool align = e.flags[kAlignRotation];
     const bool bone = e.flags[kAlignToBone];
@@ -730,13 +875,21 @@ namespace faf::editor
     return flat ? "TRampAnimateFlat" : "TRampAnimateAlignToBone";
   }
 
-  bool EmitterFinished(const EmitterBlueprint& e, const float tickCount)
+  bool EmitterFinished(
+    const EmitterBlueprint& e,
+    const float tickCount
+  )
   {
     // CEfxEmitter::OnTick: destroyed once TICKCOUNT reaches Lifetime, unless Lifetime is negative.
     return e.lifetime >= 0.0f && tickCount >= e.lifetime;
   }
 
-  std::vector<EmittedParticle> EmitTick(const EmitterBlueprint& e, const float tickCount, float& carry, const std::function<float()>& random)
+  std::vector<EmittedParticle> EmitTick(
+    const EmitterBlueprint& e,
+    const float tickCount,
+    float& carry,
+    const std::function<float()>& random
+  )
   {
     std::vector<EmittedParticle> out;
     const float repeat = e.repeatTime;
@@ -750,7 +903,9 @@ namespace faf::editor
       }
       return phase;
     };
-    const auto curve = [&](const int c, const float phase) { return EmitterCurveValue(e.curves[static_cast<std::size_t>(c)], phase, random()); };
+    const auto curve = [&](const int c, const float phase) {
+      return EmitterCurveValue(e.curves[static_cast<std::size_t>(c)], phase, random());
+    };
     carry += curve(kEmitRate, phaseOf(tickCount));
     const int count = static_cast<int>(std::floor(carry));
     carry -= static_cast<float>(count);
@@ -799,8 +954,10 @@ namespace faf::editor
       p.endSize = curve(kEndSize, phase);
       p.rampSelection = curve(kRampSelection, phase);
       p.framerate = curve(kFrameRate, phase);
-      // floor(selection) * (1 / TextureStripcount), for every particle (CEfxEmitter.cpp 0x0065CE00; a ramp-only tag ignores it).
-      p.textureSelection = e.textureStripCount > 0.0f ? std::floor(curve(kTextureSelection, phase)) / e.textureStripCount : 0.0f;
+      // floor(selection) * (1 / TextureStripcount), for every particle (CEfxEmitter.cpp 0x0065CE00; a ramp-only tag
+      // ignores it).
+      p.textureSelection =
+        e.textureStripCount > 0.0f ? std::floor(curve(kTextureSelection, phase)) / e.textureStripCount : 0.0f;
       p.angle = curve(kInitialRotation, phase) * 0.017453292f;
       p.rotationRate = curve(kRotationRate, phase) * 0.017453292f;
       out.push_back(p);
@@ -808,7 +965,9 @@ namespace faf::editor
     return out;
   }
 
-  std::string WriteEmitter(const EmitterBlueprint& e)
+  std::string WriteEmitter(
+    const EmitterBlueprint& e
+  )
   {
     // WEmitterWx::WriteBlueprintScript's order and formats.
     std::string out = "EmitterBlueprint {\n";
@@ -817,12 +976,21 @@ namespace faf::editor
     Append(out, "\tRepeattime = %.2f,\n", static_cast<double>(e.repeatTime));
     Append(out, "\tTextureFramecount = %.2f,\n", static_cast<double>(e.textureFrameCount));
     Append(out, "\tBlendmode = %.2f,\n", static_cast<double>(e.blendMode));
-    const auto flag = [&](const int f) { return e.flags[static_cast<std::size_t>(f)] ? "true" : "false"; };
+    const auto flag = [&](const int f) {
+      return e.flags[static_cast<std::size_t>(f)] ? "true" : "false";
+    };
     for (const int f : {kLocalVelocity, kLocalAcceleration, kGravity, kAlignRotation, kAlignToBone, kFlat}) {
       Append(out, "\t%s = %s,\n", kFlags[f], flag(f));
     }
     Append(out, "\tLODCutoff = %.2f,\n", static_cast<double>(e.lodCutoff));
-    for (const int f : {kEmitIfVisible, kCatchupEmit, kCreateIfVisible, kSnapToWaterline, kOnlyEmitOnWater, kParticleResistance, kInterpolateEmission}) {
+    for (const int f :
+         {kEmitIfVisible,
+          kCatchupEmit,
+          kCreateIfVisible,
+          kSnapToWaterline,
+          kOnlyEmitOnWater,
+          kParticleResistance,
+          kInterpolateEmission}) {
       Append(out, "\t%s = %s,\n", kFlags[f], flag(f));
     }
     Append(out, "\tTextureStripcount = %.2f,\n", static_cast<double>(e.textureStripCount));
@@ -836,7 +1004,13 @@ namespace faf::editor
       const EmitterCurve& curve = e.curves[static_cast<std::size_t>(c)];
       Append(out, "\t%s = {\n\t\tXRange = %.2f,\n\t\tKeys = {\n", kCurves[c].name, static_cast<double>(curve.xRange));
       for (const EmitterKey& key : curve.keys) {
-        Append(out, "\t\t\t{ x=%.3f,y=%.3f,z=%.3f },\n", static_cast<double>(key.x), static_cast<double>(key.y), static_cast<double>(key.z));
+        Append(
+          out,
+          "\t\t\t{ x=%.3f,y=%.3f,z=%.3f },\n",
+          static_cast<double>(key.x),
+          static_cast<double>(key.y),
+          static_cast<double>(key.z)
+        );
       }
       out += "\t\t},\n\t},\n";
     }

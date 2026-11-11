@@ -12,7 +12,11 @@ namespace moho
    * Reads one user-entity interpolated transform and emits `{x, y, z, range}`
    * where range is the unit blueprint's staging-platform scan radius.
    */
-  bool AirPlatformExtractor::Extract(float* const outPosRange, void* const userEntity, const float alpha)
+  bool AirPlatformExtractor::Extract(
+    float* const outPosRange,
+    void* const userEntity,
+    const float alpha
+  )
   {
     if (outPosRange == nullptr || userEntity == nullptr) {
       return false;

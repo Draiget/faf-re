@@ -15,7 +15,12 @@ namespace faf::remote::wire
     struct SNameHash
     {
       using is_transparent = void;
-      [[nodiscard]] std::size_t operator()(const std::string_view name) const noexcept { return std::hash<std::string_view>{}(name); }
+      [[nodiscard]] std::size_t operator()(
+        const std::string_view name
+      ) const noexcept
+      {
+        return std::hash<std::string_view>{}(name);
+      }
     };
 
     /**
@@ -36,7 +41,9 @@ namespace faf::remote::wire
     : mSerial(sSessionSerials.fetch_add(1u, std::memory_order_relaxed) + 1u)
   {}
 
-  std::uint32_t CSessionTableWriters::Sound(const SSoundEntry& entry)
+  std::uint32_t CSessionTableWriters::Sound(
+    const SSoundEntry& entry
+  )
   {
     const std::lock_guard<std::mutex> lock(mInternLock);
     const CSoundTableWriter::SInterned interned = mSounds.Intern(entry);
@@ -46,7 +53,9 @@ namespace faf::remote::wire
     return interned.id;
   }
 
-  std::uint32_t CSessionTableWriters::Name(const std::string_view name)
+  std::uint32_t CSessionTableWriters::Name(
+    const std::string_view name
+  )
   {
     // Most names asked for are empty (a unit's custom name, a weapon's range visuals): no hash for those.
     if (name.empty()) {
@@ -78,7 +87,9 @@ namespace faf::remote::wire
     return id;
   }
 
-  bool CSessionTableWriters::Deposit(const SDeposit& deposit)
+  bool CSessionTableWriters::Deposit(
+    const SDeposit& deposit
+  )
   {
     if (mDepositCount >= kMaxDeposits) {
       return false;
@@ -90,33 +101,45 @@ namespace faf::remote::wire
 
   namespace
   {
-    [[nodiscard]] bool CellRectValid(const SCellRect& rect) noexcept
+    [[nodiscard]] bool CellRectValid(
+      const SCellRect& rect
+    ) noexcept
     {
       return rect.x0 <= rect.x1 && rect.z0 <= rect.z1;
     }
 
-    [[nodiscard]] std::uint64_t CellCount(const SCellRect& rect) noexcept
+    [[nodiscard]] std::uint64_t CellCount(
+      const SCellRect& rect
+    ) noexcept
     {
-      return CellRectValid(rect) ? (static_cast<std::uint64_t>(static_cast<std::int64_t>(rect.x1) - rect.x0 + 1)
-                                    * static_cast<std::uint64_t>(static_cast<std::int64_t>(rect.z1) - rect.z0 + 1))
+      return CellRectValid(rect) ? (static_cast<std::uint64_t>(static_cast<std::int64_t>(rect.x1) - rect.x0 + 1) *
+                                    static_cast<std::uint64_t>(static_cast<std::int64_t>(rect.z1) - rect.z0 + 1))
                                  : 0u;
     }
 
-    [[nodiscard]] std::uint32_t ZigZag(const std::int32_t value) noexcept
+    [[nodiscard]] std::uint32_t ZigZag(
+      const std::int32_t value
+    ) noexcept
     {
       return (static_cast<std::uint32_t>(value) << 1) ^ static_cast<std::uint32_t>(value >> 31);
     }
 
-    [[nodiscard]] std::int32_t UnZigZag(const std::uint32_t value) noexcept
+    [[nodiscard]] std::int32_t UnZigZag(
+      const std::uint32_t value
+    ) noexcept
     {
       return static_cast<std::int32_t>(value >> 1) ^ -static_cast<std::int32_t>(value & 1u);
     }
   } // namespace
 
-  bool CSessionTableWriters::TerrainEdit(STerrainEdit edit)
+  bool CSessionTableWriters::TerrainEdit(
+    STerrainEdit edit
+  )
   {
-    if (mNewTerrainEdits.size() >= kMaxTerrainEdits || CellCount(edit.cells) > kMaxEditCells
-        || edit.heights.size() != CellCount(edit.cells)) {
+    if (
+      mNewTerrainEdits.size() >= kMaxTerrainEdits || CellCount(edit.cells) > kMaxEditCells ||
+      edit.heights.size() != CellCount(edit.cells)
+    ) {
       return false;
     }
     mNewTerrainEdits.push_back(std::move(edit));
@@ -125,7 +148,10 @@ namespace faf::remote::wire
 
   namespace
   {
-    void WriteCellRect(const SCellRect& rect, BitWriter& writer)
+    void WriteCellRect(
+      const SCellRect& rect,
+      BitWriter& writer
+    )
     {
       writer.WriteVarUint(ZigZag(rect.x0));
       writer.WriteVarUint(ZigZag(rect.z0));
@@ -133,7 +159,9 @@ namespace faf::remote::wire
       writer.WriteVarUint(ZigZag(rect.z1));
     }
 
-    [[nodiscard]] SCellRect ReadCellRect(BitReader& reader)
+    [[nodiscard]] SCellRect ReadCellRect(
+      BitReader& reader
+    )
     {
       SCellRect rect{};
       rect.x0 = UnZigZag(reader.ReadVarUint());
@@ -144,7 +172,9 @@ namespace faf::remote::wire
     }
   } // namespace
 
-  void CSessionTableWriters::WritePending(BitWriter& writer)
+  void CSessionTableWriters::WritePending(
+    BitWriter& writer
+  )
   {
     writer.WriteVarUint(static_cast<std::uint32_t>(mNewSounds.size()));
     for (const std::uint32_t id : mNewSounds) {
@@ -184,7 +214,9 @@ namespace faf::remote::wire
     mNewTerrainEdits.clear();
   }
 
-  bool CSessionTableReaders::Read(BitReader& reader)
+  bool CSessionTableReaders::Read(
+    BitReader& reader
+  )
   {
     const std::uint32_t sounds = reader.ReadVarUint();
     if (!reader.Ok() || sounds > CSoundTableReader::kMaxEntries) {
@@ -205,7 +237,11 @@ namespace faf::remote::wire
       }
     }
     const std::uint32_t deposits = reader.ReadVarUint();
-    if (!reader.Ok() || deposits > CSessionTableWriters::kMaxDeposits - std::min<std::size_t>(mDeposits.size(), CSessionTableWriters::kMaxDeposits)) {
+    if (
+      !reader.Ok() ||
+      deposits >
+        CSessionTableWriters::kMaxDeposits - std::min<std::size_t>(mDeposits.size(), CSessionTableWriters::kMaxDeposits)
+    ) {
       return false;
     }
     for (std::uint32_t i = 0; i < deposits; ++i) {

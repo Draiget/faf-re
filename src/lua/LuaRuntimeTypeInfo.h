@@ -226,4 +226,3 @@ void register_lua_StateTypeInfoStartup();
  * constructor can pre-register its typeid, then arms teardown.
  */
 void register_UdataTypeInfoStartup();
-

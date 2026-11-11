@@ -20,18 +20,18 @@ namespace moho
    */
   struct SScmVertex
   {
-    float mLocalPositionX;           // +0x00
-    float mLocalPositionY;           // +0x04
-    float mLocalPositionZ;           // +0x08
-    float mNormal[3];                // +0x0C
-    float mTangent[3];               // +0x18
-    float mBinormal[3];              // +0x24
-    float mTexCoord0[2];             // +0x30
-    float mTexCoord1[2];             // +0x38
-    std::uint8_t mBoneIndex;         // +0x40 (the bone the vertex is rigidly bound to)
-    std::uint8_t mBoneIndex1;        // +0x41
-    std::uint8_t mBoneIndex2;        // +0x42
-    std::uint8_t mBoneIndex3;        // +0x43
+    float mLocalPositionX;    // +0x00
+    float mLocalPositionY;    // +0x04
+    float mLocalPositionZ;    // +0x08
+    float mNormal[3];         // +0x0C
+    float mTangent[3];        // +0x18
+    float mBinormal[3];       // +0x24
+    float mTexCoord0[2];      // +0x30
+    float mTexCoord1[2];      // +0x38
+    std::uint8_t mBoneIndex;  // +0x40 (the bone the vertex is rigidly bound to)
+    std::uint8_t mBoneIndex1; // +0x41
+    std::uint8_t mBoneIndex2; // +0x42
+    std::uint8_t mBoneIndex3; // +0x43
   };
 
   static_assert(offsetof(SScmVertex, mLocalPositionX) == 0x00, "SScmVertex::mLocalPositionX offset must be 0x00");
@@ -59,7 +59,7 @@ namespace moho
   struct SScmFile
   {
     std::uint8_t mUnknown00[0x08];
-    std::uint32_t mBoneTableOffset;        // +0x08
+    std::uint32_t mBoneTableOffset; // +0x08
     /// Skinned bone count - the number of bones a pose blends and the number of
     /// GPU skinning-palette slots one instance of this mesh occupies.
     /// `MeshBatch::Initialize` seeds `mBoneCount` from here (0x007E6FD8
@@ -67,18 +67,18 @@ namespace moho
     /// passes it to `CAniPose::InterpolatePose` (0x007DEDEF, same +0x0C).
     /// Distinct from `mBoneTotalCount` at +0x2C, which also counts attachment
     /// bones; their difference is `MeshBatch::mAttachCount`.
-    std::uint32_t mSkinBoneCount;          // +0x0C
-    std::uint32_t mVertexOffset;           // +0x10 (byte offset of the SScmVertex array)
+    std::uint32_t mSkinBoneCount; // +0x0C
+    std::uint32_t mVertexOffset;  // +0x10 (byte offset of the SScmVertex array)
     std::uint8_t mUnknown14[0x04];
-    std::uint32_t mVertexCount;            // +0x18
-    std::uint32_t mIndexDataOffset;        // +0x1C (SCM 16-bit index-data offset)
+    std::uint32_t mVertexCount;     // +0x18
+    std::uint32_t mIndexDataOffset; // +0x1C (SCM 16-bit index-data offset)
     /// 16-bit index count; the triangle count is this divided by three
     /// (0x007E6FC1 `mov ecx, [edi+20h]`, then the signed magic-divide by 3).
-    std::uint32_t mIndexCount;             // +0x20
+    std::uint32_t mIndexCount; // +0x20
     std::uint8_t mUnknown24[0x08];
     /// Total bone-table entries, skinned bones plus attachment bones. Named
     /// `mBoneCount` before the +0x0C lane above was identified.
-    std::uint32_t mBoneTotalCount;         // +0x2C
+    std::uint32_t mBoneTotalCount; // +0x2C
   };
 
   static_assert(offsetof(SScmFile, mBoneTableOffset) == 0x08, "SScmFile::mBoneTableOffset offset must be 0x08");
@@ -92,14 +92,18 @@ namespace moho
   namespace scm_file
   {
     /// Base pointer of the packed SCM vertex records inside the file image.
-    [[nodiscard]] inline const SScmVertex* GetVertices(const SScmFile& file) noexcept
+    [[nodiscard]] inline const SScmVertex* GetVertices(
+      const SScmFile& file
+    ) noexcept
     {
       const auto* const fileBase = reinterpret_cast<const std::uint8_t*>(&file);
       return reinterpret_cast<const SScmVertex*>(fileBase + file.mVertexOffset);
     }
 
     /// Base pointer of the packed 16-bit SCM index buffer inside the file image.
-    [[nodiscard]] inline const std::uint16_t* GetIndices(const SScmFile& file) noexcept
+    [[nodiscard]] inline const std::uint16_t* GetIndices(
+      const SScmFile& file
+    ) noexcept
     {
       const auto* const fileBase = reinterpret_cast<const std::uint8_t*>(&file);
       return reinterpret_cast<const std::uint16_t*>(fileBase + file.mIndexDataOffset);
@@ -108,7 +112,9 @@ namespace moho
     /// Base pointer of the packed SCM bone-name string block, which starts
     /// immediately after the fixed 0x40-byte on-disk header. File-image blob
     /// access, same as `GetVertices`/`GetIndices`.
-    [[nodiscard]] inline const char* GetBoneNames(const SScmFile& file) noexcept
+    [[nodiscard]] inline const char* GetBoneNames(
+      const SScmFile& file
+    ) noexcept
     {
       const auto* const fileBase = reinterpret_cast<const std::uint8_t*>(&file);
       return reinterpret_cast<const char*>(fileBase + 0x40);

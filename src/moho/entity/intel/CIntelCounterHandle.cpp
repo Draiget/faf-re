@@ -19,7 +19,10 @@
 namespace
 {
 
-  [[noreturn]] void ThrowPointerTypeMismatch(gpg::RType* const expectedType, const gpg::RRef& source)
+  [[noreturn]] void ThrowPointerTypeMismatch(
+    gpg::RType* const expectedType,
+    const gpg::RRef& source
+  )
   {
     const char* const expected = expectedType ? expectedType->GetName() : "null";
     const char* const actual = source.mType ? source.mType->GetName() : "null";
@@ -32,7 +35,11 @@ namespace
     throw std::runtime_error(message.c_str());
   }
 
-  template <class TPointer> [[nodiscard]] gpg::RRef MakeIntelHandleRef(TPointer* const object, gpg::RType* expectedType)
+  template <class TPointer>
+  [[nodiscard]] gpg::RRef MakeIntelHandleRef(
+    TPointer* const object,
+    gpg::RType* expectedType
+  )
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -53,9 +60,8 @@ namespace
         return out;
       }
 
-      out.mObj = reinterpret_cast<void*>(
-        reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset)
-      );
+      out.mObj =
+        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
       out.mType = dynamicType;
       return out;
     } catch (...) {
@@ -65,7 +71,11 @@ namespace
 
   template <class TPointer>
   [[nodiscard]]
-  TPointer* ReadTypedPointer(gpg::ReadArchive* const archive, gpg::RType* const expectedType, const gpg::RRef& ownerRef)
+  TPointer* ReadTypedPointer(
+    gpg::ReadArchive* const archive,
+    gpg::RType* const expectedType,
+    const gpg::RRef& ownerRef
+  )
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -84,7 +94,11 @@ namespace
     return static_cast<TPointer*>(upcast.mObj);
   }
 
-  void ApplyCounterIntelToReconGrid(moho::CIntelCounterHandle& handle, moho::IAiReconDB* reconDB, const bool doAdd)
+  void ApplyCounterIntelToReconGrid(
+    moho::CIntelCounterHandle& handle,
+    moho::IAiReconDB* reconDB,
+    const bool doAdd
+  )
   {
     if (reconDB == nullptr) {
       return;
@@ -121,7 +135,10 @@ namespace
     grid.release();
   }
 
-  void ApplyCounterIntelToForeignArmies(moho::CIntelCounterHandle& handle, const bool doAdd)
+  void ApplyCounterIntelToForeignArmies(
+    moho::CIntelCounterHandle& handle,
+    const bool doAdd
+  )
   {
     if (handle.mSim == nullptr) {
       return;
@@ -161,9 +178,12 @@ namespace moho
    * What it does:
    * Initializes counter-intel handle state, owner pointers, and type selector.
    */
-CIntelCounterHandle::CIntelCounterHandle(
-  const std::uint32_t radius, Sim* const sim, const EIntelCounter type, CAiReconDBImpl* const reconDB
-)
+  CIntelCounterHandle::CIntelCounterHandle(
+    const std::uint32_t radius,
+    Sim* const sim,
+    const EIntelCounter type,
+    CAiReconDBImpl* const reconDB
+  )
     : CIntelPosHandle(radius, boost::SharedPtrRaw<CIntelGrid>{})
     , mSim(sim)
     , mReconDB(reconDB)
@@ -202,7 +222,9 @@ CIntelCounterHandle::CIntelCounterHandle(
    * Loads `mSim`, `mReconDB`, `mType`, then deserializes the
    * `CIntelPosHandle` base payload.
    */
-  void CIntelCounterHandle::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CIntelCounterHandle::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -249,7 +271,9 @@ CIntelCounterHandle::CIntelCounterHandle(
    * Saves `mSim` and `mReconDB` as unowned pointers, writes `mType`,
    * then serializes the `CIntelPosHandle` base payload.
    */
-  void CIntelCounterHandle::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CIntelCounterHandle::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -353,7 +377,9 @@ CIntelCounterHandle::CIntelCounterHandle(
    * Runs non-virtual destructor body and conditionally frees the object
    * allocation when `shouldDelete & 1` is set.
    */
-  void CIntelCounterHandle::Destroy(const int shouldDelete)
+  void CIntelCounterHandle::Destroy(
+    const int shouldDelete
+  )
   {
     this->CIntelCounterHandle::~CIntelCounterHandle();
     if ((shouldDelete & 1) != 0) {
@@ -367,7 +393,12 @@ namespace moho
   /**
    * Address: 0x0076F910 (FUN_0076F910)
    */
-  void CIntelCounterHandle::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CIntelCounterHandle::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CIntelCounterHandle(0u, nullptr, INTELCOUNTER_None, nullptr)), 0u);
   }

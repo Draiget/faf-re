@@ -22,7 +22,10 @@ namespace
 
   struct CMauiItemListTypeInfoBootstrap
   {
-    CMauiItemListTypeInfoBootstrap() { moho::register_CMauiItemListTypeInfoStartup(); }
+    CMauiItemListTypeInfoBootstrap()
+    {
+      moho::register_CMauiItemListTypeInfoStartup();
+    }
   };
   CMauiItemListTypeInfoBootstrap gCMauiItemListTypeInfoBootstrap;
 
@@ -37,7 +40,9 @@ namespace
    * `RType::IsDerivedFrom` cannot walk from it to CScriptObject and every
    * reflected reference built from a CMauiItemList fails its upcast.
    */
-  void AddCMauiControlBase(gpg::RType& typeInfo)
+  void AddCMauiControlBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CMauiControl>(&typeInfo);
   }
@@ -98,4 +103,7 @@ void moho::register_CMauiItemListTypeInfoStartup()
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CMauiItemListTypeInfoStartup_7991f0, moho::register_CMauiItemListTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CMauiItemListTypeInfoStartup_7991f0,
+  moho::register_CMauiItemListTypeInfoStartup
+)

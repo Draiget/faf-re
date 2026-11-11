@@ -15,12 +15,20 @@ namespace faf::editor
     constexpr float kTurnRim = 2.0f;
 
     /** Height samples per mask texel. */
-    [[nodiscard]] float SamplesPerTexel(const int maskWidth, const MaskTerrain& terrain)
+    [[nodiscard]] float SamplesPerTexel(
+      const int maskWidth,
+      const MaskTerrain& terrain
+    )
     {
-      return maskWidth > 0 && terrain.width > 1 ? static_cast<float>(terrain.width - 1) / static_cast<float>(maskWidth) : 1.0f;
+      return maskWidth > 0 && terrain.width > 1 ? static_cast<float>(terrain.width - 1) / static_cast<float>(maskWidth)
+                                                : 1.0f;
     }
 
-    [[nodiscard]] float Falloff(const float distance, const float radius, const float falloff)
+    [[nodiscard]] float Falloff(
+      const float distance,
+      const float radius,
+      const float falloff
+    )
     {
       const float t = distance / radius;
       if (t >= 1.0f) {
@@ -35,10 +43,15 @@ namespace faf::editor
     }
 
     /** A value in [0, 1) per texel, layer and brush step. */
-    [[nodiscard]] float Dither(const int x, const int z, const int layer, const std::uint32_t step)
+    [[nodiscard]] float Dither(
+      const int x,
+      const int z,
+      const int layer,
+      const std::uint32_t step
+    )
     {
-      std::uint32_t v = static_cast<std::uint32_t>(x) * 0x9E3779B1u ^ static_cast<std::uint32_t>(z) * 0x85EBCA77u ^ static_cast<std::uint32_t>(layer) * 0xC2B2AE3Du ^
-                        step * 0x27D4EB2Fu;
+      std::uint32_t v = static_cast<std::uint32_t>(x) * 0x9E3779B1u ^ static_cast<std::uint32_t>(z) * 0x85EBCA77u ^
+        static_cast<std::uint32_t>(layer) * 0xC2B2AE3Du ^ step * 0x27D4EB2Fu;
       v ^= v >> 15;
       v *= 0x2C1B3C6Du;
       v ^= v >> 12;
@@ -46,7 +59,14 @@ namespace faf::editor
     }
 
     /** Ground height (words) and slope (rise over run) under texel (x, z). */
-    void GroundAt(const MaskTerrain& terrain, const float perTexel, const int x, const int z, float& height, float& slope)
+    void GroundAt(
+      const MaskTerrain& terrain,
+      const float perTexel,
+      const int x,
+      const int z,
+      float& height,
+      float& slope
+    )
     {
       height = 0.0f;
       slope = 0.0f;
@@ -56,8 +76,11 @@ namespace faf::editor
       const int sx = std::clamp(static_cast<int>((static_cast<float>(x) + 0.5f) * perTexel), 0, terrain.width - 1);
       const int sz = std::clamp(static_cast<int>((static_cast<float>(z) + 0.5f) * perTexel), 0, terrain.height - 1);
       const auto at = [&](const int ax, const int az) {
-        return static_cast<float>(terrain.heights[static_cast<std::size_t>(std::clamp(az, 0, terrain.height - 1)) * static_cast<std::size_t>(terrain.width) +
-                                                  static_cast<std::size_t>(std::clamp(ax, 0, terrain.width - 1))]);
+        return static_cast<float>(
+          terrain.heights
+            [static_cast<std::size_t>(std::clamp(az, 0, terrain.height - 1)) * static_cast<std::size_t>(terrain.width) +
+             static_cast<std::size_t>(std::clamp(ax, 0, terrain.width - 1))]
+        );
       };
       height = at(sx, sz);
       const float dx = (at(sx + 1, sz) - at(sx - 1, sz)) * 0.5f / 128.0f;
@@ -69,7 +92,10 @@ namespace faf::editor
     {
       SampleRect area;
       std::vector<std::uint64_t> texels;
-      [[nodiscard]] std::uint64_t At(const int x, const int z) const
+      [[nodiscard]] std::uint64_t At(
+        const int x,
+        const int z
+      ) const
       {
         const int cx = std::clamp(x, area.x0, area.x1);
         const int cz = std::clamp(z, area.z0, area.z1);
@@ -88,14 +114,29 @@ namespace faf::editor
       std::vector<SampleRect> rects;
     };
 
-    Shape ShapeOf(const int maskWidth, const int maskHeight, const MaskTerrain& terrain, const float x, const float z, const MaskBrush& brush)
+    Shape ShapeOf(
+      const int maskWidth,
+      const int maskHeight,
+      const MaskTerrain& terrain,
+      const float x,
+      const float z,
+      const MaskBrush& brush
+    )
     {
       Shape shape;
       const float perTexel = SamplesPerTexel(maskWidth, terrain);
       shape.symmetry = EffectiveSymmetry(brush.shape.symmetry, maskWidth, maskHeight);
       shape.radius = brush.shape.radius / perTexel;
-      shape.centres = HeightBrushCentres(maskWidth, maskHeight, x / perTexel - 0.5f, z / perTexel - 0.5f, shape.symmetry, brush.shape.turns,
-                                         shape.centreX, shape.centreZ);
+      shape.centres = HeightBrushCentres(
+        maskWidth,
+        maskHeight,
+        x / perTexel - 0.5f,
+        z / perTexel - 0.5f,
+        shape.symmetry,
+        brush.shape.turns,
+        shape.centreX,
+        shape.centreZ
+      );
       const float reach = shape.radius + (shape.symmetry == Symmetry::NWay ? kTurnRim : 0.0f);
       for (int i = 0; i < shape.centres; ++i) {
         SampleRect rect{
@@ -111,7 +152,12 @@ namespace faf::editor
       return shape;
     }
 
-    [[nodiscard]] bool FirstRectHolding(const std::vector<SampleRect>& rects, const std::size_t r, const int x, const int z)
+    [[nodiscard]] bool FirstRectHolding(
+      const std::vector<SampleRect>& rects,
+      const std::size_t r,
+      const int x,
+      const int z
+    )
     {
       for (std::size_t e = 0; e < r; ++e) {
         if (x >= rects[e].x0 && x <= rects[e].x1 && z >= rects[e].z0 && z <= rects[e].z1) {
@@ -121,11 +167,18 @@ namespace faf::editor
       return true;
     }
 
-    [[nodiscard]] float WeightAt(const Shape& shape, const int x, const int z, const MaskBrush& brush, const float extra = 0.0f)
+    [[nodiscard]] float WeightAt(
+      const Shape& shape,
+      const int x,
+      const int z,
+      const MaskBrush& brush,
+      const float extra = 0.0f
+    )
     {
       float weight = 0.0f;
       for (int c = 0; c < shape.centres; ++c) {
-        const float distance = std::hypot(static_cast<float>(x) - shape.centreX[c], static_cast<float>(z) - shape.centreZ[c]);
+        const float distance =
+          std::hypot(static_cast<float>(x) - shape.centreX[c], static_cast<float>(z) - shape.centreZ[c]);
         if (extra > 0.0f) {
           weight = std::max(weight, distance < shape.radius + extra ? 1.0f : 0.0f);
         } else {
@@ -136,8 +189,14 @@ namespace faf::editor
     }
 
     /** The brush's new texel for (x, z), from the texels before the step. */
-    [[nodiscard]] std::uint64_t Brushed(const Snapshot& snapshot, const int x, const int z, const float weight, const MaskBrush& brush,
-                                        const float seconds)
+    [[nodiscard]] std::uint64_t Brushed(
+      const Snapshot& snapshot,
+      const int x,
+      const int z,
+      const float weight,
+      const MaskBrush& brush,
+      const float seconds
+    )
     {
       const std::uint64_t texel = snapshot.At(x, z);
       const float strength = std::clamp(brush.shape.strength, 0.0f, 1.0f);
@@ -178,7 +237,13 @@ namespace faf::editor
       return out;
     }
 
-    [[nodiscard]] bool WithinLimits(const MaskTerrain& terrain, const float perTexel, const int x, const int z, const HeightBrush& shape)
+    [[nodiscard]] bool WithinLimits(
+      const MaskTerrain& terrain,
+      const float perTexel,
+      const int x,
+      const int z,
+      const HeightBrush& shape
+    )
     {
       if (!shape.limitHeight && !shape.limitSlope) {
         return true;
@@ -193,8 +258,14 @@ namespace faf::editor
     }
   } // namespace
 
-  std::vector<SampleRect> MaskBrushRects(const int maskWidth, const int maskHeight, const MaskTerrain& terrain, const float x, const float z,
-                                         const MaskBrush& brush)
+  std::vector<SampleRect> MaskBrushRects(
+    const int maskWidth,
+    const int maskHeight,
+    const MaskTerrain& terrain,
+    const float x,
+    const float z,
+    const MaskBrush& brush
+  )
   {
     if (maskWidth < 2 || maskHeight < 2 || brush.shape.radius <= 0.0f) {
       return {};
@@ -202,8 +273,16 @@ namespace faf::editor
     return ShapeOf(maskWidth, maskHeight, terrain, x, z, brush).rects;
   }
 
-  std::vector<SampleRect> ApplyMaskBrush(std::uint64_t* const texels, const int maskWidth, const int maskHeight, const MaskTerrain& terrain,
-                                         const float x, const float z, const MaskBrush& brush, const float seconds)
+  std::vector<SampleRect> ApplyMaskBrush(
+    std::uint64_t* const texels,
+    const int maskWidth,
+    const int maskHeight,
+    const MaskTerrain& terrain,
+    const float x,
+    const float z,
+    const MaskBrush& brush,
+    const float seconds
+  )
   {
     if (texels == nullptr || maskWidth < 2 || maskHeight < 2 || brush.shape.radius <= 0.0f || seconds <= 0.0f) {
       return {};
@@ -213,7 +292,12 @@ namespace faf::editor
     std::vector<Snapshot> snapshots;
     for (const SampleRect& rect : shape.rects) {
       Snapshot snapshot;
-      snapshot.area = {std::max(0, rect.x0 - 1), std::max(0, rect.z0 - 1), std::min(maskWidth - 1, rect.x1 + 1), std::min(maskHeight - 1, rect.z1 + 1)};
+      snapshot.area = {
+        std::max(0, rect.x0 - 1),
+        std::max(0, rect.z0 - 1),
+        std::min(maskWidth - 1, rect.x1 + 1),
+        std::min(maskHeight - 1, rect.z1 + 1)
+      };
       for (int row = snapshot.area.z0; row <= snapshot.area.z1; ++row) {
         const std::uint64_t* const line = texels + static_cast<std::size_t>(row) * static_cast<std::size_t>(maskWidth);
         snapshot.texels.insert(snapshot.texels.end(), line + snapshot.area.x0, line + snapshot.area.x1 + 1);
@@ -248,14 +332,19 @@ namespace faf::editor
         for (int tz = rect.z0; tz <= rect.z1; ++tz) {
           for (int tx = rect.x0; tx <= rect.x1; ++tx) {
             const int k = TurnSector(maskWidth, maskHeight, turns, tx, tz);
-            if (k == 0 || !FirstRectHolding(shape.rects, r, tx, tz) || WeightAt(shape, tx, tz, brush, kTurnRim) <= 0.0f) {
+            if (
+              k == 0 || !FirstRectHolding(shape.rects, r, tx, tz) || WeightAt(shape, tx, tz, brush, kTurnRim) <= 0.0f
+            ) {
               continue;
             }
             const double back = -kTwoPi * k / turns;
             const int sx = static_cast<int>(std::lround(cx + (tx - cx) * std::cos(back) - (tz - cz) * std::sin(back)));
             const int sz = static_cast<int>(std::lround(cz + (tx - cx) * std::sin(back) + (tz - cz) * std::cos(back)));
             // Only from the first sector (a rounded turned-back texel next to its edge can fall outside it).
-            if (sx >= 0 && sz >= 0 && sx < maskWidth && sz < maskHeight && TurnSector(maskWidth, maskHeight, turns, sx, sz) == 0) {
+            if (
+              sx >= 0 && sz >= 0 && sx < maskWidth && sz < maskHeight &&
+              TurnSector(maskWidth, maskHeight, turns, sx, sz) == 0
+            ) {
               texels[index(tx, tz)] = texels[index(sx, sz)];
             }
           }
@@ -270,7 +359,8 @@ namespace faf::editor
         for (int tx = rect.x0; tx <= rect.x1; ++tx) {
           int memberX[kMaxSymmetryCopies];
           int memberZ[kMaxSymmetryCopies];
-          const int members = SymmetricSamples(shape.symmetry, brush.shape.turns, maskWidth, maskHeight, tx, tz, memberX, memberZ);
+          const int members =
+            SymmetricSamples(shape.symmetry, brush.shape.turns, maskWidth, maskHeight, tx, tz, memberX, memberZ);
           bool first = true;
           for (int m = 1; m < members && first; ++m) {
             first = memberZ[m] > tz || (memberZ[m] == tz && memberX[m] >= tx);
@@ -295,7 +385,15 @@ namespace faf::editor
   namespace
   {
     /** N-way turns: the nearest texel to (x, z) turned back into the first sector; false off the mask. */
-    bool TurnedBackTexel(const int maskWidth, const int maskHeight, const int turns, const int x, const int z, int& outX, int& outZ)
+    bool TurnedBackTexel(
+      const int maskWidth,
+      const int maskHeight,
+      const int turns,
+      const int x,
+      const int z,
+      int& outX,
+      int& outZ
+    )
     {
       const int k = TurnSector(maskWidth, maskHeight, turns, x, z);
       const double cx = (maskWidth - 1) * 0.5;
@@ -306,18 +404,27 @@ namespace faf::editor
       return outX >= 0 && outZ >= 0 && outX < maskWidth && outZ < maskHeight;
     }
 
-    [[nodiscard]] int LargestByteDifference(const std::uint64_t a, const std::uint64_t b)
+    [[nodiscard]] int LargestByteDifference(
+      const std::uint64_t a,
+      const std::uint64_t b
+    )
     {
       int largest = 0;
       for (int layer = 0; layer < 8; ++layer) {
-        largest = std::max(largest, std::abs(static_cast<int>(MaskByte(a, layer)) - static_cast<int>(MaskByte(b, layer))));
+        largest =
+          std::max(largest, std::abs(static_cast<int>(MaskByte(a, layer)) - static_cast<int>(MaskByte(b, layer))));
       }
       return largest;
     }
   } // namespace
 
-  MaskSymmetryReport CheckMaskSymmetry(const std::uint64_t* const texels, const int maskWidth, const int maskHeight, const Symmetry requested,
-                                       const int turns)
+  MaskSymmetryReport CheckMaskSymmetry(
+    const std::uint64_t* const texels,
+    const int maskWidth,
+    const int maskHeight,
+    const Symmetry requested,
+    const int turns
+  )
   {
     MaskSymmetryReport report;
     const Symmetry symmetry = EffectiveSymmetry(requested, maskWidth, maskHeight);
@@ -337,8 +444,11 @@ namespace faf::editor
         if (symmetry == Symmetry::NWay) {
           int sx = 0;
           int sz = 0;
-          if (TurnSector(maskWidth, maskHeight, turns, x, z) == 0 || !TurnedBackTexel(maskWidth, maskHeight, turns, x, z, sx, sz) ||
-              TurnSector(maskWidth, maskHeight, turns, sx, sz) != 0) {
+          if (
+            TurnSector(maskWidth, maskHeight, turns, x, z) == 0 ||
+            !TurnedBackTexel(maskWidth, maskHeight, turns, x, z, sx, sz) ||
+            TurnSector(maskWidth, maskHeight, turns, sx, sz) != 0
+          ) {
             continue;
           }
           largest = LargestByteDifference(at(x, z), at(sx, sz));
@@ -354,22 +464,36 @@ namespace faf::editor
         report.largest = std::max(report.largest, largest);
         if (largest > 0) {
           ++report.differing;
-          marked[static_cast<std::size_t>(z / kBlock) * static_cast<std::size_t>(blocksX) + static_cast<std::size_t>(x / kBlock)] = 1;
+          marked
+            [static_cast<std::size_t>(z / kBlock) * static_cast<std::size_t>(blocksX) +
+             static_cast<std::size_t>(x / kBlock)] = 1;
         }
       }
     }
     for (int bz = 0; bz < blocksZ; ++bz) {
       for (int bx = 0; bx < blocksX; ++bx) {
-        if (marked[static_cast<std::size_t>(bz) * static_cast<std::size_t>(blocksX) + static_cast<std::size_t>(bx)] != 0) {
+        if (
+          marked[static_cast<std::size_t>(bz) * static_cast<std::size_t>(blocksX) + static_cast<std::size_t>(bx)] != 0
+        ) {
           report.blocks.push_back(
-            {bx * kBlock, bz * kBlock, std::min(maskWidth - 1, bx * kBlock + kBlock - 1), std::min(maskHeight - 1, bz * kBlock + kBlock - 1)});
+            {bx * kBlock,
+             bz * kBlock,
+             std::min(maskWidth - 1, bx * kBlock + kBlock - 1),
+             std::min(maskHeight - 1, bz * kBlock + kBlock - 1)}
+          );
         }
       }
     }
     return report;
   }
 
-  SampleRect MakeMasksSymmetric(std::uint64_t* const texels, const int maskWidth, const int maskHeight, const Symmetry requested, const int turns)
+  SampleRect MakeMasksSymmetric(
+    std::uint64_t* const texels,
+    const int maskWidth,
+    const int maskHeight,
+    const Symmetry requested,
+    const int turns
+  )
   {
     const Symmetry symmetry = EffectiveSymmetry(requested, maskWidth, maskHeight);
     if (texels == nullptr || maskWidth < 2 || maskHeight < 2 || symmetry == Symmetry::None) {
@@ -384,8 +508,11 @@ namespace faf::editor
         for (int x = 0; x < maskWidth; ++x) {
           int sx = 0;
           int sz = 0;
-          if (TurnSector(maskWidth, maskHeight, turns, x, z) != 0 && TurnedBackTexel(maskWidth, maskHeight, turns, x, z, sx, sz) &&
-              TurnSector(maskWidth, maskHeight, turns, sx, sz) == 0) {
+          if (
+            TurnSector(maskWidth, maskHeight, turns, x, z) != 0 &&
+            TurnedBackTexel(maskWidth, maskHeight, turns, x, z, sx, sz) &&
+            TurnSector(maskWidth, maskHeight, turns, sx, sz) == 0
+          ) {
             texels[index(x, z)] = texels[index(sx, sz)];
           }
         }
@@ -412,7 +539,11 @@ namespace faf::editor
     return {0, 0, maskWidth - 1, maskHeight - 1};
   }
 
-  void MaskCoverage(const std::uint64_t* const texels, const std::size_t count, float (&coverage)[8])
+  void MaskCoverage(
+    const std::uint64_t* const texels,
+    const std::size_t count,
+    float (&coverage)[8]
+  )
   {
     std::uint64_t sums[8]{};
     for (std::size_t i = 0; i < count; ++i) {
@@ -421,12 +552,18 @@ namespace faf::editor
       }
     }
     for (int layer = 0; layer < 8; ++layer) {
-      coverage[layer] = count == 0 ? 0.0f : static_cast<float>(static_cast<double>(sums[layer]) / (255.0 * static_cast<double>(count)));
+      coverage[layer] =
+        count == 0 ? 0.0f : static_cast<float>(static_cast<double>(sums[layer]) / (255.0 * static_cast<double>(count)));
     }
   }
 
-  SampleRect ApplyMaskRules(std::uint64_t* const texels, const int maskWidth, const int maskHeight, const MaskTerrain& terrain,
-                            const std::vector<MaskRule>& rules)
+  SampleRect ApplyMaskRules(
+    std::uint64_t* const texels,
+    const int maskWidth,
+    const int maskHeight,
+    const MaskTerrain& terrain,
+    const std::vector<MaskRule>& rules
+  )
   {
     if (texels == nullptr || maskWidth < 1 || maskHeight < 1) {
       return {};
@@ -437,10 +574,14 @@ namespace faf::editor
         float height = 0.0f;
         float slope = 0.0f;
         GroundAt(terrain, perTexel, tx, tz, height, slope);
-        std::uint64_t& texel = texels[static_cast<std::size_t>(tz) * static_cast<std::size_t>(maskWidth) + static_cast<std::size_t>(tx)];
+        std::uint64_t& texel =
+          texels[static_cast<std::size_t>(tz) * static_cast<std::size_t>(maskWidth) + static_cast<std::size_t>(tx)];
         for (const MaskRule& rule : rules) {
           const float units = height / 128.0f;
-          if ((rule.useHeight && (units < rule.low || units > rule.high)) || (rule.useSlope && (slope < rule.minSlope || slope > rule.maxSlope))) {
+          if (
+            (rule.useHeight && (units < rule.low || units > rule.high)) ||
+            (rule.useSlope && (slope < rule.minSlope || slope > rule.maxSlope))
+          ) {
             continue;
           }
           texel = WithMaskByte(texel, std::clamp(rule.layer, 0, 7), 255);

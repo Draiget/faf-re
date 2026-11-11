@@ -13,7 +13,7 @@ namespace moho
 {
   void register_BVIntSetTypeInfo();
   void register_BVIntSetSerializer();
-}
+} // namespace moho
 
 namespace
 {
@@ -72,4 +72,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_BVIntSetTypeInfo_180679, moho::register_BVIntSetTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_BVIntSetTypeInfo_180679,
+  moho::register_BVIntSetTypeInfo
+)

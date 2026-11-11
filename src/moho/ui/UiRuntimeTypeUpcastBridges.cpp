@@ -171,7 +171,10 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] void* UpcastObjectRef(const gpg::RRef* const sourceRef, gpg::RType* const targetType)
+  [[nodiscard]] void* UpcastObjectRef(
+    const gpg::RRef* const sourceRef,
+    gpg::RType* const targetType
+  )
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(*sourceRef, targetType);
     return upcast.mObj;
@@ -183,7 +186,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CMauiControl*`.
    */
-  [[maybe_unused]] void* UpcastRefToCMauiControlObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCMauiControlObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, gpg::RTypeOf<moho::CMauiControl>());
   }
@@ -194,7 +199,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CMauiBitmap*`.
    */
-  [[maybe_unused]] void* UpcastRefToCMauiBitmapObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCMauiBitmapObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, CachedUpcastTypeFromTypeInfo<moho::CMauiBitmap>());
   }
@@ -205,7 +212,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CMauiBorder*`.
    */
-  [[maybe_unused]] void* UpcastRefToCMauiBorderObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCMauiBorderObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, gpg::RTypeOf<moho::CMauiBorder>());
   }
@@ -216,7 +225,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CMauiCursor*`.
    */
-  [[maybe_unused]] void* UpcastRefToCMauiCursorObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCMauiCursorObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, gpg::RTypeOf<moho::CMauiCursor>());
   }
@@ -227,7 +238,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CMauiLuaDragger*`.
    */
-  [[maybe_unused]] void* UpcastRefToCMauiLuaDraggerObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCMauiLuaDraggerObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, CachedCMauiLuaDraggerUpcastType());
   }
@@ -238,7 +251,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CMauiFrame*`.
    */
-  [[maybe_unused]] void* UpcastRefToCMauiFrameObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCMauiFrameObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, CachedUpcastTypeFromTypeInfo<moho::CMauiFrame>());
   }
@@ -249,7 +264,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CMauiEdit*`.
    */
-  [[maybe_unused]] void* UpcastRefToCMauiEditObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCMauiEditObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, gpg::RTypeOf<moho::CMauiEdit>());
   }
@@ -260,7 +277,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CMauiHistogram*`.
    */
-  [[maybe_unused]] void* UpcastRefToCMauiHistogramObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCMauiHistogramObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, CachedCMauiHistogramTypePrimary());
   }
@@ -271,7 +290,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CMauiItemList*`.
    */
-  [[maybe_unused]] void* UpcastRefToCMauiItemListObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCMauiItemListObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, CachedCMauiItemListTypePrimary());
   }
@@ -282,7 +303,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CMauiMesh*`.
    */
-  [[maybe_unused]] void* UpcastRefToCMauiMeshObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCMauiMeshObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, CachedUpcastTypeFromTypeInfo<moho::CMauiMesh>());
   }
@@ -293,7 +316,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CMauiMovie*`.
    */
-  [[maybe_unused]] void* UpcastRefToCMauiMovieObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCMauiMovieObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, CachedUpcastTypeFromTypeInfo<moho::CMauiMovie>());
   }
@@ -304,7 +329,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CMauiScrollbar*`.
    */
-  [[maybe_unused]] void* UpcastRefToCMauiScrollbarObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCMauiScrollbarObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, gpg::RTypeOf<moho::CMauiScrollbar>());
   }
@@ -315,7 +342,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `CLuaWldUIProvider*`.
    */
-  [[maybe_unused]] void* UpcastRefToCLuaWldUIProviderObject(const gpg::RRef* const sourceRef)
+  [[maybe_unused]] void* UpcastRefToCLuaWldUIProviderObject(
+    const gpg::RRef* const sourceRef
+  )
   {
     return UpcastObjectRef(sourceRef, gpg::RTypeOf<moho::CLuaWldUIProvider>());
   }

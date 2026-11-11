@@ -54,7 +54,9 @@ void Unit::UpdateVisibility()
  * Attaches through `Entity::AttachTo`, then (for mobile units) notifies unit
  * motion and sets attached-state bit; resets cached transport load factor.
  */
-bool Unit::AttachTo(const SEntAttachInfo& attachInfo)
+bool Unit::AttachTo(
+  const SEntAttachInfo& attachInfo
+)
 {
   if (!Entity::AttachTo(attachInfo)) {
     return false;
@@ -77,7 +79,10 @@ bool Unit::AttachTo(const SEntAttachInfo& attachInfo)
  * motion and clears attached-state bit; resets cached transport load factor
  * and unlinks the transport weak-pointer chain.
  */
-bool Unit::DetachFrom(Entity* const parent, const bool skipBallistic)
+bool Unit::DetachFrom(
+  Entity* const parent,
+  const bool skipBallistic
+)
 {
   if (!Entity::DetachFrom(parent, skipBallistic)) {
     return false;
@@ -108,7 +113,10 @@ bool Unit::DetachFrom(Entity* const parent, const bool skipBallistic)
  * `Wm3::MultiplyQuaternionVector` -- same quaternion-convention
  * mismatch as the other `MultQuadVec` consumers in this bug class.
  */
-Wm3::Vec3f* Unit::PredictAheadBomb(Wm3::Vec3f* const out, const float precision) const
+Wm3::Vec3f* Unit::PredictAheadBomb(
+  Wm3::Vec3f* const out,
+  const float precision
+) const
 {
   if (!out) {
     return nullptr;
@@ -165,7 +173,10 @@ Wm3::Vec3f* Unit::PredictAheadBomb(Wm3::Vec3f* const out, const float precision)
  * Scales current world velocity by ten ticks and resolves one ballistic
  * drop-point lane against `targetPosition` using sim gravity.
  */
-Wm3::Vec3f* Unit::CalcBombDrop(Wm3::Vec3f* const out, const Wm3::Vec3f& targetPosition) const
+Wm3::Vec3f* Unit::CalcBombDrop(
+  Wm3::Vec3f* const out,
+  const Wm3::Vec3f& targetPosition
+) const
 {
   // 0x006D3A67: virtual, like PredictAheadBomb.
   Wm3::Vec3f velocity = GetVelocity();
@@ -173,13 +184,7 @@ Wm3::Vec3f* Unit::CalcBombDrop(Wm3::Vec3f* const out, const Wm3::Vec3f& targetPo
   velocity.y *= 10.0f;
   velocity.z *= 10.0f;
 
-  return ComputeBombDropAimPoint(
-    velocity,
-    out,
-    SimulationRef->mPhysConstants->mGravity,
-    targetPosition,
-    GetPosition()
-  );
+  return ComputeBombDropAimPoint(velocity, out, SimulationRef->mPhysConstants->mGravity, targetPosition, GetPosition());
 }
 
 /**
@@ -210,13 +215,17 @@ void Unit::InitializeArmor()
 }
 
 /**
- * Address: 0x006A9D60 (FUN_006A9D60, ?ProcessArmorOnDamage@Unit@Moho@@QBEMMV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+ * Address: 0x006A9D60 (FUN_006A9D60,
+ * ?ProcessArmorOnDamage@Unit@Moho@@QBEMMV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
  *
  * What it does:
  * Applies one armor multiplier lane to incoming damage when the incoming
  * damage-type token exists in `ArmorMultipliers`.
  */
-float Unit::ProcessArmorOnDamage(const float amount, const fa::string damageType) const
+float Unit::ProcessArmorOnDamage(
+  const float amount,
+  const fa::string damageType
+) const
 {
   float scaledAmount = amount;
   if (const auto match = ArmorMultipliers.find(damageType); match != ArmorMultipliers.end()) {
@@ -233,7 +242,9 @@ float Unit::ProcessArmorOnDamage(const float amount, const fa::string damageType
  * Returns this unit's armor multiplier for one damage type. A damage type the
  * blueprint never listed returns 1.0, so it passes through unmodified.
  */
-float Unit::GetArmorMult(const fa::string& damageType) const
+float Unit::GetArmorMult(
+  const fa::string& damageType
+) const
 {
   if (const auto match = ArmorMultipliers.find(damageType); match != ArmorMultipliers.end()) {
     return match->second;
@@ -255,10 +266,14 @@ float Unit::GetArmorMult(const fa::string& damageType) const
  * epilogue at 0x006AA2F2 loads, on every path past the zero-delta exit.
  * CUnitReclaimTask credits reclaimed resources in proportion to it.
  */
-float Unit::Materialize(const float delta)
+float Unit::Materialize(
+  const float delta
+)
 {
   SimulationRef->Logf(
-    "Unit[0x%08x]->Materialize(%.5f [0x%08x])\n", static_cast<std::uint32_t>(id_), delta,
+    "Unit[0x%08x]->Materialize(%.5f [0x%08x])\n",
+    static_cast<std::uint32_t>(id_),
+    delta,
     std::bit_cast<std::uint32_t>(delta)
   );
 
@@ -297,15 +312,13 @@ float Unit::Materialize(const float delta)
   VarDat().mUnitStates &= ~(1ull << UNITSTATE_BeingBuilt);
   mVarDat.mIsBeingBuilt = 0u;
 
-  const char* const layerName = (static_cast<unsigned int>(mVarDat.mLayerMask) > LAYER_Orbit)
-                                  ? ""
-                                  : Entity::LayerToString(mVarDat.mLayerMask);
+  const char* const layerName =
+    (static_cast<unsigned int>(mVarDat.mLayerMask) > LAYER_Orbit) ? "" : Entity::LayerToString(mVarDat.mLayerMask);
   RunScriptOnStopBeingBuilt(CreatorRef, layerName);
 
   const RUnitBlueprint* const blueprint = GetBlueprint();
   if (blueprint != nullptr && blueprint->General.CapCost > 0.0f) {
-    if (CArmyStats* const armyStats = (ArmyRef != nullptr) ? ArmyRef->GetArmyStats() : nullptr;
-        armyStats != nullptr) {
+    if (CArmyStats* const armyStats = (ArmyRef != nullptr) ? ArmyRef->GetArmyStats() : nullptr; armyStats != nullptr) {
       const std::int32_t one = 1;
       IncrementArmyBlueprintFloatStat(armyStats, "Units_Active", blueprint, 1.0f);
       (void)armyStats->UpdateUnitStat("Units_Active", &one);

@@ -81,7 +81,9 @@ namespace
    * that map's first member, the shared height-field handle. There is no null
    * guard in the binary and none is added here.
    */
-  [[nodiscard]] moho::CHeightField& ActiveTerrainHeightField(moho::IWldTerrainRes& terrainRes) noexcept
+  [[nodiscard]] moho::CHeightField& ActiveTerrainHeightField(
+    moho::IWldTerrainRes& terrainRes
+  ) noexcept
   {
     return *terrainRes.mMap->GetHeightField();
   }
@@ -93,14 +95,20 @@ namespace
    * exactly this order. `gpg::Rect2` models the strict-overlap half
    * (`Overlaps`) but has no rect-in-rect predicate, so it lives here.
    */
-  [[nodiscard]] bool RectCovers(const gpg::Rect2i& view, const gpg::Rect2i& rect) noexcept
+  [[nodiscard]] bool RectCovers(
+    const gpg::Rect2i& view,
+    const gpg::Rect2i& rect
+  ) noexcept
   {
     return rect.x0 >= view.x0 && view.x1 >= rect.x1 && rect.z0 >= view.z0 && view.z1 >= rect.z1;
   }
 
   /// Clamp one grid coordinate into `[0, extent - 1]`, in the binary's
   /// min-then-max order (`cmp`/`cmovless` pair, then `test`/`jge` against 0).
-  [[nodiscard]] std::int32_t ClampHeightSampleIndex(const std::int32_t coordinate, const std::int32_t extent) noexcept
+  [[nodiscard]] std::int32_t ClampHeightSampleIndex(
+    const std::int32_t coordinate,
+    const std::int32_t extent
+  ) noexcept
   {
     std::int32_t clamped = extent - 1;
     if (coordinate < clamped) {
@@ -113,8 +121,11 @@ namespace
   }
 
   /// Height-field sample at `(x, z)` in world units, edge-clamped.
-  [[nodiscard]] float
-    SampleTerrainHeight(const moho::CHeightField& field, const std::int32_t x, const std::int32_t z) noexcept
+  [[nodiscard]] float SampleTerrainHeight(
+    const moho::CHeightField& field,
+    const std::int32_t x,
+    const std::int32_t z
+  ) noexcept
   {
     const std::int32_t sampleX = ClampHeightSampleIndex(x, field.width);
     const std::int32_t sampleZ = ClampHeightSampleIndex(z, field.height);
@@ -141,7 +152,9 @@ namespace
     return corner;
   }
 
-  [[nodiscard]] std::int32_t FloorToInt(const float value) noexcept
+  [[nodiscard]] std::int32_t FloorToInt(
+    const float value
+  ) noexcept
   {
     return static_cast<std::int32_t>(std::floor(value));
   }
@@ -156,7 +169,9 @@ namespace
     "1)/2.0f + .5f) * (vTexelSize.x * 128.0f);};";
 
   template <typename T>
-  void DeleteOwned(T*& lane) noexcept
+  void DeleteOwned(
+    T*& lane
+  ) noexcept
   {
     if (lane == nullptr) {
       return;
@@ -167,7 +182,10 @@ namespace
   }
 
   template <typename T>
-  void ReplaceOwned(T*& lane, T* const nextLane) noexcept
+  void ReplaceOwned(
+    T*& lane,
+    T* const nextLane
+  ) noexcept
   {
     if (lane == nextLane) {
       return;
@@ -177,7 +195,9 @@ namespace
     lane = nextLane;
   }
 
-  void FillOverlayQuadIndices(moho::CD3DIndexSheet* const indexSheet)
+  void FillOverlayQuadIndices(
+    moho::CD3DIndexSheet* const indexSheet
+  )
   {
     std::int16_t* const indices = indexSheet->Lock(0U, kOverlayIndexCount, true, false);
     if (indices == nullptr) {
@@ -185,7 +205,8 @@ namespace
     }
 
     std::int16_t* write = indices;
-    for (std::uint16_t indexToken = 2; indexToken < kOverlayVertexLoopStop; indexToken = static_cast<std::uint16_t>(indexToken + 4)) {
+    for (std::uint16_t indexToken = 2; indexToken < kOverlayVertexLoopStop;
+         indexToken = static_cast<std::uint16_t>(indexToken + 4)) {
       *(write + 0) = static_cast<std::int16_t>(indexToken - 2);
       *(write + 1) = static_cast<std::int16_t>(indexToken - 1);
       *(write + 2) = static_cast<std::int16_t>(indexToken + 0);
@@ -283,7 +304,9 @@ namespace moho
    * this class when `graphics_Fidelity` is 1, and the binary compares against
    * that same constant here.
    */
-  bool MediumFidelityTerrain::IsFidelity(const std::int32_t fidelity) const
+  bool MediumFidelityTerrain::IsFidelity(
+    const std::int32_t fidelity
+  ) const
   {
     return fidelity == kMediumTerrainFidelity;
   }
@@ -295,7 +318,9 @@ namespace moho
    * Binds the terrain resource, resets shared medium-fidelity helper
    * ownership lanes, then dispatches initialization.
    */
-  bool MediumFidelityTerrain::Create(IWldTerrainRes* const terrainResource)
+  bool MediumFidelityTerrain::Create(
+    IWldTerrainRes* const terrainResource
+  )
   {
     mTerrainResource = terrainResource;
 
@@ -363,10 +388,7 @@ namespace moho
 
     if (!sMediumFidelityNoiseFillTexture) {
       (void)resources->CreateDynamicTextureSheet2(
-        sMediumFidelityNoiseFillTexture,
-        quarterWidth,
-        quarterHeight,
-        kNoiseFillTextureFormat
+        sMediumFidelityNoiseFillTexture, quarterWidth, quarterHeight, kNoiseFillTextureFormat
       );
 
       (void)resources->FillDynamicTexture(kNoiseFillName, kNoiseFillShaderSource, sMediumFidelityNoiseFillTexture);
@@ -395,7 +417,9 @@ namespace moho
    * updates terrain-scale and viewport normalization constants, and forwards
    * the optional terrain-normal map texture handle for terrain normal passes.
    */
-  void MediumFidelityTerrain::LoadShaderVars(const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture)
+  void MediumFidelityTerrain::LoadShaderVars(
+    const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture
+  )
   {
     auto& shaderVars = GetTerrainShaderVars();
 
@@ -403,7 +427,9 @@ namespace moho
     StratumMaterial& strata = terrainRes->GetStratumMaterial();
     strata.SetSizeTo(terrainRes);
 
-    BindTextureShaderVar(shaderVars.skirtTexture, boost::static_pointer_cast<ID3DTextureSheet>(sMediumFidelityGridTexture));
+    BindTextureShaderVar(
+      shaderVars.skirtTexture, boost::static_pointer_cast<ID3DTextureSheet>(sMediumFidelityGridTexture)
+    );
     BindTextureShaderVar(shaderVars.utilityTextureA, strata.mStratumMask0);
     BindTextureShaderVar(shaderVars.utilityTextureB, strata.mStratumMask1);
     BindTextureShaderVar(shaderVars.utilityTextureC, terrainRes->GetWaterMap());
@@ -456,10 +482,7 @@ namespace moho
     const CHeightField* const heightField = REN_GetTerrainRes()->mMap->mHeightField.get();
 
     const float terrainScale[4] = {
-      1.0f / static_cast<float>(heightField->width - 1),
-      1.0f / static_cast<float>(heightField->height - 1),
-      0.0f,
-      1.0f
+      1.0f / static_cast<float>(heightField->width - 1), 1.0f / static_cast<float>(heightField->height - 1), 0.0f, 1.0f
     };
     SetShaderVarMem(shaderVars.terrainScale, 4U, terrainScale);
 
@@ -472,15 +495,13 @@ namespace moho
     const float viewportWidthNdc = static_cast<float>(mViewportWidth) * inverseViewportWidth;
     const float viewportHeightNdc = static_cast<float>(mViewportHeight) * inverseViewportHeight;
 
-    const float viewportScale[2] = {
-      viewportWidthNdc * 0.5f,
-      viewportHeightNdc * -0.5f
-    };
+    const float viewportScale[2] = {viewportWidthNdc * 0.5f, viewportHeightNdc * -0.5f};
 
     const float viewportOffset[2] = {
-      (viewportWidthNdc * 0.5f) + (static_cast<float>(mViewportOriginX) * inverseViewportWidth) + (inverseViewportWidth * 0.5f),
-      (inverseViewportHeight * 0.5f)
-        + ((static_cast<float>(mViewportOriginY) * inverseViewportHeight) + (viewportHeightNdc * 0.5f))
+      (viewportWidthNdc * 0.5f) + (static_cast<float>(mViewportOriginX) * inverseViewportWidth) +
+        (inverseViewportWidth * 0.5f),
+      (inverseViewportHeight * 0.5f) +
+        ((static_cast<float>(mViewportOriginY) * inverseViewportHeight) + (viewportHeightNdc * 0.5f))
     };
 
     SetShaderVarMem(shaderVars.viewportScale, 2U, viewportScale);
@@ -505,7 +526,9 @@ namespace moho
    * lane is written disabled. Finally the noise / decal-mask / bi-cubic-lookup
    * textures are bound.
    */
-  void MediumFidelityTerrain::LoadTerrainLighting(Shadow* const shadowContext)
+  void MediumFidelityTerrain::LoadTerrainLighting(
+    Shadow* const shadowContext
+  )
   {
     auto& shaderVars = GetTerrainShaderVars();
 
@@ -541,9 +564,7 @@ namespace moho
     // which is `sunDir.c + invView.r[2].c` (the constant is -0.0).
     const Vector4f& cameraBasisZ = camera.inverseView.r[2];
     float halfAngle[3] = {
-      sunDirection.x + cameraBasisZ.x,
-      sunDirection.y + cameraBasisZ.y,
-      sunDirection.z + cameraBasisZ.z
+      sunDirection.x + cameraBasisZ.x, sunDirection.y + cameraBasisZ.y, sunDirection.z + cameraBasisZ.z
     };
     const float halfAngleLength =
       std::sqrt((halfAngle[0] * halfAngle[0]) + (halfAngle[1] * halfAngle[1]) + (halfAngle[2] * halfAngle[2]));
@@ -560,20 +581,12 @@ namespace moho
     SetShaderVarMem(shaderVars.halfAngle, 3U, halfAngle);
 
     // Camera forward direction: -inverseView.r[2].
-    const float cameraDirection[3] = {
-      -cameraBasisZ.x,
-      -cameraBasisZ.y,
-      -cameraBasisZ.z
-    };
+    const float cameraDirection[3] = {-cameraBasisZ.x, -cameraBasisZ.y, -cameraBasisZ.z};
     SetShaderVarMem(shaderVars.cameraDirection, 3U, cameraDirection);
 
     // Camera world position: inverseView.r[3] (translation row).
     const Vector4f& cameraTranslation = camera.inverseView.r[3];
-    const float cameraPosition[3] = {
-      cameraTranslation.x,
-      cameraTranslation.y,
-      cameraTranslation.z
-    };
+    const float cameraPosition[3] = {cameraTranslation.x, cameraTranslation.y, cameraTranslation.z};
     SetShaderVarMem(shaderVars.cameraPosition, 3U, cameraPosition);
 
     const Vector4f specularColor = terrainRes->GetSpecularColor();
@@ -629,7 +642,9 @@ namespace moho
    * literal - it comes from the params block, which is what makes this the
    * `Cond` variant.
    */
-  void MediumFidelityTerrain::CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params)
+  void MediumFidelityTerrain::CondDrawTerrainTechnique(
+    const STerrainTechniqueDrawParams& params
+  )
   {
     if (!ren_Terrain) {
       return;
@@ -758,7 +773,9 @@ namespace moho
    * but without `CHeightField::GetHeightAt`'s null/extent guard, which this
    * body does not perform.
    */
-  void MediumFidelityTerrain::DrawDirtyTerrain(CD3DPrimBatcher* const primBatcher)
+  void MediumFidelityTerrain::DrawDirtyTerrain(
+    CD3DPrimBatcher* const primBatcher
+  )
   {
     if (!ren_ShowDirtyTerrain) {
       return;
@@ -791,14 +808,11 @@ namespace moho
         continue;
       }
 
-      const CD3DPrimBatcher::Vertex nearLeft =
-        MakeDirtyRectCorner(heightField, dirtyRect.x0, dirtyRect.z0, 0.0f, 0.0f);
+      const CD3DPrimBatcher::Vertex nearLeft = MakeDirtyRectCorner(heightField, dirtyRect.x0, dirtyRect.z0, 0.0f, 0.0f);
       const CD3DPrimBatcher::Vertex nearRight =
         MakeDirtyRectCorner(heightField, dirtyRect.x1, dirtyRect.z0, 1.0f, 0.0f);
-      const CD3DPrimBatcher::Vertex farRight =
-        MakeDirtyRectCorner(heightField, dirtyRect.x1, dirtyRect.z1, 1.0f, 1.0f);
-      const CD3DPrimBatcher::Vertex farLeft =
-        MakeDirtyRectCorner(heightField, dirtyRect.x0, dirtyRect.z1, 0.0f, 1.0f);
+      const CD3DPrimBatcher::Vertex farRight = MakeDirtyRectCorner(heightField, dirtyRect.x1, dirtyRect.z1, 1.0f, 1.0f);
+      const CD3DPrimBatcher::Vertex farLeft = MakeDirtyRectCorner(heightField, dirtyRect.x0, dirtyRect.z1, 0.0f, 1.0f);
 
       primBatcher->DrawQuad(farLeft, farRight, nearRight, nearLeft);
     }
@@ -813,7 +827,10 @@ namespace moho
    * Dispatches the shared medium-fidelity water alpha-mask render lane for the
    * active terrain camera.
    */
-  void MediumFidelityTerrain::DrawWaterLine(const std::int32_t /*gameTick*/, const float /*deltaSeconds*/)
+  void MediumFidelityTerrain::DrawWaterLine(
+    const std::int32_t /*gameTick*/,
+    const float /*deltaSeconds*/
+  )
   {
     (void)sMediumFidelityWaterSurface->RenderWaterLayerAlphaMask(mCamera);
   }
@@ -830,7 +847,9 @@ namespace moho
    * Each shader-var write is guarded by Exists() as in the binary - the
    * technique does not necessarily declare all three.
    */
-  void MediumFidelityTerrain::DrawTerrainDepth(const GeomCamera3& camera)
+  void MediumFidelityTerrain::DrawTerrainDepth(
+    const GeomCamera3& camera
+  )
   {
     if (!ren_Terrain) {
       return;
@@ -938,8 +957,7 @@ namespace moho
       const std::int32_t gameTick
     )
     {
-      const boost::shared_ptr<ID3DTextureSheet> texture =
-        decal.GetTexture(slot, lod, gameTick);
+      const boost::shared_ptr<ID3DTextureSheet> texture = decal.GetTexture(slot, lod, gameTick);
       target.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
     }
   } // namespace
@@ -1022,9 +1040,11 @@ namespace moho
     if (splatVertexCount > 10000U) {
       D3D_GetDevice()->SelectTechnique("TSplats");
       GetTerrainShaderVars().decalAlbedoTexture.GetTexture(
-        boost::static_pointer_cast<CD3DDynamicTextureSheet>(sMediumFidelityTextureBatcher->GetCompositeTexture()));
+        boost::static_pointer_cast<CD3DDynamicTextureSheet>(sMediumFidelityTextureBatcher->GetCompositeTexture())
+      );
       DrawSplatChunksPassMajor(
-        D3D_GetDevice(), mOverlayVertexSheet, mOverlayIndexSheet, mSplatVertices.data(), splatVertexCount, 2500);
+        D3D_GetDevice(), mOverlayVertexSheet, mOverlayIndexSheet, mSplatVertices.data(), splatVertexCount, 2500
+      );
       return;
     }
 
@@ -1070,7 +1090,10 @@ namespace moho
    * triangle-list draw per glowing decal. No-op unless both `ren_Decals` and
    * `ren_glowingDecals` are enabled.
    */
-  void MediumFidelityTerrain::DrawGlowingDecals(const std::int32_t gameTick, const float lod)
+  void MediumFidelityTerrain::DrawGlowingDecals(
+    const std::int32_t gameTick,
+    const float lod
+  )
   {
     if (!ren_Decals || !ren_glowingDecals) {
       return;
@@ -1124,7 +1147,10 @@ namespace moho
    * only ever becomes set on the terminal alpha sentinel (which returns), so the
    * reselect never fires during forward iteration and is omitted here for clarity.
    */
-  void MediumFidelityTerrain::DrawNormalMappedDecals(const std::int32_t gameTick, const float lod)
+  void MediumFidelityTerrain::DrawNormalMappedDecals(
+    const std::int32_t gameTick,
+    const float lod
+  )
   {
     if (!ren_Decals) {
       return;
@@ -1212,7 +1238,10 @@ namespace moho
    * tesselated index count to be a whole number of triangles (`% 3 == 0`)
    * before issuing the draw.
    */
-  void MediumFidelityTerrain::DrawTerrainNormal(const std::int32_t gameTick, const float deltaSeconds)
+  void MediumFidelityTerrain::DrawTerrainNormal(
+    const std::int32_t gameTick,
+    const float deltaSeconds
+  )
   {
     if (!ren_Terrain) {
       return;
@@ -1228,9 +1257,8 @@ namespace moho
     // rather than a literal, so a map can override the normal pass.
     CD3DEffect* const effect = device->GetCurEffect();
     const fa::string technique = effect->GetStringAnnotation(
-      terrainRes->GetStratumMaterial().mShaderName,
-      fa::string{"normals"},
-      fa::string{"TTerrainNormals"});
+      terrainRes->GetStratumMaterial().mShaderName, fa::string{"normals"}, fa::string{"TTerrainNormals"}
+    );
     device->SelectTechnique(technique.c_str());
 
     LoadTerrainLighting(nullptr);
@@ -1258,8 +1286,8 @@ namespace moho
       SetShaderVarMem(shaderVars.normalBasisSizeSource, 2U, &info.mWidth);
 
       const std::int32_t querySize = (static_cast<std::int32_t>(info.mWidth) < static_cast<std::int32_t>(info.mHeight))
-                                       ? static_cast<std::int32_t>(info.mHeight)
-                                       : static_cast<std::int32_t>(info.mWidth);
+        ? static_cast<std::int32_t>(info.mHeight)
+        : static_cast<std::int32_t>(info.mWidth);
 
       std::int32_t rangeStart = 0;
       std::uint32_t rangeCount = 0;
@@ -1272,7 +1300,8 @@ namespace moho
         &rangeStart,
         &rangeCount,
         &minValue,
-        &maxValue);
+        &maxValue
+      );
 
       if (rangeStart + static_cast<std::int32_t>(rangeCount) >= kSkirtMaxIndexCount) {
         continue;
@@ -1311,7 +1340,10 @@ namespace moho
    * medium and high paths defer it to the water pass so it composites over the
    * water surface.
    */
-  void MediumFidelityTerrain::DrawWaterAlbedoDecals(const std::int32_t gameTick, const float deltaSeconds)
+  void MediumFidelityTerrain::DrawWaterAlbedoDecals(
+    const std::int32_t gameTick,
+    const float deltaSeconds
+  )
   {
     if (!ren_Decals) {
       return;
@@ -1366,7 +1398,8 @@ namespace moho
     const std::int32_t tick,
     const float tickLerp,
     const boost::shared_ptr<ID3DRenderTarget> refractionTexture,
-    const boost::shared_ptr<ID3DRenderTarget> reflectionTexture)
+    const boost::shared_ptr<ID3DRenderTarget> reflectionTexture
+  )
   {
     const float inverseRenderWidth = 1.0F / static_cast<float>(mViewportRenderWidth);
     const float inverseRenderHeight = 1.0F / static_cast<float>(mViewportRenderHeight);
@@ -1377,21 +1410,16 @@ namespace moho
     const float viewportScaleOffset[4] = {
       halfWidthScale,
       heightScale * -0.5F,
-      (halfWidthScale + (inverseRenderWidth * static_cast<float>(mViewportOriginX)))
-        + (inverseRenderWidth * 0.5F),
-      (inverseRenderHeight * 0.5F)
-        + ((inverseRenderHeight * static_cast<float>(mViewportOriginY)) + (heightScale * 0.5F))
+      (halfWidthScale + (inverseRenderWidth * static_cast<float>(mViewportOriginX))) + (inverseRenderWidth * 0.5F),
+      (inverseRenderHeight * 0.5F) +
+        ((inverseRenderHeight * static_cast<float>(mViewportOriginY)) + (heightScale * 0.5F))
     };
     SetShaderVarMem(GetWater2ViewportScaleOffsetShaderVar(), 4U, viewportScaleOffset);
 
     auto* const terrainRes = mTerrainResource;
     (void)sMediumFidelityWaterSurface->RenderWaterSurface(
-      tick,
-      tickLerp,
-      mCamera,
-      terrainRes->GetWaterShaderProperties(),
-      refractionTexture,
-      reflectionTexture);
+      tick, tickLerp, mCamera, terrainRes->GetWaterShaderProperties(), refractionTexture, reflectionTexture
+    );
 
     DrawWaterAlbedoDecals(tick, tickLerp);
   }
@@ -1453,8 +1481,9 @@ namespace moho
     // the same object read by the binary at [terrainRes + 4].
     const STIMap& map = *mTerrainResource->mMap;
     // Engine addition (water bodies): the highest level, as HighFidelityTerrain::DrawNormals.
-    const float waterElevation = map.HasWaterBodies() ? WaterBodyTerrainShaderLevel(map)
-                                                      : (map.mWaterEnabled ? map.mWaterElevation : kWaterElevationSentinel);
+    const float waterElevation = map.HasWaterBodies()
+      ? WaterBodyTerrainShaderLevel(map)
+      : (map.mWaterEnabled ? map.mWaterElevation : kWaterElevationSentinel);
     if (shaderVars.waterElevation.Exists()) {
       shaderVars.waterElevation.SetFloat(waterElevation);
     }
@@ -1504,7 +1533,8 @@ namespace moho
     GeomCamera3* const camera,
     const std::int32_t* const viewportBlock,
     const bool minimapPass,
-    const std::int32_t /*forceRegenerate*/)
+    const std::int32_t /*forceRegenerate*/
+  )
   {
     if (mTerrainResource == nullptr) {
       return;
@@ -1574,8 +1604,10 @@ namespace moho
 
           for (CWldTerrainDecal* const decal : visibleDecals) {
 
-            if (!ren_NormalDecals
-                && (decal->mType == WldTerrainDecalType_NormalsAlpha || decal->mType == WldTerrainDecalType_Normals)) {
+            if (
+              !ren_NormalDecals &&
+              (decal->mType == WldTerrainDecalType_NormalsAlpha || decal->mType == WldTerrainDecalType_Normals)
+            ) {
               continue;
             }
             // Unlike the low-fidelity class, fidelity 0 always passes: the
@@ -1613,8 +1645,12 @@ namespace moho
             if (isFlat) {
               std::uint32_t addedIndexCount = 0;
               (void)mTesselator->EmitCollisionQuad(
-                reinterpret_cast<const Wm3::Vector3f*>(&flatnessQuad.mCorner0), &command.startIndex, &addedIndexCount,
-                &command.startVertex, reinterpret_cast<std::uint32_t*>(&command.endVertex));
+                reinterpret_cast<const Wm3::Vector3f*>(&flatnessQuad.mCorner0),
+                &command.startIndex,
+                &addedIndexCount,
+                &command.startVertex,
+                reinterpret_cast<std::uint32_t*>(&command.endVertex)
+              );
               command.indexCount = static_cast<std::int32_t>(addedIndexCount);
 
               if (command.indexCount > 0 && (command.startIndex + command.indexCount) < kSkirtMaxIndexCount) {
@@ -1633,11 +1669,20 @@ namespace moho
               std::int32_t minRectIndex = 0;
               std::int32_t maxRectIndex = 0;
               (void)mTesselator->CollectClippedCollisionIndicesInRect(
-                FloorToInt(decal->mBoundsMinX), FloorToInt(decal->mBoundsMinZ), FloorToInt(decal->mBoundsMaxX),
-                FloorToInt(decal->mBoundsMaxZ), &baselineIndexCount, &addedIndexCount, &minRectIndex, &maxRectIndex);
+                FloorToInt(decal->mBoundsMinX),
+                FloorToInt(decal->mBoundsMinZ),
+                FloorToInt(decal->mBoundsMaxX),
+                FloorToInt(decal->mBoundsMaxZ),
+                &baselineIndexCount,
+                &addedIndexCount,
+                &minRectIndex,
+                &maxRectIndex
+              );
 
-              if (addedIndexCount > 0
-                  && (baselineIndexCount + static_cast<std::int32_t>(addedIndexCount)) < kSkirtMaxIndexCount) {
+              if (
+                addedIndexCount > 0 &&
+                (baselineIndexCount + static_cast<std::int32_t>(addedIndexCount)) < kSkirtMaxIndexCount
+              ) {
                 command.startIndex = baselineIndexCount;
                 command.indexCount = static_cast<std::int32_t>(addedIndexCount);
                 command.startVertex = minRectIndex;
@@ -1674,14 +1719,15 @@ namespace moho
 
             const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
             const Vector4f& row1 = mCamera->viewport.r[1];
-            const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
-              + (firstVertex.mPosition.x * row1.x) + row1.w;
+            const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y) +
+              (firstVertex.mPosition.x * row1.x) + row1.w;
 
             if (worldDistance > splat->mCutoffLOD) {
               continue;
             }
-            if (splatBudget++ >= splatOutputBudget.available
-              && !TryGrowSplatOutput(mSplatVertices, splatOutputBudget)) {
+            if (
+              splatBudget++ >= splatOutputBudget.available && !TryGrowSplatOutput(mSplatVertices, splatOutputBudget)
+            ) {
               break;
             }
 

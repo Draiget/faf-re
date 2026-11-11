@@ -17,18 +17,26 @@ namespace
 {
   constexpr std::uint32_t kVersionWithTechnique = 0x3Cu; // Read takes the technique name from 0x3C on
 
-  void AppendInt(std::string& bytes, const std::int32_t value)
+  void AppendInt(
+    std::string& bytes,
+    const std::int32_t value
+  )
   {
     bytes.append(reinterpret_cast<const char*>(&value), sizeof(value));
   }
 
-  void AppendFloat(std::string& bytes, const float value)
+  void AppendFloat(
+    std::string& bytes,
+    const float value
+  )
   {
     bytes.append(reinterpret_cast<const char*>(&value), sizeof(value));
   }
 
   /** The payload after the technique name: texture path, count, nine floats per decal. */
-  std::string Payload(const int decals)
+  std::string Payload(
+    const int decals
+  )
   {
     std::string bytes = std::string("/textures/ui/cartographic.dds") + '\0';
     AppendInt(bytes, decals);
@@ -40,7 +48,9 @@ namespace
     return bytes;
   }
 
-  std::string Written(moho::CartographicDecalBatch& batch)
+  std::string Written(
+    moho::CartographicDecalBatch& batch
+  )
   {
     gpg::MemBufferStream stream(16u);
     gpg::BinaryWriter writer(&stream);
@@ -48,7 +58,9 @@ namespace
     return std::string(stream.GetConstBuffer().begin(), stream.GetLength());
   }
 
-  gpg::MemBufferStream Reader(const std::string& bytes)
+  gpg::MemBufferStream Reader(
+    const std::string& bytes
+  )
   {
     return gpg::MemBufferStream(gpg::CopyMemBuffer(bytes.data(), bytes.size()));
   }
@@ -56,7 +68,10 @@ namespace
 
 // A batch read at the current version writes back the same bytes: technique and texture as NUL-terminated
 // strings, the decal count, then each decal's nine floats in order.
-TEST(RenderCartographic, BatchWritesBackWhatItRead)
+TEST(
+  RenderCartographic,
+  BatchWritesBackWhatItRead
+)
 {
   for (const int decals : {0, 1, 3}) {
     SCOPED_TRACE(testing::Message() << decals << " decals");
@@ -75,7 +90,10 @@ TEST(RenderCartographic, BatchWritesBackWhatItRead)
 
 // Before version 0x3C a batch has no technique name in the stream; it reads as "Decal" (0x007D5400), and writes
 // it out, so a legacy batch saves in the current form.
-TEST(RenderCartographic, LegacyBatchDefaultsToTheDecalTechnique)
+TEST(
+  RenderCartographic,
+  LegacyBatchDefaultsToTheDecalTechnique
+)
 {
   const std::string legacy = Payload(2);
   gpg::MemBufferStream stream = Reader(legacy);
@@ -87,7 +105,10 @@ TEST(RenderCartographic, LegacyBatchDefaultsToTheDecalTechnique)
 }
 
 // Reading again replaces the batch (Read calls Shutdown first), and a copy keeps every decal.
-TEST(RenderCartographic, ReadReplacesAndCopyKeepsTheDecals)
+TEST(
+  RenderCartographic,
+  ReadReplacesAndCopyKeepsTheDecals
+)
 {
   const std::string first = std::string("A") + '\0' + Payload(3);
   const std::string second = std::string("B") + '\0' + Payload(1);

@@ -57,14 +57,19 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_SSavedGameArmyInfoTypeInfo_ed43fe, preregister_SSavedGameArmyInfoTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_SSavedGameArmyInfoTypeInfo_ed43fe,
+  preregister_SSavedGameArmyInfoTypeInfo
+)
 
 namespace moho
 {
   /**
    * Inlined into `gpg::SerSaveLoadHelper<SSavedGameArmyInfo>::Deserialize` 0x00880040.
    */
-  void SSavedGameArmyInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SSavedGameArmyInfo::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     archive->ReadString(&mPlayerName);
   }
@@ -72,7 +77,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<SSavedGameArmyInfo>::Serialize` 0x00880060.
    */
-  void SSavedGameArmyInfo::MemberSerialize(gpg::WriteArchive* const archive)
+  void SSavedGameArmyInfo::MemberSerialize(
+    gpg::WriteArchive* const archive
+  )
   {
     archive->WriteString(&mPlayerName);
   }

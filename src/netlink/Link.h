@@ -113,7 +113,7 @@ namespace faf::netlink
 
   struct LinkCallbacks
   {
-    std::function<void(const CandidatesMessage&)> onSignal; // to the remote peer, via onIceMsg
+    std::function<void(const CandidatesMessage&)> onSignal;       // to the remote peer, via onIceMsg
     std::function<void(const std::uint8_t*, std::size_t)> onData; // game datagram from the peer
     std::function<void(LinkState)> onState;
     std::function<void(bool)> onConnected;
@@ -144,22 +144,22 @@ namespace faf::netlink
     std::uint64_t invalidReceived = 0; // first byte neither 'd' nor 'e'
     std::uint32_t attempts = 0;
     double lastRttMs = -1;
-    bool onWebRtc = false;         // issue #239: datagrams on the data channel
-    std::uint64_t webRtcSent = 0;  // of dataSent
+    bool onWebRtc = false;        // issue #239: datagrams on the data channel
+    std::uint64_t webRtcSent = 0; // of dataSent
     // Issue #240: the redundant lane, while on.
     bool onLane = false;
-    std::uint64_t laneRepeats = 0;     // copies sent
-    std::uint64_t laneUnacked = 0;     // datagrams whose copies ran out before an ack
-    std::uint64_t laneDuplicates = 0;  // copies received after the datagram itself
-    std::uint64_t laneLost = 0;        // lane datagrams counted lost
+    std::uint64_t laneRepeats = 0;    // copies sent
+    std::uint64_t laneUnacked = 0;    // datagrams whose copies ran out before an ack
+    std::uint64_t laneDuplicates = 0; // copies received after the datagram itself
+    std::uint64_t laneLost = 0;       // lane datagrams counted lost
     // Issue #322: the selected pair's candidate types ("host", "srflx", "prflx",
     // "relay") while connected, empty otherwise. Either "relay": through TURN.
     std::string localType;
     std::string remoteType;
-    bool laneEncrypted = false;        // issue #289: the lane is on and sealed
+    bool laneEncrypted = false;            // issue #289: the lane is on and sealed
     std::uint64_t laneUnauthenticated = 0; // lane datagrams dropped: not sealed with the agreed key
-    double laneRttMs = -1;             // issue #322: the lane's smoothed RTT, both ends; -1 before a sample
-    PathChoice choice;                 // issue #322: the path the player picked
+    double laneRttMs = -1;                 // issue #322: the lane's smoothed RTT, both ends; -1 before a sample
+    PathChoice choice;                     // issue #322: the path the player picked
   };
 
   class Link
@@ -191,7 +191,9 @@ namespace faf::netlink
     // offer, which comes when the peer's echo goes unanswered. Done in the
     // next Tick, so the callbacks run on the ticking thread. Issue #322: with a
     // choice, this and later attempts take that path. Any thread.
-    void Reconnect(const std::optional<PathChoice>& choice = std::nullopt)
+    void Reconnect(
+      const std::optional<PathChoice>& choice = std::nullopt
+    )
     {
       std::lock_guard lock(mMutex);
       if (choice) {
@@ -201,14 +203,23 @@ namespace faf::netlink
     }
 
     LinkState GetState() const;
-    bool IsConnected() const { return mConnected.load(); }
+    bool IsConnected() const
+    {
+      return mConnected.load();
+    }
     // Issue #234: the peer on this connection proved to be ours.
-    bool IsOurPeer() const { return mOurPeer.load(); }
+    bool IsOurPeer() const
+    {
+      return mOurPeer.load();
+    }
     LinkStats GetStats() const;
-    const LinkOptions& GetOptions() const { return mOptions; }
+    const LinkOptions& GetOptions() const
+    {
+      return mOptions;
+    }
 
   private:
-    struct Pending; // deferred callbacks, run after the lock is released
+    struct Pending;   // deferred callbacks, run after the lock is released
     struct Internals; // libjuice-facing state (Link.cpp)
 
     void InitiateLocked(Pending& out, const CandidatesMessage* remote);
@@ -256,10 +267,10 @@ namespace faf::netlink
     std::optional<Clock::time_point> mAwaitDeadline;
     std::optional<Clock::time_point> mCheckDeadline;
     std::optional<Clock::time_point> mRestartAt;
-    std::atomic<bool> mReconnectAsked{false}; // issue #321
-    std::optional<PathChoice> mPendingChoice;  // issue #322, under mMutex
-    PathChoice mChoice;                        // under mMutex
-    bool mChoicePicked = false;                // the player picked mChoice: tell our peer
+    std::atomic<bool> mReconnectAsked{false};            // issue #321
+    std::optional<PathChoice> mPendingChoice;            // issue #322, under mMutex
+    PathChoice mChoice;                                  // under mMutex
+    bool mChoicePicked = false;                          // the player picked mChoice: tell our peer
     PathChoice::Mode mPeerMode = PathChoice::Mode::Auto; // the peer's pick, this attempt
     Clock::time_point mNextEcho{};
     std::atomic<std::int64_t> mLastEchoReplyMs{0};

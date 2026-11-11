@@ -54,7 +54,9 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RRef MakeEntityObjectRef(moho::Entity* entity)
+  [[nodiscard]] gpg::RRef MakeEntityObjectRef(
+    moho::Entity* entity
+  )
   {
     gpg::RRef out{};
     out.mType = gpg::RTypeOf<moho::Entity>();
@@ -71,8 +73,12 @@ namespace
     }
 
     int baseOffset = 0;
-    if (dynamicType && gpg::RTypeOf<moho::Entity>() && dynamicType->IsDerivedFrom(gpg::RTypeOf<moho::Entity>(), &baseOffset)) {
-      out.mObj = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(entity) - static_cast<std::uintptr_t>(baseOffset));
+    if (
+      dynamicType && gpg::RTypeOf<moho::Entity>() &&
+      dynamicType->IsDerivedFrom(gpg::RTypeOf<moho::Entity>(), &baseOffset)
+    ) {
+      out.mObj =
+        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(entity) - static_cast<std::uintptr_t>(baseOffset));
       out.mType = dynamicType;
       return out;
     }
@@ -81,7 +87,9 @@ namespace
     return out;
   }
 
-  [[nodiscard]] gpg::RRef MakeEntityPointerSlotRef(moho::Entity** slot)
+  [[nodiscard]] gpg::RRef MakeEntityPointerSlotRef(
+    moho::Entity** slot
+  )
   {
     if (gpg::RType* const pointerType = CachedEntityPointerType(); pointerType != nullptr) {
       gpg::RRef out{};
@@ -93,7 +101,10 @@ namespace
     return MakeEntityObjectRef(slot ? *slot : nullptr);
   }
 
-  [[nodiscard]] moho::Entity* ReadEntityPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] moho::Entity* ReadEntityPointer(
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef
+  )
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -112,7 +123,8 @@ namespace
     const char* const expected = gpg::RTypeOf<moho::Entity>() ? gpg::RTypeOf<moho::Entity>()->GetName() : "Entity";
     const char* const actual = source.GetTypeName();
     const fa::string message = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
       expected ? expected : "Entity",
       actual ? actual : "null"
     );
@@ -122,7 +134,12 @@ namespace
   /**
    * Address: 0x0067CD30 (FUN_0067CD30, Moho::RWeakPtrType_Entity::SerLoad)
    */
-  void LoadWeakPtrEntity(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void LoadWeakPtrEntity(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<WeakPtrEntity*>(objectPtr);
     if (!archive || !weak) {
@@ -136,7 +153,12 @@ namespace
   /**
    * Address: 0x0067CD60 (FUN_0067CD60, Moho::RWeakPtrType_Entity::SerSave)
    */
-  void SaveWeakPtrEntity(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveWeakPtrEntity(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<WeakPtrEntity*>(objectPtr);
     if (!archive || !weak) {
@@ -150,7 +172,12 @@ namespace
   /**
    * Address: 0x0067CDA0 (FUN_0067CDA0, gpg::RVectorType_Entity_P::SerLoad)
    */
-  void LoadEntityPointerVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void LoadEntityPointerVector(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const storage = reinterpret_cast<EntityPtrVector*>(objectPtr);
     if (!archive || !storage) {
@@ -183,7 +210,12 @@ namespace
   /**
    * Address: 0x0067CEB0 (FUN_0067CEB0, gpg::RVectorType_Entity_P::SerSave)
    */
-  void SaveEntityPointerVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveEntityPointerVector(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const storage = reinterpret_cast<const EntityPtrVector*>(objectPtr);
     if (!archive || !storage) {
@@ -196,10 +228,7 @@ namespace
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       gpg::WriteRawPointer(
-        archive,
-        MakeEntityObjectRef((*storage)[static_cast<std::size_t>(i)]),
-        gpg::TrackedPointerState::Unowned,
-        owner
+        archive, MakeEntityObjectRef((*storage)[static_cast<std::size_t>(i)]), gpg::TrackedPointerState::Unowned, owner
       );
     }
   }
@@ -210,7 +239,12 @@ namespace
    * What it does:
    * Deserializes tracked `Entity*` pointer lanes into `fastvector<Entity*>` storage.
    */
-  void LoadFastVectorEntityPointer(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorEntityPointer(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -245,7 +279,8 @@ namespace
       const char* const expected = gpg::RTypeOf<moho::Entity>() ? gpg::RTypeOf<moho::Entity>()->GetName() : "Entity";
       const char* const actual = source.GetTypeName();
       const fa::string message = gpg::STR_Printf(
-        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
+        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+        "instead",
         expected ? expected : "Entity",
         actual ? actual : "null"
       );
@@ -316,12 +351,17 @@ namespace
   }
 
   /**
-    * Alias of FUN_00694380 (non-canonical helper lane).
+   * Alias of FUN_00694380 (non-canonical helper lane).
    *
    * What it does:
    * Serializes tracked `Entity*` pointer lanes from `fastvector<Entity*>` storage.
    */
-  void SaveFastVectorEntityPointer(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorEntityPointer(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     if (!archive || objectPtr == 0) {
       return;
@@ -372,17 +412,27 @@ namespace
 namespace moho
 {
   /**
-    * Alias of FUN_0067CD30 (non-canonical helper lane).
+   * Alias of FUN_0067CD30 (non-canonical helper lane).
    */
-  void WeakPtr_Entity::Deserialize(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_Entity::Deserialize(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     LoadWeakPtrEntity(archive, objectPtr, 0, ownerRef);
   }
 
   /**
-    * Alias of FUN_0067CD60 (non-canonical helper lane).
+   * Alias of FUN_0067CD60 (non-canonical helper lane).
    */
-  void WeakPtr_Entity::Serialize(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_Entity::Serialize(
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     SaveWeakPtrEntity(archive, objectPtr, 0, ownerRef);
   }
@@ -403,7 +453,9 @@ namespace moho
   /**
    * Address: 0x0067BEB0 (FUN_0067BEB0, Moho::RWeakPtrType_Entity::GetLexical)
    */
-  fa::string RWeakPtrType<Entity>::GetLexical(const gpg::RRef& ref) const
+  fa::string RWeakPtrType<Entity>::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     auto* const weak = static_cast<const WeakPtrEntity*>(ref.mObj);
     if (!weak || !weak->HasValue()) {
@@ -449,7 +501,10 @@ namespace moho
   /**
    * Address: 0x0067C090 (FUN_0067C090, Moho::RWeakPtrType_Entity::SubscriptIndex)
    */
-  gpg::RRef RWeakPtrType<Entity>::SubscriptIndex(void* obj, const int ind) const
+  gpg::RRef RWeakPtrType<Entity>::SubscriptIndex(
+    void* obj,
+    const int ind
+  ) const
   {
     GPG_ASSERT(ind == 0);
 
@@ -460,7 +515,9 @@ namespace moho
   /**
    * Address: 0x0067C060 (FUN_0067C060, Moho::RWeakPtrType_Entity::GetCount)
    */
-  size_t RWeakPtrType<Entity>::GetCount(void* obj) const
+  size_t RWeakPtrType<Entity>::GetCount(
+    void* obj
+  ) const
   {
     auto* const weak = static_cast<WeakPtrEntity*>(obj);
     return (weak && weak->HasValue()) ? 1u : 0u;
@@ -512,7 +569,9 @@ namespace gpg
   /**
    * Address: 0x0067C190 (FUN_0067C190, gpg::RVectorType_Entity_P::GetLexical)
    */
-  fa::string RVectorType<moho::Entity*>::GetLexical(const gpg::RRef& ref) const
+  fa::string RVectorType<moho::Entity*>::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -540,7 +599,10 @@ namespace gpg
   /**
    * Address: 0x0067C260 (FUN_0067C260, gpg::RVectorType_Entity_P::SubscriptIndex)
    */
-  gpg::RRef RVectorType<moho::Entity*>::SubscriptIndex(void* obj, const int ind) const
+  gpg::RRef RVectorType<moho::Entity*>::SubscriptIndex(
+    void* obj,
+    const int ind
+  ) const
   {
     auto* const storage = static_cast<EntityPtrVector*>(obj);
     GPG_ASSERT(storage != nullptr);
@@ -557,7 +619,9 @@ namespace gpg
   /**
    * Address: 0x0067C230 (FUN_0067C230, gpg::RVectorType_Entity_P::GetCount)
    */
-  size_t RVectorType<moho::Entity*>::GetCount(void* obj) const
+  size_t RVectorType<moho::Entity*>::GetCount(
+    void* obj
+  ) const
   {
     if (!obj) {
       return 0u;
@@ -569,7 +633,10 @@ namespace gpg
   /**
    * Address: 0x0067C250 (FUN_0067C250, gpg::RVectorType_Entity_P::SetCount)
    */
-  void RVectorType<moho::Entity*>::SetCount(void* obj, const int count) const
+  void RVectorType<moho::Entity*>::SetCount(
+    void* obj,
+    const int count
+  ) const
   {
     auto* const storage = static_cast<EntityPtrVector*>(obj);
     GPG_ASSERT(storage != nullptr);
@@ -608,14 +675,16 @@ namespace gpg
    * What it does:
    * Formats inherited lexical text and appends current fastvector element count.
    */
-  fa::string RFastVectorType<moho::Entity*>::GetLexical(const gpg::RRef& ref) const
+  fa::string RFastVectorType<moho::Entity*>::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
   }
 
   /**
-    * Alias of FUN_00694380 (non-canonical helper lane).
+   * Alias of FUN_00694380 (non-canonical helper lane).
    */
   const gpg::RIndexed* RFastVectorType<moho::Entity*>::IsIndexed() const
   {
@@ -623,11 +692,14 @@ namespace gpg
   }
 
   /**
-    * Alias of FUN_00694380 (non-canonical helper lane).
+   * Alias of FUN_00694380 (non-canonical helper lane).
    */
   void RFastVectorType<moho::Entity*>::Init()
   {
-    static_assert(sizeof(gpg::core::FastVectorInline<moho::Entity*>) == 0x10, "gpg::core::FastVectorInline<moho::Entity*> is 0x10 bytes on x86");
+    static_assert(
+      sizeof(gpg::core::FastVectorInline<moho::Entity*>) == 0x10,
+      "gpg::core::FastVectorInline<moho::Entity*> is 0x10 bytes on x86"
+    );
     size_ = sizeof(gpg::core::FastVectorInline<moho::Entity*>);
     version_ = 1;
     serLoadFunc_ = &LoadFastVectorEntityPointer;
@@ -635,9 +707,12 @@ namespace gpg
   }
 
   /**
-    * Alias of FUN_00694380 (non-canonical helper lane).
+   * Alias of FUN_00694380 (non-canonical helper lane).
    */
-  gpg::RRef RFastVectorType<moho::Entity*>::SubscriptIndex(void* obj, const int ind) const
+  gpg::RRef RFastVectorType<moho::Entity*>::SubscriptIndex(
+    void* obj,
+    const int ind
+  ) const
   {
     if (!obj) {
       return MakeEntityPointerSlotRef(nullptr);
@@ -654,9 +729,11 @@ namespace gpg
   }
 
   /**
-    * Alias of FUN_00694380 (non-canonical helper lane).
+   * Alias of FUN_00694380 (non-canonical helper lane).
    */
-  size_t RFastVectorType<moho::Entity*>::GetCount(void* obj) const
+  size_t RFastVectorType<moho::Entity*>::GetCount(
+    void* obj
+  ) const
   {
     if (!obj) {
       return 0u;
@@ -667,9 +744,12 @@ namespace gpg
   }
 
   /**
-    * Alias of FUN_00694380 (non-canonical helper lane).
+   * Alias of FUN_00694380 (non-canonical helper lane).
    */
-  void RFastVectorType<moho::Entity*>::SetCount(void* obj, const int count) const
+  void RFastVectorType<moho::Entity*>::SetCount(
+    void* obj,
+    const int count
+  ) const
   {
     GPG_ASSERT(obj != nullptr);
     GPG_ASSERT(count >= 0);
@@ -710,7 +790,7 @@ namespace moho
   }
 
   /**
-    * Alias of FUN_00694380 (non-canonical helper lane).
+   * Alias of FUN_00694380 (non-canonical helper lane).
    *
    * What it does:
    * Constructs and preregisters RTTI for `fastvector<Entity*>`.
@@ -736,6 +816,15 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_WeakPtr_Entity_Type_00_d52ccd, moho::register_WeakPtr_Entity_Type_00)
-GPG_PREREGISTER_INIT(register_VectorEntityPtr_Type_00_d52ccd, moho::register_VectorEntityPtr_Type_00)
-GPG_PREREGISTER_INIT(register_FastVectorEntityPtrType_00_d52ccd, moho::register_FastVectorEntityPtrType_00)
+GPG_PREREGISTER_INIT(
+  register_WeakPtr_Entity_Type_00_d52ccd,
+  moho::register_WeakPtr_Entity_Type_00
+)
+GPG_PREREGISTER_INIT(
+  register_VectorEntityPtr_Type_00_d52ccd,
+  moho::register_VectorEntityPtr_Type_00
+)
+GPG_PREREGISTER_INIT(
+  register_FastVectorEntityPtrType_00_d52ccd,
+  moho::register_FastVectorEntityPtrType_00
+)

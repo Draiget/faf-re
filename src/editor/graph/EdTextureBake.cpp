@@ -12,7 +12,9 @@ namespace faf::editor
   namespace
   {
     /** The image as RGBA floats, then each smaller level the 2 x 2 average of the one above. */
-    std::vector<TexImage> MipChain(const TexImage& image)
+    std::vector<TexImage> MipChain(
+      const TexImage& image
+    )
     {
       std::vector<TexImage> levels(1);
       TexImage& top = levels.front();
@@ -41,7 +43,9 @@ namespace faf::editor
               const int y0 = std::min(y * 2, above.size - 1);
               const int x1 = (x * 2 + 1) % above.size;
               const int y1 = (y * 2 + 1) % above.size;
-              d[c] = (above.Pixel(x0, y0)[c] + above.Pixel(x1, y0)[c] + above.Pixel(x0, y1)[c] + above.Pixel(x1, y1)[c]) * 0.25f;
+              d[c] =
+                (above.Pixel(x0, y0)[c] + above.Pixel(x1, y0)[c] + above.Pixel(x0, y1)[c] + above.Pixel(x1, y1)[c]) *
+                0.25f;
             }
           }
         }
@@ -50,22 +54,37 @@ namespace faf::editor
       return levels;
     }
 
-    std::uint8_t Byte(const float v)
+    std::uint8_t Byte(
+      const float v
+    )
     {
       return static_cast<std::uint8_t>(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f));
     }
   } // namespace
 
-  bool EncodeDds(const TexImage& image, const DdsKind kind, std::vector<std::uint8_t>& out, std::string& error)
+  bool EncodeDds(
+    const TexImage& image,
+    const DdsKind kind,
+    std::vector<std::uint8_t>& out,
+    std::string& error
+  )
   {
     if (image.size <= 0 || (image.channels != 1 && image.channels != 4)) {
       error = "empty image";
       return false;
     }
     const std::vector<TexImage> levels = MipChain(image);
-    const DXGI_FORMAT format = kind == DdsKind::Bgra ? DXGI_FORMAT_B8G8R8A8_UNORM : kind == DdsKind::Bc1 ? DXGI_FORMAT_BC1_UNORM : DXGI_FORMAT_BC3_UNORM;
+    const DXGI_FORMAT format = kind == DdsKind::Bgra ? DXGI_FORMAT_B8G8R8A8_UNORM
+      : kind == DdsKind::Bc1                         ? DXGI_FORMAT_BC1_UNORM
+                                                     : DXGI_FORMAT_BC3_UNORM;
     gpg::gal::imaging::Image dds;
-    dds.Allocate(format, static_cast<std::uint32_t>(image.size), static_cast<std::uint32_t>(image.size), static_cast<std::uint32_t>(levels.size()), 1U);
+    dds.Allocate(
+      format,
+      static_cast<std::uint32_t>(image.size),
+      static_cast<std::uint32_t>(image.size),
+      static_cast<std::uint32_t>(levels.size()),
+      1U
+    );
     if (dds.subresources.size() != levels.size()) {
       error = "the DDS layout has no room for the mip levels";
       return false;
@@ -88,8 +107,11 @@ namespace faf::editor
       const std::size_t rowBytes = static_cast<std::size_t>(level.size) * 4U;
       if (kind == DdsKind::Bgra) {
         for (int y = 0; y < level.size; ++y) {
-          std::memcpy(dds.bytes.data() + sub.offset + static_cast<std::size_t>(y) * sub.rowPitch, pixels.data() + y * rowBytes,
-                      std::min<std::size_t>(rowBytes, sub.rowPitch));
+          std::memcpy(
+            dds.bytes.data() + sub.offset + static_cast<std::size_t>(y) * sub.rowPitch,
+            pixels.data() + y * rowBytes,
+            std::min<std::size_t>(rowBytes, sub.rowPitch)
+          );
         }
         continue;
       }
@@ -101,7 +123,8 @@ namespace faf::editor
       source.slicePitch = rowBytes * static_cast<std::size_t>(level.size);
       source.pixels = pixels.data();
       DirectX::ScratchImage compressed;
-      const HRESULT hr = DirectX::Compress(source, format, DirectX::TEX_COMPRESS_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT, compressed);
+      const HRESULT hr =
+        DirectX::Compress(source, format, DirectX::TEX_COMPRESS_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT, compressed);
       const DirectX::Image* result = SUCCEEDED(hr) ? compressed.GetImage(0, 0, 0) : nullptr;
       if (result == nullptr) {
         error = "compressing mip level " + std::to_string(mip) + " failed";
@@ -109,8 +132,11 @@ namespace faf::editor
       }
       // Row of 4 x 4 blocks by row.
       for (std::uint32_t row = 0; row < sub.rowCount; ++row) {
-        std::memcpy(dds.bytes.data() + sub.offset + static_cast<std::size_t>(row) * sub.rowPitch, result->pixels + row * result->rowPitch,
-                    std::min<std::size_t>(result->rowPitch, sub.rowPitch));
+        std::memcpy(
+          dds.bytes.data() + sub.offset + static_cast<std::size_t>(row) * sub.rowPitch,
+          result->pixels + row * result->rowPitch,
+          std::min<std::size_t>(result->rowPitch, sub.rowPitch)
+        );
       }
     }
     if (FAILED(gpg::gal::imaging::ImageCodec::WriteDds(dds, out))) {

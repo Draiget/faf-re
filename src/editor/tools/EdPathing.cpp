@@ -15,12 +15,20 @@ namespace faf::editor
     constexpr std::uint8_t kWaterSubSeabed = 0x8 | 0x4 | 0x2;
   } // namespace
 
-  std::vector<std::uint8_t> PassableCells(const std::uint16_t* const heights, const int width, const int height, const bool water,
-                                          const float waterLevel, const PathFootprint& footprint)
+  std::vector<std::uint8_t> PassableCells(
+    const std::uint16_t* const heights,
+    const int width,
+    const int height,
+    const bool water,
+    const float waterLevel,
+    const PathFootprint& footprint
+  )
   {
     const int cellsX = width - 1;
     const int cellsZ = height - 1;
-    std::vector<std::uint8_t> cells(static_cast<std::size_t>(std::max(cellsX, 0)) * static_cast<std::size_t>(std::max(cellsZ, 0)), 0);
+    std::vector<std::uint8_t> cells(
+      static_cast<std::size_t>(std::max(cellsX, 0)) * static_cast<std::size_t>(std::max(cellsZ, 0)), 0
+    );
     if (heights == nullptr || cellsX <= 0 || cellsZ <= 0) {
       return cells;
     }
@@ -58,7 +66,12 @@ namespace faf::editor
     return cells;
   }
 
-  int ConnectAreas(const std::vector<std::uint8_t>& cells, const int cellsX, const int cellsZ, std::vector<int>& areas)
+  int ConnectAreas(
+    const std::vector<std::uint8_t>& cells,
+    const int cellsX,
+    const int cellsZ,
+    std::vector<int>& areas
+  )
   {
     areas.assign(cells.size(), 0);
     int count = 0;
@@ -91,7 +104,14 @@ namespace faf::editor
     return count;
   }
 
-  int AreaNear(const std::vector<int>& areas, const int cellsX, const int cellsZ, const float x, const float z, const int reach)
+  int AreaNear(
+    const std::vector<int>& areas,
+    const int cellsX,
+    const int cellsZ,
+    const float x,
+    const float z,
+    const int reach
+  )
   {
     const int cx = static_cast<int>(std::floor(x));
     const int cz = static_cast<int>(std::floor(z));
@@ -104,7 +124,8 @@ namespace faf::editor
         if (px < 0 || pz < 0 || px >= cellsX || pz >= cellsZ) {
           continue;
         }
-        const int area = areas[static_cast<std::size_t>(pz) * static_cast<std::size_t>(cellsX) + static_cast<std::size_t>(px)];
+        const int area =
+          areas[static_cast<std::size_t>(pz) * static_cast<std::size_t>(cellsX) + static_cast<std::size_t>(px)];
         if (area != 0 && dx * dx + dz * dz < bestDistance) {
           bestDistance = dx * dx + dz * dz;
           best = area;

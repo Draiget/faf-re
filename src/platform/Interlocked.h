@@ -21,29 +21,41 @@ namespace platform
 
   // Atomic operations on a 32-bit field that isn't a std::atomic, because a recovered layout or
   // lock-free counter fixes its type. All sequentially consistent, as the intrinsics' full barriers.
-  [[nodiscard]] inline std::atomic_ref<std::int32_t> AtomicField(volatile std::int32_t* const slot) noexcept
+  [[nodiscard]] inline std::atomic_ref<std::int32_t> AtomicField(
+    volatile std::int32_t* const slot
+  ) noexcept
   {
     return std::atomic_ref<std::int32_t>(const_cast<std::int32_t&>(*slot));
   }
 
-  [[nodiscard]] inline std::int32_t AtomicLoad(volatile std::int32_t* const slot) noexcept
+  [[nodiscard]] inline std::int32_t AtomicLoad(
+    volatile std::int32_t* const slot
+  ) noexcept
   {
     return AtomicField(slot).load();
   }
 
   // Each of these returns the value before the operation.
-  inline std::int32_t AtomicExchange(volatile std::int32_t* const slot, const std::int32_t value) noexcept
+  inline std::int32_t AtomicExchange(
+    volatile std::int32_t* const slot,
+    const std::int32_t value
+  ) noexcept
   {
     return AtomicField(slot).exchange(value);
   }
 
-  inline std::int32_t AtomicAdd(volatile std::int32_t* const slot, const std::int32_t delta) noexcept
+  inline std::int32_t AtomicAdd(
+    volatile std::int32_t* const slot,
+    const std::int32_t delta
+  ) noexcept
   {
     return AtomicField(slot).fetch_add(delta);
   }
 
   inline std::int32_t AtomicCompareExchange(
-    volatile std::int32_t* const slot, const std::int32_t desired, const std::int32_t expected
+    volatile std::int32_t* const slot,
+    const std::int32_t desired,
+    const std::int32_t expected
   ) noexcept
   {
     std::int32_t previous = expected;
@@ -52,7 +64,10 @@ namespace platform
   }
 
   // Adds to a float stored as its bits. The sum's operand order matters for NaNs: current + delta.
-  inline std::int32_t AtomicAddFloat(volatile std::int32_t* const slot, const float delta) noexcept
+  inline std::int32_t AtomicAddFloat(
+    volatile std::int32_t* const slot,
+    const float delta
+  ) noexcept
   {
     for (;;) {
       const std::int32_t observed = AtomicLoad(slot);

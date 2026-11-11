@@ -21,7 +21,9 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeCAimManipulatorRef(moho::CAimManipulator* const object)
+  [[nodiscard]] gpg::RRef MakeCAimManipulatorRef(
+    moho::CAimManipulator* const object
+  )
   {
     return gpg::MakeRRef(object);
   }
@@ -48,7 +50,9 @@ namespace moho
    * What it does:
    * Executes one non-deleting destruction lane for `CAimManipulatorTypeInfo`.
    */
-  [[maybe_unused]] void DestroyCAimManipulatorTypeInfoBody(CAimManipulatorTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void DestroyCAimManipulatorTypeInfoBody(
+    CAimManipulatorTypeInfo* const typeInfo
+  ) noexcept
   {
     typeInfo->~CAimManipulatorTypeInfo();
   }
@@ -99,11 +103,11 @@ namespace moho
    * What it does:
    * Default-constructs supplied storage and returns its reflected reference.
    */
-  gpg::RRef CAimManipulatorTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CAimManipulatorTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
-    CAimManipulator* const object = objectStorage
-      ? ::new (objectStorage) CAimManipulator()
-      : nullptr;
+    CAimManipulator* const object = objectStorage ? ::new (objectStorage) CAimManipulator() : nullptr;
     return MakeCAimManipulatorRef(object);
   }
 
@@ -113,7 +117,9 @@ namespace moho
    * What it does:
    * Deletes the reflected object through its virtual destructor.
    */
-  void CAimManipulatorTypeInfo::Delete(void* const objectStorage)
+  void CAimManipulatorTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CAimManipulator*>(objectStorage);
   }
@@ -124,7 +130,9 @@ namespace moho
    * What it does:
    * Runs the virtual destructor without releasing supplied storage.
    */
-  void CAimManipulatorTypeInfo::Destruct(void* const objectStorage)
+  void CAimManipulatorTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     static_cast<CAimManipulator*>(objectStorage)->~CAimManipulator();
   }
@@ -132,7 +140,9 @@ namespace moho
   /**
    * Address: 0x00632FD0 (FUN_00632FD0, Moho::CAimManipulatorTypeInfo::AddBase_IAniManipulator)
    */
-  void CAimManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const typeInfo)
+  void CAimManipulatorTypeInfo::AddBase_IAniManipulator(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::IAniManipulator>(typeInfo);
   }
@@ -152,4 +162,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAimManipulatorTypeInfo_9e43e8, moho::register_CAimManipulatorTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAimManipulatorTypeInfo_9e43e8,
+  moho::register_CAimManipulatorTypeInfo
+)

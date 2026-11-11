@@ -7,8 +7,7 @@ namespace
     "PostDragger(originFrame, keycode, dragger)\n"
     "Make 'dragger' the active dragger from a particular frame. You can pass nil to cancel the current dragger.";
   constexpr const char* kPostDraggerInvalidKeyError = "Invalid key specified. Must be LBUTTON or RBUTTON or MBUTTON";
-}
-
+} // namespace
 
 /**
  * Address: 0x0078DE50 (FUN_0078DE50, Moho::CMauiLuaDragger::CMauiLuaDragger)
@@ -37,8 +36,7 @@ namespace
   constexpr std::int32_t kMauiLButtonCode = 301;
   constexpr std::int32_t kMauiRButtonCode = 302;
   constexpr std::int32_t kMauiMButtonCode = 304;
-}
-
+} // namespace
 
 gpg::RType* moho::CMauiLuaDragger::sType = nullptr;
 
@@ -198,8 +196,7 @@ namespace
 
     return static_cast<moho::CMauiLuaDragger*>(upcast.mObj);
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x0078DB50 (slot +0x04 of ??_7IMauiDragger@Moho@@6B@, VA 0x00E38DC0)
@@ -432,11 +429,22 @@ void func_OnCommandDragEnd(
 
 // Rows 0x00F5A488: EVT_MOUSE_EVENTS is the thirteen mouse rows, all bound to
 // OnMouseMove (0x007A4970), in the order that macro lists them.
-BEGIN_EVENT_TABLE(moho::CMauiWxEventMapper, wxEvtHandler)
-  EVT_MOUSE_EVENTS(moho::CMauiWxEventMapper::OnMouseMove)
-  EVT_KEY_UP(moho::CMauiWxEventMapper::OnKeyUp)
-  EVT_KEY_DOWN(moho::CMauiWxEventMapper::OnKeyDown)
-  EVT_CHAR(moho::CMauiWxEventMapper::OnChar)
+BEGIN_EVENT_TABLE(
+  moho::CMauiWxEventMapper,
+  wxEvtHandler
+)
+EVT_MOUSE_EVENTS(
+  moho::CMauiWxEventMapper::OnMouseMove
+)
+EVT_KEY_UP(
+  moho::CMauiWxEventMapper::OnKeyUp
+)
+EVT_KEY_DOWN(
+  moho::CMauiWxEventMapper::OnKeyDown
+)
+EVT_CHAR(
+  moho::CMauiWxEventMapper::OnChar
+)
 END_EVENT_TABLE()
 
 /**

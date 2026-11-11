@@ -43,7 +43,10 @@ namespace
     ScenarioUtils.CreateArmyGroupAsPlatoon('ARMY_17', 'Patrol', 'GrowthFormation')
 )lua";
 
-  TEST(UnitFate, PathToTheUnit)
+  TEST(
+    UnitFate,
+    PathToTheUnit
+  )
   {
     const faf::editor::UnitGroup root = Army();
     EXPECT_EQ(faf::editor::UnitGroupPath(root, "UNIT_3"), (std::vector<std::string>{"Optional_Wreckage_2", "Middle"}));
@@ -51,7 +54,10 @@ namespace
     EXPECT_TRUE(faf::editor::UnitGroupPath(root, "UNIT_9").empty());
   }
 
-  TEST(UnitFate, TheGamesOwnGroups)
+  TEST(
+    UnitFate,
+    TheGamesOwnGroups
+  )
   {
     EXPECT_EQ(faf::editor::FateOfUnit({"INITIAL"}, false, "").kind, UnitFate::Kind::Unit);
     EXPECT_EQ(faf::editor::FateOfUnit({"INITIAL", "Base"}, true, "").kind, UnitFate::Kind::Unit);
@@ -61,7 +67,10 @@ namespace
     EXPECT_EQ(faf::editor::FateOfUnit({"INITIAL", "WRECKAGE"}, true, "").kind, UnitFate::Kind::Wreck);
   }
 
-  TEST(UnitFate, GroupsTheScriptCreates)
+  TEST(
+    UnitFate,
+    GroupsTheScriptCreates
+  )
   {
     const UnitFate prefix = faf::editor::FateOfUnit({"Optional_Wreckage_2", "Middle"}, true, kScript);
     EXPECT_EQ(prefix.kind, UnitFate::Kind::ScriptWreck);
@@ -75,7 +84,8 @@ namespace
     EXPECT_EQ(faf::editor::FateOfUnit({"Spare"}, true, kScript).kind, UnitFate::Kind::Never);
   }
 
-  // URS0201 (Salem class destroyer) as FAF ships it: 2250 mass, 15000 energy, TECH2, Wreckage MassMult 0.9, EnergyMult 0.
+  // URS0201 (Salem class destroyer) as FAF ships it: 2250 mass, 15000 energy, TECH2, Wreckage MassMult 0.9, EnergyMult
+  // 0.
   const char* const kDestroyer = R"lua(UnitBlueprint {
     Categories = {
         "SELECTABLE",
@@ -98,7 +108,10 @@ namespace
 }
 )lua";
 
-  TEST(UnitFate, WreckValueAsUnitLuaMakesIt)
+  TEST(
+    UnitFate,
+    WreckValueAsUnitLuaMakesIt
+  )
   {
     const faf::editor::WreckValue dry = faf::editor::WreckOfUnit(kDestroyer, 2250.0, 15000.0, false);
     EXPECT_TRUE(dry.exists);
@@ -107,11 +120,16 @@ namespace
     const faf::editor::WreckValue wet = faf::editor::WreckOfUnit(kDestroyer, 2250.0, 15000.0, true);
     EXPECT_DOUBLE_EQ(wet.mass, 2250.0 * 0.9 * 0.8 * 0.6);
     // No Wreckage table: no wreck.
-    EXPECT_FALSE(faf::editor::WreckOfUnit("UnitBlueprint { Economy = { BuildCostMass = 50 } }", 50.0, 0.0, false).exists);
+    EXPECT_FALSE(
+      faf::editor::WreckOfUnit("UnitBlueprint { Economy = { BuildCostMass = 50 } }", 50.0, 0.0, false).exists
+    );
     // A naval unit without one gets FAF's default (Blueprints.lua): UES0103, a tech 1 frigate of 280 mass.
-    const faf::editor::WreckValue frigate =
-      faf::editor::WreckOfUnit("UnitBlueprint { Categories = { \"UEF\", \"NAVAL\", \"TECH1\", }, Economy = { BuildCostMass = 280 } }", 280.0,
-                               2000.0, false);
+    const faf::editor::WreckValue frigate = faf::editor::WreckOfUnit(
+      "UnitBlueprint { Categories = { \"UEF\", \"NAVAL\", \"TECH1\", }, Economy = { BuildCostMass = 280 } }",
+      280.0,
+      2000.0,
+      false
+    );
     EXPECT_TRUE(frigate.exists);
     EXPECT_DOUBLE_EQ(frigate.mass, 280.0 * 0.9 * 0.9);
     EXPECT_DOUBLE_EQ(frigate.energy, 0.0);

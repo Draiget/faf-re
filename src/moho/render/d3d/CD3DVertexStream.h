@@ -83,9 +83,9 @@ namespace moho
     bool CreateBuffer();
 
   public:
-    CD3DDevice* mDevice;                   // +0x04
+    CD3DDevice* mDevice;                    // +0x04
     gpg::gal::VertexBufferContext mContext; // +0x08
-    BufferHandle mBuffer;                  // +0x1C
+    BufferHandle mBuffer;                   // +0x1C
   };
 
   static_assert(sizeof(CD3DVertexStream::BufferHandle) == 0x08, "CD3DVertexStream::BufferHandle size must be 0x08");

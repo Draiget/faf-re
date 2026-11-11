@@ -52,17 +52,17 @@ namespace gpg::gal
    */
   struct DeviceRuntimeInfo
   {
-    fa::string api;            // "D3D9", "D3D11", "D3D12", "Vulkan"
-    fa::string adapter;        // adapter description
-    fa::string driverVersion;  // when the API exposes it
-    fa::string featureLevel;   // "11_1", "SM3", Vulkan API version ...
+    fa::string api;           // "D3D9", "D3D11", "D3D12", "Vulkan"
+    fa::string adapter;       // adapter description
+    fa::string driverVersion; // when the API exposes it
+    fa::string featureLevel;  // "11_1", "SM3", Vulkan API version ...
     std::uint32_t vendorId = 0, deviceId = 0;
-    std::uint64_t dedicatedVideoMemory = 0;   // bytes
+    std::uint64_t dedicatedVideoMemory = 0; // bytes
     std::uint64_t sharedSystemMemory = 0;
-    std::uint64_t localBudget = 0, localUsage = 0;        // DXGI QueryVideoMemoryInfo / VK_EXT_memory_budget
+    std::uint64_t localBudget = 0, localUsage = 0; // DXGI QueryVideoMemoryInfo / VK_EXT_memory_budget
     std::uint64_t nonLocalBudget = 0, nonLocalUsage = 0;
     std::uint64_t availableTextureMemory = 0; // D3D9 GetAvailableTextureMem
-    fa::string swapChain;      // e.g. "1280x720 flip-discard 3 buffers, tearing"
+    fa::string swapChain;                     // e.g. "1280x720 flip-discard 3 buffers, tearing"
     bool vsync = false;
     std::uint32_t gpuDrivenFeatures = 0;
   };
@@ -254,9 +254,8 @@ namespace gpg::gal
      * What it does:
      * Creates one depth/stencil target described by `context`.
      */
-    virtual boost::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(
-      const DepthStencilTargetContext* context
-    ) = 0;
+    virtual boost::shared_ptr<DepthStencilTarget>
+    CreateDepthStencilTarget(const DepthStencilTargetContext* context) = 0;
     /**
      * Slot: 14 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
@@ -324,10 +323,8 @@ namespace gpg::gal
      * What it does:
      * Writes one cube render target to `filePath` as a DDS file.
      */
-    virtual void SaveCubeRenderTarget(
-      const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
-      const fa::string& filePath
-    ) = 0;
+    virtual void
+    SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) = 0;
     /**
      * Slot: 21 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
@@ -378,10 +375,8 @@ namespace gpg::gal
      * it unimplemented (0x008E9B40, 0x008FA260), and nothing in reach calls it,
      * so the handle types are not known.
      */
-    virtual boost::weak_ptr<void>* Func7(
-      boost::weak_ptr<void>* outWeakHandle,
-      boost::shared_ptr<void> temporarySharedHandle
-    ) = 0;
+    virtual boost::weak_ptr<void>*
+    Func7(boost::weak_ptr<void>* outWeakHandle, boost::shared_ptr<void> temporarySharedHandle) = 0;
     /**
      * Slot: 26 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
@@ -500,14 +495,8 @@ namespace gpg::gal
      * What it does:
      * Clears the bound target, depth and stencil.
      */
-    virtual void Clear(
-        bool clearTarget,
-        bool clearZbuffer,
-        bool clearStencil,
-        std::uint32_t color,
-        float depth,
-        int stencil
-    ) = 0;
+    virtual void
+    Clear(bool clearTarget, bool clearZbuffer, bool clearStencil, std::uint32_t color, float depth, int stencil) = 0;
     /**
      * Slot: 39 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
@@ -553,13 +542,7 @@ namespace gpg::gal
      * What it does:
      * Sets the fixed-function fog parameters.
      */
-    virtual void SetFogState(
-        bool enable,
-        const Matrix* projection,
-        float fogStart,
-        float fogEnd,
-        int fogColor
-    ) = 0;
+    virtual void SetFogState(bool enable, const Matrix* projection, float fogStart, float fogEnd, int fogColor) = 0;
     /**
      * Slot: 44 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)
@@ -696,7 +679,10 @@ namespace gpg::gal
      * Nothing here (false).
      */
     virtual bool SetRayInstances(
-      const RayInstance* instances, std::uint32_t count, const boost::shared_ptr<Texture>* textures = nullptr, std::uint32_t textureCount = 0U
+      const RayInstance* instances,
+      std::uint32_t count,
+      const boost::shared_ptr<Texture>* textures = nullptr,
+      std::uint32_t textureCount = 0U
     );
 
   protected:
@@ -717,4 +703,3 @@ namespace gpg::gal
    */
   [[nodiscard]] bool SupportsVertexTextureFormat(std::uint32_t textureFormat);
 } // namespace gpg::gal
-

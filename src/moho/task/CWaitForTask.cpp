@@ -40,7 +40,9 @@ namespace
    * What it does:
    * Adds reflected `CTask` base metadata at subobject offset `0x00`.
    */
-  void AddCTaskBaseToTypeInfo(gpg::RType* const typeInfo)
+  void AddCTaskBaseToTypeInfo(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<CTask>(typeInfo);
   }
@@ -54,18 +56,18 @@ CWaitForTask::CWaitForTask()
   : CTask(nullptr, false)
   , mEventLinkRef()
   , mEventObject()
-{
-}
+{}
 
 /**
  * Address: 0x004CA520 (FUN_004CA520, ??0CWaitForTask@Moho@@QAE@ABVLuaObject@LuaPlus@@@Z)
  */
-CWaitForTask::CWaitForTask(const LuaPlus::LuaObject& payload)
+CWaitForTask::CWaitForTask(
+  const LuaPlus::LuaObject& payload
+)
   : CTask(nullptr, false)
   , mEventLinkRef()
   , mEventObject(payload)
-{
-}
+{}
 
 /**
  * Address: 0x004CA5B0 (FUN_004CA5B0, sub_4CA5B0)
@@ -106,7 +108,9 @@ int CWaitForTask::Execute()
 /**
  * Address: 0x004CC3B0 (FUN_004CC3B0, Moho::CWaitForTask::MemberSerialize in export label)
  */
-void CWaitForTask::MemberDeserialize(gpg::ReadArchive* const archive)
+void CWaitForTask::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   gpg::RType* luaObjectType = LuaPlus::LuaObject::sType;
   if (!luaObjectType) {
@@ -123,7 +127,10 @@ void CWaitForTask::MemberDeserialize(gpg::ReadArchive* const archive)
 /**
  * Address: 0x004CC460 (FUN_004CC460, Moho::CWaitForTask::MemberDeserialize in export label)
  */
-void CWaitForTask::MemberSerialize(gpg::WriteArchive* const archive) const{
+void CWaitForTask::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
+{
   gpg::RType* luaObjectType = LuaPlus::LuaObject::sType;
   if (!luaObjectType) {
     luaObjectType = gpg::LookupRType(typeid(LuaPlus::LuaObject));
@@ -173,16 +180,27 @@ void CWaitForTaskTypeInfo::Init()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CWaitForTaskTypeInfo_30426d, moho::register_CWaitForTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CWaitForTaskTypeInfo_30426d,
+  moho::register_CWaitForTaskTypeInfo
+)
 
-GPG_PREREGISTER_INIT(PreRegisterCWaitForTaskTypeInfo_30426d, PreRegisterCWaitForTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  PreRegisterCWaitForTaskTypeInfo_30426d,
+  PreRegisterCWaitForTaskTypeInfo
+)
 
 namespace moho
 {
   /**
    * Address: 0x004CA750 (FUN_004CA750)
    */
-  void CWaitForTask::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CWaitForTask::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CWaitForTask()), 0u);
   }

@@ -10,14 +10,15 @@
 
 #include "server/SpeedWatch.h"
 
-// Engine addition, dedicated server (plan WP10.7 step 2): a player whose link can't carry the game's data holds the game,
-// as a lockstep peer whose data comes late does; FAF players expect a slow participant to slow the game rather than drop
-// out. How long the oldest view a seat hasn't acked has waited (CServerNet's `behindSeconds`; beats behind would count
-// for more seconds as the game slows) is looked at every kWindowSeconds. Being behind alone says little (a far link's delay doesn't shrink when the game slows); falling
-// further behind does: a link more than kBehindSeconds behind that fell more than kGrowSeconds further behind over the
-// window gets a limit one step under the game's speed (one step a window at most). After kCalmWindows windows in a row
-// in which it didn't fall behind and was under kBehindSeconds, the limit rises a step, and goes once it reaches the
-// requested speed. The server runs at the lowest of the requested speed, each seat's machine limit (step 0) and these.
+// Engine addition, dedicated server (plan WP10.7 step 2): a player whose link can't carry the game's data holds the
+// game, as a lockstep peer whose data comes late does; FAF players expect a slow participant to slow the game rather
+// than drop out. How long the oldest view a seat hasn't acked has waited (CServerNet's `behindSeconds`; beats behind
+// would count for more seconds as the game slows) is looked at every kWindowSeconds. Being behind alone says little (a
+// far link's delay doesn't shrink when the game slows); falling further behind does: a link more than kBehindSeconds
+// behind that fell more than kGrowSeconds further behind over the window gets a limit one step under the game's speed
+// (one step a window at most). After kCalmWindows windows in a row in which it didn't fall behind and was under
+// kBehindSeconds, the limit rises a step, and goes once it reaches the requested speed. The server runs at the lowest
+// of the requested speed, each seat's machine limit (step 0) and these.
 
 namespace faf::server
 {
@@ -53,7 +54,12 @@ namespace faf::server
     static constexpr double kSilentSeconds = 2.0;
 
     /** `speed`: the speed the game runs at now; `asked`: the speed requested. Returns the limits that changed. */
-    std::vector<SLinkNews> Update(const double now, const int speed, const int asked, const std::span<const SLinkSample> seats)
+    std::vector<SLinkNews> Update(
+      const double now,
+      const int speed,
+      const int asked,
+      const std::span<const SLinkSample> seats
+    )
     {
       std::vector<SLinkNews> news;
       for (const SLinkSample& seat : seats) {

@@ -6,7 +6,7 @@ namespace
 {
   std::uint32_t gSimpleRenderWorldViewOffsetInit = 0;
   Wm3::Vector3f gSimpleRenderWorldViewOffset{};
-}
+} // namespace
 
 namespace moho
 {
@@ -17,7 +17,9 @@ namespace moho
    * Installs this class's vtable (0x00E40584), clears the shake toggle and
    * stores the camera payload the view reports from `GetCameraView`.
    */
-  SimpleRenderWorldView::SimpleRenderWorldView(GeomCamera3* const cameraView)
+  SimpleRenderWorldView::SimpleRenderWorldView(
+    GeomCamera3* const cameraView
+  )
     : mCanShake(false)
     , mCameraView(cameraView)
   {}
@@ -25,13 +27,23 @@ namespace moho
   /**
    * Address: 0x007F62A0 (FUN_007F62A0, nullsub_56)
    */
-  void SimpleRenderWorldView::Render(CD3DPrimBatcher*, int, float, float)
+  void SimpleRenderWorldView::Render(
+    CD3DPrimBatcher*,
+    int,
+    float,
+    float
+  )
   {}
 
   /**
    * Address: 0x007F62B0 (FUN_007F62B0, Moho::SimpleRenderWorldView::RenderCommandGraph)
    */
-  void SimpleRenderWorldView::RenderCommandGraph(CD3DPrimBatcher*, int, float, float)
+  void SimpleRenderWorldView::RenderCommandGraph(
+    CD3DPrimBatcher*,
+    int,
+    float,
+    float
+  )
   {}
 
   /**
@@ -89,7 +101,9 @@ namespace moho
   /**
    * Address: 0x007F6350 (FUN_007F6350, Moho::SimpleRenderWorldView::SetOrthographic)
    */
-  void SimpleRenderWorldView::SetOrthographic(const bool enabled)
+  void SimpleRenderWorldView::SetOrthographic(
+    const bool enabled
+  )
   {
     // 0x007F6350 is `mov al,[arg]; mov [ecx+4],al; ret 4` - the AL load feeds
     // the store, so the slot returns nothing. IDA types it `bool` only because

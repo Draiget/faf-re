@@ -11,16 +11,29 @@ class wxString : public std::wstring
 {
 public:
   wxString() = default;
-  wxString(const wchar_t* const text)
+  wxString(
+    const wchar_t* const text
+  )
     : std::wstring(text != nullptr ? text : L"")
   {}
-  wxString(const std::wstring& text)
+  wxString(
+    const std::wstring& text
+  )
     : std::wstring(text)
   {}
 
-  const wchar_t* c_str() const { return std::wstring::c_str(); }
-  bool IsEmpty() const { return empty(); }
-  std::size_t Len() const { return size(); }
+  const wchar_t* c_str() const
+  {
+    return std::wstring::c_str();
+  }
+  bool IsEmpty() const
+  {
+    return empty();
+  }
+  std::size_t Len() const
+  {
+    return size();
+  }
 };
 
 extern const wxString wxEmptyString;

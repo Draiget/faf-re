@@ -5,8 +5,13 @@
 
 namespace faf::editor
 {
-  std::vector<int> MirrorPartners(const std::vector<std::optional<std::array<float, 2>>>& starts, const int width, const int height,
-                                  const Symmetry symmetry, const int turns)
+  std::vector<int> MirrorPartners(
+    const std::vector<std::optional<std::array<float, 2>>>& starts,
+    const int width,
+    const int height,
+    const Symmetry symmetry,
+    const int turns
+  )
   {
     std::vector<int> partners(starts.size(), -1);
     for (std::size_t i = 0; i < starts.size(); ++i) {
@@ -15,7 +20,8 @@ namespace faf::editor
       }
       float copyX[kMaxSymmetryCopies];
       float copyZ[kMaxSymmetryCopies];
-      const int copies = HeightBrushCentres(width, height, (*starts[i])[0], (*starts[i])[1], symmetry, turns, copyX, copyZ);
+      const int copies =
+        HeightBrushCentres(width, height, (*starts[i])[0], (*starts[i])[1], symmetry, turns, copyX, copyZ);
       if (copies < 2) {
         continue;
       }
@@ -37,7 +43,9 @@ namespace faf::editor
     return partners;
   }
 
-  std::vector<int> PairMirroredSlots(const std::vector<int>& partners)
+  std::vector<int> PairMirroredSlots(
+    const std::vector<int>& partners
+  )
   {
     std::vector<int> order;
     std::vector<bool> placed(partners.size(), false);
@@ -60,7 +68,9 @@ namespace faf::editor
     return order;
   }
 
-  std::string NextArmyName(const std::vector<std::string>& names)
+  std::string NextArmyName(
+    const std::vector<std::string>& names
+  )
   {
     int highest = 0;
     for (const std::string& name : names) {

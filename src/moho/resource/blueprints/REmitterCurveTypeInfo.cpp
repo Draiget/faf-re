@@ -422,7 +422,9 @@ namespace
    * Returns base lexical text plus reflected vector size for one
    * `fa::vector<moho::REmitterCurveKey>` instance.
    */
-  fa::string CurveKeyVectorTypeInfo::GetLexical(const gpg::RRef& ref) const
+  fa::string CurveKeyVectorTypeInfo::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -456,7 +458,10 @@ namespace
    * and replaces destination storage with the loaded sequence.
    */
   void CurveKeyVectorTypeInfo::SerLoad(
-    gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef* const
   )
   {
     if (archive == nullptr || objectPtr == 0) {
@@ -489,7 +494,10 @@ namespace
    * reflected write callbacks.
    */
   void CurveKeyVectorTypeInfo::SerSave(
-    gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
   )
   {
     if (archive == nullptr) {
@@ -512,7 +520,10 @@ namespace
     }
   }
 
-  gpg::RRef CurveKeyVectorTypeInfo::SubscriptIndex(void* const obj, const int ind) const
+  gpg::RRef CurveKeyVectorTypeInfo::SubscriptIndex(
+    void* const obj,
+    const int ind
+  ) const
   {
     gpg::RRef out{};
     out.mType = gpg::RTypeOf<moho::REmitterCurveKey>();
@@ -527,7 +538,9 @@ namespace
     return out;
   }
 
-  size_t CurveKeyVectorTypeInfo::GetCount(void* const obj) const
+  size_t CurveKeyVectorTypeInfo::GetCount(
+    void* const obj
+  ) const
   {
     const auto* const storage = static_cast<const CurveKeyVector*>(obj);
     return storage ? storage->size() : 0u;
@@ -536,7 +549,10 @@ namespace
   /**
    * Address: 0x00515D20 (FUN_00515D20, gpg::RVectorType_REmitterCurveKey::SetCount)
    */
-  void CurveKeyVectorTypeInfo::SetCount(void* const obj, const int count) const
+  void CurveKeyVectorTypeInfo::SetCount(
+    void* const obj,
+    const int count
+  ) const
   {
     if (obj == nullptr || count < 0) {
       return;
@@ -563,7 +579,9 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeEmitterCurveRef(moho::REmitterBlueprintCurve* object)
+  [[nodiscard]] gpg::RRef MakeEmitterCurveRef(
+    moho::REmitterBlueprintCurve* object
+  )
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -583,12 +601,16 @@ namespace
     return MakeEmitterCurveRef(new moho::REmitterBlueprintCurve());
   }
 
-  void DeleteEmitterCurveObject(void* objectMemory)
+  void DeleteEmitterCurveObject(
+    void* objectMemory
+  )
   {
     delete static_cast<moho::REmitterBlueprintCurve*>(objectMemory);
   }
 
-  void DestructEmitterCurveObject(void* objectMemory)
+  void DestructEmitterCurveObject(
+    void* objectMemory
+  )
   {
     if (!objectMemory) {
       return;
@@ -597,7 +619,9 @@ namespace
     static_cast<moho::REmitterBlueprintCurve*>(objectMemory)->~REmitterBlueprintCurve();
   }
 
-  [[nodiscard]] gpg::RRef MakeEmitterCurveKeyRef(moho::REmitterCurveKey* object)
+  [[nodiscard]] gpg::RRef MakeEmitterCurveKeyRef(
+    moho::REmitterCurveKey* object
+  )
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -610,7 +634,9 @@ namespace
     return MakeEmitterCurveKeyRef(new moho::REmitterCurveKey());
   }
 
-  [[nodiscard]] gpg::RRef ConstructEmitterCurveKeyRef(void* objectMemory)
+  [[nodiscard]] gpg::RRef ConstructEmitterCurveKeyRef(
+    void* objectMemory
+  )
   {
     if (!objectMemory) {
       return MakeEmitterCurveKeyRef(nullptr);
@@ -620,12 +646,16 @@ namespace
     return MakeEmitterCurveKeyRef(object);
   }
 
-  void DeleteEmitterCurveKeyObject(void* objectMemory)
+  void DeleteEmitterCurveKeyObject(
+    void* objectMemory
+  )
   {
     delete static_cast<moho::REmitterCurveKey*>(objectMemory);
   }
 
-  void DestructEmitterCurveKeyObject(void* objectMemory)
+  void DestructEmitterCurveKeyObject(
+    void* objectMemory
+  )
   {
     if (!objectMemory) {
       return;
@@ -641,7 +671,9 @@ namespace
    * Installs `REmitterBlueprintCurve` lifecycle callback lanes on one
    * `gpg::RType` descriptor and returns that descriptor.
    */
-  [[nodiscard]] gpg::RType* BindEmitterBlueprintCurveLifecycleCallbacks(gpg::RType* const typeInfo)
+  [[nodiscard]] gpg::RType* BindEmitterBlueprintCurveLifecycleCallbacks(
+    gpg::RType* const typeInfo
+  )
   {
     typeInfo->newRefFunc_ = &NewEmitterCurveRef;
     typeInfo->ctorRefFunc_ = &CurveTypeInfo::CtrRef;
@@ -657,7 +689,9 @@ namespace
    * Installs `REmitterCurveKey` lifecycle callback lanes on one
    * `gpg::RType` descriptor and returns that descriptor.
    */
-  [[nodiscard]] gpg::RType* BindEmitterCurveKeyLifecycleCallbacks(gpg::RType* const typeInfo)
+  [[nodiscard]] gpg::RType* BindEmitterCurveKeyLifecycleCallbacks(
+    gpg::RType* const typeInfo
+  )
   {
     typeInfo->newRefFunc_ = &NewEmitterCurveKeyRef;
     typeInfo->ctorRefFunc_ = &ConstructEmitterCurveKeyRef;
@@ -706,7 +740,9 @@ namespace moho
   /**
    * Address: 0x00516EC0 (FUN_00516EC0)
    */
-  void REmitterBlueprintCurveTypeInfo::AddBaseRObject(gpg::RType* const typeInfo)
+  void REmitterBlueprintCurveTypeInfo::AddBaseRObject(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<gpg::RObject>(typeInfo);
   }
@@ -714,7 +750,9 @@ namespace moho
   /**
    * Address: 0x00516F20 (FUN_00516F20)
    */
-  void REmitterBlueprintCurveTypeInfo::AddFields(gpg::RType* const typeInfo)
+  void REmitterBlueprintCurveTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
     typeInfo->AddField<float>("XRange", offsetof(REmitterBlueprintCurve, XRange), 3, "Range of X for this curve.");
     typeInfo->AddField<CurveKeyVector>("Keys", offsetof(REmitterBlueprintCurve, Keys), 3, "Keys for this curve.");
@@ -744,7 +782,9 @@ namespace moho
    * Constructs one `REmitterBlueprintCurve` in caller-provided storage and
    * returns a typed reflection reference for that object.
    */
-  gpg::RRef REmitterBlueprintCurveTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef REmitterBlueprintCurveTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const curve = gpg::ConstructInStorage<REmitterBlueprintCurve>(objectStorage);
 
@@ -778,7 +818,9 @@ namespace moho
   /**
    * Address: 0x00516FA0 (FUN_00516FA0)
    */
-  void REmitterCurveKeyTypeInfo::AddBaseRObject(gpg::RType* const typeInfo)
+  void REmitterCurveKeyTypeInfo::AddBaseRObject(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<gpg::RObject>(typeInfo);
   }
@@ -786,7 +828,9 @@ namespace moho
   /**
    * Address: 0x00515720 (FUN_00515720)
    */
-  void REmitterCurveKeyTypeInfo::AddFields(gpg::RType* const typeInfo)
+  void REmitterCurveKeyTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
     typeInfo->AddField<float>("x", offsetof(REmitterCurveKey, X), 3, "X pos of this curve.");
     typeInfo->AddField<float>("y", offsetof(REmitterCurveKey, Y), 3, "Y pos of this curve.");
@@ -854,8 +898,20 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_REmitterBlueprintCurveTypeInfo_399a30, moho::register_REmitterBlueprintCurveTypeInfo)
-GPG_PREREGISTER_INIT(register_REmitterCurveKeyTypeInfo_399a30, moho::register_REmitterCurveKeyTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_REmitterBlueprintCurveTypeInfo_399a30,
+  moho::register_REmitterBlueprintCurveTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_REmitterCurveKeyTypeInfo_399a30,
+  moho::register_REmitterCurveKeyTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_VectorREmitterCurveKeyType_399a30, moho::preregister_VectorREmitterCurveKeyType)
-GPG_PREREGISTER_INIT(register_VectorREmitterCurveKeyType_399a30, moho::register_VectorREmitterCurveKeyType)
+GPG_PREREGISTER_INIT(
+  preregister_VectorREmitterCurveKeyType_399a30,
+  moho::preregister_VectorREmitterCurveKeyType
+)
+GPG_PREREGISTER_INIT(
+  register_VectorREmitterCurveKeyType_399a30,
+  moho::register_VectorREmitterCurveKeyType
+)

@@ -27,11 +27,12 @@ namespace moho
   class INetConnector;
   class INetConnection;
 
-  class MOHO_EMPTY_BASES CLobby : public CScriptObject,
-                                  public IMessageReceiver,
-                                  public INetDatagramHandler,
-                                  public CPushTask<CLobby>,
-                                  public CPullTask<CLobby>
+  class MOHO_EMPTY_BASES CLobby :
+    public CScriptObject,
+    public IMessageReceiver,
+    public INetDatagramHandler,
+    public CPushTask<CLobby>,
+    public CPullTask<CLobby>
   {
   public:
     /**
@@ -211,7 +212,9 @@ namespace moho
      * @param hostPeerUidBuf
      */
     void ProcessConnectionToHostEstablished(
-      const char** localPeerUidBuf, const char** newLocalNameBuf, const char** hostPeerUidBuf
+      const char** localPeerUidBuf,
+      const char** newLocalNameBuf,
+      const char** hostPeerUidBuf
     );
 
     /**
@@ -337,7 +340,10 @@ namespace moho
      * Resolves or creates the per-owner command source id entry.
      */
     uint32_t AssignCommandSource(
-      int timeouts, int32_t ownerId, fa::vector<SSTICommandSource>& commandSources, uint32_t& sourceId
+      int timeouts,
+      int32_t ownerId,
+      fa::vector<SSTICommandSource>& commandSources,
+      uint32_t& sourceId
     );
 
   private:
@@ -345,19 +351,19 @@ namespace moho
     SPeer* FindPeerByUid(int32_t uid);
 
   public:
-    INetConnector* connector{nullptr};           // 0x78
-    int32_t maxConnections{0};                   // 0x7C
-    HANDLE event{nullptr};                       // 0x80
-    bool joinedLobby{false};                     // 0x84
-    INetConnection* peerConnection{nullptr};     // 0x88
-    bool mHasNAT{false};                         // 0x8C
+    INetConnector* connector{nullptr};        // 0x78
+    int32_t maxConnections{0};                // 0x7C
+    HANDLE event{nullptr};                    // 0x80
+    bool joinedLobby{false};                  // 0x84
+    INetConnection* peerConnection{nullptr};  // 0x88
+    bool mHasNAT{false};                      // 0x8C
     fa::string playerName;                    // 0x90
-    int32_t localUid{-1};                        // 0xAC
-    TDatList<SPeer, void> peers;                 // 0xB0
-    bool peersDirty{false};                      // 0xB8
-    int32_t mNextId{0};                          // 0xBC
+    int32_t localUid{-1};                     // 0xAC
+    TDatList<SPeer, void> peers;              // 0xB0
+    bool peersDirty{false};                   // 0xB8
+    int32_t mNextId{0};                       // 0xBC
     fa::auto_ptr<INetDatagramSocket> mSocket; // 0xC0
-    int32_t hostedTime{0};                       // 0xC4
+    int32_t hostedTime{0};                    // 0xC4
 
     // Engine addition, not in the binary: who in the lobby runs our engine.
     std::unique_ptr<CLobbyPeerFeatures> mPeerFeatures;

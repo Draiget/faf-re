@@ -58,7 +58,10 @@ namespace moho
      */
     CountedPtr() noexcept = default;
 
-    CountedPtr(const CountedPtr& other) noexcept : tex(other.tex)
+    CountedPtr(
+      const CountedPtr& other
+    ) noexcept
+      : tex(other.tex)
     {
       Retain(tex);
     }
@@ -68,10 +71,17 @@ namespace moho
      * as emitted for the beam vector copies (retain the new texture, release the
      * old one). Formerly `CopyCountedParticleTextureLaneRetain` in
      * BeamRenderHelpers.cpp, removed 2026-09-10.)
-     * Address: 0x00794E10 (FUN_00794E10 -- `CountedPtr<T>::operator=` reading the source handle through a slot: retain the new object, release the old one; callers `DrawUnitCustomNameLabel` 0x0085E0A0 and `DrawUnitSelectionSetNameLabel` 0x0085E3A0 (CWldSession.cpp); formerly `AssignIntrusiveRefCountedWordFromSlot` in moho/containers/LegacyContainerFillLanes.cpp (RULE ONE), file removed 2026-09-10.)
-     * Address: 0x0089E580 (FUN_0089E580 -- the same `CountedPtr<T>::operator=` shape for a second handle type; zero callers, unreachable; formerly `AssignIntrusiveRefCountedWordFromSlot` in moho/containers/LegacyContainerFillLanes.cpp (RULE ONE), file removed 2026-09-10.)
+     * Address: 0x00794E10 (FUN_00794E10 -- `CountedPtr<T>::operator=` reading the source handle through a slot: retain
+     * the new object, release the old one; callers `DrawUnitCustomNameLabel` 0x0085E0A0 and
+     * `DrawUnitSelectionSetNameLabel` 0x0085E3A0 (CWldSession.cpp); formerly `AssignIntrusiveRefCountedWordFromSlot` in
+     * moho/containers/LegacyContainerFillLanes.cpp (RULE ONE), file removed 2026-09-10.) Address: 0x0089E580
+     * (FUN_0089E580 -- the same `CountedPtr<T>::operator=` shape for a second handle type; zero callers, unreachable;
+     * formerly `AssignIntrusiveRefCountedWordFromSlot` in moho/containers/LegacyContainerFillLanes.cpp (RULE ONE), file
+     * removed 2026-09-10.)
      */
-    CountedPtr& operator=(const CountedPtr& other) noexcept
+    CountedPtr& operator=(
+      const CountedPtr& other
+    ) noexcept
     {
       if (this != &other) {
         T* const previous = tex;
@@ -82,7 +92,9 @@ namespace moho
       return *this;
     }
 
-    void reset(T* const payload = nullptr) noexcept
+    void reset(
+      T* const payload = nullptr
+    ) noexcept
     {
       if (tex != payload) {
         T* const previous = tex;
@@ -113,7 +125,9 @@ namespace moho
     }
 
   private:
-    static void Retain(T* const payload) noexcept
+    static void Retain(
+      T* const payload
+    ) noexcept
     {
       if constexpr (requires(T* p) { p->AddReferenceAtomic(); }) {
         if (payload != nullptr) {
@@ -122,7 +136,9 @@ namespace moho
       }
     }
 
-    static void Release(T* const payload) noexcept
+    static void Release(
+      T* const payload
+    ) noexcept
     {
       if constexpr (requires(T* p) { p->ReleaseReferenceAtomic(); }) {
         if (payload != nullptr) {

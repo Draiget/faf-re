@@ -22,7 +22,10 @@ namespace
 
   struct CMauiFrameTypeInfoBootstrap
   {
-    CMauiFrameTypeInfoBootstrap() { moho::register_CMauiFrameTypeInfoStartup(); }
+    CMauiFrameTypeInfoBootstrap()
+    {
+      moho::register_CMauiFrameTypeInfoStartup();
+    }
   };
   CMauiFrameTypeInfoBootstrap gCMauiFrameTypeInfoBootstrap;
 
@@ -46,7 +49,9 @@ namespace
     return cached;
   }
 
-  void AddCMauiControlBase(gpg::RType& typeInfo)
+  void AddCMauiControlBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::RType* const baseType = CachedCMauiControlType();
 
@@ -105,7 +110,9 @@ void moho::register_CMauiFrameTypeInfoStartup()
   (void)AcquireCMauiFrameTypeInfo();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CMauiFrameTypeInfoStartup_050fa0, moho::register_CMauiFrameTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CMauiFrameTypeInfoStartup_050fa0,
+  moho::register_CMauiFrameTypeInfoStartup
+)

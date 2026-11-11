@@ -1,4 +1,5 @@
-// What a texture slot holds under a terrain shader (src/editor/tools/EdShaderSlots.cpp), as FAF's terrain.fx lays them out.
+// What a texture slot holds under a terrain shader (src/editor/tools/EdShaderSlots.cpp), as FAF's terrain.fx lays them
+// out.
 
 #include "editor/tools/EdShaderSlots.h"
 
@@ -8,7 +9,10 @@ namespace
 {
   using faf::editor::ShaderSlotUseOf;
 
-  TEST(ShaderSlots, GpgShadersHaveStrataOnly)
+  TEST(
+    ShaderSlots,
+    GpgShadersHaveStrataOnly
+  )
   {
     for (int slot = 0; slot < 10; ++slot) {
       EXPECT_TRUE(ShaderSlotUseOf("TTerrainXP", slot).text.empty());
@@ -16,7 +20,10 @@ namespace
     }
   }
 
-  TEST(ShaderSlots, TheNumberedShadersKeepStratum8AndTheUpperSlot)
+  TEST(
+    ShaderSlots,
+    TheNumberedShadersKeepStratum8AndTheUpperSlot
+  )
   {
     // 1XX and 2XX: stratum 8 (S7) map-wide, the upper slot the layers' height and roughness.
     EXPECT_TRUE(ShaderSlotUseOf("Terrain250", 8).mapWide);
@@ -35,7 +42,10 @@ namespace
     EXPECT_TRUE(ShaderSlotUseOf("Terrain10", 8).text.empty());
   }
 
-  TEST(ShaderSlots, MapWideOnlyAboveTheMapsSize)
+  TEST(
+    ShaderSlots,
+    MapWideOnlyAboveTheMapsSize
+  )
   {
     // terrain.fx: a scale of 1024 on a 512-unit map is a tile value of 0.5, under 1: map-wide.
     EXPECT_TRUE(faf::editor::MapWideOn(1024.0f, 512.0f));

@@ -28,8 +28,9 @@ namespace
     return CScriptObject::StaticGetClass();
   }
 
-
-  [[nodiscard]] gpg::RRef MakeCUnitScriptTaskRef(CUnitScriptTask* object)
+  [[nodiscard]] gpg::RRef MakeCUnitScriptTaskRef(
+    CUnitScriptTask* object
+  )
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -48,7 +49,9 @@ namespace
   /**
    * Address: 0x00623D30 (FUN_00623D30, CUnitScriptTaskTypeInfo::deleteFunc_)
    */
-  void DeleteCUnitScriptTaskOwned(void* object)
+  void DeleteCUnitScriptTaskOwned(
+    void* object
+  )
   {
     delete static_cast<CUnitScriptTask*>(object);
   }
@@ -56,7 +59,9 @@ namespace
   /**
    * Address: 0x00623D50 (FUN_00623D50, CUnitScriptTaskTypeInfo::ctorRefFunc_)
    */
-  [[nodiscard]] gpg::RRef ConstructCUnitScriptTaskRefInPlace(void* storage)
+  [[nodiscard]] gpg::RRef ConstructCUnitScriptTaskRefInPlace(
+    void* storage
+  )
   {
     auto* const task = static_cast<CUnitScriptTask*>(storage);
     if (task) {
@@ -68,7 +73,9 @@ namespace
   /**
    * Address: 0x00623DC0 (FUN_00623DC0, CUnitScriptTaskTypeInfo::dtrFunc_)
    */
-  void DestroyCUnitScriptTaskInPlace(void* object)
+  void DestroyCUnitScriptTaskInPlace(
+    void* object
+  )
   {
     auto* const task = static_cast<CUnitScriptTask*>(object);
     if (task) {
@@ -79,97 +86,107 @@ namespace
 
 namespace moho
 {
-/**
- * Address: 0x00622D20 (FUN_00622D20)
- */
-gpg::RType* register_CUnitScriptTaskTypeInfo()
-{
-  TypeInfo& typeInfo = AcquireTypeInfo();
-  gpg::PreRegisterRType(typeid(CUnitScriptTask), &typeInfo);
-  return &typeInfo;
-}
+  /**
+   * Address: 0x00622D20 (FUN_00622D20)
+   */
+  gpg::RType* register_CUnitScriptTaskTypeInfo()
+  {
+    TypeInfo& typeInfo = AcquireTypeInfo();
+    gpg::PreRegisterRType(typeid(CUnitScriptTask), &typeInfo);
+    return &typeInfo;
+  }
 
-/**
- * Address: 0x00622DE0 (FUN_00622DE0, scalar deleting thunk)
- */
-CUnitScriptTaskTypeInfo::~CUnitScriptTaskTypeInfo() = default;
+  /**
+   * Address: 0x00622DE0 (FUN_00622DE0, scalar deleting thunk)
+   */
+  CUnitScriptTaskTypeInfo::~CUnitScriptTaskTypeInfo() = default;
 
-/**
- * Address: 0x00622DD0 (FUN_00622DD0, ?GetName@CUnitScriptTaskTypeInfo@Moho@@UBEPBDXZ)
- */
-const char* CUnitScriptTaskTypeInfo::GetName() const
-{
-  return "CUnitScriptTask";
-}
+  /**
+   * Address: 0x00622DD0 (FUN_00622DD0, ?GetName@CUnitScriptTaskTypeInfo@Moho@@UBEPBDXZ)
+   */
+  const char* CUnitScriptTaskTypeInfo::GetName() const
+  {
+    return "CUnitScriptTask";
+  }
 
-/**
- * Address: 0x00622D80 (FUN_00622D80, ?Init@CUnitScriptTaskTypeInfo@Moho@@UAEXXZ)
- */
-void CUnitScriptTaskTypeInfo::Init()
-{
-  size_ = sizeof(CUnitScriptTask);
-  (void)gpg::BindRTypeLifecycleCallbacks(
-    this,
-    &CreateCUnitScriptTaskRefOwned,
-    &ConstructCUnitScriptTaskRefInPlace,
-    &DeleteCUnitScriptTaskOwned,
-    &DestroyCUnitScriptTaskInPlace
-  );
+  /**
+   * Address: 0x00622D80 (FUN_00622D80, ?Init@CUnitScriptTaskTypeInfo@Moho@@UAEXXZ)
+   */
+  void CUnitScriptTaskTypeInfo::Init()
+  {
+    size_ = sizeof(CUnitScriptTask);
+    (void)gpg::BindRTypeLifecycleCallbacks(
+      this,
+      &CreateCUnitScriptTaskRefOwned,
+      &ConstructCUnitScriptTaskRefInPlace,
+      &DeleteCUnitScriptTaskOwned,
+      &DestroyCUnitScriptTaskInPlace
+    );
 
-  gpg::RType::Init();
-  version_ = 1;
+    gpg::RType::Init();
+    version_ = 1;
 
-  AddBase_CCommandTask(this);
-  AddBase_CScriptObject(this);
-  AddBase_Listener_ECommandEvent(this);
+    AddBase_CCommandTask(this);
+    AddBase_CScriptObject(this);
+    AddBase_Listener_ECommandEvent(this);
 
-  Finish();
-}
+    Finish();
+  }
 
-/**
- * Address: 0x00623DD0 (FUN_00623DD0, Moho::CUnitScriptTaskTypeInfo::AddBase_CCommandTask)
- *
- * IDA signature:
- * void __stdcall Moho::CUnitScriptTaskTypeInfo::AddBase_CCommandTask(gpg::RType *typeInfo);
- *
- * What it does:
- * Registers `CCommandTask` as the primary base at offset 0. The binary emits
- * one such function per base rather than a shared offset-taking helper.
- */
-void CUnitScriptTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
-{
-  AddBaseIfPresent(typeInfo, gpg::RTypeOf<CCommandTask>(), 0x00);
-}
+  /**
+   * Address: 0x00623DD0 (FUN_00623DD0, Moho::CUnitScriptTaskTypeInfo::AddBase_CCommandTask)
+   *
+   * IDA signature:
+   * void __stdcall Moho::CUnitScriptTaskTypeInfo::AddBase_CCommandTask(gpg::RType *typeInfo);
+   *
+   * What it does:
+   * Registers `CCommandTask` as the primary base at offset 0. The binary emits
+   * one such function per base rather than a shared offset-taking helper.
+   */
+  void CUnitScriptTaskTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
+  {
+    AddBaseIfPresent(typeInfo, gpg::RTypeOf<CCommandTask>(), 0x00);
+  }
 
-/**
- * Address: 0x00623E30 (FUN_00623E30, Moho::CUnitScriptTaskTypeInfo::AddBase_CScriptObject)
- *
- * What it does:
- * Registers the `CScriptObject` sub-object base at +0x30.
- */
-void CUnitScriptTaskTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
-{
-  AddBaseIfPresent(typeInfo, CachedCScriptObjectType(), gpg::BaseSubobjectOffset<CUnitScriptTask, CScriptObject>());
-}
+  /**
+   * Address: 0x00623E30 (FUN_00623E30, Moho::CUnitScriptTaskTypeInfo::AddBase_CScriptObject)
+   *
+   * What it does:
+   * Registers the `CScriptObject` sub-object base at +0x30.
+   */
+  void CUnitScriptTaskTypeInfo::AddBase_CScriptObject(
+    gpg::RType* const typeInfo
+  )
+  {
+    AddBaseIfPresent(typeInfo, CachedCScriptObjectType(), gpg::BaseSubobjectOffset<CUnitScriptTask, CScriptObject>());
+  }
 
-/**
- * Address: 0x00623E90 (FUN_00623E90, Moho::CUnitScriptTaskTypeInfo::AddBase_Listener_ECommandEvent)
- *
- * What it does:
- * Registers the `Listener<ECommandEvent>` sub-object base at +0x64.
- */
-void CUnitScriptTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
-{
-  AddBaseIfPresent(typeInfo, gpg::RTypeOf<Listener<ECommandEvent>>(), gpg::BaseSubobjectOffset<CUnitScriptTask, Listener<ECommandEvent>>());
-}
+  /**
+   * Address: 0x00623E90 (FUN_00623E90, Moho::CUnitScriptTaskTypeInfo::AddBase_Listener_ECommandEvent)
+   *
+   * What it does:
+   * Registers the `Listener<ECommandEvent>` sub-object base at +0x64.
+   */
+  void CUnitScriptTaskTypeInfo::AddBase_Listener_ECommandEvent(
+    gpg::RType* const typeInfo
+  )
+  {
+    AddBaseIfPresent(
+      typeInfo,
+      gpg::RTypeOf<Listener<ECommandEvent>>(),
+      gpg::BaseSubobjectOffset<CUnitScriptTask, Listener<ECommandEvent>>()
+    );
+  }
 
-/**
- * Address: 0x00BD1960 (FUN_00BD1960)
- */
-void register_CUnitScriptTaskTypeInfoStartup()
-{
-  (void)register_CUnitScriptTaskTypeInfo();
-}
+  /**
+   * Address: 0x00BD1960 (FUN_00BD1960)
+   */
+  void register_CUnitScriptTaskTypeInfoStartup()
+  {
+    (void)register_CUnitScriptTaskTypeInfo();
+  }
 } // namespace moho
 
 namespace
@@ -187,4 +204,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitScriptTaskTypeInfo_31c747, moho::register_CUnitScriptTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitScriptTaskTypeInfo_31c747,
+  moho::register_CUnitScriptTaskTypeInfo
+)

@@ -44,4 +44,3 @@ namespace moho
    */
   CScrLuaInitForm* register_Trace_LuaFuncDef();
 } // namespace moho
-

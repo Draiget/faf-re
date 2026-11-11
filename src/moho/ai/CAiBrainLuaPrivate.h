@@ -31,7 +31,9 @@ namespace
   // The two counting helpers are `CPlatoon::CountUnits()`
   // (0x00725840), the same loop with the same per-squad `end_ - start_`.
 
-  [[nodiscard]] gpg::RRef MakeEconResourceRef(moho::EEconResource* const resource)
+  [[nodiscard]] gpg::RRef MakeEconResourceRef(
+    moho::EEconResource* const resource
+  )
   {
     gpg::RRef enumRef{};
     if (resource == nullptr) {
@@ -48,24 +50,33 @@ namespace
     return enumRef;
   }
 
-  [[nodiscard]] float& SelectResourceLane(moho::SEconPair& value, const moho::EEconResource resource) noexcept
-  {
-    return resource == moho::ECON_MASS ? value.MASS : value.ENERGY;
-  }
-
-  [[maybe_unused]] [[nodiscard]] const float& SelectResourceLane(const moho::SEconPair& value, const moho::EEconResource resource) noexcept
-  {
-    return resource == moho::ECON_MASS ? value.MASS : value.ENERGY;
-  }
-
-  [[maybe_unused]] [[nodiscard]] std::uint64_t SelectResourceLane(
-    const moho::SEconStoragePair& value, const moho::EEconResource resource
+  [[nodiscard]] float& SelectResourceLane(
+    moho::SEconPair& value,
+    const moho::EEconResource resource
   ) noexcept
   {
     return resource == moho::ECON_MASS ? value.MASS : value.ENERGY;
   }
 
-  [[nodiscard]] moho::CArmyStats* ResolveArmyStats(moho::CAiBrain* const brain)
+  [[maybe_unused]] [[nodiscard]] const float& SelectResourceLane(
+    const moho::SEconPair& value,
+    const moho::EEconResource resource
+  ) noexcept
+  {
+    return resource == moho::ECON_MASS ? value.MASS : value.ENERGY;
+  }
+
+  [[maybe_unused]] [[nodiscard]] std::uint64_t SelectResourceLane(
+    const moho::SEconStoragePair& value,
+    const moho::EEconResource resource
+  ) noexcept
+  {
+    return resource == moho::ECON_MASS ? value.MASS : value.ENERGY;
+  }
+
+  [[nodiscard]] moho::CArmyStats* ResolveArmyStats(
+    moho::CAiBrain* const brain
+  )
   {
     if (brain == nullptr || brain->mArmy == nullptr) {
       return nullptr;
@@ -73,5 +84,4 @@ namespace
 
     return brain->mArmy->GetArmyStats();
   }
-}
-
+} // namespace

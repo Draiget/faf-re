@@ -117,7 +117,10 @@ UserUnit* IUnit::IsUserUnit()
  * Computes spawn elevation using layer flags and UnitAttributes::spawnElevationOffset.
  */
 float IUnit::CalcSpawnElevation(
-  const STIMap* map, const ELayer layer, const VTransform transform, const UnitAttributes& attributes
+  const STIMap* map,
+  const ELayer layer,
+  const VTransform transform,
+  const UnitAttributes& attributes
 )
 {
   const std::uint32_t layerMask = static_cast<std::uint32_t>(layer);
@@ -151,7 +154,9 @@ namespace moho
    * Upcasts one reflected reference to `IUnit` and returns the typed object
    * pointer when the source is compatible.
    */
-  [[nodiscard]] IUnit* CastIUnitFromRRef(const gpg::RRef& source)
+  [[nodiscard]] IUnit* CastIUnitFromRRef(
+    const gpg::RRef& source
+  )
   {
     gpg::RType* type = IUnit::sType;
     if (type == nullptr) {

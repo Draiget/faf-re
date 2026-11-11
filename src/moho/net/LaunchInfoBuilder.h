@@ -17,7 +17,7 @@ namespace LuaPlus
 {
   class LuaObject;
   class LuaState;
-}
+} // namespace LuaPlus
 
 namespace moho
 {
@@ -45,11 +45,14 @@ namespace moho
      * Gives `ownerId` the next client index the first time it is named (`localIndex` for the
      * local participant); `name` is the config's name for one not known yet.
      */
-    virtual void AssignClientIndex(std::int32_t& clientIndex, std::int32_t ownerId, const char* name, std::int32_t& localIndex) = 0;
+    virtual void
+    AssignClientIndex(std::int32_t& clientIndex, std::int32_t ownerId, const char* name, std::int32_t& localIndex) = 0;
 
     /** `ownerId`'s command source, appending one to `commandSources` the first time. */
     virtual std::uint32_t AssignCommandSource(
-      std::int32_t timeouts, std::int32_t ownerId, fa::vector<SSTICommandSource>& commandSources,
+      std::int32_t timeouts,
+      std::int32_t ownerId,
+      fa::vector<SSTICommandSource>& commandSources,
       std::uint32_t& localSource
     ) = 0;
   };
@@ -60,7 +63,7 @@ namespace moho
     const char* failure = nullptr;
     boost::shared_ptr<LaunchInfoNew> launchInfo;
     fa::string mapName;
-    std::int32_t clientCount = 0;        // client indices handed out
+    std::int32_t clientCount = 0; // client indices handed out
     std::int32_t localClientIndex = -1;
     std::uint32_t localSourceId = 0xFFu;
   };
@@ -74,7 +77,10 @@ namespace moho
    * whatever a malformed entry throws), possibly after some assignments were made.
    */
   [[nodiscard]] SLaunchBuild BuildLaunchInfo(
-    const LuaPlus::LuaObject& gameConfig, ILaunchParticipants& participants, std::int32_t seed, bool isMultiplayer,
+    const LuaPlus::LuaObject& gameConfig,
+    ILaunchParticipants& participants,
+    std::int32_t seed,
+    bool isMultiplayer,
     LuaPlus::LuaState* state
   );
 
@@ -82,7 +88,7 @@ namespace moho
   struct SLaunchClient
   {
     std::int32_t uid = 0;
-    fa::string name;                  // the command source takes this name
+    fa::string name;                     // the command source takes this name
     std::int32_t clientIndex = -1;       // -1: not assigned
     std::uint32_t commandSource = 0xFFu; // 0xFF: none
   };
@@ -96,17 +102,29 @@ namespace moho
   public:
     CLaunchRoster(std::int32_t localUid, fa::string localName, std::vector<SLaunchClient> remotes);
 
-    [[nodiscard]] std::int32_t LocalUid() const override { return mLocalUid; }
+    [[nodiscard]] std::int32_t LocalUid() const override
+    {
+      return mLocalUid;
+    }
     /** What `lobbyComm.lua` returns, as a roster's Lua state has no `import` to read it with. */
     [[nodiscard]] LuaPlus::LuaObject DefaultPlayerOptions(LuaPlus::LuaState* state) override;
-    void AssignClientIndex(std::int32_t& clientIndex, std::int32_t ownerId, const char* name, std::int32_t& localIndex)
-      override;
+    void AssignClientIndex(
+      std::int32_t& clientIndex,
+      std::int32_t ownerId,
+      const char* name,
+      std::int32_t& localIndex
+    ) override;
     std::uint32_t AssignCommandSource(
-      std::int32_t timeouts, std::int32_t ownerId, fa::vector<SSTICommandSource>& commandSources,
+      std::int32_t timeouts,
+      std::int32_t ownerId,
+      fa::vector<SSTICommandSource>& commandSources,
       std::uint32_t& localSource
     ) override;
 
-    [[nodiscard]] const std::vector<SLaunchClient>& Remotes() const noexcept { return mRemotes; }
+    [[nodiscard]] const std::vector<SLaunchClient>& Remotes() const noexcept
+    {
+      return mRemotes;
+    }
 
   private:
     [[nodiscard]] SLaunchClient* Find(std::int32_t uid) noexcept;

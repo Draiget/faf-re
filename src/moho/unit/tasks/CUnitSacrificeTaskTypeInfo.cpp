@@ -7,7 +7,8 @@
 #include "moho/misc/Listener.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/ECommandEvent.h"
-#include "moho/unit/tasks/CUnitSacrificeTask.h"
+#include "moho/unit/tasks/CUnitSacrificeTask.h"
+
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -83,7 +84,9 @@ namespace moho
    * Registers `CCommandTask` as the primary reflection base for
    * `CUnitSacrificeTask`.
    */
-  void __stdcall CUnitSacrificeTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitSacrificeTaskTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -95,9 +98,13 @@ namespace moho
    * Registers `Listener<ECommandEvent>` as the secondary reflection base for
    * `CUnitSacrificeTask`.
    */
-  void __stdcall CUnitSacrificeTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
+  void __stdcall CUnitSacrificeTaskTypeInfo::AddBase_Listener_ECommandEvent(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(typeInfo, gpg::BaseSubobjectOffset<CUnitSacrificeTask, Listener<ECommandEvent>>());
+    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(
+      typeInfo, gpg::BaseSubobjectOffset<CUnitSacrificeTask, Listener<ECommandEvent>>()
+    );
   }
 
   /**
@@ -123,7 +130,9 @@ namespace moho
    * Constructs one `CUnitSacrificeTask` in caller-provided storage and
    * returns its typed reflection reference.
    */
-  gpg::RRef CUnitSacrificeTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitSacrificeTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CUnitSacrificeTask*>(objectStorage);
     if (task) {
@@ -141,7 +150,9 @@ namespace moho
    * What it does:
    * Deletes a `CUnitSacrificeTask` through its deleting-destructor path.
    */
-  void CUnitSacrificeTaskTypeInfo::Delete(void* const objectStorage)
+  void CUnitSacrificeTaskTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitSacrificeTask*>(objectStorage);
   }
@@ -153,7 +164,9 @@ namespace moho
    * Runs the non-deleting `CUnitSacrificeTask` destructor body on placement
    * storage.
    */
-  void CUnitSacrificeTaskTypeInfo::Destruct(void* const objectStorage)
+  void CUnitSacrificeTaskTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     if (!objectStorage) {
       return;
@@ -174,7 +187,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitSacrificeTaskTypeInfo_c94ae0, moho::register_CUnitSacrificeTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitSacrificeTaskTypeInfo_c94ae0,
+  moho::register_CUnitSacrificeTaskTypeInfo
+)

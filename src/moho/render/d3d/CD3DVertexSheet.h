@@ -23,7 +23,8 @@ namespace moho
      * CD3DVertexFormat *,CD3DDevice *,int,std::uint32_t,CD3DVertexStream **
      *
      * IDA signature:
-     * Moho::CD3DVertexSheet *__userpurge CD3DVertexSheet@<eax>(CD3DVertexFormat *a1@<ebx>, CD3DVertexSheet *this, CD3DDevice *a3, int a4, int a5, CD3DVertexStream **a6);
+     * Moho::CD3DVertexSheet *__userpurge CD3DVertexSheet@<eax>(CD3DVertexFormat *a1@<ebx>, CD3DVertexSheet *this,
+     * CD3DDevice *a3, int a4, int a5, CD3DVertexStream **a6);
      *
      * What it does:
      * Initializes list links and typed stream ownership storage, then wires one
@@ -145,7 +146,8 @@ namespace moho
      * std::uint32_t
      *
      * IDA signature:
-     * Moho::CD3DVertexStream *__thiscall Moho::CD3DVertexSheet::GetVertStream(Moho::CD3DVertexSheet *this, unsigned int a2);
+     * Moho::CD3DVertexStream *__thiscall Moho::CD3DVertexSheet::GetVertStream(Moho::CD3DVertexSheet *this, unsigned int
+     * a2);
      *
      * What it does:
      * Returns one retained stream by index when in range.
@@ -178,7 +180,6 @@ namespace moho
     bool CreateOwnedStreamBuffers();
 
   private:
-
     /**
      * Address: 0x004401C0 (FUN_004401C0)
      *
@@ -194,13 +195,13 @@ namespace moho
     void SetStreamOwned(std::uint32_t streamIndex, bool owned);
 
   public:
-    TDatListItem<CD3DVertexSheet, void> mLink;   // +0x04
-    CD3DDevice* mDevice;                         // +0x0C
-    CD3DVertexFormat* mVertexFormat;             // +0x10
-    int mStreamFrequencyToken;                   // +0x14
-    std::uint32_t mStreamUsageToken;             // +0x18
-    fa::vector<CD3DVertexStream*> mStreams;   // +0x1C
-    SBitStorage32 mOwnedStreamMask;              // +0x2C
+    TDatListItem<CD3DVertexSheet, void> mLink; // +0x04
+    CD3DDevice* mDevice;                       // +0x0C
+    CD3DVertexFormat* mVertexFormat;           // +0x10
+    int mStreamFrequencyToken;                 // +0x14
+    std::uint32_t mStreamUsageToken;           // +0x18
+    fa::vector<CD3DVertexStream*> mStreams;    // +0x1C
+    SBitStorage32 mOwnedStreamMask;            // +0x2C
   };
 
   static_assert(offsetof(CD3DVertexSheet, mLink) == 0x04, "CD3DVertexSheet::mLink offset must be 0x04");

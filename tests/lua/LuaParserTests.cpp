@@ -18,7 +18,9 @@ namespace
   {
   protected:
     /** The load error of `source`; a test failure when it loads. */
-    std::string LoadError(const std::string& source)
+    std::string LoadError(
+      const std::string& source
+    )
     {
       std::string message;
       const int status = Load(source, &message);
@@ -27,7 +29,10 @@ namespace
     }
   };
 
-  TEST_F(LuaParser, StringLiteralsAndEscapes)
+  TEST_F(
+    LuaParser,
+    StringLiteralsAndEscapes
+  )
   {
     EXPECT_EQ(Str(R"(return "a\tb\nc")"), "a\tb\nc");
     EXPECT_EQ(Str(R"(return 'it\'s "q"')"), "it's \"q\"");
@@ -39,7 +44,10 @@ namespace
   }
 
   // Fork: `\xNN` is an escape (read_string 0x00918C40); a `\x` without a hex digit is a plain x.
-  TEST_F(LuaParser, HexEscapes)
+  TEST_F(
+    LuaParser,
+    HexEscapes
+  )
   {
     EXPECT_EQ(Str(R"(return "\x41\x62")"), "Ab");
     EXPECT_EQ(Str(R"(return "\x4")"), "\x04");
@@ -47,7 +55,10 @@ namespace
     EXPECT_EQ(Str(R"(return "\xg")"), "xg");
   }
 
-  TEST_F(LuaParser, LongStringsAndComments)
+  TEST_F(
+    LuaParser,
+    LongStringsAndComments
+  )
   {
     EXPECT_EQ(Str("return [[plain]]"), "plain");
     EXPECT_EQ(Str("return [[\nskips the first newline]]"), "skips the first newline");
@@ -62,7 +73,10 @@ namespace
 
   // Fork additions in luaX_lex (0x00919100): `!=` spells `~=`, `#` starts a comment anywhere, and a
   // UTF-8 byte-order mark is skipped (compares with 0xEF/0xBB/0xBF at 0x00919298..0x009192FF).
-  TEST_F(LuaParser, ForkLexicalAdditions)
+  TEST_F(
+    LuaParser,
+    ForkLexicalAdditions
+  )
   {
     EXPECT_TRUE(Bool("return 1 != 2"));
     EXPECT_FALSE(Bool("return 'a' != 'a'"));
@@ -74,7 +88,10 @@ namespace
 
   // Fork: `0x` literals of up to eight hex digits (read_numeral 0x00918440 compares with a
   // lower-case 'x' at 0x009184AF), read as an integer and stored as a float.
-  TEST_F(LuaParser, NumberLiterals)
+  TEST_F(
+    LuaParser,
+    NumberLiterals
+  )
   {
     EXPECT_EQ(Num("return 0x10"), 16.0);
     EXPECT_EQ(Num("return 0xFF"), 255.0);
@@ -90,7 +107,10 @@ namespace
   // Fork: a constructor may open with `&<hash size>` and a second `&<array size>` (constructor
   // 0x0091B710 compares with '&' at 0x0091B789; message at 0x00D467C4). The hints only size the
   // table.
-  TEST_F(LuaParser, ConstructorSizeHints)
+  TEST_F(
+    LuaParser,
+    ConstructorSizeHints
+  )
   {
     EXPECT_EQ(Num("local t = {&4&8 10, 20} return t[1] + t[2]"), 30.0);
     EXPECT_EQ(Num("local t = {&16} t.a = 1 t.b = 2 return t.a + t.b"), 3.0);
@@ -99,7 +119,10 @@ namespace
     EXPECT_TRUE(Contains(LoadError("local t = {&1& }"), "size expected following &"));
   }
 
-  TEST_F(LuaParser, StatementSeparatorsAndScopes)
+  TEST_F(
+    LuaParser,
+    StatementSeparatorsAndScopes
+  )
   {
     EXPECT_EQ(Num("local a = 1; local b = 2; return a + b;"), 3.0);
     EXPECT_EQ(Num("local a = 1 do local a = 2 end return a"), 1.0);
@@ -114,7 +137,10 @@ namespace
     const char* expected;
   };
 
-  TEST_F(LuaParser, SyntaxErrorsReportTheProblem)
+  TEST_F(
+    LuaParser,
+    SyntaxErrorsReportTheProblem
+  )
   {
     const std::vector<SyntaxCase> cases = {
       {"x = ", "test(1): unexpected symbol near `<eof>'"},
@@ -159,7 +185,10 @@ namespace
     }
   }
 
-  TEST_F(LuaParser, LoadstringReportsErrorsAsValues)
+  TEST_F(
+    LuaParser,
+    LoadstringReportsErrorsAsValues
+  )
   {
     EXPECT_TRUE(Bool("local f, e = loadstring('x =') return f == nil and type(e) == 'string'"));
     EXPECT_TRUE(Contains(Str("local f, e = loadstring('x =') return e"), "[string \"x =\"](1): unexpected symbol"));
@@ -169,7 +198,10 @@ namespace
 
   // Nesting past LUA_MAXPARSERLEVEL (200) and past the 200 locals / 32 upvalues of one function
   // fails with a "too many" message instead of overflowing anything.
-  TEST_F(LuaParser, CompileLimits)
+  TEST_F(
+    LuaParser,
+    CompileLimits
+  )
   {
     EXPECT_TRUE(Contains(LoadError("x = " + std::string(300, '(') + "1" + std::string(300, ')')), "too many"));
     EXPECT_TRUE(Contains(LoadError("x = " + std::string(300, '{') + std::string(300, '}')), "too many"));
@@ -208,7 +240,10 @@ namespace
   }
 
   // Many constants and a long function body: the constant table and code vector grow.
-  TEST_F(LuaParser, LargeChunksCompile)
+  TEST_F(
+    LuaParser,
+    LargeChunksCompile
+  )
   {
     std::string source = "local t = {}\n";
     for (int i = 0; i < 3000; ++i) {
@@ -220,7 +255,10 @@ namespace
 
   // Every prefix of a valid program, and many byte-level mutations of it, must load or fail with
   // a message; none may crash or escape as an exception.
-  TEST_F(LuaParser, TruncatedAndMutatedChunksNeverCrash)
+  TEST_F(
+    LuaParser,
+    TruncatedAndMutatedChunksNeverCrash
+  )
   {
     const std::string program = R"(
       local function f(a, b, ...)
@@ -256,9 +294,15 @@ namespace
         const std::size_t at = nextRandom() % mutated.size();
         const char c = kAlphabet[nextRandom() % (sizeof(kAlphabet) - 1u)];
         switch (nextRandom() % 3u) {
-        case 0: mutated[at] = c; break;
-        case 1: mutated.insert(mutated.begin() + static_cast<std::ptrdiff_t>(at), c); break;
-        default: mutated.erase(mutated.begin() + static_cast<std::ptrdiff_t>(at)); break;
+        case 0:
+          mutated[at] = c;
+          break;
+        case 1:
+          mutated.insert(mutated.begin() + static_cast<std::ptrdiff_t>(at), c);
+          break;
+        default:
+          mutated.erase(mutated.begin() + static_cast<std::ptrdiff_t>(at));
+          break;
         }
       }
       std::string message;

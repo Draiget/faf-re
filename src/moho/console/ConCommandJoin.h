@@ -15,7 +15,9 @@ namespace moho
    * `separator` + each subsequent item.
    */
   [[nodiscard]] inline fa::string AppendJoinedStringRange(
-    const fa::string* const begin, const fa::string* const end, const char* separator
+    const fa::string* const begin,
+    const fa::string* const end,
+    const char* separator
   )
   {
     std::string joined;

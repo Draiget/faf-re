@@ -36,12 +36,17 @@ namespace
   constexpr std::uint64_t kUnitStateMaskTaskPending = kUnitStateMaskTransportLoading;
   constexpr std::uint64_t kUnitStateMaskAirStagingPending = kUnitStateMaskLandingOnPlatform;
 
-  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  [[nodiscard]] moho::ETaskState NextTaskState(
+    const moho::ETaskState state
+  ) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
 
-  [[nodiscard]] moho::SOCellPos ToCellPos(const Wm3::Vector3f& position, const moho::SFootprint& footprint) noexcept
+  [[nodiscard]] moho::SOCellPos ToCellPos(
+    const Wm3::Vector3f& position,
+    const moho::SFootprint& footprint
+  ) noexcept
   {
     moho::SOCellPos cell{};
     cell.x = static_cast<std::int16_t>(std::lrintf(position.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
@@ -49,7 +54,10 @@ namespace
     return cell;
   }
 
-  [[nodiscard]] moho::SNavGoal BuildSingleCellGoal(const moho::SOCellPos& cell, const moho::ELayer layer) noexcept
+  [[nodiscard]] moho::SNavGoal BuildSingleCellGoal(
+    const moho::SOCellPos& cell,
+    const moho::ELayer layer
+  ) noexcept
   {
     moho::SNavGoal goal{};
     goal.minX = static_cast<std::int32_t>(cell.x);
@@ -64,19 +72,27 @@ namespace
     return goal;
   }
 
-  void QueueMoveGoal(moho::CCommandTask* const ownerTask, const moho::SNavGoal& goal)
+  void QueueMoveGoal(
+    moho::CCommandTask* const ownerTask,
+    const moho::SNavGoal& goal
+  )
   {
     moho::NewMoveTask(goal, ownerTask, 0, nullptr, 0);
   }
 
-  [[nodiscard]] bool CommandHeadsMatch(moho::Unit* const a, moho::Unit* const b)
+  [[nodiscard]] bool CommandHeadsMatch(
+    moho::Unit* const a,
+    moho::Unit* const b
+  )
   {
     const moho::CUnitCommand* const aHead = (a && a->CommandQueue) ? a->CommandQueue->GetCurrentCommand() : nullptr;
     const moho::CUnitCommand* const bHead = (b && b->CommandQueue) ? b->CommandQueue->GetCurrentCommand() : nullptr;
     return aHead == bHead;
   }
 
-  [[nodiscard]] bool HasLandingAirUnit(const moho::CUnitCommand* const command)
+  [[nodiscard]] bool HasLandingAirUnit(
+    const moho::CUnitCommand* const command
+  )
   {
     if (!command) {
       return false;
@@ -99,7 +115,6 @@ namespace
 
     return false;
   }
-
 
 } // namespace
 
@@ -238,7 +253,10 @@ namespace moho
   /**
    * Address: 0x006018E0 (FUN_006018E0, ??0CUnitCallAirStagingPlatform@Moho@@QAE@@Z)
    */
-  CUnitCallAirStagingPlatform::CUnitCallAirStagingPlatform(CCommandTask* const parentTask, Unit* const platformUnit)
+  CUnitCallAirStagingPlatform::CUnitCallAirStagingPlatform(
+    CCommandTask* const parentTask,
+    Unit* const platformUnit
+  )
     : CCommandTask(parentTask)
     , mPlatform(platformUnit)
   {
@@ -294,8 +312,10 @@ namespace moho
         unitMotion->mHeight = gpg::pInf;
       }
 
-      if (Unit* const platformUnit = mPlatform.GetObjectPtr();
-          platformUnit != nullptr && platformUnit->AiTransport != nullptr && !platformUnit->IsDead()) {
+      if (
+        Unit* const platformUnit = mPlatform.GetObjectPtr();
+        platformUnit != nullptr && platformUnit->AiTransport != nullptr && !platformUnit->IsDead()
+      ) {
         platformUnit->AiTransport->TransportRemovePickupUnit(mUnit, true);
       }
     }
@@ -320,7 +340,11 @@ namespace moho
    * Loads base command-task state plus air-staging platform weak pointer and
    * completion flag from archive data.
    */
-  void CUnitCallAirStagingPlatform::MemberDeserialize(gpg::ReadArchive* const archive, int, const gpg::RRef&)
+  void CUnitCallAirStagingPlatform::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    int,
+    const gpg::RRef&
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -340,7 +364,11 @@ namespace moho
    * Saves base command-task state plus air-staging platform weak pointer and
    * completion flag into archive data.
    */
-  void CUnitCallAirStagingPlatform::MemberSerialize(gpg::WriteArchive* const archive, int, const gpg::RRef&) const
+  void CUnitCallAirStagingPlatform::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    int,
+    const gpg::RRef&
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {

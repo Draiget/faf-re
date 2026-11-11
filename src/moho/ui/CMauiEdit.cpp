@@ -524,7 +524,6 @@ namespace
     CopyUtf8TextToClipboard(edit->GetSelection());
   }
 
-
   /**
    * Address: 0x0078F620 (FUN_0078F620, Moho::CMauiEdit::ApplyFontAndRefreshClip)
    *
@@ -612,7 +611,7 @@ namespace
     RenderEditTextAt(edit, primBatcher, text, x, baselineY, color);
     return advance;
   }
-}
+} // namespace
 
 gpg::RType* moho::CMauiEdit::sType = nullptr;
 
@@ -792,8 +791,7 @@ int moho::cfunc_CMauiEditGetForegroundColorL(
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  LuaPlus::LuaObject colorObject =
-    SCR_EncodeColor(state, ReadEditForegroundColorLane(edit));
+  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, ReadEditForegroundColorLane(edit));
   colorObject.PushStack(state);
   return 1;
 }
@@ -904,8 +902,7 @@ int moho::cfunc_CMauiEditGetBackgroundColorL(
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  LuaPlus::LuaObject colorObject =
-    SCR_EncodeColor(state, ReadEditBackgroundColorLane(edit));
+  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, ReadEditBackgroundColorLane(edit));
   colorObject.PushStack(state);
   return 1;
 }
@@ -1901,9 +1898,7 @@ int moho::cfunc_CMauiEditSetNewHighlightForegroundColorL(
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
-  (void)WriteEditHighlightForegroundColorLane(
-    edit, SCR_DecodeColor(state, colorObject)
-  );
+  (void)WriteEditHighlightForegroundColorLane(edit, SCR_DecodeColor(state, colorObject));
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -1956,8 +1951,7 @@ int moho::cfunc_CMauiEditGetHighlightForegroundColorL(
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  LuaPlus::LuaObject colorObject =
-    SCR_EncodeColor(state, ReadEditHighlightForegroundColorLane(edit));
+  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, ReadEditHighlightForegroundColorLane(edit));
   colorObject.PushStack(state);
   return 1;
 }
@@ -2012,9 +2006,7 @@ int moho::cfunc_CMauiEditSetNewHighlightBackgroundColorL(
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
-  (void)WriteEditHighlightBackgroundColorLane(
-    edit, SCR_DecodeColor(state, colorObject)
-  );
+  (void)WriteEditHighlightBackgroundColorLane(edit, SCR_DecodeColor(state, colorObject));
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -2067,8 +2059,7 @@ int moho::cfunc_CMauiEditGetHighlightBackgroundColorL(
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  LuaPlus::LuaObject colorObject =
-    SCR_EncodeColor(state, ReadEditHighlightBackgroundColorLane(edit));
+  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, ReadEditHighlightBackgroundColorLane(edit));
   colorObject.PushStack(state);
   return 1;
 }
@@ -2582,24 +2573,14 @@ void moho::CMauiEdit::DoRender(
   }
 
   if (selectedEnd > selectedStart) {
-    const fa::string runText =
-      gpg::STR_Utf8SubString(mText.c_str(), selectedStart, selectedEnd - selectedStart);
+    const fa::string runText = gpg::STR_Utf8SubString(mText.c_str(), selectedStart, selectedEnd - selectedStart);
     const float runAdvance = font->GetAdvance(runText.c_str(), 0);
 
     if (mBackgroundVisible) {
-      DrawSolidColorQuad(
-        primBatcher,
-        mHighlightBackgroundColor,
-        penX,
-        top,
-        penX + runAdvance,
-        bottom,
-        mVertexAlpha
-      );
+      DrawSolidColorQuad(primBatcher, mHighlightBackgroundColor, penX, top, penX + runAdvance, bottom, mVertexAlpha);
     }
 
-    penX +=
-      RenderEditTextRun(this, primBatcher, runText, penX, baselineY, mHighlightForegroundColor);
+    penX += RenderEditTextRun(this, primBatcher, runText, penX, baselineY, mHighlightForegroundColor);
   }
 
   int suffixStart = mSelectionEnd;
@@ -2621,8 +2602,7 @@ void moho::CMauiEdit::DoRender(
     return;
   }
 
-  const fa::string caretPrefix =
-    gpg::STR_Utf8SubString(mText.c_str(), clipStart, caretPosition - clipStart);
+  const fa::string caretPrefix = gpg::STR_Utf8SubString(mText.c_str(), clipStart, caretPosition - clipStart);
   const float caretX = left + font->GetAdvance(caretPrefix.c_str(), 0);
   const float caretBottom = top + font->mAscent + font->mDescent;
   const std::uint32_t caretColor = mCaretColor | (mCaretCycleCurrentAlpha << 24u);
@@ -2708,9 +2688,7 @@ fa::string moho::CMauiEdit::GetSelection()
  */
 bool moho::CMauiEdit::EnterPressed()
 {
-  return RunScriptStringBool(
-    "OnEnterPressed", std::string(mText.c_str())
-  );
+  return RunScriptStringBool("OnEnterPressed", std::string(mText.c_str()));
 }
 
 /**
@@ -2721,9 +2699,7 @@ bool moho::CMauiEdit::EnterPressed()
  */
 bool moho::CMauiEdit::EscPressed()
 {
-  return RunScriptStringBool(
-    "OnEscPressed", std::string(mText.c_str())
-  );
+  return RunScriptStringBool("OnEscPressed", std::string(mText.c_str()));
 }
 
 /**
@@ -2822,8 +2798,7 @@ void moho::CMauiEdit::NonTextKeyPressed(
   SMauiEventData* const eventData
 )
 {
-  LuaPlus::LuaState* const activeState =
-    mLuaObj.GetActiveState();
+  LuaPlus::LuaState* const activeState = mLuaObj.GetActiveState();
   LuaPlus::LuaObject eventObject{};
   const LuaPlus::LuaObject* const createdEvent = CreateLuaEventObject(eventData, &eventObject, activeState);
   RunScriptIntObject("OnNonTextKeyPressed", keyCode, *createdEvent);
@@ -3102,8 +3077,7 @@ void moho::CMauiEdit::HandleClickEvent(
   }
 
   const float localMouseX = eventData->mMousePos.x - CScriptLazyVar_float::GetValue(&mLeftLV);
-  fa::string clippedText =
-    gpg::STR_Utf8SubString(mText.c_str(), mClipOffset, mClipLength);
+  fa::string clippedText = gpg::STR_Utf8SubString(mText.c_str(), mClipOffset, mClipLength);
   const int nearestCharacterIndex = mFont->GetNearestCharacterIndex(clippedText.c_str(), localMouseX);
 
   if (eventData->mEventType == MET_ButtonPress) {
@@ -3237,8 +3211,7 @@ void moho::CMauiEdit::HandleKeyEvent(
     case MKEY_LEFT:
       if ((eventData->mModifiers & MEM_Shift) != 0u) {
         if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
-          const int moveAmount =
-            mCaretPosition - gpg::STR_GetWordStartIndex(mText, mCaretPosition);
+          const int moveAmount = mCaretPosition - gpg::STR_GetWordStartIndex(mText, mCaretPosition);
           if (moveAmount != 0) {
             MoveSelectionLeft(moveAmount);
           }
@@ -3325,8 +3298,7 @@ void moho::CMauiEdit::HandleKeyEvent(
     }
 
     {
-      const int moveAmount =
-        mCaretPosition - gpg::STR_GetWordStartIndex(mText, mCaretPosition);
+      const int moveAmount = mCaretPosition - gpg::STR_GetWordStartIndex(mText, mCaretPosition);
       if (moveAmount != 0) {
         MoveSelectionLeft(moveAmount);
       }
@@ -3364,8 +3336,7 @@ void moho::CMauiEdit::HandleKeyEvent(
     }
 
     if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
-      const int moveAmount =
-        gpg::STR_GetNextWordStartIndex(mText, mCaretPosition) - mCaretPosition;
+      const int moveAmount = gpg::STR_GetNextWordStartIndex(mText, mCaretPosition) - mCaretPosition;
       if (moveAmount != 0) {
         MoveSelectionRight(moveAmount);
       }
@@ -3397,10 +3368,8 @@ void moho::CMauiEdit::DragRelease(
   const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
   const float releaseX = eventData->mMousePos.x - left;
 
-  fa::string clippedText =
-    gpg::STR_Utf8SubString(mText.c_str(), mClipOffset, mClipLength);
-  const int releaseCaret =
-    mFont->GetNearestCharacterIndex(clippedText.c_str(), releaseX) + mClipOffset;
+  fa::string clippedText = gpg::STR_Utf8SubString(mText.c_str(), mClipOffset, mClipLength);
+  const int releaseCaret = mFont->GetNearestCharacterIndex(clippedText.c_str(), releaseX) + mClipOffset;
 
   if (releaseCaret == mDragStart) {
     mSelectionStart = 0;

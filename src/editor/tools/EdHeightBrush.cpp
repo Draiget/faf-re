@@ -21,21 +21,33 @@ namespace faf::editor
     // reads between samples (and their own turned-back samples) reach that far.
     constexpr float kTurnRim = 2.0f;
 
-    [[nodiscard]] bool NeedsSquare(const Symmetry symmetry)
+    [[nodiscard]] bool NeedsSquare(
+      const Symmetry symmetry
+    )
     {
-      return symmetry == Symmetry::DiagonalBack || symmetry == Symmetry::DiagonalForward || symmetry == Symmetry::BothDiagonals ||
-             symmetry == Symmetry::QuarterTurns || symmetry == Symmetry::NWay;
+      return symmetry == Symmetry::DiagonalBack || symmetry == Symmetry::DiagonalForward ||
+        symmetry == Symmetry::BothDiagonals || symmetry == Symmetry::QuarterTurns || symmetry == Symmetry::NWay;
     }
 
-    [[nodiscard]] int Turns(const int turns)
+    [[nodiscard]] int Turns(
+      const int turns
+    )
     {
       return std::clamp(turns, 2, kMaxSymmetryCopies);
     }
 
     /** The copies of a point under `symmetry`, for samples (T int) and for the brush's centre (T float). */
     template <typename T>
-    int Copies(const Symmetry symmetry, const int turns, const T w, const T h, const T x, const T z, T (&outX)[kMaxSymmetryCopies],
-               T (&outZ)[kMaxSymmetryCopies])
+    int Copies(
+      const Symmetry symmetry,
+      const int turns,
+      const T w,
+      const T h,
+      const T x,
+      const T z,
+      T (&outX)[kMaxSymmetryCopies],
+      T (&outZ)[kMaxSymmetryCopies]
+    )
     {
       int n = 0;
       const auto add = [&](const T cx, const T cz) {
@@ -99,7 +111,10 @@ namespace faf::editor
       return n;
     }
 
-    [[nodiscard]] float Weight(const float distance, const HeightBrush& brush)
+    [[nodiscard]] float Weight(
+      const float distance,
+      const HeightBrush& brush
+    )
     {
       const float t = distance / brush.radius;
       if (t >= 1.0f) {
@@ -114,7 +129,10 @@ namespace faf::editor
     }
 
     /** A fixed value in [-1, 1] per sample, so Noise gives every member of a group the same change. */
-    [[nodiscard]] float SampleNoise(const int x, const int z)
+    [[nodiscard]] float SampleNoise(
+      const int x,
+      const int z
+    )
     {
       std::uint32_t v = static_cast<std::uint32_t>(x) * 0x8DA6B343u ^ static_cast<std::uint32_t>(z) * 0xD8163841u;
       v ^= v >> 13;
@@ -123,14 +141,24 @@ namespace faf::editor
       return static_cast<float>(v & 0xFFFFu) / 32767.5f - 1.0f;
     }
 
-    [[nodiscard]] bool Contains(const SampleRect& rect, const int x, const int z)
+    [[nodiscard]] bool Contains(
+      const SampleRect& rect,
+      const int x,
+      const int z
+    )
     {
       return x >= rect.x0 && x <= rect.x1 && z >= rect.z0 && z <= rect.z1;
     }
 
     /** The rectangle each centre's brush covers, clipped to the map; empty ones left out. */
-    std::vector<SampleRect> RectsAround(const int width, const int height, const float (&centreX)[kMaxSymmetryCopies],
-                                        const float (&centreZ)[kMaxSymmetryCopies], const int centres, const float radius)
+    std::vector<SampleRect> RectsAround(
+      const int width,
+      const int height,
+      const float (&centreX)[kMaxSymmetryCopies],
+      const float (&centreZ)[kMaxSymmetryCopies],
+      const int centres,
+      const float radius
+    )
     {
       std::vector<SampleRect> rects;
       for (int i = 0; i < centres; ++i) {
@@ -152,7 +180,10 @@ namespace faf::editor
     {
       SampleRect area;
       std::vector<std::uint16_t> words;
-      [[nodiscard]] float At(const int sx, const int sz) const
+      [[nodiscard]] float At(
+        const int sx,
+        const int sz
+      ) const
       {
         const int cx = std::clamp(sx, area.x0, area.x1);
         const int cz = std::clamp(sz, area.z0, area.z1);
@@ -160,14 +191,23 @@ namespace faf::editor
       }
     };
 
-    std::vector<Snapshot> TakeSnapshots(const std::uint16_t* const heights, const int width, const int height,
-                                        const std::vector<SampleRect>& rects)
+    std::vector<Snapshot> TakeSnapshots(
+      const std::uint16_t* const heights,
+      const int width,
+      const int height,
+      const std::vector<SampleRect>& rects
+    )
     {
       std::vector<Snapshot> snapshots;
       snapshots.reserve(rects.size());
       for (const SampleRect& rect : rects) {
         Snapshot snapshot;
-        snapshot.area = {std::max(0, rect.x0 - 1), std::max(0, rect.z0 - 1), std::min(width - 1, rect.x1 + 1), std::min(height - 1, rect.z1 + 1)};
+        snapshot.area = {
+          std::max(0, rect.x0 - 1),
+          std::max(0, rect.z0 - 1),
+          std::min(width - 1, rect.x1 + 1),
+          std::min(height - 1, rect.z1 + 1)
+        };
         for (int sz = snapshot.area.z0; sz <= snapshot.area.z1; ++sz) {
           const std::uint16_t* const row = heights + static_cast<std::size_t>(sz) * static_cast<std::size_t>(width);
           snapshot.words.insert(snapshot.words.end(), row + snapshot.area.x0, row + snapshot.area.x1 + 1);
@@ -178,7 +218,12 @@ namespace faf::editor
     }
 
     /** The stamp's value (0..1) at offset (dx, dz) from the brush's centre, over the brush's square; 0 outside. */
-    [[nodiscard]] float StampAt(const HeightStamp& stamp, const float dx, const float dz, const float radius)
+    [[nodiscard]] float StampAt(
+      const HeightStamp& stamp,
+      const float dx,
+      const float dz,
+      const float radius
+    )
     {
       if (stamp.width < 2 || stamp.height < 2 || radius <= 0.0f) {
         return 0.0f;
@@ -193,14 +238,22 @@ namespace faf::editor
       const float fx = u - static_cast<float>(x0);
       const float fz = v - static_cast<float>(z0);
       const auto at = [&](const int x, const int z) {
-        return static_cast<float>(stamp.words[static_cast<std::size_t>(z) * static_cast<std::size_t>(stamp.width) + static_cast<std::size_t>(x)]);
+        return static_cast<float>(
+          stamp.words[static_cast<std::size_t>(z) * static_cast<std::size_t>(stamp.width) + static_cast<std::size_t>(x)]
+        );
       };
-      const float value = (at(x0, z0) * (1.0f - fx) + at(x0 + 1, z0) * fx) * (1.0f - fz) + (at(x0, z0 + 1) * (1.0f - fx) + at(x0 + 1, z0 + 1) * fx) * fz;
+      const float value = (at(x0, z0) * (1.0f - fx) + at(x0 + 1, z0) * fx) * (1.0f - fz) +
+        (at(x0, z0 + 1) * (1.0f - fx) + at(x0 + 1, z0 + 1) * fx) * fz;
       return value / 65535.0f;
     }
 
     /** Whether the limits let the brush change this sample (read before the step). */
-    [[nodiscard]] bool WithinLimits(const Snapshot& snapshot, const int sx, const int sz, const HeightBrush& brush)
+    [[nodiscard]] bool WithinLimits(
+      const Snapshot& snapshot,
+      const int sx,
+      const int sz,
+      const HeightBrush& brush
+    )
     {
       const float current = snapshot.At(sx, sz);
       if (brush.limitHeight && (current < brush.limitLow || current > brush.limitHigh)) {
@@ -217,9 +270,18 @@ namespace faf::editor
       return true;
     }
 
-    /** The brush's new height for one sample, from the heights before the step; (dx, dz) from its nearest copy's centre. */
-    [[nodiscard]] float BrushedHeight(const Snapshot& snapshot, const int sx, const int sz, const float weight, const HeightBrush& brush,
-                                      const float seconds, const float dx, const float dz)
+    /** The brush's new height for one sample, from the heights before the step; (dx, dz) from its nearest copy's
+     * centre. */
+    [[nodiscard]] float BrushedHeight(
+      const Snapshot& snapshot,
+      const int sx,
+      const int sz,
+      const float weight,
+      const HeightBrush& brush,
+      const float seconds,
+      const float dx,
+      const float dz
+    )
     {
       const float strength = std::clamp(brush.strength, 0.0f, 1.0f);
       const float blend = std::min(1.0f, strength * kBlendPerSecond * seconds);
@@ -252,7 +314,8 @@ namespace faf::editor
         if (!brush.planeSet) {
           return current;
         }
-        return current + (static_cast<float>(brush.planeX * sx + brush.planeZ * sz + brush.planeC) - current) * blend * weight;
+        return current +
+          (static_cast<float>(brush.planeX * sx + brush.planeZ * sz + brush.planeC) - current) * blend * weight;
       case HeightBrushMode::Stamp:
         if (brush.stamp == nullptr) {
           return current;
@@ -261,8 +324,8 @@ namespace faf::editor
       case HeightBrushMode::Erode: {
         // Each of the 8 neighbours: the part of the difference over the talus slope at its distance, towards it. A
         // sixteenth of each (half of a pair's excess, shared by 8 neighbours) keeps a step from overshooting.
-        // Its own rate: up to kErodeStepsPerSecond full steps a second (at most one a call). The other brushes' blend would
-        // move a sample under half a word a frame at 60 fps, which rounds back to nothing.
+        // Its own rate: up to kErodeStepsPerSecond full steps a second (at most one a call). The other brushes' blend
+        // would move a sample under half a word a frame at 60 fps, which rounds back to nothing.
         const float steps = std::min(1.0f, strength * kErodeStepsPerSecond * seconds);
         const float talus = std::max(0.0f, brush.erodeTalus) * kWordsPerUnit;
         float change = 0.0f;
@@ -287,14 +350,22 @@ namespace faf::editor
       return current;
     }
 
-    [[nodiscard]] std::uint16_t ToWord(const float value)
+    [[nodiscard]] std::uint16_t ToWord(
+      const float value
+    )
     {
       return static_cast<std::uint16_t>(std::lround(std::clamp(value, 0.0f, 65535.0f)));
     }
 
-    [[nodiscard]] float StrongestWeight(const int sx, const int sz, const float (&centreX)[kMaxSymmetryCopies],
-                                        const float (&centreZ)[kMaxSymmetryCopies], const int centres, const HeightBrush& brush,
-                                        int* const strongest = nullptr)
+    [[nodiscard]] float StrongestWeight(
+      const int sx,
+      const int sz,
+      const float (&centreX)[kMaxSymmetryCopies],
+      const float (&centreZ)[kMaxSymmetryCopies],
+      const int centres,
+      const HeightBrush& brush,
+      int* const strongest = nullptr
+    )
     {
       float weight = 0.0f;
       float nearest = 0.0f;
@@ -311,8 +382,14 @@ namespace faf::editor
     }
 
     /** True if the sample is within `reach` of a centre. */
-    [[nodiscard]] bool NearACentre(const int sx, const int sz, const float (&centreX)[kMaxSymmetryCopies],
-                                   const float (&centreZ)[kMaxSymmetryCopies], const int centres, const float reach)
+    [[nodiscard]] bool NearACentre(
+      const int sx,
+      const int sz,
+      const float (&centreX)[kMaxSymmetryCopies],
+      const float (&centreZ)[kMaxSymmetryCopies],
+      const int centres,
+      const float reach
+    )
     {
       for (int c = 0; c < centres; ++c) {
         if (std::hypot(static_cast<float>(sx) - centreX[c], static_cast<float>(sz) - centreZ[c]) < reach) {
@@ -323,7 +400,12 @@ namespace faf::editor
     }
 
     /** True if no rectangle before `r` holds the sample (each sample is handled once). */
-    [[nodiscard]] bool FirstRectHolding(const std::vector<SampleRect>& rects, const std::size_t r, const int sx, const int sz)
+    [[nodiscard]] bool FirstRectHolding(
+      const std::vector<SampleRect>& rects,
+      const std::size_t r,
+      const int sx,
+      const int sz
+    )
     {
       for (std::size_t e = 0; e < r; ++e) {
         if (Contains(rects[e], sx, sz)) {
@@ -345,7 +427,10 @@ namespace faf::editor
         return z ^ (z >> 31);
       }
       /** 0 to 1. */
-      float Unit() { return static_cast<float>(Next() >> 40) / 16777216.0f; }
+      float Unit()
+      {
+        return static_cast<float>(Next() >> 40) / 16777216.0f;
+      }
     };
 
     constexpr float kDropletsPerSecond = 600.0f;
@@ -363,8 +448,17 @@ namespace faf::editor
      * on a float copy of the area, in game units, then each changed sample written, rounded at random but evenly, to
      * every member of its symmetry group.
      */
-    void ApplyWater(std::uint16_t* const heights, const int width, const int height, const SampleRect& rect, const float cx, const float cz,
-                    const Symmetry symmetry, const HeightBrush& brush, const float seconds)
+    void ApplyWater(
+      std::uint16_t* const heights,
+      const int width,
+      const int height,
+      const SampleRect& rect,
+      const float cx,
+      const float cz,
+      const Symmetry symmetry,
+      const HeightBrush& brush,
+      const float seconds
+    )
     {
       const int areaW = rect.x1 - rect.x0 + 1;
       const int areaH = rect.z1 - rect.z0 + 1;
@@ -375,10 +469,12 @@ namespace faf::editor
       std::vector<std::uint16_t> original(ground.size());
       for (int z = 0; z < areaH; ++z) {
         for (int x = 0; x < areaW; ++x) {
-          const std::uint16_t word =
-            heights[static_cast<std::size_t>(rect.z0 + z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(rect.x0 + x)];
+          const std::uint16_t word = heights
+            [static_cast<std::size_t>(rect.z0 + z) * static_cast<std::size_t>(width) +
+             static_cast<std::size_t>(rect.x0 + x)];
           original[static_cast<std::size_t>(z) * static_cast<std::size_t>(areaW) + static_cast<std::size_t>(x)] = word;
-          ground[static_cast<std::size_t>(z) * static_cast<std::size_t>(areaW) + static_cast<std::size_t>(x)] = static_cast<float>(word) / kWordsPerUnit;
+          ground[static_cast<std::size_t>(z) * static_cast<std::size_t>(areaW) + static_cast<std::size_t>(x)] =
+            static_cast<float>(word) / kWordsPerUnit;
         }
       }
       const auto cell = [&](const int x, const int z) -> float& {
@@ -387,7 +483,8 @@ namespace faf::editor
       // Inside the area with a cell to the right and below (bilinear reads and writes), and under the brush.
       const auto usable = [&](const float px, const float pz) {
         return px >= 0.0f && pz >= 0.0f && px < static_cast<float>(areaW - 1) && pz < static_cast<float>(areaH - 1) &&
-               Weight(std::hypot(px + static_cast<float>(rect.x0) - cx, pz + static_cast<float>(rect.z0) - cz), brush) > 0.0f;
+          Weight(std::hypot(px + static_cast<float>(rect.x0) - cx, pz + static_cast<float>(rect.z0) - cz), brush) >
+          0.0f;
       };
       // The height at a point and its gradient, from its cell's four corners.
       const auto sample = [&](const float px, const float pz, float& h, float& gx, float& gz) {
@@ -444,7 +541,8 @@ namespace faf::editor
           sample(nx, nz, nh, ngx, ngz);
           const float rise = nh - h;
           const float capacity = std::max(-rise * speed * water * kDropletCapacity, kDropletMinCapacity);
-          const float weight = Weight(std::hypot(px + static_cast<float>(rect.x0) - cx, pz + static_cast<float>(rect.z0) - cz), brush);
+          const float weight =
+            Weight(std::hypot(px + static_cast<float>(rect.x0) - cx, pz + static_cast<float>(rect.z0) - cz), brush);
           if (sediment > capacity || rise > 0.0f) {
             // Uphill it fills the dip it leaves (no more than it carries); otherwise it leaves what it can't carry.
             const float drop = rise > 0.0f ? std::min(rise, sediment) : (sediment - capacity) * kDropletDepositRate;
@@ -468,7 +566,10 @@ namespace faf::editor
       // lost on average), to every member of its symmetry group, within the brush's limits.
       const auto originalAt = [&](const int x, const int z) {
         return static_cast<float>(
-          original[static_cast<std::size_t>(std::clamp(z, 0, areaH - 1)) * static_cast<std::size_t>(areaW) + static_cast<std::size_t>(std::clamp(x, 0, areaW - 1))]);
+          original
+            [static_cast<std::size_t>(std::clamp(z, 0, areaH - 1)) * static_cast<std::size_t>(areaW) +
+             static_cast<std::size_t>(std::clamp(x, 0, areaW - 1))]
+        );
       };
       for (int z = 0; z < areaH; ++z) {
         for (int x = 0; x < areaW; ++x) {
@@ -476,7 +577,10 @@ namespace faf::editor
           const float lower = std::floor(value);
           const float rounded = random.Unit() < value - lower ? lower + 1.0f : lower;
           const std::uint16_t word = ToWord(rounded);
-          if (word == original[static_cast<std::size_t>(z) * static_cast<std::size_t>(areaW) + static_cast<std::size_t>(x)]) {
+          if (
+            word ==
+            original[static_cast<std::size_t>(z) * static_cast<std::size_t>(areaW) + static_cast<std::size_t>(x)]
+          ) {
             continue;
           }
           const float before = originalAt(x, z);
@@ -492,18 +596,29 @@ namespace faf::editor
           }
           int memberX[kMaxSymmetryCopies];
           int memberZ[kMaxSymmetryCopies];
-          const int members = Copies<int>(symmetry, brush.turns, width - 1, height - 1, rect.x0 + x, rect.z0 + z, memberX, memberZ);
+          const int members =
+            Copies<int>(symmetry, brush.turns, width - 1, height - 1, rect.x0 + x, rect.z0 + z, memberX, memberZ);
           for (int m = 0; m < members; ++m) {
-            heights[static_cast<std::size_t>(memberZ[m]) * static_cast<std::size_t>(width) + static_cast<std::size_t>(memberX[m])] = word;
+            heights
+              [static_cast<std::size_t>(memberZ[m]) * static_cast<std::size_t>(width) +
+               static_cast<std::size_t>(memberX[m])] = word;
           }
         }
       }
     }
 
     /** N-way turns: see ApplyHeightBrush. */
-    void ApplyTurned(std::uint16_t* const heights, const int width, const int height, const std::vector<SampleRect>& rects,
-                     const float (&centreX)[kMaxSymmetryCopies], const float (&centreZ)[kMaxSymmetryCopies], const int centres,
-                     const HeightBrush& brush, const float seconds)
+    void ApplyTurned(
+      std::uint16_t* const heights,
+      const int width,
+      const int height,
+      const std::vector<SampleRect>& rects,
+      const float (&centreX)[kMaxSymmetryCopies],
+      const float (&centreZ)[kMaxSymmetryCopies],
+      const int centres,
+      const HeightBrush& brush,
+      const float seconds
+    )
     {
       // The first sector, painted with the brush from the heights before the step.
       const std::vector<Snapshot> snapshots = TakeSnapshots(heights, width, height, rects);
@@ -518,8 +633,16 @@ namespace faf::editor
             const float weight = StrongestWeight(sx, sz, centreX, centreZ, centres, brush, &nearest);
             if (weight > 0.0f && WithinLimits(snapshots[r], sx, sz, brush)) {
               heights[static_cast<std::size_t>(sz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(sx)] =
-                ToWord(BrushedHeight(snapshots[r], sx, sz, weight, brush, seconds, static_cast<float>(sx) - centreX[nearest],
-                                     static_cast<float>(sz) - centreZ[nearest]));
+                ToWord(BrushedHeight(
+                  snapshots[r],
+                  sx,
+                  sz,
+                  weight,
+                  brush,
+                  seconds,
+                  static_cast<float>(sx) - centreX[nearest],
+                  static_cast<float>(sz) - centreZ[nearest]
+                ));
             }
           }
         }
@@ -532,9 +655,11 @@ namespace faf::editor
         for (int sz = rect.z0; sz <= rect.z1; ++sz) {
           for (int sx = rect.x0; sx <= rect.x1; ++sx) {
             double value = 0.0;
-            if (TurnSector(width, height, brush.turns, sx, sz) == 0 || !FirstRectHolding(rects, r, sx, sz) ||
-                !NearACentre(sx, sz, centreX, centreZ, centres, brush.radius + kTurnRim) ||
-                !TurnedHeight(heights, width, height, brush.turns, sx, sz, value)) {
+            if (
+              TurnSector(width, height, brush.turns, sx, sz) == 0 || !FirstRectHolding(rects, r, sx, sz) ||
+              !NearACentre(sx, sz, centreX, centreZ, centres, brush.radius + kTurnRim) ||
+              !TurnedHeight(heights, width, height, brush.turns, sx, sz, value)
+            ) {
               continue;
             }
             heights[static_cast<std::size_t>(sz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(sx)] =
@@ -545,7 +670,14 @@ namespace faf::editor
     }
   } // namespace
 
-  bool PlaneThrough(const double (&x)[3], const double (&h)[3], const double (&z)[3], double& planeX, double& planeZ, double& planeC)
+  bool PlaneThrough(
+    const double (&x)[3],
+    const double (&h)[3],
+    const double (&z)[3],
+    double& planeX,
+    double& planeZ,
+    double& planeC
+  )
   {
     // h = a x + b z + c through the three points: Cramer's rule on the two differences.
     const double x1 = x[1] - x[0];
@@ -564,7 +696,13 @@ namespace faf::editor
     return true;
   }
 
-  int TurnSector(const int width, const int height, const int turns, const int x, const int z)
+  int TurnSector(
+    const int width,
+    const int height,
+    const int turns,
+    const int x,
+    const int z
+  )
   {
     const int count = Turns(turns);
     double angle = std::atan2(z - (height - 1) * 0.5, x - (width - 1) * 0.5);
@@ -574,14 +712,22 @@ namespace faf::editor
     return std::min(count - 1, static_cast<int>(angle / (kTwoPi / count)));
   }
 
-  bool TurnedHeight(const std::uint16_t* const heights, const int width, const int height, const int turns, const int x, const int z,
-                    double& value)
+  bool TurnedHeight(
+    const std::uint16_t* const heights,
+    const int width,
+    const int height,
+    const int turns,
+    const int x,
+    const int z,
+    double& value
+  )
   {
     const int count = Turns(turns);
     const double cx = (width - 1) * 0.5;
     const double cz = (height - 1) * 0.5;
     // A point turned back by the sector of sample (sx, sz).
-    const auto turnBack = [&](const int sx, const int sz, const double px, const double pz, double& outX, double& outZ) {
+    const auto turnBack =
+      [&](const int sx, const int sz, const double px, const double pz, double& outX, double& outZ) {
       const double back = -kTwoPi * TurnSector(width, height, count, sx, sz) / count;
       outX = cx + (px - cx) * std::cos(back) - (pz - cz) * std::sin(back);
       outZ = cz + (px - cx) * std::sin(back) + (pz - cz) * std::cos(back);
@@ -607,31 +753,68 @@ namespace faf::editor
         sx = std::clamp(static_cast<int>(std::lround(bx)), 0, width - 1);
         sz = std::clamp(static_cast<int>(std::lround(bz)), 0, height - 1);
       }
-      return static_cast<double>(heights[static_cast<std::size_t>(sz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(sx)]);
+      return static_cast<double>(
+        heights[static_cast<std::size_t>(sz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(sx)]
+      );
     };
-    value = (at(x0, z0) * (1.0 - fx) + at(x0 + 1, z0) * fx) * (1.0 - fz) + (at(x0, z0 + 1) * (1.0 - fx) + at(x0 + 1, z0 + 1) * fx) * fz;
+    value = (at(x0, z0) * (1.0 - fx) + at(x0 + 1, z0) * fx) * (1.0 - fz) +
+      (at(x0, z0 + 1) * (1.0 - fx) + at(x0 + 1, z0 + 1) * fx) * fz;
     return true;
   }
 
-  Symmetry EffectiveSymmetry(const Symmetry symmetry, const int width, const int height)
+  Symmetry EffectiveSymmetry(
+    const Symmetry symmetry,
+    const int width,
+    const int height
+  )
   {
     return NeedsSquare(symmetry) && width != height ? Symmetry::None : symmetry;
   }
 
-  int SymmetricSamples(const Symmetry symmetry, const int turns, const int width, const int height, const int x, const int z,
-                       int (&outX)[kMaxSymmetryCopies], int (&outZ)[kMaxSymmetryCopies])
+  int SymmetricSamples(
+    const Symmetry symmetry,
+    const int turns,
+    const int width,
+    const int height,
+    const int x,
+    const int z,
+    int (&outX)[kMaxSymmetryCopies],
+    int (&outZ)[kMaxSymmetryCopies]
+  )
   {
     return Copies<int>(EffectiveSymmetry(symmetry, width, height), turns, width - 1, height - 1, x, z, outX, outZ);
   }
 
-  int HeightBrushCentres(const int width, const int height, const float x, const float z, const Symmetry symmetry, const int turns,
-                         float (&outX)[kMaxSymmetryCopies], float (&outZ)[kMaxSymmetryCopies])
+  int HeightBrushCentres(
+    const int width,
+    const int height,
+    const float x,
+    const float z,
+    const Symmetry symmetry,
+    const int turns,
+    float (&outX)[kMaxSymmetryCopies],
+    float (&outZ)[kMaxSymmetryCopies]
+  )
   {
-    return Copies<float>(EffectiveSymmetry(symmetry, width, height), turns, static_cast<float>(width - 1), static_cast<float>(height - 1), x,
-                         z, outX, outZ);
+    return Copies<float>(
+      EffectiveSymmetry(symmetry, width, height),
+      turns,
+      static_cast<float>(width - 1),
+      static_cast<float>(height - 1),
+      x,
+      z,
+      outX,
+      outZ
+    );
   }
 
-  std::vector<SampleRect> HeightBrushRects(const int width, const int height, const float x, const float z, const HeightBrush& brush)
+  std::vector<SampleRect> HeightBrushRects(
+    const int width,
+    const int height,
+    const float x,
+    const float z,
+    const HeightBrush& brush
+  )
   {
     if (width < 2 || height < 2 || brush.radius <= 0.0f) {
       return {};
@@ -643,8 +826,15 @@ namespace faf::editor
     return RectsAround(width, height, centreX, centreZ, centres, brush.radius + (turned ? kTurnRim : 0.0f));
   }
 
-  std::vector<SampleRect> ApplyHeightBrush(std::uint16_t* const heights, const int width, const int height, const float x,
-                                           const float z, const HeightBrush& brush, const float seconds)
+  std::vector<SampleRect> ApplyHeightBrush(
+    std::uint16_t* const heights,
+    const int width,
+    const int height,
+    const float x,
+    const float z,
+    const HeightBrush& brush,
+    const float seconds
+  )
   {
     if (heights == nullptr || width < 2 || height < 2 || brush.radius <= 0.0f || seconds <= 0.0f) {
       return {};
@@ -655,8 +845,9 @@ namespace faf::editor
     float centreX[kMaxSymmetryCopies];
     float centreZ[kMaxSymmetryCopies];
     const int centres = HeightBrushCentres(width, height, x, z, symmetry, brush.turns, centreX, centreZ);
-    const std::vector<SampleRect> rects =
-      RectsAround(width, height, centreX, centreZ, centres, brush.radius + (symmetry == Symmetry::NWay ? kTurnRim : 0.0f));
+    const std::vector<SampleRect> rects = RectsAround(
+      width, height, centreX, centreZ, centres, brush.radius + (symmetry == Symmetry::NWay ? kTurnRim : 0.0f)
+    );
     if (brush.mode == HeightBrushMode::WaterErode) {
       // Simulated around the cursor's copy; its changes written to every symmetric copy.
       if (!rects.empty()) {
@@ -691,10 +882,20 @@ namespace faf::editor
           if (weight <= 0.0f || !WithinLimits(snapshots[r], sx, sz, brush)) {
             continue;
           }
-          const std::uint16_t word = ToWord(BrushedHeight(snapshots[r], sx, sz, weight, brush, seconds, static_cast<float>(sx) - centreX[nearest],
-                                                          static_cast<float>(sz) - centreZ[nearest]));
+          const std::uint16_t word = ToWord(BrushedHeight(
+            snapshots[r],
+            sx,
+            sz,
+            weight,
+            brush,
+            seconds,
+            static_cast<float>(sx) - centreX[nearest],
+            static_cast<float>(sz) - centreZ[nearest]
+          ));
           for (int m = 0; m < members; ++m) {
-            heights[static_cast<std::size_t>(memberZ[m]) * static_cast<std::size_t>(width) + static_cast<std::size_t>(memberX[m])] = word;
+            heights
+              [static_cast<std::size_t>(memberZ[m]) * static_cast<std::size_t>(width) +
+               static_cast<std::size_t>(memberX[m])] = word;
           }
         }
       }

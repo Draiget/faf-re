@@ -48,7 +48,6 @@ namespace moho
     void AddEnums();
   };
 
-
   static_assert(sizeof(EEconResourceTypeInfo) == 0x78, "EEconResourceTypeInfo size must be 0x78");
 
   /**

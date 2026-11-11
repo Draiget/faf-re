@@ -24,17 +24,25 @@ using namespace gpg::gal::effects;
 
 namespace
 {
-  constexpr std::uint8_t U8(const int value)
+  constexpr std::uint8_t U8(
+    const int value
+  )
   {
     return static_cast<std::uint8_t>(value);
   }
 
-  bool Contains(const std::string& text, const std::string& needle)
+  bool Contains(
+    const std::string& text,
+    const std::string& needle
+  )
   {
     return text.find(needle) != std::string::npos;
   }
 
-  bool HasNote(const TranslatedEffectSource& translated, const std::string& note)
+  bool HasNote(
+    const TranslatedEffectSource& translated,
+    const std::string& note
+  )
   {
     for (const std::string& line : translated.notes) {
       if (line == note) {
@@ -44,7 +52,10 @@ namespace
     return false;
   }
 
-  const Pass& OnlyPass(const EffectDescription& description, const char* const technique)
+  const Pass& OnlyPass(
+    const EffectDescription& description,
+    const char* const technique
+  )
   {
     const Technique* const found = description.FindTechnique(technique);
     if (found == nullptr || found->passes.empty()) {
@@ -146,7 +157,10 @@ technique10 Overlay { pass P0 { VertexShader = compile vs_4_0 FixedFuncVS(); } }
 )fx";
 } // namespace
 
-TEST(GalEffectSourceD3D11, Direct3D9DepthAndStencilStatesBecomeAStateObject)
+TEST(
+  GalEffectSourceD3D11,
+  Direct3D9DepthAndStencilStatesBecomeAStateObject
+)
 {
   const TranslatedEffectSource translated = TranslateEffectSource(kCast, false, {});
   const EffectDescription description = ParseEffect(translated.source);
@@ -189,7 +203,10 @@ TEST(GalEffectSourceD3D11, Direct3D9DepthAndStencilStatesBecomeAStateObject)
   EXPECT_EQ(singleDepth.back.depthFailOp, U8(D3D11_STENCIL_OP_INCR));
 }
 
-TEST(GalEffectSourceD3D11, PassBlendStatesMergeIntoTheBoundStateObject)
+TEST(
+  GalEffectSourceD3D11,
+  PassBlendStatesMergeIntoTheBoundStateObject
+)
 {
   const TranslatedEffectSource translated = TranslateEffectSource(kMixed, false, {});
   const EffectDescription description = ParseEffect(translated.source);
@@ -215,17 +232,25 @@ TEST(GalEffectSourceD3D11, PassBlendStatesMergeIntoTheBoundStateObject)
   EXPECT_FALSE(Contains(addBody, "DestBlendAlpha = ZERO;"));
 }
 
-TEST(GalEffectSourceD3D11, OneDimensionalSamplersReadATwoDimensionalRamp)
+TEST(
+  GalEffectSourceD3D11,
+  OneDimensionalSamplersReadATwoDimensionalRamp
+)
 {
   const TranslatedEffectSource translated = TranslateEffectSource(kMixed, false, {});
   EXPECT_FALSE(Contains(translated.source, "sampler1D"));
   EXPECT_TRUE(Contains(translated.source, "sampler2D RampSampler"));
   EXPECT_TRUE(Contains(translated.source, "faf_tex1D( RampSampler, u )"));
-  EXPECT_TRUE(Contains(translated.source, "float4 faf_tex1D(sampler2D s, float u) { return tex2D(s, float2(u, 0.5)); }"));
+  EXPECT_TRUE(
+    Contains(translated.source, "float4 faf_tex1D(sampler2D s, float u) { return tex2D(s, float2(u, 0.5)); }")
+  );
   EXPECT_TRUE(HasNote(translated, "1D samplers read as 2D: 1 sampler(s), 1 read(s)"));
 }
 
-TEST(GalEffectSourceD3D11, ShaderModelIsRaisedOnRequest)
+TEST(
+  GalEffectSourceD3D11,
+  ShaderModelIsRaisedOnRequest
+)
 {
   const TranslatedEffectSource raised = TranslateEffectSource(kMixed, true, {});
   EXPECT_FALSE(Contains(raised.source, "vs_4_0"));
@@ -238,7 +263,10 @@ TEST(GalEffectSourceD3D11, ShaderModelIsRaisedOnRequest)
   EXPECT_FALSE(HasNote(kept, "shader model 4.1 profiles"));
 }
 
-TEST(GalEffectSourceD3D11, AStructNamedLikeATechniqueIsRenamed)
+TEST(
+  GalEffectSourceD3D11,
+  AStructNamedLikeATechniqueIsRenamed
+)
 {
   const TranslatedEffectSource translated = TranslateEffectSource(kMixed, false, {});
   EXPECT_TRUE(Contains(translated.source, "struct faf_Cirrus"));
@@ -254,7 +282,10 @@ TEST(GalEffectSourceD3D11, AStructNamedLikeATechniqueIsRenamed)
 
 // The original water2.fx (effects.scd, line 448) and FAF's copies before fa #6452: a local named like an effect
 // parameter reads the parameter in its own initializer, which only D3D9's compiler accepts.
-TEST(GalEffectSourceD3D11, ALocalReadingTheParameterItShadowsIsRenamed)
+TEST(
+  GalEffectSourceD3D11,
+  ALocalReadingTheParameterItShadowsIsRenamed
+)
 {
   const char* const source = R"fx(
 float2 waterLerp = 0.3;
@@ -278,7 +309,9 @@ technique10 Other { pass P0 { PixelShader = compile ps_4_0 OtherPS(); } }
 )fx";
   const TranslatedEffectSource translated = TranslateEffectSource(source, false, {});
   EXPECT_TRUE(Contains(translated.source, "float2 waterLerp = 0.3;"));
-  EXPECT_TRUE(Contains(translated.source, "float faf_local_waterLerp = clamp( waterDepth, waterLerp.x, waterLerp.y );"));
+  EXPECT_TRUE(
+    Contains(translated.source, "float faf_local_waterLerp = clamp( waterDepth, waterLerp.x, waterLerp.y );")
+  );
   EXPECT_TRUE(Contains(translated.source, "flow.waterLerp = faf_local_waterLerp;"));
   EXPECT_TRUE(Contains(translated.source, "lerp( colour.xyz, float3( 0, 0, 0 ), faf_local_waterLerp )"));
   EXPECT_TRUE(Contains(translated.source, "return colour * flow.waterLerp;"));
@@ -292,7 +325,10 @@ technique10 Other { pass P0 { PixelShader = compile ps_4_0 OtherPS(); } }
   EXPECT_NE(description.FindTechnique("Other"), nullptr);
 }
 
-TEST(GalEffectSourceD3D11, ALocalNotReadingTheParameterIsKept)
+TEST(
+  GalEffectSourceD3D11,
+  ALocalNotReadingTheParameterIsKept
+)
 {
   const char* const source = R"fx(
 float2 waterLerp = 0.3;
@@ -308,10 +344,15 @@ technique10 Water { pass P0 { PixelShader = compile ps_4_0 WaterPS(); } }
   EXPECT_FALSE(Contains(translated.source, "faf_local_"));
 }
 
-TEST(GalEffectSourceD3D11, PixelShadersAreRelinkedBySemantic)
+TEST(
+  GalEffectSourceD3D11,
+  PixelShadersAreRelinkedBySemantic
+)
 {
   const TranslatedEffectSource translated = TranslateEffectSource(kMixed, false, {});
-  EXPECT_TRUE(Contains(translated.source, "float4 faf_ps_0( VOut faf_in ) : COLOR0\n{\n    return LinkPS( faf_in.col, faf_in.uv );\n}\n"));
+  EXPECT_TRUE(Contains(
+    translated.source, "float4 faf_ps_0( VOut faf_in ) : COLOR0\n{\n    return LinkPS( faf_in.col, faf_in.uv );\n}\n"
+  ));
   EXPECT_TRUE(HasNote(translated, "pixel shader inputs re-linked through 1 wrapper(s)"));
 
   const EffectDescription description = ParseEffect(translated.source);
@@ -319,11 +360,15 @@ TEST(GalEffectSourceD3D11, PixelShadersAreRelinkedBySemantic)
   ASSERT_NE(link, nullptr);
   ASSERT_EQ(link->passes.size(), 3U);
   EXPECT_EQ(link->passes[0].pixelShader.function, "faf_ps_0");
-  EXPECT_EQ(link->passes[1].pixelShader.function, "PrefixPS") << "inputs that are a prefix of the outputs need no wrapper";
+  EXPECT_EQ(link->passes[1].pixelShader.function, "PrefixPS")
+    << "inputs that are a prefix of the outputs need no wrapper";
   EXPECT_EQ(link->passes[2].pixelShader.function, "faf_ps_0") << "one wrapper per (pixel shader, vertex output)";
 }
 
-TEST(GalEffectSourceD3D11, DepthBiasesAreScaledToDepthSteps)
+TEST(
+  GalEffectSourceD3D11,
+  DepthBiasesAreScaledToDepthSteps
+)
 {
   const TranslatedEffectSource translated = TranslateEffectSource(kMixed, false, {});
   const EffectDescription description = ParseEffect(translated.source);
@@ -347,7 +392,10 @@ TEST(GalEffectSourceD3D11, DepthBiasesAreScaledToDepthSteps)
   EXPECT_TRUE(decal->passes[1].rasterizer->depthClipEnable);
 }
 
-TEST(GalEffectSourceD3D11, UnsupportedStatesAreNotedAndDropped)
+TEST(
+  GalEffectSourceD3D11,
+  UnsupportedStatesAreNotedAndDropped
+)
 {
   const TranslatedEffectSource translated = TranslateEffectSource(kMixed, false, {});
   EXPECT_TRUE(HasNote(translated, "unsupported zfunc value 'Sometimes' ignored"));
@@ -362,7 +410,10 @@ TEST(GalEffectSourceD3D11, UnsupportedStatesAreNotedAndDropped)
   EXPECT_EQ(odd.vertexShader.function, "LinkVS");
 }
 
-TEST(GalEffectSourceD3D11, FixedFunctionTechniquesAreEmulatedOrDropped)
+TEST(
+  GalEffectSourceD3D11,
+  FixedFunctionTechniquesAreEmulatedOrDropped
+)
 {
   const TranslatedEffectSource translated = TranslateEffectSource(kMixed, false, {});
   EXPECT_TRUE(HasNote(translated, "D3D9 fixed-function FixedFuncVS emulated for pre-transformed vertices"));
@@ -375,7 +426,10 @@ TEST(GalEffectSourceD3D11, FixedFunctionTechniquesAreEmulatedOrDropped)
   EXPECT_EQ(viewport->columns, 4U);
 }
 
-TEST(GalEffectSourceD3D11, Direct3D9AlphaTestMovesIntoThePixelShader)
+TEST(
+  GalEffectSourceD3D11,
+  Direct3D9AlphaTestMovesIntoThePixelShader
+)
 {
   const char* const preprocessed = R"fx(
 float4 WaterPS( float4 c : TEXCOORD0 ) : COLOR0 { return c; }
@@ -402,11 +456,14 @@ technique Water
 }
 )fx";
   const TranslatedEffectSource translated = TranslateEffectSource(preprocessed, false, original);
-  EXPECT_TRUE(Contains(translated.source, "float4 faf_alphatest_0( float4 c : TEXCOORD0 ) : COLOR0\n{\n"
-                                          "    float4 faf_result = WaterPS( c );\n"
-                                          "    uint faf_alpha = (uint)round(saturate(faf_result.a) * 255.0);\n"
-                                          "    if (!(faf_alpha != 0u))\n        discard;\n"
-                                          "    return faf_result;\n}\n"));
+  EXPECT_TRUE(Contains(
+    translated.source,
+    "float4 faf_alphatest_0( float4 c : TEXCOORD0 ) : COLOR0\n{\n"
+    "    float4 faf_result = WaterPS( c );\n"
+    "    uint faf_alpha = (uint)round(saturate(faf_result.a) * 255.0);\n"
+    "    if (!(faf_alpha != 0u))\n        discard;\n"
+    "    return faf_result;\n}\n"
+  ));
   EXPECT_TRUE(HasNote(translated, "D3D9 alpha test applied in the pixel shader of 1 pass(es)"));
   EXPECT_FALSE(Contains(translated.source, "if ( inputAlpha < 0.5 ) discard;")) << "the compat stand-in is emptied";
 
@@ -418,14 +475,22 @@ technique Water
   EXPECT_EQ(water->passes[1].pixelShader.function, "WaterPS");
 }
 
-TEST(GalEffectSourceD3D11, DirectivesAreDroppedAndD3D9MathIsPrepended)
+TEST(
+  GalEffectSourceD3D11,
+  DirectivesAreDroppedAndD3D9MathIsPrepended
+)
 {
   const TranslatedEffectSource translated = TranslateEffectSource(kMixed, false, {});
-  EXPECT_EQ(translated.source.rfind("#define sqrt(x) sqrt(abs(x))\n#define rsqrt(x) rsqrt(abs(x))\n#define pow(x, y)", 0U), 0U);
+  EXPECT_EQ(
+    translated.source.rfind("#define sqrt(x) sqrt(abs(x))\n#define rsqrt(x) rsqrt(abs(x))\n#define pow(x, y)", 0U), 0U
+  );
   EXPECT_FALSE(Contains(translated.source, "#line"));
 }
 
-TEST(GalEffectSourceD3D11, FastScanAndRegexScanAgree)
+TEST(
+  GalEffectSourceD3D11,
+  FastScanAndRegexScanAgree
+)
 {
   // ren_EffectFastScan replaced std::regex scans; FAF_FX_SCAN_VERIFY compares the two at run time.
   const bool fast = gpg::gal::d3d11::gEffectFastScan;
@@ -446,7 +511,10 @@ TEST(GalEffectSourceD3D11, FastScanAndRegexScanAgree)
   EXPECT_TRUE(Contains(tested.source, "return faf_alphatest_0( faf_in.col, faf_in.uv );"));
 }
 
-TEST(GalEffectSourceD3D11, SeparateAlphaBlendingIsKeptInTheTranslatedText)
+TEST(
+  GalEffectSourceD3D11,
+  SeparateAlphaBlendingIsKeptInTheTranslatedText
+)
 {
   const char* const source = R"fx(
 technique10 Separate
@@ -474,7 +542,10 @@ technique10 Separate
 // ones, so on Direct3D 12 and Vulkan the pass blends alpha with SRC_ALPHA / INV_SRC_ALPHA instead
 // of ZERO / ONE. No effect the game ships enables separate alpha (checked in FAF's effects.nx2), so
 // only a mod's effect would show it. Minimal input: the source of the test above.
-TEST(GalEffectSourceD3D11, DISABLED_SeparateAlphaBlendingReachesTheEffectDescription)
+TEST(
+  GalEffectSourceD3D11,
+  DISABLED_SeparateAlphaBlendingReachesTheEffectDescription
+)
 {
   const char* const source = R"fx(
 technique10 Separate

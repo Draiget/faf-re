@@ -47,7 +47,7 @@ namespace moho
     wxEvent* Clone() const override;
 
     fa::string mSourceName; // +0x20
-    int mSourceLine;           // +0x3C
+    int mSourceLine;        // +0x3C
   };
 
   static_assert(offsetof(ScrPauseEvent, mSourceName) == 0x20, "ScrPauseEvent::mSourceName offset must be 0x20");

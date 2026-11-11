@@ -37,7 +37,7 @@ namespace
   {
     textureBatches.push_back(texture);
   }
-}
+} // namespace
 
 gpg::RType* moho::CMauiBitmap::sType = nullptr;
 
@@ -1336,8 +1336,7 @@ namespace
     }
     return remainingSlots;
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x0077F950 (FUN_0077F950, Moho::CMauiBitmap::CMauiBitmap)
@@ -1816,7 +1815,6 @@ void moho::CMauiBitmap::Dump()
 {
   CMauiControl::Dump();
   gpg::Logf("CMauiBitmap");
-
 
   const int textureCount = static_cast<int>(mTextureBatches.size());
 

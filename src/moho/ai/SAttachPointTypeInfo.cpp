@@ -69,9 +69,14 @@ void moho::register_SAttachPointTypeInfo()
   (void)preregister_SAttachPointTypeInfoStartup();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SAttachPointTypeInfo_1ad790, moho::register_SAttachPointTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SAttachPointTypeInfo_1ad790,
+  moho::register_SAttachPointTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_SAttachPointTypeInfoStartup_1ad790, preregister_SAttachPointTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  preregister_SAttachPointTypeInfoStartup_1ad790,
+  preregister_SAttachPointTypeInfoStartup
+)

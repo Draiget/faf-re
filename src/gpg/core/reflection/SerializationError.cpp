@@ -9,10 +9,11 @@ using namespace gpg;
  * What it does:
  * Builds the serialization exception payload from a C-string message.
  */
-SerializationError::SerializationError(const char* const message)
-    : std::runtime_error(message)
-{
-}
+SerializationError::SerializationError(
+  const char* const message
+)
+  : std::runtime_error(message)
+{}
 
 /**
  * Address: 0x00406770 (FUN_00406770)

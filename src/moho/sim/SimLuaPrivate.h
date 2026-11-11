@@ -17,5 +17,4 @@ namespace
     static CScrLuaInitFormSet fallbackSet("Sim");
     return fallbackSet;
   }
-}
-
+} // namespace

@@ -23,8 +23,17 @@ namespace faf::editor
     std::vector<float> data;
 
     void Reset(int newSize, int newChannels, float fill = 0.0f);
-    [[nodiscard]] float* Pixel(const int x, const int y) { return data.data() + (static_cast<std::size_t>(y) * size + x) * channels; }
-    [[nodiscard]] const float* Pixel(const int x, const int y) const
+    [[nodiscard]] float* Pixel(
+      const int x,
+      const int y
+    )
+    {
+      return data.data() + (static_cast<std::size_t>(y) * size + x) * channels;
+    }
+    [[nodiscard]] const float* Pixel(
+      const int x,
+      const int y
+    ) const
     {
       return data.data() + (static_cast<std::size_t>(y) * size + x) * channels;
     }
@@ -40,7 +49,8 @@ namespace faf::editor
     int height = 0;
     float units = 1.0f;
     std::vector<float> heights;
-    /** The stratum masks, rows along z: one texel's eight weights in one word, byte k for stratum k + 1 (EdMaskBrush.h). */
+    /** The stratum masks, rows along z: one texel's eight weights in one word, byte k for stratum k + 1
+     * (EdMaskBrush.h). */
     int maskWidth = 0;
     int maskHeight = 0;
     std::vector<std::uint64_t> masks;
@@ -58,10 +68,17 @@ namespace faf::editor
     /** Reads a texture file (a DDS from the VFS) into an RGBA image; false when it can't. */
     using TextureLoader = std::function<bool(const std::string& path, TexImage& out)>;
 
-    explicit TextureGraphEvaluator(const NodeGraph& graph) : mGraph(&graph) {}
+    explicit TextureGraphEvaluator(
+      const NodeGraph& graph
+    )
+      : mGraph(&graph)
+    {}
 
     void SetSize(int size);
-    [[nodiscard]] int Size() const noexcept { return mSize; }
+    [[nodiscard]] int Size() const noexcept
+    {
+      return mSize;
+    }
     void SetTextureLoader(TextureLoader loader);
     void SetTerrain(std::shared_ptr<const TerrainSource> terrain);
 

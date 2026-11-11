@@ -16,16 +16,17 @@ namespace moho
    * Address: 0x007ED430 (FUN_007ED430, Moho::MiscellaneousExtractor::Range)
    */
   bool MiscellaneousExtractor::Range(
-    SRangeExtractionPayload* const outRange, const RUnitBlueprint* const unitBlueprint, const Wm3::Vec3f& center
+    SRangeExtractionPayload* const outRange,
+    const RUnitBlueprint* const unitBlueprint,
+    const Wm3::Vec3f& center
   ) const
   {
     if (!outRange || !unitBlueprint) {
       return false;
     }
 
-    const float radius = ResolvePositiveRadius(
-      unitBlueprint->AI.StagingPlatformScanRadius, unitBlueprint->AI.GuardScanRadius
-    );
+    const float radius =
+      ResolvePositiveRadius(unitBlueprint->AI.StagingPlatformScanRadius, unitBlueprint->AI.GuardScanRadius);
     return StoreRangeAtCenter(outRange, center, radius);
   }
 
@@ -53,7 +54,9 @@ namespace moho
    * filter admits.
    */
   bool MiscellaneousExtractor::Extract(
-    SRangeExtractionPayload* const outRange, const UserEntity* const userEntity, const float interpolationAlpha
+    SRangeExtractionPayload* const outRange,
+    const UserEntity* const userEntity,
+    const float interpolationAlpha
   ) const
   {
     if (!outRange || !userEntity) {
@@ -70,9 +73,8 @@ namespace moho
       return false;
     }
 
-    const float radius = ResolvePositiveRadius(
-      unitBlueprint->AI.StagingPlatformScanRadius, unitBlueprint->AI.GuardScanRadius
-    );
+    const float radius =
+      ResolvePositiveRadius(unitBlueprint->AI.StagingPlatformScanRadius, unitBlueprint->AI.GuardScanRadius);
     return StoreRangeAtEntity(outRange, *userEntity, interpolationAlpha, radius);
   }
 } // namespace moho

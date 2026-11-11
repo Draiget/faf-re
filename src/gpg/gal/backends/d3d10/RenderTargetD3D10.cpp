@@ -2,10 +2,12 @@
 
 namespace gpg::gal
 {
-namespace
-{
+  namespace
+  {
 
-    int MapDxgiToGalRenderTargetFormat(const int dxgiFormat)
+    int MapDxgiToGalRenderTargetFormat(
+      const int dxgiFormat
+    )
     {
       for (const DXGIFormatPair& pair : kRenderTargetDxgiGalPairs) {
         if (pair.dxgi == dxgiFormat) {
@@ -22,12 +24,13 @@ namespace
      * What it does:
      * Executes the recovered non-deleting destructor body lanes for `RenderTargetD3D10`.
      */
-    void DestroyRenderTargetD3D10Body(RenderTargetD3D10* const renderTarget)
+    void DestroyRenderTargetD3D10Body(
+      RenderTargetD3D10* const renderTarget
+    )
     {
       renderTarget->DestroyState();
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x00902D20 (FUN_00902D20, ??0RenderTargetD3D10@gal@gpg@@QAE@@Z)
@@ -40,8 +43,7 @@ namespace
     , renderTexture_(nullptr)
     , renderTargetView_(nullptr)
     , shaderResourceView_(nullptr)
-  {
-  }
+  {}
 
   /**
    * Address: 0x00902FE0 (FUN_00902FE0)
@@ -217,5 +219,4 @@ namespace
 
     return shaderResourceView_;
   }
-}
-
+} // namespace gpg::gal

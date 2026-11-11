@@ -16,7 +16,7 @@ namespace gpg
 {
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -30,13 +30,10 @@ namespace moho
   struct SOCellPos;
   class Unit;
 
-
   /**
    * Recovered command-task owner for unit guard behavior state.
    */
-  class CUnitGuardTask
-    : public CCommandTask
-    , public Listener<ECommandEvent>
+  class CUnitGuardTask : public CCommandTask, public Listener<ECommandEvent>
   {
   public:
     static gpg::RType* sType;
@@ -329,22 +326,22 @@ namespace moho
   public:
     // 0x30 (mUnknown0030) and 0x34 (Listener<ECommandEvent>) now come from
     // the base-class chain declared above.
-    CCommandTask* mCommandTask; // +0x40
+    CCommandTask* mCommandTask;               // +0x40
     WeakPtr<CUnitCommand> mPrimaryCommandRef; // +0x44
-    WeakPtr<CUnitCommand> mCommandRef; // +0x4C
-    CAiTarget mTarget; // +0x54
-    bool mTrackGuardedUnit; // +0x74 (v13a)
-    bool mRefreshGuardedUnitFromNearby; // +0x75 (v13b)
-    bool mDisableBestEnemySearch; // +0x76 (v13c)
-    bool mDisableReactionState; // +0x77 (v13d)
-    bool mPreferTransportRefuel; // +0x78 (v14a)
-    bool mAllowFerryBeaconRedirect; // +0x79 (v14b)
-    bool mUnknown7A; // +0x7A (v14c)
-    std::uint8_t mPad007B; // +0x7B
-    WeakPtr<Unit> mSecondaryUnit; // +0x7C
-    Wm3::Vector3f mGuardDirection; // +0x84 (v17)
-    Wm3::Vector3f mGuardMoveAnchorPosition; // +0x90 (v20)
-    SNavGoal mGuardGoal; // +0x9C (v23)
+    WeakPtr<CUnitCommand> mCommandRef;        // +0x4C
+    CAiTarget mTarget;                        // +0x54
+    bool mTrackGuardedUnit;                   // +0x74 (v13a)
+    bool mRefreshGuardedUnitFromNearby;       // +0x75 (v13b)
+    bool mDisableBestEnemySearch;             // +0x76 (v13c)
+    bool mDisableReactionState;               // +0x77 (v13d)
+    bool mPreferTransportRefuel;              // +0x78 (v14a)
+    bool mAllowFerryBeaconRedirect;           // +0x79 (v14b)
+    bool mUnknown7A;                          // +0x7A (v14c)
+    std::uint8_t mPad007B;                    // +0x7B
+    WeakPtr<Unit> mSecondaryUnit;             // +0x7C
+    Wm3::Vector3f mGuardDirection;            // +0x84 (v17)
+    Wm3::Vector3f mGuardMoveAnchorPosition;   // +0x90 (v20)
+    SNavGoal mGuardGoal;                      // +0x9C (v23)
   };
 
   static_assert(sizeof(CUnitGuardTask) == 0xC0, "CUnitGuardTask size must be 0xC0");

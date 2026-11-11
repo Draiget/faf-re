@@ -16,7 +16,7 @@ namespace gpg
   class BinaryReader;
   class RType;
   class Stream;
-}
+} // namespace gpg
 
 namespace gpg::gal
 {

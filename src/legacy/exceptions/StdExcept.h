@@ -98,11 +98,12 @@ namespace fa
      * empty-string initialization followed by `string::assign(m, 0, npos)`,
      * which is what MSVC emits for a `string` member-initializer.
      */
-    explicit message_exception(const string& message) noexcept
+    explicit message_exception(
+      const string& message
+    ) noexcept
       : exception()
       , mStr(message)
-    {
-    }
+    {}
 
     ~message_exception() override = default;
 
@@ -123,12 +124,10 @@ namespace fa
   /// Tags that give each instantiation its own type and vtable, matching the
   /// two classes MSVC8 declares separately.
   struct logic_error_tag
-  {
-  };
+  {};
 
   struct runtime_error_tag
-  {
-  };
+  {};
 
   using logic_error = message_exception<logic_error_tag>;
   using runtime_error = message_exception<runtime_error_tag>;
@@ -136,8 +135,10 @@ namespace fa
   // mStr is the only member, so the sizes pin it to +0x0C between them -
   // the displacement both constructors use (`lea ecx, [esi+0xCh]`). An
   // offsetof would say it more directly but cannot reach a private member.
-  static_assert(sizeof(runtime_error) == sizeof(exception) + sizeof(string),
-                "fa::runtime_error must be its base plus exactly one string");
+  static_assert(
+    sizeof(runtime_error) == sizeof(exception) + sizeof(string),
+    "fa::runtime_error must be its base plus exactly one string"
+  );
   static_assert(sizeof(runtime_error) == 0x28, "fa::runtime_error size must be 0x28");
   static_assert(sizeof(logic_error) == 0x28, "fa::logic_error size must be 0x28");
 

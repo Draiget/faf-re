@@ -13,7 +13,11 @@ namespace difffuzz
   {
     std::uint64_t s;
 
-    explicit Rng(const std::uint64_t seed) noexcept : s(seed ? seed : 0x9E3779B97F4A7C15ull) {}
+    explicit Rng(
+      const std::uint64_t seed
+    ) noexcept
+      : s(seed ? seed : 0x9E3779B97F4A7C15ull)
+    {}
 
     std::uint64_t Next() noexcept // splitmix64
     {
@@ -22,11 +26,33 @@ namespace difffuzz
       z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
       return z ^ (z >> 31);
     }
-    std::uint32_t U32() noexcept { return static_cast<std::uint32_t>(Next() >> 32); }
-    std::uint32_t Below(const std::uint32_t n) noexcept { return static_cast<std::uint32_t>((Next() >> 32) % n); }
-    bool Chance(const std::uint32_t percent) noexcept { return Below(100) < percent; }
-    double Unit() noexcept { return static_cast<double>(Next() >> 11) * (1.0 / 9007199254740992.0); } // [0,1)
-    double Range(const double lo, const double hi) noexcept { return lo + (hi - lo) * Unit(); }
+    std::uint32_t U32() noexcept
+    {
+      return static_cast<std::uint32_t>(Next() >> 32);
+    }
+    std::uint32_t Below(
+      const std::uint32_t n
+    ) noexcept
+    {
+      return static_cast<std::uint32_t>((Next() >> 32) % n);
+    }
+    bool Chance(
+      const std::uint32_t percent
+    ) noexcept
+    {
+      return Below(100) < percent;
+    }
+    double Unit() noexcept
+    {
+      return static_cast<double>(Next() >> 11) * (1.0 / 9007199254740992.0);
+    } // [0,1)
+    double Range(
+      const double lo,
+      const double hi
+    ) noexcept
+    {
+      return lo + (hi - lo) * Unit();
+    }
   };
 
   /// Global switch: allow signaling NaNs in generated inputs (off by default -
@@ -34,13 +60,17 @@ namespace difffuzz
   /// is a known, intentional-free divergence class for pure copies).
   extern bool gAllowSnan;
 
-  [[nodiscard]] inline std::uint32_t Bits(const float f) noexcept
+  [[nodiscard]] inline std::uint32_t Bits(
+    const float f
+  ) noexcept
   {
     std::uint32_t u;
     std::memcpy(&u, &f, 4);
     return u;
   }
-  [[nodiscard]] inline float FromBits(const std::uint32_t u) noexcept
+  [[nodiscard]] inline float FromBits(
+    const std::uint32_t u
+  ) noexcept
   {
     float f;
     std::memcpy(&f, &u, 4);
@@ -52,7 +82,9 @@ namespace difffuzz
   /// NaN: the sign and payload arithmetic leaves on a NaN are the compiler's
   /// choice (clang folds `x * -1.0` to a negation on some versions), and
   /// faf_math_dump needs the same inputs on every platform.
-  [[nodiscard]] inline float DerivedFloat(const double value) noexcept
+  [[nodiscard]] inline float DerivedFloat(
+    const double value
+  ) noexcept
   {
     return std::isnan(value) ? FromBits(0x7FC00000u) : static_cast<float>(value);
   }
@@ -81,8 +113,8 @@ namespace difffuzz
   struct Target
   {
     const char* name;
-    std::uint32_t va;     // retail entry point (for the report)
-    const char* source;   // our definition, file:line
+    std::uint32_t va;   // retail entry point (for the report)
+    const char* source; // our definition, file:line
     int inWords;
     int outWords;
     const char* inLayout;  // e.g. "v[3] q[4]"

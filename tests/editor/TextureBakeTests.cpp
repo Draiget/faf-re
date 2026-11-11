@@ -14,7 +14,9 @@ namespace
   using namespace faf::editor;
 
   /** A smooth tiling pattern with alpha (block compression keeps smooth images close). */
-  TexImage Pattern(const int size)
+  TexImage Pattern(
+    const int size
+  )
   {
     TexImage image;
     image.Reset(size, 4);
@@ -33,7 +35,12 @@ namespace
   }
 
   /** The worst channel difference between the DDS's top level, decoded to BGRA, and the image. */
-  float Worst(const std::vector<std::uint8_t>& dds, const TexImage& image, std::uint32_t& mips, std::uint32_t& width)
+  float Worst(
+    const std::vector<std::uint8_t>& dds,
+    const TexImage& image,
+    std::uint32_t& mips,
+    std::uint32_t& width
+  )
   {
     gpg::gal::imaging::ImageCodec* codec = gpg::gal::imaging::ImageCodec::Instance();
     EXPECT_NE(codec, nullptr);
@@ -69,7 +76,10 @@ namespace
     return worst;
   }
 
-  TEST(TextureBake, UncompressedReadsBackExactlyWithItsMips)
+  TEST(
+    TextureBake,
+    UncompressedReadsBackExactlyWithItsMips
+  )
   {
     const TexImage image = Pattern(64);
     std::vector<std::uint8_t> dds;
@@ -84,7 +94,10 @@ namespace
     EXPECT_EQ(width, 64U);
   }
 
-  TEST(TextureBake, Bc3KeepsTheImageAndItsAlphaClose)
+  TEST(
+    TextureBake,
+    Bc3KeepsTheImageAndItsAlphaClose
+  )
   {
     const TexImage image = Pattern(128);
     std::vector<std::uint8_t> dds;
@@ -98,9 +111,13 @@ namespace
     EXPECT_EQ(mips, 8U);
   }
 
-  TEST(TextureBake, Bc1ForOpaqueImages)
+  TEST(
+    TextureBake,
+    Bc1ForOpaqueImages
+  )
   {
-    // As large as the BC3 test: block compression follows a gradient this smooth (at 32 px it changes 4x as fast per block).
+    // As large as the BC3 test: block compression follows a gradient this smooth (at 32 px it changes 4x as fast per
+    // block).
     TexImage image = Pattern(128);
     for (int y = 0; y < 128; ++y) {
       for (int x = 0; x < 128; ++x) {
@@ -116,7 +133,10 @@ namespace
     EXPECT_LT(Worst(dds, image, mips, width), 0.06f);
   }
 
-  TEST(TextureBake, AGreyImageIsWrittenAsGreyRgb)
+  TEST(
+    TextureBake,
+    AGreyImageIsWrittenAsGreyRgb
+  )
   {
     TexImage grey;
     grey.Reset(16, 1, 0.25f);

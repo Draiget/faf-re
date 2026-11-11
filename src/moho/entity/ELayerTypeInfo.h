@@ -34,7 +34,6 @@ namespace moho
 
   static_assert(sizeof(ELayerTypeInfo) == 0x78, "ELayerTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x0050B9F0 (FUN_0050B9F0, preregister_ELayerTypeInfo)
    *

@@ -27,7 +27,9 @@ bool Unit::IsBusy() const
  * Estimates whether assisting `task->mUnit` should switch to pickup by
  * comparing this unit's goal ETA against assisted-unit interception ETA.
  */
-bool Unit::NeedsPickup(const CUnitAssistMoveTask* const task) const
+bool Unit::NeedsPickup(
+  const CUnitAssistMoveTask* const task
+) const
 {
   if (IsUnitState(UNITSTATE_ProblemGettingToGoal)) {
     return true;
@@ -46,7 +48,8 @@ bool Unit::NeedsPickup(const CUnitAssistMoveTask* const task) const
   }
 
   const RUnitBlueprint* const selfBlueprint = GetBlueprint();
-  const float selfMaxSpeed = (selfBlueprint->Air.CanFly != 0u) ? selfBlueprint->Air.MaxAirspeed : selfBlueprint->Physics.MaxSpeed;
+  const float selfMaxSpeed =
+    (selfBlueprint->Air.CanFly != 0u) ? selfBlueprint->Air.MaxAirspeed : selfBlueprint->Physics.MaxSpeed;
   if (selfMaxSpeed < 0.001f) {
     return false;
   }
@@ -129,18 +132,18 @@ Unit* Unit::FindPlatform()
   }
 
   // Skip if this unit is its own formation lead.
-  if (IUnit* const formationLead = mInfoCache.mFormationLeadRef.GetObjectPtr();
-      formationLead != nullptr && formationLead->IsUnit() == this) {
+  if (
+    IUnit* const formationLead = mInfoCache.mFormationLeadRef.GetObjectPtr();
+    formationLead != nullptr && formationLead->IsUnit() == this
+  ) {
     return nullptr;
   }
 
   // Need refuel: threshold ratio exceeds current fuel ratio.
   const float fuelRatio = mUnitVarDat.mFuelRatio;
   bool needsService = false;
-  if (CSimConVarBase* const needRefuelDef = &moho::gSimConVar_NeedRefuelThresholdRatio;
-      needRefuelDef != nullptr) {
-    if (CSimConVarInstanceBase* const needRefuel = SimulationRef->GetSimVar(needRefuelDef);
-        needRefuel != nullptr) {
+  if (CSimConVarBase* const needRefuelDef = &moho::gSimConVar_NeedRefuelThresholdRatio; needRefuelDef != nullptr) {
+    if (CSimConVarInstanceBase* const needRefuel = SimulationRef->GetSimVar(needRefuelDef); needRefuel != nullptr) {
       needsService = *static_cast<const float*>(needRefuel->GetValueStorage()) > fuelRatio;
     }
   }
@@ -149,10 +152,8 @@ Unit* Unit::FindPlatform()
   if (!needsService) {
     const float health = mVarDat.mHealth;
     const float maxHealth = mVarDat.mMaxHealth;
-    if (CSimConVarBase* const needRepairDef = &moho::gSimConVar_NeedRepairThresholdRatio;
-        needRepairDef != nullptr) {
-      if (CSimConVarInstanceBase* const needRepair = SimulationRef->GetSimVar(needRepairDef);
-          needRepair != nullptr) {
+    if (CSimConVarBase* const needRepairDef = &moho::gSimConVar_NeedRepairThresholdRatio; needRepairDef != nullptr) {
+      if (CSimConVarInstanceBase* const needRepair = SimulationRef->GetSimVar(needRepairDef); needRepair != nullptr) {
         needsService = *static_cast<const float*>(needRepair->GetValueStorage()) > (health / maxHealth);
       }
     }
@@ -255,12 +256,12 @@ void Unit::UpdateSpeedThroughStatus()
     if (isAirEscort) {
       enableSpeedThrough = true;
     } else if (
-      currentCommand != nullptr
-      && nextCommand != nullptr
-      && nextCommand->GetCoordinatingOrdersSnapshot().empty()
+      currentCommand != nullptr && nextCommand != nullptr && nextCommand->GetCoordinatingOrdersSnapshot().empty()
     ) {
-      if (IsSpeedThroughBusyCommandType(currentCommand->mVarDat.mCmdType)
-          && IsSpeedThroughBusyCommandType(nextCommand->mVarDat.mCmdType) && !IsUnitState(UNITSTATE_AssistMoving)) {
+      if (
+        IsSpeedThroughBusyCommandType(currentCommand->mVarDat.mCmdType) &&
+        IsSpeedThroughBusyCommandType(nextCommand->mVarDat.mCmdType) && !IsUnitState(UNITSTATE_AssistMoving)
+      ) {
         const Unit* const formationLead = mInfoCache.mFormationLeadRef.GetObjectPtr();
         if (formationLead == nullptr || formationLead == this) {
           enableSpeedThrough = true;
@@ -279,7 +280,9 @@ void Unit::UpdateSpeedThroughStatus()
  * Recomputes spawn elevation/layer for the incoming transform, warps through
  * motion component when present, then refreshes entity layer and terrain type.
  */
-void Unit::Warp(const VTransform& transform)
+void Unit::Warp(
+  const VTransform& transform
+)
 {
   VTransform warpedTransform = transform;
   const ELayer startingLayer = GetStartingLayer(warpedTransform.pos_, LAYER_None);
@@ -310,7 +313,9 @@ bool Unit::IsNavigatorIdle() const
 }
 
 // 0x006A4AF0
-bool Unit::IsUnitState(const EUnitState state) const
+bool Unit::IsUnitState(
+  const EUnitState state
+) const
 {
   const std::uint32_t bit = static_cast<std::uint32_t>(state);
   if (bit >= 64u) {
@@ -340,10 +345,11 @@ Unit* Unit::GetGuardedUnit() const
  * `maxAgeTicks` ticks stale (current sim tick minus the last update tick, as an
  * unsigned compare), then returns a reference to the cached list.
  */
-gpg::core::FastVectorN<WeakPtr<Entity>, 20>& Unit::GetBlipsInRange(const unsigned int maxAgeTicks)
+gpg::core::FastVectorN<WeakPtr<Entity>, 20>& Unit::GetBlipsInRange(
+  const unsigned int maxAgeTicks
+)
 {
-  const unsigned int ticksSinceUpdate =
-    SimulationRef->mCurTick - static_cast<unsigned int>(mBlipLastUpdateTick);
+  const unsigned int ticksSinceUpdate = SimulationRef->mCurTick - static_cast<unsigned int>(mBlipLastUpdateTick);
   if (ticksSinceUpdate >= maxAgeTicks) {
     UpdateBlipsInRange();
   }
@@ -477,7 +483,9 @@ void Unit::UpdateBlipsInRange()
  * old/new guarded units, clears stale guard-formation lanes, and marks this
  * unit sync-dirty.
  */
-void Unit::SetGuardedUnit(Unit* const guarded)
+void Unit::SetGuardedUnit(
+  Unit* const guarded
+)
 {
   Unit* const oldGuardedUnit = GuardedUnitRef.GetObjectPtr();
   if (oldGuardedUnit != nullptr) {
@@ -504,7 +512,9 @@ void Unit::SetGuardedUnit(Unit* const guarded)
  * Inserts one guarding owner into this unit's guarded-by list when non-null,
  * then clears this unit's guard-formation lane.
  */
-void Unit::RemoveGuardedByUnit(Unit* const guardedByUnit)
+void Unit::RemoveGuardedByUnit(
+  Unit* const guardedByUnit
+)
 {
   if (guardedByUnit != nullptr) {
     (void)GuardedByList.Add(guardedByUnit); // 0x0057DDD0
@@ -573,7 +583,9 @@ Unit* Unit::GetFerryUnit() const
  * What it does:
  * Rebinds this unit's assigned-transport weak-reference lane.
  */
-void Unit::SetAssignedTransport(Unit* const assignedTransport)
+void Unit::SetAssignedTransport(
+  Unit* const assignedTransport
+)
 {
   AssignedTransportRef.Set(assignedTransport);
 }
@@ -618,7 +630,9 @@ Unit* Unit::GetCreator() const
  * Returns true when this unit skirt rectangle overlaps `other` using the
  * original 1.0f edge-contact tolerance checks.
  */
-bool Unit::OverlapsWith(Unit* const other) const
+bool Unit::OverlapsWith(
+  Unit* const other
+) const
 {
   if (other == nullptr || IsDead() || other->IsDead()) {
     return false;

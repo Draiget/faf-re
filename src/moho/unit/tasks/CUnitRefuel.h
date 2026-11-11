@@ -10,7 +10,7 @@ namespace gpg
 {
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -97,10 +97,10 @@ namespace moho
     int Execute() override;
 
   public:
-    WeakPtr<Unit> mTargetUnit;          // 0x30
-    bool mHasTransportReservation;      // 0x38
-    bool mIsCarrier;                    // 0x39
-    std::uint8_t mPad3A[0x02];          // 0x3A
+    WeakPtr<Unit> mTargetUnit;     // 0x30
+    bool mHasTransportReservation; // 0x38
+    bool mIsCarrier;               // 0x39
+    std::uint8_t mPad3A[0x02];     // 0x3A
   };
 
   static_assert(sizeof(CUnitRefuel) == 0x3C, "CUnitRefuel size must be 0x3C");

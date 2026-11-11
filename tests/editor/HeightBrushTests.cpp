@@ -27,20 +27,30 @@ namespace
     int height;
     std::vector<std::uint16_t> words;
 
-    Field(const int w, const int h, const std::uint16_t fill)
+    Field(
+      const int w,
+      const int h,
+      const std::uint16_t fill
+    )
       : width(w)
       , height(h)
       , words(static_cast<std::size_t>(w) * static_cast<std::size_t>(h), fill)
     {}
 
-    [[nodiscard]] std::uint16_t At(const int x, const int z) const
+    [[nodiscard]] std::uint16_t At(
+      const int x,
+      const int z
+    ) const
     {
       return words[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)];
     }
   };
 
   /** Every sample equals each of its symmetric copies. */
-  ::testing::AssertionResult CopiesEqual(const Field& field, const Symmetry symmetry)
+  ::testing::AssertionResult CopiesEqual(
+    const Field& field,
+    const Symmetry symmetry
+  )
   {
     for (int z = 0; z < field.height; ++z) {
       for (int x = 0; x < field.width; ++x) {
@@ -49,8 +59,8 @@ namespace
         const int n = SymmetricSamples(symmetry, 3, field.width, field.height, x, z, cx, cz);
         for (int i = 1; i < n; ++i) {
           if (field.At(cx[i], cz[i]) != field.At(x, z)) {
-            return ::testing::AssertionFailure() << "(" << x << "," << z << ")=" << field.At(x, z) << " but copy (" << cx[i] << ","
-                                                 << cz[i] << ")=" << field.At(cx[i], cz[i]);
+            return ::testing::AssertionFailure() << "(" << x << "," << z << ")=" << field.At(x, z) << " but copy ("
+                                                 << cx[i] << "," << cz[i] << ")=" << field.At(cx[i], cz[i]);
           }
         }
       }
@@ -58,7 +68,9 @@ namespace
     return ::testing::AssertionSuccess();
   }
 
-  faf::editor::HeightStamp RandomStamp(const unsigned seed)
+  faf::editor::HeightStamp RandomStamp(
+    const unsigned seed
+  )
   {
     faf::editor::HeightStamp stamp;
     stamp.width = 17;
@@ -71,7 +83,11 @@ namespace
     return stamp;
   }
 
-  void RandomStrokes(Field& field, const Symmetry symmetry, const unsigned seed)
+  void RandomStrokes(
+    Field& field,
+    const Symmetry symmetry,
+    const unsigned seed
+  )
   {
     std::mt19937 random(seed);
     std::uniform_real_distribution<float> along(0.0f, static_cast<float>(field.width - 1));
@@ -99,14 +115,19 @@ namespace
       brush.limitHigh = 12000.0f;
       brush.limitSlope = stroke % 5 == 0;
       brush.limitMaxSlope = 0.5f;
-      (void)ApplyHeightBrush(field.words.data(), field.width, field.height, along(random), down(random), brush, 0.016f + unit(random) * 0.05f);
+      (void)ApplyHeightBrush(
+        field.words.data(), field.width, field.height, along(random), down(random), brush, 0.016f + unit(random) * 0.05f
+      );
     }
   }
 
   class EverySymmetry : public ::testing::TestWithParam<Symmetry>
   {};
 
-  TEST_P(EverySymmetry, CopiesStayIdenticalAfterRandomStrokes)
+  TEST_P(
+    EverySymmetry,
+    CopiesStayIdenticalAfterRandomStrokes
+  )
   {
     Field field(65, 65, 8000);
     RandomStrokes(field, GetParam(), 1234u + static_cast<unsigned>(GetParam()));
@@ -114,13 +135,27 @@ namespace
   }
 
   INSTANTIATE_TEST_SUITE_P(
-    HeightBrush, EverySymmetry,
-    ::testing::Values(Symmetry::None, Symmetry::LeftRight, Symmetry::TopBottom, Symmetry::DiagonalBack, Symmetry::DiagonalForward,
-                      Symmetry::HalfTurn, Symmetry::BothAxes, Symmetry::BothDiagonals, Symmetry::QuarterTurns)
+    HeightBrush,
+    EverySymmetry,
+    ::testing::Values(
+      Symmetry::None,
+      Symmetry::LeftRight,
+      Symmetry::TopBottom,
+      Symmetry::DiagonalBack,
+      Symmetry::DiagonalForward,
+      Symmetry::HalfTurn,
+      Symmetry::BothAxes,
+      Symmetry::BothDiagonals,
+      Symmetry::QuarterTurns
+    )
   );
 
   /** RandomStrokes with N-way turns of `turns` copies. */
-  void RandomTurnedStrokes(Field& field, const int turns, const unsigned seed)
+  void RandomTurnedStrokes(
+    Field& field,
+    const int turns,
+    const unsigned seed
+  )
   {
     std::mt19937 random(seed);
     std::uniform_real_distribution<float> along(0.0f, static_cast<float>(field.width - 1));
@@ -135,11 +170,22 @@ namespace
       brush.strength = unit(random);
       brush.falloff = unit(random);
       brush.flattenTo = unit(random) * 20000.0f;
-      (void)ApplyHeightBrush(field.words.data(), field.width, field.height, along(random), along(random), brush, 0.016f + unit(random) * 0.05f);
+      (void)ApplyHeightBrush(
+        field.words.data(),
+        field.width,
+        field.height,
+        along(random),
+        along(random),
+        brush,
+        0.016f + unit(random) * 0.05f
+      );
     }
   }
 
-  TEST(HeightBrush, FourWayTurnIsExact)
+  TEST(
+    HeightBrush,
+    FourWayTurnIsExact
+  )
   {
     // Four turns land on samples: the same groups as quarter turns, bit for bit.
     Field field(65, 65, 8000);
@@ -147,7 +193,10 @@ namespace
     EXPECT_TRUE(CopiesEqual(field, Symmetry::QuarterTurns));
   }
 
-  TEST(HeightBrush, ThreeWayTurnCopiesStayClose)
+  TEST(
+    HeightBrush,
+    ThreeWayTurnCopiesStayClose
+  )
   {
     // Three turns fall between samples: every painted sample stays within a small share of the raise of
     // the height at its point turned by a third, read between samples.
@@ -178,7 +227,7 @@ namespace
         const double fx = px - x0;
         const double fz = pz - z0;
         const double turned = (field.At(x0, z0) * (1.0 - fx) + field.At(x0 + 1, z0) * fx) * (1.0 - fz) +
-                              (field.At(x0, z0 + 1) * (1.0 - fx) + field.At(x0 + 1, z0 + 1) * fx) * fz;
+          (field.At(x0, z0 + 1) * (1.0 - fx) + field.At(x0 + 1, z0 + 1) * fx) * fz;
         worst = std::max(worst, std::fabs(turned - field.At(x, z)));
       }
     }
@@ -187,7 +236,11 @@ namespace
   }
 
   /** One step of `brush` at the middle of a 33 x 33 field of `fill`, at full strength with a hard edge. */
-  Field Stepped(HeightBrush brush, const std::uint16_t fill, const float seconds = 1.0f)
+  Field Stepped(
+    HeightBrush brush,
+    const std::uint16_t fill,
+    const float seconds = 1.0f
+  )
   {
     Field field(33, 33, fill);
     brush.strength = 1.0f;
@@ -197,7 +250,10 @@ namespace
     return field;
   }
 
-  TEST(HeightBrush, ErodeSlumpsAPillarWithoutMakingGround)
+  TEST(
+    HeightBrush,
+    ErodeSlumpsAPillarWithoutMakingGround
+  )
   {
     // A 2 x 2 pillar 2000 words (about 16 units) over flat ground at 1000, well inside the brush.
     Field field(33, 33, 1000);
@@ -230,7 +286,8 @@ namespace
     int steepest = 0;
     for (int z = 5; z <= 26; ++z) {
       for (int x = 5; x <= 25; ++x) {
-        steepest = std::max(steepest, std::abs(static_cast<int>(field.At(x + 1, z)) - static_cast<int>(field.At(x, z))));
+        steepest =
+          std::max(steepest, std::abs(static_cast<int>(field.At(x + 1, z)) - static_cast<int>(field.At(x, z))));
       }
     }
     EXPECT_LT(steepest, 77 + 20);
@@ -238,7 +295,10 @@ namespace
     EXPECT_NEAR(static_cast<double>(total()), static_cast<double>(before), static_cast<double>(before) * 0.0005);
   }
 
-  TEST(HeightBrush, ErodeWorksAtTheEditorsFrameRate)
+  TEST(
+    HeightBrush,
+    ErodeWorksAtTheEditorsFrameRate
+  )
   {
     // As the editor paints: a step a frame at 60 fps, strength 0.5, for three seconds, on a ridge only a little steeper
     // than the talus (96 words a sample against 76.8). Each frame's change there is about a word; scaled like the other
@@ -246,7 +306,8 @@ namespace
     Field field(33, 33, 0);
     for (int z = 0; z < 33; ++z) {
       for (int x = 0; x < 33; ++x) {
-        field.words[static_cast<std::size_t>(z) * 33 + static_cast<std::size_t>(x)] = static_cast<std::uint16_t>(4000 - 96 * std::abs(x - 16));
+        field.words[static_cast<std::size_t>(z) * 33 + static_cast<std::size_t>(x)] =
+          static_cast<std::uint16_t>(4000 - 96 * std::abs(x - 16));
       }
     }
     HeightBrush brush;
@@ -264,12 +325,16 @@ namespace
   }
 
   /** A field leaning down towards +x (`drop` words a sample) with a little noise, so rain has somewhere to run. */
-  Field Ramp(const int size, const int drop)
+  Field Ramp(
+    const int size,
+    const int drop
+  )
   {
     Field field(size, size, 0);
     for (int z = 0; z < size; ++z) {
       for (int x = 0; x < size; ++x) {
-        const int bump = static_cast<int>((static_cast<unsigned>(x * 73856093) ^ static_cast<unsigned>(z * 19349663)) % 40u);
+        const int bump =
+          static_cast<int>((static_cast<unsigned>(x * 73856093) ^ static_cast<unsigned>(z * 19349663)) % 40u);
         field.words[static_cast<std::size_t>(z) * static_cast<std::size_t>(size) + static_cast<std::size_t>(x)] =
           static_cast<std::uint16_t>(20000 - drop * x + bump);
       }
@@ -277,7 +342,9 @@ namespace
     return field;
   }
 
-  long long TotalOf(const Field& field)
+  long long TotalOf(
+    const Field& field
+  )
   {
     long long sum = 0;
     for (const std::uint16_t w : field.words) {
@@ -296,7 +363,10 @@ namespace
     return brush;
   }
 
-  TEST(HeightBrush, WaterErodeCarvesARampWithoutMakingGround)
+  TEST(
+    HeightBrush,
+    WaterErodeCarvesARampWithoutMakingGround
+  )
   {
     Field field = Ramp(49, 60);
     const Field before = field;
@@ -320,7 +390,10 @@ namespace
     EXPECT_EQ(field.At(46, 46), before.At(46, 46));
   }
 
-  TEST(HeightBrush, WaterErodeLeavesFlatGroundAndRepeatsWithItsSeed)
+  TEST(
+    HeightBrush,
+    WaterErodeLeavesFlatGroundAndRepeatsWithItsSeed
+  )
   {
     Field flat(33, 33, 5000);
     HeightBrush brush = Rain();
@@ -340,14 +413,18 @@ namespace
     EXPECT_EQ(a.words, b.words);
   }
 
-  TEST(HeightBrush, WaterErodeKeepsAMirroredMapMirrored)
+  TEST(
+    HeightBrush,
+    WaterErodeKeepsAMirroredMapMirrored
+  )
   {
     // Left-right mirrored hills, rained on near the mirror line and well off it.
     Field field(49, 49, 0);
     for (int z = 0; z < 49; ++z) {
       for (int x = 0; x < 49; ++x) {
         const int mx = std::min(x, 48 - x);
-        field.words[static_cast<std::size_t>(z) * 49 + static_cast<std::size_t>(x)] = static_cast<std::uint16_t>(8000 + 70 * mx + 30 * z);
+        field.words[static_cast<std::size_t>(z) * 49 + static_cast<std::size_t>(x)] =
+          static_cast<std::uint16_t>(8000 + 70 * mx + 30 * z);
       }
     }
     HeightBrush brush = Rain();
@@ -360,12 +437,16 @@ namespace
     EXPECT_TRUE(CopiesEqual(field, Symmetry::LeftRight));
   }
 
-  TEST(HeightBrush, ErodeLeavesGroundGentlerThanTheTalusAlone)
+  TEST(
+    HeightBrush,
+    ErodeLeavesGroundGentlerThanTheTalusAlone
+  )
   {
     Field field(33, 33, 0);
     for (int z = 0; z < 33; ++z) {
       for (int x = 0; x < 33; ++x) {
-        field.words[static_cast<std::size_t>(z) * 33 + static_cast<std::size_t>(x)] = static_cast<std::uint16_t>(1000 + 40 * x); // 0.31 a unit
+        field.words[static_cast<std::size_t>(z) * 33 + static_cast<std::size_t>(x)] =
+          static_cast<std::uint16_t>(1000 + 40 * x); // 0.31 a unit
       }
     }
     const std::vector<std::uint16_t> before = field.words;
@@ -380,7 +461,10 @@ namespace
     EXPECT_EQ(field.words, before);
   }
 
-  TEST(HeightBrush, SetHeightTerraceAndPlaneReachTheirTargets)
+  TEST(
+    HeightBrush,
+    SetHeightTerraceAndPlaneReachTheirTargets
+  )
   {
     HeightBrush brush;
     brush.mode = HeightBrushMode::SetHeight;
@@ -407,7 +491,10 @@ namespace
     EXPECT_FALSE(faf::editor::PlaneThrough(line, ph, line, brush.planeX, brush.planeZ, brush.planeC));
   }
 
-  TEST(HeightBrush, StampAddsItsImageTimesHeight)
+  TEST(
+    HeightBrush,
+    StampAddsItsImageTimesHeight
+  )
   {
     faf::editor::HeightStamp stamp;
     stamp.width = 2;
@@ -421,7 +508,10 @@ namespace
     EXPECT_EQ(Stepped(brush, 500, 0.016f).At(16, 16), 1500); // once per click, whatever the frame's length
   }
 
-  TEST(HeightBrush, LimitsKeepSamplesOutsideThem)
+  TEST(
+    HeightBrush,
+    LimitsKeepSamplesOutsideThem
+  )
   {
     HeightBrush brush;
     brush.mode = HeightBrushMode::Raise;
@@ -452,7 +542,10 @@ namespace
     EXPECT_NE(limited.words, ramp.words);
   }
 
-  TEST(HeightBrush, StrokeOnTheMirrorLineAppliesOnce)
+  TEST(
+    HeightBrush,
+    StrokeOnTheMirrorLineAppliesOnce
+  )
   {
     // The same raise on the left-right mirror line, alone and mirrored: the copies overlap there, and each
     // sample takes the strongest copy, not their sum.
@@ -470,7 +563,10 @@ namespace
     EXPECT_EQ(alone.words, mirrored.words);
   }
 
-  TEST(HeightBrush, SquareOnlyModesFallBackOnARectangle)
+  TEST(
+    HeightBrush,
+    SquareOnlyModesFallBackOnARectangle
+  )
   {
     HeightBrush brush;
     brush.symmetry = Symmetry::QuarterTurns;
@@ -479,7 +575,10 @@ namespace
     EXPECT_EQ(rects.size(), 1u);
   }
 
-  TEST(HeightBrush, MirroredStrokeMakesTheTouchedSamplesEqual)
+  TEST(
+    HeightBrush,
+    MirroredStrokeMakesTheTouchedSamplesEqual
+  )
   {
     // A map whose halves differ: every sample a mirrored stroke wrote equals its mirror afterwards.
     Field field(33, 33, 0);

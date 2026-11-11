@@ -52,7 +52,9 @@ namespace moho
     return sInstance;
   }
 
-  LuaPlus::LuaObject CScrLuaMetatableFactory<CollisionBeamEntity>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CollisionBeamEntity>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -99,7 +101,9 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_CollisionBeamEntity__initL`.
    */
-  int cfunc_CollisionBeamEntity__init(lua_State* const luaContext)
+  int cfunc_CollisionBeamEntity__init(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CollisionBeamEntity__initL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -112,7 +116,9 @@ namespace moho
    * interval and attach-bone setup from the spec table, and pushes the created
    * beam Lua object.
    */
-  int cfunc_CollisionBeamEntity__initL(LuaPlus::LuaState* const state)
+  int cfunc_CollisionBeamEntity__initL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     moho::SCR_ExpectExactArgs(state, 2, kCollisionBeamEntityInitHelpText);
@@ -168,7 +174,9 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_CollisionBeamEntitySetBeamFxL`.
    */
-  int cfunc_CollisionBeamEntitySetBeamFx(lua_State* const luaContext)
+  int cfunc_CollisionBeamEntitySetBeamFx(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CollisionBeamEntitySetBeamFxL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -181,7 +189,9 @@ namespace moho
    * ownership, and optionally runs one collision-check pass when a launcher is
    * present.
    */
-  int cfunc_CollisionBeamEntitySetBeamFxL(LuaPlus::LuaState* const state)
+  int cfunc_CollisionBeamEntitySetBeamFxL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
@@ -214,7 +224,9 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_CollisionBeamEntityDisableL`.
    */
-  int cfunc_CollisionBeamEntityDisable(lua_State* const luaContext)
+  int cfunc_CollisionBeamEntityDisable(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CollisionBeamEntityDisableL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -226,7 +238,9 @@ namespace moho
    * Resolves one beam argument, runs script callback `OnDisable`, and clears
    * the runtime enabled flag.
    */
-  int cfunc_CollisionBeamEntityDisableL(LuaPlus::LuaState* const state)
+  int cfunc_CollisionBeamEntityDisableL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kCollisionBeamEntityDisableHelpText);
 
@@ -244,7 +258,9 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_CollisionBeamEntityEnableL`.
    */
-  int cfunc_CollisionBeamEntityEnable(lua_State* const luaContext)
+  int cfunc_CollisionBeamEntityEnable(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CollisionBeamEntityEnableL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -256,7 +272,9 @@ namespace moho
    * Resolves one beam argument, runs script callback `OnEnable`, and enables
    * collision-check updates.
    */
-  int cfunc_CollisionBeamEntityEnableL(LuaPlus::LuaState* const state)
+  int cfunc_CollisionBeamEntityEnableL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kCollisionBeamEntityEnableHelpText);
 
@@ -274,7 +292,9 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_CollisionBeamEntityIsEnabledL`.
    */
-  int cfunc_CollisionBeamEntityIsEnabled(lua_State* const luaContext)
+  int cfunc_CollisionBeamEntityIsEnabled(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CollisionBeamEntityIsEnabledL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -286,7 +306,9 @@ namespace moho
    * Resolves one beam argument and pushes whether its runtime enabled flag is
    * currently set.
    */
-  int cfunc_CollisionBeamEntityIsEnabledL(LuaPlus::LuaState* const state)
+  int cfunc_CollisionBeamEntityIsEnabledL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     moho::SCR_ExpectExactArgs(state, 1, kCollisionBeamEntityIsEnabledHelpText);
@@ -305,7 +327,9 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_CollisionBeamEntityGetLauncherL`.
    */
-  int cfunc_CollisionBeamEntityGetLauncher(lua_State* const luaContext)
+  int cfunc_CollisionBeamEntityGetLauncher(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CollisionBeamEntityGetLauncherL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -317,7 +341,9 @@ namespace moho
    * Resolves one beam argument and pushes launcher unit Lua object when
    * available; otherwise pushes `nil`.
    */
-  int cfunc_CollisionBeamEntityGetLauncherL(LuaPlus::LuaState* const state)
+  int cfunc_CollisionBeamEntityGetLauncherL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     moho::SCR_ExpectExactArgs(state, 1, kCollisionBeamEntityGetLauncherHelpText);
@@ -379,8 +405,11 @@ namespace moho
   CScrLuaInitForm* register_moho_CollisionBeamEntity_ClassBinder()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.CollisionBeamEntity", &CScrLuaMetatableFactory<CollisionBeamEntity>::Instance(),
-      kCollisionBeamEntityClassName, ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.CollisionBeamEntity",
+      &CScrLuaMetatableFactory<CollisionBeamEntity>::Instance(),
+      kCollisionBeamEntityClassName,
+      ""
     );
     return &binder;
   }
@@ -593,5 +622,6 @@ namespace
     }
   };
 
-  const CollisionBeamEntityLuaFunctionThunksLuaFuncDefBootstrap gCollisionBeamEntityLuaFunctionThunksLuaFuncDefBootstrap{};
+  const CollisionBeamEntityLuaFunctionThunksLuaFuncDefBootstrap
+    gCollisionBeamEntityLuaFunctionThunksLuaFuncDefBootstrap{};
 } // namespace

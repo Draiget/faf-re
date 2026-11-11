@@ -75,7 +75,10 @@ namespace moho
     using gpg::gal::effects::Fnv1a64;
 
     template <class T>
-    void AddValue(Fnv1a64& hash, const T& value) noexcept
+    void AddValue(
+      Fnv1a64& hash,
+      const T& value
+    ) noexcept
     {
       hash.Add(&value, sizeof(value));
     }
@@ -97,8 +100,11 @@ namespace moho
         AddValue(hash, version.dwMajorVersion);
         AddValue(hash, version.dwMinorVersion);
         AddValue(hash, version.dwBuildNumber);
-        for (const UINT action : {SPI_GETFONTSMOOTHING, SPI_GETFONTSMOOTHINGTYPE, SPI_GETFONTSMOOTHINGCONTRAST,
-                                  SPI_GETFONTSMOOTHINGORIENTATION}) {
+        for (const UINT action :
+             {SPI_GETFONTSMOOTHING,
+              SPI_GETFONTSMOOTHINGTYPE,
+              SPI_GETFONTSMOOTHINGCONTRAST,
+              SPI_GETFONTSMOOTHINGORIENTATION}) {
           UINT value = 0;
           (void)SystemParametersInfoW(action, 0, &value, 0);
           AddValue(hash, value);
@@ -120,7 +126,9 @@ namespace moho
       float mAdvance = 0.0f;
       std::vector<std::uint64_t> mBlocks;
 
-      [[nodiscard]] bool operator==(const SCachedGlyph& other) const
+      [[nodiscard]] bool operator==(
+        const SCachedGlyph& other
+      ) const
       {
         return mBlockWidth == other.mBlockWidth && mBlockHeight == other.mBlockHeight && mV2 == other.mV2 &&
           mV3 == other.mV3 && mV4 == other.mV4 && mV5 == other.mV5 && mAdvance == other.mAdvance &&
@@ -136,7 +144,9 @@ namespace moho
     class GlyphCacheStore
     {
     public:
-      [[nodiscard]] const SCachedGlyph* Find(const std::uint64_t key)
+      [[nodiscard]] const SCachedGlyph* Find(
+        const std::uint64_t key
+      )
       {
         const std::lock_guard<std::mutex> lock(mLock);
         LoadLocked();
@@ -144,7 +154,10 @@ namespace moho
         return found != mGlyphs.end() ? &found->second : nullptr;
       }
 
-      void Add(const std::uint64_t key, SCachedGlyph glyph)
+      void Add(
+        const std::uint64_t key,
+        SCachedGlyph glyph
+      )
       {
         const std::lock_guard<std::mutex> lock(mLock);
         LoadLocked();
@@ -163,7 +176,9 @@ namespace moho
         }
       }
 
-      void SaveIfIdle(const bool now)
+      void SaveIfIdle(
+        const bool now
+      )
       {
         const std::lock_guard<std::mutex> lock(mLock);
         if (!mDirty || (!now && GetTickCount64() - mLastAdd < 3000u)) {
@@ -177,7 +192,8 @@ namespace moho
         // Another process (the other game of a local test, say) may have written glyphs this one
         // never met since this one read the file: they are kept.
         ReadFileLocked(path, mGlyphs);
-        const std::string temporary = path + "." + std::to_string(GetCurrentProcessId()) + ".tmp"; // each process its own
+        const std::string temporary =
+          path + "." + std::to_string(GetCurrentProcessId()) + ".tmp"; // each process its own
         std::FILE* const out = std::fopen(temporary.c_str(), "wb");
         if (out == nullptr) {
           return;
@@ -219,14 +235,23 @@ namespace moho
       }
 
       /// A glyph as GetCharInfo makes them: 4 to 128 pixels each way in steps of 4, two blocks per 4x4.
-      [[nodiscard]] static bool IsGlyphShape(const std::uint16_t width, const std::uint16_t height, const std::uint32_t count)
+      [[nodiscard]] static bool IsGlyphShape(
+        const std::uint16_t width,
+        const std::uint16_t height,
+        const std::uint32_t count
+      )
       {
-        const auto fits = [](const std::uint16_t size) { return size >= 4u && size <= 128u && size % 4u == 0u; };
+        const auto fits = [](const std::uint16_t size) {
+          return size >= 4u && size <= 128u && size % 4u == 0u;
+        };
         return fits(width) && fits(height) && count == (width / 4u) * (height / 4u) * 2u;
       }
 
       /// Adds the file's glyphs that `glyphs` does not hold yet; stops at the first damaged entry.
-      static void ReadFileLocked(const std::string& path, std::unordered_map<std::uint64_t, SCachedGlyph>& glyphs)
+      static void ReadFileLocked(
+        const std::string& path,
+        std::unordered_map<std::uint64_t, SCachedGlyph>& glyphs
+      )
       {
         std::FILE* const in = std::fopen(path.c_str(), "rb");
         if (in == nullptr) {
@@ -234,18 +259,22 @@ namespace moho
         }
         char magic[8] = {};
         std::uint64_t environment = 0;
-        if (std::fread(magic, 1, 8, in) == 8 && std::memcmp(magic, "FAFGLYP1", 8) == 0 &&
-            std::fread(&environment, sizeof(environment), 1, in) == 1 && environment == GlyphEnvironment()) {
+        if (
+          std::fread(magic, 1, 8, in) == 8 && std::memcmp(magic, "FAFGLYP1", 8) == 0 &&
+          std::fread(&environment, sizeof(environment), 1, in) == 1 && environment == GlyphEnvironment()
+        ) {
           for (;;) {
             std::uint64_t key = 0;
             SCachedGlyph glyph;
             float metrics[5] = {};
             std::uint32_t count = 0;
-            if (std::fread(&key, sizeof(key), 1, in) != 1 ||
-                std::fread(&glyph.mBlockWidth, sizeof(glyph.mBlockWidth), 1, in) != 1 ||
-                std::fread(&glyph.mBlockHeight, sizeof(glyph.mBlockHeight), 1, in) != 1 ||
-                std::fread(metrics, sizeof(metrics), 1, in) != 1 || std::fread(&count, sizeof(count), 1, in) != 1 ||
-                !IsGlyphShape(glyph.mBlockWidth, glyph.mBlockHeight, count)) {
+            if (
+              std::fread(&key, sizeof(key), 1, in) != 1 ||
+              std::fread(&glyph.mBlockWidth, sizeof(glyph.mBlockWidth), 1, in) != 1 ||
+              std::fread(&glyph.mBlockHeight, sizeof(glyph.mBlockHeight), 1, in) != 1 ||
+              std::fread(metrics, sizeof(metrics), 1, in) != 1 || std::fread(&count, sizeof(count), 1, in) != 1 ||
+              !IsGlyphShape(glyph.mBlockWidth, glyph.mBlockHeight, count)
+            ) {
               break;
             }
             glyph.mBlocks.resize(count);
@@ -288,7 +317,9 @@ namespace moho
     }
 
     /// The identity of the font selected into `dc`: its face, text metrics and 'head' table.
-    [[nodiscard]] std::uint64_t ComputeFontIdentity(HDC const dc)
+    [[nodiscard]] std::uint64_t ComputeFontIdentity(
+      HDC const dc
+    )
     {
       constexpr DWORD kHeadTable = 0x64616568u; // 'head'
       const DWORD headSize = GetFontData(dc, kHeadTable, 0, nullptr, 0);
@@ -312,7 +343,10 @@ namespace moho
       return hash.Value() | 1u; // never 0
     }
 
-    [[nodiscard]] std::uint64_t GlyphKey(const std::uint64_t font, const wchar_t character)
+    [[nodiscard]] std::uint64_t GlyphKey(
+      const std::uint64_t font,
+      const wchar_t character
+    )
     {
       Fnv1a64 hash;
       AddValue(hash, font);
@@ -336,7 +370,8 @@ namespace moho
     );
     TConVar<int> gTConVar_ren_MsdfTextMinSize(
       "ren_MsdfTextMinSize",
-      "The smallest text in pixels ren_MsdfText draws from an atlas; smaller text stays on GDI glyphs. Not for a mod's font.",
+      "The smallest text in pixels ren_MsdfText draws from an atlas; smaller text stays on GDI glyphs. Not for a mod's "
+      "font.",
       &ren_MsdfTextMinSize
     );
 
@@ -405,17 +440,24 @@ namespace moho
     MsdfAtlasPage sMsdfGamePage;
     MsdfAtlasPage sMsdfModPage;
 
-    [[nodiscard]] const SMsdfGlyph* FindMsdfGlyph(const SMsdfFontAtlas& atlas, const std::uint32_t codepoint)
+    [[nodiscard]] const SMsdfGlyph* FindMsdfGlyph(
+      const SMsdfFontAtlas& atlas,
+      const std::uint32_t codepoint
+    )
     {
       const auto found = std::lower_bound(
-        atlas.mGlyphs.begin(), atlas.mGlyphs.end(), codepoint,
-        [](const SMsdfGlyph& glyph, const std::uint32_t value) { return glyph.mCodepoint < value; }
+        atlas.mGlyphs.begin(), atlas.mGlyphs.end(), codepoint, [](const SMsdfGlyph& glyph, const std::uint32_t value) {
+        return glyph.mCodepoint < value;
+      }
       );
       return found != atlas.mGlyphs.end() && found->mCodepoint == codepoint ? &*found : nullptr;
     }
 
     /** Writes one font's pixels and the empty texels to its right and below it, which keep the next font apart. */
-    [[nodiscard]] bool WriteFontToPage(MsdfAtlasPage& page, const MsdfAtlasPage::PlacedFont& placed)
+    [[nodiscard]] bool WriteFontToPage(
+      MsdfAtlasPage& page,
+      const MsdfAtlasPage::PlacedFont& placed
+    )
     {
       const SMsdfFontAtlas& atlas = *placed.mAtlas;
       const std::int32_t right = (std::min)(placed.mX + atlas.mWidth + kMsdfPageSpacing, kMsdfPageWidth);
@@ -429,7 +471,8 @@ namespace moho
       const std::size_t lockedRowBytes = static_cast<std::size_t>(right - placed.mX) * 4u;
       const std::size_t atlasRowBytes = static_cast<std::size_t>(atlas.mWidth) * 4u;
       for (std::int32_t row = 0; row < bottom - placed.mY; ++row) {
-        auto* const out = static_cast<std::uint8_t*>(bits) + static_cast<std::size_t>(pitch) * static_cast<std::size_t>(row);
+        auto* const out =
+          static_cast<std::uint8_t*>(bits) + static_cast<std::size_t>(pitch) * static_cast<std::size_t>(row);
         std::memset(out, 0, lockedRowBytes);
         if (row < atlas.mHeight) {
           std::memcpy(out, atlas.mPixels.data() + atlasRowBytes * static_cast<std::size_t>(row), atlasRowBytes);
@@ -444,7 +487,11 @@ namespace moho
      * False when the page is full or can't be made; that font stays on GDI glyphs. `outFull` says it was full.
      */
     [[nodiscard]] bool AcquireMsdfPlacement(
-      MsdfAtlasPage& page, const SMsdfFontAtlas& atlas, std::int32_t& outX, std::int32_t& outY, bool& outFull
+      MsdfAtlasPage& page,
+      const SMsdfFontAtlas& atlas,
+      std::int32_t& outX,
+      std::int32_t& outY,
+      bool& outFull
     )
     {
       outFull = false;
@@ -500,7 +547,10 @@ namespace moho
       return true;
     }
 
-    [[nodiscard]] const SMsdfStrike* FindMsdfStrike(const SMsdfFontAtlas& atlas, const std::int32_t pixelSize)
+    [[nodiscard]] const SMsdfStrike* FindMsdfStrike(
+      const SMsdfFontAtlas& atlas,
+      const std::int32_t pixelSize
+    )
     {
       for (const SMsdfStrike& strike : atlas.mStrikes) {
         if (strike.mPixelSize == pixelSize) {
@@ -510,11 +560,18 @@ namespace moho
       return nullptr;
     }
 
-    [[nodiscard]] const SMsdfStrikeGlyph* FindMsdfStrikeGlyph(const SMsdfStrike& strike, const std::uint32_t codepoint)
+    [[nodiscard]] const SMsdfStrikeGlyph* FindMsdfStrikeGlyph(
+      const SMsdfStrike& strike,
+      const std::uint32_t codepoint
+    )
     {
       const auto found = std::lower_bound(
-        strike.mGlyphs.begin(), strike.mGlyphs.end(), codepoint,
-        [](const SMsdfStrikeGlyph& glyph, const std::uint32_t value) { return glyph.mCodepoint < value; }
+        strike.mGlyphs.begin(),
+        strike.mGlyphs.end(),
+        codepoint,
+        [](const SMsdfStrikeGlyph& glyph, const std::uint32_t value) {
+        return glyph.mCodepoint < value;
+      }
       );
       return found != strike.mGlyphs.end() && found->mCodepoint == codepoint ? &*found : nullptr;
     }
@@ -530,8 +587,15 @@ namespace moho
      * caller drawing with a technique other than the UI's.
      */
     [[nodiscard]] bool RenderMsdfText(
-      CD3DFont& font, const char* const text, CD3DPrimBatcher& primBatcher, const Vector3f& origin, const Vector3f& xAxis,
-      const Vector3f& yAxis, const std::uint32_t color, const float maxAdvance, Vector3f& outCursor
+      CD3DFont& font,
+      const char* const text,
+      CD3DPrimBatcher& primBatcher,
+      const Vector3f& origin,
+      const Vector3f& xAxis,
+      const Vector3f& yAxis,
+      const std::uint32_t color,
+      const float maxAdvance,
+      Vector3f& outCursor
     )
     {
       const auto bound = sMsdfBindings.find(&font);
@@ -540,7 +604,10 @@ namespace moho
         return false;
       }
       const float textScale = xAxis.x;
-      if (!(textScale > 0.0f) || xAxis.y != 0.0f || xAxis.z != 0.0f || yAxis.x != 0.0f || yAxis.y != -textScale || yAxis.z != 0.0f) {
+      if (
+        !(textScale > 0.0f) || xAxis.y != 0.0f || xAxis.z != 0.0f || yAxis.x != 0.0f || yAxis.y != -textScale ||
+        yAxis.z != 0.0f
+      ) {
         return false;
       }
       MsdfBinding& binding = bound->second;
@@ -581,7 +648,9 @@ namespace moho
         const SMsdfGlyph* found = FindMsdfGlyph(atlas, static_cast<std::uint32_t>(codepoint));
         bool fromFallback = false;
         if (found == nullptr) {
-          if (fallback == nullptr || (found = FindMsdfGlyph(*fallback, static_cast<std::uint32_t>(codepoint))) == nullptr) {
+          if (
+            fallback == nullptr || (found = FindMsdfGlyph(*fallback, static_cast<std::uint32_t>(codepoint))) == nullptr
+          ) {
             return false;
           }
           usesFallback = true;
@@ -594,8 +663,10 @@ namespace moho
 
       CD3DDevice* const device = D3D_GetDevice();
       CD3DEffect* const effect = device != nullptr ? device->GetCurEffect() : nullptr;
-      if (effect == nullptr || std::strcmp(effect->mName.c_str(), "primbatcher") != 0
-          || !effect->mCurrentTechnique || std::strcmp(effect->mCurrentTechnique->GetName()->c_str(), kScreenTextTechnique) != 0) {
+      if (
+        effect == nullptr || std::strcmp(effect->mName.c_str(), "primbatcher") != 0 || !effect->mCurrentTechnique ||
+        std::strcmp(effect->mCurrentTechnique->GetName()->c_str(), kScreenTextTechnique) != 0
+      ) {
         return false;
       }
       std::int32_t pageX = 0;
@@ -604,7 +675,11 @@ namespace moho
       MsdfAtlasPage& page = binding.mIsMod ? sMsdfModPage : sMsdfGamePage;
       if (!AcquireMsdfPlacement(page, atlas, pageX, pageY, pageFull)) {
         if (pageFull && binding.mIsMod && !binding.mNoPage) {
-          gpg::Warnf("MSDF: the atlas page is full; %s at %d px draws in the default font", binding.mFace.c_str(), binding.mPointSize);
+          gpg::Warnf(
+            "MSDF: the atlas page is full; %s at %d px draws in the default font",
+            binding.mFace.c_str(),
+            binding.mPointSize
+          );
           binding.mNoPage = true;
           DestroyGlyphPageCache(font.mCharInfo); // they hold the mod font's advances
           InitializeGlyphPageCache(font.mCharInfo);
@@ -727,7 +802,11 @@ namespace moho
      */
     template <std::size_t N>
     [[nodiscard]] bool ReadGlyphBitmap(
-      HBITMAP const bitmap, const int width, const int height, const int sampleWidth, const int sampleHeight,
+      HBITMAP const bitmap,
+      const int width,
+      const int height,
+      const int sampleWidth,
+      const int sampleHeight,
       std::array<COLORREF, N>& out
     )
     {
@@ -735,13 +814,18 @@ namespace moho
         return false;
       }
       BITMAP info{};
-      if (GetObjectW(bitmap, sizeof(info), &info) == 0 || info.bmBitsPixel != 32 || info.bmWidth != width ||
-          info.bmHeight != height || info.bmWidthBytes != width * 4) {
+      if (
+        GetObjectW(bitmap, sizeof(info), &info) == 0 || info.bmBitsPixel != 32 || info.bmWidth != width ||
+        info.bmHeight != height || info.bmWidthBytes != width * 4
+      ) {
         return false;
       }
       (void)GdiFlush(); // DrawTextW may still sit in the GDI batch; GetPixel flushes it implicitly
       std::array<std::uint32_t, N> bits{};
-      if (GetBitmapBits(bitmap, static_cast<LONG>(N * sizeof(std::uint32_t)), bits.data()) != static_cast<LONG>(N * sizeof(std::uint32_t))) {
+      if (
+        GetBitmapBits(bitmap, static_cast<LONG>(N * sizeof(std::uint32_t)), bits.data()) !=
+        static_cast<LONG>(N * sizeof(std::uint32_t))
+      ) {
         return false;
       }
       out.fill(0u);
@@ -768,7 +852,10 @@ namespace moho
        * What it does:
        * Orders font-cache lookup keys by point-size first, then face-name bytes.
        */
-      [[nodiscard]] bool operator()(const FontLookup& lhs, const FontLookup& rhs) const noexcept
+      [[nodiscard]] bool operator()(
+        const FontLookup& lhs,
+        const FontLookup& rhs
+      ) const noexcept
       {
         if (lhs.mPointSize != rhs.mPointSize) {
           return lhs.mPointSize < rhs.mPointSize;
@@ -796,7 +883,10 @@ namespace moho
      * What it does:
      * Builds one font-cache lookup key from point-size and face-name text.
      */
-    [[nodiscard]] FontLookup MakeFontLookup(const std::int32_t pointSize, const char* const faceName)
+    [[nodiscard]] FontLookup MakeFontLookup(
+      const std::int32_t pointSize,
+      const char* const faceName
+    )
     {
       FontLookup lookup{};
       lookup.mPointSize = pointSize;
@@ -810,7 +900,9 @@ namespace moho
      * What it does:
      * Releases one intrusive `CD3DFont` owner lane and clears on last-owner.
      */
-    void ReleaseIntrusiveFont(CD3DFont* const font) noexcept
+    void ReleaseIntrusiveFont(
+      CD3DFont* const font
+    ) noexcept
     {
       if (font == nullptr) {
         return;
@@ -829,7 +921,9 @@ namespace moho
      * Releases one font-cache entry payload (intrusive CD3DFont reference) and
      * resets the stored pointer lane.
      */
-    void ReleaseFontCacheEntry(CD3DFont*& font) noexcept
+    void ReleaseFontCacheEntry(
+      CD3DFont*& font
+    ) noexcept
     {
       ReleaseIntrusiveFont(font);
       font = nullptr;
@@ -889,7 +983,9 @@ namespace moho
      * What it does:
      * Returns lower-bound iterator for one font-cache lookup key.
      */
-    [[nodiscard]] FontCacheMap::iterator LowerBoundCachedFont(const FontLookup& lookup)
+    [[nodiscard]] FontCacheMap::iterator LowerBoundCachedFont(
+      const FontLookup& lookup
+    )
     {
       return GetFontCache().lower_bound(lookup);
     }
@@ -900,7 +996,9 @@ namespace moho
      * What it does:
      * Performs key lookup in the static font-cache map.
      */
-    [[nodiscard]] FontCacheMap::iterator FindCachedFont(const FontLookup& lookup)
+    [[nodiscard]] FontCacheMap::iterator FindCachedFont(
+      const FontLookup& lookup
+    )
     {
       FontCacheMap& cache = GetFontCache();
       const auto lowerBound = LowerBoundCachedFont(lookup);
@@ -923,8 +1021,10 @@ namespace moho
      * Inserts one key/value record in the static font-cache map when missing and
      * reports iterator + insertion status.
      */
-    [[nodiscard]] std::pair<FontCacheMap::iterator, bool>
-    InsertFontCacheEntry(const FontLookup& lookup, CD3DFont* const font)
+    [[nodiscard]] std::pair<FontCacheMap::iterator, bool> InsertFontCacheEntry(
+      const FontLookup& lookup,
+      CD3DFont* const font
+    )
     {
       FontCacheMap& cache = GetFontCache();
       return InsertFontCacheEntryChecked(cache, lookup, font);
@@ -936,8 +1036,11 @@ namespace moho
      * What it does:
      * Inserts one cache record with map-size guard semantics.
      */
-    [[nodiscard]] std::pair<FontCacheMap::iterator, bool>
-    InsertFontCacheEntryChecked(FontCacheMap& cache, const FontLookup& lookup, CD3DFont* const font)
+    [[nodiscard]] std::pair<FontCacheMap::iterator, bool> InsertFontCacheEntryChecked(
+      FontCacheMap& cache,
+      const FontLookup& lookup,
+      CD3DFont* const font
+    )
     {
       constexpr std::size_t kMaxMapSize = 0x071C71C6u;
       if (cache.size() >= kMaxMapSize) {
@@ -955,7 +1058,9 @@ namespace moho
      * What it does:
      * Initializes glyph-page storage with 256 page slots.
      */
-    void InitializeGlyphPageCache(CD3DFont::SCharInfoPages& pages)
+    void InitializeGlyphPageCache(
+      CD3DFont::SCharInfoPages& pages
+    )
     {
       pages = CD3DFont::SCharInfoPages(256);
     }
@@ -967,7 +1072,9 @@ namespace moho
      * Tail-thunk adapter that forwards one glyph-page cache init lane into
      * `FUN_00429140`.
      */
-    [[maybe_unused]] void InitializeGlyphPageCacheThunk(CD3DFont::SCharInfoPages& pages)
+    [[maybe_unused]] void InitializeGlyphPageCacheThunk(
+      CD3DFont::SCharInfoPages& pages
+    )
     {
       InitializeGlyphPageCache(pages);
     }
@@ -981,7 +1088,9 @@ namespace moho
      * What it does:
      * Clears glyph-page storage and releases owned page vectors.
      */
-    void DestroyGlyphPageCache(CD3DFont::SCharInfoPages& pages)
+    void DestroyGlyphPageCache(
+      CD3DFont::SCharInfoPages& pages
+    )
     {
       pages = CD3DFont::SCharInfoPages{};
     }
@@ -992,7 +1101,9 @@ namespace moho
      * What it does:
      * Returns begin pointer for one kerning-pair vector storage lane.
      */
-    [[nodiscard]] CD3DFont::SKerningPair* GetKerningPairsBegin(CD3DFont::KerningPairVector& pairs)
+    [[nodiscard]] CD3DFont::SKerningPair* GetKerningPairsBegin(
+      CD3DFont::KerningPairVector& pairs
+    )
     {
       return pairs.begin();
     }
@@ -1003,7 +1114,9 @@ namespace moho
      * What it does:
      * Returns end pointer for one kerning-pair vector storage lane.
      */
-    [[nodiscard]] CD3DFont::SKerningPair* GetKerningPairsEnd(CD3DFont::KerningPairVector& pairs)
+    [[nodiscard]] CD3DFont::SKerningPair* GetKerningPairsEnd(
+      CD3DFont::KerningPairVector& pairs
+    )
     {
       return pairs.end();
     }
@@ -1015,7 +1128,10 @@ namespace moho
      * What it does:
      * Computes element pointer for one indexed kerning-pair slot.
      */
-    [[nodiscard]] CD3DFont::SKerningPair* GetKerningPairAt(CD3DFont::SKerningPair* const begin, const std::size_t index)
+    [[nodiscard]] CD3DFont::SKerningPair* GetKerningPairAt(
+      CD3DFont::SKerningPair* const begin,
+      const std::size_t index
+    )
     {
       return begin + index;
     }
@@ -1026,7 +1142,10 @@ namespace moho
      * What it does:
      * Computes element pointer for one indexed glyph-info slot.
      */
-    [[maybe_unused]] [[nodiscard]] CD3DFont::SCharInfo* GetGlyphInfoAt(CD3DFont::SCharInfo* const begin, const std::size_t index)
+    [[maybe_unused]] [[nodiscard]] CD3DFont::SCharInfo* GetGlyphInfoAt(
+      CD3DFont::SCharInfo* const begin,
+      const std::size_t index
+    )
     {
       return begin + index;
     }
@@ -1046,7 +1165,9 @@ namespace moho
      * at its two call shapes, cited on `resize` in legacy/containers/Vector.h.
      */
     [[nodiscard]] bool InitKerningPairBuffer(
-      const std::size_t count, CD3DFont::KerningPairVector& out, const CD3DFont::SKerningPair& fillValue
+      const std::size_t count,
+      CD3DFont::KerningPairVector& out,
+      const CD3DFont::SKerningPair& fillValue
     )
     {
       out = CD3DFont::KerningPairVector{};
@@ -1068,7 +1189,10 @@ namespace moho
      * What it does:
      * Initializes one kerning-pair buffer to requested count with zero fill.
      */
-    void InitKerningPairBufferZeroFill(const std::size_t count, CD3DFont::KerningPairVector& out)
+    void InitKerningPairBufferZeroFill(
+      const std::size_t count,
+      CD3DFont::KerningPairVector& out
+    )
     {
       const CD3DFont::SKerningPair fill{};
       (void)InitKerningPairBuffer(count, out, fill);
@@ -1080,7 +1204,9 @@ namespace moho
      * What it does:
      * Returns current glyph-entry count for one glyph page.
      */
-    [[nodiscard]] std::size_t GetGlyphPageEntryCount(const CD3DFont::SCharInfoPage& page) noexcept
+    [[nodiscard]] std::size_t GetGlyphPageEntryCount(
+      const CD3DFont::SCharInfoPage& page
+    ) noexcept
     {
       return page.size();
     }
@@ -1117,7 +1243,8 @@ namespace moho
      * or trimming trailing records as needed.
      */
     void NormalizeGlyphPageTo256(
-      CD3DFont::SCharInfoPage& page, const CD3DFont::SCharInfo& fillValue
+      CD3DFont::SCharInfoPage& page,
+      const CD3DFont::SCharInfo& fillValue
     )
     {
       constexpr std::size_t kGlyphEntriesPerPage = 256u;
@@ -1128,8 +1255,7 @@ namespace moho
       const std::size_t count = GetGlyphPageEntryCount(page);
       if (count < kGlyphEntriesPerPage) {
         page.resize(kGlyphEntriesPerPage, fillValue);
-      }
-      else if (count > kGlyphEntriesPerPage) {
+      } else if (count > kGlyphEntriesPerPage) {
         page.erase(page.begin() + static_cast<std::ptrdiff_t>(kGlyphEntriesPerPage), page.end());
       }
     }
@@ -1140,7 +1266,9 @@ namespace moho
      * What it does:
      * Normalizes one glyph page to 256 entries using zero/default glyph fill.
      */
-    void NormalizeGlyphPageTo256ZeroFill(CD3DFont::SCharInfoPage& page)
+    void NormalizeGlyphPageTo256ZeroFill(
+      CD3DFont::SCharInfoPage& page
+    )
     {
       const CD3DFont::SCharInfo fill{};
       NormalizeGlyphPageTo256(page, fill);
@@ -1186,7 +1314,9 @@ namespace moho
      * Resizes one DXT scratch lane as 8-byte word-pairs with fill pattern.
      */
     void ResizeDxtWordPairScratch(
-      const std::size_t count, DxtWordPairVector& scratch, const DxtWordPair& fillValue
+      const std::size_t count,
+      DxtWordPairVector& scratch,
+      const DxtWordPair& fillValue
     )
     {
       if (count > GetDxtWordPairMaxCount()) {
@@ -1201,7 +1331,10 @@ namespace moho
      * What it does:
      * Resizes one DXT scratch lane as zero-filled 8-byte word-pairs.
      */
-    [[maybe_unused]] void ResizeDxtWordPairScratchZeroFill(const std::size_t count, DxtWordPairVector& scratch)
+    [[maybe_unused]] void ResizeDxtWordPairScratchZeroFill(
+      const std::size_t count,
+      DxtWordPairVector& scratch
+    )
     {
       const DxtWordPair fill{};
       ResizeDxtWordPairScratch(count, scratch, fill);
@@ -1219,7 +1352,11 @@ namespace moho
      * Releases intrusive font ownership payload for one map iterator range and
      * erases matching cache nodes.
      */
-    void ReleaseFontCacheRange(FontCacheMap& cache, FontCacheMap::iterator begin, const FontCacheMap::iterator end)
+    void ReleaseFontCacheRange(
+      FontCacheMap& cache,
+      FontCacheMap::iterator begin,
+      const FontCacheMap::iterator end
+    )
     {
       if (begin == cache.begin() && end == GetFontCacheHead()) {
         for (auto& [lookup, cachedFont] : cache) {
@@ -1257,12 +1394,18 @@ namespace moho
       (void)registered;
     }
 
-    [[nodiscard]] boost::SharedPtrRaw<CD3DFont> MakeFontHandle(CD3DFont* const font)
+    [[nodiscard]] boost::SharedPtrRaw<CD3DFont> MakeFontHandle(
+      CD3DFont* const font
+    )
     {
-      return boost::SharedPtrRaw<CD3DFont>::with_deleter(font, [](CD3DFont* const ptr) { ReleaseIntrusiveFont(ptr); });
+      return boost::SharedPtrRaw<CD3DFont>::with_deleter(font, [](CD3DFont* const ptr) {
+        ReleaseIntrusiveFont(ptr);
+      });
     }
 
-    [[nodiscard]] std::uint32_t PackKerningKey(const CD3DFont::SKerningPair& pair) noexcept
+    [[nodiscard]] std::uint32_t PackKerningKey(
+      const CD3DFont::SKerningPair& pair
+    ) noexcept
     {
       const auto left = static_cast<std::uint16_t>(pair.mLeft);
       const auto right = static_cast<std::uint16_t>(pair.mRight);
@@ -1284,14 +1427,16 @@ namespace moho
      * What it does:
      * Orders one kerning-pair lane by packed (left,right) key.
      */
-    void SortKerningPairsByPackedKey(CD3DFont::KerningPairVector& pairs)
+    void SortKerningPairsByPackedKey(
+      CD3DFont::KerningPairVector& pairs
+    )
     {
       std::sort(
         GetKerningPairsBegin(pairs),
         GetKerningPairsEnd(pairs),
         [](const CD3DFont::SKerningPair& lhs, const CD3DFont::SKerningPair& rhs) {
-          return PackKerningKey(lhs) < PackKerningKey(rhs);
-        }
+        return PackKerningKey(lhs) < PackKerningKey(rhs);
+      }
       );
     }
 
@@ -1302,7 +1447,9 @@ namespace moho
      * Tail-thunk adapter that forwards one kerning-pair sort lane into
      * `FUN_0042A3F0`.
      */
-    [[maybe_unused]] void SortKerningPairsByPackedKeyThunk(CD3DFont::KerningPairVector& pairs)
+    [[maybe_unused]] void SortKerningPairsByPackedKeyThunk(
+      CD3DFont::KerningPairVector& pairs
+    )
     {
       SortKerningPairsByPackedKey(pairs);
     }
@@ -1311,7 +1458,10 @@ namespace moho
      * Takes a mod's atlas once it has been cooked: from then on the font has that file's metrics and advances, so
      * what GDI's default font measured is dropped along with its glyphs.
      */
-    void PollModFontBinding(CD3DFont& font, MsdfBinding& binding)
+    void PollModFontBinding(
+      CD3DFont& font,
+      MsdfBinding& binding
+    )
     {
       if (!binding.mIsMod || binding.mAtlas) {
         return;
@@ -1324,7 +1474,9 @@ namespace moho
       const float size = static_cast<float>(binding.mPointSize);
       binding.mStrike = FindMsdfStrike(atlas, binding.mPointSize);
       gpg::Logf(
-        "MSDF: %s at %d px drawn from %s", binding.mFace.c_str(), binding.mPointSize,
+        "MSDF: %s at %d px drawn from %s",
+        binding.mFace.c_str(),
+        binding.mPointSize,
         binding.mStrike != nullptr ? "its bitmaps" : "its distance field"
       );
       font.mAscent = std::ceil(atlas.mAscent * size);
@@ -1364,7 +1516,10 @@ namespace moho
    * What it does:
    * Looks up or creates one cached D3D font object for point-size + face-name.
    */
-  boost::SharedPtrRaw<CD3DFont> CD3DFont::Create(const std::int32_t pointSize, const gpg::StrArg faceName)
+  boost::SharedPtrRaw<CD3DFont> CD3DFont::Create(
+    const std::int32_t pointSize,
+    const gpg::StrArg faceName
+  )
   {
     RegisterFontCacheTeardown();
 
@@ -1380,8 +1535,9 @@ namespace moho
 
     // A mod's family never reaches GDI; its name means nothing there anyway, and its file was never loaded there.
     const bool isModFace = lookup.mFace.compare(0u, 4u, "mod:") == 0;
-    const HFONT createdWin32Font =
-      CreateFontA(-pointSize, 0, 0, 0, 0, 0, 0, 0, 1u, 0, 0, 4u, 0, isModFace ? kModFontFallbackFace : lookup.mFace.c_str());
+    const HFONT createdWin32Font = CreateFontA(
+      -pointSize, 0, 0, 0, 0, 0, 0, 0, 1u, 0, 0, 4u, 0, isModFace ? kModFontFallbackFace : lookup.mFace.c_str()
+    );
     if (createdWin32Font == nullptr) {
       return {};
     }
@@ -1421,7 +1577,9 @@ namespace moho
    * Initializes D3D font metrics, glyph-page cache lanes, and kerning pairs
    * from one Win32 font handle.
    */
-  CD3DFont::CD3DFont(const HFONT font)
+  CD3DFont::CD3DFont(
+    const HFONT font
+  )
     : CountedObject()
     , mFont(font)
     , mIsTruetype(false)
@@ -1496,7 +1654,9 @@ namespace moho
    * Executes the scalar-deleting-dtor thunk path used by intrusive release
    * callsites.
    */
-  CD3DFont* CD3DFont::Release(const std::int32_t destroyNow)
+  CD3DFont* CD3DFont::Release(
+    const std::int32_t destroyNow
+  )
   {
     this->~CD3DFont();
     if ((destroyNow & 1) != 0) {
@@ -1547,7 +1707,9 @@ namespace moho
    * Returns cached glyph metrics/texture info for one UTF-16 codepoint,
    * building the glyph page/atlas data on first use.
    */
-  const CD3DFont::SCharInfo& CD3DFont::GetCharInfo(const wchar_t chText)
+  const CD3DFont::SCharInfo& CD3DFont::GetCharInfo(
+    const wchar_t chText
+  )
   {
     constexpr int kGlyphScratchWidth = 128;
     constexpr int kGlyphScratchHeight = 128;
@@ -1613,12 +1775,14 @@ namespace moho
       const auto bound = sMsdfBindings.find(this);
       if (bound != sMsdfBindings.end() && bound->second.mIsMod && bound->second.mAtlas) {
         const MsdfBinding& binding = bound->second;
-        const SMsdfGlyph* const glyph = binding.mNoPage ? nullptr : FindMsdfGlyph(*binding.mAtlas, static_cast<std::uint32_t>(chText));
+        const SMsdfGlyph* const glyph =
+          binding.mNoPage ? nullptr : FindMsdfGlyph(*binding.mAtlas, static_cast<std::uint32_t>(chText));
         if (glyph != nullptr) {
           advance = glyph->mAdvance * static_cast<float>(binding.mPointSize);
         }
         modStrike = binding.mStrike;
-        modStrikeGlyph = modStrike != nullptr ? FindMsdfStrikeGlyph(*modStrike, static_cast<std::uint32_t>(chText)) : nullptr;
+        modStrikeGlyph =
+          modStrike != nullptr ? FindMsdfStrikeGlyph(*modStrike, static_cast<std::uint32_t>(chText)) : nullptr;
         if (modStrikeGlyph != nullptr) {
           advance = modStrikeGlyph->mAdvance;
         }
@@ -1655,14 +1819,18 @@ namespace moho
     std::array<COLORREF, static_cast<std::size_t>(kGlyphScratchWidth * kGlyphScratchHeight)> pixels{};
     const int sampleWidth = (std::min)(glyphWidth + 4, kGlyphScratchWidth);
     const int sampleHeight = (std::min)(glyphHeight + 4, kGlyphScratchHeight);
-    const auto readWithGetPixel = [&](std::array<COLORREF, static_cast<std::size_t>(kGlyphScratchWidth * kGlyphScratchHeight)>& out) {
+    const auto readWithGetPixel =
+      [&](std::array<COLORREF, static_cast<std::size_t>(kGlyphScratchWidth * kGlyphScratchHeight)>& out) {
       for (int y = 0; y < sampleHeight; ++y) {
         for (int x = 0; x < sampleWidth; ++x) {
           out[static_cast<std::size_t>(y * kGlyphScratchWidth + x)] = GetPixel(mDeviceContext, x, y);
         }
       }
     };
-    if (ren_GlyphBitmapRead && ReadGlyphBitmap(mBitmap, kGlyphScratchWidth, kGlyphScratchHeight, sampleWidth, sampleHeight, pixels)) {
+    if (
+      ren_GlyphBitmapRead &&
+      ReadGlyphBitmap(mBitmap, kGlyphScratchWidth, kGlyphScratchHeight, sampleWidth, sampleHeight, pixels)
+    ) {
       // Engine addition (ren_GlyphBitmapRead): the whole 128x128 scratch bitmap in one call, instead
       // of the binary's GetPixel per pixel (0x00425BC7), one kernel call each: 70 ms in a zoom frame
       // that met new characters. The first glyph of the session is read both ways; any difference
@@ -1692,7 +1860,9 @@ namespace moho
         for (int column = 0; column < modStrikeGlyph->mWidth; ++column) {
           const int x = baselineX + modStrikeGlyph->mLeft + column;
           if (x >= 0 && x < sampleWidth && y >= 0 && y < sampleHeight) {
-            const std::uint8_t value = coverage[static_cast<std::size_t>(row) * static_cast<std::size_t>(modStrikeGlyph->mWidth) + static_cast<std::size_t>(column)];
+            const std::uint8_t value = coverage
+              [static_cast<std::size_t>(row) * static_cast<std::size_t>(modStrikeGlyph->mWidth) +
+               static_cast<std::size_t>(column)];
             pixels[static_cast<std::size_t>(y * kGlyphScratchWidth + x)] = RGB(value, value, value);
           }
         }
@@ -1820,15 +1990,15 @@ namespace moho
 
     for (int y = yMin; y < (yMin + blockHeight); y += 4) {
       for (int x = xMin; x < (xMin + blockWidth); x += 4) {
-        const auto* const source = reinterpret_cast<const std::uint8_t*>(
-          &pixels[static_cast<std::size_t>(y * kGlyphScratchWidth + x)]
-        );
+        const auto* const source =
+          reinterpret_cast<const std::uint8_t*>(&pixels[static_cast<std::size_t>(y * kGlyphScratchWidth + x)]);
         dxt5Blocks.push_back(DXT_EncodeAlphaBlock(source, static_cast<int>(sizeof(COLORREF)), kGlyphScratchWidth * 4));
         dxt5Blocks.push_back(kDxtOpaqueColorBlock);
       }
     }
 
-    const std::uint32_t sourcePitchBytes = static_cast<std::uint32_t>(16u * (static_cast<std::uint32_t>(blockWidth) / 4u));
+    const std::uint32_t sourcePitchBytes =
+      static_cast<std::uint32_t>(16u * (static_cast<std::uint32_t>(blockWidth) / 4u));
     charInfo.mTex = CD3DBatchTexture::FromDXT5(
       static_cast<std::uint32_t>(blockWidth),
       static_cast<std::uint32_t>(blockHeight),
@@ -1856,8 +2026,10 @@ namespace moho
         if (rasterized == cachedGlyph) {
           gGlyphCacheVerified = true;
         } else {
-          gpg::Warnf("CD3DFont: a cached glyph (u+%04x) differs from its rasterization; glyphs are rasterized from now on",
-                     static_cast<unsigned int>(chText));
+          gpg::Warnf(
+            "CD3DFont: a cached glyph (u+%04x) differs from its rasterization; glyphs are rasterized from now on",
+            static_cast<unsigned int>(chText)
+          );
           ren_GlyphCache = false;
           GlyphCache().Drop();
         }
@@ -1869,7 +2041,8 @@ namespace moho
   }
 
   /**
-   * Address: 0x00426470 (FUN_00426470, ?Render@CD3DFont@Moho@@QAE?AV?$Vector3@M@Wm3@@VStrArg@gpg@@PAVCD3DPrimBatcher@2@ABV34@22IMM@Z)
+   * Address: 0x00426470 (FUN_00426470,
+   * ?Render@CD3DFont@Moho@@QAE?AV?$Vector3@M@Wm3@@VStrArg@gpg@@PAVCD3DPrimBatcher@2@ABV34@22IMM@Z)
    *
    * What it does:
    * Draws one UTF-8 string along caller-provided axis vectors and returns the
@@ -1888,7 +2061,10 @@ namespace moho
   {
     PollModFont();
     Vector3f cursor = origin;
-    if ((ren_MsdfText || IsModFont()) && RenderMsdfText(*this, text, *primBatcher, origin, xAxis, yAxis, color, maxAdvance, cursor)) {
+    if (
+      (ren_MsdfText || IsModFont()) &&
+      RenderMsdfText(*this, text, *primBatcher, origin, xAxis, yAxis, color, maxAdvance, cursor)
+    ) {
       return cursor;
     }
 
@@ -1917,7 +2093,8 @@ namespace moho
   }
 
   /**
-   * Address: 0x00426580 (FUN_00426580, ?Render2D@CD3DFont@Moho@@QAEXVStrArg@gpg@@PAVCD3DPrimBatcher@2@ABV?$Vector2@M@Wm3@@IMM@Z)
+   * Address: 0x00426580 (FUN_00426580,
+   * ?Render2D@CD3DFont@Moho@@QAEXVStrArg@gpg@@PAVCD3DPrimBatcher@2@ABV?$Vector2@M@Wm3@@IMM@Z)
    *
    * What it does:
    * Projects one 2D text draw into 3D render space and dispatches to
@@ -1935,16 +2112,7 @@ namespace moho
     const Vector3f origin3D{origin.x, origin.y, 0.0f};
     const Vector3f xAxis{1.0f, 0.0f, 0.0f};
     const Vector3f yAxis{0.0f, -1.0f, 0.0f};
-    (void)Render(
-      text,
-      primBatcher,
-      origin3D,
-      xAxis,
-      yAxis,
-      color,
-      glyphScale,
-      gpg::NaN
-    );
+    (void)Render(text, primBatcher, origin3D, xAxis, yAxis, color, glyphScale, gpg::NaN);
   }
 
   /**
@@ -1953,7 +2121,10 @@ namespace moho
    * What it does:
    * Returns cumulative glyph advance for one UTF-8 string.
    */
-  float CD3DFont::GetAdvance(const gpg::StrArg text, const std::int32_t /*flags*/)
+  float CD3DFont::GetAdvance(
+    const gpg::StrArg text,
+    const std::int32_t /*flags*/
+  )
   {
     PollModFont();
     float advance = 0.0f;
@@ -1972,7 +2143,10 @@ namespace moho
    * What it does:
    * Returns the UTF-8 character index closest to the caller-provided advance.
    */
-  std::int32_t CD3DFont::GetNearestCharacterIndex(const gpg::StrArg text, const float targetAdvance)
+  std::int32_t CD3DFont::GetNearestCharacterIndex(
+    const gpg::StrArg text,
+    const float targetAdvance
+  )
   {
     std::int32_t index = 0;
     float cumulativeAdvance = 0.0f;
@@ -1991,7 +2165,9 @@ namespace moho
     return index;
   }
 
-  void REN_SaveGlyphCache(const bool now)
+  void REN_SaveGlyphCache(
+    const bool now
+  )
   {
     if (ren_GlyphCache) {
       GlyphCache().SaveIfIdle(now);

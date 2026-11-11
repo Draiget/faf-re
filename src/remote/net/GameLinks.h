@@ -36,9 +36,9 @@ namespace faf::remote::net
     /**
      * Server to player, reliable, one per beat: varints beat, entities in the player's own frame and in their team's,
      * then the own frame, team frame (empty without one), army, grid and Lua lanes, each a varint size and its bytes
-     * (remote/ViewLanes.h). The player's client holds both frames; a blip of the player's own unit is theirs to leave out.
-     * An empty team frame means none: a player cut from their team drops what they held of it. After a reconnect the
-     * first view's frames are whole (no baseline), and so are its army and grid lanes.
+     * (remote/ViewLanes.h). The player's client holds both frames; a blip of the player's own unit is theirs to leave
+     * out. An empty team frame means none: a player cut from their team drops what they held of it. After a reconnect
+     * the first view's frames are whole (no baseline), and so are its army and grid lanes.
      */
     View = 5,
     /**
@@ -52,9 +52,9 @@ namespace faf::remote::net
      */
     CommandAnswer = 7,
     /**
-     * Server to player, reliable, after a beat's view every few beats (plan WPR.30): varint beat, then what the player's
-     * client should hold after it, `wire::HashRecord` summed over its own frame and over its team's frame, as two 64-bit
-     * integers (the second 0 without a team frame).
+     * Server to player, reliable, after a beat's view every few beats (plan WPR.30): varint beat, then what the
+     * player's client should hold after it, `wire::HashRecord` summed over its own frame and over its team's frame, as
+     * two 64-bit integers (the second 0 without a team frame).
      */
     ViewCheck = 8,
     /** Player to server, reliable: its frames didn't match a `ViewCheck`; it wants its next view whole. */
@@ -117,7 +117,8 @@ namespace faf::remote::net
     /**
      * Player to server, reliable (plan WP10.7): varint (speed limit + 10). The player's sim-speed limit: the speed step
      * its game keeps up with, from what applying the server's views costs it (remote/SpeedLimit.h), as a lockstep
-     * client's `CLIMSG_IntParam` reports its sim's. Sent when it changes. The server runs at the slowest playing seat's.
+     * client's `CLIMSG_IntParam` reports its sim's. Sent when it changes. The server runs at the slowest playing
+     * seat's.
      */
     SpeedLimit = 18,
     /**
@@ -128,8 +129,9 @@ namespace faf::remote::net
      */
     FocusArmy = 19,
     /**
-     * Player to server, reliable (plan WP11.1): the player's cameras (`SetGeomCams`) at most every 250 ms: varint count,
-     * then per camera its view-projection and LOD scale as 17 floats. Kept per seat for camera-ordered work (WP8.2).
+     * Player to server, reliable (plan WP11.1): the player's cameras (`SetGeomCams`) at most every 250 ms: varint
+     * count, then per camera its view-projection and LOD scale as 17 floats. Kept per seat for camera-ordered work
+     * (WP8.2).
      */
     Cameras = 20,
   };
@@ -189,7 +191,10 @@ namespace faf::remote::net
     explicit CServerLinks(const ChannelConfig& channel = {});
 
     [[nodiscard]] bool Open(const SEndpoint& local, std::string& error);
-    [[nodiscard]] SEndpoint Local() const noexcept { return mSocket.Local(); }
+    [[nodiscard]] SEndpoint Local() const noexcept
+    {
+      return mSocket.Local();
+    }
 
     /**
      * Plan WPR.45, WPR.48: from the first call on, only datagrams from these addresses (any port) reach the handshake
@@ -207,13 +212,21 @@ namespace faf::remote::net
 
     /** Takes what has arrived, tells `events`, and sends what's due. */
     void Pump(std::uint64_t nowUs, IEvents& events);
-    void Wait(int milliseconds) noexcept { mSocket.Wait(milliseconds); }
+    void Wait(
+      int milliseconds
+    ) noexcept
+    {
+      mSocket.Wait(milliseconds);
+    }
 
     bool SendReliable(std::int32_t uid, const void* data, std::size_t size);
     /** To every player with a live channel. */
     void SendUnreliableToAll(const void* data, std::size_t size);
 
-    [[nodiscard]] const SGameLinkStats& Stats() const noexcept { return mStats; }
+    [[nodiscard]] const SGameLinkStats& Stats() const noexcept
+    {
+      return mStats;
+    }
     [[nodiscard]] const ChannelStats* StatsOf(std::int32_t uid) const;
     /** Reliable bytes the uid hasn't acknowledged. */
     [[nodiscard]] std::uint64_t ReliableUnacked(std::int32_t uid) const;
@@ -235,8 +248,20 @@ namespace faf::remote::net
       bool lost = false;
     };
 
-    void HandleDatagram(const std::uint8_t* data, std::size_t size, const SEndpoint& from, std::uint64_t nowUs, IEvents& events);
-    void HandleConnect(const std::uint8_t* data, std::size_t size, const SEndpoint& from, std::uint64_t nowUs, IEvents& events);
+    void HandleDatagram(
+      const std::uint8_t* data,
+      std::size_t size,
+      const SEndpoint& from,
+      std::uint64_t nowUs,
+      IEvents& events
+    );
+    void HandleConnect(
+      const std::uint8_t* data,
+      std::size_t size,
+      const SEndpoint& from,
+      std::uint64_t nowUs,
+      IEvents& events
+    );
     [[nodiscard]] bool TakeHandshakeBudget(std::uint64_t nowUs) noexcept;
     /** One address's own budget (`kHandshakesPerAddressPerSecond`). */
     [[nodiscard]] bool TakeAddressBudget(std::uint32_t ip, std::uint64_t nowUs) noexcept;
@@ -290,10 +315,21 @@ namespace faf::remote::net
     void Reconnect();
 
     void Pump(std::uint64_t nowUs);
-    void Wait(int milliseconds) noexcept { mSocket.Wait(milliseconds); }
+    void Wait(
+      int milliseconds
+    ) noexcept
+    {
+      mSocket.Wait(milliseconds);
+    }
 
-    [[nodiscard]] EState State() const noexcept { return mState; }
-    [[nodiscard]] std::optional<EHandshakeRefusal> Refusal() const noexcept { return mRefusal; }
+    [[nodiscard]] EState State() const noexcept
+    {
+      return mState;
+    }
+    [[nodiscard]] std::optional<EHandshakeRefusal> Refusal() const noexcept
+    {
+      return mRefusal;
+    }
 
     bool SendReliable(const void* data, std::size_t size);
     bool TakeUnreliable(std::vector<std::uint8_t>& out);

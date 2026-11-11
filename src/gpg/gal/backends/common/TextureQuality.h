@@ -16,7 +16,9 @@ namespace gpg::gal::imaging
    * Do not alter resizing or explicit mip limits.
    */
   [[nodiscard]] inline std::uint32_t TextureQualityMipLevels(
-    const void* const data, const std::size_t bytes, const std::uint32_t requestedSkip
+    const void* const data,
+    const std::size_t bytes,
+    const std::uint32_t requestedSkip
   ) noexcept
   {
     if (requestedSkip == 0U || data == nullptr || bytes < 128U) {
@@ -46,4 +48,4 @@ namespace gpg::gal::imaging
     const std::uint32_t levels = (word(8U) & 0x20000U) != 0U ? word(28U) : 1U; // DDSD_MIPMAPCOUNT
     return levels > 1U ? std::min(requestedSkip, levels - 1U) : 0U;
   }
-}
+} // namespace gpg::gal::imaging

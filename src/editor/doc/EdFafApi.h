@@ -172,15 +172,29 @@ namespace faf::editor
      */
     std::string Picture(const std::string& url);
     /** Where the editor keeps the pictures it downloads. */
-    void SetPictureCache(std::filesystem::path folder) { mPictureCache = std::move(folder); }
+    void SetPictureCache(
+      std::filesystem::path folder
+    )
+    {
+      mPictureCache = std::move(folder);
+    }
 
-    [[nodiscard]] State GetState() const noexcept { return mState.load(); }
+    [[nodiscard]] State GetState() const noexcept
+    {
+      return mState.load();
+    }
     [[nodiscard]] std::string Message() const;
     [[nodiscard]] std::string UserCode() const;
     [[nodiscard]] std::string VerifyUrl() const;
-    [[nodiscard]] bool Searching() const noexcept { return mSearching.load(); }
+    [[nodiscard]] bool Searching() const noexcept
+    {
+      return mSearching.load();
+    }
     /** The sign-in's page should open in the browser now (once). */
-    [[nodiscard]] bool TakeOpenPage() noexcept { return mOpenPage.exchange(false); }
+    [[nodiscard]] bool TakeOpenPage() noexcept
+    {
+      return mOpenPage.exchange(false);
+    }
 
   private:
     void Run(std::function<void()> job);

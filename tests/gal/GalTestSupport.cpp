@@ -4,7 +4,10 @@
 
 namespace faf_gal_tests
 {
-  float FloatAt(const std::span<const std::uint8_t> image, const std::size_t offset)
+  float FloatAt(
+    const std::span<const std::uint8_t> image,
+    const std::size_t offset
+  )
   {
     float value = 0.0f;
     if (offset + sizeof(value) <= image.size()) {
@@ -13,7 +16,10 @@ namespace faf_gal_tests
     return value;
   }
 
-  std::uint32_t WordAt(const std::span<const std::uint8_t> image, const std::size_t offset)
+  std::uint32_t WordAt(
+    const std::span<const std::uint8_t> image,
+    const std::size_t offset
+  )
   {
     std::uint32_t value = 0U;
     if (offset + sizeof(value) <= image.size()) {
@@ -22,22 +28,31 @@ namespace faf_gal_tests
     return value;
   }
 
-  std::int32_t IntAt(const std::span<const std::uint8_t> image, const std::size_t offset)
+  std::int32_t IntAt(
+    const std::span<const std::uint8_t> image,
+    const std::size_t offset
+  )
   {
     return static_cast<std::int32_t>(WordAt(image, offset));
   }
 
-  std::uint32_t Bits(const float value)
+  std::uint32_t Bits(
+    const float value
+  )
   {
     std::uint32_t bits = 0U;
     std::memcpy(&bits, &value, sizeof(bits));
     return bits;
   }
 
-  std::size_t Count(const std::string_view text, const std::string_view needle)
+  std::size_t Count(
+    const std::string_view text,
+    const std::string_view needle
+  )
   {
     std::size_t count = 0U;
-    for (std::size_t at = text.find(needle); !needle.empty() && at != std::string_view::npos; at = text.find(needle, at + needle.size())) {
+    for (std::size_t at = text.find(needle); !needle.empty() && at != std::string_view::npos;
+         at = text.find(needle, at + needle.size())) {
       ++count;
     }
     return count;

@@ -24,7 +24,10 @@ public:
     (void)style;
   }
 
-  const std::wstring& GetPath() const { return m_path; }
+  const std::wstring& GetPath() const
+  {
+    return m_path;
+  }
 
 private:
   std::wstring m_path;

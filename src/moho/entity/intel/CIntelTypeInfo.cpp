@@ -4,7 +4,8 @@
 #include <typeinfo>
 
 #include "moho/entity/intel/CIntel.h"
-#include "moho/entity/intel/CIntelPosHandle.h"
+#include "moho/entity/intel/CIntelPosHandle.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 namespace
 {
@@ -17,7 +18,9 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeCIntelRef(moho::CIntel* const object)
+  [[nodiscard]] gpg::RRef MakeCIntelRef(
+    moho::CIntel* const object
+  )
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -57,11 +60,7 @@ namespace moho
   {
     size_ = sizeof(CIntel);
     (void)gpg::BindRTypeLifecycleCallbacks(
-      this,
-      &CIntelTypeInfo::NewRef,
-      &CIntelTypeInfo::CtrRef,
-      &CIntelTypeInfo::Delete,
-      &CIntelTypeInfo::Destruct
+      this, &CIntelTypeInfo::NewRef, &CIntelTypeInfo::CtrRef, &CIntelTypeInfo::Delete, &CIntelTypeInfo::Destruct
     );
     gpg::RType::Init();
     Finish();
@@ -79,7 +78,9 @@ namespace moho
   /**
    * Address: 0x0076E950 (FUN_0076E950, Moho::CIntelTypeInfo::CtrRef)
    */
-  gpg::RRef CIntelTypeInfo::CtrRef(void* const objectPtr)
+  gpg::RRef CIntelTypeInfo::CtrRef(
+    void* const objectPtr
+  )
   {
     auto* const object = reinterpret_cast<CIntel*>(objectPtr);
     if (object) {
@@ -91,7 +92,9 @@ namespace moho
   /**
    * Address: 0x0076E920 (FUN_0076E920, Moho::CIntelTypeInfo::Delete)
    */
-  void CIntelTypeInfo::Delete(void* const objectPtr)
+  void CIntelTypeInfo::Delete(
+    void* const objectPtr
+  )
   {
     auto* const object = reinterpret_cast<CIntel*>(objectPtr);
     if (!object) {
@@ -104,7 +107,9 @@ namespace moho
   /**
    * Address: 0x0076E9C0 (FUN_0076E9C0, Moho::CIntelTypeInfo::Destruct)
    */
-  void CIntelTypeInfo::Destruct(void* const objectPtr)
+  void CIntelTypeInfo::Destruct(
+    void* const objectPtr
+  )
   {
     if (auto* const object = static_cast<CIntel*>(objectPtr)) {
       object->~CIntel();
@@ -136,7 +141,9 @@ namespace
   [[maybe_unused]] CIntelTypeInfoBootstrap gCIntelTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CIntelTypeInfo_c83258, moho::register_CIntelTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CIntelTypeInfo_c83258,
+  moho::register_CIntelTypeInfo
+)

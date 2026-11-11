@@ -22,9 +22,15 @@ namespace moho
    * What it does:
    * Loads the `Broadcaster<EAiTransportEvent>` base.
    */
-  void IAiTransport::MemberDeserialize(gpg::ReadArchive* const archive)
+  void IAiTransport::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
-    archive->Read(gpg::RTypeOf<moho::Broadcaster<moho::EAiTransportEvent>>(), static_cast<Broadcaster<EAiTransportEvent>*>(this), gpg::RRef{});
+    archive->Read(
+      gpg::RTypeOf<moho::Broadcaster<moho::EAiTransportEvent>>(),
+      static_cast<Broadcaster<EAiTransportEvent>*>(this),
+      gpg::RRef{}
+    );
   }
 
   /**
@@ -33,9 +39,15 @@ namespace moho
    * What it does:
    * Saves the `Broadcaster<EAiTransportEvent>` base.
    */
-  void IAiTransport::MemberSerialize(gpg::WriteArchive* const archive) const
+  void IAiTransport::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
-    archive->Write(gpg::RTypeOf<moho::Broadcaster<moho::EAiTransportEvent>>(), static_cast<const Broadcaster<EAiTransportEvent>*>(this), gpg::RRef{});
+    archive->Write(
+      gpg::RTypeOf<moho::Broadcaster<moho::EAiTransportEvent>>(),
+      static_cast<const Broadcaster<EAiTransportEvent>*>(this),
+      gpg::RRef{}
+    );
   }
 } // namespace moho
 

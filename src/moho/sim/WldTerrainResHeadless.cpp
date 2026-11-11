@@ -37,20 +37,27 @@ namespace
 {
   using moho::CBackgroundTaskControl;
 
-  void TickLoadingProgress(CBackgroundTaskControl& loadControl)
+  void TickLoadingProgress(
+    CBackgroundTaskControl& loadControl
+  )
   {
     if (loadControl.mHandle != nullptr) {
       loadControl.mHandle->UpdateLoadingProgress();
     }
   }
 
-  void SkipString(gpg::BinaryReader& reader)
+  void SkipString(
+    gpg::BinaryReader& reader
+  )
   {
     fa::string scratch;
     reader.ReadString(&scratch);
   }
 
-  void SkipBytes(gpg::BinaryReader& reader, const std::size_t byteCount)
+  void SkipBytes(
+    gpg::BinaryReader& reader,
+    const std::size_t byteCount
+  )
   {
     std::vector<char> scratch(byteCount);
     if (byteCount != 0u) {
@@ -59,14 +66,18 @@ namespace
   }
 
   template <class T>
-  void SkipValue(gpg::BinaryReader& reader)
+  void SkipValue(
+    gpg::BinaryReader& reader
+  )
   {
     T scratch{};
     reader.ReadExact(scratch);
   }
 
   /// One `payloadSize` + payload sheet, as the utility-mask and water-map loops read it.
-  void SkipSizedPayload(gpg::BinaryReader& reader)
+  void SkipSizedPayload(
+    gpg::BinaryReader& reader
+  )
   {
     std::uint32_t payloadSize = 0;
     reader.ReadExact(payloadSize);
@@ -75,7 +86,9 @@ namespace
 
   /// CWaterShaderProperties::Load (0x008A03C0): 20 floats, the cubemap and ramp
   /// paths, 4 floats, then 4 x { 2 floats, wave texture path }.
-  void SkipWaterShaderProperties(gpg::BinaryReader& reader)
+  void SkipWaterShaderProperties(
+    gpg::BinaryReader& reader
+  )
   {
     SkipBytes(reader, 20u * sizeof(float));
     SkipString(reader);
@@ -91,7 +104,10 @@ namespace
   /// WaveGenerator::LoadSerializedState: two texture paths, 13 floats (position,
   /// angle, direction, lifetime, update interval and size ranges) and, after
   /// format 51, 4 more (ramp scale, framerate range, texture selection).
-  void SkipWaveSystem(gpg::BinaryReader& reader, const std::uint32_t version)
+  void SkipWaveSystem(
+    gpg::BinaryReader& reader,
+    const std::uint32_t version
+  )
   {
     std::int32_t generatorCount = 0;
     reader.ReadExact(generatorCount);
@@ -106,7 +122,9 @@ namespace
   }
 
   /// CWldTerrainRes::LoadLayer (0x008A3FC0): a texture path and its size.
-  void SkipStratumLayer(gpg::BinaryReader& reader)
+  void SkipStratumLayer(
+    gpg::BinaryReader& reader
+  )
   {
     SkipString(reader);
     SkipValue<float>(reader);
@@ -115,7 +133,9 @@ namespace
   /// CDecalManager::Load (0x00877CD0): two counters, the decals
   /// (CWldTerrainDecal::DecalLoad), then the decal groups
   /// (CDecalGroup::ReadFromStream).
-  void SkipTerrainDecals(gpg::BinaryReader& reader)
+  void SkipTerrainDecals(
+    gpg::BinaryReader& reader
+  )
   {
     SkipValue<std::uint32_t>(reader); // mDecalCount
     SkipValue<std::uint32_t>(reader); // mNumDecals
@@ -154,21 +174,24 @@ namespace
 
   /// CWldTerrainRes::LoadTexturing (0x008A4040): the strata layers (a flat layout
   /// before version 54, 19 LoadLayer records since), then the terrain decals.
-  void SkipTexturing(gpg::BinaryReader& reader, const std::uint32_t version)
+  void SkipTexturing(
+    gpg::BinaryReader& reader,
+    const std::uint32_t version
+  )
   {
     if (version < 54) {
-      SkipString(reader);                // shader name
-      SkipValue<std::uint32_t>(reader);  // discarded lane
+      SkipString(reader);                    // shader name
+      SkipValue<std::uint32_t>(reader);      // discarded lane
       for (int pair = 0; pair < 5; ++pair) { // lower, then strata 0..3
         SkipString(reader);
         SkipString(reader);
         SkipValue<float>(reader);
         SkipValue<float>(reader);
       }
-      SkipString(reader);                // upper albedo
-      SkipString(reader);                // discarded upper normal
-      SkipValue<float>(reader);          // upper size
-      SkipValue<std::uint32_t>(reader);  // discarded lane
+      SkipString(reader);               // upper albedo
+      SkipString(reader);               // discarded upper normal
+      SkipValue<float>(reader);         // upper size
+      SkipValue<std::uint32_t>(reader); // discarded lane
     } else {
       for (int layer = 0; layer < 19; ++layer) {
         SkipStratumLayer(reader);
@@ -183,7 +206,9 @@ namespace
   /// decal-upload records (0x28 bytes each), three cloud paths, the cirrus
   /// multiplier and colour, the cirrus path, a discarded layer count and the four
   /// 20-byte cirrus layer records.
-  void SkipSkyDome(gpg::BinaryReader& reader)
+  void SkipSkyDome(
+    gpg::BinaryReader& reader
+  )
   {
     SkipBytes(reader, 64u);
     SkipString(reader);
@@ -205,7 +230,10 @@ namespace
   /// Cartographic::ReadDecals (0x007D1D30): a batch count, then per batch
   /// (CartographicDecalBatch::Read, 0x007D5400) the technique name (from 0x3C),
   /// the texture path, a decal count and 36 bytes per decal.
-  void SkipCartographicDecals(gpg::BinaryReader& reader, const std::uint32_t version)
+  void SkipCartographicDecals(
+    gpg::BinaryReader& reader,
+    const std::uint32_t version
+  )
   {
     std::int32_t batchCount = 0;
     reader.Read(reinterpret_cast<char*>(&batchCount), sizeof(batchCount));
@@ -223,7 +251,9 @@ namespace
     }
   }
 
-  [[noreturn]] void DieNoRenderer(const char* const call)
+  [[noreturn]] void DieNoRenderer(
+    const char* const call
+  )
   {
     gpg::Die("IWldTerrainRes::%s: this terrain resource has no renderer (no client in this process)", call);
   }
@@ -234,70 +264,280 @@ namespace
     CWldTerrainResHeadless() = default;
     ~CWldTerrainResHeadless() override = default;
 
-    bool GetBool() const override { return false; }
-    const moho::Cartographic& GetCartographic() const override { DieNoRenderer("GetCartographic"); }
-    moho::Cartographic& GetCartographic() override { DieNoRenderer("GetCartographic"); }
-    const moho::SkyDome& GetSkyDome() const override { DieNoRenderer("GetSkyDome"); }
-    moho::SkyDome& GetSkyDome() override { DieNoRenderer("GetSkyDome"); }
-    void SetSkycube(const fa::string& texturePath) override { mSkycubeFile = texturePath; }
-    const fa::string& GetSkycubeFile() const override { return mSkycubeFile; }
-    boost::shared_ptr<moho::ID3DTextureSheet> GetSkycube() const override { return {}; }
-    void SetBackground(const fa::string& texturePath) override { mBackgroundFile = texturePath; }
-    const fa::string& GetBackgroundFile() const override { return mBackgroundFile; }
-    boost::shared_ptr<moho::ID3DTextureSheet> GetBackground() const override { return {}; }
-    void AddEnvLookup(const fa::string&, const fa::string&) override {}
-    void RemoveEnvLookup(const fa::string&) override {}
-    boost::shared_ptr<moho::ID3DTextureSheet> GetEnvLookup(const fa::string&) const override { return {}; }
-    void EnumerateEnvLookup(moho::TerrainEnvironmentLookupPairs&) const override {}
+    bool GetBool() const override
+    {
+      return false;
+    }
+    const moho::Cartographic& GetCartographic() const override
+    {
+      DieNoRenderer("GetCartographic");
+    }
+    moho::Cartographic& GetCartographic() override
+    {
+      DieNoRenderer("GetCartographic");
+    }
+    const moho::SkyDome& GetSkyDome() const override
+    {
+      DieNoRenderer("GetSkyDome");
+    }
+    moho::SkyDome& GetSkyDome() override
+    {
+      DieNoRenderer("GetSkyDome");
+    }
+    void SetSkycube(
+      const fa::string& texturePath
+    ) override
+    {
+      mSkycubeFile = texturePath;
+    }
+    const fa::string& GetSkycubeFile() const override
+    {
+      return mSkycubeFile;
+    }
+    boost::shared_ptr<moho::ID3DTextureSheet> GetSkycube() const override
+    {
+      return {};
+    }
+    void SetBackground(
+      const fa::string& texturePath
+    ) override
+    {
+      mBackgroundFile = texturePath;
+    }
+    const fa::string& GetBackgroundFile() const override
+    {
+      return mBackgroundFile;
+    }
+    boost::shared_ptr<moho::ID3DTextureSheet> GetBackground() const override
+    {
+      return {};
+    }
+    void AddEnvLookup(
+      const fa::string&,
+      const fa::string&
+    ) override
+    {}
+    void RemoveEnvLookup(
+      const fa::string&
+    ) override
+    {}
+    boost::shared_ptr<moho::ID3DTextureSheet> GetEnvLookup(
+      const fa::string&
+    ) const override
+    {
+      return {};
+    }
+    void EnumerateEnvLookup(
+      moho::TerrainEnvironmentLookupPairs&
+    ) const override
+    {}
     void ClearEnvLookup() override {}
-    void SetTopographicSamples(std::int32_t) override {}
-    std::int32_t GetTopographicSamples() const override { return 20; }
-    void SetHypsometricColor(std::int32_t, std::uint32_t) override {}
-    std::uint32_t GetHypsometricColor(std::int32_t) const override { return 0xFFFFFFFFu; }
-    void SetImagerElevationOffset(float) override {}
-    float GetImagerElevationOffset() const override { return 0.0f; }
-    bool Reset(moho::SChartSize, LuaPlus::LuaState*) override { DieNoRenderer("Reset"); }
-    Wm3::AxisAlignedBox3f GetWorldBounds() const override { DieNoRenderer("GetWorldBounds"); }
-    moho::StratumMaterial& GetStratumMaterial() override { DieNoRenderer("GetStratumMaterial"); }
-    moho::WaveSystem* GetWaveSystem() override { return nullptr; }
-    void UpdateWaveSystem(const moho::GeomCamera3&, float, std::int32_t) override {}
-    boost::shared_ptr<moho::ID3DTextureSheet> GetWaterMap() const override { return {}; }
-    void UpdateWaterMap(const gpg::Rect2i&) override {}
+    void SetTopographicSamples(
+      std::int32_t
+    ) override
+    {}
+    std::int32_t GetTopographicSamples() const override
+    {
+      return 20;
+    }
+    void SetHypsometricColor(
+      std::int32_t,
+      std::uint32_t
+    ) override
+    {}
+    std::uint32_t GetHypsometricColor(
+      std::int32_t
+    ) const override
+    {
+      return 0xFFFFFFFFu;
+    }
+    void SetImagerElevationOffset(
+      float
+    ) override
+    {}
+    float GetImagerElevationOffset() const override
+    {
+      return 0.0f;
+    }
+    bool Reset(
+      moho::SChartSize,
+      LuaPlus::LuaState*
+    ) override
+    {
+      DieNoRenderer("Reset");
+    }
+    Wm3::AxisAlignedBox3f GetWorldBounds() const override
+    {
+      DieNoRenderer("GetWorldBounds");
+    }
+    moho::StratumMaterial& GetStratumMaterial() override
+    {
+      DieNoRenderer("GetStratumMaterial");
+    }
+    moho::WaveSystem* GetWaveSystem() override
+    {
+      return nullptr;
+    }
+    void UpdateWaveSystem(
+      const moho::GeomCamera3&,
+      float,
+      std::int32_t
+    ) override
+    {}
+    boost::shared_ptr<moho::ID3DTextureSheet> GetWaterMap() const override
+    {
+      return {};
+    }
+    void UpdateWaterMap(
+      const gpg::Rect2i&
+    ) override
+    {}
     void UpdateWaterMap() override {}
-    Wm3::Vector2f GetWaterMapSize() const override { return Wm3::Vector2f{0.0f, 0.0f}; }
-    void UpdateNormalMap(const gpg::Rect2i&) override {}
-    void NotifyMapChange(const gpg::Rect2i&) override {}
-    gpg::BitArray2D* GetDebugDirtyTerrain() override { return nullptr; }
-    const fa::list<gpg::Rect2i>& GetDebugDirtyRects() const override { return mDebugDirtyRects; }
-    std::int32_t GetNormalMapCount() override { return 0; }
-    moho::SNormalMapInfo GetNormalMapInfo(std::int32_t) const override { DieNoRenderer("GetNormalMapInfo"); }
-    void UpdateStratumMask(std::int32_t, const std::uint8_t*, std::int32_t, std::int32_t, std::int32_t, std::int32_t) override {}
-    void UpdateStratumMask(std::int32_t, const std::uint8_t*) override {}
-    void GetStratumMask(std::int32_t, std::uint8_t*) override { DieNoRenderer("GetStratumMask"); }
-    float GetLightingMultiplier() const override { return 1.5f; }
-    void SetLightingMultiplier(const float&) override {}
-    Wm3::Vector3f GetSunDirection() const override { return Wm3::Vector3f{0.70700002f, 0.70700002f, 0.0f}; }
-    void SetSunDirection(const Wm3::Vector3f&) override {}
-    Wm3::Vector3f GetSunAmbience() const override { return Wm3::Vector3f{0.2f, 0.2f, 0.2f}; }
-    void SetSunAmbience(const Wm3::Vector3f&) override {}
-    Wm3::Vector3f GetSunColor() const override { return Wm3::Vector3f{1.0f, 1.0f, 1.0f}; }
-    void SetSunColor(const Wm3::Vector3f&) override {}
-    Wm3::Vector3f GetShadowFillColor() const override { return Wm3::Vector3f{0.69999999f, 0.69999999f, 0.75f}; }
-    void SetShadowFillColor(const Wm3::Vector3f&) override {}
-    moho::Vector4f GetSpecularColor() const override { return moho::Vector4f{}; }
-    void SetSpecularColor(const moho::Vector4f&) override {}
-    float GetBloom() const override { return 0.079999998f; }
-    void SetBloom(float) override {}
-    const moho::SFogInfo& GetFogInfo() const override { DieNoRenderer("GetFogInfo"); }
-    void SetFogInfo(const moho::SFogInfo&) override {}
+    Wm3::Vector2f GetWaterMapSize() const override
+    {
+      return Wm3::Vector2f{0.0f, 0.0f};
+    }
+    void UpdateNormalMap(
+      const gpg::Rect2i&
+    ) override
+    {}
+    void NotifyMapChange(
+      const gpg::Rect2i&
+    ) override
+    {}
+    gpg::BitArray2D* GetDebugDirtyTerrain() override
+    {
+      return nullptr;
+    }
+    const fa::list<gpg::Rect2i>& GetDebugDirtyRects() const override
+    {
+      return mDebugDirtyRects;
+    }
+    std::int32_t GetNormalMapCount() override
+    {
+      return 0;
+    }
+    moho::SNormalMapInfo GetNormalMapInfo(
+      std::int32_t
+    ) const override
+    {
+      DieNoRenderer("GetNormalMapInfo");
+    }
+    void UpdateStratumMask(
+      std::int32_t,
+      const std::uint8_t*,
+      std::int32_t,
+      std::int32_t,
+      std::int32_t,
+      std::int32_t
+    ) override
+    {}
+    void UpdateStratumMask(
+      std::int32_t,
+      const std::uint8_t*
+    ) override
+    {}
+    void GetStratumMask(
+      std::int32_t,
+      std::uint8_t*
+    ) override
+    {
+      DieNoRenderer("GetStratumMask");
+    }
+    float GetLightingMultiplier() const override
+    {
+      return 1.5f;
+    }
+    void SetLightingMultiplier(
+      const float&
+    ) override
+    {}
+    Wm3::Vector3f GetSunDirection() const override
+    {
+      return Wm3::Vector3f{0.70700002f, 0.70700002f, 0.0f};
+    }
+    void SetSunDirection(
+      const Wm3::Vector3f&
+    ) override
+    {}
+    Wm3::Vector3f GetSunAmbience() const override
+    {
+      return Wm3::Vector3f{0.2f, 0.2f, 0.2f};
+    }
+    void SetSunAmbience(
+      const Wm3::Vector3f&
+    ) override
+    {}
+    Wm3::Vector3f GetSunColor() const override
+    {
+      return Wm3::Vector3f{1.0f, 1.0f, 1.0f};
+    }
+    void SetSunColor(
+      const Wm3::Vector3f&
+    ) override
+    {}
+    Wm3::Vector3f GetShadowFillColor() const override
+    {
+      return Wm3::Vector3f{0.69999999f, 0.69999999f, 0.75f};
+    }
+    void SetShadowFillColor(
+      const Wm3::Vector3f&
+    ) override
+    {}
+    moho::Vector4f GetSpecularColor() const override
+    {
+      return moho::Vector4f{};
+    }
+    void SetSpecularColor(
+      const moho::Vector4f&
+    ) override
+    {}
+    float GetBloom() const override
+    {
+      return 0.079999998f;
+    }
+    void SetBloom(
+      float
+    ) override
+    {}
+    const moho::SFogInfo& GetFogInfo() const override
+    {
+      DieNoRenderer("GetFogInfo");
+    }
+    void SetFogInfo(
+      const moho::SFogInfo&
+    ) override
+    {}
 
-    void WaterEnabled(const bool enabled) override { mMap->mWaterEnabled = enabled; }
-    void SetWaterElevation(const float elevation) override { mMap->mWaterElevation = elevation; }
-    void SetWaterElevationDeep(const float elevation) override { mMap->mWaterElevationDeep = elevation; }
-    void SetWaterElevationAbyss(const float elevation) override { mMap->mWaterElevationAbyss = elevation; }
+    void WaterEnabled(
+      const bool enabled
+    ) override
+    {
+      mMap->mWaterEnabled = enabled;
+    }
+    void SetWaterElevation(
+      const float elevation
+    ) override
+    {
+      mMap->mWaterElevation = elevation;
+    }
+    void SetWaterElevationDeep(
+      const float elevation
+    ) override
+    {
+      mMap->mWaterElevationDeep = elevation;
+    }
+    void SetWaterElevationAbyss(
+      const float elevation
+    ) override
+    {
+      mMap->mWaterElevationAbyss = elevation;
+    }
 
     /// CWldTerrainRes::SetPlayableMapRect (0x008A6DA0).
-    bool SetPlayableMapRect(const moho::VisibilityRect& rect) override
+    bool SetPlayableMapRect(
+      const moho::VisibilityRect& rect
+    ) override
     {
       moho::STIMap* const map = mMap;
       if (map == nullptr) {
@@ -311,33 +551,74 @@ namespace
     }
 
     /// CWldTerrainRes::GetPlayableMapRect.
-    const moho::VisibilityRect* GetPlayableMapRect(moho::VisibilityRect& outRect) const override
+    const moho::VisibilityRect* GetPlayableMapRect(
+      moho::VisibilityRect& outRect
+    ) const override
     {
       outRect = moho::VisibilityRect::FromRect2i(mMap->mPlayableRect);
       return &outRect;
     }
 
     /// CWldTerrainRes::IsInPlayableRect (0x008A6DD0).
-    bool IsInPlayableRect(const Wm3::Vec3f& worldPos) override
+    bool IsInPlayableRect(
+      const Wm3::Vec3f& worldPos
+    ) override
     {
       const gpg::Rect2i& playableRect = mMap->mPlayableRect;
       return static_cast<float>(playableRect.x0) <= worldPos.x && static_cast<float>(playableRect.z0) <= worldPos.z &&
-             worldPos.x <= static_cast<float>(playableRect.x1) && worldPos.z <= static_cast<float>(playableRect.z1);
+        worldPos.x <= static_cast<float>(playableRect.x1) && worldPos.z <= static_cast<float>(playableRect.z1);
     }
 
-    void SetWaterShaderProperties(const moho::CWaterShaderProperties&) override {}
-    moho::CWaterShaderProperties* GetWaterShaderProperties() override { return nullptr; }
-    std::uint8_t* GetWaterFoam() override { return nullptr; }
-    std::uint8_t* GetWaterFlatness() override { return nullptr; }
-    std::uint8_t* GetWaterDepthBias() override { return nullptr; }
-    bool IsInEditMode() const override { return false; }
-    void EnterEditMode(CBackgroundTaskControl&) override { DieNoRenderer("EnterEditMode"); }
+    void SetWaterShaderProperties(
+      const moho::CWaterShaderProperties&
+    ) override
+    {}
+    moho::CWaterShaderProperties* GetWaterShaderProperties() override
+    {
+      return nullptr;
+    }
+    std::uint8_t* GetWaterFoam() override
+    {
+      return nullptr;
+    }
+    std::uint8_t* GetWaterFlatness() override
+    {
+      return nullptr;
+    }
+    std::uint8_t* GetWaterDepthBias() override
+    {
+      return nullptr;
+    }
+    bool IsInEditMode() const override
+    {
+      return false;
+    }
+    void EnterEditMode(
+      CBackgroundTaskControl&
+    ) override
+    {
+      DieNoRenderer("EnterEditMode");
+    }
     void ExitEditMode() override {}
-    void SyncTerrain(const moho::CHeightField*) override {}
+    void SyncTerrain(
+      const moho::CHeightField*
+    ) override
+    {}
     bool Load(gpg::BinaryReader& reader, LuaPlus::LuaState* state, CBackgroundTaskControl& loadControl) override;
-    bool Save(gpg::BinaryWriter&) override { DieNoRenderer("Save"); }
-    bool Finalize() override { return false; }
-    moho::IDecalManager* GetDecalManager() override { return nullptr; }
+    bool Save(
+      gpg::BinaryWriter&
+    ) override
+    {
+      DieNoRenderer("Save");
+    }
+    bool Finalize() override
+    {
+      return false;
+    }
+    moho::IDecalManager* GetDecalManager() override
+    {
+      return nullptr;
+    }
 
   private:
     fa::string mSkycubeFile;
@@ -350,7 +631,9 @@ namespace
    * comment. The map data is built with the same calls.
    */
   bool CWldTerrainResHeadless::Load(
-    gpg::BinaryReader& reader, LuaPlus::LuaState* const state, CBackgroundTaskControl& loadControl
+    gpg::BinaryReader& reader,
+    LuaPlus::LuaState* const state,
+    CBackgroundTaskControl& loadControl
   )
   {
     std::uint32_t version = 0;

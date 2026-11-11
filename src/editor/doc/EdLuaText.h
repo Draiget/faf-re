@@ -27,13 +27,17 @@ namespace faf::editor
     [[nodiscard]] const LuaText* Field(const std::string& name) const;
     [[nodiscard]] bool IsNumber() const;
     [[nodiscard]] double Number(double fallback = 0.0) const;
-    [[nodiscard]] bool IsTrue() const { return atom == "true"; }
+    [[nodiscard]] bool IsTrue() const
+    {
+      return atom == "true";
+    }
   };
 
   /** The value that starts at `at` (after spaces and comments); false with `error`. */
   bool ReadLuaValue(const std::string& text, std::size_t at, LuaText& value, std::string& error);
 
-  /** A top-level `name = value` of a file, its value read; false when the file has no such assignment or it doesn't read. */
+  /** A top-level `name = value` of a file, its value read; false when the file has no such assignment or it doesn't
+   * read. */
   bool ReadLuaAssignment(const std::string& text, const std::string& name, LuaText& value, std::string& error);
 
   /** A number as a map file writes it: no trailing zeros, at most 3 decimals. */

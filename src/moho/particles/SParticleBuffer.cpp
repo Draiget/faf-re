@@ -12,6 +12,5 @@ namespace moho
     : mParticles()
     , mTrails()
     , mBeams()
-  {
-  }
+  {}
 } // namespace moho

@@ -8,12 +8,21 @@ namespace
 {
   using faf::editor::JsonNode;
 
-  TEST(FafApi, JsonReadsWhatTheApiWrites)
+  TEST(
+    FafApi,
+    JsonReadsWhatTheApiWrites
+  )
   {
     JsonNode root;
     std::string error;
-    ASSERT_TRUE(faf::editor::ParseJson(R"({"a": [1, 2.5, -3e2], "b": {"c": "x \"y\" {z}", "d": true, "e": null},
-      "u": "Café 😀", "n": "line\nnext"})", root, error)) << error;
+    ASSERT_TRUE(
+      faf::editor::ParseJson(
+        R"({"a": [1, 2.5, -3e2], "b": {"c": "x \"y\" {z}", "d": true, "e": null},
+      "u": "Café 😀", "n": "line\nnext"})",
+        root,
+        error
+      )
+    ) << error;
     ASSERT_NE(root.Get("a"), nullptr);
     ASSERT_EQ(root.Get("a")->items.size(), 3u);
     EXPECT_EQ(root.Get("a")->items[1].number, 2.5);
@@ -27,14 +36,19 @@ namespace
     EXPECT_FALSE(faf::editor::ParseJson(R"({"a": 1} x)", root, error));
   }
 
-  TEST(FafApi, SearchLink)
+  TEST(
+    FafApi,
+    SearchLink
+  )
   {
     faf::editor::VaultQuery query;
     query.text = "seton \"clutch\"";
     const std::string url = faf::editor::VaultSearchUrl(query, 2);
     EXPECT_EQ(url.rfind("https://api.faforever.com/data/map?filter=", 0), 0u);
     // displayName=="*seton clutch*";latestVersion.hidden==false, quotes in the text left out.
-    EXPECT_NE(url.find("displayName%3D%3D%22%2Aseton%20clutch%2A%22%3BlatestVersion.hidden%3D%3Dfalse"), std::string::npos) << url;
+    EXPECT_NE(
+      url.find("displayName%3D%3D%22%2Aseton%20clutch%2A%22%3BlatestVersion.hidden%3D%3Dfalse"), std::string::npos
+    ) << url;
     EXPECT_NE(url.find("&include=latestVersion,author"), std::string::npos);
     EXPECT_NE(url.find("page%5Bnumber%5D=2"), std::string::npos);
     EXPECT_NE(url.find("&sort=-gamesPlayed"), std::string::npos);
@@ -55,11 +69,14 @@ namespace
     filtered.rankedOnly = true;
     filtered.sortProperty = "latestVersion.createTime";
     filtered.descending = false;
-    EXPECT_EQ(faf::editor::VaultQueryFilter(filtered),
-              "displayName==\"*Dual*\";author.login==\"*Gator*\";latestVersion.updateTime=gt=\"2024-01-01T00:00:00Z\";"
-              "latestVersion.updateTime=lt=\"2025-06-30T00:00:00Z\";latestVersion.width=in=(\"512\",\"1024\");"
-              "latestVersion.height=in=(\"1024\");latestVersion.maxPlayers=ge=4;latestVersion.maxPlayers=le=8;"
-              "reviewsSummary.averageScore=ge=3.5;reviewsSummary.averageScore=le=4.5;latestVersion.ranked==\"true\";latestVersion.hidden==false");
+    EXPECT_EQ(
+      faf::editor::VaultQueryFilter(filtered),
+      "displayName==\"*Dual*\";author.login==\"*Gator*\";latestVersion.updateTime=gt=\"2024-01-01T00:00:00Z\";"
+      "latestVersion.updateTime=lt=\"2025-06-30T00:00:00Z\";latestVersion.width=in=(\"512\",\"1024\");"
+      "latestVersion.height=in=(\"1024\");latestVersion.maxPlayers=ge=4;latestVersion.maxPlayers=le=8;"
+      "reviewsSummary.averageScore=ge=3.5;reviewsSummary.averageScore=le=4.5;latestVersion.ranked==\"true\";"
+      "latestVersion.hidden==false"
+    );
     EXPECT_NE(faf::editor::VaultSearchUrl(filtered, 1).find("&sort=latestVersion.createTime&"), std::string::npos);
     // The range ends that mean "any" and a bad date add nothing.
     faf::editor::VaultQuery any;
@@ -72,7 +89,10 @@ namespace
     EXPECT_EQ(read, filtered);
   }
 
-  TEST(FafApi, SearchAnswerToMaps)
+  TEST(
+    FafApi,
+    SearchAnswerToMaps
+  )
   {
     // The JSON:API shape: maps in data, their latest versions and authors in included.
     const char* const answer = R"({

@@ -76,34 +76,6 @@ namespace moho
    */
   CScrLuaInitForm* func_ReconBlipIsKnownFake_LuaFuncDef();
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00BD4BE0 (FUN_00BD4BE0, register_sim_SimInits_mForms_prependStartupLane21)
    *
@@ -529,19 +501,6 @@ namespace moho
    */
   CScrLuaInitForm* register_DrawCircle_LuaFuncDef();
 
-
-
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x00BD8790 (FUN_00BD8790, register_moho_weapon_methods)
    *
@@ -657,15 +616,4 @@ namespace moho
    */
   CScrLuaInitForm* register_ReconBlipIsKnownFake_LuaFuncDef();
 
-
-
-
-
-
-
-
-
 } // namespace moho
-
-
-

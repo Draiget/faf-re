@@ -24,6 +24,10 @@ namespace faf::editor
    * `bytes` with each image `keep` marks replaced by the same-numbered one of `originals` (each a whole chunk, length
    * first). Nothing changes when the counts differ.
    */
-  std::string WithOriginalImages(const std::string& bytes, const std::vector<ImageChunk>& chunks, const std::vector<std::string>& originals,
-                                 const std::vector<bool>& keep);
+  std::string WithOriginalImages(
+    const std::string& bytes,
+    const std::vector<ImageChunk>& chunks,
+    const std::vector<std::string>& originals,
+    const std::vector<bool>& keep
+  );
 } // namespace faf::editor

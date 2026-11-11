@@ -29,10 +29,12 @@ namespace moho
   };
 
   static_assert(
-    offsetof(SRangeExtractionPayload, centerX) == 0x00, "SRangeExtractionPayload::centerX offset must be 0x00"
+    offsetof(SRangeExtractionPayload, centerX) == 0x00,
+    "SRangeExtractionPayload::centerX offset must be 0x00"
   );
   static_assert(
-    offsetof(SRangeExtractionPayload, centerZ) == 0x04, "SRangeExtractionPayload::centerZ offset must be 0x04"
+    offsetof(SRangeExtractionPayload, centerZ) == 0x04,
+    "SRangeExtractionPayload::centerZ offset must be 0x04"
   );
   static_assert(
     offsetof(SRangeExtractionPayload, innerRadius) == 0x08,

@@ -25,12 +25,10 @@
 namespace
 {
 
-
   struct DestroyInstanceVtableTag
   {
     virtual ~DestroyInstanceVtableTag() = default;
   };
-
 
   struct SurfaceVtableResetTag
   {
@@ -48,10 +46,6 @@ namespace
     moho::MeshRenderer* instance;
   };
 
-
-
-
-
   DestroyInstanceVtableTag gDestroyInstanceVtableTag{};
   SurfaceVtableResetTag gSurfaceVtableResetTag{};
   SeedVtableResetTag gSeedVtableResetTag{};
@@ -66,9 +60,6 @@ namespace
   {
     return *reinterpret_cast<void**>(&gDestroyInstanceVtableTag);
   }
-
-
-
 
   /**
    * Address: 0x007D9820 (FUN_007D9820)
@@ -91,14 +82,15 @@ namespace
     return outLane;
   }
 
-
   /**
    * Address: 0x007D5EA0 (FUN_007D5EA0)
    *
    * What it does:
    * Resets one destroy-instance helper lane to the `DestroyInstance` vtable.
    */
-  void ResetDestroyInstanceLaneVtable(DestroyInstanceLane* const lane) noexcept
+  void ResetDestroyInstanceLaneVtable(
+    DestroyInstanceLane* const lane
+  ) noexcept
   {
     if (lane == nullptr) {
       return;
@@ -149,12 +141,16 @@ namespace
     return static_cast<float>(static_cast<double>(randomWord) * kInvTwoTo32);
   }
 
-  [[nodiscard]] int AlignDownToEven(const int value) noexcept
+  [[nodiscard]] int AlignDownToEven(
+    const int value
+  ) noexcept
   {
     return (value % 2 != 0) ? (value - 1) : value;
   }
 
-  [[nodiscard]] int AlignUpToEven(const int value) noexcept
+  [[nodiscard]] int AlignUpToEven(
+    const int value
+  ) noexcept
   {
     return (value % 2 != 0) ? (value + 1) : value;
   }
@@ -171,9 +167,8 @@ namespace
 
     const int clampedX = std::clamp(x, 0, heightField.width - 1);
     const int clampedZ = std::clamp(z, 0, heightField.height - 1);
-    const std::size_t sampleIndex =
-      static_cast<std::size_t>(clampedZ) * static_cast<std::size_t>(heightField.width)
-      + static_cast<std::size_t>(clampedX);
+    const std::size_t sampleIndex = static_cast<std::size_t>(clampedZ) * static_cast<std::size_t>(heightField.width) +
+      static_cast<std::size_t>(clampedX);
 
     constexpr float kHeightWordScale = 0.0078125f;
     return static_cast<float>(heightField.data[sampleIndex]) * kHeightWordScale;
@@ -220,8 +215,7 @@ namespace
     }
 
     const std::size_t terrainIndex =
-      static_cast<std::size_t>(z) * static_cast<std::size_t>(map.mTerrainType.width)
-      + static_cast<std::size_t>(x);
+      static_cast<std::size_t>(z) * static_cast<std::size_t>(map.mTerrainType.width) + static_cast<std::size_t>(x);
     return map.mTerrainType.data[terrainIndex];
   }
 
@@ -243,7 +237,6 @@ namespace
     ResetDestroyInstanceLaneVtable(&destroyLane);
   }
 
-
   [[nodiscard]] moho::ClutterRegion* AllocateRegionPoolBlock()
   {
     constexpr std::uint32_t kRegionPoolCount = 128u;
@@ -253,8 +246,7 @@ namespace
     );
     *reinterpret_cast<std::uint32_t*>(rawStorage) = kRegionPoolCount;
 
-    auto* const regionBase =
-      reinterpret_cast<moho::ClutterRegion*>(rawStorage + sizeof(std::uint32_t));
+    auto* const regionBase = reinterpret_cast<moho::ClutterRegion*>(rawStorage + sizeof(std::uint32_t));
     std::uint32_t constructedCount = 0u;
 
     try {
@@ -276,7 +268,9 @@ namespace
   /**
    * Address: 0x007D60C0 (FUN_007D60C0)
    */
-  void ResetClutterSeedVtable(moho::ClutterSurfaceElement* const seed)
+  void ResetClutterSeedVtable(
+    moho::ClutterSurfaceElement* const seed
+  )
   {
     seed->vtable = reinterpret_cast<moho::ClutterSurfaceElementVTable*>(SeedVtableResetToken());
   }
@@ -405,7 +399,9 @@ namespace moho
    * non-trivially-copyable), but without this operator the loop would fall
    * back to the implicit, all-4-field copy-assignment.
    */
-  ClutterSurfaceElement& ClutterSurfaceElement::operator=(const ClutterSurfaceElement& rhs)
+  ClutterSurfaceElement& ClutterSurfaceElement::operator=(
+    const ClutterSurfaceElement& rhs
+  )
   {
     selectionWeight = rhs.selectionWeight;
     uniformScale = rhs.uniformScale;
@@ -456,8 +452,7 @@ namespace moho
   ClutterSurfaceEntry::ClutterSurfaceEntry()
     : vtable(SurfaceVtableResetToken())
     , density(0)
-  {
-  }
+  {}
 
   /**
    * Address: 0x007D5D10 (FUN_007D5D10)
@@ -493,7 +488,6 @@ namespace moho
   Clutter::Clutter()
   {
 
-
     // mSurfaces[256] (moho::ClutterSurfaceEntry, real ctor above) is
     // default-constructed automatically here, matching the real binary's
     // `` `eh vector constructor iterator' `` call in this constructor.
@@ -514,14 +508,10 @@ namespace moho
   {
     Shutdown();
 
-
-
     // mSurfaces[256] (moho::ClutterSurfaceEntry, real dtor above) is
     // destroyed automatically as part of this destructor's implicit member
     // teardown, matching the real binary's `` `eh vector destructor
     // iterator' `` call in `~Clutter`.
-
-
   }
 
   /**
@@ -531,7 +521,9 @@ namespace moho
    * Runs one clutter update frame by culling stale regions first, then
    * generating new visible region clutter from terrain data.
    */
-  void Clutter::Update(const GeomCamera3* const camera)
+  void Clutter::Update(
+    const GeomCamera3* const camera
+  )
   {
     UpdateCurrent(camera);
     GenerateNew(camera);
@@ -544,7 +536,10 @@ namespace moho
    * Returns whether one region AABB is close enough to the camera and inside
    * the camera frustum-solid lane.
    */
-  bool Clutter::IsVisible(const GeomCamera3* const camera, const Wm3::AxisAlignedBox3f& regionBox)
+  bool Clutter::IsVisible(
+    const GeomCamera3* const camera,
+    const Wm3::AxisAlignedBox3f& regionBox
+  )
   {
     const float centerX = (regionBox.Min.x + regionBox.Max.x) * 0.5f;
     const float centerY = (regionBox.Min.y + regionBox.Max.y) * 0.5f;
@@ -568,7 +563,10 @@ namespace moho
    * Returns visibility state for one clutter region by delegating to AABB
    * visibility test using the region's box lane.
    */
-  bool Clutter::IsVisible(const GeomCamera3* const camera, const ClutterRegion* const region)
+  bool Clutter::IsVisible(
+    const GeomCamera3* const camera,
+    const ClutterRegion* const region
+  )
   {
     return region != nullptr && IsVisible(camera, region->mBox);
   }
@@ -580,7 +578,9 @@ namespace moho
    * Walks the active-region chain and destroys regions that are outside clutter
    * distance radius or no longer intersect the camera frustum solid.
    */
-  void Clutter::UpdateCurrent(const GeomCamera3* const camera)
+  void Clutter::UpdateCurrent(
+    const GeomCamera3* const camera
+  )
   {
     ClutterRegion* currentRegion = mCurRegion;
     while (currentRegion != nullptr) {
@@ -600,7 +600,9 @@ namespace moho
    * Scans 2x2 terrain tiles around the camera clutter radius, creates missing
    * visible regions, and populates each region from four sampled terrain types.
    */
-  void Clutter::GenerateNew(const GeomCamera3* const camera)
+  void Clutter::GenerateNew(
+    const GeomCamera3* const camera
+  )
   {
     (void)MeshRenderer::GetInstance();
 
@@ -656,22 +658,18 @@ namespace moho
         const std::uint8_t terrain10 = GetTerrainTypeAtOrDefault(*terrainMap, x + 1, z);
         const std::uint8_t terrain11 = GetTerrainTypeAtOrDefault(*terrainMap, x + 1, z + 1);
 
-        const float density00 = static_cast<float>(
-                                  (terrain00 == terrain01) + (terrain00 == terrain10) + (terrain00 == terrain11) + 1
-                                )
-                              * 0.25f;
-        const float density01 = static_cast<float>(
-                                  (terrain01 == terrain00) + (terrain01 == terrain10) + (terrain01 == terrain11) + 1
-                                )
-                              * 0.25f;
-        const float density10 = static_cast<float>(
-                                  (terrain10 == terrain00) + (terrain10 == terrain01) + (terrain10 == terrain11) + 1
-                                )
-                              * 0.25f;
-        const float density11 = static_cast<float>(
-                                  (terrain11 == terrain00) + (terrain11 == terrain01) + (terrain11 == terrain10) + 1
-                                )
-                              * 0.25f;
+        const float density00 =
+          static_cast<float>((terrain00 == terrain01) + (terrain00 == terrain10) + (terrain00 == terrain11) + 1) *
+          0.25f;
+        const float density01 =
+          static_cast<float>((terrain01 == terrain00) + (terrain01 == terrain10) + (terrain01 == terrain11) + 1) *
+          0.25f;
+        const float density10 =
+          static_cast<float>((terrain10 == terrain00) + (terrain10 == terrain01) + (terrain10 == terrain11) + 1) *
+          0.25f;
+        const float density11 =
+          static_cast<float>((terrain11 == terrain00) + (terrain11 == terrain01) + (terrain11 == terrain10) + 1) *
+          0.25f;
 
         PopulateRegionClutter(camera, *heightField, region, density00, GetSurface(terrain00));
         PopulateRegionClutter(camera, *heightField, region, density01, GetSurface(terrain01));
@@ -687,7 +685,10 @@ namespace moho
    * What it does:
    * Binds each mesh instance in the region to the supplied camera.
    */
-  void Clutter::UpdateRegion(const GeomCamera3* const camera, ClutterRegion* const region)
+  void Clutter::UpdateRegion(
+    const GeomCamera3* const camera,
+    ClutterRegion* const region
+  )
   {
     for (void* const entry : region->mMap) {
       static_cast<MeshInstance*>(entry)->visibilityCamera = camera;
@@ -700,7 +701,10 @@ namespace moho
    * What it does:
    * Probes the region-key RB-tree for one exact `(x,z)` key match.
    */
-  bool Clutter::IsCluttered(const int x, const int z)
+  bool Clutter::IsCluttered(
+    const int x,
+    const int z
+  )
   {
     return mKeys.find(ClutterRegionKey(x, z)) != mKeys.end();
   }
@@ -753,7 +757,9 @@ namespace moho
   /**
    * Address: 0x007D7150 (FUN_007D7150, ?GetSurface@Clutter@Moho@@AAEABVSurface@12@E@Z)
    */
-  const ClutterSurfaceEntry& Clutter::GetSurface(const std::uint8_t terrainType)
+  const ClutterSurfaceEntry& Clutter::GetSurface(
+    const std::uint8_t terrainType
+  )
   {
     if (mBuffer[terrainType] != 0u) {
       return mSurfaces[terrainType];
@@ -800,7 +806,8 @@ namespace moho
   }
 
   /**
-   * Address: 0x007D7430 (FUN_007D7430, ?ClutterRegion@Clutter@Moho@@AAEXPBVGeomCamera3@2@ABVCHeightField@2@PAVRegion@12@MABVSurface@12@@Z)
+   * Address: 0x007D7430 (FUN_007D7430,
+   * ?ClutterRegion@Clutter@Moho@@AAEXPBVGeomCamera3@2@ABVCHeightField@2@PAVRegion@12@MABVSurface@12@@Z)
    */
   void Clutter::PopulateRegionClutter(
     const GeomCamera3* const camera,
@@ -877,7 +884,9 @@ namespace moho
    * Detaches one region node from the active doubly-linked chain and updates
    * `mCurRegion` when it points at the removed node.
    */
-  void Clutter::UnlinkRegion(ClutterRegion* const region)
+  void Clutter::UnlinkRegion(
+    ClutterRegion* const region
+  )
   {
     if (mCurRegion == region) {
       mCurRegion = region->mNext;
@@ -901,7 +910,11 @@ namespace moho
    * recycled region, links it as current, writes coordinates/bounds, and
    * inserts the corresponding key into the region-key tree.
    */
-  ClutterRegion* Clutter::CreateRegion(const int x, const int z, const Wm3::AxisAlignedBox3f& box)
+  ClutterRegion* Clutter::CreateRegion(
+    const int x,
+    const int z,
+    const Wm3::AxisAlignedBox3f& box
+  )
   {
     constexpr std::uint32_t kRegionPoolCount = 128u;
 
@@ -940,7 +953,9 @@ namespace moho
   /**
    * Address: 0x007D7080 (FUN_007D7080, ?DestroyRegion@Clutter@Moho@@AAEXPAVRegion@12@@Z)
    */
-  void Clutter::DestroyRegion(ClutterRegion* const region)
+  void Clutter::DestroyRegion(
+    ClutterRegion* const region
+  )
   {
     (void)mKeys.erase(ClutterRegionKey(*region));
 
@@ -1007,7 +1022,6 @@ namespace moho
   }
 } // namespace moho
 
-
 namespace moho
 {
   /**
@@ -1016,9 +1030,10 @@ namespace moho
    * What it does:
    * Builds one region key from a live region's grid coordinates.
    */
-  ClutterRegionKey::ClutterRegionKey(const ClutterRegion& region) noexcept
+  ClutterRegionKey::ClutterRegionKey(
+    const ClutterRegion& region
+  ) noexcept
     : mX(region.mX)
     , mZ(region.mZ)
-  {
-  }
+  {}
 } // namespace moho

@@ -13,7 +13,7 @@ namespace moho::runtime
     constexpr HRESULT kHrInvalidArg = static_cast<HRESULT>(0x80070057u);
     constexpr HRESULT kHrInsufficientBuffer = static_cast<HRESULT>(0x8007007Au);
 
-  }
+  } // namespace
 
   /**
    * Address: 0x00B2CCDC (FUN_00B2CCDC)
@@ -22,7 +22,11 @@ namespace moho::runtime
    * Copies one narrow string into a bounded destination and always writes a
    * trailing NUL when destination capacity is non-zero.
    */
-  HRESULT __stdcall StrSafeCopyNarrowWorker(char* destination, int destinationChars, const char* source)
+  HRESULT __stdcall StrSafeCopyNarrowWorker(
+    char* destination,
+    int destinationChars,
+    const char* source
+  )
   {
     HRESULT result = kHrOk;
     if (destinationChars == 0) {
@@ -56,7 +60,11 @@ namespace moho::runtime
    * Copies one wide string into a bounded destination and always writes a
    * trailing NUL when destination capacity is non-zero.
    */
-  HRESULT __stdcall StrSafeCopyWideWorker(wchar_t* destination, int destinationChars, const wchar_t* source)
+  HRESULT __stdcall StrSafeCopyWideWorker(
+    wchar_t* destination,
+    int destinationChars,
+    const wchar_t* source
+  )
   {
     HRESULT result = kHrOk;
     if (destinationChars == 0) {
@@ -230,7 +238,11 @@ namespace moho::runtime
    * Validates narrow destination-count range and forwards to the strsafe copy
    * worker.
    */
-  HRESULT __stdcall StrSafeCopyNarrow(char* destination, unsigned int destinationChars, const char* source)
+  HRESULT __stdcall StrSafeCopyNarrow(
+    char* destination,
+    unsigned int destinationChars,
+    const char* source
+  )
   {
     if (destinationChars <= static_cast<unsigned int>(INT_MAX)) {
       return StrSafeCopyNarrowWorker(destination, static_cast<int>(destinationChars), source);
@@ -246,7 +258,11 @@ namespace moho::runtime
    * Validates wide destination-count range and forwards to the strsafe copy
    * worker.
    */
-  HRESULT __stdcall StrSafeCopyWide(wchar_t* destination, unsigned int destinationChars, const wchar_t* source)
+  HRESULT __stdcall StrSafeCopyWide(
+    wchar_t* destination,
+    unsigned int destinationChars,
+    const wchar_t* source
+  )
   {
     if (destinationChars <= static_cast<unsigned int>(INT_MAX)) {
       return StrSafeCopyWideWorker(destination, static_cast<int>(destinationChars), source);
@@ -261,7 +277,12 @@ namespace moho::runtime
    * What it does:
    * Narrow variadic strsafe printf wrapper.
    */
-  HRESULT __cdecl StrSafePrintfNarrow(char* destination, unsigned int destinationChars, const char* format, ...)
+  HRESULT __cdecl StrSafePrintfNarrow(
+    char* destination,
+    unsigned int destinationChars,
+    const char* format,
+    ...
+  )
   {
     va_list args;
     va_start(args, format);
@@ -281,7 +302,12 @@ namespace moho::runtime
    * What it does:
    * Wide variadic strsafe printf wrapper.
    */
-  HRESULT __cdecl StrSafePrintfWide(wchar_t* destination, unsigned int destinationChars, const wchar_t* format, ...)
+  HRESULT __cdecl StrSafePrintfWide(
+    wchar_t* destination,
+    unsigned int destinationChars,
+    const wchar_t* format,
+    ...
+  )
   {
     va_list args;
     va_start(args, format);
@@ -301,7 +327,11 @@ namespace moho::runtime
    * What it does:
    * Validates narrow pointer/count lanes and forwards to bounded length worker.
    */
-  HRESULT __stdcall StrSafeLengthNarrow(const char* text, unsigned int maxChars, unsigned int* outLength)
+  HRESULT __stdcall StrSafeLengthNarrow(
+    const char* text,
+    unsigned int maxChars,
+    unsigned int* outLength
+  )
   {
     if (text != nullptr && maxChars <= static_cast<unsigned int>(INT_MAX)) {
       return StrSafeLengthNarrowWorker(text, static_cast<int>(maxChars), outLength);
@@ -316,7 +346,11 @@ namespace moho::runtime
    * What it does:
    * Validates wide pointer/count lanes and forwards to bounded length worker.
    */
-  HRESULT __stdcall StrSafeLengthWide(const wchar_t* text, unsigned int maxChars, unsigned int* outLength)
+  HRESULT __stdcall StrSafeLengthWide(
+    const wchar_t* text,
+    unsigned int maxChars,
+    unsigned int* outLength
+  )
   {
     if (text != nullptr && maxChars <= static_cast<unsigned int>(INT_MAX)) {
       return StrSafeLengthWideWorker(text, static_cast<int>(maxChars), outLength);

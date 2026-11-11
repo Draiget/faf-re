@@ -16,25 +16,25 @@ namespace platform::window
 
   enum class EventType : std::uint8_t
   {
-    None,         // nothing for the engine (an event the window system keeps to itself)
+    None, // nothing for the engine (an event the window system keeps to itself)
     CloseRequested,
-    Moved,        // x, y: the window's new screen position
-    Resized,      // width, height: the new client size in pixels
+    Moved,   // x, y: the window's new screen position
+    Resized, // width, height: the new client size in pixels
     Minimized,
-    Restored,     // shown again after Minimized, or un-maximized
+    Restored, // shown again after Minimized, or un-maximized
     Maximized,
     FocusGained,
     FocusLost,
-    Exposed,      // the window needs drawing
+    Exposed, // the window needs drawing
     MouseEnter,
     MouseLeave,
-    MouseMove,    // x, y: client coordinates in pixels
-    MouseDown,    // button, clicks (2 for a double click), x, y
-    MouseUp,      // button, x, y
-    MouseWheel,   // wheel (notches, positive away from the user), x, y
-    KeyDown,      // virtualKey, repeat
-    KeyUp,        // virtualKey
-    Text,         // codepoint: one typed character
+    MouseMove,  // x, y: client coordinates in pixels
+    MouseDown,  // button, clicks (2 for a double click), x, y
+    MouseUp,    // button, x, y
+    MouseWheel, // wheel (notches, positive away from the user), x, y
+    KeyDown,    // virtualKey, repeat
+    KeyUp,      // virtualKey
+    Text,       // codepoint: one typed character
     DisplaysChanged,
   };
 

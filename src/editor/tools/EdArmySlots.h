@@ -13,8 +13,13 @@ namespace faf::editor
    * Each slot's mirror under the symmetry: the slot whose start is nearest its start's first copy (-1 when the slot has
    * no start, the symmetry makes no copy, or the nearest is itself). `starts` is by slot, x and z.
    */
-  std::vector<int> MirrorPartners(const std::vector<std::optional<std::array<float, 2>>>& starts, int width, int height,
-                                  Symmetry symmetry, int turns);
+  std::vector<int> MirrorPartners(
+    const std::vector<std::optional<std::array<float, 2>>>& starts,
+    int width,
+    int height,
+    Symmetry symmetry,
+    int turns
+  );
 
   /**
    * The slot order with each start followed by its mirror, the pairs in the order their first slot had: so slots 1 and

@@ -23,7 +23,10 @@
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaInitForm.h"
 
-int main(int argc, char** argv)
+int main(
+  int argc,
+  char** argv
+)
 {
   std::FILE* out = stdout;
   if (argc > 1) {
@@ -41,7 +44,9 @@ int main(int argc, char** argv)
     ++sets;
     for (const moho::CScrLuaInitForm* form = set->mForms; form != nullptr; form = form->mNextInSet) {
       std::fprintf(
-        out, "  form %s [%s]\n", form->mName != nullptr ? form->mName : "(null)",
+        out,
+        "  form %s [%s]\n",
+        form->mName != nullptr ? form->mName : "(null)",
         form->mGroupName != nullptr ? form->mGroupName : "(null)"
       );
       ++forms;
@@ -70,7 +75,11 @@ int main(int argc, char** argv)
   std::fprintf(out, "commands\n%s\n", commands.c_str());
 
   std::fprintf(
-    stderr, "%d Lua init sets, %d forms, %d reflection types, %zu pre-registered\n", sets, forms, types,
+    stderr,
+    "%d Lua init sets, %d forms, %d reflection types, %zu pre-registered\n",
+    sets,
+    forms,
+    types,
     preregistered.size()
   );
   if (out != stdout) {

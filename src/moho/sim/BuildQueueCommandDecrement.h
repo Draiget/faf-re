@@ -27,4 +27,4 @@ namespace moho
   // events). Bridges to the recovered ResolveHelperBuildCount (FUN_008B4220) in
   // UserUnit.cpp, which owns the helper event-ring decomposition.
   std::int32_t QueuedBuildCommandCount(const UserCommandIssueHelper& helper) noexcept;
-}
+} // namespace moho

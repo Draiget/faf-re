@@ -30,22 +30,48 @@ public:
   );
   ~wxWindow() override;
 
-  wxWindow* GetParent() const { return m_parent; }
-  WXWidget GetHandle() const { return m_handle; }
-  WXWidget GetHWND() const { return m_handle; }
+  wxWindow* GetParent() const
+  {
+    return m_parent;
+  }
+  WXWidget GetHandle() const
+  {
+    return m_handle;
+  }
+  WXWidget GetHWND() const
+  {
+    return m_handle;
+  }
   // Set by the window system (issue #256) when it creates the native window.
-  void SetHandle(WXWidget const handle) { m_handle = handle; }
+  void SetHandle(
+    WXWidget const handle
+  )
+  {
+    m_handle = handle;
+  }
 
   virtual bool Show(bool show = true);
   // wx 2.4.2 deletes a window at once unless it is a top-level one; nothing here defers.
   virtual bool Destroy();
-  bool IsShown() const { return m_shown; }
+  bool IsShown() const
+  {
+    return m_shown;
+  }
   // The window that gets the keyboard and mouse events of its top-level window.
   virtual void SetFocus();
   static wxWindow* FindFocus();
-  const std::vector<wxWindow*>& GetChildren() const { return m_children; }
-  bool IsTopLevel() const { return m_topLevel; }
-  virtual void Refresh(bool eraseBackground = true, const wxRect* rect = nullptr)
+  const std::vector<wxWindow*>& GetChildren() const
+  {
+    return m_children;
+  }
+  bool IsTopLevel() const
+  {
+    return m_topLevel;
+  }
+  virtual void Refresh(
+    bool eraseBackground = true,
+    const wxRect* rect = nullptr
+  )
   {
     (void)eraseBackground;
     (void)rect;
@@ -54,12 +80,32 @@ public:
   void SetSize(int width, int height);
   // wx 2.4.2: -1 keeps a coordinate or dimension as it is (with wxSIZE_USE_EXISTING).
   void SetSize(int x, int y, int width, int height, int sizeFlags = 0);
-  void Move(int x, int y) { SetSize(x, y, -1, -1); }
-  wxSize GetSize() const { return GetClientSize(); }
-  wxPoint GetPosition() const { return wxPoint(m_screenX, m_screenY); }
+  void Move(
+    int x,
+    int y
+  )
+  {
+    SetSize(x, y, -1, -1);
+  }
+  wxSize GetSize() const
+  {
+    return GetClientSize();
+  }
+  wxPoint GetPosition() const
+  {
+    return wxPoint(m_screenX, m_screenY);
+  }
 
-  wxEvtHandler* GetEventHandler() const { return m_eventHandler; }
-  void SetEventHandler(wxEvtHandler* const handler) { m_eventHandler = handler; }
+  wxEvtHandler* GetEventHandler() const
+  {
+    return m_eventHandler;
+  }
+  void SetEventHandler(
+    wxEvtHandler* const handler
+  )
+  {
+    m_eventHandler = handler;
+  }
 
   // src/common/wincmn.cpp 2.4.2: the new handler sees events first, then passes them on.
   void PushEventHandler(wxEvtHandler* handler);

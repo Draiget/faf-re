@@ -15,7 +15,9 @@ namespace faf::editor
 {
   namespace
   {
-    std::string Lower(std::string text)
+    std::string Lower(
+      std::string text
+    )
     {
       for (char& c : text) {
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -23,14 +25,20 @@ namespace faf::editor
       return text;
     }
 
-    std::uint32_t Get32(const std::string& data, const std::size_t at)
+    std::uint32_t Get32(
+      const std::string& data,
+      const std::size_t at
+    )
     {
       std::uint32_t value = 0;
       std::memcpy(&value, data.data() + at, sizeof(value));
       return value;
     }
 
-    std::uint16_t Get16(const std::string& data, const std::size_t at)
+    std::uint16_t Get16(
+      const std::string& data,
+      const std::size_t at
+    )
     {
       std::uint16_t value = 0;
       std::memcpy(&value, data.data() + at, sizeof(value));
@@ -38,8 +46,13 @@ namespace faf::editor
     }
 
     /** `url` (https) into `body`; false with `error`. `received` follows the bytes as they come. */
-    bool HttpGet(const std::string& url, std::string& body, std::string& error, std::atomic<std::uint64_t>& received,
-                 std::atomic<std::uint64_t>& total)
+    bool HttpGet(
+      const std::string& url,
+      std::string& body,
+      std::string& error,
+      std::atomic<std::uint64_t>& received,
+      std::atomic<std::uint64_t>& total
+    )
     {
       HttpCall call;
       call.url = url;
@@ -55,7 +68,11 @@ namespace faf::editor
     }
   } // namespace
 
-  bool ParseVaultMapName(const std::string& text, VaultMapName& out, std::string& error)
+  bool ParseVaultMapName(
+    const std::string& text,
+    VaultMapName& out,
+    std::string& error
+  )
   {
     std::string name = text;
     while (!name.empty() && std::isspace(static_cast<unsigned char>(name.back())) != 0) {
@@ -75,8 +92,10 @@ namespace faf::editor
     // The vault's folder names: letters, digits and _ . - (spaces and quotes are written as %20 and the like).
     std::string decoded;
     for (std::size_t i = 0; i < name.size(); ++i) {
-      if (name[i] == '%' && i + 2 < name.size() && std::isxdigit(static_cast<unsigned char>(name[i + 1])) != 0 &&
-          std::isxdigit(static_cast<unsigned char>(name[i + 2])) != 0) {
+      if (
+        name[i] == '%' && i + 2 < name.size() && std::isxdigit(static_cast<unsigned char>(name[i + 1])) != 0 &&
+        std::isxdigit(static_cast<unsigned char>(name[i + 2])) != 0
+      ) {
         decoded += static_cast<char>(std::stoi(name.substr(i + 1, 2), nullptr, 16));
         i += 2;
       } else {
@@ -84,8 +103,9 @@ namespace faf::editor
       }
     }
     name = decoded;
-    if (name.empty() || name == "." || name == ".." ||
-        std::any_of(name.begin(), name.end(), [](const char c) { return c == '\\' || c == ':' || static_cast<unsigned char>(c) < 32; })) {
+    if (name.empty() || name == "." || name == ".." || std::any_of(name.begin(), name.end(), [](const char c) {
+      return c == '\\' || c == ':' || static_cast<unsigned char>(c) < 32;
+    })) {
       error = "give a vault map's folder name (dualgap_adaptive.v0012) or its download link";
       return false;
     }
@@ -108,11 +128,17 @@ namespace faf::editor
     return true;
   }
 
-  bool ReadZip(const std::string& zip, std::vector<ZipEntry>& entries, std::string& error)
+  bool ReadZip(
+    const std::string& zip,
+    std::vector<ZipEntry>& entries,
+    std::string& error
+  )
   {
     // The end of central directory record: its signature within the last 64 KB and 22 bytes.
     std::size_t end = std::string::npos;
-    for (std::size_t at = zip.size() >= 22 ? zip.size() - 22 : std::string::npos; at != std::string::npos && zip.size() - at <= 65557; --at) {
+    for (std::size_t at = zip.size() >= 22 ? zip.size() - 22 : std::string::npos;
+         at != std::string::npos && zip.size() - at <= 65557;
+         --at) {
       if (Get32(zip, at) == 0x06054B50u) {
         end = at;
         break;
@@ -166,14 +192,16 @@ namespace faf::editor
         stream.avail_in = packed;
         stream.next_out = reinterpret_cast<Bytef*>(entry.data.data());
         stream.avail_out = size;
-        const bool inflated = inflateInit2(&stream, -MAX_WBITS) == Z_OK && inflate(&stream, Z_FINISH) == Z_STREAM_END && stream.total_out == size;
+        const bool inflated = inflateInit2(&stream, -MAX_WBITS) == Z_OK && inflate(&stream, Z_FINISH) == Z_STREAM_END &&
+          stream.total_out == size;
         inflateEnd(&stream);
         if (!inflated) {
           error = "the archive's entry " + entry.name + " doesn't unpack";
           return false;
         }
       } else {
-        error = "the archive's entry " + entry.name + " is packed in a way the editor can't read (method " + std::to_string(method) + ")";
+        error = "the archive's entry " + entry.name + " is packed in a way the editor can't read (method " +
+          std::to_string(method) + ")";
         return false;
       }
       if (crc32(0, reinterpret_cast<const Bytef*>(entry.data.data()), static_cast<uInt>(entry.data.size())) != crc) {
@@ -185,7 +213,10 @@ namespace faf::editor
     return true;
   }
 
-  std::string MapEntryPath(const std::string& entry, const std::string& folder)
+  std::string MapEntryPath(
+    const std::string& entry,
+    const std::string& folder
+  )
   {
     std::string path = entry;
     std::replace(path.begin(), path.end(), '\\', '/');
@@ -212,7 +243,12 @@ namespace faf::editor
     return rest;
   }
 
-  bool InstallMapZip(const std::string& zip, const std::string& folder, const std::filesystem::path& mapsFolder, std::string& error)
+  bool InstallMapZip(
+    const std::string& zip,
+    const std::string& folder,
+    const std::filesystem::path& mapsFolder,
+    std::string& error
+  )
   {
     std::vector<ZipEntry> entries;
     if (!ReadZip(zip, entries, error)) {
@@ -229,8 +265,9 @@ namespace faf::editor
         error = "the archive holds " + entry.name + ", outside the map's folder " + folder;
         return false;
       }
-      scenario = scenario || (path.find('/') == std::string::npos && Lower(path).size() > 13 &&
-                              Lower(path).compare(path.size() - 13, 13, "_scenario.lua") == 0);
+      scenario = scenario ||
+        (path.find('/') == std::string::npos && Lower(path).size() > 13 &&
+         Lower(path).compare(path.size() - 13, 13, "_scenario.lua") == 0);
       files.emplace_back(path, &entry);
     }
     if (!scenario) {
@@ -259,7 +296,10 @@ namespace faf::editor
     }
   }
 
-  bool EdVaultDownload::Start(const VaultMapName& map, const std::filesystem::path& mapsFolder)
+  bool EdVaultDownload::Start(
+    const VaultMapName& map,
+    const std::filesystem::path& mapsFolder
+  )
   {
     if (mState.load() == State::Working) {
       return false;
@@ -273,7 +313,9 @@ namespace faf::editor
     mTotal = 0;
     SetMessage("Downloading " + map.folder);
     mState = State::Working;
-    mThread = std::thread([this] { Run(); });
+    mThread = std::thread([this] {
+      Run();
+    });
     return true;
   }
 
@@ -302,7 +344,9 @@ namespace faf::editor
     return mMessage;
   }
 
-  void EdVaultDownload::SetMessage(std::string message)
+  void EdVaultDownload::SetMessage(
+    std::string message
+  )
   {
     std::lock_guard<std::mutex> lock(mLock);
     mMessage = std::move(message);

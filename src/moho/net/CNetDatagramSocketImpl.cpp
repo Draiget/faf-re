@@ -31,7 +31,10 @@ CNetDatagramSocketImpl::~CNetDatagramSocketImpl()
  * What it does:
  * Broadcast helper that forwards to `Send(..., -1, port)`.
  */
-void CNetDatagramSocketImpl::SendDefault(CMessage* msg, const u_short port)
+void CNetDatagramSocketImpl::SendDefault(
+  CMessage* msg,
+  const u_short port
+)
 {
   Send(msg, static_cast<u_long>(-1), port);
 }
@@ -43,7 +46,11 @@ void CNetDatagramSocketImpl::SendDefault(CMessage* msg, const u_short port)
  * What it does:
  * Sends one UDP datagram and logs truncation/errors.
  */
-void CNetDatagramSocketImpl::Send(CMessage* msg, const u_long address, const u_short port)
+void CNetDatagramSocketImpl::Send(
+  CMessage* msg,
+  const u_long address,
+  const u_short port
+)
 {
   sockaddr_in to{};
   to.sin_family = AF_INET;
@@ -167,7 +174,10 @@ HANDLE CNetDatagramSocketImpl::CreateEvent()
  * Initializes datagram socket object fields; this same field-init lane is also
  * emitted inline inside `NET_OpenDatagramSocket`.
  */
-CNetDatagramSocketImpl::CNetDatagramSocketImpl(INetDatagramHandler* handler, const platform::net::Socket sock)
+CNetDatagramSocketImpl::CNetDatagramSocketImpl(
+  INetDatagramHandler* handler,
+  const platform::net::Socket sock
+)
   : mDatagramHandler(handler)
   , mSocket(sock)
   , mEvent(nullptr)

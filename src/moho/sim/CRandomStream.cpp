@@ -30,7 +30,9 @@ namespace moho
     // so the scaled draw is rounded to single before the 1.0 is subtracted and
     // again after. One rounding in double lands on a different float often
     // enough to move a gaussian sample, and with it the sim checksum.
-    [[nodiscard]] float NextSignedUnit(CRandomStream& stream) noexcept
+    [[nodiscard]] float NextSignedUnit(
+      CRandomStream& stream
+    ) noexcept
     {
       constexpr float kInvTwoTo31f = 4.656612873077392578125e-10f;
       const std::uint32_t value = stream.twister.NextUInt32();
@@ -52,7 +54,9 @@ namespace moho
    * What it does:
    * Seeds MT state from caller seed.
    */
-  CMersenneTwister::CMersenneTwister(const std::uint32_t seed) noexcept
+  CMersenneTwister::CMersenneTwister(
+    const std::uint32_t seed
+  ) noexcept
   {
     Seed(seed);
   }
@@ -64,7 +68,9 @@ namespace moho
    * What it does:
    * Seeds MT state from a 32-bit seed and immediately shuffles it.
    */
-  void CMersenneTwister::Seed(const std::uint32_t seed) noexcept
+  void CMersenneTwister::Seed(
+    const std::uint32_t seed
+  ) noexcept
   {
     state[0] = seed;
     for (std::uint32_t i = 1; i < kStateWordCount; ++i) {
@@ -120,7 +126,9 @@ namespace moho
     return (value >> 18) ^ value;
   }
 
-  float CMersenneTwister::ToUnitFloat(const std::uint32_t value) noexcept
+  float CMersenneTwister::ToUnitFloat(
+    const std::uint32_t value
+  ) noexcept
   {
     return static_cast<float>(static_cast<double>(value) * kInvTwoTo32);
   }
@@ -131,7 +139,9 @@ namespace moho
    * What it does:
    * Appends MT state words to MD5 (excludes extraction position lane).
    */
-  void CMersenneTwister::Checksum(gpg::MD5Context& md5) const
+  void CMersenneTwister::Checksum(
+    gpg::MD5Context& md5
+  ) const
   {
     md5.Update(state, sizeof(state));
   }
@@ -142,7 +152,9 @@ namespace moho
    * What it does:
    * Reads the full MT state vector and extraction position from archive.
    */
-  void CMersenneTwister::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CMersenneTwister::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -164,7 +176,9 @@ namespace moho
    * What it does:
    * Writes the full MT state vector and extraction position to archive.
    */
-  void CMersenneTwister::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CMersenneTwister::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -184,7 +198,9 @@ namespace moho
    * What it does:
    * Seeds twister state from caller seed and clears cached Marsaglia-pair flag.
    */
-  CRandomStream::CRandomStream(const std::uint32_t seed) noexcept
+  CRandomStream::CRandomStream(
+    const std::uint32_t seed
+  ) noexcept
   {
     twister.Seed(seed);
     hasMarsagliaPair = 0;
@@ -207,7 +223,10 @@ namespace moho
    * What it does:
    * Returns one uniform random sample in [lower, upper) from the embedded twister.
    */
-  float CRandomStream::FRand(const float lower, const float upper) noexcept
+  float CRandomStream::FRand(
+    const float lower,
+    const float upper
+  ) noexcept
   {
     // x87 under 24-bit precision: range rounded, range * word rounded once,
     // the 2^-32 scale exact, the sum rounded, all with the extended exponent.
@@ -221,7 +240,9 @@ namespace moho
    * What it does:
    * Appends deterministic RNG state and gaussian-cache lanes into MD5.
    */
-  void CRandomStream::Checksum(gpg::MD5Context& md5) const
+  void CRandomStream::Checksum(
+    gpg::MD5Context& md5
+  ) const
   {
     md5.Update(twister.state, sizeof(twister.state));
     md5.Update(&hasMarsagliaPair, sizeof(hasMarsagliaPair));
@@ -288,7 +309,9 @@ namespace moho
    * What it does:
    * Deserializes the embedded MT state, cached gaussian sample, and cache flag.
    */
-  void CRandomStream::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CRandomStream::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -306,7 +329,9 @@ namespace moho
    * What it does:
    * Serializes the embedded MT state, cached gaussian sample, and cache flag.
    */
-  void CRandomStream::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CRandomStream::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {

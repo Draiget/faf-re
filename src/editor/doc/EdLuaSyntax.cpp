@@ -7,7 +7,10 @@ namespace faf::editor
 {
   namespace
   {
-    bool IsWord(const std::string& word, const char* const* list)
+    bool IsWord(
+      const std::string& word,
+      const char* const* list
+    )
     {
       for (; *list != nullptr; ++list) {
         if (word == *list) {
@@ -17,21 +20,55 @@ namespace faf::editor
       return false;
     }
 
-    const char* const kKeywords[] = {"and",   "break", "do",     "else", "elseif", "end",   "for",   "function", "if",
-                                     "in",    "local", "not",    "or",   "repeat", "return", "then", "until",    "while",
-                                     "continue", nullptr};
+    const char* const kKeywords[] = {"and",      "break", "do",    "else",  "elseif",   "end",  "for",
+                                     "function", "if",    "in",    "local", "not",      "or",   "repeat",
+                                     "return",   "then",  "until", "while", "continue", nullptr};
     const char* const kConstants[] = {"true", "false", "nil", nullptr};
     // The globals FAF's map scripts reach for most (lua/ScenarioUtilities, the sim's globals).
-    const char* const kEngine[] = {"ScenarioInfo", "ScenarioUtils",  "ScenarioFramework", "import",     "LOG",      "WARN",       "SPEW",
-                                   "ForkThread",   "KillThread",     "WaitSeconds",       "WaitTicks",  "ArmyBrains", "GetArmyBrain",
-                                   "ListArmies",   "Entity",         "Warp",              "VECTOR3",    "Vector",   "table",
-                                   "string",       "math",           "self",              "_G",         "pairs",    "ipairs",
-                                   "type",         "tostring",       "tonumber",          "setmetatable", "getmetatable",
-                                   "CreateEmitterAtEntity", "CreateUnitHPR", "CreateProp", "GetTerrainHeight", "GetSurfaceHeight",
-                                   nullptr};
+    const char* const kEngine[] = {
+      "ScenarioInfo",
+      "ScenarioUtils",
+      "ScenarioFramework",
+      "import",
+      "LOG",
+      "WARN",
+      "SPEW",
+      "ForkThread",
+      "KillThread",
+      "WaitSeconds",
+      "WaitTicks",
+      "ArmyBrains",
+      "GetArmyBrain",
+      "ListArmies",
+      "Entity",
+      "Warp",
+      "VECTOR3",
+      "Vector",
+      "table",
+      "string",
+      "math",
+      "self",
+      "_G",
+      "pairs",
+      "ipairs",
+      "type",
+      "tostring",
+      "tonumber",
+      "setmetatable",
+      "getmetatable",
+      "CreateEmitterAtEntity",
+      "CreateUnitHPR",
+      "CreateProp",
+      "GetTerrainHeight",
+      "GetSurfaceHeight",
+      nullptr
+    };
 
     /** `[[`, `[=[`: its level, or -1. */
-    int LongLevel(const std::string& t, const std::size_t at)
+    int LongLevel(
+      const std::string& t,
+      const std::size_t at
+    )
     {
       if (at >= t.size() || t[at] != '[') {
         return -1;
@@ -45,7 +82,11 @@ namespace faf::editor
       return q < t.size() && t[q] == '[' ? level : -1;
     }
 
-    std::size_t LongEnd(const std::string& t, const std::size_t from, const int level)
+    std::size_t LongEnd(
+      const std::string& t,
+      const std::size_t from,
+      const int level
+    )
     {
       const std::string close = "]" + std::string(static_cast<std::size_t>(level), '=') + "]";
       const std::size_t e = t.find(close, from);
@@ -53,7 +94,9 @@ namespace faf::editor
     }
   } // namespace
 
-  std::vector<LuaSpan> LuaSpans(const std::string& t)
+  std::vector<LuaSpan> LuaSpans(
+    const std::string& t
+  )
   {
     std::vector<LuaSpan> spans;
     const std::size_t n = t.size();
@@ -107,8 +150,13 @@ namespace faf::editor
         push(start, i, LuaSpanKind::String);
         continue;
       }
-      if (std::isdigit(static_cast<unsigned char>(c)) != 0 || (c == '.' && i + 1 < n && std::isdigit(static_cast<unsigned char>(t[i + 1])) != 0)) {
-        while (i < n && (std::isalnum(static_cast<unsigned char>(t[i])) != 0 || (t[i] == '.' && !(i + 1 < n && t[i + 1] == '.')))) {
+      if (
+        std::isdigit(static_cast<unsigned char>(c)) != 0 ||
+        (c == '.' && i + 1 < n && std::isdigit(static_cast<unsigned char>(t[i + 1])) != 0)
+      ) {
+        while (
+          i < n &&
+          (std::isalnum(static_cast<unsigned char>(t[i])) != 0 || (t[i] == '.' && !(i + 1 < n && t[i + 1] == '.')))) {
           ++i;
         }
         push(start, i, LuaSpanKind::Number);

@@ -7,7 +7,9 @@
 
 namespace moho
 {
-  inline void WakeOwnerThreadForImmediateTick(moho::CCommandTask* const commandTask)
+  inline void WakeOwnerThreadForImmediateTick(
+    moho::CCommandTask* const commandTask
+  )
   {
     if (commandTask == nullptr || commandTask->mOwnerThread == nullptr) {
       return;

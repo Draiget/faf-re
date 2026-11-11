@@ -93,4 +93,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_PathTablesTypeInfo_7db8da, moho::register_PathTablesTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_PathTablesTypeInfo_7db8da,
+  moho::register_PathTablesTypeInfo
+)

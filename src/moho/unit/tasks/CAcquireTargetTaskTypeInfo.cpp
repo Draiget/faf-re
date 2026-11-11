@@ -25,7 +25,9 @@ namespace
    * Runs the in-place default construction path for one
    * `CAcquireTargetTask` instance used by type-info `NewRef`/`CtrRef`.
    */
-  [[nodiscard]] moho::CAcquireTargetTask* ConstructAcquireTargetTaskInPlace(void* const objectStorage)
+  [[nodiscard]] moho::CAcquireTargetTask* ConstructAcquireTargetTaskInPlace(
+    void* const objectStorage
+  )
   {
     if (objectStorage == nullptr) {
       return nullptr;
@@ -94,7 +96,9 @@ namespace moho
   /**
    * Address: 0x005DEE50 (FUN_005DEE50, AddBase_CTask)
    */
-  void CAcquireTargetTaskTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
+  void CAcquireTargetTaskTypeInfo::AddBase_CTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* baseType = CTask::sType;
     if (!baseType) {
@@ -108,7 +112,9 @@ namespace moho
   /**
    * Address: 0x005DEEB0 (FUN_005DEEB0, AddBase_ManyToOneListener_EProjectileImpactEvent)
    */
-  void CAcquireTargetTaskTypeInfo::AddBase_ManyToOneListener_EProjectileImpactEvent(gpg::RType* const typeInfo)
+  void CAcquireTargetTaskTypeInfo::AddBase_ManyToOneListener_EProjectileImpactEvent(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* baseType = ManyToOneListener_EProjectileImpactEvent::sType;
     if (!baseType) {
@@ -116,13 +122,17 @@ namespace moho
       ManyToOneListener_EProjectileImpactEvent::sType = baseType;
     }
 
-    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::BaseSubobjectOffset<CAcquireTargetTask, ManyToOneListener_EProjectileImpactEvent>());
+    gpg::AddReflectedBaseType(
+      typeInfo, baseType, gpg::BaseSubobjectOffset<CAcquireTargetTask, ManyToOneListener_EProjectileImpactEvent>()
+    );
   }
 
   /**
    * Address: 0x005DEF10 (FUN_005DEF10, AddBase_ManyToOneListener_ECollisionBeamEvent)
    */
-  void CAcquireTargetTaskTypeInfo::AddBase_ManyToOneListener_ECollisionBeamEvent(gpg::RType* const typeInfo)
+  void CAcquireTargetTaskTypeInfo::AddBase_ManyToOneListener_ECollisionBeamEvent(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* baseType = ManyToOneListener_ECollisionBeamEvent::sType;
     if (!baseType) {
@@ -130,7 +140,9 @@ namespace moho
       ManyToOneListener_ECollisionBeamEvent::sType = baseType;
     }
 
-    gpg::AddReflectedBaseType(typeInfo, baseType, gpg::BaseSubobjectOffset<CAcquireTargetTask, ManyToOneListener_ECollisionBeamEvent>());
+    gpg::AddReflectedBaseType(
+      typeInfo, baseType, gpg::BaseSubobjectOffset<CAcquireTargetTask, ManyToOneListener_ECollisionBeamEvent>()
+    );
   }
 
   /**
@@ -146,7 +158,9 @@ namespace moho
   /**
    * Address: 0x005DDA20 (FUN_005DDA20, CtrRef)
    */
-  gpg::RRef CAcquireTargetTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CAcquireTargetTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = ConstructAcquireTargetTaskInPlace(objectStorage);
     return gpg::RRef{task, gpg::LookupRType(typeid(CAcquireTargetTask))};
@@ -155,7 +169,9 @@ namespace moho
   /**
    * Address: 0x005DDA00 (FUN_005DDA00, Delete)
    */
-  void CAcquireTargetTaskTypeInfo::Delete(void* const objectStorage)
+  void CAcquireTargetTaskTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CAcquireTargetTask*>(objectStorage);
   }
@@ -163,7 +179,9 @@ namespace moho
   /**
    * Address: 0x005DDA90 (FUN_005DDA90, Destruct)
    */
-  void CAcquireTargetTaskTypeInfo::Destruct(void* const objectStorage)
+  void CAcquireTargetTaskTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CAcquireTargetTask*>(objectStorage);
     if (!task) {
@@ -184,4 +202,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAcquireTargetTaskTypeInfo_304df2, moho::register_CAcquireTargetTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAcquireTargetTaskTypeInfo_304df2,
+  moho::register_CAcquireTargetTaskTypeInfo
+)

@@ -64,14 +64,18 @@ namespace
    */
   fa::multimap<std::uint32_t, moho::CSndVar*> gSndVarNameCache;
 
-  [[nodiscard]] std::uint32_t HashSndVarName(const fa::string& name)
+  [[nodiscard]] std::uint32_t HashSndVarName(
+    const fa::string& name
+  )
   {
     const std::string hashInput(name.c_str(), name.size());
     return gpg::Hash(hashInput, kSndVarHashSalt);
   }
 
-  [[nodiscard]] moho::CSndVar*
-  FindCachedSndVarByNameLocked(const fa::string& variableName, const std::uint32_t nameHash)
+  [[nodiscard]] moho::CSndVar* FindCachedSndVarByNameLocked(
+    const fa::string& variableName,
+    const std::uint32_t nameHash
+  )
   {
     const auto [first, last] = gSndVarNameCache.equal_range(nameHash);
     for (auto it = first; it != last; ++it) {
@@ -84,7 +88,9 @@ namespace
     return nullptr;
   }
 
-  void RemoveCachedSndVarByPointerLocked(const moho::CSndVar* const value)
+  void RemoveCachedSndVarByPointerLocked(
+    const moho::CSndVar* const value
+  )
   {
     for (auto it = gSndVarNameCache.begin(); it != gSndVarNameCache.end();) {
       if (it->second == value) {
@@ -107,7 +113,9 @@ namespace
    * `fa::list<CSndParams*>` registry's `FUN_004E32D0`/`FUN_004E3310` pair
    * used by `func_RegisterCSndParams` (CSndParams.cpp).
    */
-  void RegisterSndVarInstance(moho::CSndVar* const value)
+  void RegisterSndVarInstance(
+    moho::CSndVar* const value
+  )
   {
     std::lock_guard<std::recursive_mutex> lock(gSndVarRegistryMutex);
     gSndVarRegistry.push_back(value);
@@ -119,7 +127,9 @@ namespace
    * What it does:
    * Removes one `CSndVar` instance from the process-global variable-name lane.
    */
-  void UnregisterSndVarInstance(const moho::CSndVar* const value)
+  void UnregisterSndVarInstance(
+    const moho::CSndVar* const value
+  )
   {
     std::lock_guard<std::recursive_mutex> lock(gSndVarRegistryMutex);
     RemoveCachedSndVarByPointerLocked(value);
@@ -139,7 +149,9 @@ namespace
    * Returns the registered variable name for one resolved variable id, or an
    * empty string when no matching descriptor is present.
    */
-  fa::string LookupSndVarNameById(const std::uint16_t variableId)
+  fa::string LookupSndVarNameById(
+    const std::uint16_t variableId
+  )
   {
     std::lock_guard<std::recursive_mutex> lock(gSndVarRegistryMutex);
     for (const moho::CSndVar* const entry : gSndVarRegistry) {
@@ -163,7 +175,9 @@ namespace moho
    * What it does:
    * Returns one interned `CSndVar` for the supplied variable name.
    */
-  CSndVar* SND_FindOrCreateVariable(const fa::string& variableName)
+  CSndVar* SND_FindOrCreateVariable(
+    const fa::string& variableName
+  )
   {
     if (variableName.empty()) {
       return nullptr;
@@ -188,7 +202,9 @@ namespace moho
    * Initializes one unresolved sound-variable descriptor and registers it in
    * the global variable-name lane.
    */
-  CSndVar::CSndVar(const char* const name)
+  CSndVar::CSndVar(
+    const char* const name
+  )
     : mState(0xFFFFu)
     , mResolved(0u)
     , mReserved03(0u)
@@ -213,7 +229,6 @@ namespace moho
     mReserved03 = 0u;
   }
 
-
   /**
    * Address: 0x004E0150 (FUN_004E0150, ?SND_GetVariableName@Moho@@...)
    *
@@ -222,7 +237,9 @@ namespace moho
    * What it does:
    * Returns the registered name for one global sound variable id.
    */
-  fa::string SND_GetVariableName(const int variableId)
+  fa::string SND_GetVariableName(
+    const int variableId
+  )
   {
     return LookupSndVarNameById(static_cast<std::uint16_t>(variableId));
   }
@@ -230,7 +247,12 @@ namespace moho
 
 namespace moho
 {
-  void CSndVar::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CSndVar::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     fa::string name;
     archive.ReadString(&name);
@@ -238,7 +260,10 @@ namespace moho
   }
 
   void CSndVar::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     archive.WriteString(&mName);

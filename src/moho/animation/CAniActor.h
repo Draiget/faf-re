@@ -88,9 +88,8 @@ namespace moho
      * Allocates one `CAniActor` and publishes it as an unowned serialization
      * construct result.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x0063E200 (FUN_0063E200, sub_63E200)
@@ -109,7 +108,8 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
-     * Address: 0x005E3CF0 (FUN_005E3CF0, ?GetSkeleton@CAniActor@Moho@@QBE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
+     * Address: 0x005E3CF0 (FUN_005E3CF0,
+     * ?GetSkeleton@CAniActor@Moho@@QBE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
      *
      * What it does:
      * Returns the current skeleton handle from the actor-owned pose object.
@@ -127,7 +127,8 @@ namespace moho
     boost::shared_ptr<CAniPose> GetPoseShared() const;
 
     /**
-     * Address: 0x005BDD70 (FUN_005BDD70, ?GetPriorPoseShared@CAniActor@Moho@@QBE?AV?$shared_ptr@VCAniPose@Moho@@@boost@@XZ)
+     * Address: 0x005BDD70 (FUN_005BDD70,
+     * ?GetPriorPoseShared@CAniActor@Moho@@QBE?AV?$shared_ptr@VCAniPose@Moho@@@boost@@XZ)
      *
      * What it does:
      * Returns one retained shared-ptr handle to this actor's prior pose.

@@ -30,7 +30,9 @@ namespace
     ModernEffect modern;
   };
 
-  Generated Generate(const std::string& source)
+  Generated Generate(
+    const std::string& source
+  )
   {
     Generated result;
     result.description = ParseEffect(source);
@@ -38,12 +40,18 @@ namespace
     return result;
   }
 
-  bool Contains(const std::string& text, const std::string& needle)
+  bool Contains(
+    const std::string& text,
+    const std::string& needle
+  )
   {
     return text.find(needle) != std::string::npos;
   }
 
-  bool HasNote(const std::vector<std::string>& notes, const std::string& note)
+  bool HasNote(
+    const std::vector<std::string>& notes,
+    const std::string& note
+  )
   {
     for (const std::string& line : notes) {
       if (line == note) {
@@ -54,7 +62,11 @@ namespace
   }
 
   /** The slot of the parameter named `name`. */
-  const ConstantSlot* Slot(const EffectDescription& description, const ConstantLayout& layout, const std::string& name)
+  const ConstantSlot* Slot(
+    const EffectDescription& description,
+    const ConstantLayout& layout,
+    const std::string& name
+  )
   {
     for (std::uint32_t index = 0U; index < description.parameters.size(); ++index) {
       if (description.parameters[index].name == name) {
@@ -65,8 +77,12 @@ namespace
   }
 
   void ExpectSlot(
-    const EffectDescription& description, const ConstantLayout& layout, const std::string& name, const std::uint32_t offset,
-    const std::uint32_t size, const std::uint32_t stride
+    const EffectDescription& description,
+    const ConstantLayout& layout,
+    const std::string& name,
+    const std::uint32_t offset,
+    const std::uint32_t size,
+    const std::uint32_t stride
   )
   {
     const ConstantSlot* const slot = Slot(description, layout, name);
@@ -77,7 +93,10 @@ namespace
   }
 } // namespace
 
-TEST(GalConstantLayout, ScalarsAndVectorsPackIntoRegistersWithoutCrossingThem)
+TEST(
+  GalConstantLayout,
+  ScalarsAndVectorsPackIntoRegistersWithoutCrossingThem
+)
 {
   const EffectDescription description = ParseEffect(R"fx(
 float a;
@@ -95,8 +114,8 @@ float j;
 )fx");
   const ConstantLayout layout = ComputeConstantLayout(description);
   ExpectSlot(description, layout, "a", 0U, 4U, 16U);
-  ExpectSlot(description, layout, "b", 4U, 8U, 16U);   // 4 + 8 fits the first register
-  ExpectSlot(description, layout, "c", 16U, 8U, 16U);  // 12 + 8 would cross it
+  ExpectSlot(description, layout, "b", 4U, 8U, 16U);  // 4 + 8 fits the first register
+  ExpectSlot(description, layout, "c", 16U, 8U, 16U); // 12 + 8 would cross it
   ExpectSlot(description, layout, "d", 24U, 4U, 16U);
   ExpectSlot(description, layout, "e", 32U, 12U, 16U); // 28 + 12 would cross
   ExpectSlot(description, layout, "f", 44U, 4U, 16U);  // fills the register exactly
@@ -110,7 +129,10 @@ float j;
   EXPECT_EQ(layout.slots.size(), 10U);
 }
 
-TEST(GalConstantLayout, ArraysAndMatricesStartRegisters)
+TEST(
+  GalConstantLayout,
+  ArraysAndMatricesStartRegisters
+)
 {
   const EffectDescription description = ParseEffect(R"fx(
 float x;
@@ -129,18 +151,23 @@ float w;
   ExpectSlot(description, layout, "x", 0U, 4U, 16U);
   ExpectSlot(description, layout, "world", 16U, 64U, 64U);
   ExpectSlot(description, layout, "y", 80U, 4U, 16U);
-  ExpectSlot(description, layout, "weights", 96U, 36U, 16U);    // two full registers and one float
-  ExpectSlot(description, layout, "z", 132U, 4U, 16U);          // packs after the last element
-  ExpectSlot(description, layout, "rowMajor", 144U, 48U, 48U);  // 3 rows of float4
+  ExpectSlot(description, layout, "weights", 96U, 36U, 16U);      // two full registers and one float
+  ExpectSlot(description, layout, "z", 132U, 4U, 16U);            // packs after the last element
+  ExpectSlot(description, layout, "rowMajor", 144U, 48U, 48U);    // 3 rows of float4
   ExpectSlot(description, layout, "columnMajor", 192U, 60U, 64U); // 4 columns of float3
   ExpectSlot(description, layout, "colours", 256U, 32U, 16U);
-  ExpectSlot(description, layout, "small", 288U, 24U, 32U);     // 2 rows of float2
-  ExpectSlot(description, layout, "oneRow", 320U, 16U, 16U);    // one register: packs like a float4, which 312 + 16 would cross
+  ExpectSlot(description, layout, "small", 288U, 24U, 32U); // 2 rows of float2
+  ExpectSlot(
+    description, layout, "oneRow", 320U, 16U, 16U
+  ); // one register: packs like a float4, which 312 + 16 would cross
   ExpectSlot(description, layout, "w", 336U, 4U, 16U);
   EXPECT_EQ(layout.size, 340U);
 }
 
-TEST(GalConstantLayout, StructsStartARegisterAndLayOutTheirMembers)
+TEST(
+  GalConstantLayout,
+  StructsStartARegisterAndLayOutTheirMembers
+)
 {
   const EffectDescription description = ParseEffect(R"fx(
 struct Layer { float2 a; float3 b; float c[2]; float4x4 m; };
@@ -186,7 +213,10 @@ float y;
   EXPECT_EQ(layout.Find(99U), nullptr);
 }
 
-TEST(GalModernHlsl, EffectConstructsBecomePlainHlsl)
+TEST(
+  GalModernHlsl,
+  EffectConstructsBecomePlainHlsl
+)
 {
   Generated generated = Generate(faf_gal_tests::kDrawEffect);
   const std::string& hlsl = generated.modern.hlsl;
@@ -219,8 +249,12 @@ TEST(GalModernHlsl, EffectConstructsBecomePlainHlsl)
   EXPECT_FALSE(Contains(hlsl, "UnusedTexture"));
   EXPECT_TRUE(Contains(hlsl, "SamplerState faf_smp_BaseSampler : register(s0);"));
   EXPECT_TRUE(Contains(hlsl, "SamplerState faf_smp_EnvSampler : register(s1);"));
-  EXPECT_TRUE(Contains(hlsl, "#define BaseSampler faf_make_sampler(BaseTexture, faf_nullCube, faf_null3D, faf_smp_BaseSampler)"));
-  EXPECT_TRUE(Contains(hlsl, "#define EnvSampler faf_make_sampler(faf_null2D, EnvTexture__faf_cube, faf_null3D, faf_smp_EnvSampler)"));
+  EXPECT_TRUE(
+    Contains(hlsl, "#define BaseSampler faf_make_sampler(BaseTexture, faf_nullCube, faf_null3D, faf_smp_BaseSampler)")
+  );
+  EXPECT_TRUE(Contains(
+    hlsl, "#define EnvSampler faf_make_sampler(faf_null2D, EnvTexture__faf_cube, faf_null3D, faf_smp_EnvSampler)"
+  ));
 
   // A sampler-typed function parameter takes the joined type.
   EXPECT_TRUE(Contains(hlsl, "float4 Lookup( faf_sampler s, float2 uv )"));
@@ -239,7 +273,10 @@ TEST(GalModernHlsl, EffectConstructsBecomePlainHlsl)
   EXPECT_TRUE(generated.modern.notes.empty());
 }
 
-TEST(GalModernHlsl, OneEntryPointPerStageFunctionAndArguments)
+TEST(
+  GalModernHlsl,
+  OneEntryPointPerStageFunctionAndArguments
+)
 {
   Generated generated = Generate(faf_gal_tests::kDrawEffect);
   const std::vector<ShaderEntry>& entries = generated.modern.entries;
@@ -273,7 +310,10 @@ TEST(GalModernHlsl, OneEntryPointPerStageFunctionAndArguments)
   EXPECT_EQ(Count(hlsl, "faf_entry_"), 3U);
 }
 
-TEST(GalModernHlsl, EntryWrappersRewriteSemanticsAndFillUniforms)
+TEST(
+  GalModernHlsl,
+  EntryWrappersRewriteSemanticsAndFillUniforms
+)
 {
   Generated generated = Generate(R"fx(
 struct VSOut { float4 pos : POSITION; float2 uv : TEXCOORD0; };
@@ -303,10 +343,17 @@ technique10 T
 )fx");
   const std::string& hlsl = generated.modern.hlsl;
   // A void vertex shader with out parameters: SV_Position on the out position, no `return`.
-  EXPECT_TRUE(Contains(hlsl, "void faf_entry_vs_0(float4 p : POSITION, float3 normal : NORMAL0, out float4 op : SV_Position, out float2 ouv : TEXCOORD0)"));
+  EXPECT_TRUE(Contains(
+    hlsl,
+    "void faf_entry_vs_0(float4 p : POSITION, float3 normal : NORMAL0, out float4 op : SV_Position, out float2 ouv : "
+    "TEXCOORD0)"
+  ));
   // Two inputs on one semantic: the second reads the first.
   EXPECT_TRUE(Contains(hlsl, "    PlainVS(p, normal, (float3)normal, op, ouv);"));
-  EXPECT_TRUE(Contains(hlsl, "float4 faf_entry_ps_1(float4 pos : SV_Position, float2 uv : TEXCOORD0, out float depth : SV_Depth) : SV_Target0"));
+  EXPECT_TRUE(Contains(
+    hlsl,
+    "float4 faf_entry_ps_1(float4 pos : SV_Position, float2 uv : TEXCOORD0, out float depth : SV_Depth) : SV_Target0"
+  ));
   // Uniform parameters the pass leaves out: their default, or 0.
   EXPECT_TRUE(Contains(hlsl, "return DepthPS(pos, uv, depth, 0.25, 0);"));
 
@@ -317,7 +364,10 @@ technique10 T
   EXPECT_EQ(technique->passes[1].vertexShader.entry, "faf_entry_vs_0");
 }
 
-TEST(GalModernHlsl, StructRolesFollowTheStagesThatUseThem)
+TEST(
+  GalModernHlsl,
+  StructRolesFollowTheStagesThatUseThem
+)
 {
   Generated generated = Generate(R"fx(
 struct Vertex { float4 position : POSITION0; float4 colour : COLOR0; };
@@ -337,13 +387,20 @@ technique10 T
   const std::string& hlsl = generated.modern.hlsl;
   // Vertex (and its typedef Pixel): a vertex output, so POSITION0 becomes SV_Position.
   EXPECT_TRUE(Contains(hlsl, "struct Vertex\n{\n    float4 position : SV_Position;\n    float4 colour : COLOR0;\n};"));
-  EXPECT_TRUE(Contains(hlsl, "struct PSOut\n{\n    float4 c0 : SV_Target0;\n    float4 c1 : SV_Target1;\n    float d : SV_Depth;\n};"));
+  EXPECT_TRUE(Contains(
+    hlsl, "struct PSOut\n{\n    float4 c0 : SV_Target0;\n    float4 c1 : SV_Target1;\n    float d : SV_Depth;\n};"
+  ));
   EXPECT_TRUE(Contains(hlsl, "struct Unused { float4 p : POSITION; };")) << "a struct no stage uses is kept as written";
   EXPECT_TRUE(Contains(hlsl, "struct Both { float4 p : POSITION; };"));
-  EXPECT_TRUE(HasNote(generated.modern.notes, "struct Both is both a vertex input and a stage output; semantics left as written"));
+  EXPECT_TRUE(
+    HasNote(generated.modern.notes, "struct Both is both a vertex input and a stage output; semantics left as written")
+  );
 }
 
-TEST(GalModernHlsl, UntypedAndVolumeSamplersGetEveryViewTheyAreReadIn)
+TEST(
+  GalModernHlsl,
+  UntypedAndVolumeSamplersGetEveryViewTheyAreReadIn
+)
 {
   Generated generated = Generate(R"fx(
 texture Shared;
@@ -367,16 +424,25 @@ float4 PSCube( float3 dir : TEXCOORD0 ) : COLOR0 { return texCUBE( AnySampler, d
   EXPECT_EQ(textures[3].slot, 3U);
 
   const std::string& hlsl = generated.modern.hlsl;
-  EXPECT_TRUE(Contains(hlsl, "#define AnySampler faf_make_sampler(Shared, Shared__faf_cube, Shared__faf_3d, faf_smp_AnySampler)"));
+  EXPECT_TRUE(
+    Contains(hlsl, "#define AnySampler faf_make_sampler(Shared, Shared__faf_cube, Shared__faf_3d, faf_smp_AnySampler)")
+  );
   EXPECT_TRUE(Contains(hlsl, "Texture3D Volume__faf_3d : register(t3);"));
-  EXPECT_TRUE(Contains(hlsl, "#define VolumeSampler faf_make_sampler(faf_null2D, faf_nullCube, Volume__faf_3d, faf_smp_VolumeSampler)"));
-  EXPECT_TRUE(Contains(hlsl, "#define Unbound faf_make_sampler(faf_null2D, faf_nullCube, faf_null3D, faf_smp_Unbound)"));
+  EXPECT_TRUE(Contains(
+    hlsl, "#define VolumeSampler faf_make_sampler(faf_null2D, faf_nullCube, Volume__faf_3d, faf_smp_VolumeSampler)"
+  ));
+  EXPECT_TRUE(
+    Contains(hlsl, "#define Unbound faf_make_sampler(faf_null2D, faf_nullCube, faf_null3D, faf_smp_Unbound)")
+  );
   EXPECT_TRUE(Contains(hlsl, "SamplerState faf_smp_Unbound : register(s2);"));
 }
 
 // Engine addition (ren_ShadowCascades): the lighting shadow samplers read through the cascade atlas, the
 // blur samplers on the same texture don't, and a sampler passed on whole keeps the plain type.
-TEST(GalModernHlsl, ShadowLookupSamplersReadThroughTheCascadeAtlas)
+TEST(
+  GalModernHlsl,
+  ShadowLookupSamplersReadThroughTheCascadeAtlas
+)
 {
   const std::string body = R"fx(
 texture ShadowTexture;
@@ -388,12 +454,18 @@ float4 BlurPS( float2 uv : TEXCOORD0 ) : COLOR0 { return tex2D( ShadowVerticalBl
   const std::string source = std::string(ShadowCascadeDeclaration()) + body;
   Generated generated = Generate(source);
   const std::string& hlsl = generated.modern.hlsl;
-  EXPECT_TRUE(Contains(hlsl, "#define ShadowSampler faf_make_shadow_sampler(ShadowTexture, faf_nullCube, faf_null3D, faf_smp_ShadowSampler)"));
+  EXPECT_TRUE(Contains(
+    hlsl,
+    "#define ShadowSampler faf_make_shadow_sampler(ShadowTexture, faf_nullCube, faf_null3D, faf_smp_ShadowSampler)"
+  ));
   EXPECT_TRUE(Contains(hlsl, "#define ShadowVerticalBlurSampler faf_make_sampler("));
   EXPECT_TRUE(Contains(hlsl, "float4 faf_ShadowCascades[9];"));
   EXPECT_TRUE(Contains(hlsl, "float2 faf_shadow_uv(float2 uv)"));
-  EXPECT_LT(hlsl.find("float4 faf_ShadowCascades[9];"), hlsl.find("float2 faf_shadow_uv(float2 uv)")) << "the helpers read the parameter";
-  EXPECT_FALSE(HasNote(generated.modern.notes, "a shadow sampler is used other than in a tex2D lookup; shadow cascades are off"));
+  EXPECT_LT(hlsl.find("float4 faf_ShadowCascades[9];"), hlsl.find("float2 faf_shadow_uv(float2 uv)"))
+    << "the helpers read the parameter";
+  EXPECT_FALSE(
+    HasNote(generated.modern.notes, "a shadow sampler is used other than in a tex2D lookup; shadow cascades are off")
+  );
 
   // Without the parameter (an effect the runtime didn't give it) nothing changes.
   Generated plain = Generate(body);
@@ -411,14 +483,19 @@ float4 PassPS( float2 uv : TEXCOORD0 ) : COLOR0 { return Look( shadowSampler, uv
 )fx";
   Generated blocked = Generate(passed);
   EXPECT_TRUE(Contains(blocked.modern.hlsl, "#define shadowSampler faf_make_sampler("));
-  EXPECT_TRUE(HasNote(blocked.modern.notes, "a shadow sampler is used other than in a tex2D lookup; shadow cascades are off"));
+  EXPECT_TRUE(
+    HasNote(blocked.modern.notes, "a shadow sampler is used other than in a tex2D lookup; shadow cascades are off")
+  );
   EXPECT_TRUE(gShadowCascadesBlocked.load());
   gShadowCascadesBlocked.store(false);
 }
 
 // Engine addition (tessellation): a pass naming a hull and a domain function gets attributed entry points around
 // them, with the vertex shader's output as the patch's control point.
-TEST(GalModernHlsl, TessellatedPassesGetHullAndDomainEntries)
+TEST(
+  GalModernHlsl,
+  TessellatedPassesGetHullAndDomainEntries
+)
 {
   Generated generated = Generate(faf_gal_tests::kTessellatedEffect);
   ASSERT_EQ(generated.description.techniques.size(), 1U);
@@ -438,13 +515,17 @@ TEST(GalModernHlsl, TessellatedPassesGetHullAndDomainEntries)
   const std::string& hlsl = generated.modern.hlsl;
   EXPECT_TRUE(Contains(hlsl, "InputPatch<ControlPoint, 3> faf_patch"));
   EXPECT_TRUE(Contains(hlsl, "OutputPatch<ControlPoint, 3> faf_patch"));
-  EXPECT_TRUE(Contains(hlsl, "Place(faf_weights, faf_patch[0], faf_patch[1], faf_patch[2], 2.0)")) << "the pass's argument";
+  EXPECT_TRUE(Contains(hlsl, "Place(faf_weights, faf_patch[0], faf_patch[1], faf_patch[2], 2.0)"))
+    << "the pass's argument";
   EXPECT_TRUE(Contains(hlsl, "Factors(faf_patch[0], faf_patch[1], faf_patch[2])"));
 }
 
 // A hull shader without its domain shader (or the reverse) is not a tessellated pass: the pass keeps neither
 // and is marked, so the engine's load check refuses it rather than drawing patch points as triangles.
-TEST(GalModernHlsl, AHullShaderWithoutItsDomainShaderDropsBoth)
+TEST(
+  GalModernHlsl,
+  AHullShaderWithoutItsDomainShaderDropsBoth
+)
 {
   std::string source = faf_gal_tests::kTessellatedEffect;
   const std::string domain = "        SetDomainShader( CompileShader( ds_5_0, Place( 2.0 ) ) );\n";
@@ -456,17 +537,25 @@ TEST(GalModernHlsl, AHullShaderWithoutItsDomainShaderDropsBoth)
   EXPECT_FALSE(pass.Tessellated());
   EXPECT_TRUE(pass.tessellationDropped);
   EXPECT_TRUE(pass.hullShader.entry.empty());
-  EXPECT_TRUE(HasNote(generated.modern.notes, "technique Tessellated: a hull shader needs a domain shader and the reverse; ignored"));
+  EXPECT_TRUE(HasNote(
+    generated.modern.notes, "technique Tessellated: a hull shader needs a domain shader and the reverse; ignored"
+  ));
 }
 
 // A domain function that doesn't take the weights and three points can't be wrapped: both stages go.
-TEST(GalModernHlsl, ADomainFunctionWithTheWrongParametersDropsTheTessellation)
+TEST(
+  GalModernHlsl,
+  ADomainFunctionWithTheWrongParametersDropsTheTessellation
+)
 {
   std::string source = faf_gal_tests::kTessellatedEffect;
-  const std::string head = "Surface Place( float3 weights, ControlPoint a, ControlPoint b, ControlPoint c, uniform float scale )";
+  const std::string head =
+    "Surface Place( float3 weights, ControlPoint a, ControlPoint b, ControlPoint c, uniform float scale )";
   const std::size_t at = source.find(head);
   ASSERT_NE(at, std::string::npos);
-  source.replace(at, head.size(), "Surface Place( float3 weights, ControlPoint a, ControlPoint b, uniform float scale )");
+  source.replace(
+    at, head.size(), "Surface Place( float3 weights, ControlPoint a, ControlPoint b, uniform float scale )"
+  );
   const std::string body = "a.position * weights.x + b.position * weights.y + c.position * weights.z";
   const std::size_t bodyAt = source.find(body);
   ASSERT_NE(bodyAt, std::string::npos);
@@ -480,7 +569,10 @@ TEST(GalModernHlsl, ADomainFunctionWithTheWrongParametersDropsTheTessellation)
 }
 
 // Engine addition (ren_TextureAnisotropy): only a trilinear sampler that wraps both ways turns anisotropic.
-TEST(GalTextureFiltering, OnlyTiledTrilinearSamplersTurnAnisotropic)
+TEST(
+  GalTextureFiltering,
+  OnlyTiledTrilinearSamplersTurnAnisotropic
+)
 {
   const int saved = gTextureAnisotropy;
   SamplerDesc tiled{};
@@ -515,7 +607,10 @@ TEST(GalTextureFiltering, OnlyTiledTrilinearSamplersTurnAnisotropic)
   gTextureAnisotropy = saved;
 }
 
-TEST(GalModernHlsl, Direct3D9AlphaTestIsEmulatedInThePixelEntry)
+TEST(
+  GalModernHlsl,
+  Direct3D9AlphaTestIsEmulatedInThePixelEntry
+)
 {
   const std::string source = R"fx(
 struct PSOut { float4 colour : COLOR0; };
@@ -533,7 +628,8 @@ technique10 Water
 }
 )fx";
   EffectDescription description = ParseEffect(source);
-  ApplyDirect3D9PassStates(R"fx(
+  ApplyDirect3D9PassStates(
+    R"fx(
 technique Water
 {
     pass P0 { AlphaTestEnable = true; AlphaFunc = NotEqual; AlphaRef = 0; }
@@ -542,18 +638,22 @@ technique Water
     pass P3 { AlphaTestEnable = true; AlphaFunc = Less; AlphaRef = 1; }
 }
 )fx",
-                           description);
+    description
+  );
   const ModernEffect modern = GenerateModernHlsl(source, description);
   const std::string& hlsl = modern.hlsl;
 
   // P0 and P1 call the same function, but only P0 tests alpha: two entries.
   const Technique& water = description.techniques[0];
   EXPECT_NE(water.passes[0].pixelShader.entry, water.passes[1].pixelShader.entry);
-  EXPECT_TRUE(Contains(hlsl, "    float4 faf_output = WaterPS(p);\n"
-                             "    uint faf_alpha = (uint)round(saturate(faf_output.a) * 255.0);\n"
-                             "    uint faf_ref = 0u;\n"
-                             "    if (!(faf_alpha != faf_ref)) discard;\n"
-                             "    return faf_output;\n"));
+  EXPECT_TRUE(Contains(
+    hlsl,
+    "    float4 faf_output = WaterPS(p);\n"
+    "    uint faf_alpha = (uint)round(saturate(faf_output.a) * 255.0);\n"
+    "    uint faf_ref = 0u;\n"
+    "    if (!(faf_alpha != faf_ref)) discard;\n"
+    "    return faf_output;\n"
+  ));
   // A struct output tests its first float4 member.
   EXPECT_TRUE(Contains(hlsl, "saturate(faf_output.colour.a)"));
   EXPECT_TRUE(Contains(hlsl, "if (!(faf_alpha >= faf_ref)) discard;"));
@@ -569,9 +669,16 @@ technique Water
   EXPECT_TRUE(Contains(GenerateModernHlsl(source, plain).hlsl, "if ( a < 0.5 ) discard;"));
 }
 
-TEST(GalModernHlsl, DirectivesStaticsAndFunctionsWithoutEntriesPassThrough)
+TEST(
+  GalModernHlsl,
+  DirectivesStaticsAndFunctionsWithoutEntriesPassThrough
+)
 {
-  Generated generated = Generate("#define FOO 1\nstatic const float kScale = 2;\nfloat Helper( float x ) { return x * kScale; }\nfloat Shadowed;\nfloat Shadow( float Shadowed ) { Shadowed = 1; return Shadowed; }\nfloat Local() { float Shadowed = 2; Shadowed += 1; return Shadowed; }\n");
+  Generated generated = Generate(
+    "#define FOO 1\nstatic const float kScale = 2;\nfloat Helper( float x ) { return x * kScale; }\nfloat "
+    "Shadowed;\nfloat Shadow( float Shadowed ) { Shadowed = 1; return Shadowed; }\nfloat Local() { float Shadowed = 2; "
+    "Shadowed += 1; return Shadowed; }\n"
+  );
   const std::string& hlsl = generated.modern.hlsl;
   EXPECT_TRUE(Contains(hlsl, "#define FOO 1\n"));
   EXPECT_TRUE(Contains(hlsl, "static const float kScale = 2;"));
@@ -581,7 +688,10 @@ TEST(GalModernHlsl, DirectivesStaticsAndFunctionsWithoutEntriesPassThrough)
   EXPECT_TRUE(Contains(hlsl, "// ---- entry points (generated) ----"));
 }
 
-TEST(GalModernHlsl, WritesThroughIndicesSwizzlesAndIncrementsMakeCopies)
+TEST(
+  GalModernHlsl,
+  WritesThroughIndicesSwizzlesAndIncrementsMakeCopies
+)
 {
   Generated generated = Generate(R"fx(
 float4 Colour;
@@ -607,7 +717,10 @@ technique10 T { pass P0 { PixelShader = compile ps_4_0 PS(); } }
   EXPECT_EQ(Count(hlsl, "faf_local_ReadOnly"), 0U);
 }
 
-TEST(GalModernHlsl, RegisterBudgetOverflowIsNoted)
+TEST(
+  GalModernHlsl,
+  RegisterBudgetOverflowIsNoted
+)
 {
   std::string source;
   for (int index = 0; index < 65; ++index) {

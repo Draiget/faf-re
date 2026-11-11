@@ -32,7 +32,13 @@ namespace faf::editor
     constexpr int kTexturePin = kEmitterCurveCount;
     constexpr int kRampPin = kEmitterCurveCount + 1;
 
-    ParamDef Num(const char* name, const float initial, const float min, const float max, const char* help = "")
+    ParamDef Num(
+      const char* name,
+      const float initial,
+      const float min,
+      const float max,
+      const char* help = ""
+    )
     {
       ParamDef def;
       def.name = name;
@@ -44,14 +50,22 @@ namespace faf::editor
       return def;
     }
 
-    ParamDef Flag(const char* name, const bool initial, const char* help = "")
+    ParamDef Flag(
+      const char* name,
+      const bool initial,
+      const char* help = ""
+    )
     {
       ParamDef def = Num(name, initial ? 1.0f : 0.0f, 0.0f, 1.0f, help);
       def.kind = ParamKind::Bool;
       return def;
     }
 
-    ParamDef Text(const char* name, const char* initial, const char* help = "")
+    ParamDef Text(
+      const char* name,
+      const char* initial,
+      const char* help = ""
+    )
     {
       ParamDef def;
       def.name = name;
@@ -61,7 +75,11 @@ namespace faf::editor
       return def;
     }
 
-    ParamDef Choice(const char* name, std::vector<std::string> choices, const int initial)
+    ParamDef Choice(
+      const char* name,
+      std::vector<std::string> choices,
+      const int initial
+    )
     {
       ParamDef def;
       def.name = name;
@@ -71,7 +89,10 @@ namespace faf::editor
       return def;
     }
 
-    PinDef Pin(const char* name, const PinType type)
+    PinDef Pin(
+      const char* name,
+      const PinType type
+    )
     {
       return PinDef{name, type, {}};
     }
@@ -81,8 +102,16 @@ namespace faf::editor
       NodeTypeRegistry registry;
       // The output: up to twelve emitters played together (a template's list).
       {
-        NodeType effect{kEffectOutput, "Effect", "Output",
-                        "What the graph makes: the emitters played together, as a game effect (an EffectTemplates list) is.", {}, {}, {}, true};
+        NodeType effect{
+          kEffectOutput,
+          "Effect",
+          "Output",
+          "What the graph makes: the emitters played together, as a game effect (an EffectTemplates list) is.",
+          {},
+          {},
+          {},
+          true
+        };
         for (int i = 1; i <= 12; ++i) {
           effect.inputs.push_back(PinDef{"Emitter " + std::to_string(i), PinType::Emitter, {}});
         }
@@ -91,65 +120,152 @@ namespace faf::editor
       }
       // An emitter: its file's settings; its curves and textures through its pins.
       {
-        NodeType emitter{kEmitterNode, "Emitter", "Emitters",
-                         "One emitter file: its settings here, its 21 curves and its textures from the nodes linked to its pins.", {}, {Pin("Emitter", PinType::Emitter)}, {}, false};
+        NodeType emitter{
+          kEmitterNode,
+          "Emitter",
+          "Emitters",
+          "One emitter file: its settings here, its 21 curves and its textures from the nodes linked to its pins.",
+          {},
+          {Pin("Emitter", PinType::Emitter)},
+          {},
+          false
+        };
         for (int c = 0; c < kEmitterCurveCount; ++c) {
           emitter.inputs.push_back(PinDef{CurveInfo(c).caption, PinType::Curve, {}});
         }
         emitter.inputs.push_back(Pin("Texture", PinType::Texture));
         emitter.inputs.push_back(Pin("Ramp", PinType::Texture));
         std::vector<std::string> blends(std::begin(kEmitterBlendModes), std::end(kEmitterBlendModes));
-        emitter.params = {Text("Name", "new_emitter", "The file's name (without .bp)"),
-                          Text("Id", "new_emitter", "BlueprintId (FAF's loader replaces it with the file's path)"),
-                          Num("Lifetime", 10.0f, -1.0f, 200.0f, "Ticks the emitter lives (10 a second); -1: until destroyed"),
-                          Num("Repeat time", 10.0f, 0.1f, 200.0f, "Ticks after which its curves start over"),
-                          Choice("Blend", blends, 0),
-                          Num("Frames", 1.0f, 1.0f, 64.0f, "Animation frames across the texture"),
-                          Num("Strips", 1.0f, 1.0f, 64.0f, "Rows of the texture (Texture Selection picks one)"),
-                          Num("LOD cutoff", 100.0f, 0.0f, 2000.0f, "The camera distance beyond which it doesn't emit"),
-                          Num("Sort order", 0.0f, -100.0f, 100.0f)};
+        emitter.params = {
+          Text("Name", "new_emitter", "The file's name (without .bp)"),
+          Text("Id", "new_emitter", "BlueprintId (FAF's loader replaces it with the file's path)"),
+          Num("Lifetime", 10.0f, -1.0f, 200.0f, "Ticks the emitter lives (10 a second); -1: until destroyed"),
+          Num("Repeat time", 10.0f, 0.1f, 200.0f, "Ticks after which its curves start over"),
+          Choice("Blend", blends, 0),
+          Num("Frames", 1.0f, 1.0f, 64.0f, "Animation frames across the texture"),
+          Num("Strips", 1.0f, 1.0f, 64.0f, "Rows of the texture (Texture Selection picks one)"),
+          Num("LOD cutoff", 100.0f, 0.0f, 2000.0f, "The camera distance beyond which it doesn't emit"),
+          Num("Sort order", 0.0f, -100.0f, 100.0f)
+        };
         for (int f = 0; f < kEmitterFlagCount; ++f) {
-          emitter.params.push_back(Flag(FlagName(f), f == kEmitIfVisible || f == kCatchupEmit || f == kInterpolateEmission));
+          emitter.params.push_back(
+            Flag(FlagName(f), f == kEmitIfVisible || f == kCatchupEmit || f == kInterpolateEmission)
+          );
         }
         emitter.params.push_back(Flag("Low fidelity", true));
         emitter.params.push_back(Flag("Medium fidelity", true));
         emitter.params.push_back(Flag("High fidelity", true));
         registry.Add(std::move(emitter));
       }
-      registry.Add({kCurveNode, "Curve", "Curves", "Keys over the emitter's time: each a time, a value and a random spread around it.",
-                    {}, {Pin("Curve", PinType::Curve)},
-                    {Num("Time range", 10.0f, 0.1f, 200.0f, "The curve's time axis in ticks"), Text("Keys", "5 1 0", "time value spread; time value spread")}, false});
-      registry.Add({kConstantNode, "Constant", "Curves", "One value, with a random spread around it, for the whole time.",
-                    {}, {Pin("Curve", PinType::Curve)},
-                    {Num("Value", 1.0f, -100.0f, 100.0f), Num("Spread", 0.0f, 0.0f, 100.0f, "Each particle gets the value plus a random amount within half of it either way"),
-                     Num("Key at", 0.0f, 0.0f, 200.0f, "Where the file keeps its one key (no effect on the value)"),
-                     Num("Time range", -1.0f, -1.0f, 200.0f, "The file's time range for it (-1: the emitter's repeat time)")}, false});
-      registry.Add({"CurveRandom", "Random Range", "Curves", "Any value from Min to Max, picked for each particle.",
-                    {}, {Pin("Curve", PinType::Curve)}, {Num("Min", 0.0f, -100.0f, 100.0f), Num("Max", 1.0f, -100.0f, 100.0f)}, false});
-      registry.Add({"CurveOverLife", "Over Time", "Curves", "From one value at the start of the emitter's time to another at its end.",
-                    {}, {Pin("Curve", PinType::Curve)}, {Num("From", 0.0f, -100.0f, 100.0f), Num("To", 1.0f, -100.0f, 100.0f), Num("Spread", 0.0f, 0.0f, 100.0f)}, false});
-      registry.Add({"CurveScale", "Multiply", "Math", "The curve times a factor (its spread too).",
-                    {Pin("Curve", PinType::Curve)}, {Pin("Curve", PinType::Curve)}, {Num("Factor", 2.0f, -100.0f, 100.0f)}, false});
-      registry.Add({"CurveAdd", "Add", "Math", "The curve plus an amount.",
-                    {Pin("Curve", PinType::Curve)}, {Pin("Curve", PinType::Curve)}, {Num("Amount", 1.0f, -100.0f, 100.0f)}, false});
-      registry.Add({kTextureNode, "Texture", "Textures", "A particle texture or colour ramp from the game's files.",
-                    {}, {Pin("Texture", PinType::Texture)}, {Text("Texture", "/textures/particles/smoke_white_01.dds", "The texture's path")}, false});
+      registry.Add(
+        {kCurveNode,
+         "Curve",
+         "Curves",
+         "Keys over the emitter's time: each a time, a value and a random spread around it.",
+         {},
+         {Pin("Curve", PinType::Curve)},
+         {Num("Time range", 10.0f, 0.1f, 200.0f, "The curve's time axis in ticks"),
+          Text("Keys", "5 1 0", "time value spread; time value spread")},
+         false}
+      );
+      registry.Add(
+        {kConstantNode,
+         "Constant",
+         "Curves",
+         "One value, with a random spread around it, for the whole time.",
+         {},
+         {Pin("Curve", PinType::Curve)},
+         {Num("Value", 1.0f, -100.0f, 100.0f),
+          Num(
+            "Spread",
+            0.0f,
+            0.0f,
+            100.0f,
+            "Each particle gets the value plus a random amount within half of it either way"
+          ),
+          Num("Key at", 0.0f, 0.0f, 200.0f, "Where the file keeps its one key (no effect on the value)"),
+          Num("Time range", -1.0f, -1.0f, 200.0f, "The file's time range for it (-1: the emitter's repeat time)")},
+         false}
+      );
+      registry.Add(
+        {"CurveRandom",
+         "Random Range",
+         "Curves",
+         "Any value from Min to Max, picked for each particle.",
+         {},
+         {Pin("Curve", PinType::Curve)},
+         {Num("Min", 0.0f, -100.0f, 100.0f), Num("Max", 1.0f, -100.0f, 100.0f)},
+         false}
+      );
+      registry.Add(
+        {"CurveOverLife",
+         "Over Time",
+         "Curves",
+         "From one value at the start of the emitter's time to another at its end.",
+         {},
+         {Pin("Curve", PinType::Curve)},
+         {Num("From", 0.0f, -100.0f, 100.0f), Num("To", 1.0f, -100.0f, 100.0f), Num("Spread", 0.0f, 0.0f, 100.0f)},
+         false}
+      );
+      registry.Add(
+        {"CurveScale",
+         "Multiply",
+         "Math",
+         "The curve times a factor (its spread too).",
+         {Pin("Curve", PinType::Curve)},
+         {Pin("Curve", PinType::Curve)},
+         {Num("Factor", 2.0f, -100.0f, 100.0f)},
+         false}
+      );
+      registry.Add(
+        {"CurveAdd",
+         "Add",
+         "Math",
+         "The curve plus an amount.",
+         {Pin("Curve", PinType::Curve)},
+         {Pin("Curve", PinType::Curve)},
+         {Num("Amount", 1.0f, -100.0f, 100.0f)},
+         false}
+      );
+      registry.Add(
+        {kTextureNode,
+         "Texture",
+         "Textures",
+         "A particle texture or colour ramp from the game's files.",
+         {},
+         {Pin("Texture", PinType::Texture)},
+         {Text("Texture", "/textures/particles/smoke_white_01.dds", "The texture's path")},
+         false}
+      );
       return registry;
     }
 
-    float F(const GraphNode& node, const std::size_t param)
+    float F(
+      const GraphNode& node,
+      const std::size_t param
+    )
     {
       return node.params[param].value[0];
     }
 
-    void SetF(NodeGraph& graph, const int id, const std::size_t param, const float value)
+    void SetF(
+      NodeGraph& graph,
+      const int id,
+      const std::size_t param,
+      const float value
+    )
     {
       ParamValue v;
       v.value = {value, 0.0f, 0.0f, 0.0f};
       graph.SetParam(id, param, v);
     }
 
-    void SetText(NodeGraph& graph, const int id, const std::size_t param, const std::string& text)
+    void SetText(
+      NodeGraph& graph,
+      const int id,
+      const std::size_t param,
+      const std::string& text
+    )
     {
       ParamValue v;
       v.text = text;
@@ -157,7 +273,12 @@ namespace faf::editor
     }
 
     /** The curve a node's output makes (`range`: the emitter's repeat time, for nodes without one). */
-    EmitterCurve EvaluateCurve(const NodeGraph& graph, const int id, const float range, const int depth = 0)
+    EmitterCurve EvaluateCurve(
+      const NodeGraph& graph,
+      const int id,
+      const float range,
+      const int depth = 0
+    )
     {
       EmitterCurve curve;
       curve.xRange = range;
@@ -195,7 +316,9 @@ namespace faf::editor
       return curve;
     }
 
-    std::string Number(const float value)
+    std::string Number(
+      const float value
+    )
     {
       char text[32];
       (void)std::snprintf(text, sizeof(text), "%.9g", static_cast<double>(value));
@@ -209,7 +332,9 @@ namespace faf::editor
     return types;
   }
 
-  std::string CurveKeysText(const std::vector<EmitterKey>& keys)
+  std::string CurveKeysText(
+    const std::vector<EmitterKey>& keys
+  )
   {
     std::string out;
     for (const EmitterKey& key : keys) {
@@ -218,7 +343,9 @@ namespace faf::editor
     return out;
   }
 
-  std::vector<EmitterKey> CurveKeysFromText(const std::string& text)
+  std::vector<EmitterKey> CurveKeysFromText(
+    const std::string& text
+  )
   {
     std::vector<EmitterKey> keys;
     std::size_t at = 0;
@@ -246,7 +373,13 @@ namespace faf::editor
     return keys;
   }
 
-  int AddEmitterNodes(NodeGraph& graph, const EmitterBlueprint& e, const std::string& name, const float x, const float y)
+  int AddEmitterNodes(
+    NodeGraph& graph,
+    const EmitterBlueprint& e,
+    const std::string& name,
+    const float x,
+    const float y
+  )
   {
     const int emitter = graph.AddNode(kEmitterNode, x, y);
     SetText(graph, emitter, kName, name);
@@ -259,7 +392,9 @@ namespace faf::editor
     SetF(graph, emitter, kLod, e.lodCutoff);
     SetF(graph, emitter, kSort, e.sortOrder);
     for (int f = 0; f < kEmitterFlagCount; ++f) {
-      SetF(graph, emitter, kFirstFlag + static_cast<std::size_t>(f), e.flags[static_cast<std::size_t>(f)] ? 1.0f : 0.0f);
+      SetF(
+        graph, emitter, kFirstFlag + static_cast<std::size_t>(f), e.flags[static_cast<std::size_t>(f)] ? 1.0f : 0.0f
+      );
     }
     SetF(graph, emitter, kLow, e.lowFidelity ? 1.0f : 0.0f);
     SetF(graph, emitter, kMed, e.medFidelity ? 1.0f : 0.0f);
@@ -294,7 +429,11 @@ namespace faf::editor
     return emitter;
   }
 
-  void BuildEffectGraph(NodeGraph& graph, const std::string& effectName, const std::vector<std::pair<std::string, EmitterBlueprint>>& emitters)
+  void BuildEffectGraph(
+    NodeGraph& graph,
+    const std::string& effectName,
+    const std::vector<std::pair<std::string, EmitterBlueprint>>& emitters
+  )
   {
     graph.Clear();
     const float outputX = 300.0f;
@@ -302,12 +441,17 @@ namespace faf::editor
     SetText(graph, output, 0, effectName);
     // Each emitter a block of its own, stacked down the left.
     for (std::size_t i = 0; i < emitters.size() && i < 12; ++i) {
-      const int emitter = AddEmitterNodes(graph, emitters[i].second, emitters[i].first, 0.0f, static_cast<float>(i) * 1450.0f);
+      const int emitter =
+        AddEmitterNodes(graph, emitters[i].second, emitters[i].first, 0.0f, static_cast<float>(i) * 1450.0f);
       (void)graph.Link(emitter, 0, output, static_cast<int>(i));
     }
   }
 
-  bool GraphEmitters(const NodeGraph& graph, std::vector<std::pair<std::string, EmitterBlueprint>>& out, std::string& error)
+  bool GraphEmitters(
+    const NodeGraph& graph,
+    std::vector<std::pair<std::string, EmitterBlueprint>>& out,
+    std::string& error
+  )
   {
     out.clear();
     const int output = graph.OutputNode();
@@ -343,7 +487,8 @@ namespace faf::editor
         } else {
           // Unlinked: the curve's starting key, as retail's editor starts a new emitter.
           const EmitterCurveInfo& info = CurveInfo(c);
-          e.curves[static_cast<std::size_t>(c)] = EmitterCurve{e.repeatTime, {{e.repeatTime * 0.5f, info.initialValue, info.initialSpread}}};
+          e.curves[static_cast<std::size_t>(c)] =
+            EmitterCurve{e.repeatTime, {{e.repeatTime * 0.5f, info.initialValue, info.initialSpread}}};
         }
       }
       const auto texture = [&](const int texturePin) {
@@ -362,7 +507,9 @@ namespace faf::editor
     return true;
   }
 
-  std::vector<EffectTemplate> ParseEffectTemplates(const std::string& luaText)
+  std::vector<EffectTemplate> ParseEffectTemplates(
+    const std::string& luaText
+  )
   {
     // Comments out first (`--[[ ]]` and `--`).
     std::string text;
@@ -380,7 +527,9 @@ namespace faf::editor
     std::map<std::string, std::string> variables;
     std::vector<EffectTemplate> templates;
     std::size_t at = 0;
-    const auto isName = [](const char c) { return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_'; };
+    const auto isName = [](const char c) {
+      return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
+    };
     while (at < text.size()) {
       // A top-level assignment: at a line's start, `Name = 'text'` or `Name = { ... }`.
       if ((at == 0 || text[at - 1] == '\n') && isName(text[at])) {

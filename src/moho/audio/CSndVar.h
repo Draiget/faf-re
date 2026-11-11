@@ -13,7 +13,7 @@ namespace gpg
   class WriteArchive;
   class SerConstructResult;
   class SerSaveConstructArgsResult;
-}
+} // namespace gpg
 
 namespace gpg
 {
@@ -43,9 +43,8 @@ namespace moho
      * owned by the sound system. Inlined into `SerConstructHelper<CSndVar>::Construct`
      * 0x004E0560.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * What it does:
@@ -53,7 +52,10 @@ namespace moho
      * `SerSaveConstructHelper<CSndVar>::SaveConstructArgs` 0x004E0430.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     inline static gpg::RType* sType = nullptr;
@@ -88,7 +90,7 @@ namespace moho
     mutable std::uint16_t mState;   // +0x00
     mutable std::uint8_t mResolved; // +0x02
     std::uint8_t mReserved03;       // +0x03
-    fa::string mName;            // +0x04
+    fa::string mName;               // +0x04
   };
 
   /**

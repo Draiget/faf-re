@@ -21,7 +21,10 @@ namespace faf::server
 {
   namespace
   {
-    void WriteLane(remote::net::ByteWriter& writer, const remote::wire::BitWriter& lane)
+    void WriteLane(
+      remote::net::ByteWriter& writer,
+      const remote::wire::BitWriter& lane
+    )
     {
       const auto bytes = lane.Bytes();
       writer.Varint(bytes.size());
@@ -29,7 +32,12 @@ namespace faf::server
     }
   } // namespace
 
-  std::vector<std::uint8_t> MakeGameInfo(const float mapSizeX, const float mapSizeZ, const std::int32_t army, const std::uint32_t source)
+  std::vector<std::uint8_t> MakeGameInfo(
+    const float mapSizeX,
+    const float mapSizeZ,
+    const std::int32_t army,
+    const std::uint32_t source
+  )
   {
     std::vector<std::uint8_t> message(1u + 2u * sizeof(float) + sizeof(army) + sizeof(source));
     message[0] = static_cast<std::uint8_t>(remote::net::ESeatMessage::GameInfo);
@@ -44,8 +52,14 @@ namespace faf::server
   }
 
   CServerViews::CServerViews(
-    const remote::wire::SContentTables& tables, moho::RRuleGameRules& rules, const float mapSizeX, const float mapSizeZ, CServerNet& net,
-    std::map<std::size_t, std::int32_t> players, const unsigned int threads, const bool teams
+    const remote::wire::SContentTables& tables,
+    moho::RRuleGameRules& rules,
+    const float mapSizeX,
+    const float mapSizeZ,
+    CServerNet& net,
+    std::map<std::size_t, std::int32_t> players,
+    const unsigned int threads,
+    const bool teams
   )
     : CViewLanes(tables, mapSizeX, mapSizeZ)
     , mRules(rules)
@@ -118,17 +132,19 @@ namespace faf::server
       }
     }
 
-    mNet.Intake().Drain(
-      &mRules,
-      [this](const std::int32_t army) -> const remote::CViewIdMap* {
-        return army >= 0 && static_cast<std::size_t>(army) < ViewCount() ? &IdMap(army) : nullptr;
-      },
-      [this](const std::int32_t army, const std::uint32_t id) { return army >= 0 && ViewHoldsEntity(static_cast<std::size_t>(army), id); },
-      [this](const std::int32_t uid, std::vector<std::uint8_t> message) { mNet.QueueView(uid, std::move(message)); }
-    );
+    mNet.Intake().Drain(&mRules, [this](const std::int32_t army) -> const remote::CViewIdMap* {
+      return army >= 0 && static_cast<std::size_t>(army) < ViewCount() ? &IdMap(army) : nullptr;
+    }, [this](const std::int32_t army, const std::uint32_t id) {
+      return army >= 0 && ViewHoldsEntity(static_cast<std::size_t>(army), id);
+    }, [this](const std::int32_t uid, std::vector<std::uint8_t> message) {
+      mNet.QueueView(uid, std::move(message));
+    });
   }
 
-  void CServerViews::OnLanesEncoded(const std::size_t army, const SLanes& lanes)
+  void CServerViews::OnLanesEncoded(
+    const std::size_t army,
+    const SLanes& lanes
+  )
   {
     const auto player = mPlayers.find(army);
     if (player == mPlayers.end()) {
@@ -141,8 +157,8 @@ namespace faf::server
     mGridBytes.fetch_add(lanes.grids.Bytes().size(), std::memory_order_relaxed);
     std::vector<std::uint8_t> message;
     message.reserve(
-      30u + lanes.frame.Bytes().size() + teamFrame.Bytes().size() + lanes.armies.Bytes().size() + lanes.grids.Bytes().size()
-      + (lanes.poses != nullptr ? lanes.poses->Bytes().size() : 0u)
+      30u + lanes.frame.Bytes().size() + teamFrame.Bytes().size() + lanes.armies.Bytes().size() +
+      lanes.grids.Bytes().size() + (lanes.poses != nullptr ? lanes.poses->Bytes().size() : 0u)
     );
     remote::net::ByteWriter writer(message);
     writer.Byte(static_cast<std::uint8_t>(remote::net::ESeatMessage::View));
@@ -173,12 +189,16 @@ namespace faf::server
     }
   }
 
-  void CServerViews::OnViewFrames(moho::Sim& sim)
+  void CServerViews::OnViewFrames(
+    moho::Sim& sim
+  )
   {
     // #178: the frames' headers carry the game speed and the server's clock for the clients' beat clocks.
     SetFrameClock(
       mFrameSimRate.load(std::memory_order_relaxed),
-      static_cast<std::uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - mStart).count())
+      static_cast<std::uint32_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - mStart).count()
+      )
     );
     // The builders are done with the beat (they interned what the frames name); its views go out after this.
     if (mSessionTables.HasPending()) {
@@ -200,7 +220,10 @@ namespace faf::server
     CViewLanes::OnViewFrames(sim);
   }
 
-  void CServerViews::OnLuaRouterBeat(moho::Sim& sim, remote::CSyncRouter& router)
+  void CServerViews::OnLuaRouterBeat(
+    moho::Sim& sim,
+    remote::CSyncRouter& router
+  )
   {
     (void)sim;
     // The same beat's `Sync` (`CSyncRouter::OnSyncTable` applies the request before it routes the table).
@@ -215,7 +238,9 @@ namespace faf::server
     mLuaResyncs.clear();
   }
 
-  void CServerViews::OnLuaRouterMade(remote::CSyncRouter& router)
+  void CServerViews::OnLuaRouterMade(
+    remote::CSyncRouter& router
+  )
   {
     // On the sim's thread, at the end of `Sim::Sync` (SimTick.cpp), after the beat's views were encoded: the same
     // beat's `Sync` for each player, in the order queued after that beat's view unless the views' pipeline is late.
@@ -224,7 +249,11 @@ namespace faf::server
         if (WatchEverything(view)) {
           router.MoveView(view, -1); // its `Sync` as focus -1's, with `NoteFocusArmyChanged`
           if (const auto player = mPlayers.find(view); player != mPlayers.end()) {
-            gpg::Logf("views: the player of army index %zu (uid %d) has left every army; they watch everything from now on", view, player->second);
+            gpg::Logf(
+              "views: the player of army index %zu (uid %d) has left every army; they watch everything from now on",
+              view,
+              player->second
+            );
           }
         }
       });
@@ -232,8 +261,8 @@ namespace faf::server
     router.SetPayloadObserver([this, &router](moho::Sim& sim) {
       const auto beat = static_cast<std::uint64_t>(sim.mCurBeat);
       // Plan WP15.4: the sim's own timeouts are unlimited (the server keeps them), so its `TimeoutsRemaining` reads -1.
-      // FAF's pause button takes the count from the first paused beat (UserSync.lua OnPause, tabs.lua): from then on each
-      // player's `Sync` carries what the pausing player has left after this pause, as the server counts it.
+      // FAF's pause button takes the count from the first paused beat (UserSync.lua OnPause, tabs.lua): from then on
+      // each player's `Sync` carries what the pausing player has left after this pause, as the server counts it.
       const std::int32_t pausedBy = sim.mPausedByCommandSource;
       if (pausedBy != mPausedSeen) {
         mPausedSeen = pausedBy;
@@ -245,8 +274,14 @@ namespace faf::server
           if (granted && *granted >= 0) {
             mPauseShown = std::max(*granted - seen, 0);
           }
-          gpg::Logf("server views: beat %d paused by source %d: granted %d, seen %d, shown %d", static_cast<int>(sim.mCurBeat), static_cast<int>(pausedBy),
-                    granted ? *granted : -99, seen, mPauseShown ? *mPauseShown : -99);
+          gpg::Logf(
+            "server views: beat %d paused by source %d: granted %d, seen %d, shown %d",
+            static_cast<int>(sim.mCurBeat),
+            static_cast<int>(pausedBy),
+            granted ? *granted : -99,
+            seen,
+            mPauseShown ? *mPauseShown : -99
+          );
         }
       }
       static constexpr std::string_view kTimeoutsKey = "TimeoutsRemaining";
@@ -256,8 +291,11 @@ namespace faf::server
           continue;
         }
         std::span<const std::uint8_t> payload = router.Payload(army);
-        if (mPauseShown && std::search(payload.begin(), payload.end(), kTimeoutsKey.begin(), kTimeoutsKey.end()) != payload.end() &&
-            SetTableNumber(payload, kTimeoutsKey, static_cast<float>(*mPauseShown), rewritten)) {
+        if (
+          mPauseShown &&
+          std::search(payload.begin(), payload.end(), kTimeoutsKey.begin(), kTimeoutsKey.end()) != payload.end() &&
+          SetTableNumber(payload, kTimeoutsKey, static_cast<float>(*mPauseShown), rewritten)
+        ) {
           payload = rewritten;
         }
         remote::wire::BitWriter lane;
@@ -282,9 +320,10 @@ namespace faf::server
     const auto megabytes = [](const std::atomic<std::uint64_t>& bytes) {
       return std::to_string(bytes.load(std::memory_order_relaxed) / (1024u * 1024u));
     };
-    return "views so far: entities " + megabytes(mFrameBytes) + " MB, armies " + megabytes(mArmyBytes) + " MB, grids " + megabytes(mGridBytes) + " MB, Lua " + megabytes(mLuaBytes) + " MB, poses " + megabytes(mPoseBytes) + " MB, session tables "
-         + std::to_string(mTableRecords.load(std::memory_order_relaxed)) + " records of "
-         + std::to_string(mTableBytes.load(std::memory_order_relaxed) / 1024u) + " KB to each player";
+    return "views so far: entities " + megabytes(mFrameBytes) + " MB, armies " + megabytes(mArmyBytes) + " MB, grids " +
+      megabytes(mGridBytes) + " MB, Lua " + megabytes(mLuaBytes) + " MB, poses " + megabytes(mPoseBytes) +
+      " MB, session tables " + std::to_string(mTableRecords.load(std::memory_order_relaxed)) + " records of " +
+      std::to_string(mTableBytes.load(std::memory_order_relaxed) / 1024u) + " KB to each player";
   }
 
   void CServerViews::OnViewsFinished()

@@ -46,7 +46,10 @@ INetDatagramSocket::~INetDatagramSocket() = default;
  * Opens/configures non-blocking broadcast UDP socket, binds it to `port`,
  * and returns datagram-socket implementation bound to `handler`.
  */
-INetDatagramSocket* moho::NET_OpenDatagramSocket(const u_short port, INetDatagramHandler* handler)
+INetDatagramSocket* moho::NET_OpenDatagramSocket(
+  const u_short port,
+  INetDatagramHandler* handler
+)
 {
   if (!NET_Init()) {
     return nullptr;

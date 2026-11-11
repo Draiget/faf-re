@@ -8,10 +8,10 @@
 namespace faf::editor
 {
   /**
-   * What becomes of a unit a map's `_save.lua` holds, read from FAF's Lua (lua/sim/ScenarioUtilities.lua): units are only
-   * data until something creates their group. At the start the game creates each army's `INITIAL` group (a civilian
-   * army's unless the lobby's Civilians option is "removed") and turns its `WRECKAGE` group into wrecks; any other group
-   * exists only when the map's script creates it (`CreateArmyGroup(army, group, wreckage)`).
+   * What becomes of a unit a map's `_save.lua` holds, read from FAF's Lua (lua/sim/ScenarioUtilities.lua): units are
+   * only data until something creates their group. At the start the game creates each army's `INITIAL` group (a
+   * civilian army's unless the lobby's Civilians option is "removed") and turns its `WRECKAGE` group into wrecks; any
+   * other group exists only when the map's script creates it (`CreateArmyGroup(army, group, wreckage)`).
    */
   struct UnitFate
   {
@@ -37,7 +37,8 @@ namespace faf::editor
     std::string text;
   };
 
-  /** One `CreateArmyGroup(army, group, wreckage)` (or a kin) in a map's script: names as written, `..` a name's start. */
+  /** One `CreateArmyGroup(army, group, wreckage)` (or a kin) in a map's script: names as written, `..` a name's start.
+   */
   struct ScriptGroupCreation
   {
     /** The army, when written as a string ('ARMY_17'); empty when made at run time. */
@@ -52,7 +53,8 @@ namespace faf::editor
   /** The names of the groups from under the army's root down to the unit's (empty when the unit isn't there). */
   std::vector<std::string> UnitGroupPath(const UnitGroup& root, const std::string& unit);
 
-  /** The fate of a unit in the groups `path` of an army (`civilian`: not a player slot), given the map's script text. */
+  /** The fate of a unit in the groups `path` of an army (`civilian`: not a player slot), given the map's script text.
+   */
   UnitFate FateOfUnit(const std::vector<std::string>& path, bool civilian, const std::string& script);
 
   /**
@@ -66,5 +68,6 @@ namespace faf::editor
     double mass = 0.0;
     double energy = 0.0;
   };
-  WreckValue WreckOfUnit(const std::string& blueprintText, double buildCostMass, double buildCostEnergy, bool underwater);
+  WreckValue
+  WreckOfUnit(const std::string& blueprintText, double buildCostMass, double buildCostEnergy, bool underwater);
 } // namespace faf::editor

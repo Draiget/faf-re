@@ -45,7 +45,6 @@ namespace moho
     void AddEnums();
   };
 
-
   /**
    * Address: 0x00BCEBD0 (FUN_00BCEBD0, register_EAiTargetTypeTypeInfo)
    *

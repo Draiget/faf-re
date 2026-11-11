@@ -13,7 +13,10 @@ namespace moho
   TValue SCR_FromLuaCopy(const LuaPlus::LuaObject& object);
 
   template <typename TValue>
-  TValue* SCR_FromLuaCopy(const LuaPlus::LuaObject* object, TValue* outValue)
+  TValue* SCR_FromLuaCopy(
+    const LuaPlus::LuaObject* object,
+    TValue* outValue
+  )
   {
     if (!outValue || !object) {
       return outValue;

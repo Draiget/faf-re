@@ -44,7 +44,11 @@ struct PROCESS_MEMORY_COUNTERS_EX
 };
 
 // The calling process only (`process` is GetCurrentProcess()); `size` picks the structure.
-inline BOOL GetProcessMemoryInfo(HANDLE process, PROCESS_MEMORY_COUNTERS* const counters, const DWORD size)
+inline BOOL GetProcessMemoryInfo(
+  HANDLE process,
+  PROCESS_MEMORY_COUNTERS* const counters,
+  const DWORD size
+)
 {
   (void)process;
   if (counters == nullptr || size < sizeof(PROCESS_MEMORY_COUNTERS)) {

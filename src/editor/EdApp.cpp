@@ -101,19 +101,32 @@ namespace faf::editor
     float gUiScaleRead = -1.0f;
     float gUiScaleNow = 1.0f;
 
-    void* UiSettingsOpen(ImGuiContext*, ImGuiSettingsHandler*, const char* const name)
+    void* UiSettingsOpen(
+      ImGuiContext*,
+      ImGuiSettingsHandler*,
+      const char* const name
+    )
     {
       return std::strcmp(name, "Ui") == 0 ? &gUiScaleRead : nullptr;
     }
 
-    void UiSettingsLine(ImGuiContext*, ImGuiSettingsHandler*, void*, const char* const line)
+    void UiSettingsLine(
+      ImGuiContext*,
+      ImGuiSettingsHandler*,
+      void*,
+      const char* const line
+    )
     {
       if (float scale = 0.0f; std::sscanf(line, "Scale=%f", &scale) == 1 && scale >= 0.5f && scale <= 3.0f) {
         gUiScaleRead = scale;
       }
     }
 
-    void UiSettingsWrite(ImGuiContext*, ImGuiSettingsHandler* const handler, ImGuiTextBuffer* const out)
+    void UiSettingsWrite(
+      ImGuiContext*,
+      ImGuiSettingsHandler* const handler,
+      ImGuiTextBuffer* const out
+    )
     {
       out->appendf("[%s][Ui]\nScale=%.3f\n\n", handler->TypeName, static_cast<double>(gUiScaleNow));
     }
@@ -184,12 +197,17 @@ namespace faf::editor
     std::vector<RECT> gOverView;
 
     /** Whether a mouse message at `at` (the panels' window's client point) belongs to the 3D view under the panels. */
-    [[nodiscard]] bool MouseIsTheViews(const POINT at)
+    [[nodiscard]] bool MouseIsTheViews(
+      const POINT at
+    )
     {
       if (!gComposite || gViewWindow == nullptr || ::PtInRect(&gViewRect, at) == FALSE) {
         return false;
       }
-      if (ImGui::GetCurrentContext() != nullptr && (ImGui::GetCurrentContext()->ActiveId != 0 || ImGui::GetTopMostPopupModal() != nullptr)) {
+      if (
+        ImGui::GetCurrentContext() != nullptr &&
+        (ImGui::GetCurrentContext()->ActiveId != 0 || ImGui::GetTopMostPopupModal() != nullptr)
+      ) {
         return false; // a drag that began on a panel, or a dialog
       }
       for (const RECT& over : gOverView) {
@@ -233,7 +251,9 @@ namespace faf::editor
     }
 
     /** Whether this Windows user can list and write `folder`'s maps (another user's Documents can't). */
-    [[nodiscard]] bool VaultUsable(const std::filesystem::path& folder)
+    [[nodiscard]] bool VaultUsable(
+      const std::filesystem::path& folder
+    )
     {
       std::error_code code;
       if (folder.empty() || !std::filesystem::is_directory(folder, code)) {
@@ -259,10 +279,14 @@ namespace faf::editor
      * downloaded into another one were gone after a restart: user report). A folder whose name the game
      * already lists is left alone, as the init file does (two folders of one name would mix).
      */
-    void MountVaultMaps(const std::filesystem::path& vault)
+    void MountVaultMaps(
+      const std::filesystem::path& vault
+    )
     {
       const auto lower = [](std::string text) {
-        std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+          return static_cast<char>(std::tolower(c));
+        });
         return text;
       };
       moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS();
@@ -297,8 +321,11 @@ namespace faf::editor
         gpg::Warnf("editor: the vault's %zu map folders not in the game's list couldn't be mounted", folders.size());
         return;
       }
-      gpg::Logf("editor: mounted %zu map folders of the vault the init file doesn't mount (first: %s)", folders.size(),
-                folders.front().first.string().c_str());
+      gpg::Logf(
+        "editor: mounted %zu map folders of the vault the init file doesn't mount (first: %s)",
+        folders.size(),
+        folders.front().first.string().c_str()
+      );
     }
 
     void OnMenuCommand(UINT command);
@@ -312,7 +339,12 @@ namespace faf::editor
      * The game's viewport keeps its own input (mouse and keys reach the game as in the game); only F5, the
      * editor's Play/Stop, stops here, whatever a player's own key bindings say.
      */
-    LRESULT CALLBACK EditorViewportProc(const HWND window, const UINT message, const WPARAM wParam, const LPARAM lParam)
+    LRESULT CALLBACK EditorViewportProc(
+      const HWND window,
+      const UINT message,
+      const WPARAM wParam,
+      const LPARAM lParam
+    )
     {
       if ((message == WM_KEYDOWN || message == WM_KEYUP) && wParam == VK_F5) {
         if (message == WM_KEYDOWN && (lParam & (1 << 30)) == 0) {
@@ -333,14 +365,22 @@ namespace faf::editor
       }
       // The editor's view in front of a play: what it doesn't take doesn't reach the game behind it either (a click
       // there must not order the session's units).
-      if (EditorViewOverPlay() && ((message >= WM_MOUSEFIRST && message <= WM_MOUSELAST) || (message >= WM_KEYFIRST && message <= WM_KEYLAST))) {
+      if (
+        EditorViewOverPlay() &&
+        ((message >= WM_MOUSEFIRST && message <= WM_MOUSELAST) || (message >= WM_KEYFIRST && message <= WM_KEYLAST))
+      ) {
         return 0;
       }
       return ::CallWindowProcW(gViewportProc, window, message, wParam, lParam);
     }
 
     /** The panels' window: its input is ImGui's; a click takes the keyboard focus from the game. */
-    LRESULT CALLBACK PanelWindowProc(const HWND window, const UINT message, const WPARAM wParam, const LPARAM lParam)
+    LRESULT CALLBACK PanelWindowProc(
+      const HWND window,
+      const UINT message,
+      const WPARAM wParam,
+      const LPARAM lParam
+    )
     {
       // Over the composited 3D view: the mouse is the view's (in its own client coordinates), and a click gives it
       // the keyboard. ImGui still sees the moves, so a panel under the cursor before stops being hovered.
@@ -379,7 +419,9 @@ namespace faf::editor
       if (message == WM_LBUTTONDOWN || message == WM_RBUTTONDOWN || message == WM_MBUTTONDOWN) {
         ::SetFocus(window);
       }
-      if (ImGui::GetCurrentContext() != nullptr && ImGui_ImplWin32_WndProcHandler(window, message, wParam, lParam) != 0) {
+      if (
+        ImGui::GetCurrentContext() != nullptr && ImGui_ImplWin32_WndProcHandler(window, message, wParam, lParam) != 0
+      ) {
         return 1;
       }
       if (message == WM_ERASEBKGND) {
@@ -389,7 +431,10 @@ namespace faf::editor
     }
 
     /** moho::gAppBeforeDeviceCreate: the panels' window, under the game's viewport, and its head. */
-    void AddPanelHead(gpg::gal::DeviceContext& context, void* const frameWindow)
+    void AddPanelHead(
+      gpg::gal::DeviceContext& context,
+      void* const frameWindow
+    )
     {
       const HWND frame = static_cast<HWND>(frameWindow);
       const HINSTANCE instance = ::GetModuleHandleW(nullptr);
@@ -406,8 +451,20 @@ namespace faf::editor
       ::GetClientRect(frame, &client);
       const int width = std::max(1L, client.right - client.left);
       const int height = std::max(1L, client.bottom - client.top);
-      gPanelWindow = ::CreateWindowExW(0, kPanelWindowClass, L"", WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS, 0, 0, width, height,
-                                       frame, nullptr, instance, nullptr);
+      gPanelWindow = ::CreateWindowExW(
+        0,
+        kPanelWindowClass,
+        L"",
+        WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
+        0,
+        0,
+        width,
+        height,
+        frame,
+        nullptr,
+        instance,
+        nullptr
+      );
       ::SetWindowPos(gPanelWindow, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
       gpg::gal::Head head{};
@@ -425,7 +482,12 @@ namespace faf::editor
      * (an "are you sure" dialog from the main menu's scripts, which the editor never starts), so the loop is
      * ended here and the app's Destroy takes the windows down.
      */
-    LRESULT CALLBACK EditorFrameProc(const HWND window, const UINT message, const WPARAM wParam, const LPARAM lParam)
+    LRESULT CALLBACK EditorFrameProc(
+      const HWND window,
+      const UINT message,
+      const WPARAM wParam,
+      const LPARAM lParam
+    )
     {
       if (message == WM_CLOSE) {
         gWindowClosing = true;
@@ -450,7 +512,9 @@ namespace faf::editor
     }
 
     /** UTF-8 to the window's text. */
-    [[nodiscard]] std::wstring Widen(const std::string& text)
+    [[nodiscard]] std::wstring Widen(
+      const std::string& text
+    )
     {
       if (text.empty()) {
         return {};
@@ -463,14 +527,17 @@ namespace faf::editor
       return wide;
     }
 
-    [[nodiscard]] HWND HandleOf(const wxWindow* const window)
+    [[nodiscard]] HWND HandleOf(
+      const wxWindow* const window
+    )
     {
       return window != nullptr ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(window->GetHandle())) : nullptr;
     }
 
     namespace
     {
-      std::filesystem::path AskFile(HWND owner, bool save, const wchar_t* filter, const wchar_t* extension, const wchar_t* title);
+      std::filesystem::path
+      AskFile(HWND owner, bool save, const wchar_t* filter, const wchar_t* extension, const wchar_t* title);
     } // namespace
 
     /**
@@ -488,11 +555,19 @@ namespace faf::editor
       bool Init() override;
       void Main() override;
       void Destroy() override;
-      bool AppDoSuppressWindowsKeys() const override { return mGame.AppDoSuppressWindowsKeys(); }
+      bool AppDoSuppressWindowsKeys() const override
+      {
+        return mGame.AppDoSuppressWindowsKeys();
+      }
 
       void HandleMenuCommand(UINT command);
       void UpdateMenu();
-      bool HandleViewportMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+      bool HandleViewportMessage(
+        HWND window,
+        UINT message,
+        WPARAM wParam,
+        LPARAM lParam
+      )
       {
         if (message == WM_KEYDOWN && wParam == 'S' && (::GetKeyState(VK_CONTROL) & 0x8000) != 0) {
           SaveDocument();
@@ -508,7 +583,10 @@ namespace faf::editor
         }
         return mScene.OnWindowMessage(window, message, wParam, lParam);
       }
-      [[nodiscard]] bool SessionActive() const { return mPlay.Active(); }
+      [[nodiscard]] bool SessionActive() const
+      {
+        return mPlay.Active();
+      }
       /**
        * The view switches and tool per map (doc/EdViewState): read when a map opens (a map not seen before keeps the
        * switches as they are), written within a second of a change. Command-line test runs (`/open`, `/play`) don't
@@ -552,8 +630,9 @@ namespace faf::editor
           return;
         }
         mViewStateSaved = state;
-        static const bool testRun = (moho::CFG_GetArgOption("/open", 1, nullptr) || moho::CFG_GetArgOption("/play", 1, nullptr)) &&
-                                    !moho::CFG_GetArgOption("/viewsave", 0, nullptr);
+        static const bool testRun =
+          (moho::CFG_GetArgOption("/open", 1, nullptr) || moho::CFG_GetArgOption("/play", 1, nullptr)) &&
+          !moho::CFG_GetArgOption("/viewsave", 0, nullptr);
         if (testRun) {
           return;
         }
@@ -597,8 +676,8 @@ namespace faf::editor
       double mPropSwapUndoAt = 0.0;
 
       /**
-       * Before a frame: the scale read from layout.ini at the first frame into the toolbar's, `/uiscale <x>` (test runs)
-       * once, then any change applied (sizes from the DPI style, fonts by FontScaleMain) and marked for saving.
+       * Before a frame: the scale read from layout.ini at the first frame into the toolbar's, `/uiscale <x>` (test
+       * runs) once, then any change applied (sizes from the DPI style, fonts by FontScaleMain) and marked for saving.
        */
       void ApplyUiScale()
       {
@@ -608,7 +687,8 @@ namespace faf::editor
           gUiScaleRead = -1.0f;
           gpg::Logf("editor: UI scale %.2f from layout.ini", static_cast<double>(scale));
         }
-        // The test option once layout.ini has been read (ImGui reads it at the first frame), so it wins over the file's.
+        // The test option once layout.ini has been read (ImGui reads it at the first frame), so it wins over the
+        // file's.
         static bool argDone = false;
         if (!argDone && ImGui::GetCurrentContext()->SettingsLoaded) {
           argDone = true;
@@ -636,7 +716,10 @@ namespace faf::editor
         mShell->EditorViewInPlay() = !mShell->EditorViewInPlay();
         gpg::Logf("editor: F6: the %s view", mShell->EditorViewInPlay() ? "editor's" : "game's");
       }
-      [[nodiscard]] bool EditorViewOverPlay() const { return mScene.OverPlay(); }
+      [[nodiscard]] bool EditorViewOverPlay() const
+      {
+        return mScene.OverPlay();
+      }
 
     private:
       void SetUpImGui();
@@ -777,7 +860,8 @@ namespace faf::editor
       std::string mVaultMapArg;
       /** `/waterbody <body>` (test runs, '+' for spaces): a body added as one edit once the map is shown. */
       std::string mWaterBodyArg;
-      /** `/waterpick <n>[,seed|outline]` or `/waterpick new` (test runs): a body chosen, and what a click in the view does. */
+      /** `/waterpick <n>[,seed|outline]` or `/waterpick new` (test runs): a body chosen, and what a click in the view
+       * does. */
       std::string mWaterPickArg;
       /** `/unittool <type>,<army>[,select]` (test runs). */
       std::string mUnitToolArg;
@@ -861,8 +945,12 @@ namespace faf::editor
       moho::gUIBeforeStartGameUI = &InstallLoadingView;
 
       if (!mGame.Init()) {
-        ::MessageBoxW(nullptr, L"Neither Direct3D 12 nor Vulkan started, or the game data could not be read. See the log.",
-                      kTitle, MB_OK | MB_ICONERROR);
+        ::MessageBoxW(
+          nullptr,
+          L"Neither Direct3D 12 nor Vulkan started, or the game data could not be read. See the log.",
+          kTitle,
+          MB_OK | MB_ICONERROR
+        );
         return false;
       }
       // The game starts its first session or the main menu on its first frame (CScApp::Main); the editor
@@ -872,7 +960,10 @@ namespace faf::editor
       const HWND frame = HandleOf(mGame.supcomFrame);
       const HWND viewport = HandleOf(moho::ren_Viewport);
       const gpg::gal::DeviceContext* const context = gpg::gal::Device::GetInstance()->GetDeviceContext();
-      if (frame == nullptr || viewport == nullptr || gPanelWindow == nullptr || context->GetHeadCount() <= static_cast<int>(kPanelHead)) {
+      if (
+        frame == nullptr || viewport == nullptr || gPanelWindow == nullptr ||
+        context->GetHeadCount() <= static_cast<int>(kPanelHead)
+      ) {
         gpg::Warnf("editor: the game window, its viewport or the panels' window is missing");
         return false;
       }
@@ -881,16 +972,24 @@ namespace faf::editor
       ::SetWindowTextW(frame, mBaseTitle.c_str());
       mShownTitle = mBaseTitle;
 
-      gViewportProc = reinterpret_cast<WNDPROC>(::SetWindowLongPtrW(viewport, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&EditorViewportProc)));
-      gFrameProc = reinterpret_cast<WNDPROC>(::SetWindowLongPtrW(frame, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&EditorFrameProc)));
+      gViewportProc = reinterpret_cast<WNDPROC>(
+        ::SetWindowLongPtrW(viewport, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&EditorViewportProc))
+      );
+      gFrameProc = reinterpret_cast<WNDPROC>(
+        ::SetWindowLongPtrW(frame, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&EditorFrameProc))
+      );
 
       SetUpImGui();
       if (!mRenderer.Init()) {
-        ::MessageBoxW(nullptr, L"The editor's panels could not be set up on this device. See the log.", kTitle, MB_OK | MB_ICONERROR);
+        ::MessageBoxW(
+          nullptr, L"The editor's panels could not be set up on this device. See the log.", kTitle, MB_OK | MB_ICONERROR
+        );
         return false;
       }
       mImGuiReady = true;
-      EdImGuiRenderer::SetGameViewSource([]() { return gViewSurface; });
+      EdImGuiRenderer::SetGameViewSource([]() {
+        return gViewSurface;
+      });
       // `/playsetups <file>` (test runs) reads and writes the play setups there instead.
       if (fa::vector<fa::string> args; moho::CFG_GetArgOption("/playsetups", 1, &args) && !args.empty()) {
         mPlay.SetSetupsFile(args[0].c_str());
@@ -915,11 +1014,17 @@ namespace faf::editor
         mDocument.SetVaultFolder(vault[0].c_str());
       } else if (VaultUsable(clientVault)) {
         mDocument.SetVaultFolder(clientVault);
-      } else if (PWSTR documents = nullptr; SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &documents))) {
-        mDocument.SetVaultFolder(std::filesystem::path(documents) / "My Games" / "Gas Powered Games" / "Supreme Commander Forged Alliance");
+      } else if (
+        PWSTR documents = nullptr; SUCCEEDED(::SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &documents))
+      ) {
+        mDocument.SetVaultFolder(
+          std::filesystem::path(documents) / "My Games" / "Gas Powered Games" / "Supreme Commander Forged Alliance"
+        );
         ::CoTaskMemFree(documents);
         if (!clientVault.empty()) {
-          gpg::Logf("editor: the FAF client's vault %s isn't writable by this Windows user", clientVault.string().c_str());
+          gpg::Logf(
+            "editor: the FAF client's vault %s isn't writable by this Windows user", clientVault.string().c_str()
+          );
         }
       }
       gpg::Logf("editor: the vault is %s", mDocument.VaultFolder().string().c_str());
@@ -931,9 +1036,13 @@ namespace faf::editor
         mShell->Browser().Faf().SetTokenFile(mPendingFafTokenFile);
         mShell->Browser().Faf().SetPictureCache(mPendingFafTokenFile.parent_path() / "cache" / "maps");
       }
-      mDocument.SetBeforeDrop([this] { mScene.Detach(); });
+      mDocument.SetBeforeDrop([this] {
+        mScene.Detach();
+      });
       mScene.SetTools(&mShell->Tools());
-      mShell->Tools().SetPropPictures([this](const std::string& blueprint) { return mPropThumbnails.Get(blueprint); });
+      mShell->Tools().SetPropPictures([this](const std::string& blueprint) {
+        return mPropThumbnails.Get(blueprint);
+      });
       ReadOpenCommandLine();
       gEditorApp = this;
       // The particle editor's own view renders at the start of the game head's frame (moho::gViewportBeforeFrame).
@@ -947,16 +1056,21 @@ namespace faf::editor
           return;
         }
         const gpg::gal::Head& game = context->GetHead(0);
-        gEditorApp->mShell->ParticleEditor().Viewport().Render(static_cast<int>(game.mWidth), static_cast<int>(game.mHeight),
-                                                                ImGui::GetCurrentContext() != nullptr ? ImGui::GetIO().DeltaTime : 0.016f);
+        gEditorApp->mShell->ParticleEditor().Viewport().Render(
+          static_cast<int>(game.mWidth),
+          static_cast<int>(game.mHeight),
+          ImGui::GetCurrentContext() != nullptr ? ImGui::GetIO().DeltaTime : 0.016f
+        );
       };
       BuildMenu(frame);
       // The game view's ambient occlusion makes its GPU programs on first use, which the editor's own view never
       // is: made now, so the first Play's first frame doesn't wait for them (WPE.15).
       const auto warmStart = std::chrono::steady_clock::now();
       if (moho::AmbientOcclusionRenderer::Get().IsActive()) {
-        gpg::Logf("editor: game view's ambient occlusion made ahead in %.2f s",
-                  std::chrono::duration<double>(std::chrono::steady_clock::now() - warmStart).count());
+        gpg::Logf(
+          "editor: game view's ambient occlusion made ahead in %.2f s",
+          std::chrono::duration<double>(std::chrono::steady_clock::now() - warmStart).count()
+        );
       }
       gpg::Logf("editor: ready on %s", api);
       return true;
@@ -1020,7 +1134,9 @@ namespace faf::editor
       ImGui_ImplWin32_Init(gPanelWindow);
     }
 
-    void EditorApp::BuildMenu(const HWND frame)
+    void EditorApp::BuildMenu(
+      const HWND frame
+    )
     {
       HMENU file = ::CreatePopupMenu();
       ::AppendMenuW(file, MF_STRING, kMenuNew, L"&New map...\tCtrl+N");
@@ -1062,7 +1178,9 @@ namespace faf::editor
       const std::vector<std::string>& maps = mPlay.Maps();
       for (std::size_t i = 0; i < maps.size(); ++i) {
         const std::wstring label = Widen(mPlay.Titles()[i]) + L"  (" + Widen(MapDisplayName(maps[i])) + L")";
-        ::AppendMenuW(mMapMenu, MF_STRING | ((i % 32U == 0U && i != 0U) ? MF_MENUBARBREAK : 0U), kMenuFirstMap + i, label.c_str());
+        ::AppendMenuW(
+          mMapMenu, MF_STRING | ((i % 32U == 0U && i != 0U) ? MF_MENUBARBREAK : 0U), kMenuFirstMap + i, label.c_str()
+        );
       }
       mPlayMenu = ::CreatePopupMenu();
       ::AppendMenuW(mPlayMenu, MF_STRING, kMenuPlayStop, L"&Play\tF5");
@@ -1081,13 +1199,17 @@ namespace faf::editor
       ::SetMenu(frame, mMenuBar);
       // The client area loses the menu's height; the game's frame resizes its viewport and the device to it
       // (WSupComFrame's size handler), so the game's interface lays out below the menu.
-      ::SetWindowPos(frame, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+      ::SetWindowPos(
+        frame, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED
+      );
       ::DrawMenuBar(frame);
     }
 
     void EditorApp::UpdateMenu()
     {
-      const auto check = [&](const UINT id, const bool on) { ::CheckMenuItem(mViewMenu, id, MF_BYCOMMAND | (on ? MF_CHECKED : MF_UNCHECKED)); };
+      const auto check = [&](const UINT id, const bool on) {
+        ::CheckMenuItem(mViewMenu, id, MF_BYCOMMAND | (on ? MF_CHECKED : MF_UNCHECKED));
+      };
       check(kMenuTools, mShell->ShowTools());
       check(kMenuMap, mShell->ShowMap());
       check(kMenuInfo, mShell->ShowInfo());
@@ -1120,12 +1242,15 @@ namespace faf::editor
             continue;
           }
           const UINT id = kMenuFirstRecent + static_cast<UINT>(mRecentShown.size());
-          const bool current = mDocument.GetState() == EdDocument::State::Open && _stricmp(mDocument.Path().c_str(), recent.c_str()) == 0;
+          const bool current =
+            mDocument.GetState() == EdDocument::State::Open && _stricmp(mDocument.Path().c_str(), recent.c_str()) == 0;
           std::wstring label = Widen(mPlay.Titles()[i]) + L"  (" + Widen(MapDisplayName(maps[i])) + L")";
           if (mRecentShown.size() < 9) {
             label = L"&" + std::to_wstring(mRecentShown.size() + 1) + L"  " + label;
           }
-          ::AppendMenuW(mRecentMenu, MF_STRING | (busy ? MF_GRAYED : 0U) | (current ? MF_CHECKED : 0U), id, label.c_str());
+          ::AppendMenuW(
+            mRecentMenu, MF_STRING | (busy ? MF_GRAYED : 0U) | (current ? MF_CHECKED : 0U), id, label.c_str()
+          );
           mRecentShown.push_back(maps[i]);
           break;
         }
@@ -1136,11 +1261,18 @@ namespace faf::editor
         ::AppendMenuW(mRecentMenu, MF_SEPARATOR, 0, nullptr);
         ::AppendMenuW(mRecentMenu, MF_STRING, kMenuClearRecent, L"&Clear recently opened");
       }
-      ::ModifyMenuW(mPlayMenu, kMenuPlayStop, MF_BYCOMMAND | MF_STRING | ((active || mPlay.CanPlay()) ? MF_ENABLED : MF_GRAYED),
-                    kMenuPlayStop, active ? L"&Stop\tF5" : L"&Play\tF5");
+      ::ModifyMenuW(
+        mPlayMenu,
+        kMenuPlayStop,
+        MF_BYCOMMAND | MF_STRING | ((active || mPlay.CanPlay()) ? MF_ENABLED : MF_GRAYED),
+        kMenuPlayStop,
+        active ? L"&Stop\tF5" : L"&Play\tF5"
+      );
       const int count = static_cast<int>(mPlay.Maps().size());
       for (int i = 0; i < count; ++i) {
-        ::CheckMenuItem(mMapMenu, kMenuFirstMap + i, MF_BYCOMMAND | (i == mPlay.Selected() ? MF_CHECKED : MF_UNCHECKED));
+        ::CheckMenuItem(
+          mMapMenu, kMenuFirstMap + i, MF_BYCOMMAND | (i == mPlay.Selected() ? MF_CHECKED : MF_UNCHECKED)
+        );
         ::EnableMenuItem(mMapMenu, kMenuFirstMap + i, MF_BYCOMMAND | (active ? MF_GRAYED : MF_ENABLED));
       }
     }
@@ -1178,13 +1310,17 @@ namespace faf::editor
       io.AddMousePosEvent(click.x, click.y);
       if (step == 1 || (click.doubleClick && step == 3)) {
         io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
-        gpg::Logf("editor: test click at %.0f,%.0f%s", click.x, click.y, click.doubleClick && step == 3 ? " (second)" : "");
+        gpg::Logf(
+          "editor: test click at %.0f,%.0f%s", click.x, click.y, click.doubleClick && step == 3 ? " (second)" : ""
+        );
       } else if (step == 2 || (click.doubleClick && step == 4)) {
         io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
       }
     }
 
-    void EditorApp::HandleMenuCommand(const UINT command)
+    void EditorApp::HandleMenuCommand(
+      const UINT command
+    )
     {
       switch (command) {
       case kMenuExit:
@@ -1279,8 +1415,10 @@ namespace faf::editor
         }
         return;
       default:
-        if (command >= kMenuFirstRecent && command < kMenuFirstRecent + mRecentShown.size() && !mPlay.Active() &&
-            mDocument.GetState() != EdDocument::State::Loading) {
+        if (
+          command >= kMenuFirstRecent && command < kMenuFirstRecent + mRecentShown.size() && !mPlay.Active() &&
+          mDocument.GetState() != EdDocument::State::Loading
+        ) {
           const std::string scenario = mRecentShown[command - kMenuFirstRecent];
           const std::vector<std::string>& maps = mPlay.Maps();
           for (std::size_t i = 0; i < maps.size(); ++i) {
@@ -1304,7 +1442,8 @@ namespace faf::editor
       std::wstring title = mBaseTitle;
       if (mPlay.Active() && !mPlay.Maps().empty()) {
         const std::size_t at = static_cast<std::size_t>(mPlay.Selected());
-        title += L" - " + Widen(mPlay.StateText()) + L" " + Widen(mPlay.Titles()[at]) + L" (" + Widen(MapDisplayName(mPlay.Maps()[at])) + L")";
+        title += L" - " + Widen(mPlay.StateText()) + L" " + Widen(mPlay.Titles()[at]) + L" (" +
+          Widen(MapDisplayName(mPlay.Maps()[at])) + L")";
       }
       if (title != mShownTitle) {
         mShownTitle = title;
@@ -1312,7 +1451,12 @@ namespace faf::editor
       }
     }
 
-    bool OnViewportMessage(const HWND window, const UINT message, const WPARAM wParam, const LPARAM lParam)
+    bool OnViewportMessage(
+      const HWND window,
+      const UINT message,
+      const WPARAM wParam,
+      const LPARAM lParam
+    )
     {
       return gEditorApp != nullptr && gEditorApp->HandleViewportMessage(window, message, wParam, lParam);
     }
@@ -1329,14 +1473,18 @@ namespace faf::editor
       return gEditorApp != nullptr && gEditorApp->EditorViewOverPlay();
     }
 
-    void OnMenuCommand(const UINT command)
+    void OnMenuCommand(
+      const UINT command
+    )
     {
       if (gEditorApp != nullptr) {
         gEditorApp->HandleMenuCommand(command);
       }
     }
 
-    void OnMenuOpening(const HMENU menu)
+    void OnMenuOpening(
+      const HMENU menu
+    )
     {
       (void)menu;
       if (gEditorApp != nullptr) {
@@ -1361,12 +1509,16 @@ namespace faf::editor
       const float frameSeconds = std::chrono::duration<float>(now - mLastFrame).count();
       // A stall: the lines before this one in the log say what the editor was doing.
       if (frameSeconds > 0.33f && mFramesRun > 120) {
-        gpg::Warnf("editor: the editor stopped for %.2f s (frame %llu)", static_cast<double>(frameSeconds),
-                   static_cast<unsigned long long>(mFramesRun));
+        gpg::Warnf(
+          "editor: the editor stopped for %.2f s (frame %llu)",
+          static_cast<double>(frameSeconds),
+          static_cast<unsigned long long>(mFramesRun)
+        );
       }
       ++mFramesRun;
       mLastFrame = now;
-      // The editor's view in front of a running play, when asked for (F6 / the toolbar); a new play starts in the game's.
+      // The editor's view in front of a running play, when asked for (F6 / the toolbar); a new play starts in the
+      // game's.
       const bool playIdle = moho::WLD_GetFrameAction() == moho::EWldFrameAction::Inactive;
       if (playIdle) {
         mShell->EditorViewInPlay() = false;
@@ -1388,10 +1540,17 @@ namespace faf::editor
             (void)std::sscanf(value[0].c_str(), "%lf,%lf,%lf", &on, &off, &again);
             // The game's camera at each switch (it should be where it was left when the game's view comes back).
             const auto logGameCamera = [](const char* const when) {
-              if (moho::CameraImpl* const camera = moho::CAM_GetManager()->GetCamera("WorldCamera"); camera != nullptr) {
+              if (
+                moho::CameraImpl* const camera = moho::CAM_GetManager()->GetCamera("WorldCamera"); camera != nullptr
+              ) {
                 const Wm3::Vector3f at = camera->GetTargetPosition();
-                gpg::Logf("editor: the game's camera %s: at %.1f,%.1f, zoom %.1f", when, static_cast<double>(at.x), static_cast<double>(at.z),
-                          static_cast<double>(camera->CameraGetTargetZoom()));
+                gpg::Logf(
+                  "editor: the game's camera %s: at %.1f,%.1f, zoom %.1f",
+                  when,
+                  static_cast<double>(at.x),
+                  static_cast<double>(at.z),
+                  static_cast<double>(camera->CameraGetTargetZoom())
+                );
               }
             };
             if (!onDone && now - playingSince >= on) {
@@ -1440,18 +1599,32 @@ namespace faf::editor
                   z = u.z;
                 }
               }
-              gpg::Logf("editor: live test %s: %s %s army %d health %.0f/%.0f at %.1f,%.1f; %zu enhancements, has:%s; toggles:%s", when,
-                        info.blueprint.c_str(), info.name.c_str(), info.army, static_cast<double>(info.health), static_cast<double>(info.maxHealth),
-                        static_cast<double>(x), static_cast<double>(z), info.enhancements.size(), has.empty() ? " none" : has.c_str(),
-                        toggles.empty() ? " none" : toggles.c_str());
+              gpg::Logf(
+                "editor: live test %s: %s %s army %d health %.0f/%.0f at %.1f,%.1f; %zu enhancements, has:%s; "
+                "toggles:%s",
+                when,
+                info.blueprint.c_str(),
+                info.name.c_str(),
+                info.army,
+                static_cast<double>(info.health),
+                static_cast<double>(info.maxHealth),
+                static_cast<double>(x),
+                static_cast<double>(z),
+                info.enhancements.size(),
+                has.empty() ? " none" : has.c_str(),
+                toggles.empty() ? " none" : toggles.c_str()
+              );
               return info;
             };
             if (step == 0) {
               static bool listed = false;
               if (!listed) {
                 listed = true;
-                gpg::Logf("editor: live test: %zu units, the first %s", mScene.LiveNow().size(),
-                          mScene.LiveNow().empty() ? "-" : mScene.LiveNow().front().blueprint.c_str());
+                gpg::Logf(
+                  "editor: live test: %zu units, the first %s",
+                  mScene.LiveNow().size(),
+                  mScene.LiveNow().empty() ? "-" : mScene.LiveNow().front().blueprint.c_str()
+                );
               }
               bool found = false;
               for (const LiveUnit& u : mScene.LiveNow()) {
@@ -1488,11 +1661,13 @@ namespace faf::editor
               step = 3;
             }
           }
-          // `/playdecaltest` (test runs, with /playeditorview): in the editor's view, the map's first decal copied beside the
-          // first commander, then the map's last decal moved 40 units, then both taken back as undo does; the play's
-          // decals counted and looked up after each (WPE.49).
-          if (moho::CFG_GetArgOption("/playdecaltest", 0, nullptr) && mScene.OverPlay() && mScene.SessionMap() != nullptr &&
-              mDocument.Decals() != nullptr) {
+          // `/playdecaltest` (test runs, with /playeditorview): in the editor's view, the map's first decal copied
+          // beside the first commander, then the map's last decal moved 40 units, then both taken back as undo does;
+          // the play's decals counted and looked up after each (WPE.49).
+          if (
+            moho::CFG_GetArgOption("/playdecaltest", 0, nullptr) && mScene.OverPlay() &&
+            mScene.SessionMap() != nullptr && mDocument.Decals() != nullptr
+          ) {
             static int step = 0;
             static EdDocument::DecalSnapshot original;
             static DecalState added;
@@ -1516,7 +1691,11 @@ namespace faf::editor
                     gpg::Warnf("editor: decal test: the map has no decals");
                     break;
                   }
-                  gpg::Logf("editor: decal test: %zu decals in the editor, %d in the play", original.size(), play->GetDecalCount());
+                  gpg::Logf(
+                    "editor: decal test: %zu decals in the editor, %d in the play",
+                    original.size(),
+                    play->GetDecalCount()
+                  );
                   added = original.front();
                   added.position[0] = u.x + 20.0f;
                   added.position[2] = u.z;
@@ -1524,8 +1703,13 @@ namespace faf::editor
                   mDocument.DecalsEdited(original);
                   const EdDocument::DecalSnapshot now = mDocument.DecalsNow();
                   added = now.back();
-                  gpg::Logf("editor: decal test: one added at %.0f,%.0f: %d in the play, the new one there: %s", static_cast<double>(added.position[0]),
-                            static_cast<double>(added.position[2]), play->GetDecalCount(), inPlay(added) ? "yes" : "no");
+                  gpg::Logf(
+                    "editor: decal test: one added at %.0f,%.0f: %d in the play, the new one there: %s",
+                    static_cast<double>(added.position[0]),
+                    static_cast<double>(added.position[2]),
+                    play->GetDecalCount(),
+                    inPlay(added) ? "yes" : "no"
+                  );
                   step = 1;
                 }
               }
@@ -1536,24 +1720,38 @@ namespace faf::editor
               const DecalState was = last;
               last.position[0] += 40.0f;
               moved = last;
-              // As the editor's own decal moves do it: the decals set, then the edit recorded (which sends it to the play).
+              // As the editor's own decal moves do it: the decals set, then the edit recorded (which sends it to the
+              // play).
               RestoreDecals(*mDocument.Decals(), after);
               mDocument.DecalsEdited(before);
-              gpg::Logf("editor: decal test: the map's decal %s moved 40: %d in the play, there at the old place: %s, at the new: %s",
-                        was.names[0].c_str(), play->GetDecalCount(), inPlay(was) ? "yes" : "no", inPlay(moved) ? "yes" : "no");
+              gpg::Logf(
+                "editor: decal test: the map's decal %s moved 40: %d in the play, there at the old place: %s, at the "
+                "new: %s",
+                was.names[0].c_str(),
+                play->GetDecalCount(),
+                inPlay(was) ? "yes" : "no",
+                inPlay(moved) ? "yes" : "no"
+              );
               step = 2;
             } else if (step == 2 && play != nullptr) {
               mDocument.RestoreDecals(original);
-              gpg::Logf("editor: decal test: back to the map's own (undo's way): %d in the play, the added one there: %s, the moved one at "
-                        "its new place: %s",
-                        play->GetDecalCount(), inPlay(added) ? "yes" : "no", inPlay(moved) ? "yes" : "no");
+              gpg::Logf(
+                "editor: decal test: back to the map's own (undo's way): %d in the play, the added one there: %s, the "
+                "moved one at "
+                "its new place: %s",
+                play->GetDecalCount(),
+                inPlay(added) ? "yes" : "no",
+                inPlay(moved) ? "yes" : "no"
+              );
               step = 3;
             }
           }
-          // `/playlooktest` (test runs, with /playeditorview): in the editor's view, the sun's colour made red, the water
-          // raised 6 and stratum 4 painted beside the first commander; each read back from the play's map, and the water
-          // from its sim (WPE.41).
-          if (moho::CFG_GetArgOption("/playlooktest", 0, nullptr) && mScene.OverPlay() && mScene.SessionMap() != nullptr) {
+          // `/playlooktest` (test runs, with /playeditorview): in the editor's view, the sun's colour made red, the
+          // water raised 6 and stratum 4 painted beside the first commander; each read back from the play's map, and
+          // the water from its sim (WPE.41).
+          if (
+            moho::CFG_GetArgOption("/playlooktest", 0, nullptr) && mScene.OverPlay() && mScene.SessionMap() != nullptr
+          ) {
             static int step = 0;
             static double stepAt = 0.0;
             static std::uint32_t unitId = 0;
@@ -1578,23 +1776,36 @@ namespace faf::editor
               lighting.sunColor[2] = 0.3f;
               mDocument.ApplyLighting(lighting);
               const Wm3::Vector3f sun = play->GetSunColor();
-              gpg::Logf("editor: look test: the play's sun colour %.2f,%.2f,%.2f -> %.2f,%.2f,%.2f", static_cast<double>(sunBefore.x),
-                        static_cast<double>(sunBefore.y), static_cast<double>(sunBefore.z), static_cast<double>(sun.x), static_cast<double>(sun.y),
-                        static_cast<double>(sun.z));
+              gpg::Logf(
+                "editor: look test: the play's sun colour %.2f,%.2f,%.2f -> %.2f,%.2f,%.2f",
+                static_cast<double>(sunBefore.x),
+                static_cast<double>(sunBefore.y),
+                static_cast<double>(sunBefore.z),
+                static_cast<double>(sun.x),
+                static_cast<double>(sun.y),
+                static_cast<double>(sun.z)
+              );
               const float levelBefore = play->mMap != nullptr ? play->mMap->mWaterElevation : 0.0f;
               WaterState water = mDocument.WaterNow();
               water.elevation += 6.0f;
               water.deep += 6.0f;
               water.abyss += 6.0f;
               mDocument.ApplyWater(water);
-              gpg::Logf("editor: look test: the play's drawn water level %.2f -> %.2f", static_cast<double>(levelBefore),
-                        static_cast<double>(play->mMap != nullptr ? play->mMap->mWaterElevation : 0.0f));
+              gpg::Logf(
+                "editor: look test: the play's drawn water level %.2f -> %.2f",
+                static_cast<double>(levelBefore),
+                static_cast<double>(play->mMap != nullptr ? play->mMap->mWaterElevation : 0.0f)
+              );
               mScene.TestLiveMask(x, z);
               step = 2;
               stepAt = now + 2.0;
             } else if (step == 2 && now >= stepAt) {
               // A point of open water on Seton's Clutch: the surface there is the water's level.
-              LiveUnitDo(unitId, "LOG('editor: look test: the sim surface at 150,150 ' .. GetSurfaceHeight(150, 150) .. ', ground ' .. GetTerrainHeight(150, 150))");
+              LiveUnitDo(
+                unitId,
+                "LOG('editor: look test: the sim surface at 150,150 ' .. GetSurfaceHeight(150, 150) .. ', ground ' .. "
+                "GetTerrainHeight(150, 150))"
+              );
               step = 3;
             }
           }
@@ -1666,9 +1877,9 @@ namespace faf::editor
               stepAt = now + 2.0;
             }
           }
-          // `/playheighttest` (test runs, with /playeditorview): in the editor's view, a raise under the first commander,
-          // then the sim's own terrain height there and the commander's height read through its Lua (WPE.40: the play's
-          // sim takes it; WPE.47: the commander stands on the new ground).
+          // `/playheighttest` (test runs, with /playeditorview): in the editor's view, a raise under the first
+          // commander, then the sim's own terrain height there and the commander's height read through its Lua (WPE.40:
+          // the play's sim takes it; WPE.47: the commander stands on the new ground).
           if (moho::CFG_GetArgOption("/playheighttest", 0, nullptr) && mScene.OverPlay()) {
             SetLiveHeightsNoReseat(moho::CFG_GetArgOption("/playnoreseat", 0, nullptr));
             static int step = 0;
@@ -1687,20 +1898,38 @@ namespace faf::editor
                 }
               }
             } else if (step == 1 && now >= stepAt) {
-              const moho::CHeightField* const edited = mDocument.Map() != nullptr ? mDocument.Map()->mTerrainRes->GetHeightField() : nullptr;
+              const moho::CHeightField* const edited =
+                mDocument.Map() != nullptr ? mDocument.Map()->mTerrainRes->GetHeightField() : nullptr;
               const float before = edited != nullptr ? edited->GetElevation(x, z) : 0.0f;
               const bool raised = mScene.TestRaise(x, z, 1.0f);
-              gpg::Logf("editor: height test: raise at %.0f,%.0f %s; the editor's height %.2f -> %.2f", static_cast<double>(x),
-                        static_cast<double>(z), raised ? "made" : "changed nothing", static_cast<double>(before),
-                        static_cast<double>(edited != nullptr ? edited->GetElevation(x, z) : 0.0f));
+              gpg::Logf(
+                "editor: height test: raise at %.0f,%.0f %s; the editor's height %.2f -> %.2f",
+                static_cast<double>(x),
+                static_cast<double>(z),
+                raised ? "made" : "changed nothing",
+                static_cast<double>(before),
+                static_cast<double>(edited != nullptr ? edited->GetElevation(x, z) : 0.0f)
+              );
               step = 2;
               stepAt = now + 2.0;
             } else if (step == 2 && now >= stepAt) {
               char lua[160];
-              std::snprintf(lua, sizeof(lua), "LOG(string.format('editor: height test: the sim reads %%.2f at %.0f,%.0f', GetTerrainHeight(%.1f, %.1f)))",
-                            static_cast<double>(x), static_cast<double>(z), static_cast<double>(x), static_cast<double>(z));
+              std::snprintf(
+                lua,
+                sizeof(lua),
+                "LOG(string.format('editor: height test: the sim reads %%.2f at %.0f,%.0f', GetTerrainHeight(%.1f, "
+                "%.1f)))",
+                static_cast<double>(x),
+                static_cast<double>(z),
+                static_cast<double>(x),
+                static_cast<double>(z)
+              );
               LiveUnitDo(unitId, lua);
-              LiveUnitDo(unitId, "local p = u:GetPosition() LOG('editor: height test: the commander at y ' .. p[2] .. ', ground ' .. GetTerrainHeight(p[1], p[3]))");
+              LiveUnitDo(
+                unitId,
+                "local p = u:GetPosition() LOG('editor: height test: the commander at y ' .. p[2] .. ', ground ' .. "
+                "GetTerrainHeight(p[1], p[3]))"
+              );
               step = 3;
             }
           }
@@ -1712,7 +1941,11 @@ namespace faf::editor
           againDone = false;
         }
       }
-      mScene.Update(frameSeconds, playIdle, mShell->EditorViewInPlay() && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing);
+      mScene.Update(
+        frameSeconds,
+        playIdle,
+        mShell->EditorViewInPlay() && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing
+      );
       KeepViewState();
       KeepSoundToFocus();
       mShell->Tools().SetModelsLoading(mScene.ModelsPending());
@@ -1735,9 +1968,13 @@ namespace faf::editor
         if (!mThumbDumpArg.empty() && ++mThumbDumpFrames % 30 == 0) {
           const std::size_t comma = mThumbDumpArg.find(',');
           std::string blueprint;
-          if (comma != std::string::npos &&
-              mPropThumbnails.Save(mThumbDumpArg.substr(0, comma), mThumbDumpArg.substr(comma + 1), blueprint)) {
-            gpg::Logf("editor: thumbnail of %s saved to %s", blueprint.c_str(), mThumbDumpArg.substr(comma + 1).c_str());
+          if (
+            comma != std::string::npos &&
+            mPropThumbnails.Save(mThumbDumpArg.substr(0, comma), mThumbDumpArg.substr(comma + 1), blueprint)
+          ) {
+            gpg::Logf(
+              "editor: thumbnail of %s saved to %s", blueprint.c_str(), mThumbDumpArg.substr(comma + 1).c_str()
+            );
             mThumbDumpArg.clear();
           }
         }
@@ -1769,8 +2006,13 @@ namespace faf::editor
           mOpenFolderArg.clear();
         }
         if (mShell->Browser().TakeOpenFileAsk()) {
-          const std::filesystem::path file = AskFile(HandleOf(mGame.supcomFrame), false, L"Map scenario (*_scenario.lua)\0*_scenario.lua\0", L"lua",
-                                                     L"Open a map from a folder: pick its _scenario.lua");
+          const std::filesystem::path file = AskFile(
+            HandleOf(mGame.supcomFrame),
+            false,
+            L"Map scenario (*_scenario.lua)\0*_scenario.lua\0",
+            L"lua",
+            L"Open a map from a folder: pick its _scenario.lua"
+          );
           if (!file.empty()) {
             mShell->Browser().OpenFromDisk(file);
           }
@@ -1781,7 +2023,9 @@ namespace faf::editor
           if (moho::CFG_GetArgOption("/materialeditor", 0, nullptr)) {
             mShell->ShowMaterialEditor() = true;
           }
-          if (fa::vector<fa::string> filter; moho::CFG_GetArgOption("/particlebrowser", 1, &filter) && !filter.empty()) {
+          if (
+            fa::vector<fa::string> filter; moho::CFG_GetArgOption("/particlebrowser", 1, &filter) && !filter.empty()
+          ) {
             // `/particlebrowser <search>` (test runs): the browser open, its search set, the first match played.
             mShell->ShowParticleBrowser() = true;
             mShell->ParticleEditor().TestBrowse(filter[0].c_str());
@@ -1808,16 +2052,21 @@ namespace faf::editor
             mShell->ShowMaterialEditor() = true;
             mShell->MaterialEditor().SelectFirst(type[0].c_str());
           }
-          mShell->MaterialEditor().SetTerrainSource([this] { return mScene.TerrainHeights(); });
+          mShell->MaterialEditor().SetTerrainSource([this] {
+            return mScene.TerrainHeights();
+          });
         }
         {
           // A vault map's own folder keeps its graphs; the game's own maps (in its install folder) don't get any.
           const std::filesystem::path scmap = mDocument.MapDiskFile();
           const std::string vault = mDocument.VaultFolder().lexically_normal().string();
           const std::string folder = scmap.parent_path().lexically_normal().string();
-          const bool inVault = !scmap.empty() && !vault.empty() && folder.size() > vault.size() && _strnicmp(folder.c_str(), vault.c_str(), vault.size()) == 0;
+          const bool inVault = !scmap.empty() && !vault.empty() && folder.size() > vault.size() &&
+            _strnicmp(folder.c_str(), vault.c_str(), vault.size()) == 0;
           mShell->MaterialEditor().SetMapFolder(inVault ? scmap.parent_path() : std::filesystem::path());
-          mShell->ParticleEditor().SetMapFolder(inVault ? scmap.parent_path() : std::filesystem::path(), inVault ? mDocument.FolderName() : std::string());
+          mShell->ParticleEditor().SetMapFolder(
+            inVault ? scmap.parent_path() : std::filesystem::path(), inVault ? mDocument.FolderName() : std::string()
+          );
           // The particle editor's effect plays in its own view (EdParticleViewport) while its windows show.
           mShell->ParticleEditor().Frame(mShell->ShowParticleEditor() || mShell->ShowParticleBrowser());
           if (std::string effect; mShell->ParticleEditor().TakePlaceAsk(effect) && mScene.Attached()) {
@@ -1827,24 +2076,40 @@ namespace faf::editor
         mShell->Draw();
         // `/focuspanel <window>` (test runs): that panel in front, a while after the map opened (opening fronts Info).
         if (mFocusPanelFrames < 90 && mDocument.GetState() == EdDocument::State::Open) {
-          if (fa::vector<fa::string> panel; ++mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/focuspanel", 1, &panel) && !panel.empty()) {
+          if (
+            fa::vector<fa::string> panel;
+            ++mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/focuspanel", 1, &panel) && !panel.empty()
+          ) {
             ImGui::SetWindowFocus(panel[0].c_str());
             gpg::Logf("editor: /focuspanel %s", panel[0].c_str());
           }
           // `/materiallive <slot>` and `/materialapply <slot>` (test runs): the material editor's result into a slot.
-          if (fa::vector<fa::string> slot; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/materiallive", 1, &slot) && !slot.empty()) {
+          if (
+            fa::vector<fa::string> slot;
+            mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/materiallive", 1, &slot) && !slot.empty()
+          ) {
             mShell->MaterialEditor().TestLive(std::atoi(slot[0].c_str()));
           }
-          if (fa::vector<fa::string> file; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/particleswitch", 1, &file) && !file.empty()) {
-            // `/particleswitch <game path>` (test runs): the open effect taken as edited, then another opened (it asks first).
+          if (
+            fa::vector<fa::string> file;
+            mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/particleswitch", 1, &file) && !file.empty()
+          ) {
+            // `/particleswitch <game path>` (test runs): the open effect taken as edited, then another opened (it asks
+            // first).
             mShell->ShowParticleEditor() = true;
             mShell->ParticleEditor().TestOpenEdited(file[0].c_str());
           }
-          if (fa::vector<fa::string> key; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/adaptivewindow", 1, &key) && !key.empty()) {
+          if (
+            fa::vector<fa::string> key;
+            mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/adaptivewindow", 1, &key) && !key.empty()
+          ) {
             // `/adaptivewindow <option key>` (test runs): the Adaptive Map window on that option.
             mShell->OpenAdaptiveWindow(key[0].c_str());
           }
-          if (fa::vector<fa::string> spec; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/adaptivepreview", 1, &spec) && !spec.empty()) {
+          if (
+            fa::vector<fa::string> spec;
+            mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/adaptivepreview", 1, &spec) && !spec.empty()
+          ) {
             // `/adaptivepreview <key>=<choice>,...[;<players>]` (test runs): the window's preview of a game on.
             mShell->TestAdaptivePreview(spec[0].c_str());
           }
@@ -1852,19 +2117,29 @@ namespace faf::editor
             // `/texturepicker` (test runs): the particle editor's next texture input opens its browser.
             mShell->ParticleEditor().TestTexturePicker();
           }
-          if (fa::vector<fa::string> effect; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/placeeffect", 1, &effect) && !effect.empty()) {
+          if (
+            fa::vector<fa::string> effect;
+            mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/placeeffect", 1, &effect) && !effect.empty()
+          ) {
             // `/placeeffect <game path>` (test runs): an effect decoration at the view's centre.
             mScene.PlaceEffect(effect[0].c_str());
           }
-          if (fa::vector<fa::string> distance; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/particleframe", 1, &distance) && !distance.empty()) {
-            // `/particleframe <distance>` (test runs): the view this close to its centre, where the particle preview emits.
+          if (
+            fa::vector<fa::string> distance;
+            mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/particleframe", 1, &distance) && !distance.empty()
+          ) {
+            // `/particleframe <distance>` (test runs): the view this close to its centre, where the particle preview
+            // emits.
             float x = 0.0f;
             float y = 0.0f;
             float z = 0.0f;
             mScene.ViewTarget(x, y, z);
             mScene.FramePoint(x, z, static_cast<float>(std::atof(distance[0].c_str())));
           }
-          if (fa::vector<fa::string> slot; mFocusPanelFrames == 80 && moho::CFG_GetArgOption("/materialapply", 1, &slot) && !slot.empty()) {
+          if (
+            fa::vector<fa::string> slot;
+            mFocusPanelFrames == 80 && moho::CFG_GetArgOption("/materialapply", 1, &slot) && !slot.empty()
+          ) {
             mShell->MaterialEditor().TestApply(std::atoi(slot[0].c_str()));
           }
         }
@@ -1890,7 +2165,10 @@ namespace faf::editor
             mShell->OpenNewMap();
           } else if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) {
             (void)mScene.Undo();
-          } else if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Y) || ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z)) {
+          } else if (
+            ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Y) ||
+            ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z)
+          ) {
             (void)mScene.Redo();
           }
         }
@@ -1955,7 +2233,9 @@ namespace faf::editor
             continue;
           }
           if (point.size() == 2 && point[0] == '^') {
-            mUiClicks.push_back({-1.0f, -1.0f, false, static_cast<char>(std::toupper(static_cast<unsigned char>(point[1])))});
+            mUiClicks.push_back(
+              {-1.0f, -1.0f, false, static_cast<char>(std::toupper(static_cast<unsigned char>(point[1])))}
+            );
             continue;
           }
           const bool twice = !point.empty() && point[0] == 'd';
@@ -1964,7 +2244,11 @@ namespace faf::editor
           }
           const std::size_t comma = point.find(',');
           if (comma != std::string::npos) {
-            mUiClicks.push_back({static_cast<float>(std::atof(point.c_str())), static_cast<float>(std::atof(point.c_str() + comma + 1)), twice});
+            mUiClicks.push_back(
+              {static_cast<float>(std::atof(point.c_str())),
+               static_cast<float>(std::atof(point.c_str() + comma + 1)),
+               twice}
+            );
           }
         }
       }
@@ -2077,15 +2361,21 @@ namespace faf::editor
         return;
       }
       std::string wanted = args[0].c_str();
-      std::transform(wanted.begin(), wanted.end(), wanted.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(wanted.begin(), wanted.end(), wanted.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       const std::vector<std::string>& maps = mPlay.Maps();
       for (std::size_t i = 0; i < maps.size(); ++i) {
         std::string folder = MapDisplayName(maps[i]);
-        std::transform(folder.begin(), folder.end(), folder.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::transform(folder.begin(), folder.end(), folder.begin(), [](const unsigned char c) {
+          return static_cast<char>(std::tolower(c));
+        });
         if (folder == wanted) {
           mPlay.Select(static_cast<int>(i));
           const bool started = mDocument.Open(maps[i]);
-          (started ? gpg::Logf : gpg::Warnf)("editor: /open %s: %s %s", args[0].c_str(), started ? "opening" : "can't open", maps[i].c_str());
+          (started ? gpg::Logf : gpg::Warnf)(
+            "editor: /open %s: %s %s", args[0].c_str(), started ? "opening" : "can't open", maps[i].c_str()
+          );
           return;
         }
       }
@@ -2099,8 +2389,18 @@ namespace faf::editor
         material.SetSlotNames({});
         return;
       }
-      static const char* const kSlotLabels[10] = {"Lower", "Stratum 1", "Stratum 2", "Stratum 3", "Stratum 4",
-                                                  "Stratum 5", "Stratum 6", "Stratum 7", "Stratum 8", "Upper"};
+      static const char* const kSlotLabels[10] = {
+        "Lower",
+        "Stratum 1",
+        "Stratum 2",
+        "Stratum 3",
+        "Stratum 4",
+        "Stratum 5",
+        "Stratum 6",
+        "Stratum 7",
+        "Stratum 8",
+        "Upper"
+      };
       std::vector<std::string> names;
       const std::vector<EdTools::LayerSlot> slots = mScene.LayerSlots();
       for (std::size_t s = 0; s < slots.size() && s < 10; ++s) {
@@ -2118,7 +2418,9 @@ namespace faf::editor
       }
     }
 
-    void EditorApp::ApplyMaterial(const EdMaterialEditor::Bake& bake)
+    void EditorApp::ApplyMaterial(
+      const EdMaterialEditor::Bake& bake
+    )
     {
       EdMaterialEditor& material = mShell->MaterialEditor();
       const std::filesystem::path scmap = mDocument.MapDiskFile();
@@ -2129,7 +2431,9 @@ namespace faf::editor
       // <map>/env/layers/<graph>_albedo.dds (and _normals.dds), named in the game's files under the map's folder.
       std::string base;
       for (const char c : bake.name) {
-        base += (std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_' || c == '-') ? static_cast<char>(std::tolower(static_cast<unsigned char>(c))) : '_';
+        base += (std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_' || c == '-')
+          ? static_cast<char>(std::tolower(static_cast<unsigned char>(c)))
+          : '_';
       }
       const std::filesystem::path folder = scmap.parent_path() / "env" / "layers";
       std::error_code ec;
@@ -2162,15 +2466,22 @@ namespace faf::editor
       // The game's files must see the new file for the terrain (and Play) to load it.
       std::string read;
       const bool seen = ReadGameFile(value.albedo, read) && read.size() == bake.albedo.size();
-      gpg::Logf("editor: material %s applied to slot %d: %s (%zu bytes)%s", bake.name.c_str(), bake.slot, value.albedo.c_str(), bake.albedo.size(),
-                seen ? "" : "; the game's files don't see it yet");
+      gpg::Logf(
+        "editor: material %s applied to slot %d: %s (%zu bytes)%s",
+        bake.name.c_str(),
+        bake.slot,
+        value.albedo.c_str(),
+        bake.albedo.size(),
+        seen ? "" : "; the game's files don't see it yet"
+      );
       if (!seen) {
         mScene.PreviewLayerSlot(bake.slot, bake.albedo, bake.normals, 10.0f);
       }
       std::string status = "Applied to the slot: " + value.albedo;
       if (bake.mask != nullptr && bake.slot >= 1 && bake.slot <= 8) {
         std::string message;
-        status += mScene.SetMaskLayer(bake.slot - 1, *bake.mask, message) ? "; the stratum's mask painted" : "; " + message;
+        status +=
+          mScene.SetMaskLayer(bake.slot - 1, *bake.mask, message) ? "; the stratum's mask painted" : "; " + message;
       }
       material.SetStatus(status);
     }
@@ -2188,8 +2499,13 @@ namespace faf::editor
     namespace
     {
       /** A Windows file dialog for one kind of file; empty when cancelled. */
-      std::filesystem::path AskFile(const HWND owner, const bool save, const wchar_t* const filter, const wchar_t* const extension,
-                                    const wchar_t* const title)
+      std::filesystem::path AskFile(
+        const HWND owner,
+        const bool save,
+        const wchar_t* const filter,
+        const wchar_t* const extension,
+        const wchar_t* const title
+      )
       {
         wchar_t path[MAX_PATH] = L"";
         OPENFILENAMEW dialog{};
@@ -2200,13 +2516,17 @@ namespace faf::editor
         dialog.lpstrFilter = filter;
         dialog.lpstrDefExt = extension;
         dialog.lpstrTitle = title;
-        dialog.Flags = save ? (OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR) : (OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR);
+        dialog.Flags = save ? (OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR)
+                            : (OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR);
         const BOOL chosen = save ? ::GetSaveFileNameW(&dialog) : ::GetOpenFileNameW(&dialog);
         return chosen != FALSE ? std::filesystem::path(path) : std::filesystem::path{};
       }
 
       /** The Windows file dialog for a height image; empty when cancelled. */
-      std::filesystem::path AskHeightFile(const HWND owner, const bool save)
+      std::filesystem::path AskHeightFile(
+        const HWND owner,
+        const bool save
+      )
       {
         wchar_t path[MAX_PATH] = L"";
         OPENFILENAMEW dialog{};
@@ -2215,13 +2535,16 @@ namespace faf::editor
         dialog.lpstrFile = path;
         dialog.nMaxFile = MAX_PATH;
         if (save) {
-          dialog.lpstrFilter = L"16-bit grey PNG (*.png)\0*.png\0Raw 16-bit (*.raw)\0*.raw\0World Machine (*.r16)\0*.r16\0";
+          dialog.lpstrFilter =
+            L"16-bit grey PNG (*.png)\0*.png\0Raw 16-bit (*.raw)\0*.raw\0World Machine (*.r16)\0*.r16\0";
           dialog.lpstrDefExt = L"png";
           dialog.lpstrTitle = L"Export the height field";
           dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
           return ::GetSaveFileNameW(&dialog) != FALSE ? std::filesystem::path(path) : std::filesystem::path{};
         }
-        dialog.lpstrFilter = L"Height images (*.png;*.raw;*.r16;*.bmp;*.tif;*.tiff)\0*.png;*.raw;*.r16;*.bmp;*.tif;*.tiff\0All files\0*.*\0";
+        dialog.lpstrFilter =
+          L"Height images (*.png;*.raw;*.r16;*.bmp;*.tif;*.tiff)\0*.png;*.raw;*.r16;*.bmp;*.tif;*.tiff\0All "
+          L"files\0*.*\0";
         dialog.lpstrTitle = L"Import a height field";
         dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
         return ::GetOpenFileNameW(&dialog) != FALSE ? std::filesystem::path(path) : std::filesystem::path{};
@@ -2270,7 +2593,9 @@ namespace faf::editor
       if (!mPropToolArg.empty() && tools.HasPropBlueprints()) {
         // `/proptool <mode>,<blueprint>` (test runs): 0 Single, 1 Scatter, 2 Erase.
         const std::size_t comma = mPropToolArg.find(',');
-        tools.SetPropTool(comma == std::string::npos ? std::string{} : mPropToolArg.substr(comma + 1), std::atoi(mPropToolArg.c_str()));
+        tools.SetPropTool(
+          comma == std::string::npos ? std::string{} : mPropToolArg.substr(comma + 1), std::atoi(mPropToolArg.c_str())
+        );
         mPropToolArg.clear();
       }
       if (mToolArg >= 0) {
@@ -2311,12 +2636,16 @@ namespace faf::editor
         // through RenderDoc's in-app API (RENDERDOC_GetAPI, version 1.0.0; TriggerCapture is its table's 16th entry).
         if (mRdCaptureFrame < 0) {
           fa::vector<fa::string> value;
-          mRdCaptureFrame = moho::CFG_GetArgOption("/rdcapture", 1, &value) && !value.empty() ? std::atoi(value[0].c_str()) : 0;
+          mRdCaptureFrame =
+            moho::CFG_GetArgOption("/rdcapture", 1, &value) && !value.empty() ? std::atoi(value[0].c_str()) : 0;
         }
         if (mRdCaptureFrame > 0 && ++mRdFrames == mRdCaptureFrame) {
           if (const HMODULE renderDoc = ::GetModuleHandleA("renderdoc.dll"); renderDoc != nullptr) {
             using GetApi = int(__cdecl*)(int, void**);
-            if (const auto getApi = reinterpret_cast<GetApi>(::GetProcAddress(renderDoc, "RENDERDOC_GetAPI")); getApi != nullptr) {
+            if (
+              const auto getApi = reinterpret_cast<GetApi>(::GetProcAddress(renderDoc, "RENDERDOC_GetAPI"));
+              getApi != nullptr
+            ) {
               void** api = nullptr;
               // Version 1.1.0 for TriggerMultiFrameCapture (the table's 23rd entry): three frames, and the prop
               // pictures asked for again, so the frames hold thumbnail passes.
@@ -2346,8 +2675,8 @@ namespace faf::editor
             mScene.FillAirGrid(count, replace);
           }
         }
-        // `/adaptive <marker>,<army>` (test runs): ties a mass or hydrocarbon marker to an army in the adaptive tables, once
-        // (the map becomes adaptive first when it isn't).
+        // `/adaptive <marker>,<army>` (test runs): ties a mass or hydrocarbon marker to an army in the adaptive tables,
+        // once (the map becomes adaptive first when it isn't).
         if (!mAdaptiveArgDone) {
           mAdaptiveArgDone = true;
           if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/adaptive", 1, &value) && !value.empty()) {
@@ -2364,13 +2693,19 @@ namespace faf::editor
             const std::vector<ScenarioTeam> teams = mDocument.Teams();
             const int slots = teams.empty() ? 1 : static_cast<int>(teams.front().armies.size());
             tables.maxPlayers = mDocument.Adaptive() ? std::max(tables.maxPlayers, slots) : slots;
-            std::vector<std::vector<std::string>>& byArmy = marker.rfind("Hydrocarbon", 0) == 0 ? tables.hydroArmy : tables.mexArmy;
+            std::vector<std::vector<std::string>>& byArmy =
+              marker.rfind("Hydrocarbon", 0) == 0 ? tables.hydroArmy : tables.mexArmy;
             if (army >= 1) {
               byArmy.resize(std::max(byArmy.size(), static_cast<std::size_t>(army)));
               byArmy[static_cast<std::size_t>(army - 1)].push_back(marker);
             }
             mDocument.SetTablesText(WithAdaptiveTables(mDocument.TablesText(), tables));
-            gpg::Logf("editor: adaptive: %s spawns with ARMY_%d (tables %s)", marker.c_str(), army, mDocument.Facts().tablesPath.c_str());
+            gpg::Logf(
+              "editor: adaptive: %s spawns with ARMY_%d (tables %s)",
+              marker.c_str(),
+              army,
+              mDocument.Facts().tablesPath.c_str()
+            );
           }
         }
         // `/propedit <position|heading|size>,<a>[,<b>,<c>]` (test runs): one edit of the selection, once it has one.
@@ -2380,9 +2715,9 @@ namespace faf::editor
             const std::string text = value[0].c_str();
             PropertyEdit asked;
             asked.what = text.rfind("position", 0) == 0 ? PropertyEdit::What::Position
-                         : text.rfind("heading", 0) == 0 ? PropertyEdit::What::Heading
-                         : text.rfind("size", 0) == 0    ? PropertyEdit::What::Size
-                                                         : PropertyEdit::What::None;
+              : text.rfind("heading", 0) == 0           ? PropertyEdit::What::Heading
+              : text.rfind("size", 0) == 0              ? PropertyEdit::What::Size
+                                                        : PropertyEdit::What::None;
             std::size_t at = text.find(',');
             for (int i = 0; i < 3 && at != std::string::npos; ++i) {
               asked.values[i] = static_cast<float>(std::atof(text.c_str() + at + 1));
@@ -2424,8 +2759,13 @@ namespace faf::editor
               mWaterDragging = false;
               if (!(mWaterBefore == mDocument.WaterNow())) {
                 mDocument.WaterEdited(mWaterBefore);
-                gpg::Logf("editor: water: %s, level %.2f, deep %.2f, abyss %.2f", water.enabled ? "on" : "off", static_cast<double>(water.elevation),
-                          static_cast<double>(water.deep), static_cast<double>(water.abyss));
+                gpg::Logf(
+                  "editor: water: %s, level %.2f, deep %.2f, abyss %.2f",
+                  water.enabled ? "on" : "off",
+                  static_cast<double>(water.elevation),
+                  static_cast<double>(water.deep),
+                  static_cast<double>(water.abyss)
+                );
               }
             }
           }
@@ -2474,7 +2814,9 @@ namespace faf::editor
             tools.SelectWaterBody(std::atoi(mWaterPickArg.c_str()) - 1);
             const std::size_t comma = mWaterPickArg.find(',');
             const std::string mode = comma == std::string::npos ? std::string() : mWaterPickArg.substr(comma + 1);
-            tools.WaterBodyPick() = mode == "seed" ? EdTools::WaterPick::Seed : mode == "outline" ? EdTools::WaterPick::Outline : EdTools::WaterPick::None;
+            tools.WaterBodyPick() = mode == "seed" ? EdTools::WaterPick::Seed
+              : mode == "outline"                  ? EdTools::WaterPick::Outline
+                                                   : EdTools::WaterPick::None;
           }
           gpg::Logf("editor: /waterpick %s", mWaterPickArg.c_str());
           mWaterPickArg.clear();
@@ -2495,8 +2837,13 @@ namespace faf::editor
           water.abyss = values[3];
           mDocument.ApplyWater(water);
           mDocument.WaterEdited(before);
-          gpg::Logf("editor: water set: %s, level %.2f, deep %.2f, abyss %.2f", water.enabled ? "on" : "off", static_cast<double>(water.elevation),
-                    static_cast<double>(water.deep), static_cast<double>(water.abyss));
+          gpg::Logf(
+            "editor: water set: %s, level %.2f, deep %.2f, abyss %.2f",
+            water.enabled ? "on" : "off",
+            static_cast<double>(water.elevation),
+            static_cast<double>(water.deep),
+            static_cast<double>(water.abyss)
+          );
           mWaterSetArg.clear();
         }
         tools.SetUnitSelectionCount(mScene.UnitSelectionCount());
@@ -2504,8 +2851,11 @@ namespace faf::editor
         if (!mUnitToolArg.empty()) {
           const std::size_t first = mUnitToolArg.find(',');
           const std::size_t second = first == std::string::npos ? std::string::npos : mUnitToolArg.find(',', first + 1);
-          tools.SetUnitTool(mUnitToolArg.substr(0, first), first == std::string::npos ? std::string() : mUnitToolArg.substr(first + 1, second - first - 1),
-                            second != std::string::npos && mUnitToolArg.substr(second + 1) == "select");
+          tools.SetUnitTool(
+            mUnitToolArg.substr(0, first),
+            first == std::string::npos ? std::string() : mUnitToolArg.substr(first + 1, second - first - 1),
+            second != std::string::npos && mUnitToolArg.substr(second + 1) == "select"
+          );
           mUnitToolArg.clear();
         }
         if (tools.PropsToolActive()) {
@@ -2517,17 +2867,35 @@ namespace faf::editor
             const UnitWreckTotals wrecks = MapUnitWrecks(mDocument);
             if (reclaim.props > 0 || !reclaim.rows.empty() || wrecks.startCount > 0 || wrecks.scriptCount > 0) {
               char summary[480];
-              int used = std::snprintf(summary, sizeof(summary), "%d props: %.0f mass, %.0f energy. %d give none, %d have no blueprint.",
-                                       reclaim.props, reclaim.mass, reclaim.energy, reclaim.none, reclaim.unknown);
+              int used = std::snprintf(
+                summary,
+                sizeof(summary),
+                "%d props: %.0f mass, %.0f energy. %d give none, %d have no blueprint.",
+                reclaim.props,
+                reclaim.mass,
+                reclaim.energy,
+                reclaim.none,
+                reclaim.unknown
+              );
               if (wrecks.startCount > 0 && used > 0 && used < static_cast<int>(sizeof(summary))) {
-                used += std::snprintf(summary + used, sizeof(summary) - static_cast<std::size_t>(used),
-                                      " Unit wrecks from the start: %d, %.0f mass, %.0f energy.", wrecks.startCount, wrecks.startMass,
-                                      wrecks.startEnergy);
+                used += std::snprintf(
+                  summary + used,
+                  sizeof(summary) - static_cast<std::size_t>(used),
+                  " Unit wrecks from the start: %d, %.0f mass, %.0f energy.",
+                  wrecks.startCount,
+                  wrecks.startMass,
+                  wrecks.startEnergy
+                );
               }
               if (wrecks.scriptCount > 0 && used > 0 && used < static_cast<int>(sizeof(summary))) {
-                (void)std::snprintf(summary + used, sizeof(summary) - static_cast<std::size_t>(used),
-                                    " The script's wreck groups, all on: %d more, %.0f mass, %.0f energy (lobby options decide).",
-                                    wrecks.scriptCount, wrecks.scriptMass, wrecks.scriptEnergy);
+                (void)std::snprintf(
+                  summary + used,
+                  sizeof(summary) - static_cast<std::size_t>(used),
+                  " The script's wreck groups, all on: %d more, %.0f mass, %.0f energy (lobby options decide).",
+                  wrecks.scriptCount,
+                  wrecks.scriptMass,
+                  wrecks.scriptEnergy
+                );
               }
               std::vector<std::string> rows;
               for (std::size_t i = 0; i < reclaim.rows.size() && i < 8; ++i) {
@@ -2538,8 +2906,14 @@ namespace faf::editor
                 }
                 char line[200];
                 // The mass first, so a narrow panel cuts the name, not the number.
-                (void)std::snprintf(line, sizeof(line), "%.0f  %d x %s", static_cast<double>(row.mass * static_cast<float>(row.count)), row.count,
-                                    name.c_str());
+                (void)std::snprintf(
+                  line,
+                  sizeof(line),
+                  "%.0f  %d x %s",
+                  static_cast<double>(row.mass * static_cast<float>(row.count)),
+                  row.count,
+                  name.c_str()
+                );
                 rows.emplace_back(line);
               }
               if (!mReclaimLogged) {
@@ -2615,7 +2989,8 @@ namespace faf::editor
             tools.SetGridStep(static_cast<float>(std::atof(step[0].c_str())));
           }
         }
-        // `/hoverprop <index or part of a blueprint path>` (test runs): the Select tool's cursor kept on that prop (WPE.54).
+        // `/hoverprop <index or part of a blueprint path>` (test runs): the Select tool's cursor kept on that prop
+        // (WPE.54).
         static bool hoverPropArmed = false;
         if (
           fa::vector<fa::string> prop;
@@ -2640,16 +3015,22 @@ namespace faf::editor
             mShell->TestPropSwap(swap[0].c_str());
           }
         }
-        if (fa::vector<fa::string> hover; !mFrameMarkerArg.empty() && moho::CFG_GetArgOption("/hovermarker", 1, &hover) && !hover.empty()) {
-          // `/hovermarker <name>` (test runs, with /framemarker): the cursor kept on that marker ("Mass+08" for "Mass 08").
+        if (
+          fa::vector<fa::string> hover;
+          !mFrameMarkerArg.empty() && moho::CFG_GetArgOption("/hovermarker", 1, &hover) && !hover.empty()
+        ) {
+          // `/hovermarker <name>` (test runs, with /framemarker): the cursor kept on that marker ("Mass+08" for "Mass
+          // 08").
           std::string name = hover[0].c_str();
           std::replace(name.begin(), name.end(), '+', ' ');
           mScene.TestHoverMarker(name);
         }
         if (!mFrameMarkerArg.empty()) {
           const std::size_t at = mFrameMarkerArg.find('@');
-          mScene.FrameMarker(mFrameMarkerArg.substr(0, at),
-                             at == std::string::npos ? 140.0f : static_cast<float>(std::atof(mFrameMarkerArg.c_str() + at + 1)));
+          mScene.FrameMarker(
+            mFrameMarkerArg.substr(0, at),
+            at == std::string::npos ? 140.0f : static_cast<float>(std::atof(mFrameMarkerArg.c_str() + at + 1))
+          );
           mFrameMarkerArg.clear();
         }
         // `/selectunit <army>,<unit>` (test runs), once the units are drawn.
@@ -2705,15 +3086,24 @@ namespace faf::editor
           tools.SetConnectPathNodes(moho::CFG_GetArgOption("/connectnodes", 0, nullptr));
           mMarkerToolArg.clear();
         }
-        // The playable area: the panel shows it and asks for changes; `/playablearea x0,z0,x1,z1` (or `none`) for test runs.
+        // The playable area: the panel shows it and asks for changes; `/playablearea x0,z0,x1,z1` (or `none`) for test
+        // runs.
         if (const moho::CHeightField* const field = mDocument.Map()->mTerrainRes->GetHeightField(); field != nullptr) {
           const std::optional<EdDocument::PlayableRect> area = mDocument.PlayableArea();
-          tools.SetPlayableArea(area ? std::optional<std::array<int, 4>>(std::array<int, 4>{area->x0, area->z0, area->x1, area->z1}) : std::nullopt,
-                                field->width - 1, field->height - 1);
+          tools.SetPlayableArea(
+            area ? std::optional<std::array<int, 4>>(std::array<int, 4>{area->x0, area->z0, area->x1, area->z1})
+                 : std::nullopt,
+            field->width - 1,
+            field->height - 1
+          );
         }
         if (std::optional<std::array<int, 4>> change; tools.TakePlayableAreaChange(change)) {
-          mScene.ChangePlayableArea(change ? std::optional<EdDocument::PlayableRect>(EdDocument::PlayableRect{(*change)[0], (*change)[1], (*change)[2], (*change)[3]})
-                                           : std::nullopt);
+          mScene.ChangePlayableArea(
+            change ? std::optional<EdDocument::PlayableRect>(
+                       EdDocument::PlayableRect{(*change)[0], (*change)[1], (*change)[2], (*change)[3]}
+                     )
+                   : std::nullopt
+          );
         }
         if (!mPlayableAreaArg.empty()) {
           int x0 = 0, z0 = 0, x1 = 0, z1 = 0;
@@ -2844,11 +3234,22 @@ namespace faf::editor
         std::filesystem::path importFile;
         std::filesystem::path exportFile;
         if (tools.TakeWaterImport()) {
-          importFile = AskFile(HandleOf(mGame.supcomFrame), false, L"Water settings (*.scmwtr)\0*.scmwtr\0All files\0*.*\0", L"scmwtr",
-                               L"Import water settings");
+          importFile = AskFile(
+            HandleOf(mGame.supcomFrame),
+            false,
+            L"Water settings (*.scmwtr)\0*.scmwtr\0All files\0*.*\0",
+            L"scmwtr",
+            L"Import water settings"
+          );
         }
         if (tools.TakeWaterExport()) {
-          exportFile = AskFile(HandleOf(mGame.supcomFrame), true, L"Water settings (*.scmwtr)\0*.scmwtr\0", L"scmwtr", L"Export water settings");
+          exportFile = AskFile(
+            HandleOf(mGame.supcomFrame),
+            true,
+            L"Water settings (*.scmwtr)\0*.scmwtr\0",
+            L"scmwtr",
+            L"Export water settings"
+          );
         }
         if (mScene.Attached() && !mWaterFilesDone) {
           mWaterFilesDone = true;
@@ -2875,14 +3276,21 @@ namespace faf::editor
             water.abyss = before.abyss;
             for (int i = 0; i < 6; ++i) {
               if (water.textures[i] != before.textures[i]) {
-                gpg::Logf("editor: water texture %d: %s (was %s)", i, water.textures[i].c_str(), before.textures[i].c_str());
+                gpg::Logf(
+                  "editor: water texture %d: %s (was %s)", i, water.textures[i].c_str(), before.textures[i].c_str()
+                );
               }
             }
             mDocument.ApplyWater(water);
             mDocument.WaterEdited(before);
-            gpg::Logf("editor: water settings imported from %s: colour %.3f %.3f %.3f, sun reflection %.2f", importFile.string().c_str(),
-                      static_cast<double>(water.shader.mWaterColor[0]), static_cast<double>(water.shader.mWaterColor[1]),
-                      static_cast<double>(water.shader.mWaterColor[2]), static_cast<double>(water.shader.mSunReflectionAmount));
+            gpg::Logf(
+              "editor: water settings imported from %s: colour %.3f %.3f %.3f, sun reflection %.2f",
+              importFile.string().c_str(),
+              static_cast<double>(water.shader.mWaterColor[0]),
+              static_cast<double>(water.shader.mWaterColor[1]),
+              static_cast<double>(water.shader.mWaterColor[2]),
+              static_cast<double>(water.shader.mSunReflectionAmount)
+            );
           }
         }
         if (!exportFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
@@ -2896,18 +3304,22 @@ namespace faf::editor
           }
         }
       }
-      // The Lighting panel's "from another map", or `/lightingfrom <map folder>` for test runs: that map's lighting, read
-      // from its .scmap.
+      // The Lighting panel's "from another map", or `/lightingfrom <map folder>` for test runs: that map's lighting,
+      // read from its .scmap.
       {
         std::string scenario = mShell->TakeLightingFromMap();
         if (mScene.Attached() && !mLightingFromDone) {
           mLightingFromDone = true;
           if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/lightingfrom", 1, &value) && !value.empty()) {
             std::string wanted = value[0].c_str();
-            std::transform(wanted.begin(), wanted.end(), wanted.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            std::transform(wanted.begin(), wanted.end(), wanted.begin(), [](const unsigned char c) {
+              return static_cast<char>(std::tolower(c));
+            });
             for (const std::string& map : mPlay.Maps()) {
               std::string folder = MapDisplayName(map);
-              std::transform(folder.begin(), folder.end(), folder.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+              std::transform(folder.begin(), folder.end(), folder.begin(), [](const unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+              });
               if (folder == wanted) {
                 scenario = map;
               }
@@ -2920,7 +3332,10 @@ namespace faf::editor
           std::smatch path;
           LightingState lighting = mDocument.LightingNow();
           std::string error;
-          if (!ReadGameFile(scenario, text) || !std::regex_search(text, path, std::regex(R"(\bmap\s*=\s*['"]([^'"]+\.scmap)['"])"))) {
+          if (
+            !ReadGameFile(scenario, text) ||
+            !std::regex_search(text, path, std::regex(R"(\bmap\s*=\s*['"]([^'"]+\.scmap)['"])"))
+          ) {
             gpg::Warnf("editor: %s names no map file", scenario.c_str());
           } else if (!ReadGameFile(path[1].str(), bytes) || !LightingFromScmap(bytes, lighting, error)) {
             gpg::Warnf("editor: %s: %s", path[1].str().c_str(), error.empty() ? "can't read it" : error.c_str());
@@ -2928,9 +3343,16 @@ namespace faf::editor
             const LightingState before = mDocument.LightingNow();
             mDocument.ApplyLighting(lighting);
             mDocument.LightingEdited(before);
-            gpg::Logf("editor: lighting from %s: multiplier %.2f, sun colour %.2f %.2f %.2f, fog %.0f to %.0f", path[1].str().c_str(),
-                      static_cast<double>(lighting.multiplier), static_cast<double>(lighting.sunColor[0]), static_cast<double>(lighting.sunColor[1]),
-                      static_cast<double>(lighting.sunColor[2]), static_cast<double>(lighting.fogStart), static_cast<double>(lighting.fogEnd));
+            gpg::Logf(
+              "editor: lighting from %s: multiplier %.2f, sun colour %.2f %.2f %.2f, fog %.0f to %.0f",
+              path[1].str().c_str(),
+              static_cast<double>(lighting.multiplier),
+              static_cast<double>(lighting.sunColor[0]),
+              static_cast<double>(lighting.sunColor[1]),
+              static_cast<double>(lighting.sunColor[2]),
+              static_cast<double>(lighting.fogStart),
+              static_cast<double>(lighting.fogEnd)
+            );
           }
         }
       }
@@ -2939,12 +3361,22 @@ namespace faf::editor
         std::filesystem::path importFile;
         std::filesystem::path exportFile;
         if (mShell->TakeLightingImport()) {
-          importFile = AskFile(HandleOf(mGame.supcomFrame), false, L"Lighting settings (*.scmlighting)\0*.scmlighting\0All files\0*.*\0",
-                               L"scmlighting", L"Import lighting settings");
+          importFile = AskFile(
+            HandleOf(mGame.supcomFrame),
+            false,
+            L"Lighting settings (*.scmlighting)\0*.scmlighting\0All files\0*.*\0",
+            L"scmlighting",
+            L"Import lighting settings"
+          );
         }
         if (mShell->TakeLightingExport()) {
-          exportFile = AskFile(HandleOf(mGame.supcomFrame), true, L"Lighting settings (*.scmlighting)\0*.scmlighting\0", L"scmlighting",
-                               L"Export lighting settings");
+          exportFile = AskFile(
+            HandleOf(mGame.supcomFrame),
+            true,
+            L"Lighting settings (*.scmlighting)\0*.scmlighting\0",
+            L"scmlighting",
+            L"Export lighting settings"
+          );
         }
         if (mScene.Attached() && !mLightingFilesDone) {
           mLightingFilesDone = true;
@@ -2966,9 +3398,16 @@ namespace faf::editor
           } else {
             mDocument.ApplyLighting(lighting);
             mDocument.LightingEdited(before);
-            gpg::Logf("editor: lighting imported from %s: multiplier %.2f, sun colour %.2f %.2f %.2f, fog %.0f to %.0f", importFile.string().c_str(),
-                      static_cast<double>(lighting.multiplier), static_cast<double>(lighting.sunColor[0]), static_cast<double>(lighting.sunColor[1]),
-                      static_cast<double>(lighting.sunColor[2]), static_cast<double>(lighting.fogStart), static_cast<double>(lighting.fogEnd));
+            gpg::Logf(
+              "editor: lighting imported from %s: multiplier %.2f, sun colour %.2f %.2f %.2f, fog %.0f to %.0f",
+              importFile.string().c_str(),
+              static_cast<double>(lighting.multiplier),
+              static_cast<double>(lighting.sunColor[0]),
+              static_cast<double>(lighting.sunColor[1]),
+              static_cast<double>(lighting.sunColor[2]),
+              static_cast<double>(lighting.fogStart),
+              static_cast<double>(lighting.fogEnd)
+            );
           }
         }
         if (!exportFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
@@ -2983,12 +3422,22 @@ namespace faf::editor
         std::filesystem::path importFile;
         std::filesystem::path exportFile;
         if (tools.TakeMarkerFileImport()) {
-          importFile = AskFile(HandleOf(mGame.supcomFrame), false, L"Markers (*.fafmapmarkers)\0*.fafmapmarkers\0All files\0*.*\0",
-                               L"fafmapmarkers", L"Import markers");
+          importFile = AskFile(
+            HandleOf(mGame.supcomFrame),
+            false,
+            L"Markers (*.fafmapmarkers)\0*.fafmapmarkers\0All files\0*.*\0",
+            L"fafmapmarkers",
+            L"Import markers"
+          );
         }
         if (tools.TakeMarkerFileExport()) {
-          exportFile = AskFile(HandleOf(mGame.supcomFrame), true, L"Markers (*.fafmapmarkers)\0*.fafmapmarkers\0", L"fafmapmarkers",
-                               L"Export markers");
+          exportFile = AskFile(
+            HandleOf(mGame.supcomFrame),
+            true,
+            L"Markers (*.fafmapmarkers)\0*.fafmapmarkers\0",
+            L"fafmapmarkers",
+            L"Export markers"
+          );
         }
         if (mScene.Attached() && !mMarkerFilesDone) {
           mMarkerFilesDone = true;
@@ -3003,12 +3452,18 @@ namespace faf::editor
         if (!exportFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
           const std::vector<std::string>& names = mScene.SelectedMarkerNames();
           const int size = std::max(mDocument.Facts().fieldWidth - 1, 0);
-          const std::string text = MarkersToFafmapmarkers(mDocument.SaveData().Markers(), names, size, std::max(mDocument.Facts().fieldHeight - 1, 0));
+          const std::string text = MarkersToFafmapmarkers(
+            mDocument.SaveData().Markers(), names, size, std::max(mDocument.Facts().fieldHeight - 1, 0)
+          );
           std::ofstream out(exportFile, std::ios::binary | std::ios::trunc);
           out.write(text.data(), static_cast<std::streamsize>(text.size()));
           const std::size_t count = names.empty() ? mDocument.SaveData().Markers().size() : names.size();
-          (out ? gpg::Logf : gpg::Warnf)("editor: %zu markers (%s) exported to %s", count, names.empty() ? "all" : "the selected",
-                                        exportFile.string().c_str());
+          (out ? gpg::Logf : gpg::Warnf)(
+            "editor: %zu markers (%s) exported to %s",
+            count,
+            names.empty() ? "all" : "the selected",
+            exportFile.string().c_str()
+          );
         }
         if (!importFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
           std::ifstream in(importFile, std::ios::binary);
@@ -3018,22 +3473,36 @@ namespace faf::editor
           if (!in || !mScene.ImportMarkerFile(text, result, error)) {
             gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
           } else {
-            gpg::Logf("editor: %zu markers imported from %s (%s to %s), %d path links, %d of a type the editor doesn't place left out",
-                      result.names.size(), importFile.string().c_str(), result.names.empty() ? "-" : result.names.front().c_str(),
-                      result.names.empty() ? "-" : result.names.back().c_str(), result.links, result.skipped);
+            gpg::Logf(
+              "editor: %zu markers imported from %s (%s to %s), %d path links, %d of a type the editor doesn't place "
+              "left out",
+              result.names.size(),
+              importFile.string().c_str(),
+              result.names.empty() ? "-" : result.names.front().c_str(),
+              result.names.empty() ? "-" : result.names.back().c_str(),
+              result.links,
+              result.skipped
+            );
           }
         }
       }
-      // The Units tool's units file, or `/unitsimport <file>`, `/unitsexport <file>` for test runs (the Units tool's army).
+      // The Units tool's units file, or `/unitsimport <file>`, `/unitsexport <file>` for test runs (the Units tool's
+      // army).
       {
         std::filesystem::path importFile;
         std::filesystem::path exportFile;
         if (tools.TakeUnitFileImport()) {
-          importFile = AskFile(HandleOf(mGame.supcomFrame), false, L"Units (*.scunits)\0*.scunits\0All files\0*.*\0", L"scunits",
-                               L"Import units");
+          importFile = AskFile(
+            HandleOf(mGame.supcomFrame),
+            false,
+            L"Units (*.scunits)\0*.scunits\0All files\0*.*\0",
+            L"scunits",
+            L"Import units"
+          );
         }
         if (tools.TakeUnitFileExport()) {
-          exportFile = AskFile(HandleOf(mGame.supcomFrame), true, L"Units (*.scunits)\0*.scunits\0", L"scunits", L"Export units");
+          exportFile =
+            AskFile(HandleOf(mGame.supcomFrame), true, L"Units (*.scunits)\0*.scunits\0", L"scunits", L"Export units");
         }
         if (mScene.Attached() && !mUnitFilesDone && !tools.UnitArmy().empty()) {
           mUnitFilesDone = true;
@@ -3050,8 +3519,12 @@ namespace faf::editor
           const std::string text = UnitsToScunits(units);
           std::ofstream out(exportFile, std::ios::binary | std::ios::trunc);
           out.write(text.data(), static_cast<std::streamsize>(text.size()));
-          (out ? gpg::Logf : gpg::Warnf)("editor: %zu units (%s) exported to %s", units.size(),
-                                        mScene.UnitSelectionCount() > 0 ? "the selected" : tools.UnitArmy().c_str(), exportFile.string().c_str());
+          (out ? gpg::Logf : gpg::Warnf)(
+            "editor: %zu units (%s) exported to %s",
+            units.size(),
+            mScene.UnitSelectionCount() > 0 ? "the selected" : tools.UnitArmy().c_str(),
+            exportFile.string().c_str()
+          );
         }
         if (!importFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
           std::ifstream in(importFile, std::ios::binary);
@@ -3062,12 +3535,20 @@ namespace faf::editor
           if (!in || !mScene.ImportUnitFile(text, tools.UnitArmy(), names, moved, error)) {
             gpg::Warnf("editor: %s: %s", importFile.string().c_str(), in ? error.c_str() : "can't read it");
           } else {
-            gpg::Logf("editor: %zu units imported from %s into %s (%s to %s)%s", names.size(), importFile.string().c_str(),
-                      tools.UnitArmy().c_str(), names.front().c_str(), names.back().c_str(), moved ? ", moved onto this map" : "");
+            gpg::Logf(
+              "editor: %zu units imported from %s into %s (%s to %s)%s",
+              names.size(),
+              importFile.string().c_str(),
+              tools.UnitArmy().c_str(),
+              names.front().c_str(),
+              names.back().c_str(),
+              moved ? ", moved onto this map" : ""
+            );
           }
         }
       }
-      // The Texture tool's layer files, or `/layerimport <slot>,<file>`, `/layerexport <slot>,<file>`, `/layersetimport <file>`,
+      // The Texture tool's layer files, or `/layerimport <slot>,<file>`, `/layerexport <slot>,<file>`, `/layersetimport
+      // <file>`,
       // `/layersetexport <file>` for test runs (slot 0 the lower layer, 9 the upper one).
       {
         int slot = 0;
@@ -3093,9 +3574,15 @@ namespace faf::editor
         }
         // Test runs: the switches in a fixed order, export before import, one each frame from the map's first one.
         if (ask == EdTools::LayerFileAsk::None && mScene.Attached() && mLayerFileStep < 4) {
-          static const char* const kSwitches[4] = {"/layersetexport", "/layerexport", "/layersetimport", "/layerimport"};
-          static const EdTools::LayerFileAsk kAsks[4] = {EdTools::LayerFileAsk::ExportSet, EdTools::LayerFileAsk::ExportLayer,
-                                                         EdTools::LayerFileAsk::ImportSet, EdTools::LayerFileAsk::ImportLayer};
+          static const char* const kSwitches[4] = {
+            "/layersetexport", "/layerexport", "/layersetimport", "/layerimport"
+          };
+          static const EdTools::LayerFileAsk kAsks[4] = {
+            EdTools::LayerFileAsk::ExportSet,
+            EdTools::LayerFileAsk::ExportLayer,
+            EdTools::LayerFileAsk::ImportSet,
+            EdTools::LayerFileAsk::ImportLayer
+          };
           const int step = mLayerFileStep++;
           if (fa::vector<fa::string> value; moho::CFG_GetArgOption(kSwitches[step], 1, &value) && !value.empty()) {
             std::string text = value[0].c_str();
@@ -3113,14 +3600,21 @@ namespace faf::editor
           slot = std::clamp(slot, 0, 9);
           if (ask == EdTools::LayerFileAsk::ExportLayer || ask == EdTools::LayerFileAsk::ExportSet) {
             const std::vector<LayerSettings> layers = mScene.LayerSettingsNow();
-            const std::string text = set ? LayersToScmst(mScene.TerrainShader(), layers) : LayerToScmsl(layers[static_cast<std::size_t>(slot)]);
+            const std::string text = set ? LayersToScmst(mScene.TerrainShader(), layers)
+                                         : LayerToScmsl(layers[static_cast<std::size_t>(slot)]);
             std::ofstream out(file, std::ios::binary | std::ios::trunc);
             out.write(text.data(), static_cast<std::streamsize>(text.size()));
             if (set) {
-              (out ? gpg::Logf : gpg::Warnf)("editor: the layer set (%s) exported to %s", mScene.TerrainShader().c_str(), file.string().c_str());
+              (out ? gpg::Logf : gpg::Warnf)(
+                "editor: the layer set (%s) exported to %s", mScene.TerrainShader().c_str(), file.string().c_str()
+              );
             } else {
-              (out ? gpg::Logf : gpg::Warnf)("editor: layer %d (%s) exported to %s", slot, layers[static_cast<std::size_t>(slot)].albedo.c_str(),
-                                            file.string().c_str());
+              (out ? gpg::Logf : gpg::Warnf)(
+                "editor: layer %d (%s) exported to %s",
+                slot,
+                layers[static_cast<std::size_t>(slot)].albedo.c_str(),
+                file.string().c_str()
+              );
             }
           } else {
             std::ifstream in(file, std::ios::binary);
@@ -3144,8 +3638,13 @@ namespace faf::editor
               gpg::Warnf("editor: %s: %s", file.string().c_str(), in ? error.c_str() : "can't read it");
             } else {
               const int changed = mScene.ApplyLayerSettings(shader, changes);
-              gpg::Logf("editor: %s imported from %s: %d change%s (one undo step)", set ? "a layer set" : "a layer", file.string().c_str(),
-                        changed, changed == 1 ? "" : "s");
+              gpg::Logf(
+                "editor: %s imported from %s: %d change%s (one undo step)",
+                set ? "a layer set" : "a layer",
+                file.string().c_str(),
+                changed,
+                changed == 1 ? "" : "s"
+              );
             }
           }
         }
@@ -3155,12 +3654,22 @@ namespace faf::editor
         std::filesystem::path importFile;
         std::filesystem::path exportFile;
         if (tools.TakePaintSetImport()) {
-          importFile = AskFile(HandleOf(mGame.supcomFrame), false, L"Prop paint sets (*.proppaintset)\0*.proppaintset\0All files\0*.*\0",
-                               L"proppaintset", L"Import a prop paint set");
+          importFile = AskFile(
+            HandleOf(mGame.supcomFrame),
+            false,
+            L"Prop paint sets (*.proppaintset)\0*.proppaintset\0All files\0*.*\0",
+            L"proppaintset",
+            L"Import a prop paint set"
+          );
         }
         if (tools.TakePaintSetExport()) {
-          exportFile = AskFile(HandleOf(mGame.supcomFrame), true, L"Prop paint sets (*.proppaintset)\0*.proppaintset\0", L"proppaintset",
-                               L"Export the paint list");
+          exportFile = AskFile(
+            HandleOf(mGame.supcomFrame),
+            true,
+            L"Prop paint sets (*.proppaintset)\0*.proppaintset\0",
+            L"proppaintset",
+            L"Export the paint list"
+          );
         }
         if (mScene.Attached() && !mPaintSetDone && tools.HasPropBlueprints()) {
           mPaintSetDone = true;
@@ -3184,11 +3693,17 @@ namespace faf::editor
               if (const std::string known = tools.PropBlueprintNamed(entry.blueprint); !known.empty()) {
                 entry.blueprint = known;
               } else if (tools.HasPropBlueprints()) {
-                gpg::Warnf("editor: %s: no prop blueprint %s; Scatter skips it until it is there", importFile.string().c_str(), entry.blueprint.c_str());
+                gpg::Warnf(
+                  "editor: %s: no prop blueprint %s; Scatter skips it until it is there",
+                  importFile.string().c_str(),
+                  entry.blueprint.c_str()
+                );
                 ++unknown;
               }
             }
-            gpg::Logf("editor: paint list from %s: %zu props (%d unknown)", importFile.string().c_str(), entries.size(), unknown);
+            gpg::Logf(
+              "editor: paint list from %s: %zu props (%d unknown)", importFile.string().c_str(), entries.size(), unknown
+            );
             tools.SetPaintList(std::move(entries));
           }
         }
@@ -3196,7 +3711,9 @@ namespace faf::editor
           const std::string text = PaintSetToProppaintset(tools.PaintList());
           std::ofstream out(exportFile, std::ios::binary | std::ios::trunc);
           out.write(text.data(), static_cast<std::streamsize>(text.size()));
-          (out ? gpg::Logf : gpg::Warnf)("editor: paint list (%zu props) exported to %s", tools.PaintList().size(), exportFile.string().c_str());
+          (out ? gpg::Logf : gpg::Warnf)(
+            "editor: paint list (%zu props) exported to %s", tools.PaintList().size(), exportFile.string().c_str()
+          );
         }
       }
       // The Lighting panel's sky file, or `/skyboximport <file>`, `/skyboxexport <file>` for test runs.
@@ -3204,11 +3721,18 @@ namespace faf::editor
         std::filesystem::path importFile;
         std::filesystem::path exportFile;
         if (mShell->TakeSkyboxImport()) {
-          importFile = AskFile(HandleOf(mGame.supcomFrame), false, L"Sky (*.scmskybox)\0*.scmskybox\0All files\0*.*\0", L"scmskybox",
-                               L"Import a sky");
+          importFile = AskFile(
+            HandleOf(mGame.supcomFrame),
+            false,
+            L"Sky (*.scmskybox)\0*.scmskybox\0All files\0*.*\0",
+            L"scmskybox",
+            L"Import a sky"
+          );
         }
         if (mShell->TakeSkyboxExport()) {
-          exportFile = AskFile(HandleOf(mGame.supcomFrame), true, L"Sky (*.scmskybox)\0*.scmskybox\0", L"scmskybox", L"Export the sky");
+          exportFile = AskFile(
+            HandleOf(mGame.supcomFrame), true, L"Sky (*.scmskybox)\0*.scmskybox\0", L"scmskybox", L"Export the sky"
+          );
         }
         if (mScene.Attached() && !mSkyboxFilesDone) {
           mSkyboxFilesDone = true;
@@ -3225,8 +3749,12 @@ namespace faf::editor
           const std::string text = SkyboxToScmskybox(sky);
           std::ofstream out(exportFile, std::ios::binary | std::ios::trunc);
           out.write(text.data(), static_cast<std::streamsize>(text.size()));
-          (out ? gpg::Logf : gpg::Warnf)("editor: the sky (%zu planets, cirrus %s) exported to %s", sky.planets.size(), sky.cirrusTexture.c_str(),
-                                        exportFile.string().c_str());
+          (out ? gpg::Logf : gpg::Warnf)(
+            "editor: the sky (%zu planets, cirrus %s) exported to %s",
+            sky.planets.size(),
+            sky.cirrusTexture.c_str(),
+            exportFile.string().c_str()
+          );
         }
         if (!importFile.empty() && mDocument.GetState() == EdDocument::State::Open) {
           std::ifstream in(importFile, std::ios::binary);
@@ -3239,13 +3767,20 @@ namespace faf::editor
             const SkyboxState before = mDocument.SkyboxNow();
             mDocument.ApplySkybox(sky);
             mDocument.SkyboxEdited(before);
-            gpg::Logf("editor: sky imported from %s: dome %.0f, %zu planets, zenith %.2f %.2f %.2f", importFile.string().c_str(),
-                      static_cast<double>(sky.scale), sky.planets.size(), static_cast<double>(sky.zenithColor[0]),
-                      static_cast<double>(sky.zenithColor[1]), static_cast<double>(sky.zenithColor[2]));
+            gpg::Logf(
+              "editor: sky imported from %s: dome %.0f, %zu planets, zenith %.2f %.2f %.2f",
+              importFile.string().c_str(),
+              static_cast<double>(sky.scale),
+              sky.planets.size(),
+              static_cast<double>(sky.zenithColor[0]),
+              static_cast<double>(sky.zenithColor[1]),
+              static_cast<double>(sky.zenithColor[2])
+            );
           }
         }
       }
-      // The Water panel's waves, or `/waves <pattern>,<depth>,<density %>[,<spacing>]`, `/wavesclear`, `/wavesexport <file>`,
+      // The Water panel's waves, or `/waves <pattern>,<depth>,<density %>[,<spacing>]`, `/wavesclear`, `/wavesexport
+      // <file>`,
       // `/wavesimport <file>`, `/wavepatterns <file>` for test runs (export first, then clear, import, patterns, add).
       {
         tools.SetWaveCount(mDocument.WaveCount());
@@ -3259,7 +3794,8 @@ namespace faf::editor
           mWaveSwitchesDone = true;
           const auto file = [](const char* const option) {
             fa::vector<fa::string> value;
-            return moho::CFG_GetArgOption(option, 1, &value) && !value.empty() ? std::filesystem::path(value[0].c_str()) : std::filesystem::path();
+            return moho::CFG_GetArgOption(option, 1, &value) && !value.empty() ? std::filesystem::path(value[0].c_str())
+                                                                               : std::filesystem::path();
           };
           if (const auto f = file("/wavesexport"); !f.empty()) {
             asks.emplace_back(EdTools::WaveAsk::Export, f);
@@ -3293,20 +3829,31 @@ namespace faf::editor
           const HWND owner = HandleOf(mGame.supcomFrame);
           if (what == EdTools::WaveAsk::Export) {
             if (path.empty()) {
-              path = AskFile(owner, true, L"Waves (*.scmwaves)\0*.scmwaves\0", L"scmwaves", L"Export the wave generators");
+              path =
+                AskFile(owner, true, L"Waves (*.scmwaves)\0*.scmwaves\0", L"scmwaves", L"Export the wave generators");
             }
             if (!path.empty()) {
               const std::vector<WaveRecord> waves = mDocument.WavesNow();
               const std::string text = WavesToScmwaves(waves);
               std::ofstream out(path, std::ios::binary | std::ios::trunc);
               out.write(text.data(), static_cast<std::streamsize>(text.size()));
-              (out ? gpg::Logf : gpg::Warnf)("editor: %zu wave generators exported to %s", waves.size(), path.string().c_str());
+              (out ? gpg::Logf
+                   : gpg::Warnf)("editor: %zu wave generators exported to %s", waves.size(), path.string().c_str());
             }
           } else if (what == EdTools::WaveAsk::Import || what == EdTools::WaveAsk::LoadPatterns) {
             const bool patterns = what == EdTools::WaveAsk::LoadPatterns;
             if (path.empty()) {
-              path = patterns ? AskFile(owner, false, L"Wave patterns (*.lua)\0*.lua\0All files\0*.*\0", L"lua", L"Load wave patterns")
-                              : AskFile(owner, false, L"Waves (*.scmwaves)\0*.scmwaves\0All files\0*.*\0", L"scmwaves", L"Import wave generators");
+              path = patterns
+                ? AskFile(
+                    owner, false, L"Wave patterns (*.lua)\0*.lua\0All files\0*.*\0", L"lua", L"Load wave patterns"
+                  )
+                : AskFile(
+                    owner,
+                    false,
+                    L"Waves (*.scmwaves)\0*.scmwaves\0All files\0*.*\0",
+                    L"scmwaves",
+                    L"Import wave generators"
+                  );
             }
             if (path.empty()) {
               continue;
@@ -3332,7 +3879,11 @@ namespace faf::editor
             std::vector<WaveRecord> before = mDocument.WavesNow();
             mDocument.ApplyWaves(waves);
             mDocument.WavesEdited(std::move(before));
-            gpg::Logf("editor: %zu wave generators imported from %s (in place of the map's)", waves.size(), path.string().c_str());
+            gpg::Logf(
+              "editor: %zu wave generators imported from %s (in place of the map's)",
+              waves.size(),
+              path.string().c_str()
+            );
           } else if (what == EdTools::WaveAsk::Clear) {
             std::vector<WaveRecord> before = mDocument.WavesNow();
             if (!before.empty()) {
@@ -3350,11 +3901,14 @@ namespace faf::editor
             }
             const int width = field->width - 1;
             const int height = field->height - 1;
-            std::vector<float> heights(static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height));
+            std::vector<float> heights(
+              static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height)
+            );
             for (int z = 0; z < field->height; ++z) {
               for (int x = 0; x < field->width; ++x) {
-                heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width) + static_cast<std::size_t>(x)] =
-                  mDocument.Map()->mTerrainRes->GetHeightAt(x, z);
+                heights
+                  [static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width) + static_cast<std::size_t>(x)] =
+                    mDocument.Map()->mTerrainRes->GetHeightAt(x, z);
               }
             }
             const std::vector<ShorePoint> found =
@@ -3370,9 +3924,17 @@ namespace faf::editor
               mDocument.ApplyWaves(after);
               mDocument.WavesEdited(std::move(before));
             }
-            gpg::Logf("editor: %zu %s waves added along the shore (%zu places at depth %.2f, %.0f%% of them, spacing %.1f), %d now",
-                      picked.size(), settings.pattern.name.c_str(), found.size(), static_cast<double>(settings.depth),
-                      static_cast<double>(settings.density * 100.0f), static_cast<double>(settings.spacing), mDocument.WaveCount());
+            gpg::Logf(
+              "editor: %zu %s waves added along the shore (%zu places at depth %.2f, %.0f%% of them, spacing %.1f), %d "
+              "now",
+              picked.size(),
+              settings.pattern.name.c_str(),
+              found.size(),
+              static_cast<double>(settings.depth),
+              static_cast<double>(settings.density * 100.0f),
+              static_cast<double>(settings.spacing),
+              mDocument.WaveCount()
+            );
           }
         }
       }
@@ -3398,15 +3960,22 @@ namespace faf::editor
       {
         std::vector<std::string> path;
         std::string name;
-        if (const EdTools::GroupAsk ask = tools.TakeGroupAsk(path, name); ask != EdTools::GroupAsk::None && mDocument.GetState() == EdDocument::State::Open) {
+        if (
+          const EdTools::GroupAsk ask = tools.TakeGroupAsk(path, name);
+          ask != EdTools::GroupAsk::None && mDocument.GetState() == EdDocument::State::Open
+        ) {
           mScene.ChangeUnitGroups(tools.UnitArmy(), ask, path, name);
           mUnitTreeFrames = 0;
         }
-        if (EdTools::UnitWreckAsk wreck; tools.TakeUnitWreck(wreck) && mDocument.GetState() == EdDocument::State::Open) {
+        if (
+          EdTools::UnitWreckAsk wreck; tools.TakeUnitWreck(wreck) && mDocument.GetState() == EdDocument::State::Open
+        ) {
           mScene.SetUnitsWreck(wreck.army, wreck.names, wreck.wreck);
           mUnitTreeFrames = 0;
         }
-        if (EdTools::UnitGroupAsk group; tools.TakeUnitGroup(group) && mDocument.GetState() == EdDocument::State::Open) {
+        if (
+          EdTools::UnitGroupAsk group; tools.TakeUnitGroup(group) && mDocument.GetState() == EdDocument::State::Open
+        ) {
           if (group.select) {
             mScene.SelectUnits(std::move(group.units));
           } else if (group.removeGroup) {
@@ -3456,9 +4025,11 @@ namespace faf::editor
             }
           }
           const std::string& verb = parts[0];
-          const EdTools::GroupAsk ask = verb == "add" ? EdTools::GroupAsk::Add : verb == "rename" ? EdTools::GroupAsk::Rename
-                                        : verb == "remove" ? EdTools::GroupAsk::Remove : verb == "move" ? EdTools::GroupAsk::MoveSelected
-                                                                                                         : EdTools::GroupAsk::Select;
+          const EdTools::GroupAsk ask = verb == "add" ? EdTools::GroupAsk::Add
+            : verb == "rename"                        ? EdTools::GroupAsk::Rename
+            : verb == "remove"                        ? EdTools::GroupAsk::Remove
+            : verb == "move"                          ? EdTools::GroupAsk::MoveSelected
+                                                      : EdTools::GroupAsk::Select;
           tools.AskGroup(ask, path, parts.size() > 2 ? parts[2] : std::string());
         }
       }
@@ -3558,8 +4129,12 @@ namespace faf::editor
       }
       if (mRoundTripShown && mScene.Attached() && ++mRoundTripFrames == mRoundTripAfter) {
         const RoundTripResult trip = RoundTripMap(mDocument, mRoundTripFolder);
-        gpg::Logf("editor: round trip of the drawn %s: %s%s", MapDisplayName(mDocument.Path()).c_str(),
-                  trip.ok ? "same data, stable" : trip.differences.c_str(), trip.sameAsOriginal ? ", same bytes as the original" : "");
+        gpg::Logf(
+          "editor: round trip of the drawn %s: %s%s",
+          MapDisplayName(mDocument.Path()).c_str(),
+          trip.ok ? "same data, stable" : trip.differences.c_str(),
+          trip.sameAsOriginal ? ", same bytes as the original" : ""
+        );
         mShell->RequestExit();
       }
       if (!mOpenAll) {
@@ -3573,9 +4148,15 @@ namespace faf::editor
             mRoundTripOk += trip.ok ? 1 : 0;
             mRoundTripDiskFiles += trip.hasDiskFile ? 1 : 0;
             mRoundTripSameBytes += trip.sameAsOriginal ? 1 : 0;
-            gpg::Logf("editor: round trip %s: %s%s%s", MapDisplayName(mDocument.Path()).c_str(), trip.ok ? "same data" : trip.differences.c_str(),
-                      trip.hasDiskFile ? (trip.sameAsOriginal ? ", same bytes as the original" : ", other bytes than the original") : "",
-                      trip.stable ? "" : ", NOT stable");
+            gpg::Logf(
+              "editor: round trip %s: %s%s%s",
+              MapDisplayName(mDocument.Path()).c_str(),
+              trip.ok ? "same data" : trip.differences.c_str(),
+              trip.hasDiskFile
+                ? (trip.sameAsOriginal ? ", same bytes as the original" : ", other bytes than the original")
+                : "",
+              trip.stable ? "" : ", NOT stable"
+            );
           }
         } else {
           mOpenAllFailed.push_back(MapDisplayName(mDocument.Path()) + ": " + mDocument.Error());
@@ -3592,9 +4173,14 @@ namespace faf::editor
       mOpenAll = false;
       gpg::Logf("editor: opened %d of %zu maps fully", mOpenAllOpened, maps.size());
       if (!mRoundTripFolder.empty()) {
-        gpg::Logf("editor: round trip: %d of %d maps read back with the same data; %d of the %d with a file of their own "
-                  "saved to the same bytes",
-                  mRoundTripOk, mOpenAllOpened, mRoundTripSameBytes, mRoundTripDiskFiles);
+        gpg::Logf(
+          "editor: round trip: %d of %d maps read back with the same data; %d of the %d with a file of their own "
+          "saved to the same bytes",
+          mRoundTripOk,
+          mOpenAllOpened,
+          mRoundTripSameBytes,
+          mRoundTripDiskFiles
+        );
       }
       for (const std::string& failure : mOpenAllFailed) {
         gpg::Warnf("editor:   %s", failure.c_str());
@@ -3629,13 +4215,17 @@ namespace faf::editor
     void EditorApp::CopyGameView()
     {
       // The game's head holds the frame it drew last (CD3DDevice::Paint presents, then draws the next one), not yet
-      // presented: copied into a target the panels draw under themselves, also while a dialog is open (it doesn't hide it).
+      // presented: copied into a target the panels draw under themselves, also while a dialog is open (it doesn't hide
+      // it).
       mViewImage = 0;
       gViewSurface = nullptr;
       gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
       moho::CD3DDevice* const d3d = moho::D3D_GetDevice();
       const gpg::gal::DeviceContext* const context = device != nullptr ? device->GetDeviceContext() : nullptr;
-      if (!gComposite || d3d == nullptr || context == nullptr || context->GetHeadCount() < 1 || d3d->GetResources() == nullptr) {
+      if (
+        !gComposite || d3d == nullptr || context == nullptr || context->GetHeadCount() < 1 ||
+        d3d->GetResources() == nullptr
+      ) {
         return;
       }
       const gpg::gal::Head& game = context->GetHead(0);
@@ -3645,7 +4235,9 @@ namespace faf::editor
       if (!mViewCopy || mViewCopyWidth != game.mWidth || mViewCopyHeight != game.mHeight) {
         mViewCopy.reset();
         moho::ID3DDeviceResources::RenderTargetHandle target;
-        (void)d3d->GetResources()->CreateRenderTarget(target, static_cast<int>(game.mWidth), static_cast<int>(game.mHeight), 2);
+        (void)d3d->GetResources()->CreateRenderTarget(
+          target, static_cast<int>(game.mWidth), static_cast<int>(game.mHeight), 2
+        );
         mViewCopy = target;
         mViewCopyWidth = game.mWidth;
         mViewCopyHeight = game.mHeight;
@@ -3699,22 +4291,31 @@ namespace faf::editor
       // show through. Hiding the window instead would stop its paint, and the panels' head is presented with it.
       // The Maps window too: a window the panels draw over the view can't move smoothly through a cut-out, as
       // the view's picture reaches the screen a frame or two apart from the panels' (user report: it lagged).
-      const bool modal = mImGuiReady && (ImGui::GetTopMostPopupModal() != nullptr || (!gComposite && mShell != nullptr && mShell->Browser().Open()));
+      const bool modal = mImGuiReady &&
+        (ImGui::GetTopMostPopupModal() != nullptr || (!gComposite && mShell != nullptr && mShell->Browser().Open()));
       std::vector<RECT> holes;
       if (mImGuiReady && !modal) {
         for (const ImGuiWindow* const window : ImGui::GetCurrentContext()->Windows) {
-          // A window not docked into the layout (the Maps window, the Material Editor, any panel pulled out) floats over
-          // the view and takes the mouse there; the dock space's own host window (behind everything) doesn't.
+          // A window not docked into the layout (the Maps window, the Material Editor, any panel pulled out) floats
+          // over the view and takes the mouse there; the dock space's own host window (behind everything) doesn't.
           const bool undocked = (window->Flags & ImGuiWindowFlags_NoBringToFrontOnFocus) == 0 &&
-                                (window->DockNode == nullptr || ImGui::DockNodeGetRootNode(window->DockNode)->IsFloatingNode());
-          const bool floating = undocked || std::strncmp(window->Name, EdMapBrowser::kWindowName, std::strlen(EdMapBrowser::kWindowName)) == 0;
-          if (!window->WasActive || window->Hidden ||
-              ((window->Flags & (ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_Popup | ImGuiWindowFlags_ChildMenu)) == 0 && !floating) ||
-              (window->Flags & ImGuiWindowFlags_ChildWindow) != 0) {
+            (window->DockNode == nullptr || ImGui::DockNodeGetRootNode(window->DockNode)->IsFloatingNode());
+          const bool floating = undocked ||
+            std::strncmp(window->Name, EdMapBrowser::kWindowName, std::strlen(EdMapBrowser::kWindowName)) == 0;
+          if (
+            !window->WasActive || window->Hidden ||
+            ((window->Flags & (ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_Popup | ImGuiWindowFlags_ChildMenu)) == 0 &&
+             !floating) ||
+            (window->Flags & ImGuiWindowFlags_ChildWindow) != 0
+          ) {
             continue;
           }
-          RECT hole{static_cast<LONG>(window->Pos.x) - x, static_cast<LONG>(window->Pos.y) - y,
-                    static_cast<LONG>(window->Pos.x + window->Size.x + 1.0f) - x, static_cast<LONG>(window->Pos.y + window->Size.y + 1.0f) - y};
+          RECT hole{
+            static_cast<LONG>(window->Pos.x) - x,
+            static_cast<LONG>(window->Pos.y) - y,
+            static_cast<LONG>(window->Pos.x + window->Size.x + 1.0f) - x,
+            static_cast<LONG>(window->Pos.y + window->Size.y + 1.0f) - y
+          };
           if (hole.right > 0 && hole.bottom > 0 && hole.left < width && hole.top < height) {
             holes.push_back(hole);
           }
@@ -3777,7 +4378,10 @@ namespace faf::editor
       RECT viewRect{};
       ::GetWindowRect(view, &viewRect);
       ::MapWindowPoints(nullptr, frame, reinterpret_cast<POINT*>(&viewRect), 2);
-      if (viewRect.left != x || viewRect.top != y || viewRect.right - viewRect.left != width || viewRect.bottom - viewRect.top != height) {
+      if (
+        viewRect.left != x || viewRect.top != y || viewRect.right - viewRect.left != width ||
+        viewRect.bottom - viewRect.top != height
+      ) {
         moho::ren_Viewport->SetSize(x, y, width, height);
       }
 
@@ -3789,8 +4393,12 @@ namespace faf::editor
       }
       const gpg::gal::Head& gameHead = active->GetHead(0);
       const gpg::gal::Head& panelHead = active->GetHead(kPanelHead);
-      if (gameHead.mWidth != static_cast<std::uint32_t>(width) || gameHead.mHeight != static_cast<std::uint32_t>(height) ||
-          panelHead.mWidth != static_cast<std::uint32_t>(clientWidth) || panelHead.mHeight != static_cast<std::uint32_t>(clientHeight)) {
+      if (
+        gameHead.mWidth != static_cast<std::uint32_t>(width) ||
+        gameHead.mHeight != static_cast<std::uint32_t>(height) ||
+        panelHead.mWidth != static_cast<std::uint32_t>(clientWidth) ||
+        panelHead.mHeight != static_cast<std::uint32_t>(clientHeight)
+      ) {
         gpg::gal::DeviceContext context(*active);
         context.GetHead(0).mWidth = static_cast<std::uint32_t>(width);
         context.GetHead(0).mHeight = static_cast<std::uint32_t>(height);
@@ -3810,8 +4418,8 @@ namespace faf::editor
         ImGui::DestroyContext();
         mImGuiReady = false;
       }
-      // The opened map's textures go while the device is up; and before the shell, whose Tools panel the scene points at
-      // (closing detaches the scene, which clears the panel's selections; user report: a crash on exit there).
+      // The opened map's textures go while the device is up; and before the shell, whose Tools panel the scene points
+      // at (closing detaches the scene, which clears the panel's selections; user report: a crash on exit there).
       mDocument.Close();
       mScene.SetTools(nullptr);
       delete mShell;
@@ -3832,7 +4440,9 @@ namespace faf::editor
   namespace
   {
     /** `gpg::Die` writes the crash report and ends the process, as the game's WinMain sets it up. */
-    void EditorDieHandler(const char* const message)
+    void EditorDieHandler(
+      const char* const message
+    )
     {
       gpg::diag::CrashReportContext reportContext{};
       reportContext.reason = (message != nullptr) ? message : "engine Die()";

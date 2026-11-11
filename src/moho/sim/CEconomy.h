@@ -87,9 +87,8 @@ namespace moho
      * Builds an empty economy for an archive load and hands it back unowned;
      * its members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00774860 (FUN_00774860, Moho::CEconomy::MemberSerialize)
@@ -143,17 +142,11 @@ namespace moho
   static_assert(offsetof(CEconomy, mSim) == 0x00, "CEconomy::mSim offset must be 0x00");
   static_assert(offsetof(CEconomy, mIndex) == 0x04, "CEconomy::mIndex offset must be 0x04");
   static_assert(offsetof(CEconomy, mResources) == 0x08, "CEconomy::mResources offset must be 0x08");
-  static_assert(
-    offsetof(CEconomy, mPendingResources) == 0x10, "CEconomy::mPendingResources offset must be 0x10"
-  );
+  static_assert(offsetof(CEconomy, mPendingResources) == 0x10, "CEconomy::mPendingResources offset must be 0x10");
   static_assert(offsetof(CEconomy, mTotals) == 0x18, "CEconomy::mTotals offset must be 0x18");
   static_assert(offsetof(CEconomy, mExtraStorage) == 0x50, "CEconomy::mExtraStorage offset must be 0x50");
-  static_assert(
-    offsetof(CEconomy, mResourceSharing) == 0x54, "CEconomy::mResourceSharing offset must be 0x54"
-  );
-  static_assert(
-    offsetof(CEconomy, mConsumptionData) == 0x58, "CEconomy::mConsumptionData offset must be 0x58"
-  );
+  static_assert(offsetof(CEconomy, mResourceSharing) == 0x54, "CEconomy::mResourceSharing offset must be 0x54");
+  static_assert(offsetof(CEconomy, mConsumptionData) == 0x58, "CEconomy::mConsumptionData offset must be 0x58");
   static_assert(sizeof(CEconomy) == 0x60, "CEconomy size must be 0x60");
 
   /**

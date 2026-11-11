@@ -37,7 +37,10 @@ TerrainTypes = {
 }
 )";
 
-  TEST(TerrainTypes, ReadsTheGamesTable)
+  TEST(
+    TerrainTypes,
+    ReadsTheGamesTable
+  )
   {
     const std::vector<faf::editor::TerrainTypeInfo> types = faf::editor::ParseTerrainTypes(kLua);
     ASSERT_EQ(types.size(), 3u);
@@ -50,7 +53,10 @@ TerrainTypes = {
     EXPECT_EQ(types[0].color, 0u);
   }
 
-  TEST(TerrainTypes, PaintsADiscAndDrawsRuns)
+  TEST(
+    TerrainTypes,
+    PaintsADiscAndDrawsRuns
+  )
   {
     const int size = 16;
     std::vector<std::uint8_t> grid(size * size, 1);

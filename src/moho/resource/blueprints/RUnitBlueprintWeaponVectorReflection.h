@@ -83,4 +83,3 @@ namespace moho
    */
   void register_VectorRUnitBlueprintWeaponType();
 } // namespace moho
-

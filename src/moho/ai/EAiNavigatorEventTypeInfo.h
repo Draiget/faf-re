@@ -56,7 +56,6 @@ namespace moho
 
   static_assert(sizeof(EAiNavigatorEventTypeInfo) == 0x78, "EAiNavigatorEventTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x00BCC640 (FUN_00BCC640, register_EAiNavigatorEventTypeInfo)
    *

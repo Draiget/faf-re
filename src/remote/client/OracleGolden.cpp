@@ -29,7 +29,7 @@ namespace faf::remote::client
   {
     constexpr std::size_t kLoggedDifferences = 30; // the live grid does not explain them
     constexpr std::size_t kLoggedExplained = 5;    // it does
-    constexpr std::size_t kKeptBeats = 256; // the sim runs at most sim_ReplayLead beats ahead
+    constexpr std::size_t kKeptBeats = 256;        // the sim runs at most sim_ReplayLead beats ahead
 
     struct SOracleEntity
     {
@@ -52,25 +52,36 @@ namespace faf::remote::client
     class COracleGolden final : public moho::CSyncObserver
     {
     public:
-      explicit COracleGolden(std::FILE* file)
+      explicit COracleGolden(
+        std::FILE* file
+      )
         : mFile(file)
       {
         std::fprintf(mFile, "# beat focus compared agree oracle-only client-only orphan-client no-mesh live-grid\n");
       }
 
-      void OnSyncWalkDone(moho::Sim& sim, const moho::SSyncData& packet) override
+      void OnSyncWalkDone(
+        moho::Sim& sim,
+        const moho::SSyncData& packet
+      ) override
       {
         (void)packet;
         OnSimSync(sim);
       }
 
-      static void ObserveBeat(moho::CWldSession& session, const std::int32_t beat, void* const context)
+      static void ObserveBeat(
+        moho::CWldSession& session,
+        const std::int32_t beat,
+        void* const context
+      )
       {
         static_cast<COracleGolden*>(context)->OnClientBeat(session, beat);
       }
 
     private:
-      void OnSimSync(moho::Sim& sim)
+      void OnSimSync(
+        moho::Sim& sim
+      )
       {
         SOracleBeat entry;
         entry.focusArmy = sim.mSyncFilter.focusArmy;
@@ -111,7 +122,10 @@ namespace faf::remote::client
         }
       }
 
-      void OnClientBeat(moho::CWldSession& session, const std::int32_t beat)
+      void OnClientBeat(
+        moho::CWldSession& session,
+        const std::int32_t beat
+      )
       {
         SOracleBeat oracle;
         {
@@ -193,8 +207,10 @@ namespace faf::remote::client
 
         // Client entities the sim no longer publishes: orphaned props and anything unexplained.
         for (const auto& [id, userEntity] : session.mEntities) {
-          if (userEntity == nullptr || userEntity->mMeshInstance == nullptr
-              || userEntity->mMeshInstance->isHidden != 0u || oracleIds.count(id) != 0u) {
+          if (
+            userEntity == nullptr || userEntity->mMeshInstance == nullptr ||
+            userEntity->mMeshInstance->isHidden != 0u || oracleIds.count(id) != 0u
+          ) {
             continue;
           }
           if (orphans.count(id) != 0u) {
@@ -224,10 +240,16 @@ namespace faf::remote::client
         mTotalLiveGrid += liveGrid;
         ++mComparedBeats;
         std::fprintf(
-          mFile, "%d %d %llu %llu %llu %llu %llu %llu %llu\n", beat, oracle.focusArmy,
-          static_cast<unsigned long long>(compared), static_cast<unsigned long long>(agree),
-          static_cast<unsigned long long>(oracleOnly), static_cast<unsigned long long>(clientOnly),
-          static_cast<unsigned long long>(orphanClient), static_cast<unsigned long long>(noMesh),
+          mFile,
+          "%d %d %llu %llu %llu %llu %llu %llu %llu\n",
+          beat,
+          oracle.focusArmy,
+          static_cast<unsigned long long>(compared),
+          static_cast<unsigned long long>(agree),
+          static_cast<unsigned long long>(oracleOnly),
+          static_cast<unsigned long long>(clientOnly),
+          static_cast<unsigned long long>(orphanClient),
+          static_cast<unsigned long long>(noMesh),
           static_cast<unsigned long long>(liveGrid)
         );
         if (mComparedBeats % 500u == 0u) {
@@ -244,24 +266,34 @@ namespace faf::remote::client
        * from the sim having moved on, not from the oracle.
        */
       [[nodiscard]] int LiveGridAnswer(
-        const std::int32_t focusArmy, const SOracleEntity& record, const moho::UserEntity* const userEntity
+        const std::int32_t focusArmy,
+        const SOracleEntity& record,
+        const moho::UserEntity* const userEntity
       ) const
       {
         moho::Sim* const sim = mSim.load();
-        if (sim == nullptr || userEntity == nullptr || record.kind == 1 || record.kind == 2
-            || record.mode != static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::ReconGrid)) {
+        if (
+          sim == nullptr || userEntity == nullptr || record.kind == 1 || record.kind == 2 ||
+          record.mode != static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::ReconGrid)
+        ) {
           return -1;
         }
         const bool sees = ViewCanSeePoint(
-          *sim, focusArmy, userEntity->mVariableData.mCurTransform.pos_,
+          *sim,
+          focusArmy,
+          userEntity->mVariableData.mCurTransform.pos_,
           userEntity->mVariableData.UsesUnderwaterReconGrid()
         );
         return sees ? 1 : 0;
       }
 
       void LogDifference(
-        const std::int32_t beat, const std::int32_t focusArmy, const SOracleEntity& record,
-        const moho::UserEntity* const userEntity, const bool drawn, const int live
+        const std::int32_t beat,
+        const std::int32_t focusArmy,
+        const SOracleEntity& record,
+        const moho::UserEntity* const userEntity,
+        const bool drawn,
+        const int live
       )
       {
         // Differences the live grid does not explain are logged first-come; the explained ones
@@ -272,15 +304,25 @@ namespace faf::remote::client
           return;
         }
         ++logged;
-        const int clientMode =
-          userEntity != nullptr ? static_cast<int>(userEntity->mVariableData.mVisibilityMode) : -1;
+        const int clientMode = userEntity != nullptr ? static_cast<int>(userEntity->mVariableData.mVisibilityMode) : -1;
         const float clientX = userEntity != nullptr ? userEntity->mVariableData.mCurTransform.pos_.x : 0.0f;
         const float clientZ = userEntity != nullptr ? userEntity->mVariableData.mCurTransform.pos_.z : 0.0f;
         gpg::Logf(
           "ORACLEGOLDEN diff beat=%d focus=%d id=0x%08X kind=%s oracle-mode=%d oracle-shown=%d client=%s "
           "client-mode=%d drawn=%d live-grid=%d sim-pos=%.5f,%.5f client-pos=%.5f,%.5f",
-          beat, focusArmy, record.id, kKindNames[record.kind], record.mode, record.shown ? 1 : 0,
-          userEntity != nullptr ? "present" : "absent", clientMode, drawn ? 1 : 0, live, record.x, record.z, clientX,
+          beat,
+          focusArmy,
+          record.id,
+          kKindNames[record.kind],
+          record.mode,
+          record.shown ? 1 : 0,
+          userEntity != nullptr ? "present" : "absent",
+          clientMode,
+          drawn ? 1 : 0,
+          live,
+          record.x,
+          record.z,
+          clientX,
           clientZ
         );
       }
@@ -290,10 +332,14 @@ namespace faf::remote::client
         gpg::Logf(
           "ORACLEGOLDEN totals beats=%llu compared=%llu agree=%llu oracle-only=%llu client-only=%llu "
           "orphan-client=%llu live-grid=%llu mesh-new=%llu not-visited=%llu missing-beats=%llu other-focus-beats=%llu",
-          static_cast<unsigned long long>(mComparedBeats), static_cast<unsigned long long>(mTotalCompared),
-          static_cast<unsigned long long>(mTotalAgree), static_cast<unsigned long long>(mTotalOracleOnly),
-          static_cast<unsigned long long>(mTotalClientOnly), static_cast<unsigned long long>(mTotalOrphanClient),
-          static_cast<unsigned long long>(mTotalLiveGrid), static_cast<unsigned long long>(mTotalMeshNew),
+          static_cast<unsigned long long>(mComparedBeats),
+          static_cast<unsigned long long>(mTotalCompared),
+          static_cast<unsigned long long>(mTotalAgree),
+          static_cast<unsigned long long>(mTotalOracleOnly),
+          static_cast<unsigned long long>(mTotalClientOnly),
+          static_cast<unsigned long long>(mTotalOrphanClient),
+          static_cast<unsigned long long>(mTotalLiveGrid),
+          static_cast<unsigned long long>(mTotalMeshNew),
           static_cast<unsigned long long>(mTotalNotVisited),
           static_cast<unsigned long long>(mMissingBeats),
           static_cast<unsigned long long>(mOtherFocusBeats)
@@ -312,10 +358,10 @@ namespace faf::remote::client
       std::uint64_t mTotalClientOnly = 0;
       std::uint64_t mTotalOrphanClient = 0;
       std::uint64_t mTotalLiveGrid = 0;
-      std::uint64_t mTotalMeshNew = 0; // oracle shows, client hides, mesh created or rebuilt this beat
+      std::uint64_t mTotalMeshNew = 0;    // oracle shows, client hides, mesh created or rebuilt this beat
       std::uint64_t mTotalNotVisited = 0; // oracle shows, client hides, not in this beat's visibility walk
       std::unordered_map<std::uint32_t, const void*> mLastMesh; // id -> mesh instance after the last beat
-      std::atomic<moho::Sim*> mSim{nullptr}; // the sim, for `LiveGridAnswer` on the client's thread
+      std::atomic<moho::Sim*> mSim{nullptr};                    // the sim, for `LiveGridAnswer` on the client's thread
       std::size_t mLoggedDifferences = 0;
       std::size_t mLoggedExplained = 0;
     };

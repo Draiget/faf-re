@@ -119,7 +119,13 @@ namespace moho
     GeomCamera3* mCameraView; // +0x08
   };
 
-  static_assert(offsetof(SimpleRenderWorldView, mCanShake) == 0x04, "SimpleRenderWorldView::mCanShake offset must be 0x04");
-  static_assert(offsetof(SimpleRenderWorldView, mCameraView) == 0x08, "SimpleRenderWorldView::mCameraView offset must be 0x08");
+  static_assert(
+    offsetof(SimpleRenderWorldView, mCanShake) == 0x04,
+    "SimpleRenderWorldView::mCanShake offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SimpleRenderWorldView, mCameraView) == 0x08,
+    "SimpleRenderWorldView::mCameraView offset must be 0x08"
+  );
   static_assert(sizeof(SimpleRenderWorldView) == 0x0C, "SimpleRenderWorldView size must be 0x0C");
 } // namespace moho

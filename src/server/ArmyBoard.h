@@ -24,7 +24,8 @@ namespace faf::server
    *    category COMMAND), the commander's health (`mEntityUpdates`) and death (`mDeleteIds`);
    *  - the beat's Lua sync, decoded into the server's own state: `Sync.Score` (FAF's score thread, every 2 s: score,
    *    units and unit cap, the brain type) and `Sync.UserUnitEnhancements` (every enhancement by unit).
-   * The server is an observer (its focus army is -1), so both carry every army (`lua/sim/score.lua`, `lua/SimSync.lua`).
+   * The server is an observer (its focus army is -1), so both carry every army (`lua/sim/score.lua`,
+   * `lua/SimSync.lua`).
    */
   class CArmyBoard
   {
@@ -46,7 +47,10 @@ namespace faf::server
     [[nodiscard]] std::string Json(int beat, const std::vector<SPlayer>& players) const;
 
     /** For the tests. */
-    [[nodiscard]] std::size_t Armies() const { return mArmies.size(); }
+    [[nodiscard]] std::size_t Armies() const
+    {
+      return mArmies.size();
+    }
 
   private:
     struct SArmy
@@ -73,7 +77,9 @@ namespace faf::server
   };
 
   /** The army an entity id belongs to: its source bits (0x0FF00000), the army's 0-based index. */
-  [[nodiscard]] constexpr std::size_t ArmyOfEntity(const std::uint32_t id) noexcept
+  [[nodiscard]] constexpr std::size_t ArmyOfEntity(
+    const std::uint32_t id
+  ) noexcept
   {
     return (id >> 20u) & 0xFFu;
   }

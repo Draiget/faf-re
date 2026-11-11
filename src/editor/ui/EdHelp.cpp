@@ -12,7 +12,9 @@ namespace faf::editor
     return full;
   }
 
-  void HelpNote(const char* const text)
+  void HelpNote(
+    const char* const text
+  )
   {
     if (text == nullptr || text[0] == '\0') {
       return;

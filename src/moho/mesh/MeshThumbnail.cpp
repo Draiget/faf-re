@@ -40,7 +40,9 @@ namespace moho
    * Deep-copies the embedded camera payload and value-copy lanes, then
    * bumps shared ownership on the output-sheet smart pointer lane.
    */
-  MeshThumbnail::MeshThumbnail(const MeshThumbnail& rhs)
+  MeshThumbnail::MeshThumbnail(
+    const MeshThumbnail& rhs
+  )
     : requestId(rhs.requestId)
     , camera(rhs.camera)
     , meshInstance(rhs.meshInstance)
@@ -58,7 +60,9 @@ namespace moho
    * test (the binary has none; every member assignment is self-safe), and
    * the vptr and the +0x04/+0x0C gaps are left alone.
    */
-  MeshThumbnail& MeshThumbnail::operator=(const MeshThumbnail& rhs)
+  MeshThumbnail& MeshThumbnail::operator=(
+    const MeshThumbnail& rhs
+  )
   {
     requestId = rhs.requestId;
     camera = rhs.camera;

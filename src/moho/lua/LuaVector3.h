@@ -7,7 +7,9 @@
 
 namespace moho
 {
-  [[nodiscard]] inline Wm3::Vec3f ReadVector3FromLuaObject(const LuaPlus::LuaObject& object) noexcept
+  [[nodiscard]] inline Wm3::Vec3f ReadVector3FromLuaObject(
+    const LuaPlus::LuaObject& object
+  ) noexcept
   {
     Wm3::Vec3f out = Wm3::Vec3f::Zero();
     if (!object.IsTable()) {

@@ -55,7 +55,12 @@ namespace moho
    */
   struct EntIdUniverse
   {
-    [[nodiscard]] EntId FromIndex(const unsigned int index) const noexcept { return static_cast<EntId>(index); }
+    [[nodiscard]] EntId FromIndex(
+      const unsigned int index
+    ) const noexcept
+    {
+      return static_cast<EntId>(index);
+    }
   };
   class Entity;
   class CollisionBeamEntity;
@@ -204,7 +209,8 @@ namespace moho
   COORDS_ToWorldPos(const STIMap* map, const SOCellPos& cellPos, ELayer layer, int sizeX, int sizeZ) noexcept;
 
   /**
-   * Address: 0x0050B1A0 (FUN_0050B1A0, ?COORDS_ToWorldPos@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSOCellPos@1@ABUSFootprint@1@@Z)
+   * Address: 0x0050B1A0 (FUN_0050B1A0,
+   * ?COORDS_ToWorldPos@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSOCellPos@1@ABUSFootprint@1@@Z)
    *
    * What it does:
    * Convenience overload that converts one cell position using a footprint's
@@ -214,7 +220,8 @@ namespace moho
   COORDS_ToWorldPos(const STIMap* map, const SOCellPos& cellPos, const SFootprint& footprint) noexcept;
 
   /**
-   * Address: 0x0050B1D0 (FUN_0050B1D0, ?COORDS_ToWorldPos@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSCoordsVec2@1@ABUSFootprint@1@@Z)
+   * Address: 0x0050B1D0 (FUN_0050B1D0,
+   * ?COORDS_ToWorldPos@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSCoordsVec2@1@ABUSFootprint@1@@Z)
    *
    * What it does:
    * Builds one world-space vector from raw XZ coordinates and samples
@@ -224,7 +231,8 @@ namespace moho
   COORDS_ToWorldPos(const STIMap* map, const SCoordsVec2& worldPos, const SFootprint& footprint) noexcept;
 
   /**
-   * Address: 0x0050B260 (FUN_0050B260, ?COORDS_GridSnap@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSCoordsVec2@1@ABUSFootprint@1@W4ELayer@1@@Z)
+   * Address: 0x0050B260 (FUN_0050B260,
+   * ?COORDS_GridSnap@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSCoordsVec2@1@ABUSFootprint@1@W4ELayer@1@@Z)
    *
    * What it does:
    * Snaps one world XZ center to footprint-origin cell coordinates and returns
@@ -253,14 +261,19 @@ namespace moho
     EntitySetBase() noexcept = default;
 
     /**
-     * Address: 0x00579500 (FUN_00579500 -- emitted for `EntitySetTemplate<Unit>`: self-links the node, then hands `this + 8` to the inline vector's copy constructor 0x0057D3F0.)
-     * Address: 0x00705AE0 (FUN_00705AE0 -- a second emission, guarded on a null source; zero callers, unreachable; formerly `CopyConstructEntitySetTemplateUnitIfPresentPrimary`, removed 2026-09-11.)
-     * Address: 0x00706230 (FUN_00706230 -- a third emission; zero callers, unreachable; formerly `CopyConstructEntitySetTemplateUnitIfPresentSecondary`, removed 2026-09-11.)
+     * Address: 0x00579500 (FUN_00579500 -- emitted for `EntitySetTemplate<Unit>`: self-links the node, then hands `this
+     * + 8` to the inline vector's copy constructor 0x0057D3F0.) Address: 0x00705AE0 (FUN_00705AE0 -- a second emission,
+     * guarded on a null source; zero callers, unreachable; formerly
+     * `CopyConstructEntitySetTemplateUnitIfPresentPrimary`, removed 2026-09-11.) Address: 0x00706230 (FUN_00706230 -- a
+     * third emission; zero callers, unreachable; formerly `CopyConstructEntitySetTemplateUnitIfPresentSecondary`,
+     * removed 2026-09-11.)
      *
      * What it does:
      * Copies `other`'s entities into a new set that is on no ring.
      */
-    EntitySetBase(const EntitySetBase& other)
+    EntitySetBase(
+      const EntitySetBase& other
+    )
       : TDatList<EntitySetBase, void>()
       , mVec(other.mVec)
     {}
@@ -271,7 +284,9 @@ namespace moho
      * place in its ring. Inlined into the element loop of the unit-set
      * vector's `_Copy_opt` (0x007056A0).
      */
-    EntitySetBase& operator=(const EntitySetBase& other)
+    EntitySetBase& operator=(
+      const EntitySetBase& other
+    )
     {
       (void)mVec.AddAll(&other.mVec);
       return *this;
@@ -279,8 +294,8 @@ namespace moho
 
     /**
      * Address: 0x005796A0 (FUN_005796A0, Moho::EntitySetTemplate_Entity::~EntitySetTemplate_Entity)
-     * Address: 0x00705B30 (FUN_00705B30 -- a second emission, for the unit-set vector's reallocation unwind loop (`CArmyImpl::UnitCategorySets`, `uninit_move_n` 0x00706900/0x00705980).)
-     * Address: 0x005C23A0 (FUN_005C23A0)
+     * Address: 0x00705B30 (FUN_00705B30 -- a second emission, for the unit-set vector's reallocation unwind loop
+     * (`CArmyImpl::UnitCategorySets`, `uninit_move_n` 0x00706900/0x00705980).) Address: 0x005C23A0 (FUN_005C23A0)
      *
      * What it does:
      * Nothing of its own: `mVec`'s destructor frees heap storage, then the
@@ -348,7 +363,9 @@ namespace moho
       using reference = T*;
 
       iterator() noexcept = default;
-      explicit iterator(Entity* const* const slot) noexcept
+      explicit iterator(
+        Entity* const* const slot
+      ) noexcept
         : mSlot(slot)
       {}
 
@@ -357,7 +374,9 @@ namespace moho
         return static_cast<T*>(*mSlot);
       }
 
-      [[nodiscard]] T* operator[](const difference_type offset) const noexcept
+      [[nodiscard]] T* operator[](
+        const difference_type offset
+      ) const noexcept
       {
         return static_cast<T*>(mSlot[offset]);
       }
@@ -368,7 +387,9 @@ namespace moho
         return *this;
       }
 
-      iterator operator++(int) noexcept
+      iterator operator++(
+        int
+      ) noexcept
       {
         iterator previous = *this;
         ++mSlot;
@@ -381,18 +402,24 @@ namespace moho
         return *this;
       }
 
-      iterator& operator+=(const difference_type offset) noexcept
+      iterator& operator+=(
+        const difference_type offset
+      ) noexcept
       {
         mSlot += offset;
         return *this;
       }
 
-      [[nodiscard]] iterator operator+(const difference_type offset) const noexcept
+      [[nodiscard]] iterator operator+(
+        const difference_type offset
+      ) const noexcept
       {
         return iterator(mSlot + offset);
       }
 
-      [[nodiscard]] difference_type operator-(const iterator& other) const noexcept
+      [[nodiscard]] difference_type operator-(
+        const iterator& other
+      ) const noexcept
       {
         return mSlot - other.mSlot;
       }
@@ -433,7 +460,9 @@ namespace moho
      * Inserts `entity` at its id's sorted position unless it is already
      * there. A null entity is stored like any other (its key is 0).
      */
-    std::pair<iterator, bool> Add(T* const entity)
+    std::pair<iterator, bool> Add(
+      T* const entity
+    )
     {
       Entity* const value = entity;
       Entity** const it = LowerBound(entity, mVec.begin(), mVec.end());
@@ -453,7 +482,9 @@ namespace moho
      * What it does:
      * Removes `entity` when present, compacting the tail.
      */
-    bool Remove(T* const entity) noexcept
+    bool Remove(
+      T* const entity
+    ) noexcept
     {
       Entity* const value = entity;
       Entity** const it = LowerBound(entity, mVec.begin(), mVec.end());
@@ -471,7 +502,9 @@ namespace moho
      * What it does:
      * Returns the position of `entity`, or `end()`.
      */
-    [[nodiscard]] iterator Find(const T* const entity) const noexcept
+    [[nodiscard]] iterator Find(
+      const T* const entity
+    ) const noexcept
     {
       const Entity* const value = entity;
       Entity* const* const it = LowerBound(entity, mVec.begin(), mVec.end());
@@ -481,7 +514,9 @@ namespace moho
       return end();
     }
 
-    [[nodiscard]] bool Contains(const T* const entity) const noexcept
+    [[nodiscard]] bool Contains(
+      const T* const entity
+    ) const noexcept
     {
       return Find(entity) != end();
     }
@@ -512,7 +547,9 @@ namespace moho
      * True when both sets hold the same entities: equal sizes, and every
      * entity of this set found in `other`.
      */
-    [[nodiscard]] bool Same(const EntitySetTemplate& other) const noexcept
+    [[nodiscard]] bool Same(
+      const EntitySetTemplate& other
+    ) const noexcept
     {
       if (Size() != other.Size()) {
         return false;
@@ -528,13 +565,20 @@ namespace moho
 
     /**
      * Address: 0x00704070 (FUN_00704070, Moho::EntitySetTemplate_Entity::AddRange)
-     * Address: 0x006F8F10 (FUN_006F8F10 -- a second emission, byte-identical (set, first, last on the stack, `ret 0xC`); callers 0x006F7AE0 (`cfunc_IssueTransportUnloadSpecificL`), 0x00725770 (`BuildPlatoonUnitSet`), 0x00726DE0 (`CPlatoon::MoveToLocation`), 0x00727740 (`CPlatoon::MoveToTarget`); formerly `AddUnitRangeFromPointerWordsRuntime` in moho/sim/SimRecoveryRuntime.cpp and `AddUnitPointerRangeToSet` in moho/sim/CPlatoon.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x006F8F10 (FUN_006F8F10 -- a second emission, byte-identical (set, first, last on the stack, `ret
+     * 0xC`); callers 0x006F7AE0 (`cfunc_IssueTransportUnloadSpecificL`), 0x00725770 (`BuildPlatoonUnitSet`), 0x00726DE0
+     * (`CPlatoon::MoveToLocation`), 0x00727740 (`CPlatoon::MoveToTarget`); formerly
+     * `AddUnitRangeFromPointerWordsRuntime` in moho/sim/SimRecoveryRuntime.cpp and `AddUnitPointerRangeToSet` in
+     * moho/sim/CPlatoon.cpp (RULE ONE), removed 2026-09-30.)
      *
      * What it does:
      * `Add`s each entity of `[first, last)` as a `T`, with a plain
      * `static_cast` and no filtering.
      */
-    void AddRange(Entity* const* first, Entity* const* const last)
+    void AddRange(
+      Entity* const* first,
+      Entity* const* const last
+    )
     {
       for (; first != last; ++first) {
         (void)Add(static_cast<T*>(*first));
@@ -616,15 +660,15 @@ namespace moho
    * backwards: the count, `~CTask`, the node's unlink, the shape's `Remove`.
    * The node and the counter were members until 2026-09-24.
    */
-  class Entity : public CScriptObject,
-                 public CollisionShape<Entity>,
-                 public TDatListItem<Entity, EntityDirtyList>,
-                 public CTask,
-                 public InstanceCounter<Entity>
+  class Entity :
+    public CScriptObject,
+    public CollisionShape<Entity>,
+    public TDatListItem<Entity, EntityDirtyList>,
+    public CTask,
+    public InstanceCounter<Entity>
   {
     // Primary vftable (38 entries)
   public:
-
     static void* operator new(std::size_t size);
     static void* operator new(std::size_t size, std::nothrow_t) noexcept;
     static void operator delete(void* ptr, std::size_t size) noexcept;
@@ -763,12 +807,8 @@ namespace moho
      * Reads construct payload (`Sim*`) and allocates one `Entity` with
      * default entity collision-bucket flags (`0x800`).
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive,
-      int version,
-      const gpg::RRef& ownerRef,
-      gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00679C40 (FUN_00679C40, ?TaskTick@Entity@Moho@@EAE?AW4ETaskStatus@2@XZ)
@@ -1090,7 +1130,7 @@ namespace moho
     virtual fa::vector<Entity*>& GetAttachedEntities();
 
     /**
-      * Alias of FUN_00679550 (non-canonical helper lane).
+     * Alias of FUN_00679550 (non-canonical helper lane).
      * VFTable SLOT: 23
      *
      * What it does:
@@ -1133,7 +1173,7 @@ namespace moho
     virtual void Kill(Entity*, gpg::StrArg, float);
 
     /**
-      * Alias of FUN_00679B80 (non-canonical helper lane).
+     * Alias of FUN_00679B80 (non-canonical helper lane).
      * VFTable SLOT: 32
      *
      * What it does:
@@ -1189,7 +1229,8 @@ namespace moho
     [[nodiscard]] bool Intersects(const Wm3::Sphere3f& sphere, CollisionResult* outResult);
 
     /**
-     * Address: 0x0067A9F0 (FUN_0067A9F0, ?Intersects@Entity@Moho@@QAE_NABV?$Vector3@M@Wm3@@0PAUCollisionSegmentResult@2@@Z)
+     * Address: 0x0067A9F0 (FUN_0067A9F0,
+     * ?Intersects@Entity@Moho@@QAE_NABV?$Vector3@M@Wm3@@0PAUCollisionSegmentResult@2@@Z)
      *
      * What it does:
      * Tests one world line segment against this entity's collision primitive
@@ -1199,7 +1240,7 @@ namespace moho
     Intersects(const Wm3::Vec3f& lineStart, const Wm3::Vec3f& lineEnd, CollisionSegmentResult* outResult);
 
     /**
-      * Alias of FUN_0067AC40 (non-canonical helper lane).
+     * Alias of FUN_0067AC40 (non-canonical helper lane).
      *
      * What it does:
      * Installs a box collision primitive, applies current transform, relinks
@@ -1208,7 +1249,7 @@ namespace moho
     void SetCollisionBoxShape(const Wm3::Box3f& localBox);
 
     /**
-      * Alias of FUN_0067AD30 (non-canonical helper lane).
+     * Alias of FUN_0067AD30 (non-canonical helper lane).
      *
      * What it does:
      * Installs a sphere collision primitive, applies current transform,
@@ -1361,8 +1402,9 @@ namespace moho
     [[nodiscard]] CIntel* GetIntelManager() const noexcept;
 
     /**
-     * Address: 0x005BDC70 (FUN_005BDC70, ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z)
-     * Mangled: ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z
+     * Address: 0x005BDC70 (FUN_005BDC70,
+     * ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z) Mangled:
+     * ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z
      *
      * What it does:
      * Replaces strategic-underlay texture lanes from one by-value shared
@@ -1371,8 +1413,9 @@ namespace moho
     void SetStrategicUnderlay(boost::shared_ptr<CD3DBatchTexture> underlayTexture);
 
     /**
-     * Address: 0x005BDD20 (FUN_005BDD20, ?GetStrategicUnderlay@Entity@Moho@@QBE?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@XZ)
-     * Mangled: ?GetStrategicUnderlay@Entity@Moho@@QBE?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@XZ
+     * Address: 0x005BDD20 (FUN_005BDD20,
+     * ?GetStrategicUnderlay@Entity@Moho@@QBE?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@XZ) Mangled:
+     * ?GetStrategicUnderlay@Entity@Moho@@QBE?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@XZ
      *
      * What it does:
      * Returns one retained shared strategic-underlay texture handle.
@@ -1475,10 +1518,10 @@ namespace moho
     // Entity data begins after the CScriptObject (+0x00, 0x34), CTask (+0x34,
     // 0x18), CollisionShape<Entity> (+0x4C, 0x14) and dirty-list node (+0x60,
     // 0x08) subobjects.
-    EntId id_;                     // 0x0068
-    REntityBlueprint* BluePrint;   // 0x006C
-    std::uint32_t mTickCreated;    // 0x0070
-    std::uint32_t mReserved74;     // 0x0074
+    EntId id_;                   // 0x0068
+    REntityBlueprint* BluePrint; // 0x006C
+    std::uint32_t mTickCreated;  // 0x0070
+    std::uint32_t mReserved74;   // 0x0074
     /**
      * The replicated variable-data block, +0x78 through +0x147.
      *
@@ -1507,53 +1550,57 @@ namespace moho
      *     mode, whose default is `MapPlayableRect` rather than zero.
      */
     SSTIEntityVariableData mVarDat; // 0x0078 .. 0x0147
-    Sim* SimulationRef;                        // 0x0148
+    Sim* SimulationRef;             // 0x0148
     // +0x014C is the owning army pointer in constructor/init and callsite evidence.
     // Attachment parent linkage is represented by mAttachInfo (+0x018C).
-    CArmyImpl* ArmyRef;                           // 0x014C
+    CArmyImpl* ArmyRef; // 0x014C
     // The transform `AdvanceCoords` (0x00678F10) commits into
     // `mVarDat.mCurTransform` next tick. `SetPendingTransform` (0x00678E90,
     // `?SetPendingTransform@Entity@Moho@@QAEXABVVTransform@2@M@Z`) stores a
     // whole `VTransform` here, and the serializer moves it through `VTransform`'s
     // RType. The constructors' identity stores are its default constructor.
-    VTransform mPendingTransform;                  // 0x0150
-    PositionHistory* mPositionHistory;             // 0x016C
-    float mPendingVelocityScale;                   // 0x0170
-    std::uint32_t mLastTickProcessed;              // 0x0174
-    CColPrimitiveBase* CollisionExtents;           // 0x0178
-    fa::vector<Entity*> mAttachedEntities;      // 0x017C
-    SEntAttachInfo mAttachInfo;                    // 0x018C
-    std::uint8_t mQueueRelinkBlocked;              // 0x01B8
-    std::uint8_t DestroyQueuedFlag;                // 0x01B9
-    std::uint8_t mOnDestroyDispatched;             // 0x01BA
-    char pad_01BB[1];                              // 0x01BB
-    RResId mResId;                        // 0x01BC (serialized resource id; RResId, 0x1C)
-    CIntel* mIntelManager;                // 0x01D8
-    std::int32_t mVizToFocusPlayer; // 0x01DC
-    std::int32_t mVizToAllies;    // 0x01E0
-    std::int32_t mVizToEnemies;  // 0x01E4
-    std::int32_t mVizToNeutrals;  // 0x01E8
+    VTransform mPendingTransform;          // 0x0150
+    PositionHistory* mPositionHistory;     // 0x016C
+    float mPendingVelocityScale;           // 0x0170
+    std::uint32_t mLastTickProcessed;      // 0x0174
+    CColPrimitiveBase* CollisionExtents;   // 0x0178
+    fa::vector<Entity*> mAttachedEntities; // 0x017C
+    SEntAttachInfo mAttachInfo;            // 0x018C
+    std::uint8_t mQueueRelinkBlocked;      // 0x01B8
+    std::uint8_t DestroyQueuedFlag;        // 0x01B9
+    std::uint8_t mOnDestroyDispatched;     // 0x01BA
+    char pad_01BB[1];                      // 0x01BB
+    RResId mResId;                         // 0x01BC (serialized resource id; RResId, 0x1C)
+    CIntel* mIntelManager;                 // 0x01D8
+    std::int32_t mVizToFocusPlayer;        // 0x01DC
+    std::int32_t mVizToAllies;             // 0x01E0
+    std::int32_t mVizToEnemies;            // 0x01E4
+    std::int32_t mVizToNeutrals;           // 0x01E8
     std::uint8_t mInterfaceCreated;        // 0x01EC
     char pad_01ED[3];                      // 0x01ED
     CTextureScroller* mScroller;           // 0x01F0 (owned texture-scroller; serialized OWNED)
     SPhysBody* mPhysBody;                  // 0x01F4 (owned physics body; serialized OWNED)
     std::uint8_t RealtimeStatsEnabled;     // 0x01F8 (per-entity realtime-stats accounting gate; FUN_00689F50)
     char pad_01F9_01FB[0x03];              // 0x01F9
-    fa::string mUniqueName;             // 0x01FC (FUN_00689F20)
+    fa::string mUniqueName;                // 0x01FC (FUN_00689F20)
     EntitySetTemplate<Entity> mShooters;   // 0x0218 (Entity:AddShooter/RemoveShooter ownership set)
     // World-space bounds of `CollisionExtents`, refreshed by `UpdateAABox`
     // (0x00679180, `?UpdateAABox@Entity@Moho@@QAEXXZ`); serialized through the
     // `Wm3::AxisAlignedBox3<float>` RType.
-    Wm3::AxisAlignedBox3f mAABox;          // 0x0240
-    LuaPlus::LuaObject mLuaPositionCache;  // 0x0258 (cached `Entity:GetPosition()` vector table)
-    Motor* mMotor;                   // 0x026C
+    Wm3::AxisAlignedBox3f mAABox;         // 0x0240
+    LuaPlus::LuaObject mLuaPositionCache; // 0x0258 (cached `Entity:GetPosition()` vector table)
+    Motor* mMotor;                        // 0x026C
   };
 
   // Defined here rather than in the class: the body reads `Entity::id_`,
   // which needs `Entity` complete.
   template <class T>
   template <class Slot>
-  Slot* EntitySetTemplate<T>::LowerBound(const T* const needle, Slot* first, Slot* const last) noexcept
+  Slot* EntitySetTemplate<T>::LowerBound(
+    const T* const needle,
+    Slot* first,
+    Slot* const last
+  ) noexcept
   {
     const Entity* const needleEntity = needle;
     const std::uint32_t key = needleEntity ? static_cast<std::uint32_t>(needleEntity->id_) : 0u;

@@ -11,7 +11,7 @@ namespace moho
 {
   class INetConnector;
   class RRuleGameRules;
-}
+} // namespace moho
 
 // Engine addition, server mode (docs/SWITCHES.md, "Server mode"): the client's entry into a
 // server-authoritative session. Built only with FAF_SERVER_MODE; without `/connectserver` on
@@ -31,7 +31,7 @@ namespace faf::remote
 
   enum class EServerConnectArgs
   {
-    Absent,  // no `/connectserver`: a lockstep session
+    Absent, // no `/connectserver`: a lockstep session
     Valid,
     Invalid, // the error text says why
   };
@@ -48,7 +48,7 @@ namespace faf::remote
   {
     NotRequested, // no `/connectserver`: the caller continues with the lockstep paths
     Started,
-    Failed,       // the player has been told why; the caller exits
+    Failed, // the player has been told why; the caller exits
   };
 
   /**
@@ -73,7 +73,8 @@ namespace faf::remote
   bool SendServerLaunchRequest(std::span<const std::uint8_t> configuration);
   /**
    * Plan WP11: the next message from the server for the game's session (`LaunchInfo`, `GameInfo`, `View`, `Beat`,
-   * `CommandAnswer`, `ViewCheck`; not a lobby frame), in arrival order. False when none is waiting or outside a session.
+   * `CommandAnswer`, `ViewCheck`; not a lobby frame), in arrival order. False when none is waiting or outside a
+   * session.
    */
   [[nodiscard]] bool TakeServerGameMessage(std::vector<std::uint8_t>& message);
   /**

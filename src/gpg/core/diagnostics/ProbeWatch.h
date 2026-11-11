@@ -30,9 +30,9 @@ namespace gpg::diag
    * commands `faf_watch` / `faf_probe`, and the FADeepProbe-compatible Lua
    * request strings handled in lua (pcall(error, "FADeepProbe ...")).
    */
-  bool ParseWatchSpec(const char* spec);          // "1a2b3000+474"
-  bool ParseProbeSpec(const char* spec);          // "438310" / "438310:ecx+474"
-  bool ParseFadepProbeRequest(const char* text);  // "FADeepProbe watchaddr ..." / "... probe ..."
+  bool ParseWatchSpec(const char* spec);         // "1a2b3000+474"
+  bool ParseProbeSpec(const char* spec);         // "438310" / "438310:ecx+474"
+  bool ParseFadepProbeRequest(const char* text); // "FADeepProbe watchaddr ..." / "... probe ..."
 
   /** Installs the vectored handler front-most. Safe to call more than once. */
   void InstallProbeWatchHandler();

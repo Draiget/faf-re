@@ -71,7 +71,10 @@ namespace faf::remote::net
     [[nodiscard]] Verdict Check(std::uint32_t sequence) const noexcept;
     void Accept(std::uint32_t sequence) noexcept;
 
-    [[nodiscard]] std::uint32_t Newest() const noexcept { return mNewest; }
+    [[nodiscard]] std::uint32_t Newest() const noexcept
+    {
+      return mNewest;
+    }
     [[nodiscard]] std::uint32_t AckBits() const noexcept;
     /** Bit i set when sequence top - i was received (i < 32, inside the window). */
     [[nodiscard]] std::uint32_t BitsDownFrom(std::uint32_t top) const noexcept;
@@ -89,14 +92,30 @@ namespace faf::remote::net
   class ByteWriter
   {
   public:
-    explicit ByteWriter(std::vector<std::uint8_t>& out) noexcept
+    explicit ByteWriter(
+      std::vector<std::uint8_t>& out
+    ) noexcept
       : mOut(out)
     {}
 
-    void Byte(std::uint8_t value) { mOut.push_back(value); }
+    void Byte(
+      std::uint8_t value
+    )
+    {
+      mOut.push_back(value);
+    }
     void Varint(std::uint64_t value);
-    void Bytes(const std::uint8_t* data, std::size_t size) { mOut.insert(mOut.end(), data, data + size); }
-    [[nodiscard]] std::size_t Size() const noexcept { return mOut.size(); }
+    void Bytes(
+      const std::uint8_t* data,
+      std::size_t size
+    )
+    {
+      mOut.insert(mOut.end(), data, data + size);
+    }
+    [[nodiscard]] std::size_t Size() const noexcept
+    {
+      return mOut.size();
+    }
 
   private:
     std::vector<std::uint8_t>& mOut;
@@ -106,7 +125,10 @@ namespace faf::remote::net
   class ByteReader
   {
   public:
-    ByteReader(const std::uint8_t* data, std::size_t size) noexcept
+    ByteReader(
+      const std::uint8_t* data,
+      std::size_t size
+    ) noexcept
       : mData(data)
       , mSize(size)
     {}
@@ -117,10 +139,19 @@ namespace faf::remote::net
     /** `size` bytes in place, or null and failed when fewer are left. */
     [[nodiscard]] const std::uint8_t* Bytes(std::size_t size) noexcept;
 
-    [[nodiscard]] bool Ok() const noexcept { return !mFailed; }
-    [[nodiscard]] bool AtEnd() const noexcept { return mPos == mSize; }
+    [[nodiscard]] bool Ok() const noexcept
+    {
+      return !mFailed;
+    }
+    [[nodiscard]] bool AtEnd() const noexcept
+    {
+      return mPos == mSize;
+    }
     /** Bytes not read yet. */
-    [[nodiscard]] std::size_t Remaining() const noexcept { return mSize - mPos; }
+    [[nodiscard]] std::size_t Remaining() const noexcept
+    {
+      return mSize - mPos;
+    }
 
   private:
     const std::uint8_t* mData;

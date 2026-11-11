@@ -70,7 +70,10 @@ namespace moho
      * translation row untouched. Inlined into `HardwareMeshBatch::FillBatch` in
      * the binary (the twelve `mulss` at 0x007E8730..0x007E884F).
      */
-    void ScaleTransformRows(VMatrix4& transform, const Wm3::Vec3f& scale)
+    void ScaleTransformRows(
+      VMatrix4& transform,
+      const Wm3::Vec3f& scale
+    )
     {
       const float axisScale[3] = {scale.x, scale.y, scale.z};
 
@@ -116,8 +119,7 @@ namespace moho
         const std::size_t slot = static_cast<std::size_t>(boneIndex) * stride;
         const auto remapIndex = static_cast<std::uint32_t>(boneRemapIndices[static_cast<std::size_t>(boneIndex)]);
 
-        const CAniPoseBone* const poseBone =
-          remapIndex < poseBoneCount ? &pose.mBones.begin()[remapIndex] : nullptr;
+        const CAniPoseBone* const poseBone = remapIndex < poseBoneCount ? &pose.mBones.begin()[remapIndex] : nullptr;
 
         if (poseBone == nullptr || poseBone->mVisible == 0) {
           transPalette[slot] = SkinPaletteEntry{0.0f, kHiddenBoneDepth, 0.0f, 0.0f};
@@ -178,7 +180,6 @@ namespace moho
 
         // The palette hands the shader xyzw; the engine stores wxyz.
         rotPalette[slot] = SkinPaletteEntry{composed.x, composed.y, composed.z, composed.w};
-
       }
     }
 
@@ -267,7 +268,9 @@ namespace moho
       }
 
       /// Reserves `boneCount` bones and returns the first; kNoBase when full.
-      [[nodiscard]] std::uint32_t Allocate(const std::uint32_t boneCount)
+      [[nodiscard]] std::uint32_t Allocate(
+        const std::uint32_t boneCount
+      )
       {
         const auto base = static_cast<std::uint32_t>(mTexels.size() / 2u);
         if (boneCount > kMaxBones - base) {
@@ -299,19 +302,27 @@ namespace moho
       }
 
       /// Records the bases just written for one bucket's instances, in order.
-      void RecordBucket(const fa::vector<MeshInstance*>& instances, const std::size_t firstBase)
+      void RecordBucket(
+        const fa::vector<MeshInstance*>& instances,
+        const std::size_t firstBase
+      )
       {
         mPrepared[instances.end()] = PreparedBucket{instances.begin(), instances.size(), firstBase};
       }
 
       /// The prepared bucket that ends at `end`, if `MeshRenderer::Batch` prepared it.
-      [[nodiscard]] const PreparedBucket* FindBucket(MeshInstance* const* const end) const
+      [[nodiscard]] const PreparedBucket* FindBucket(
+        MeshInstance* const* const end
+      ) const
       {
         const auto it = mPrepared.find(end);
         return it != mPrepared.end() ? &it->second : nullptr;
       }
 
-      [[nodiscard]] std::uint32_t PreparedBase(const PreparedBucket& bucket, MeshInstance* const* const at) const
+      [[nodiscard]] std::uint32_t PreparedBase(
+        const PreparedBucket& bucket,
+        MeshInstance* const* const at
+      ) const
       {
         const auto index = static_cast<std::size_t>(at - bucket.begin);
         return index < bucket.count ? mBases[bucket.firstBase + index] : kNoBase;
@@ -349,7 +360,9 @@ namespace moho
           std::copy_n(
             &mTexels[firstTexel],
             texels,
-            reinterpret_cast<SkinPaletteEntry*>(destination + static_cast<std::size_t>(row) * static_cast<std::size_t>(lock.pitch))
+            reinterpret_cast<SkinPaletteEntry*>(
+              destination + static_cast<std::size_t>(row) * static_cast<std::size_t>(lock.pitch)
+            )
           );
         }
         (void)mTexture->Unlock(lock);
@@ -379,11 +392,13 @@ namespace moho
       std::vector<std::uint32_t> mBases; // per prepared instance, kNoBase when it had no pose
 
     private:
-      void CreateTexture(const std::uint32_t rows)
+      void CreateTexture(
+        const std::uint32_t rows
+      )
       {
         gpg::gal::TextureContext context{};
-        context.source_ = 2u;       // no file data: an empty texture
-        context.usage_ = 2u;        // dynamic, in the default pool
+        context.source_ = 2u; // no file data: an empty texture
+        context.usage_ = 2u;  // dynamic, in the default pool
         context.format_ = gpg::gal::kTextureFormatFloat4;
         context.mipmapLevels_ = 1u;
         context.width_ = kWidth;
@@ -438,7 +453,11 @@ namespace moho
       static constexpr std::uint32_t kDefaultRecords = 0x4000u;
 
       /// Copies `count` records of `stride` bytes in and returns the first one's index.
-      [[nodiscard]] std::uint32_t Append(const void* const records, const std::uint32_t count, const std::uint32_t stride)
+      [[nodiscard]] std::uint32_t Append(
+        const void* const records,
+        const std::uint32_t count,
+        const std::uint32_t stride
+      )
       {
         if (!mBuffer || stride != mStride || count > mCapacity) {
           std::uint32_t capacity = kDefaultRecords;
@@ -466,7 +485,11 @@ namespace moho
 
         void* const destination = mBuffer->Lock(mCursor * stride, count * stride, flags);
         // Raw GPU upload: instance record blob into the locked buffer.
-        std::copy_n(static_cast<const std::uint8_t*>(records), static_cast<std::size_t>(count) * stride, static_cast<std::uint8_t*>(destination));
+        std::copy_n(
+          static_cast<const std::uint8_t*>(records),
+          static_cast<std::size_t>(count) * stride,
+          static_cast<std::uint8_t*>(destination)
+        );
         mBuffer->Unlock();
 
         const std::uint32_t first = mCursor;
@@ -505,7 +528,8 @@ namespace moho
     bool ren_MeshPackedVertices = true;
     TConVar<bool> gTConVar_ren_MeshPackedVertices(
       "ren_MeshPackedVertices",
-      "Direct3D 12 / Vulkan: a static mesh vertex takes 36 bytes where its values fit, 44 where its texture coordinates leave "
+      "Direct3D 12 / Vulkan: a static mesh vertex takes 36 bytes where its values fit, 44 where its texture "
+      "coordinates leave "
       "0 to 1 (1, the default), or 72 (0). Read when a mesh's batch is created.",
       &ren_MeshPackedVertices
     );
@@ -518,13 +542,19 @@ namespace moho
       Narrow, ///< unit directions, texture coordinates from 0 to 1: `PackedHardwareVertex`, 36 bytes
     };
 
-    [[nodiscard]] PackedLayout LayoutVerticesFit(const SScmVertex* const vertices, const std::int32_t count)
+    [[nodiscard]] PackedLayout LayoutVerticesFit(
+      const SScmVertex* const vertices,
+      const std::int32_t count
+    )
     {
       constexpr float kDirectionLimit = 1.001f;
       const auto directionFits = [](const float* const direction) {
-        return std::abs(direction[0]) <= kDirectionLimit && std::abs(direction[1]) <= kDirectionLimit && std::abs(direction[2]) <= kDirectionLimit;
+        return std::abs(direction[0]) <= kDirectionLimit && std::abs(direction[1]) <= kDirectionLimit &&
+          std::abs(direction[2]) <= kDirectionLimit;
       };
-      const auto texCoordFits = [](const float value) { return value >= 0.0f && value <= 1.0f; };
+      const auto texCoordFits = [](const float value) {
+        return value >= 0.0f && value <= 1.0f;
+      };
       bool texCoordsFit = true;
       for (std::int32_t index = 0; index < count; ++index) {
         const SScmVertex& vertex = vertices[index];
@@ -537,7 +567,10 @@ namespace moho
       return texCoordsFit ? PackedLayout::Narrow : PackedLayout::Wide;
     }
 
-    void PackDirection(std::int8_t* const packed, const float* const direction)
+    void PackDirection(
+      std::int8_t* const packed,
+      const float* const direction
+    )
     {
       for (int axis = 0; axis < 3; ++axis) {
         packed[axis] = static_cast<std::int8_t>(std::lround(std::clamp(direction[axis], -1.0f, 1.0f) * 127.0f));
@@ -545,13 +578,18 @@ namespace moho
       packed[3] = 0;
     }
 
-    [[nodiscard]] std::uint16_t PackTexCoord(const float value)
+    [[nodiscard]] std::uint16_t PackTexCoord(
+      const float value
+    )
     {
       return static_cast<std::uint16_t>(std::lround(value * 65535.0f));
     }
 
     /// Every 256 meshes, how many vertices went in which format, for the memory this saves.
-    void NotePackedVertices(const PackedLayout layout, const std::int32_t vertexCount)
+    void NotePackedVertices(
+      const PackedLayout layout,
+      const std::int32_t vertexCount
+    )
     {
       static std::uint32_t meshes[3] = {0U, 0U, 0U};
       static std::uint64_t vertices[3] = {0U, 0U, 0U};
@@ -560,15 +598,22 @@ namespace moho
       vertices[slot] += static_cast<std::uint64_t>(vertexCount);
       if (((meshes[0] + meshes[1] + meshes[2]) & 0xFFU) == 0U) {
         constexpr double kMegabyte = 1024.0 * 1024.0;
-        const double saved =
-          (static_cast<double>(vertices[2]) * (sizeof(gpg::gal::HardwareVertex) - sizeof(gpg::gal::PackedHardwareVertex)) +
-           static_cast<double>(vertices[1]) * (sizeof(gpg::gal::HardwareVertex) - sizeof(gpg::gal::PackedWideUvHardwareVertex))) /
+        const double saved = (static_cast<double>(vertices[2]) *
+                                (sizeof(gpg::gal::HardwareVertex) - sizeof(gpg::gal::PackedHardwareVertex)) +
+                              static_cast<double>(vertices[1]) *
+                                (sizeof(gpg::gal::HardwareVertex) - sizeof(gpg::gal::PackedWideUvHardwareVertex))) /
           kMegabyte;
         gpg::Logf(
-          "Mesh vertices: %u meshes packed (%llu vertices), %u packed with float texture coordinates (%llu vertices), %.1f MB saved; "
+          "Mesh vertices: %u meshes packed (%llu vertices), %u packed with float texture coordinates (%llu vertices), "
+          "%.1f MB saved; "
           "%u kept the original format (%llu vertices)",
-          meshes[2], static_cast<unsigned long long>(vertices[2]), meshes[1], static_cast<unsigned long long>(vertices[1]), saved,
-          meshes[0], static_cast<unsigned long long>(vertices[0])
+          meshes[2],
+          static_cast<unsigned long long>(vertices[2]),
+          meshes[1],
+          static_cast<unsigned long long>(vertices[1]),
+          saved,
+          meshes[0],
+          static_cast<unsigned long long>(vertices[0])
         );
       }
     }
@@ -716,8 +761,9 @@ namespace moho
     // A mesh whose texture coordinates leave 0 to 1 keeps them as floats (44 bytes); one with a direction
     // longer than one keeps the original format.
     const gpg::gal::DeviceApi deviceApi = deviceContext->mDeviceType;
-    const PackedLayout layout = (ren_MeshPackedVertices &&
-                                 (deviceApi == gpg::gal::DeviceApi::Direct3D12 || deviceApi == gpg::gal::DeviceApi::Vulkan))
+    const PackedLayout layout =
+      (ren_MeshPackedVertices &&
+       (deviceApi == gpg::gal::DeviceApi::Direct3D12 || deviceApi == gpg::gal::DeviceApi::Vulkan))
       ? LayoutVerticesFit(sourceVertices, mVertexCount)
       : PackedLayout::None;
     NotePackedVertices(layout, mVertexCount);
@@ -835,7 +881,9 @@ namespace moho
    * and the cap is `InstanceCap`, which lifts the palette's limit when the
    * bones come from the bone palette texture.
    */
-  void HardwareMeshBatch::PrepareBatch(const std::int32_t instanceCount)
+  void HardwareMeshBatch::PrepareBatch(
+    const std::int32_t instanceCount
+  )
   {
     const std::int32_t instanceCap = InstanceCap(UsesBoneTexture());
     if (instanceCount <= mActiveInstanceBudget || mActiveInstanceBudget >= instanceCap) {
@@ -890,12 +938,13 @@ namespace moho
    * until EndBatch; and with the bone palette texture, bones written for this
    * draw alone are uploaded before it.
    */
-  void HardwareMeshBatch::DrawBatch(const std::int32_t packedCount)
+  void HardwareMeshBatch::DrawBatch(
+    const std::int32_t packedCount
+  )
   {
     if (packedCount == 0) {
       return;
     }
-
 
     CD3DDevice* const d3dDevice = D3D_GetDevice();
     auto* const device = gpg::gal::Device::GetInstance();
@@ -1120,18 +1169,16 @@ namespace moho
           staging.color = meshInstance->color;
           staging.meshColor = meshInstance->meshColor;
           // 0x007E8235..0x007E8242: `fmod(float, float)` (0x00422920 -> _CIfmod).
-          staging.shaderTime = static_cast<float>(
-            fa::fmod(static_cast<float>(meshInstance->gameTick), kMeshShaderTimeWrapSeconds)
-          );
+          staging.shaderTime =
+            static_cast<float>(fa::fmod(static_cast<float>(meshInstance->gameTick), kMeshShaderTimeWrapSeconds));
           staging.useSecondaryData = mUseSecondaryData;
           staging.parameter = (&meshInstance->parameters)[mParameterAnnotation];
-          staging.scroll[0] = meshInstance->scroll1.x
-            + ((meshInstance->scroll2.x - meshInstance->scroll1.x) * MeshInstance::sCurrentInterpolant);
-          staging.scroll[1] = meshInstance->scroll1.y
-            + ((meshInstance->scroll2.y - meshInstance->scroll1.y) * MeshInstance::sCurrentInterpolant);
-          staging.dissolve = static_cast<std::uint8_t>(
-            static_cast<std::int32_t>(meshInstance->dissolve * kDissolveToByteScale)
-          );
+          staging.scroll[0] = meshInstance->scroll1.x +
+            ((meshInstance->scroll2.x - meshInstance->scroll1.x) * MeshInstance::sCurrentInterpolant);
+          staging.scroll[1] = meshInstance->scroll1.y +
+            ((meshInstance->scroll2.y - meshInstance->scroll1.y) * MeshInstance::sCurrentInterpolant);
+          staging.dissolve =
+            static_cast<std::uint8_t>(static_cast<std::int32_t>(meshInstance->dissolve * kDissolveToByteScale));
 
           bool packInstance = true;
           if (mUseBoneRemap != 0 && boneTexture) {
@@ -1141,9 +1188,8 @@ namespace moho
             // already.
             CopyTransform4x4(&staging.transform, VMatrix4::sIdentity);
 
-            std::uint32_t base = (preparedBucket != nullptr)
-              ? bonePalette.PreparedBase(*preparedBucket, current)
-              : BonePaletteTexture::kNoBase;
+            std::uint32_t base = (preparedBucket != nullptr) ? bonePalette.PreparedBase(*preparedBucket, current)
+                                                             : BonePaletteTexture::kNoBase;
             if (base == BonePaletteTexture::kNoBase) {
               base = bonePalette.WriteInstance(*meshInstance, *pose, *skeleton, mBoneRemapIndices, mBoneCount);
             }
@@ -1168,8 +1214,14 @@ namespace moho
             CopyTransform4x4(&staging.transform, VMatrix4::sIdentity);
 
             FillInstanceBonePalettes(
-              *meshInstance, *pose, *skeleton, mBoneRemapIndices, mBoneCount,
-              transPalette + staging.bonePaletteBase, rotPalette + staging.bonePaletteBase, 1u
+              *meshInstance,
+              *pose,
+              *skeleton,
+              mBoneRemapIndices,
+              mBoneCount,
+              transPalette + staging.bonePaletteBase,
+              rotPalette + staging.bonePaletteBase,
+              1u
             );
           } else {
             // Unskinned: one instance transform, scaled per axis, in the record.
@@ -1190,10 +1242,7 @@ namespace moho
 
           if (packInstance) {
             formatter->WriteFormattedVertex(
-              1,
-              static_cast<std::uint8_t*>(mScratchVertexData) + scratchOffset,
-              staging,
-              0
+              1, static_cast<std::uint8_t*>(mScratchVertexData) + scratchOffset, staging, 0
             );
 
             scratchOffset += instanceStride;
@@ -1215,9 +1264,8 @@ namespace moho
     // rather than discarding a buffer of this batch's own, and the constant
     // palettes only go out when the shader reads them.
     if (packedCount > 0) {
-      sDrawFirstInstanceRecord = GetInstanceRingBuffer().Append(
-        mScratchVertexData, static_cast<std::uint32_t>(packedCount), instanceStride
-      );
+      sDrawFirstInstanceRecord =
+        GetInstanceRingBuffer().Append(mScratchVertexData, static_cast<std::uint32_t>(packedCount), instanceStride);
     }
 
     if (!boneTexture) {
@@ -1226,8 +1274,10 @@ namespace moho
       // Engine change (ren_MeshPaletteUsedOnly): this draw reads only the bones of the instances packed
       // above. Direct3D 12 and Vulkan take just those; the older renderers keep their whole array.
       const gpg::gal::DeviceApi deviceApi = gpg::gal::Device::GetInstance()->GetDeviceContext()->mDeviceType;
-      if (ren_MeshPaletteUsedOnly && deviceApi != gpg::gal::DeviceApi::Direct3D9 && deviceApi != gpg::gal::DeviceApi::Direct3D10 &&
-          deviceApi != gpg::gal::DeviceApi::Direct3D11) {
+      if (
+        ren_MeshPaletteUsedOnly && deviceApi != gpg::gal::DeviceApi::Direct3D9 &&
+        deviceApi != gpg::gal::DeviceApi::Direct3D10 && deviceApi != gpg::gal::DeviceApi::Direct3D11
+      ) {
         const std::uint32_t used = static_cast<std::uint32_t>(std::max(std::max(packedCount, 1) * mBoneCount, 1));
         transEntries = std::min(transEntries, used);
         rotEntries = std::min(rotEntries, used);
@@ -1270,7 +1320,9 @@ namespace moho
    * device's primitive cap (the rule unskinned batches follow) and the ring
    * buffer's default size.
    */
-  std::int32_t HardwareMeshBatch::InstanceCap(const bool boneTexture) const
+  std::int32_t HardwareMeshBatch::InstanceCap(
+    const bool boneTexture
+  ) const
   {
     if (mUseBoneRemap == 0 || !boneTexture) {
       return mMaxInstancesPerDraw;
@@ -1306,7 +1358,9 @@ namespace moho
    * `FillBatch` finds them by the bucket's end and the instance's position.
    * Instances without a pose (which `FillBatch` skips) record no base.
    */
-  void HardwareMeshBatch::PrepareBonePalettes(const fa::vector<MeshInstance*>& instances)
+  void HardwareMeshBatch::PrepareBonePalettes(
+    const fa::vector<MeshInstance*>& instances
+  )
   {
     if (mBoneCount <= 0 || instances.empty()) {
       return;
@@ -1394,7 +1448,11 @@ namespace moho
    * FillInstanceBonePalettes writes (scale, translation, rotation); a hidden bone gets a zero matrix.
    * False when the instance has no pose or skeleton (FillBatch skips those too).
    */
-  bool MeshInstanceRayTransforms(const MeshBatch& batch, MeshInstance& meshInstance, std::vector<std::array<float, 12>>& out)
+  bool MeshInstanceRayTransforms(
+    const MeshBatch& batch,
+    MeshInstance& meshInstance,
+    std::vector<std::array<float, 12>>& out
+  )
   {
     out.clear();
     const auto store = [&out](const float (&rows)[4][3]) {
@@ -1430,7 +1488,14 @@ namespace moho
     std::vector<SkinPaletteEntry> translations(boneCount);
     std::vector<SkinPaletteEntry> rotations(boneCount);
     FillInstanceBonePalettes(
-      meshInstance, *pose, *skeleton, batch.mBoneRemapIndices, batch.mBoneCount, translations.data(), rotations.data(), 1U
+      meshInstance,
+      *pose,
+      *skeleton,
+      batch.mBoneRemapIndices,
+      batch.mBoneCount,
+      translations.data(),
+      rotations.data(),
+      1U
     );
     for (std::size_t bone = 0U; bone < boneCount; ++bone) {
       const SkinPaletteEntry& t = translations[bone];

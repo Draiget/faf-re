@@ -12,7 +12,9 @@ namespace
    * Registers one debug-overlay descriptor pair for navigator-waypoint
    * rendering.
    */
-  void RegisterRDebugNavWaypointsOverlayClass(moho::RDebugOverlayClass* const typeInfo)
+  void RegisterRDebugNavWaypointsOverlayClass(
+    moho::RDebugOverlayClass* const typeInfo
+  )
   {
     typeInfo->RegisterOverlayClass("Display the navigator waypoints", "NavWaypoints");
   }
@@ -66,7 +68,9 @@ namespace moho
   /**
    * Address: 0x00650DC0 (FUN_00650DC0, Moho::RDebugNavWaypointsTypeInfo::CtrRef)
    */
-  gpg::RRef RDebugNavWaypointsTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef RDebugNavWaypointsTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     return debug_reflection::CtrRef<RDebugNavWaypoints>(objectStorage, RDebugNavWaypoints::sType);
   }
@@ -74,7 +78,9 @@ namespace moho
   /**
    * Address: 0x00650DA0 (FUN_00650DA0, Moho::RDebugNavWaypointsTypeInfo::Delete)
    */
-  void RDebugNavWaypointsTypeInfo::Delete(void* const objectStorage)
+  void RDebugNavWaypointsTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     debug_reflection::Delete<RDebugNavWaypoints>(objectStorage);
   }
@@ -82,7 +88,9 @@ namespace moho
   /**
    * Address: 0x00650E00 (FUN_00650E00, Moho::RDebugNavWaypointsTypeInfo::Destruct)
    */
-  void RDebugNavWaypointsTypeInfo::Destruct(void* const objectStorage)
+  void RDebugNavWaypointsTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     debug_reflection::Destruct<RDebugNavWaypoints>(objectStorage);
   }
@@ -90,7 +98,9 @@ namespace moho
   /**
    * Address: 0x006510B0 (FUN_006510B0, Moho::RDebugNavWaypoints::AddBase_RDebugOverlay)
    */
-  void RDebugNavWaypointsTypeInfo::AddBase_RDebugOverlay(gpg::RType* const typeInfo)
+  void RDebugNavWaypointsTypeInfo::AddBase_RDebugOverlay(
+    gpg::RType* const typeInfo
+  )
   {
     debug_reflection::AddBaseRDebugOverlay(typeInfo);
   }

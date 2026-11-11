@@ -29,24 +29,24 @@ using namespace gpg;
 
 namespace
 {
-constexpr std::size_t kPipeChunkSize = 0x1000;
-constexpr std::size_t kDebugOutputPayloadSize = 0x100;
+  constexpr std::size_t kPipeChunkSize = 0x1000;
+  constexpr std::size_t kDebugOutputPayloadSize = 0x100;
 
-class HistoryLogTarget final : public gpg::LogTarget
-{
-public:
+  class HistoryLogTarget final : public gpg::LogTarget
+  {
+  public:
     enum class EntryKind : std::int32_t
     {
-        Message = 0,
-        Context = 1,
+      Message = 0,
+      Context = 1,
     };
 
     struct Entry
     {
-        EntryKind kind = EntryKind::Message;
-        gpg::LogSeverity severity = gpg::LogSeverity::Info;
-        fa::string text{};
-        std::int32_t contextDepth = 0;
+      EntryKind kind = EntryKind::Message;
+      gpg::LogSeverity severity = gpg::LogSeverity::Info;
+      fa::string text{};
+      std::int32_t contextDepth = 0;
     };
 
     /**
@@ -56,11 +56,12 @@ public:
      * Constructs one history log target, auto-registers it, and seeds the
      * retained-message cap.
      */
-    explicit HistoryLogTarget(const std::int32_t maxMessages)
-        : gpg::LogTarget(true),
-          mMaxMessages(maxMessages)
-    {
-    }
+    explicit HistoryLogTarget(
+      const std::int32_t maxMessages
+    )
+      : gpg::LogTarget(true)
+      , mMaxMessages(maxMessages)
+    {}
 
     /**
      * Address: 0x008E4960 (FUN_008E4960, HistoryLogTarget::~HistoryLogTarget)
@@ -94,11 +95,13 @@ public:
      * What it does:
      * Updates the retained-message cap and trims retained entries to fit.
      */
-    void Enable(const std::int32_t maxMessages)
+    void Enable(
+      const std::int32_t maxMessages
+    )
     {
-        std::lock_guard<std::recursive_mutex> lock(mLock);
-        mMaxMessages = maxMessages;
-        TrimLocked();
+      std::lock_guard<std::recursive_mutex> lock(mLock);
+      mMaxMessages = maxMessages;
+      TrimLocked();
     }
 
     /**
@@ -109,40 +112,40 @@ public:
      * history, then enforces the retained-message cap.
      */
     void OnMessage(
-        const gpg::LogSeverity level,
-        const fa::string& message,
-        const fa::vector<fa::string>& context,
-        const int previousDepth
+      const gpg::LogSeverity level,
+      const fa::string& message,
+      const fa::vector<fa::string>& context,
+      const int previousDepth
     ) override
     {
-        std::lock_guard<std::recursive_mutex> lock(mLock);
+      std::lock_guard<std::recursive_mutex> lock(mLock);
 
-        int startDepth = previousDepth;
-        if (startDepth < 0) {
-            startDepth = 0;
+      int startDepth = previousDepth;
+      if (startDepth < 0) {
+        startDepth = 0;
+      }
+
+      const int contextCount = static_cast<int>(context.size());
+      if (startDepth < contextCount) {
+        for (int depth = startDepth; depth < contextCount; ++depth) {
+          Entry replayEntry{};
+          replayEntry.kind = EntryKind::Context;
+          replayEntry.severity = level;
+          replayEntry.text = context[static_cast<std::size_t>(depth)];
+          replayEntry.contextDepth = depth;
+          mEntries.push_back(replayEntry);
         }
+      }
 
-        const int contextCount = static_cast<int>(context.size());
-        if (startDepth < contextCount) {
-            for (int depth = startDepth; depth < contextCount; ++depth) {
-                Entry replayEntry{};
-                replayEntry.kind = EntryKind::Context;
-                replayEntry.severity = level;
-                replayEntry.text = context[static_cast<std::size_t>(depth)];
-                replayEntry.contextDepth = depth;
-                mEntries.push_back(replayEntry);
-            }
-        }
+      Entry messageEntry{};
+      messageEntry.kind = EntryKind::Message;
+      messageEntry.severity = level;
+      messageEntry.text = message;
+      messageEntry.contextDepth = contextCount;
+      mEntries.push_back(messageEntry);
+      ++mMessageCount;
 
-        Entry messageEntry{};
-        messageEntry.kind = EntryKind::Message;
-        messageEntry.severity = level;
-        messageEntry.text = message;
-        messageEntry.contextDepth = contextCount;
-        mEntries.push_back(messageEntry);
-        ++mMessageCount;
-
-        TrimLocked();
+      TrimLocked();
     }
 
     /**
@@ -152,58 +155,57 @@ public:
      * Replays retained history entries into a target, preserving context-depth
      * transitions, then trims retained entries after replay unlock.
      */
-    void ReplayTo(gpg::LogTarget& target)
+    void ReplayTo(
+      gpg::LogTarget& target
+    )
     {
-        fa::list<Entry> snapshot{};
-        {
-            std::lock_guard<std::recursive_mutex> lock(mLock);
-            if (mEntries.empty()) {
-                return;
-            }
-
-            ++mReplayDepth;
-            snapshot = mEntries;
+      fa::list<Entry> snapshot{};
+      {
+        std::lock_guard<std::recursive_mutex> lock(mLock);
+        if (mEntries.empty()) {
+          return;
         }
 
-        fa::vector<fa::string> context{};
-        int previousDepth = 0;
-        for (const Entry& entry : snapshot) {
-            const int retainedDepth = entry.contextDepth;
-            if (retainedDepth < 0) {
-                continue;
-            }
-            const int currentDepth = static_cast<int>(context.size());
-            if (retainedDepth < currentDepth) {
-                previousDepth = retainedDepth;
-                context.erase(
-                    context.begin() + static_cast<std::size_t>(retainedDepth),
-                    context.end()
-                );
-            }
+        ++mReplayDepth;
+        snapshot = mEntries;
+      }
 
-            if (retainedDepth != static_cast<int>(context.size())) {
-                continue;
-            }
-
-            if (entry.kind == EntryKind::Context) {
-                context.push_back(entry.text);
-                continue;
-            }
-
-            target.OnMessage(entry.severity, entry.text, context, previousDepth);
-            previousDepth = retainedDepth;
+      fa::vector<fa::string> context{};
+      int previousDepth = 0;
+      for (const Entry& entry : snapshot) {
+        const int retainedDepth = entry.contextDepth;
+        if (retainedDepth < 0) {
+          continue;
+        }
+        const int currentDepth = static_cast<int>(context.size());
+        if (retainedDepth < currentDepth) {
+          previousDepth = retainedDepth;
+          context.erase(context.begin() + static_cast<std::size_t>(retainedDepth), context.end());
         }
 
-        {
-            std::lock_guard<std::recursive_mutex> lock(mLock);
-            if (mReplayDepth > 0) {
-                --mReplayDepth;
-            }
-            TrimLocked();
+        if (retainedDepth != static_cast<int>(context.size())) {
+          continue;
         }
+
+        if (entry.kind == EntryKind::Context) {
+          context.push_back(entry.text);
+          continue;
+        }
+
+        target.OnMessage(entry.severity, entry.text, context, previousDepth);
+        previousDepth = retainedDepth;
+      }
+
+      {
+        std::lock_guard<std::recursive_mutex> lock(mLock);
+        if (mReplayDepth > 0) {
+          --mReplayDepth;
+        }
+        TrimLocked();
+      }
     }
 
-private:
+  private:
     /**
      * Address: 0x008E4770 (FUN_008E4770, HistoryLogTarget::TrimLocked)
      * Address: 0x008E4660 (FUN_008E4660, `fa::list<Entry>::erase`'s node
@@ -220,54 +222,54 @@ private:
      */
     void TrimLocked()
     {
-        if (mReplayDepth != 0) {
-            return;
-        }
+      if (mReplayDepth != 0) {
+        return;
+      }
 
-        if (mMaxMessages < 0 || mMessageCount <= mMaxMessages) {
-            return;
-        }
+      if (mMaxMessages < 0 || mMessageCount <= mMaxMessages) {
+        return;
+      }
 
-        while (mMessageCount > mMaxMessages && !mEntries.empty()) {
-            bool removedMessage = false;
-            int currentDepth = 0;
+      while (mMessageCount > mMaxMessages && !mEntries.empty()) {
+        bool removedMessage = false;
+        int currentDepth = 0;
 
-            for (auto it = mEntries.begin(); it != mEntries.end();) {
-                const int entryDepth = it->contextDepth;
-                if (entryDepth < 0) {
-                    it = mEntries.erase(it);
-                    continue;
-                }
-                if (entryDepth < currentDepth) {
-                    if (it == mEntries.begin()) {
-                        currentDepth = entryDepth;
-                    } else {
-                        auto previous = it;
-                        --previous;
-                        mEntries.erase(previous);
-                        --currentDepth;
-                    }
-                    continue;
-                }
-
-                currentDepth = entryDepth;
-
-                if (it->kind == EntryKind::Context) {
-                    ++currentDepth;
-                    ++it;
-                    continue;
-                }
-
-                mEntries.erase(it);
-                --mMessageCount;
-                removedMessage = true;
-                break;
+        for (auto it = mEntries.begin(); it != mEntries.end();) {
+          const int entryDepth = it->contextDepth;
+          if (entryDepth < 0) {
+            it = mEntries.erase(it);
+            continue;
+          }
+          if (entryDepth < currentDepth) {
+            if (it == mEntries.begin()) {
+              currentDepth = entryDepth;
+            } else {
+              auto previous = it;
+              --previous;
+              mEntries.erase(previous);
+              --currentDepth;
             }
+            continue;
+          }
 
-            if (!removedMessage) {
-                break;
-            }
+          currentDepth = entryDepth;
+
+          if (it->kind == EntryKind::Context) {
+            ++currentDepth;
+            ++it;
+            continue;
+          }
+
+          mEntries.erase(it);
+          --mMessageCount;
+          removedMessage = true;
+          break;
         }
+
+        if (!removedMessage) {
+          break;
+        }
+      }
     }
 
     std::recursive_mutex mLock{};
@@ -279,133 +281,151 @@ private:
     std::int32_t mMaxMessages = 0;
     std::int32_t mMessageCount = 0;
     std::int32_t mReplayDepth = 0;
-};
+  };
 
-/**
- * Address: 0x00BE9A20 (FUN_00BE9A20, dynamic initializer for `gLogHistoryTarget`)
- * Address: 0x00C095D0 (FUN_00C095D0, dynamic atexit destructor for `gLogHistoryTarget`)
- *
- * What it does:
- * The initializer only registers the destructor with `atexit` (the null
- * pointer is already in .bss); the destructor deletes a history target still
- * alive at exit without clearing the slot, which is `~scoped_ptr`.
- */
-boost::scoped_ptr<HistoryLogTarget> gLogHistoryTarget;
+  /**
+   * Address: 0x00BE9A20 (FUN_00BE9A20, dynamic initializer for `gLogHistoryTarget`)
+   * Address: 0x00C095D0 (FUN_00C095D0, dynamic atexit destructor for `gLogHistoryTarget`)
+   *
+   * What it does:
+   * The initializer only registers the destructor with `atexit` (the null
+   * pointer is already in .bss); the destructor deletes a history target still
+   * alive at exit without clearing the slot, which is `~scoped_ptr`.
+   */
+  boost::scoped_ptr<HistoryLogTarget> gLogHistoryTarget;
 
-/**
- * Address: 0x00936D20 (FUN_00936D20, ??1sLogContext@gpg@@QAE@@Z)
- *
- * What it does:
- * Clears the global log-context singleton pointer and destroys the previous
- * instance when one was installed.
- */
-void DestroyLogContextSingleton()
-{
+  /**
+   * Address: 0x00936D20 (FUN_00936D20, ??1sLogContext@gpg@@QAE@@Z)
+   *
+   * What it does:
+   * Clears the global log-context singleton pointer and destroys the previous
+   * instance when one was installed.
+   */
+  void DestroyLogContextSingleton()
+  {
     LogContext* const previous = gpg::g_LogCtx;
     gpg::g_LogCtx = nullptr;
     delete previous;
-}
+  }
 
-gpg::ThreadState* EnsureThreadState()
-{
+  gpg::ThreadState* EnsureThreadState()
+  {
     std::call_once(gpg::g_LogOnce, &gpg::InitLogSingleton);
     if (!gpg::g_LogCtx) {
-        return nullptr;
+      return nullptr;
     }
 
     gpg::ThreadState* tls = gpg::g_LogCtx->tss.get();
     if (!tls) {
-        tls = new gpg::ThreadState{};
-        gpg::g_LogCtx->tss.reset(tls);
+      tls = new gpg::ThreadState{};
+      gpg::g_LogCtx->tss.reset(tls);
     }
     return tls;
-}
+  }
 
-/**
- * Address: 0x00936FF0 (FUN_00936FF0, fa::vector<gpg::ThreadCtxEntry*>::
- * _Insert_n for the 4-byte pointer element)
- * Address: 0x00936990 (FUN_00936990, the same instantiation's `uninit_move_n`
- * -- `memmove_s`-based, serving both the reallocation head/tail relocate and
- * the in-place tail-shift call shapes for this trivially-relocatable
- * element, same "one compiled memmove_s wrapper backs both call shapes"
- * pattern documented on Vector.h's `uninit_move_n` member)
- *
- * `tls->mEntries.push_back(entry)` below is the real, programmer-written
- * source line these two addresses compile to. Previously this call site was
- * a hand-rolled `begin`/`end`/`cap` triple with its own
- * `EnsureThreadContextCapacity` growth helper that doubled capacity -- which
- * diverged from the binary's real ~1.5x `_Insert_n` growth (confirmed
- * against 0x00936FF0's own decompile: `v10 = (v7 >> 1) + v7`). Reverted to
- * `fa::vector<ThreadCtxEntry*>` so growth, relocation, and this instance's
- * `_Insert_n`/`uninit_move_n` pair are modeled once, in `Vector.h`, instead
- * of a second time here with different (wrong) arithmetic.
- */
-void PushThreadContext(gpg::ThreadState* const tls, gpg::ThreadCtxEntry* const entry)
-{
+  /**
+   * Address: 0x00936FF0 (FUN_00936FF0, fa::vector<gpg::ThreadCtxEntry*>::
+   * _Insert_n for the 4-byte pointer element)
+   * Address: 0x00936990 (FUN_00936990, the same instantiation's `uninit_move_n`
+   * -- `memmove_s`-based, serving both the reallocation head/tail relocate and
+   * the in-place tail-shift call shapes for this trivially-relocatable
+   * element, same "one compiled memmove_s wrapper backs both call shapes"
+   * pattern documented on Vector.h's `uninit_move_n` member)
+   *
+   * `tls->mEntries.push_back(entry)` below is the real, programmer-written
+   * source line these two addresses compile to. Previously this call site was
+   * a hand-rolled `begin`/`end`/`cap` triple with its own
+   * `EnsureThreadContextCapacity` growth helper that doubled capacity -- which
+   * diverged from the binary's real ~1.5x `_Insert_n` growth (confirmed
+   * against 0x00936FF0's own decompile: `v10 = (v7 >> 1) + v7`). Reverted to
+   * `fa::vector<ThreadCtxEntry*>` so growth, relocation, and this instance's
+   * `_Insert_n`/`uninit_move_n` pair are modeled once, in `Vector.h`, instead
+   * of a second time here with different (wrong) arithmetic.
+   */
+  void PushThreadContext(
+    gpg::ThreadState* const tls,
+    gpg::ThreadCtxEntry* const entry
+  )
+  {
     if (!tls || !entry) {
-        return;
+      return;
     }
 
     tls->mEntries.push_back(entry);
-}
+  }
 
-void RemoveThreadContext(gpg::ThreadState* const tls, gpg::ThreadCtxEntry* const entry)
-{
+  void RemoveThreadContext(
+    gpg::ThreadState* const tls,
+    gpg::ThreadCtxEntry* const entry
+  )
+  {
     if (!tls || !entry || tls->mEntries.empty()) {
-        return;
+      return;
     }
 
     const auto found = std::find(tls->mEntries.begin(), tls->mEntries.end(), entry);
     if (found == tls->mEntries.end()) {
-        return;
+      return;
     }
 
     const std::uint32_t removedIndex = static_cast<std::uint32_t>(found - tls->mEntries.begin());
     tls->mEntries.erase(found);
 
     if (removedIndex < tls->depthCache) {
-        tls->depthCache = removedIndex;
+      tls->depthCache = removedIndex;
     }
-}
+  }
 
-const char* SeverityText(const gpg::LogSeverity level)
-{
-    static const char* const kSeverity[] = { "debug", "info", "warning" };
+  const char* SeverityText(
+    const gpg::LogSeverity level
+  )
+  {
+    static const char* const kSeverity[] = {"debug", "info", "warning"};
     const int index = static_cast<int>(level);
     if (index < 0 || index >= static_cast<int>(std::size(kSeverity))) {
-        return "info";
+      return "info";
     }
     return kSeverity[index];
-}
+  }
 
-/**
- * Address: 0x00906CC0 (FUN_00906CC0)
- *
- * What it does:
- * Emits repeated single-space padding into one stream and returns that stream.
- */
-std::ostream& WriteSpacePadding(std::ostream& stream, const int count)
-{
+  /**
+   * Address: 0x00906CC0 (FUN_00906CC0)
+   *
+   * What it does:
+   * Emits repeated single-space padding into one stream and returns that stream.
+   */
+  std::ostream& WriteSpacePadding(
+    std::ostream& stream,
+    const int count
+  )
+  {
     for (int i = 0; i < count; ++i) {
-        stream.put(' ');
+      stream.put(' ');
     }
     return stream;
-}
+  }
 
-void WriteIndent(std::ostream& stream, const int count)
-{
+  void WriteIndent(
+    std::ostream& stream,
+    const int count
+  )
+  {
     WriteSpacePadding(stream, count);
-}
+  }
 
-/**
- * Address: 0x00936830 (FUN_00936830, func_LogContext_Push)
- *
- * What it does:
- * Formats one vararg log message, ensures the log singleton is initialized,
- * then forwards the message to `LogContext::Dispatch` with the supplied level.
- */
-void LogContextPushFormatted(const int level, const char* const fmt, ...)
-{
+  /**
+   * Address: 0x00936830 (FUN_00936830, func_LogContext_Push)
+   *
+   * What it does:
+   * Formats one vararg log message, ensures the log singleton is initialized,
+   * then forwards the message to `LogContext::Dispatch` with the supplied level.
+   */
+  void LogContextPushFormatted(
+    const int level,
+    const char* const fmt,
+    ...
+  )
+  {
     va_list va;
     va_start(va, fmt);
     const char* formatCursor = fmt;
@@ -414,9 +434,9 @@ void LogContextPushFormatted(const int level, const char* const fmt, ...)
 
     std::call_once(gpg::g_LogOnce, &gpg::InitLogSingleton);
     if (gpg::g_LogCtx != nullptr) {
-        gpg::g_LogCtx->Dispatch(static_cast<gpg::LogSeverity>(level), message);
+      gpg::g_LogCtx->Dispatch(static_cast<gpg::LogSeverity>(level), message);
     }
-}
+  }
 } // namespace
 
 /**
@@ -428,12 +448,12 @@ void LogContextPushFormatted(const int level, const char* const fmt, ...)
  */
 void gpg::InitLogContextSingleton()
 {
-    if (g_LogCtx != nullptr) {
-        return;
-    }
+  if (g_LogCtx != nullptr) {
+    return;
+  }
 
-    g_LogCtx = new LogContext();
-    std::atexit(&DestroyLogContextSingleton);
+  g_LogCtx = new LogContext();
+  std::atexit(&DestroyLogContextSingleton);
 }
 
 /**
@@ -445,8 +465,8 @@ void gpg::InitLogContextSingleton()
  */
 [[maybe_unused]] gpg::LogContext* gpg::GetLogContextSingleton()
 {
-    std::call_once(g_LogOnce, &InitLogContextSingleton);
-    return g_LogCtx;
+  std::call_once(g_LogOnce, &InitLogContextSingleton);
+  return g_LogCtx;
 }
 
 /**
@@ -463,10 +483,10 @@ void gpg::InitLogContextSingleton()
  */
 void gpg::ThreadCtxEntry::DetachFromOwnerAndState() noexcept
 {
-    if (owner != nullptr) {
-        owner->mEntry = nullptr;
-    }
-    RemoveThreadContext(state, this);
+  if (owner != nullptr) {
+    owner->mEntry = nullptr;
+  }
+  RemoveThreadContext(state, this);
 }
 
 /**
@@ -476,9 +496,11 @@ void gpg::ThreadCtxEntry::DetachFromOwnerAndState() noexcept
  * Runs ThreadState's destructor (address 0x00936CC0) and frees the
  * allocation when the per-thread value is non-null.
  */
-void gpg::ThreadStateTssDeleter::operator()(ThreadState* const state) const noexcept
+void gpg::ThreadStateTssDeleter::operator()(
+  ThreadState* const state
+) const noexcept
 {
-    delete state;
+  delete state;
 }
 
 /**
@@ -489,13 +511,13 @@ void gpg::ThreadStateTssDeleter::operator()(ThreadState* const state) const noex
  * clears the cached last-thread pointer used by dispatch.
  */
 LogContext::LogContext()
-    : tss(),
-      rw(),
-      head(),
-      lastTls(nullptr)
+  : tss()
+  , rw()
+  , head()
+  , lastTls(nullptr)
 {
-    head.next = &head;
-    head.prev = &head;
+  head.next = &head;
+  head.prev = &head;
 }
 
 /**
@@ -505,12 +527,14 @@ LogContext::LogContext()
  * What it does:
  * Initializes base log-target state and optionally registers with global logging.
  */
-LogTarget::LogTarget(const bool autoRegister)
-    : mNode(nullptr)
+LogTarget::LogTarget(
+  const bool autoRegister
+)
+  : mNode(nullptr)
 {
-    if (autoRegister) {
-        Attach();
-    }
+  if (autoRegister) {
+    Attach();
+  }
 }
 
 /**
@@ -524,7 +548,7 @@ LogTarget::LogTarget(const bool autoRegister)
  */
 LogTarget::~LogTarget()
 {
-    Detach();
+  Detach();
 }
 
 /**
@@ -536,28 +560,28 @@ LogTarget::~LogTarget()
  */
 LogContext::~LogContext()
 {
-    rw.lock();
-    while (head.next != &head) {
-        LogTargetNode* const node = head.next;
-        node->prev->next = node->next;
-        node->next->prev = node->prev;
-        node->next = node;
-        node->prev = node;
+  rw.lock();
+  while (head.next != &head) {
+    LogTargetNode* const node = head.next;
+    node->prev->next = node->next;
+    node->next->prev = node->prev;
+    node->next = node;
+    node->prev = node;
 
-        if (node->obj != nullptr) {
-            node->obj->mNode = nullptr;
-        }
-
-        delete node;
+    if (node->obj != nullptr) {
+      node->obj->mNode = nullptr;
     }
-    head.next = &head;
-    head.prev = &head;
-    rw.unlock();
 
-    if (tss.get() != nullptr) {
-        tss.reset(nullptr);
-    }
-    lastTls = nullptr;
+    delete node;
+  }
+  head.next = &head;
+  head.prev = &head;
+  rw.unlock();
+
+  if (tss.get() != nullptr) {
+    tss.reset(nullptr);
+  }
+  lastTls = nullptr;
 }
 
 /**
@@ -567,33 +591,31 @@ LogContext::~LogContext()
  * Asserts detached target state, allocates one intrusive target node,
  * and appends it into the global log-target ring.
  */
-void LogContext::AddTarget(LogTarget* const target)
+void LogContext::AddTarget(
+  LogTarget* const target
+)
 {
-    if (target == nullptr) {
-        return;
-    }
+  if (target == nullptr) {
+    return;
+  }
 
-    if (target->mNode != nullptr) {
-        HandleAssertFailure(
-            "!target->mImpl",
-            286,
-            "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp"
-        );
-        return;
-    }
+  if (target->mNode != nullptr) {
+    HandleAssertFailure("!target->mImpl", 286, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp");
+    return;
+  }
 
-    rw.lock();
-    auto* const node = new LogTargetNode{};
-    node->obj = target;
-    node->flushOnce = 1;
-    node->busy = 0;
-    node->pendingRemove = 0;
-    node->prev = head.prev;
-    node->next = &head;
-    head.prev->next = node;
-    head.prev = node;
-    target->mNode = node;
-    rw.unlock();
+  rw.lock();
+  auto* const node = new LogTargetNode{};
+  node->obj = target;
+  node->flushOnce = 1;
+  node->busy = 0;
+  node->pendingRemove = 0;
+  node->prev = head.prev;
+  node->next = &head;
+  head.prev->next = node;
+  head.prev = node;
+  target->mNode = node;
+  rw.unlock();
 }
 
 /**
@@ -603,33 +625,35 @@ void LogContext::AddTarget(LogTarget* const target)
  * Detaches one target node from the global log-target ring, or marks
  * pending removal when dispatch is currently inside that target.
  */
-void LogContext::RemoveTarget(LogTarget* const target)
+void LogContext::RemoveTarget(
+  LogTarget* const target
+)
 {
-    if (target == nullptr) {
-        return;
-    }
+  if (target == nullptr) {
+    return;
+  }
 
-    rw.lock();
-    LogTargetNode* const node = target->mNode;
-    if (node == nullptr) {
-        rw.unlock();
-        return;
-    }
+  rw.lock();
+  LogTargetNode* const node = target->mNode;
+  if (node == nullptr) {
+    rw.unlock();
+    return;
+  }
 
-    if (node->busy) {
-        node->pendingRemove = 1;
-        target->mNode = nullptr;
-        rw.unlock();
-        return;
-    }
-
-    node->prev->next = node->next;
-    node->next->prev = node->prev;
-    node->prev = node;
-    node->next = node;
-    delete node;
+  if (node->busy) {
+    node->pendingRemove = 1;
     target->mNode = nullptr;
     rw.unlock();
+    return;
+  }
+
+  node->prev->next = node->next;
+  node->next->prev = node->prev;
+  node->prev = node;
+  node->next = node;
+  delete node;
+  target->mNode = nullptr;
+  rw.unlock();
 }
 
 /**
@@ -641,19 +665,15 @@ void LogContext::RemoveTarget(LogTarget* const target)
  */
 void LogTarget::Attach()
 {
-    if (mNode != nullptr) {
-        HandleAssertFailure(
-            "!mImpl",
-            413,
-            "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp"
-        );
-        return;
-    }
+  if (mNode != nullptr) {
+    HandleAssertFailure("!mImpl", 413, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp");
+    return;
+  }
 
-    std::call_once(g_LogOnce, &InitLogSingleton);
-    if (g_LogCtx != nullptr) {
-        g_LogCtx->AddTarget(this);
-    }
+  std::call_once(g_LogOnce, &InitLogSingleton);
+  if (g_LogCtx != nullptr) {
+    g_LogCtx->AddTarget(this);
+  }
 }
 
 /**
@@ -664,44 +684,40 @@ void LogTarget::Attach()
  */
 void LogTarget::Detach()
 {
-    if (mNode == nullptr) {
-        return;
-    }
+  if (mNode == nullptr) {
+    return;
+  }
 
-    std::call_once(g_LogOnce, &InitLogSingleton);
-    if (!g_LogCtx) {
-        HandleAssertFailure(
-            "state",
-            425,
-            "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp"
-        );
-        return;
-    }
+  std::call_once(g_LogOnce, &InitLogSingleton);
+  if (!g_LogCtx) {
+    HandleAssertFailure("state", 425, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp");
+    return;
+  }
 
-    g_LogCtx->RemoveTarget(this);
+  g_LogCtx->RemoveTarget(this);
 }
 
 void LogTarget::OnLog(
-    const int level,
-    const fa::string& message,
-    std::span<const fa::string> context,
-    int previousDepth
+  const int level,
+  const fa::string& message,
+  std::span<const fa::string> context,
+  int previousDepth
 )
 {
-    fa::vector<fa::string> contextCopy;
-    contextCopy.reserve(context.size());
-    for (const fa::string& entry : context) {
-        contextCopy.push_back(entry);
-    }
+  fa::vector<fa::string> contextCopy;
+  contextCopy.reserve(context.size());
+  for (const fa::string& entry : context) {
+    contextCopy.push_back(entry);
+  }
 
-    if (previousDepth < 0) {
-        previousDepth = 0;
-    }
-    if (previousDepth > static_cast<int>(contextCopy.size())) {
-        previousDepth = static_cast<int>(contextCopy.size());
-    }
+  if (previousDepth < 0) {
+    previousDepth = 0;
+  }
+  if (previousDepth > static_cast<int>(contextCopy.size())) {
+    previousDepth = static_cast<int>(contextCopy.size());
+  }
 
-    OnMessage(static_cast<LogSeverity>(level), message, contextCopy, previousDepth);
+  OnMessage(static_cast<LogSeverity>(level), message, contextCopy, previousDepth);
 }
 
 /**
@@ -711,15 +727,17 @@ void LogTarget::OnLog(
  * What it does:
  * Initializes stream-backed log target and controls ownership/auto-registration by flags.
  */
-StreamLogTarget::StreamLogTarget(std::ostream& stream, const unsigned int flags)
-    : LogTarget((flags & 0x1U) != 0),
-      mStream(&stream),
-      mOwnStream(static_cast<std::uint8_t>((flags >> 1U) & 0x1U)),
-      mPad0(0),
-      mPad1(0),
-      mPad2(0)
-{
-}
+StreamLogTarget::StreamLogTarget(
+  std::ostream& stream,
+  const unsigned int flags
+)
+  : LogTarget((flags & 0x1U) != 0)
+  , mStream(&stream)
+  , mOwnStream(static_cast<std::uint8_t>((flags >> 1U) & 0x1U))
+  , mPad0(0)
+  , mPad1(0)
+  , mPad2(0)
+{}
 
 /**
  * Address: 0x00906C30 (FUN_00906C30, ??1StreamLogTarget@gpg@@UAE@XZ)
@@ -733,10 +751,10 @@ StreamLogTarget::StreamLogTarget(std::ostream& stream, const unsigned int flags)
  */
 StreamLogTarget::~StreamLogTarget()
 {
-    if (mOwnStream != 0 && mStream) {
-        delete mStream;
-        mStream = nullptr;
-    }
+  if (mOwnStream != 0 && mStream) {
+    delete mStream;
+    mStream = nullptr;
+  }
 }
 
 /**
@@ -747,66 +765,66 @@ StreamLogTarget::~StreamLogTarget()
  * Formats contextual log output to the target stream with indentation and newline folding.
  */
 void StreamLogTarget::OnMessage(
-    const LogSeverity level,
-    const fa::string& message,
-    const fa::vector<fa::string>& context,
-    int previousDepth
+  const LogSeverity level,
+  const fa::string& message,
+  const fa::vector<fa::string>& context,
+  int previousDepth
 )
 {
-    if (!mStream) {
-        return;
-    }
+  if (!mStream) {
+    return;
+  }
 
-    std::ostream& out = *mStream;
-    if (previousDepth < 0) {
-        previousDepth = 0;
-    }
+  std::ostream& out = *mStream;
+  if (previousDepth < 0) {
+    previousDepth = 0;
+  }
 
-    const int contextCount = static_cast<int>(context.size());
-    if (previousDepth > contextCount) {
-        previousDepth = contextCount;
-    }
+  const int contextCount = static_cast<int>(context.size());
+  if (previousDepth > contextCount) {
+    previousDepth = contextCount;
+  }
 
-    int indent = previousDepth * 4;
-    for (int i = previousDepth; i < contextCount; ++i) {
-        WriteIndent(out, indent);
-        out << context[static_cast<std::size_t>(i)].c_str() << ":\n";
-        indent += 4;
-    }
-
-    const char* const severity = SeverityText(level);
+  int indent = previousDepth * 4;
+  for (int i = previousDepth; i < contextCount; ++i) {
     WriteIndent(out, indent);
-    out << severity << ": ";
-    const int continuationIndent = indent + static_cast<int>(std::strlen(severity)) + 2;
+    out << context[static_cast<std::size_t>(i)].c_str() << ":\n";
+    indent += 4;
+  }
 
-    const char* cursor = message.c_str();
-    const char* lineBreak = std::strchr(cursor, '\n');
-    if (!lineBreak) {
+  const char* const severity = SeverityText(level);
+  WriteIndent(out, indent);
+  out << severity << ": ";
+  const int continuationIndent = indent + static_cast<int>(std::strlen(severity)) + 2;
+
+  const char* cursor = message.c_str();
+  const char* lineBreak = std::strchr(cursor, '\n');
+  if (!lineBreak) {
+    out << cursor;
+    out.put('\n');
+  } else {
+    out.write(cursor, static_cast<std::streamsize>(lineBreak - cursor + 1));
+    cursor = lineBreak + 1;
+
+    while (*cursor != '\0') {
+      WriteIndent(out, continuationIndent);
+      lineBreak = std::strchr(cursor, '\n');
+      if (!lineBreak) {
         out << cursor;
         out.put('\n');
-    } else {
-        out.write(cursor, static_cast<std::streamsize>(lineBreak - cursor + 1));
-        cursor = lineBreak + 1;
-
-        while (*cursor != '\0') {
-            WriteIndent(out, continuationIndent);
-            lineBreak = std::strchr(cursor, '\n');
-            if (!lineBreak) {
-                out << cursor;
-                out.put('\n');
-                break;
-            }
-            out.write(cursor, static_cast<std::streamsize>(lineBreak - cursor + 1));
-            cursor = lineBreak + 1;
-        }
+        break;
+      }
+      out.write(cursor, static_cast<std::streamsize>(lineBreak - cursor + 1));
+      cursor = lineBreak + 1;
     }
+  }
 
-    if ((out.rdstate() & (std::ios::badbit | std::ios::failbit)) == 0) {
-        std::streambuf* const streamBuffer = out.rdbuf();
-        if (!streamBuffer || streamBuffer->pubsync() == -1) {
-            out.setstate(std::ios::badbit);
-        }
+  if ((out.rdstate() & (std::ios::badbit | std::ios::failbit)) == 0) {
+    std::streambuf* const streamBuffer = out.rdbuf();
+    if (!streamBuffer || streamBuffer->pubsync() == -1) {
+      out.setstate(std::ios::badbit);
     }
+  }
 }
 
 /**
@@ -817,25 +835,20 @@ void StreamLogTarget::OnMessage(
  * Initializes a lock-protected ring of 4KB stream chunks and primes get/put windows.
  */
 PipeBuf::PipeBuf()
-    : std::streambuf(),
-      mMutex(),
-      mChunks(),
-      mReadLimit(nullptr),
-      mWriteCommit(nullptr)
+  : std::streambuf()
+  , mMutex()
+  , mChunks()
+  , mReadLimit(nullptr)
+  , mWriteCommit(nullptr)
 {
-    auto* const first = new StreamBuffer{};
-    mChunks.push_back(first);
-    mReadLimit = first->bytes;
-    mWriteCommit = first->bytes;
-    setg(
-        reinterpret_cast<char*>(first->bytes),
-        reinterpret_cast<char*>(first->bytes),
-        reinterpret_cast<char*>(first->bytes)
-    );
-    setp(
-        reinterpret_cast<char*>(first->bytes),
-        reinterpret_cast<char*>(first->bytes + kPipeChunkSize)
-    );
+  auto* const first = new StreamBuffer{};
+  mChunks.push_back(first);
+  mReadLimit = first->bytes;
+  mWriteCommit = first->bytes;
+  setg(
+    reinterpret_cast<char*>(first->bytes), reinterpret_cast<char*>(first->bytes), reinterpret_cast<char*>(first->bytes)
+  );
+  setp(reinterpret_cast<char*>(first->bytes), reinterpret_cast<char*>(first->bytes + kPipeChunkSize));
 }
 
 /**
@@ -847,31 +860,31 @@ PipeBuf::PipeBuf()
  */
 PipeBuf::~PipeBuf()
 {
-    setg(nullptr, nullptr, nullptr);
-    setp(nullptr, nullptr);
+  setg(nullptr, nullptr, nullptr);
+  setp(nullptr, nullptr);
 
-    while (!mChunks.empty()) {
-        StreamBuffer* const chunk = mChunks.pop_front();
-        delete chunk;
-    }
-    mReadLimit = nullptr;
-    mWriteCommit = nullptr;
+  while (!mChunks.empty()) {
+    StreamBuffer* const chunk = mChunks.pop_front();
+    delete chunk;
+  }
+  mReadLimit = nullptr;
+  mWriteCommit = nullptr;
 }
 
 PipeBuf::StreamBuffer* PipeBuf::HeadBuffer()
 {
-    return mChunks.front();
+  return mChunks.front();
 }
 
 PipeBuf::StreamBuffer* PipeBuf::TailBuffer()
 {
-    return mChunks.back();
+  return mChunks.back();
 }
 
 bool PipeBuf::IsSingleBuffer()
 {
-    StreamBuffer* const head = HeadBuffer();
-    return head && head == TailBuffer();
+  StreamBuffer* const head = HeadBuffer();
+  return head && head == TailBuffer();
 }
 
 /**
@@ -881,36 +894,35 @@ bool PipeBuf::IsSingleBuffer()
  * What it does:
  * Appends one byte to the write tail, allocating a new 4KB chunk when put space is exhausted.
  */
-PipeBuf::int_type PipeBuf::overflow(const int_type ch)
+PipeBuf::int_type PipeBuf::overflow(
+  const int_type ch
+)
 {
-    if (traits_type::eq_int_type(ch, traits_type::eof())) {
-        return traits_type::eof();
-    }
+  if (traits_type::eq_int_type(ch, traits_type::eof())) {
+    return traits_type::eof();
+  }
 
-    char* const putNext = pptr();
-    char* const putEnd = epptr();
-    if (putNext != putEnd) {
-        *putNext = traits_type::to_char_type(ch);
-        pbump(1);
-        return ch;
-    }
-
-    auto* const fresh = new StreamBuffer{};
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
-        if (IsSingleBuffer()) {
-            mReadLimit = reinterpret_cast<std::uint8_t*>(putEnd);
-        }
-        mChunks.push_back(fresh);
-        mWriteCommit = fresh->bytes;
-    }
-
-    fresh->bytes[0] = static_cast<std::uint8_t>(traits_type::to_char_type(ch));
-    setp(
-        reinterpret_cast<char*>(fresh->bytes + 1),
-        reinterpret_cast<char*>(fresh->bytes + kPipeChunkSize)
-    );
+  char* const putNext = pptr();
+  char* const putEnd = epptr();
+  if (putNext != putEnd) {
+    *putNext = traits_type::to_char_type(ch);
+    pbump(1);
     return ch;
+  }
+
+  auto* const fresh = new StreamBuffer{};
+  {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (IsSingleBuffer()) {
+      mReadLimit = reinterpret_cast<std::uint8_t*>(putEnd);
+    }
+    mChunks.push_back(fresh);
+    mWriteCommit = fresh->bytes;
+  }
+
+  fresh->bytes[0] = static_cast<std::uint8_t>(traits_type::to_char_type(ch));
+  setp(reinterpret_cast<char*>(fresh->bytes + 1), reinterpret_cast<char*>(fresh->bytes + kPipeChunkSize));
+  return ch;
 }
 
 /**
@@ -920,45 +932,45 @@ PipeBuf::int_type PipeBuf::overflow(const int_type ch)
  * What it does:
  * Appends a byte span to the write tail, chaining new chunks as needed.
  */
-std::streamsize PipeBuf::xsputn(const char* const src, const std::streamsize count)
+std::streamsize PipeBuf::xsputn(
+  const char* const src,
+  const std::streamsize count
+)
 {
-    if (!src || count <= 0) {
-        return 0;
+  if (!src || count <= 0) {
+    return 0;
+  }
+
+  const char* cursor = src;
+  std::streamsize remaining = count;
+  while (remaining > 0) {
+    const std::streamsize writable = static_cast<std::streamsize>(epptr() - pptr());
+    if (writable > 0) {
+      const std::streamsize chunk = (remaining < writable) ? remaining : writable;
+      // Raw streambuf blob copy into the put area.
+      std::copy_n(cursor, static_cast<std::size_t>(chunk), pptr());
+      pbump(static_cast<int>(chunk));
+      cursor += chunk;
+      remaining -= chunk;
+      if (remaining <= 0) {
+        break;
+      }
     }
 
-    const char* cursor = src;
-    std::streamsize remaining = count;
-    while (remaining > 0) {
-        const std::streamsize writable = static_cast<std::streamsize>(epptr() - pptr());
-        if (writable > 0) {
-            const std::streamsize chunk = (remaining < writable) ? remaining : writable;
-            // Raw streambuf blob copy into the put area.
-            std::copy_n(cursor, static_cast<std::size_t>(chunk), pptr());
-            pbump(static_cast<int>(chunk));
-            cursor += chunk;
-            remaining -= chunk;
-            if (remaining <= 0) {
-                break;
-            }
-        }
-
-        auto* const fresh = new StreamBuffer{};
-        {
-            std::lock_guard<std::mutex> lock(mMutex);
-            if (IsSingleBuffer()) {
-                mReadLimit = reinterpret_cast<std::uint8_t*>(epptr());
-            }
-            mChunks.push_back(fresh);
-            mWriteCommit = fresh->bytes;
-        }
-
-        setp(
-            reinterpret_cast<char*>(fresh->bytes),
-            reinterpret_cast<char*>(fresh->bytes + kPipeChunkSize)
-        );
+    auto* const fresh = new StreamBuffer{};
+    {
+      std::lock_guard<std::mutex> lock(mMutex);
+      if (IsSingleBuffer()) {
+        mReadLimit = reinterpret_cast<std::uint8_t*>(epptr());
+      }
+      mChunks.push_back(fresh);
+      mWriteCommit = fresh->bytes;
     }
 
-    return count;
+    setp(reinterpret_cast<char*>(fresh->bytes), reinterpret_cast<char*>(fresh->bytes + kPipeChunkSize));
+  }
+
+  return count;
 }
 
 /**
@@ -970,24 +982,23 @@ std::streamsize PipeBuf::xsputn(const char* const src, const std::streamsize cou
  */
 std::streamsize PipeBuf::showmanyc()
 {
-    std::lock_guard<std::mutex> lock(mMutex);
+  std::lock_guard<std::mutex> lock(mMutex);
 
-    StreamBuffer* const head = HeadBuffer();
-    StreamBuffer* const tail = TailBuffer();
-    if (!head || !tail || !gptr()) {
-        return 0;
+  StreamBuffer* const head = HeadBuffer();
+  StreamBuffer* const tail = TailBuffer();
+  if (!head || !tail || !gptr()) {
+    return 0;
+  }
+
+  std::streamsize available = static_cast<std::streamsize>(mReadLimit - reinterpret_cast<const std::uint8_t*>(gptr()));
+  if (head != tail) {
+    for (DListItem<StreamBuffer>* node = head->mNext; node != tail; node = node->mNext) {
+      available += static_cast<std::streamsize>(kPipeChunkSize);
     }
+    available += static_cast<std::streamsize>(mWriteCommit - tail->bytes);
+  }
 
-    std::streamsize available =
-        static_cast<std::streamsize>(mReadLimit - reinterpret_cast<const std::uint8_t*>(gptr()));
-    if (head != tail) {
-        for (DListItem<StreamBuffer>* node = head->mNext; node != tail; node = node->mNext) {
-            available += static_cast<std::streamsize>(kPipeChunkSize);
-        }
-        available += static_cast<std::streamsize>(mWriteCommit - tail->bytes);
-    }
-
-    return available;
+  return available;
 }
 
 /**
@@ -999,56 +1010,52 @@ std::streamsize PipeBuf::showmanyc()
  */
 PipeBuf::int_type PipeBuf::underflow()
 {
-    std::uint8_t* readNext = reinterpret_cast<std::uint8_t*>(gptr());
-    std::uint8_t* readEnd = reinterpret_cast<std::uint8_t*>(egptr());
+  std::uint8_t* readNext = reinterpret_cast<std::uint8_t*>(gptr());
+  std::uint8_t* readEnd = reinterpret_cast<std::uint8_t*>(egptr());
+  if (readNext < readEnd) {
+    return traits_type::to_int_type(*readNext);
+  }
+
+  while (true) {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    StreamBuffer* head = HeadBuffer();
+    StreamBuffer* tail = TailBuffer();
+    if (!head || !tail) {
+      return traits_type::eof();
+    }
+
+    if (reinterpret_cast<std::uintptr_t>(readEnd) < reinterpret_cast<std::uintptr_t>(mReadLimit)) {
+      setg(
+        reinterpret_cast<char*>(head->bytes), reinterpret_cast<char*>(readNext), reinterpret_cast<char*>(mReadLimit)
+      );
+      return traits_type::to_int_type(*readNext);
+    }
+
+    if (head == tail) {
+      return traits_type::eof();
+    }
+
+    StreamBuffer* const consumed = mChunks.pop_front();
+    delete consumed;
+
+    head = HeadBuffer();
+    tail = TailBuffer();
+    if (!head || !tail) {
+      return traits_type::eof();
+    }
+
+    mReadLimit = (head == tail) ? mWriteCommit : (head->bytes + kPipeChunkSize);
+    setg(
+      reinterpret_cast<char*>(head->bytes), reinterpret_cast<char*>(head->bytes), reinterpret_cast<char*>(mReadLimit)
+    );
+
+    readNext = reinterpret_cast<std::uint8_t*>(gptr());
+    readEnd = reinterpret_cast<std::uint8_t*>(egptr());
     if (readNext < readEnd) {
-        return traits_type::to_int_type(*readNext);
+      return traits_type::to_int_type(*readNext);
     }
-
-    while (true) {
-        std::lock_guard<std::mutex> lock(mMutex);
-
-        StreamBuffer* head = HeadBuffer();
-        StreamBuffer* tail = TailBuffer();
-        if (!head || !tail) {
-            return traits_type::eof();
-        }
-
-        if (reinterpret_cast<std::uintptr_t>(readEnd) < reinterpret_cast<std::uintptr_t>(mReadLimit)) {
-            setg(
-                reinterpret_cast<char*>(head->bytes),
-                reinterpret_cast<char*>(readNext),
-                reinterpret_cast<char*>(mReadLimit)
-            );
-            return traits_type::to_int_type(*readNext);
-        }
-
-        if (head == tail) {
-            return traits_type::eof();
-        }
-
-        StreamBuffer* const consumed = mChunks.pop_front();
-        delete consumed;
-
-        head = HeadBuffer();
-        tail = TailBuffer();
-        if (!head || !tail) {
-            return traits_type::eof();
-        }
-
-        mReadLimit = (head == tail) ? mWriteCommit : (head->bytes + kPipeChunkSize);
-        setg(
-            reinterpret_cast<char*>(head->bytes),
-            reinterpret_cast<char*>(head->bytes),
-            reinterpret_cast<char*>(mReadLimit)
-        );
-
-        readNext = reinterpret_cast<std::uint8_t*>(gptr());
-        readEnd = reinterpret_cast<std::uint8_t*>(egptr());
-        if (readNext < readEnd) {
-            return traits_type::to_int_type(*readNext);
-        }
-    }
+  }
 }
 
 /**
@@ -1058,67 +1065,66 @@ PipeBuf::int_type PipeBuf::underflow()
  * What it does:
  * Copies readable bytes out of queued chunks while compacting consumed head buffers.
  */
-std::streamsize PipeBuf::xsgetn(char* const dst, const std::streamsize count)
+std::streamsize PipeBuf::xsgetn(
+  char* const dst,
+  const std::streamsize count
+)
 {
-    if (!dst || count <= 0) {
-        return 0;
+  if (!dst || count <= 0) {
+    return 0;
+  }
+
+  std::streamsize copied = 0;
+  while (copied < count) {
+    std::uint8_t* const readNext = reinterpret_cast<std::uint8_t*>(gptr());
+    std::uint8_t* const readEnd = reinterpret_cast<std::uint8_t*>(egptr());
+    const std::streamsize available = static_cast<std::streamsize>(readEnd - readNext);
+    if (available > 0) {
+      const std::streamsize chunk = ((count - copied) < available) ? (count - copied) : available;
+      // Raw streambuf blob copy from the get area.
+      std::copy_n(readNext, static_cast<std::size_t>(chunk), dst + copied);
+      gbump(static_cast<int>(chunk));
+      copied += chunk;
+      if (copied >= count) {
+        break;
+      }
+      continue;
     }
 
-    std::streamsize copied = 0;
-    while (copied < count) {
-        std::uint8_t* const readNext = reinterpret_cast<std::uint8_t*>(gptr());
-        std::uint8_t* const readEnd = reinterpret_cast<std::uint8_t*>(egptr());
-        const std::streamsize available = static_cast<std::streamsize>(readEnd - readNext);
-        if (available > 0) {
-            const std::streamsize chunk = ((count - copied) < available) ? (count - copied) : available;
-            // Raw streambuf blob copy from the get area.
-            std::copy_n(readNext, static_cast<std::size_t>(chunk), dst + copied);
-            gbump(static_cast<int>(chunk));
-            copied += chunk;
-            if (copied >= count) {
-                break;
-            }
-            continue;
-        }
-
-        std::lock_guard<std::mutex> lock(mMutex);
-        StreamBuffer* head = HeadBuffer();
-        StreamBuffer* tail = TailBuffer();
-        if (!head || !tail) {
-            break;
-        }
-
-        if (reinterpret_cast<std::uintptr_t>(readEnd) < reinterpret_cast<std::uintptr_t>(mReadLimit)) {
-            setg(
-                reinterpret_cast<char*>(head->bytes),
-                reinterpret_cast<char*>(readNext),
-                reinterpret_cast<char*>(mReadLimit)
-            );
-            continue;
-        }
-
-        if (head == tail) {
-            break;
-        }
-
-        StreamBuffer* const consumed = mChunks.pop_front();
-        delete consumed;
-
-        head = HeadBuffer();
-        tail = TailBuffer();
-        if (!head || !tail) {
-            break;
-        }
-
-        mReadLimit = (head == tail) ? mWriteCommit : (head->bytes + kPipeChunkSize);
-        setg(
-            reinterpret_cast<char*>(head->bytes),
-            reinterpret_cast<char*>(head->bytes),
-            reinterpret_cast<char*>(mReadLimit)
-        );
+    std::lock_guard<std::mutex> lock(mMutex);
+    StreamBuffer* head = HeadBuffer();
+    StreamBuffer* tail = TailBuffer();
+    if (!head || !tail) {
+      break;
     }
 
-    return copied;
+    if (reinterpret_cast<std::uintptr_t>(readEnd) < reinterpret_cast<std::uintptr_t>(mReadLimit)) {
+      setg(
+        reinterpret_cast<char*>(head->bytes), reinterpret_cast<char*>(readNext), reinterpret_cast<char*>(mReadLimit)
+      );
+      continue;
+    }
+
+    if (head == tail) {
+      break;
+    }
+
+    StreamBuffer* const consumed = mChunks.pop_front();
+    delete consumed;
+
+    head = HeadBuffer();
+    tail = TailBuffer();
+    if (!head || !tail) {
+      break;
+    }
+
+    mReadLimit = (head == tail) ? mWriteCommit : (head->bytes + kPipeChunkSize);
+    setg(
+      reinterpret_cast<char*>(head->bytes), reinterpret_cast<char*>(head->bytes), reinterpret_cast<char*>(mReadLimit)
+    );
+  }
+
+  return copied;
 }
 
 /**
@@ -1130,12 +1136,12 @@ std::streamsize PipeBuf::xsgetn(char* const dst, const std::streamsize count)
  */
 int PipeBuf::sync()
 {
-    std::lock_guard<std::mutex> lock(mMutex);
-    mWriteCommit = reinterpret_cast<std::uint8_t*>(pptr());
-    if (IsSingleBuffer()) {
-        mReadLimit = mWriteCommit;
-    }
-    return 0;
+  std::lock_guard<std::mutex> lock(mMutex);
+  mWriteCommit = reinterpret_cast<std::uint8_t*>(pptr());
+  if (IsSingleBuffer()) {
+    mReadLimit = mWriteCommit;
+  }
+  return 0;
 }
 
 /**
@@ -1147,7 +1153,7 @@ int PipeBuf::sync()
  */
 DebugOutputStreambuf::~DebugOutputStreambuf()
 {
-    (void)sync();
+  (void)sync();
 }
 
 /**
@@ -1157,20 +1163,22 @@ DebugOutputStreambuf::~DebugOutputStreambuf()
  * What it does:
  * Publishes pending debug output and appends one character into the internal line buffer.
  */
-DebugOutputStreambuf::int_type DebugOutputStreambuf::overflow(const int_type ch)
+DebugOutputStreambuf::int_type DebugOutputStreambuf::overflow(
+  const int_type ch
+)
 {
-    (void)sync();
-    if (!traits_type::eq_int_type(ch, traits_type::eof())) {
-        if (pptr() != nullptr && epptr() > pptr()) {
-            *pptr() = traits_type::to_char_type(ch);
-            pbump(1);
-            return ch;
-        }
-
-        (void)std::streambuf::overflow(static_cast<unsigned char>(traits_type::to_char_type(ch)));
+  (void)sync();
+  if (!traits_type::eq_int_type(ch, traits_type::eof())) {
+    if (pptr() != nullptr && epptr() > pptr()) {
+      *pptr() = traits_type::to_char_type(ch);
+      pbump(1);
+      return ch;
     }
 
-    return ch;
+    (void)std::streambuf::overflow(static_cast<unsigned char>(traits_type::to_char_type(ch)));
+  }
+
+  return ch;
 }
 
 /**
@@ -1182,14 +1190,14 @@ DebugOutputStreambuf::int_type DebugOutputStreambuf::overflow(const int_type ch)
  */
 int DebugOutputStreambuf::sync()
 {
-    char* const writeCursor = pptr();
-    if (writeCursor != nullptr && writeCursor != mBuffer) {
-        *writeCursor = '\0';
-        OutputDebugStringA(mBuffer);
-    }
+  char* const writeCursor = pptr();
+  if (writeCursor != nullptr && writeCursor != mBuffer) {
+    *writeCursor = '\0';
+    OutputDebugStringA(mBuffer);
+  }
 
-    setp(mBuffer, mBuffer + kDebugOutputPayloadSize);
-    return 0;
+  setp(mBuffer, mBuffer + kDebugOutputPayloadSize);
+  return 0;
 }
 
 /**
@@ -1200,100 +1208,102 @@ int DebugOutputStreambuf::sync()
  * emitted depth for this thread lane, then calls every attached target while
  * processing deferred removals safely after callback return.
  */
-void LogContext::Dispatch(const LogSeverity level, const fa::string& msg)
+void LogContext::Dispatch(
+  const LogSeverity level,
+  const fa::string& msg
+)
 {
-    if (level >= LogSeverity::Warn && head.next == &head) {
-        ::OutputDebugStringA(msg.c_str());
-        ::OutputDebugStringA("\n");
+  if (level >= LogSeverity::Warn && head.next == &head) {
+    ::OutputDebugStringA(msg.c_str());
+    ::OutputDebugStringA("\n");
+  }
+
+  rw.lock();
+
+  ThreadState* const tls = tss.get();
+  fa::vector<fa::string> snapshot;
+  fa::vector<fa::string> deferredOnMessageErrors;
+  int prevDepth = 0;
+
+  if (tls) {
+    const std::size_t count = tls->mEntries.size();
+
+    snapshot.reserve(count);
+    for (const ThreadCtxEntry* const entry : tls->mEntries) {
+      snapshot.push_back(entry->text);
     }
 
-    rw.lock();
+    prevDepth = static_cast<int>(tls->depthCache);
+    tls->depthCache = static_cast<std::uint32_t>(count);
 
-    ThreadState* const tls = tss.get();
-    fa::vector<fa::string> snapshot;
-    fa::vector<fa::string> deferredOnMessageErrors;
-    int prevDepth = 0;
+    if (tls != lastTls) {
+      prevDepth = 0;
+      lastTls = tls;
+    }
+  }
 
-    if (tls) {
-        const std::size_t count = tls->mEntries.size();
+  for (LogTargetNode* node = head.next; node != &head;) {
+    LogTargetNode* const current = node;
+    node = node->next;
 
-        snapshot.reserve(count);
-        for (const ThreadCtxEntry* const entry : tls->mEntries) {
-            snapshot.push_back(entry->text);
-        }
-
-        prevDepth = static_cast<int>(tls->depthCache);
-        tls->depthCache = static_cast<std::uint32_t>(count);
-
-        if (tls != lastTls) {
-            prevDepth = 0;
-            lastTls = tls;
-        }
+    if (current->busy) {
+      continue;
     }
 
-    for (LogTargetNode* node = head.next; node != &head; ) {
-        LogTargetNode* const current = node;
-        node = node->next;
+    current->busy = 1;
+    const int sendPrev = current->flushOnce ? 0 : prevDepth;
+    current->flushOnce = 0;
 
-        if (current->busy) {
-            continue;
-        }
-
-        current->busy = 1;
-        const int sendPrev = current->flushOnce ? 0 : prevDepth;
-        current->flushOnce = 0;
-
-        if (current->obj) {
-            try {
-                current->obj->OnMessage(level, msg, snapshot, sendPrev);
-            } catch (const std::exception& ex) {
-                deferredOnMessageErrors.push_back(fa::string(ex.what() ? ex.what() : "<unknown>"));
-                current->pendingRemove = 1;
-            } catch (...) {
-                deferredOnMessageErrors.push_back(fa::string("<unknown>"));
-                current->pendingRemove = 1;
-            }
-        }
-
-        current->busy = 0;
-        if (current->pendingRemove) {
-            current->prev->next = current->next;
-            current->next->prev = current->prev;
-            current->prev = current;
-            current->next = current;
-            delete current;
-        }
+    if (current->obj) {
+      try {
+        current->obj->OnMessage(level, msg, snapshot, sendPrev);
+      } catch (const std::exception& ex) {
+        deferredOnMessageErrors.push_back(fa::string(ex.what() ? ex.what() : "<unknown>"));
+        current->pendingRemove = 1;
+      } catch (...) {
+        deferredOnMessageErrors.push_back(fa::string("<unknown>"));
+        current->pendingRemove = 1;
+      }
     }
 
-    rw.unlock();
-
-    for (const fa::string& errorText : deferredOnMessageErrors) {
-        LogContextPushFormatted(
-            3,
-            "LogTarget::OnMessage() puked: %s.\nDeleted target.",
-            errorText.c_str()
-        );
+    current->busy = 0;
+    if (current->pendingRemove) {
+      current->prev->next = current->next;
+      current->next->prev = current->prev;
+      current->prev = current;
+      current->next = current;
+      delete current;
     }
+  }
+
+  rw.unlock();
+
+  for (const fa::string& errorText : deferredOnMessageErrors) {
+    LogContextPushFormatted(3, "LogTarget::OnMessage() puked: %s.\nDeleted target.", errorText.c_str());
+  }
 }
 
-ScopedLogContext::ScopedLogContext(const fa::string& text)
+ScopedLogContext::ScopedLogContext(
+  const fa::string& text
+)
 {
-    gpg::ThreadState* const tls = EnsureThreadState();
-    if (!tls) {
-        return;
-    }
+  gpg::ThreadState* const tls = EnsureThreadState();
+  if (!tls) {
+    return;
+  }
 
-    mEntry = new ThreadCtxEntry{};
-    mEntry->owner = this;
-    mEntry->text = text;
-    mEntry->state = tls;
-    PushThreadContext(tls, mEntry);
+  mEntry = new ThreadCtxEntry{};
+  mEntry->owner = this;
+  mEntry->text = text;
+  mEntry->state = tls;
+  PushThreadContext(tls, mEntry);
 }
 
-ScopedLogContext::ScopedLogContext(const char* const text)
-    : ScopedLogContext(fa::string(text ? text : ""))
-{
-}
+ScopedLogContext::ScopedLogContext(
+  const char* const text
+)
+  : ScopedLogContext(fa::string(text ? text : ""))
+{}
 
 /**
  * Address: 0x00937B90 (FUN_00937B90, ??1LogContext@gpg@@QAE@XZ_0)
@@ -1304,28 +1314,28 @@ ScopedLogContext::ScopedLogContext(const char* const text)
  */
 ScopedLogContext::~ScopedLogContext()
 {
-    if (!mEntry) {
-        return;
-    }
+  if (!mEntry) {
+    return;
+  }
 
-    std::call_once(g_LogOnce, &InitLogSingleton);
-    if (!g_LogCtx) {
-        HandleAssertFailure("state", 323, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp");
-        delete mEntry;
-        mEntry = nullptr;
-        return;
-    }
-
-    g_LogCtx->rw.lock();
-    // Capture before DetachFromOwnerAndState() runs: it nulls owner->mEntry
-    // (== this->mEntry, since owner == this here), matching the binary's
-    // `v2 = *this; sub_9368C0(v2); operator delete(v2);` ordering (FUN_00937B90).
-    ThreadCtxEntry* const entry = mEntry;
-    entry->DetachFromOwnerAndState();
-    delete entry;
-    g_LogCtx->rw.unlock();
-
+  std::call_once(g_LogOnce, &InitLogSingleton);
+  if (!g_LogCtx) {
+    HandleAssertFailure("state", 323, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\utils\\log.cpp");
+    delete mEntry;
     mEntry = nullptr;
+    return;
+  }
+
+  g_LogCtx->rw.lock();
+  // Capture before DetachFromOwnerAndState() runs: it nulls owner->mEntry
+  // (== this->mEntry, since owner == this here), matching the binary's
+  // `v2 = *this; sub_9368C0(v2); operator delete(v2);` ordering (FUN_00937B90).
+  ThreadCtxEntry* const entry = mEntry;
+  entry->DetachFromOwnerAndState();
+  delete entry;
+  g_LogCtx->rw.unlock();
+
+  mEntry = nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -1345,23 +1355,26 @@ int gpg::g_LogScopeDepth = 0;
 int gpg::g_LogScopeDepthScale = 0;
 fa::string gpg::g_LogScopePadding{};
 
-namespace {
-
-/// Rebuilds `gpg::g_LogScopePadding` to `width` space characters, using the
-/// owning-copy lane so the embedded SSO limit of `fa::string` is not a
-/// cap. Matches the original binary's `std::string::assign_1(tmp, width, 0x20)
-/// -> std::string::assign(global, tmp, 0, -1)` flow behaviourally, without
-/// the decompiler-shaped raw-byte ctor/dtor dance.
-void RefreshLogScopePadding(const unsigned int width)
+namespace
 {
+
+  /// Rebuilds `gpg::g_LogScopePadding` to `width` space characters, using the
+  /// owning-copy lane so the embedded SSO limit of `fa::string` is not a
+  /// cap. Matches the original binary's `std::string::assign_1(tmp, width, 0x20)
+  /// -> std::string::assign(global, tmp, 0, -1)` flow behaviourally, without
+  /// the decompiler-shaped raw-byte ctor/dtor dance.
+  void RefreshLogScopePadding(
+    const unsigned int width
+  )
+  {
     if (width == 0u) {
-        gpg::g_LogScopePadding.assign_owned(std::string_view{});
-        return;
+      gpg::g_LogScopePadding.assign_owned(std::string_view{});
+      return;
     }
 
     const std::string spaces(width, ' ');
     gpg::g_LogScopePadding.assign_owned(std::string_view(spaces.data(), spaces.size()));
-}
+  }
 
 } // namespace
 
@@ -1379,12 +1392,11 @@ void RefreshLogScopePadding(const unsigned int width)
  */
 fa::string* gpg::IncreaseLogScopeDepth()
 {
-    const unsigned int width =
-        static_cast<unsigned int>(++g_LogScopeDepth) *
-        static_cast<unsigned int>(g_LogScopeDepthScale);
+  const unsigned int width =
+    static_cast<unsigned int>(++g_LogScopeDepth) * static_cast<unsigned int>(g_LogScopeDepthScale);
 
-    RefreshLogScopePadding(width);
-    return &g_LogScopePadding;
+  RefreshLogScopePadding(width);
+  return &g_LogScopePadding;
 }
 
 /**
@@ -1400,12 +1412,11 @@ fa::string* gpg::IncreaseLogScopeDepth()
  */
 fa::string* gpg::DecreaseLogScopeDepth()
 {
-    const unsigned int width =
-        static_cast<unsigned int>(--g_LogScopeDepth) *
-        static_cast<unsigned int>(g_LogScopeDepthScale);
+  const unsigned int width =
+    static_cast<unsigned int>(--g_LogScopeDepth) * static_cast<unsigned int>(g_LogScopeDepthScale);
 
-    RefreshLogScopePadding(width);
-    return &g_LogScopePadding;
+  RefreshLogScopePadding(width);
+  return &g_LogScopePadding;
 }
 
 /**
@@ -1421,11 +1432,13 @@ fa::string* gpg::DecreaseLogScopeDepth()
  * the severity field, and bumps the global log-scope depth through
  * `IncreaseLogScopeDepth`.
  */
-gpg::LogScopeEntry::LogScopeEntry(const fa::string& fmt)
+gpg::LogScopeEntry::LogScopeEntry(
+  const fa::string& fmt
+)
 {
-    body.assign_owned(fmt.view());
-    severity = LogSeverity::Debug;
-    (void)IncreaseLogScopeDepth();
+  body.assign_owned(fmt.view());
+  severity = LogSeverity::Debug;
+  (void)IncreaseLogScopeDepth();
 }
 
 /**
@@ -1448,13 +1461,13 @@ gpg::LogScopeEntry::LogScopeEntry(const fa::string& fmt)
  */
 void gpg::LogScopeEntry::Emit()
 {
-    (void)DecreaseLogScopeDepth();
+  (void)DecreaseLogScopeDepth();
 
-    const unsigned int widthArg = 0u - field_0x38;
-    const fa::string formatted = STR_Printf(body.c_str(), widthArg);
-    LogMessage(severity, formatted);
+  const unsigned int widthArg = 0u - field_0x38;
+  const fa::string formatted = STR_Printf(body.c_str(), widthArg);
+  LogMessage(severity, formatted);
 
-    body.clear();
+  body.clear();
 }
 
 /**
@@ -1463,12 +1476,15 @@ void gpg::LogScopeEntry::Emit()
  * What it does:
  * Dispatches one preformatted message with explicit severity to registered targets.
  */
-void gpg::LogMessage(const LogSeverity level, const fa::string& message)
+void gpg::LogMessage(
+  const LogSeverity level,
+  const fa::string& message
+)
 {
-    std::call_once(g_LogOnce, &InitLogSingleton);
-    if (g_LogCtx) {
-        g_LogCtx->Dispatch(level, message);
-    }
+  std::call_once(g_LogOnce, &InitLogSingleton);
+  if (g_LogCtx) {
+    g_LogCtx->Dispatch(level, message);
+  }
 }
 
 /**
@@ -1477,17 +1493,20 @@ void gpg::LogMessage(const LogSeverity level, const fa::string& message)
  * What it does:
  * Formats and dispatches an info-level log message.
  */
-void gpg::Logf(const char* fmt, ...)
+void gpg::Logf(
+  const char* fmt,
+  ...
+)
 {
-    va_list va;
-    va_start(va, fmt);
-    const fa::string msg = STR_Va(fmt, va);
-    va_end(va);
+  va_list va;
+  va_start(va, fmt);
+  const fa::string msg = STR_Va(fmt, va);
+  va_end(va);
 
-    std::call_once(g_LogOnce, &InitLogSingleton);
-    if (g_LogCtx) {
-        g_LogCtx->Dispatch(LogSeverity::Info, msg);
-    }
+  std::call_once(g_LogOnce, &InitLogSingleton);
+  if (g_LogCtx) {
+    g_LogCtx->Dispatch(LogSeverity::Info, msg);
+  }
 }
 
 /**
@@ -1496,17 +1515,20 @@ void gpg::Logf(const char* fmt, ...)
  * What it does:
  * Formats and dispatches a warning-level log message.
  */
-void gpg::Warnf(const char* fmt, ...)
+void gpg::Warnf(
+  const char* fmt,
+  ...
+)
 {
-    va_list va;
-    va_start(va, fmt);
-    const fa::string msg = STR_Va(fmt, va);
-    va_end(va);
+  va_list va;
+  va_start(va, fmt);
+  const fa::string msg = STR_Va(fmt, va);
+  va_end(va);
 
-    std::call_once(g_LogOnce, &InitLogSingleton);
-    if (g_LogCtx) {
-        g_LogCtx->Dispatch(LogSeverity::Warn, msg);
-    }
+  std::call_once(g_LogOnce, &InitLogSingleton);
+  if (g_LogCtx) {
+    g_LogCtx->Dispatch(LogSeverity::Warn, msg);
+  }
 }
 
 /**
@@ -1515,17 +1537,20 @@ void gpg::Warnf(const char* fmt, ...)
  * What it does:
  * Formats and dispatches a debug-level log message.
  */
-void gpg::Debugf(const char* fmt, ...)
+void gpg::Debugf(
+  const char* fmt,
+  ...
+)
 {
-    va_list va;
-    va_start(va, fmt);
-    const fa::string msg = STR_Va(fmt, va);
-    va_end(va);
+  va_list va;
+  va_start(va, fmt);
+  const fa::string msg = STR_Va(fmt, va);
+  va_end(va);
 
-    std::call_once(g_LogOnce, &InitLogSingleton);
-    if (g_LogCtx) {
-        g_LogCtx->Dispatch(LogSeverity::Debug, msg);
-    }
+  std::call_once(g_LogOnce, &InitLogSingleton);
+  if (g_LogCtx) {
+    g_LogCtx->Dispatch(LogSeverity::Debug, msg);
+  }
 }
 
 /**
@@ -1534,14 +1559,16 @@ void gpg::Debugf(const char* fmt, ...)
  * What it does:
  * Configures bounded in-memory logging history size.
  */
-void gpg::EnableLogHistory(const int maxEntries)
+void gpg::EnableLogHistory(
+  const int maxEntries
+)
 {
-    if (gLogHistoryTarget) {
-        gLogHistoryTarget->Enable(maxEntries);
-        return;
-    }
+  if (gLogHistoryTarget) {
+    gLogHistoryTarget->Enable(maxEntries);
+    return;
+  }
 
-    gLogHistoryTarget.reset(new HistoryLogTarget(maxEntries));
+  gLogHistoryTarget.reset(new HistoryLogTarget(maxEntries));
 }
 
 /**
@@ -1550,14 +1577,16 @@ void gpg::EnableLogHistory(const int maxEntries)
  * What it does:
  * Replays retained log-history entries into one caller-supplied log target.
  */
-bool gpg::ReplayLogHistory(LogTarget* const target)
+bool gpg::ReplayLogHistory(
+  LogTarget* const target
+)
 {
-    if (target == nullptr || !gLogHistoryTarget) {
-        return false;
-    }
+  if (target == nullptr || !gLogHistoryTarget) {
+    return false;
+  }
 
-    gLogHistoryTarget->ReplayTo(*target);
-    return true;
+  gLogHistoryTarget->ReplayTo(*target);
+  return true;
 }
 
 /**
@@ -1569,22 +1598,22 @@ bool gpg::ReplayLogHistory(LogTarget* const target)
  */
 fa::string gpg::GetRecentLogLines()
 {
-    std::ostringstream stream{};
-    StreamLogTarget sink(stream, 0u);
-    (void)ReplayLogHistory(&sink);
+  std::ostringstream stream{};
+  StreamLogTarget sink(stream, 0u);
+  (void)ReplayLogHistory(&sink);
 
-    fa::string result;
-    result.assign_owned(stream.str());
-    return result;
+  fa::string result;
+  result.assign_owned(stream.str());
+  return result;
 }
 
 FILETIME gpg::FileTimeLocal()
 {
-    FILETIME ftUtc{};
-    FILETIME ftLocal{};
-    GetSystemTimeAsFileTime(&ftUtc);
-    FileTimeToLocalFileTime(&ftUtc, &ftLocal);
-    return ftLocal;
+  FILETIME ftUtc{};
+  FILETIME ftLocal{};
+  GetSystemTimeAsFileTime(&ftUtc);
+  FileTimeToLocalFileTime(&ftUtc, &ftLocal);
+  return ftLocal;
 }
 
 /**
@@ -1593,26 +1622,24 @@ FILETIME gpg::FileTimeLocal()
  * What it does:
  * Converts microsecond timestamp to local `HH:MM:SS.mmm` text.
  */
-fa::string gpg::FileTimeToString(const LONGLONG time)
+fa::string gpg::FileTimeToString(
+  const LONGLONG time
+)
 {
-    FILETIME ft100ns{};
-    *reinterpret_cast<ULONGLONG*>(&ft100ns) =
-        static_cast<ULONGLONG>(*reinterpret_cast<const ULONGLONG*>(&time)) * 10ULL;
+  FILETIME ft100ns{};
+  *reinterpret_cast<ULONGLONG*>(&ft100ns) = static_cast<ULONGLONG>(*reinterpret_cast<const ULONGLONG*>(&time)) * 10ULL;
 
-    FILETIME localFt{};
-    SYSTEMTIME st{};
-    if (!::FileTimeToLocalFileTime(&ft100ns, &localFt) ||
-        !::FileTimeToSystemTime(&localFt, &st))
-    {
-        return {};
-    }
+  FILETIME localFt{};
+  SYSTEMTIME st{};
+  if (!::FileTimeToLocalFileTime(&ft100ns, &localFt) || !::FileTimeToSystemTime(&localFt, &st)) {
+    return {};
+  }
 
-    return STR_Printf(
-        "%02u:%02u:%02u.%03u",
-        static_cast<unsigned>(st.wHour),
-        static_cast<unsigned>(st.wMinute),
-        static_cast<unsigned>(st.wSecond),
-        static_cast<unsigned>(st.wMilliseconds)
-    );
+  return STR_Printf(
+    "%02u:%02u:%02u.%03u",
+    static_cast<unsigned>(st.wHour),
+    static_cast<unsigned>(st.wMinute),
+    static_cast<unsigned>(st.wSecond),
+    static_cast<unsigned>(st.wMilliseconds)
+  );
 }
-

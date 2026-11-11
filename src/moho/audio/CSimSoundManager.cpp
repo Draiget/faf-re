@@ -12,7 +12,9 @@ namespace
   using LoopNode = moho::TDatListItem<moho::HSound, void>;
   using LoopList = moho::TDatList<moho::HSound, void>;
 
-  moho::HSound* LoopOwnerFromNode(LoopNode* node)
+  moho::HSound* LoopOwnerFromNode(
+    LoopNode* node
+  )
   {
     return LoopList::owner_from_member_node<moho::HSound, &moho::HSound::mSimLoopLink>(node);
   }
@@ -31,7 +33,10 @@ namespace
    * call which inlines to the same control flow at
    * `sizeof(SAudioRequest)=0x1C` stride.
    */
-  void QueueRequest(moho::CSimSoundManager& manager, const moho::SAudioRequest& request)
+  void QueueRequest(
+    moho::CSimSoundManager& manager,
+    const moho::SAudioRequest& request
+  )
   {
     manager.mRequests.PushBack(request);
   }
@@ -44,7 +49,8 @@ namespace
    * destination storage when capacity is sufficient.
    */
   [[nodiscard]] gpg::fastvector_n<moho::SAudioRequest, 8>* CopyRequests(
-    gpg::fastvector_n<moho::SAudioRequest, 8>& destination, const gpg::fastvector_n<moho::SAudioRequest, 64>& source
+    gpg::fastvector_n<moho::SAudioRequest, 8>& destination,
+    const gpg::fastvector_n<moho::SAudioRequest, 64>& source
   )
   {
     // Source and destination carry different inline capacities, so the
@@ -100,7 +106,9 @@ namespace moho
    * Initializes one `CSimSoundManager` runtime object with owner-sim pointer,
    * inline request-vector lanes, and self-linked active-loop sentinel.
    */
-  CSimSoundManager::CSimSoundManager(Sim* const ownerSim)
+  CSimSoundManager::CSimSoundManager(
+    Sim* const ownerSim
+  )
     : mOwnerSim(ownerSim)
     , mRequests()
     , mActiveLoops()
@@ -121,7 +129,10 @@ namespace moho
    * What it does:
    * Queues opcode-0 (one-shot) request with entity position/current layer.
    */
-  void CSimSoundManager::AddEntitySound(Entity* entity, CSndParams* params)
+  void CSimSoundManager::AddEntitySound(
+    Entity* entity,
+    CSndParams* params
+  )
   {
     SAudioRequest request{};
     request.position = entity->mVarDat.mCurTransform.pos_;
@@ -147,7 +158,9 @@ namespace moho
    * so the copy grows the destination onto the heap whenever a beat produced
    * more than eight requests.
    */
-  void CSimSoundManager::DrainRequests(gpg::fastvector_n<SAudioRequest, 8>& outRequests)
+  void CSimSoundManager::DrainRequests(
+    gpg::fastvector_n<SAudioRequest, 8>& outRequests
+  )
   {
     // The binary calls the copy helper unconditionally; the same-lane guard
     // lives inside it.
@@ -167,7 +180,9 @@ namespace moho
    * What it does:
    * Queues opcode-1 loop-start request and links handle at list tail.
    */
-  TDatListItem<HSound, void>* CSimSoundManager::AddLoop(HSound* sound)
+  TDatListItem<HSound, void>* CSimSoundManager::AddLoop(
+    HSound* sound
+  )
   {
     SAudioRequest request{};
     request.position = Wm3::Vec3f{};
@@ -194,7 +209,9 @@ namespace moho
    * What it does:
    * If the handle is active, queues opcode-2 stop-loop request and unlinks it.
    */
-  TDatListItem<HSound, void>* CSimSoundManager::StopLoop(HSound* sound)
+  TDatListItem<HSound, void>* CSimSoundManager::StopLoop(
+    HSound* sound
+  )
   {
     auto* const sentinel = static_cast<LoopNode*>(&mActiveLoops);
     auto* node = mActiveLoops.mNext;
@@ -259,7 +276,12 @@ namespace moho
 
 namespace moho
 {
-  void CSimSoundManager::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CSimSoundManager::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     Sim* sim = nullptr;
     const gpg::RRef owner{};
@@ -268,7 +290,10 @@ namespace moho
   }
 
   void CSimSoundManager::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     archive.WritePointer(mOwnerSim, gpg::TrackedPointerState::Unowned, gpg::RRef{});

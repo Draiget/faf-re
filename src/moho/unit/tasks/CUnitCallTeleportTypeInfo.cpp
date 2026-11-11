@@ -5,7 +5,8 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitCallTeleport.h"
+#include "moho/unit/tasks/CUnitCallTeleport.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -21,7 +22,9 @@ namespace
     return sInstance;
   }
 
-  void InitializeTeleportState(moho::CUnitCallTeleport* const task)
+  void InitializeTeleportState(
+    moho::CUnitCallTeleport* const task
+  )
   {
     task->mTargetTransportUnit.ClearLinkState();
     task->mCompletedSuccessfully = false;
@@ -74,7 +77,9 @@ namespace moho
   /**
    * Address: 0x00602EA0 (FUN_00602EA0, AddBase_CCommandTask)
    */
-  void __stdcall CUnitCallTeleportTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitCallTeleportTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<CCommandTask>(typeInfo);
   }
@@ -94,7 +99,9 @@ namespace moho
   /**
    * Address: 0x00602A50 (FUN_00602A50)
    */
-  gpg::RRef CUnitCallTeleportTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitCallTeleportTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CUnitCallTeleport*>(objectStorage);
     if (task) {
@@ -107,7 +114,9 @@ namespace moho
   /**
    * Address: 0x00602A30 (FUN_00602A30)
    */
-  void CUnitCallTeleportTypeInfo::Delete(void* const objectStorage)
+  void CUnitCallTeleportTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitCallTeleport*>(objectStorage);
   }
@@ -115,7 +124,9 @@ namespace moho
   /**
    * Address: 0x00602AD0 (FUN_00602AD0)
    */
-  void CUnitCallTeleportTypeInfo::Destruct(void* const objectStorage)
+  void CUnitCallTeleportTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CUnitCallTeleport*>(objectStorage);
     if (!task) {
@@ -134,8 +145,9 @@ namespace moho
   }
 } // namespace moho
 
-
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitCallTeleportTypeInfo_9cf7f9, moho::register_CUnitCallTeleportTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitCallTeleportTypeInfo_9cf7f9,
+  moho::register_CUnitCallTeleportTypeInfo
+)

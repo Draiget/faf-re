@@ -13,7 +13,11 @@ namespace gpg::gal::vulkan
     return VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
   }
 
-  VkSurfaceKHR CreateWindowSurface(const VkInstance instance, void* const window, VkResult& result)
+  VkSurfaceKHR CreateWindowSurface(
+    const VkInstance instance,
+    void* const window,
+    VkResult& result
+  )
   {
     const auto create =
       reinterpret_cast<PFN_vkCreateWin32SurfaceKHR>(Vk().vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR"));
@@ -51,10 +55,14 @@ namespace gpg::gal::vulkan
         return names[index];
       }
     }
-    return "VK_KHR_xlib_surface";  // SDL's video isn't up: the X11 one, which XWayland serves too
+    return "VK_KHR_xlib_surface"; // SDL's video isn't up: the X11 one, which XWayland serves too
   }
 
-  VkSurfaceKHR CreateWindowSurface(const VkInstance instance, void* const window, VkResult& result)
+  VkSurfaceKHR CreateWindowSurface(
+    const VkInstance instance,
+    void* const window,
+    VkResult& result
+  )
   {
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     if (window == nullptr || !SDL_Vulkan_CreateSurface(static_cast<SDL_Window*>(window), instance, nullptr, &surface)) {

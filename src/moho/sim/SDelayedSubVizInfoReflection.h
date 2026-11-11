@@ -63,7 +63,10 @@ namespace gpg
     void SetCount(void* obj, int count) const override;
   };
 
-  static_assert(sizeof(RVectorType<moho::SDelayedSubVizInfo>) == 0x68, "RVectorType<SDelayedSubVizInfo> size must be 0x68");
+  static_assert(
+    sizeof(RVectorType<moho::SDelayedSubVizInfo>) == 0x68,
+    "RVectorType<SDelayedSubVizInfo> size must be 0x68"
+  );
   static_assert(
     sizeof(fa::vector<moho::SDelayedSubVizInfo>) == 0x10,
     "fa::vector<SDelayedSubVizInfo> size must be 0x10"

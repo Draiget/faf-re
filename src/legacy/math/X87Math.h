@@ -46,7 +46,9 @@ namespace fa
    * out-of-range one is undefined in C++ (a saturating target gives another
    * result; plan WPL.19). Inline: the Lua table code calls it per number key.
    */
-  [[nodiscard]] inline std::int32_t TruncateToInt(const float value) noexcept
+  [[nodiscard]] inline std::int32_t TruncateToInt(
+    const float value
+  ) noexcept
   {
     constexpr float kInt32Bound = 2147483648.0f;
     if (!(value > -kInt32Bound - 1.0f && value < kInt32Bound)) {
@@ -61,7 +63,9 @@ namespace fa
    * lowering saturates +inf and values from 2^63 up to 0x7FFFFFFFFFFFFFFF
    * (faf_math_dump against retail, plan WPR.21).
    */
-  [[nodiscard]] inline std::int64_t TruncateToInt64(const float value) noexcept
+  [[nodiscard]] inline std::int64_t TruncateToInt64(
+    const float value
+  ) noexcept
   {
     constexpr float kInt64Bound = 9223372036854775808.0f;
     if (!(value >= -kInt64Bound && value < kInt64Bound)) {
@@ -204,7 +208,12 @@ namespace fa
    * against |t| ~ 100) overflowed the ratio and returned infinities where the
    * engine returns a vector of length |t|.
    */
-  void ScaleVectorToLengthOfX87(float* destLanes, const float* sourceLanes, const float* targetLanes, float sourceLengthSq) noexcept;
+  void ScaleVectorToLengthOfX87(
+    float* destLanes,
+    const float* sourceLanes,
+    const float* targetLanes,
+    float sourceLengthSq
+  ) noexcept;
 
   // Terrain interpolation uses the simulation's 24-bit x87 arithmetic.
   // Inlined block from FUN_0044FB90; preserve the original operation order.
@@ -214,9 +223,8 @@ namespace fa
   // binary's GetElevation returns it in st0 and CHeightField::GetNormal
   // subtracts it there (0x0069A6DA `fsubr`), so a height in the float
   // denormal range keeps its 24-bit mantissa until the difference is stored.
-  [[nodiscard]] float SubtractBilinearHeight(
-    float top, float h00, float h01, float h10, float h11, float fracX, float fracZ
-  ) noexcept;
+  [[nodiscard]] float
+  SubtractBilinearHeight(float top, float h00, float h01, float h10, float h11, float fracX, float fracZ) noexcept;
 
   /**
    * Single-precision transcendentals as the 2007 toolchain produced them.
@@ -264,7 +272,12 @@ namespace fa
    * retail on denormal-range `t` and lanes (difffuzz).
    */
   void SlerpSphericalBlend(
-    float* outLanes, const float* q1Lanes, const float* rhsLanes, float angle, float oneMinusT, float t
+    float* outLanes,
+    const float* q1Lanes,
+    const float* rhsLanes,
+    float angle,
+    float oneMinusT,
+    float t
   ) noexcept;
 
   /**
@@ -340,16 +353,68 @@ namespace fa
    * (double, mixed or integral arguments) forwards to `std::` unchanged.
    * The explicit double acos/asin overloads also preserve legacy CRT dispatch.
    */
-  [[nodiscard]] inline float sin(const float x) noexcept { return sinf(x); }
-  [[nodiscard]] inline float cos(const float x) noexcept { return cosf(x); }
-  [[nodiscard]] inline float tan(const float x) noexcept { return tanf(x); }
-  [[nodiscard]] inline float atan(const float x) noexcept { return atanf(x); }
-  [[nodiscard]] inline float asin(const float x) noexcept { return asinf(x); }
-  [[nodiscard]] inline float acos(const float x) noexcept { return acosf(x); }
-  [[nodiscard]] inline float exp(const float x) noexcept { return expf(x); }
-  [[nodiscard]] inline float log(const float x) noexcept { return logf(x); }
-  [[nodiscard]] inline float atan2(const float y, const float x) noexcept { return atan2f(y, x); }
-  [[nodiscard]] inline float pow(const float x, const float y) noexcept { return powf(x, y); }
+  [[nodiscard]] inline float sin(
+    const float x
+  ) noexcept
+  {
+    return sinf(x);
+  }
+  [[nodiscard]] inline float cos(
+    const float x
+  ) noexcept
+  {
+    return cosf(x);
+  }
+  [[nodiscard]] inline float tan(
+    const float x
+  ) noexcept
+  {
+    return tanf(x);
+  }
+  [[nodiscard]] inline float atan(
+    const float x
+  ) noexcept
+  {
+    return atanf(x);
+  }
+  [[nodiscard]] inline float asin(
+    const float x
+  ) noexcept
+  {
+    return asinf(x);
+  }
+  [[nodiscard]] inline float acos(
+    const float x
+  ) noexcept
+  {
+    return acosf(x);
+  }
+  [[nodiscard]] inline float exp(
+    const float x
+  ) noexcept
+  {
+    return expf(x);
+  }
+  [[nodiscard]] inline float log(
+    const float x
+  ) noexcept
+  {
+    return logf(x);
+  }
+  [[nodiscard]] inline float atan2(
+    const float y,
+    const float x
+  ) noexcept
+  {
+    return atan2f(y, x);
+  }
+  [[nodiscard]] inline float pow(
+    const float x,
+    const float y
+  ) noexcept
+  {
+    return powf(x, y);
+  }
 
   /**
    * `sqrt((z*z + y*y) + x*x)` of `lanes` with the squares, the sum and the

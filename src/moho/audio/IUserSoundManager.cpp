@@ -7,4 +7,3 @@
  * Initializes one user-sound-manager base interface object.
  */
 moho::IUserSoundManager::IUserSoundManager() = default;
-

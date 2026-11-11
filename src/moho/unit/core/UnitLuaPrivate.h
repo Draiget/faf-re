@@ -17,7 +17,9 @@ namespace
   // in moho/command/SSTICommandVariableData.cpp next to the command type it
   // classifies; the formation code calls it too.
 
-  [[maybe_unused]] [[nodiscard]] gpg::RRef MakeUnitStateRef(EUnitState* const unitState)
+  [[maybe_unused]] [[nodiscard]] gpg::RRef MakeUnitStateRef(
+    EUnitState* const unitState
+  )
   {
     gpg::RRef enumRef{};
     if (unitState == nullptr) {
@@ -34,7 +36,9 @@ namespace
     return enumRef;
   }
 
-  [[nodiscard]] gpg::RRef MakeRuleUnitToggleCapsRef(ERuleBPUnitToggleCaps* const toggleCap)
+  [[nodiscard]] gpg::RRef MakeRuleUnitToggleCapsRef(
+    ERuleBPUnitToggleCaps* const toggleCap
+  )
   {
     gpg::RRef enumRef{};
     if (toggleCap == nullptr) {
@@ -51,7 +55,9 @@ namespace
     return enumRef;
   }
 
-  [[maybe_unused]] [[nodiscard]] gpg::RRef MakeRuleUnitCommandCapsRef(ERuleBPUnitCommandCaps* const commandCap)
+  [[maybe_unused]] [[nodiscard]] gpg::RRef MakeRuleUnitCommandCapsRef(
+    ERuleBPUnitCommandCaps* const commandCap
+  )
   {
     gpg::RRef enumRef{};
     if (commandCap == nullptr) {
@@ -68,7 +74,9 @@ namespace
     return enumRef;
   }
 
-  [[maybe_unused]] [[nodiscard]] int ScriptBitIndexFromToggleCapValue(int toggleCapValue) noexcept
+  [[maybe_unused]] [[nodiscard]] int ScriptBitIndexFromToggleCapValue(
+    int toggleCapValue
+  ) noexcept
   {
     int bitIndex = 0;
     if (toggleCapValue == 1) {
@@ -88,7 +96,9 @@ namespace
    * What it does:
    * Converts one Lua object to `Unit*` without throwing Lua conversion errors.
    */
-  [[nodiscard]] Unit* GetUnitOptional(const LuaPlus::LuaObject& unitObject)
+  [[nodiscard]] Unit* GetUnitOptional(
+    const LuaPlus::LuaObject& unitObject
+  )
   {
     CScriptObject* const scriptObject = SCR_GetScriptObjectFromLuaObject(unitObject);
     if (scriptObject == nullptr) {
@@ -99,5 +109,4 @@ namespace
     const gpg::RRef unitRef = gpg::REF_UpcastPtr(sourceRef, gpg::RTypeOf<Unit>());
     return static_cast<Unit*>(unitRef.mObj);
   }
-}
-
+} // namespace

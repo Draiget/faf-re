@@ -32,8 +32,8 @@ namespace moho
   // (0x007F7D13), and `ren_UnitSilhouette` gates the silhouette pass inside
   // WRenViewport::Render (0x007F95EC) - so every frame read both of them
   // through a /FORCE'd null and faulted before drawing anything.
-  bool ren_Shadows = true;                // 0x00F57E53 = 0x01
-  bool ren_UnitSilhouette = false;        // 0x010A6422, zero-fill
+  bool ren_Shadows = true;         // 0x00F57E53 = 0x01
+  bool ren_UnitSilhouette = false; // 0x010A6422, zero-fill
 
   // Render/UI/editor toggles that were declared extern all over the tree but
   // never defined anywhere. The link runs with /FORCE, so each one resolved to
@@ -45,60 +45,60 @@ namespace moho
   // Every value below is read straight out of ForgedAlliance.exe at the address
   // given. Addresses in the zero-fill tail of .data carry no bytes in the image
   // and therefore start at zero.
-  bool ren_Ui = true;                     // 0x00F57DE7 = 0x01
-  bool ren_NormalDecals = true;           // 0x00F57DDE = 0x01
-  bool ren_Splats = true;                 // 0x00F57DDF = 0x01
-  bool ren_GenerateMesh = true;           // 0x00F57DE0 = 0x01
-  bool ren_Decals = true;                 // 0x00F57DDD = 0x01
-  bool ren_ClipDecals = true;             // 0x00F57B7F = 0x01
-  int ren_ClipDecalLevel = 2;             // 0x00F57DB4 = 2
-  bool ren_IgnoreDecalLOD = false;        // 0x010A643F, zero-fill
-  int ren_DecalFidelity = 0;              // 0x010A6444, zero-fill
-  bool ren_bicubicnormals = true;         // 0x00F57DC1 = 0x01
-  float ren_ShadowCoeff = 3.0f;           // 0x00F57E00 = 3.0f
-  float ren_ShadowLOD = 250.0f;           // 0x00F57E04 = 250.0f
-  bool ren_glowingDecals = true;          // 0x00F57DE1 = 0x01
+  bool ren_Ui = true;                        // 0x00F57DE7 = 0x01
+  bool ren_NormalDecals = true;              // 0x00F57DDE = 0x01
+  bool ren_Splats = true;                    // 0x00F57DDF = 0x01
+  bool ren_GenerateMesh = true;              // 0x00F57DE0 = 0x01
+  bool ren_Decals = true;                    // 0x00F57DDD = 0x01
+  bool ren_ClipDecals = true;                // 0x00F57B7F = 0x01
+  int ren_ClipDecalLevel = 2;                // 0x00F57DB4 = 2
+  bool ren_IgnoreDecalLOD = false;           // 0x010A643F, zero-fill
+  int ren_DecalFidelity = 0;                 // 0x010A6444, zero-fill
+  bool ren_bicubicnormals = true;            // 0x00F57DC1 = 0x01
+  float ren_ShadowCoeff = 3.0f;              // 0x00F57E00 = 3.0f
+  float ren_ShadowLOD = 250.0f;              // 0x00F57E04 = 250.0f
+  bool ren_glowingDecals = true;             // 0x00F57DE1 = 0x01
   bool ren_ForceUpdateMinimapTerrain = true; // 0x00F57DE2 = 0x01
-  bool ren_Bloom = true;                  // 0x00F57E51 = 0x01
-  bool ed_EnableHook = true;              // 0x00F57E55 = 0x01
-  bool ren_Oblivion = false;              // 0x010A6417, zero-fill
-  bool ren_ShowNormals = false;           // 0x010A643C, zero-fill
+  bool ren_Bloom = true;                     // 0x00F57E51 = 0x01
+  bool ed_EnableHook = true;                 // 0x00F57E55 = 0x01
+  bool ren_Oblivion = false;                 // 0x010A6417, zero-fill
+  bool ren_ShowNormals = false;              // 0x010A643C, zero-fill
   /// Gates the terrain dirty-rect debug overlay, read at 0x00805F31
   /// (`cmp ?ren_ShowDirtyTerrain@Moho@@3_NA, 0` in
   /// MediumFidelityTerrain::DrawDirtyTerrain).
-  bool ren_ShowDirtyTerrain = false;      // 0x010A643D, zero-fill
-  bool ren_DecalOverDraw = false;         // 0x010A6440, zero-fill
-  bool ren_ShowFrameTimes = false;        // 0x010A6430, zero-fill
-  bool ren_ShowNetworkStats = false;      // 0x010A6431, zero-fill
-  bool ren_ShowBandwidthUsage = false;    // 0x010A6432, zero-fill
-  bool UI_ShowControlUnderMouse = false;  // 0x010A6423, zero-fill
+  bool ren_ShowDirtyTerrain = false;     // 0x010A643D, zero-fill
+  bool ren_DecalOverDraw = false;        // 0x010A6440, zero-fill
+  bool ren_ShowFrameTimes = false;       // 0x010A6430, zero-fill
+  bool ren_ShowNetworkStats = false;     // 0x010A6431, zero-fill
+  bool ren_ShowBandwidthUsage = false;   // 0x010A6432, zero-fill
+  bool UI_ShowControlUnderMouse = false; // 0x010A6423, zero-fill
 
   // Save/restore triple read and cleared by WRenViewport::RenderPreviewImage
   // (0x007F7590-0x007F75FB) around the strategic-map preview render pass,
   // alongside the ren_Ui/ren_Fx/fog_DistanceFog/ren_Shadows toggles above.
   // All three carry an initialized byte in the shipped image.
-  bool ren_WorldBorder = true;            // 0x00F57E48 = 0x01
-  bool ren_Select = true;                 // 0x00F57E4C = 0x01
-  bool ren_fog = true;                    // 0x00F57E4D = 0x01
+  bool ren_WorldBorder = true; // 0x00F57E48 = 0x01
+  bool ren_Select = true;      // 0x00F57E4C = 0x01
+  bool ren_fog = true;         // 0x00F57E4D = 0x01
 
-  int ren_BloomBlurCount = 2;             // 0x00F57E7C = 2
+  int ren_BloomBlurCount = 2;                // 0x00F57E7C = 2
   float ren_BandwidthDisplaySeconds = 10.0f; // 0x00F57E84 = 10.0f
   float ren_BandwidthDisplayKernel = 1.0f;   // 0x00F57E88 = 1.0f
 
   // Session-beat toggles read by `CWldSession::DoBeat` / `SessionFrame`.
   // `ren_FogOfWar` is the only one with a byte in the image (0x00F57DC3 = 1);
   // the other two sit in the zero-fill tail of .data and therefore start false.
-  bool ren_FogOfWar = true;               // 0x00F57DC3 = 0x01
+  bool ren_FogOfWar = true; // 0x00F57DC3 = 0x01
   /// Engine addition (not in the binary): the map editor's "Hide the fog". The renderer leaves the fog-of-war
   /// overlay out while it is set; `ren_FogOfWar` itself is the sim's, rewritten from each beat.
   bool ren_FogOfWarHidden = false;
   /// Gates the playable-boundary pass in WRenViewport::Render, read at
   /// 0x007F94D2 (`cmp ?ren_PlayableBoundary@Moho@@3_NA, 0`).
-  bool ren_PlayableBoundary = true;       // 0x00F57E4E = 0x01
-  bool dbg_Metronome = false;             // 0x010A6466, zero-fill
+  bool ren_PlayableBoundary = true; // 0x00F57E4E = 0x01
+  bool dbg_Metronome = false;       // 0x010A6466, zero-fill
   /// Free-runs the beat drain: the frame loop stops waiting for the tick clock
   /// and consumes every packet the sim has queued.
-  bool wld_RunWithTheWind = false;        // 0x010A6467, zero-fill
+  bool wld_RunWithTheWind = false; // 0x010A6467, zero-fill
 
   int snd_index = 0;
 
@@ -138,19 +138,19 @@ namespace moho
   float cam_EntityBoxExpand = 20.0f;
   // Initial values from the shipped binary's .data, at the address each convar's
   // dynamic initializer stores as its backing pointer.
-  float ren_BorderSize = 5.0f;              // 0x00F57DB8
-  float ren_SyncTerrainLOD = 128.0f;        // 0x00F579A0
-  float ren_FrameTimeSeconds = 1.0f;        // 0x00F57E5C
-  float wld_SkewRateAdjustBase = 1.03f;     // 0x00F57A08
+  float ren_BorderSize = 5.0f;          // 0x00F57DB8
+  float ren_SyncTerrainLOD = 128.0f;    // 0x00F579A0
+  float ren_FrameTimeSeconds = 1.0f;    // 0x00F57E5C
+  float wld_SkewRateAdjustBase = 1.03f; // 0x00F57A08
   // 1.1 in the binary, which never fed it a skew (CSimDriver::GetSimSpeed returned 0). With
   // wld_SkewCorrection on, 15% gives back a stall of a few hundred ms in a few seconds.
-  float wld_SkewRateAdjustMax = 1.15f;      // 0x00F57A0C
-  float fog_OffsetMultiplier = 1.01f;       // 0x00F57E60
-  float ren_ShoreErrorCoeff = 0.4f;         // 0x00F57DBC
-  float ren_DecalAlbedoLodCutoff = 15.0f;   // 0x00F579BC
-  float ren_DecalNormalLodCutoff = 6.0f;    // 0x00F579B8
-  float ren_DecalFlatTol = 0.05f;           // 0x00F579C4
-  float ren_DecalFadeFraction = 0.5f;       // 0x00F579C0
+  float wld_SkewRateAdjustMax = 1.15f;    // 0x00F57A0C
+  float fog_OffsetMultiplier = 1.01f;     // 0x00F57E60
+  float ren_ShoreErrorCoeff = 0.4f;       // 0x00F57DBC
+  float ren_DecalAlbedoLodCutoff = 15.0f; // 0x00F579BC
+  float ren_DecalNormalLodCutoff = 6.0f;  // 0x00F579B8
+  float ren_DecalFlatTol = 0.05f;         // 0x00F579C4
+  float ren_DecalFadeFraction = 0.5f;     // 0x00F579C0
   // 0x00F57DB0. Read straight out of the shipped binary's .data (file offset
   // 0xB57DB0) as 0.003f, not the 1.0f placeholder this previously carried.
   // This is the screen-error threshold `CTesselator::GetIntersectionResult`

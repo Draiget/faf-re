@@ -128,8 +128,14 @@ namespace
     gpg::RType::load_func_t mDeserialize;
     gpg::RType::save_func_t mSerialize;
   };
-  static_assert(offsetof(SValuePairSerializer, mDeserialize) == 0x0C, "SValuePairSerializer::mDeserialize offset must be 0x0C");
-  static_assert(offsetof(SValuePairSerializer, mSerialize) == 0x10, "SValuePairSerializer::mSerialize offset must be 0x10");
+  static_assert(
+    offsetof(SValuePairSerializer, mDeserialize) == 0x0C,
+    "SValuePairSerializer::mDeserialize offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(SValuePairSerializer, mSerialize) == 0x10,
+    "SValuePairSerializer::mSerialize offset must be 0x10"
+  );
   static_assert(sizeof(SValuePairSerializer) == 0x14, "SValuePairSerializer size must be 0x14");
 
   /**
@@ -241,6 +247,12 @@ void moho::register_SValuePairTypeInfo()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SValuePairTypeInfo_95b24f, moho::register_SValuePairTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SValuePairTypeInfo_95b24f,
+  moho::register_SValuePairTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_SValuePairTypeInfo_95b24f, preregister_SValuePairTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_SValuePairTypeInfo_95b24f,
+  preregister_SValuePairTypeInfo
+)

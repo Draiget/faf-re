@@ -27,7 +27,9 @@ namespace
   constexpr const char* kSetTerrainTypeRectHelpText = "SetTerrainTypeRect( rect, terrainTypeTable )";
   constexpr const char* kSetPlayableRectHelpText = "SetPlayableRect( minX, minZ, maxX, maxZ )";
 
-  [[nodiscard]] gpg::RRef MakeEAllianceRef(moho::EAlliance* const allianceType)
+  [[nodiscard]] gpg::RRef MakeEAllianceRef(
+    moho::EAlliance* const allianceType
+  )
   {
     gpg::RRef enumRef{};
     if (allianceType == nullptr) {
@@ -72,7 +74,9 @@ namespace
   }
 
   template <int StackIndex>
-  [[nodiscard]] std::uint8_t ReadLuaColorByteArg(LuaPlus::LuaState* const state)
+  [[nodiscard]] std::uint8_t ReadLuaColorByteArg(
+    LuaPlus::LuaState* const state
+  )
   {
     LuaPlus::LuaStackObject arg(state, StackIndex);
     if (lua_type(state->m_state, StackIndex) != LUA_TNUMBER) {
@@ -82,8 +86,7 @@ namespace
     const auto value = static_cast<std::int32_t>(lua_tonumber(state->m_state, StackIndex));
     return static_cast<std::uint8_t>(value & 0xFF);
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x0075C3D0 (FUN_0075C3D0, func_SetTerrainType_LuaFuncDef)
@@ -94,12 +97,7 @@ namespace
 moho::CScrLuaInitForm* moho::func_SetTerrainType_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
-    "SetTerrainType",
-    &moho::cfunc_SetTerrainType,
-    nullptr,
-    "<global>",
-    kSetTerrainTypeLuaDefHelpText
+    SimLuaInitSet(), "SetTerrainType", &moho::cfunc_SetTerrainType, nullptr, "<global>", kSetTerrainTypeLuaDefHelpText
   );
   return &binder;
 }
@@ -110,7 +108,9 @@ moho::CScrLuaInitForm* moho::func_SetTerrainType_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetTerrainTypeL`.
  */
-int moho::cfunc_SetTerrainType(lua_State* const luaContext)
+int moho::cfunc_SetTerrainType(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetTerrainTypeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -122,7 +122,9 @@ int moho::cfunc_SetTerrainType(lua_State* const luaContext)
  * Reads `(x, z, terrainTypeTable)` from Lua and applies the table `TypeCode`
  * entry through `STIMap::SetTerrainType`.
  */
-int moho::cfunc_SetTerrainTypeL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetTerrainTypeL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -163,7 +165,8 @@ int moho::cfunc_SetTerrainTypeL(LuaPlus::LuaState* const state)
   if (lua_type(rawState, typeCodeIndex) != LUA_TNUMBER) {
     LuaPlus::LuaStackObject::TypeError(&typeCodeArg, "integer");
   }
-  const std::uint8_t terrainType = static_cast<std::uint8_t>(static_cast<std::int32_t>(lua_tonumber(rawState, typeCodeIndex)));
+  const std::uint8_t terrainType =
+    static_cast<std::uint8_t>(static_cast<std::int32_t>(lua_tonumber(rawState, typeCodeIndex)));
 
   map->SetTerrainType(x, z, terrainType);
   return 0;
@@ -212,8 +215,9 @@ static std::int32_t FillTerrainTypeRectClamped(
       if (result < endX) {
         do {
           ++result;
-          grid->data[static_cast<std::size_t>(startZ) * static_cast<std::size_t>(grid->width) + static_cast<std::size_t>(result - 1)] =
-            terrainType;
+          grid->data
+            [static_cast<std::size_t>(startZ) * static_cast<std::size_t>(grid->width) +
+             static_cast<std::size_t>(result - 1)] = terrainType;
         } while (result < endX);
         result = startX;
       }
@@ -249,7 +253,9 @@ moho::CScrLuaInitForm* moho::func_SetTerrainTypeRect_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetTerrainTypeRectL`.
  */
-int moho::cfunc_SetTerrainTypeRect(lua_State* const luaContext)
+int moho::cfunc_SetTerrainTypeRect(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetTerrainTypeRectL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -261,7 +267,9 @@ int moho::cfunc_SetTerrainTypeRect(lua_State* const luaContext)
  * Reads `(rectTable, terrainTypeTable)` from Lua and writes one clamped
  * terrain-type rectangle into `STIMap::mTerrainType`.
  */
-int moho::cfunc_SetTerrainTypeRectL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetTerrainTypeRectL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -291,16 +299,12 @@ int moho::cfunc_SetTerrainTypeRectL(LuaPlus::LuaState* const state)
   if (lua_type(rawState, typeCodeIndex) != LUA_TNUMBER) {
     LuaPlus::LuaStackObject::TypeError(&typeCodeArg, "integer");
   }
-  const std::uint8_t terrainType = static_cast<std::uint8_t>(static_cast<std::int32_t>(lua_tonumber(rawState, typeCodeIndex)));
+  const std::uint8_t terrainType =
+    static_cast<std::uint8_t>(static_cast<std::int32_t>(lua_tonumber(rawState, typeCodeIndex)));
 
   TerrainTypeGrid* const terrainTypeGrid = &map->mTerrainType;
   (void)FillTerrainTypeRectClamped(
-    rect.x0,
-    rect.z0,
-    terrainType,
-    terrainTypeGrid,
-    rect.x1 - rect.x0,
-    rect.z1 - rect.z0
+    rect.x0, rect.z0, terrainType, terrainTypeGrid, rect.x1 - rect.x0, rect.z1 - rect.z0
   );
 
   return 0;
@@ -313,7 +317,9 @@ int moho::cfunc_SetTerrainTypeRectL(LuaPlus::LuaState* const state)
  * Reads `(minX, minZ, maxX, maxZ)` from Lua, validates integer lanes,
  * and writes the playable map rectangle through `STIMap::SetPlayableMapRect`.
  */
-int moho::cfunc_SetPlayableRectL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetPlayableRectL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -378,7 +384,9 @@ int moho::cfunc_SetPlayableRectL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetPlayableRectL`.
  */
-int moho::cfunc_SetPlayableRect(lua_State* const luaContext)
+int moho::cfunc_SetPlayableRect(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetPlayableRectL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -389,7 +397,9 @@ int moho::cfunc_SetPlayableRect(lua_State* const luaContext)
  * What it does:
  * Unwraps Lua callback state and forwards to `cfunc_SetArmyStatsSyncArmyL`.
  */
-int moho::cfunc_SetArmyStatsSyncArmy(lua_State* const luaContext)
+int moho::cfunc_SetArmyStatsSyncArmy(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetArmyStatsSyncArmyL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -419,7 +429,9 @@ moho::CScrLuaInitForm* moho::func_SetArmyStatsSyncArmy_LuaFuncDef()
  * What it does:
  * Reads one integer and stores it in `Sim::mSyncArmy`.
  */
-int moho::cfunc_SetArmyStatsSyncArmyL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetArmyStatsSyncArmyL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -450,12 +462,7 @@ int moho::cfunc_SetArmyStatsSyncArmyL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_SetFocusArmySim_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
-    "SetFocusArmy",
-    &moho::cfunc_SetFocusArmySim,
-    nullptr,
-    "<global>",
-    kSetFocusArmySimHelpText
+    SimLuaInitSet(), "SetFocusArmy", &moho::cfunc_SetFocusArmySim, nullptr, "<global>", kSetFocusArmySimHelpText
   );
   return &binder;
 }
@@ -488,7 +495,9 @@ moho::CScrLuaInitForm* moho::func_SetCommandSourceSim_LuaFuncDef()
  * What it does:
  * Reads focus-army index from Lua arg #1 and writes the pending driver focus lane.
  */
-int moho::cfunc_SetFocusArmySim(lua_State* const luaContext)
+int moho::cfunc_SetFocusArmySim(
+  lua_State* const luaContext
+)
 {
   if (!luaContext) {
     return 0;
@@ -525,7 +534,9 @@ int moho::cfunc_SetFocusArmySim(lua_State* const luaContext)
  * Reads `(armyIndex, sourceIndex, enabled)` from Lua args and toggles the
  * corresponding bit in `CArmyImpl::MohoSetValidCommandSources`.
  */
-int moho::cfunc_SetCommandSourceSim(lua_State* const luaContext)
+int moho::cfunc_SetCommandSourceSim(
+  lua_State* const luaContext
+)
 {
   if (!luaContext) {
     return 0;
@@ -563,7 +574,9 @@ int moho::cfunc_SetCommandSourceSim(lua_State* const luaContext)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyStartL`.
  */
-int moho::cfunc_SetArmyStart(lua_State* const luaContext)
+int moho::cfunc_SetArmyStart(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetArmyStartL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -577,12 +590,7 @@ int moho::cfunc_SetArmyStart(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetArmyStart_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
-    "SetArmyStart",
-    &moho::cfunc_SetArmyStart,
-    nullptr,
-    "<global>",
-    kSetArmyStartHelpText
+    SimLuaInitSet(), "SetArmyStart", &moho::cfunc_SetArmyStart, nullptr, "<global>", kSetArmyStartHelpText
   );
   return &binder;
 }
@@ -594,7 +602,9 @@ moho::CScrLuaInitForm* moho::func_SetArmyStart_LuaFuncDef()
  * Reads `(army, x, z)` from Lua and forwards one start-position vector to
  * `CArmyImpl::SetArmyStart`.
  */
-int moho::cfunc_SetArmyStartL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetArmyStartL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 3, kSetArmyStartHelpText);
 
@@ -625,7 +635,9 @@ int moho::cfunc_SetArmyStartL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_SetIgnoreArmyUnitCapL`.
  */
-int moho::cfunc_SetIgnoreArmyUnitCap(lua_State* const luaContext)
+int moho::cfunc_SetIgnoreArmyUnitCap(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetIgnoreArmyUnitCapL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -656,7 +668,9 @@ moho::CScrLuaInitForm* moho::func_SetIgnoreArmyUnitCap_LuaFuncDef()
  * Reads `(army, flag)` from Lua and updates unit-cap ignore mode through the
  * army interface.
  */
-int moho::cfunc_SetIgnoreArmyUnitCapL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetIgnoreArmyUnitCapL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kSetIgnoreArmyUnitCapHelpText);
 
@@ -675,7 +689,9 @@ int moho::cfunc_SetIgnoreArmyUnitCapL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_SetIgnorePlayableRectL`.
  */
-int moho::cfunc_SetIgnorePlayableRect(lua_State* const luaContext)
+int moho::cfunc_SetIgnorePlayableRect(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetIgnorePlayableRectL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -706,7 +722,9 @@ moho::CScrLuaInitForm* moho::func_SetIgnorePlayableRect_LuaFuncDef()
  * Reads `(army, flag)` from Lua and updates playable-rect ignore mode through
  * the army interface.
  */
-int moho::cfunc_SetIgnorePlayableRectL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetIgnorePlayableRectL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kSetIgnorePlayableRectHelpText);
 
@@ -724,7 +742,9 @@ int moho::cfunc_SetIgnorePlayableRectL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyFactionIndexL`.
  */
-int moho::cfunc_SetArmyFactionIndex(lua_State* const luaContext)
+int moho::cfunc_SetArmyFactionIndex(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetArmyFactionIndexL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -754,7 +774,9 @@ moho::CScrLuaInitForm* moho::func_SetArmyFactionIndex_LuaFuncDef()
  * What it does:
  * Reads `(army, index)` and updates the army faction index lane.
  */
-int moho::cfunc_SetArmyFactionIndexL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetArmyFactionIndexL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -783,7 +805,9 @@ int moho::cfunc_SetArmyFactionIndexL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyOutOfGameL`.
  */
-int moho::cfunc_SetArmyOutOfGame(lua_State* const luaContext)
+int moho::cfunc_SetArmyOutOfGame(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetArmyOutOfGameL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -797,12 +821,7 @@ int moho::cfunc_SetArmyOutOfGame(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetArmyOutOfGame_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
-    "SetArmyOutOfGame",
-    &moho::cfunc_SetArmyOutOfGame,
-    nullptr,
-    "<global>",
-    kSetArmyOutOfGameHelpText
+    SimLuaInitSet(), "SetArmyOutOfGame", &moho::cfunc_SetArmyOutOfGame, nullptr, "<global>", kSetArmyOutOfGameHelpText
   );
   return &binder;
 }
@@ -813,7 +832,9 @@ moho::CScrLuaInitForm* moho::func_SetArmyOutOfGame_LuaFuncDef()
  * What it does:
  * Marks one selected army as out-of-game.
  */
-int moho::cfunc_SetArmyOutOfGameL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetArmyOutOfGameL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -835,7 +856,9 @@ int moho::cfunc_SetArmyOutOfGameL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetAllianceL`.
  */
-int moho::cfunc_SetAlliance(lua_State* const luaContext)
+int moho::cfunc_SetAlliance(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetAllianceL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -849,12 +872,7 @@ int moho::cfunc_SetAlliance(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetAlliance_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
-    "SetAlliance",
-    &moho::cfunc_SetAlliance,
-    nullptr,
-    "<global>",
-    kSetAllianceHelpText
+    SimLuaInitSet(), "SetAlliance", &moho::cfunc_SetAlliance, nullptr, "<global>", kSetAllianceHelpText
   );
   return &binder;
 }
@@ -866,7 +884,9 @@ moho::CScrLuaInitForm* moho::func_SetAlliance_LuaFuncDef()
  * Reads `(army1, army2, relation)` and writes symmetric alliance relation
  * lanes on both armies.
  */
-int moho::cfunc_SetAllianceL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetAllianceL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -905,7 +925,9 @@ int moho::cfunc_SetAllianceL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetAllianceOneWayL`.
  */
-int moho::cfunc_SetAllianceOneWay(lua_State* const luaContext)
+int moho::cfunc_SetAllianceOneWay(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetAllianceOneWayL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -936,7 +958,9 @@ moho::CScrLuaInitForm* moho::func_SetAllianceOneWay_LuaFuncDef()
  * Reads `(army1, army2, relation)` and writes one-way alliance relation on
  * the first army only.
  */
-int moho::cfunc_SetAllianceOneWayL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetAllianceOneWayL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -972,7 +996,9 @@ int moho::cfunc_SetAllianceOneWayL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetAlliedVictoryL`.
  */
-int moho::cfunc_SetAlliedVictory(lua_State* const luaContext)
+int moho::cfunc_SetAlliedVictory(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetAlliedVictoryL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -986,12 +1012,7 @@ int moho::cfunc_SetAlliedVictory(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetAlliedVictory_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
-    "SetAlliedVictory",
-    &moho::cfunc_SetAlliedVictory,
-    nullptr,
-    "<global>",
-    kSetAlliedVictoryHelpText
+    SimLuaInitSet(), "SetAlliedVictory", &moho::cfunc_SetAlliedVictory, nullptr, "<global>", kSetAlliedVictoryHelpText
   );
   return &binder;
 }
@@ -1003,7 +1024,9 @@ moho::CScrLuaInitForm* moho::func_SetAlliedVictory_LuaFuncDef()
  * Reads `(army, enabled)` and updates `RequestingAlliedVictory` on that army's
  * brain script object.
  */
-int moho::cfunc_SetAlliedVictoryL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetAlliedVictoryL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kSetAlliedVictoryHelpText);
 
@@ -1025,7 +1048,9 @@ int moho::cfunc_SetAlliedVictoryL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyEconomyL`.
  */
-int moho::cfunc_SetArmyEconomy(lua_State* const luaContext)
+int moho::cfunc_SetArmyEconomy(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetArmyEconomyL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1039,12 +1064,7 @@ int moho::cfunc_SetArmyEconomy(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetArmyEconomy_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
-    "SetArmyEconomy",
-    &moho::cfunc_SetArmyEconomy,
-    nullptr,
-    "<global>",
-    kSetArmyEconomyHelpText
+    SimLuaInitSet(), "SetArmyEconomy", &moho::cfunc_SetArmyEconomy, nullptr, "<global>", kSetArmyEconomyHelpText
   );
   return &binder;
 }
@@ -1056,7 +1076,9 @@ moho::CScrLuaInitForm* moho::func_SetArmyEconomy_LuaFuncDef()
  * Reads `(army, mass, energy)` and adds those deltas to the army stored
  * economy pair.
  */
-int moho::cfunc_SetArmyEconomyL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetArmyEconomyL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 3, kSetArmyEconomyHelpText);
 
@@ -1095,7 +1117,9 @@ int moho::cfunc_SetArmyEconomyL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyUnitCapL`.
  */
-int moho::cfunc_SetArmyUnitCap(lua_State* const luaContext)
+int moho::cfunc_SetArmyUnitCap(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetArmyUnitCapL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1109,12 +1133,7 @@ int moho::cfunc_SetArmyUnitCap(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetArmyUnitCap_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
-    "SetArmyUnitCap",
-    &moho::cfunc_SetArmyUnitCap,
-    nullptr,
-    "<global>",
-    kSetArmyUnitCapHelpText
+    SimLuaInitSet(), "SetArmyUnitCap", &moho::cfunc_SetArmyUnitCap, nullptr, "<global>", kSetArmyUnitCapHelpText
   );
   return &binder;
 }
@@ -1125,7 +1144,9 @@ moho::CScrLuaInitForm* moho::func_SetArmyUnitCap_LuaFuncDef()
  * What it does:
  * Reads `(army, unitCap)` from Lua and updates that army's unit-cap lane.
  */
-int moho::cfunc_SetArmyUnitCapL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetArmyUnitCapL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kSetArmyUnitCapHelpText);
 
@@ -1148,7 +1169,9 @@ int moho::cfunc_SetArmyUnitCapL(LuaPlus::LuaState* const state)
  * What it does:
  * Reads `(army, personality)` from Lua and updates the army personality lane.
  */
-int moho::cfunc_SetArmyAIPersonalityL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetArmyAIPersonalityL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1181,7 +1204,9 @@ int moho::cfunc_SetArmyAIPersonalityL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyAIPersonalityL`.
  */
-int moho::cfunc_SetArmyAIPersonality(lua_State* const luaContext)
+int moho::cfunc_SetArmyAIPersonality(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetArmyAIPersonalityL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1211,7 +1236,9 @@ moho::CScrLuaInitForm* moho::func_SetArmyAIPersonality_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyShowScoreL`.
  */
-int moho::cfunc_SetArmyShowScore(lua_State* const luaContext)
+int moho::cfunc_SetArmyShowScore(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetArmyShowScoreL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1225,12 +1252,7 @@ int moho::cfunc_SetArmyShowScore(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetArmyShowScore_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
-    "SetArmyShowScore",
-    &moho::cfunc_SetArmyShowScore,
-    nullptr,
-    "<global>",
-    kSetArmyShowScoreHelpText
+    SimLuaInitSet(), "SetArmyShowScore", &moho::cfunc_SetArmyShowScore, nullptr, "<global>", kSetArmyShowScoreHelpText
   );
   return &binder;
 }
@@ -1242,7 +1264,9 @@ moho::CScrLuaInitForm* moho::func_SetArmyShowScore_LuaFuncDef()
  * Reads `(army, showScore)` and stores score visibility in the army runtime
  * variable lane.
  */
-int moho::cfunc_SetArmyShowScoreL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetArmyShowScoreL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kSetArmyShowScoreHelpText);
 
@@ -1263,7 +1287,9 @@ int moho::cfunc_SetArmyShowScoreL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyPlansL`.
  */
-int moho::cfunc_SetArmyPlans(lua_State* const luaContext)
+int moho::cfunc_SetArmyPlans(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetArmyPlansL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1275,7 +1301,9 @@ int moho::cfunc_SetArmyPlans(lua_State* const luaContext)
  * Reads `(army, plans)` from Lua and forwards the plans string to
  * `CArmyImpl::SetArmyPlans`.
  */
-int moho::cfunc_SetArmyPlansL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetArmyPlansL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kSetArmyPlansHelpText);
 
@@ -1304,12 +1332,7 @@ int moho::cfunc_SetArmyPlansL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_SetArmyPlans_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
-    "SetArmyPlans",
-    &moho::cfunc_SetArmyPlans,
-    nullptr,
-    "<global>",
-    kSetArmyPlansHelpText
+    SimLuaInitSet(), "SetArmyPlans", &moho::cfunc_SetArmyPlans, nullptr, "<global>", kSetArmyPlansHelpText
   );
   return &binder;
 }
@@ -1320,7 +1343,9 @@ moho::CScrLuaInitForm* moho::func_SetArmyPlans_LuaFuncDef()
  * What it does:
  * Reads `(army, r, g, b)` from Lua and writes packed color lanes to the army.
  */
-int moho::cfunc_SetArmyColorL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetArmyColorL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1349,7 +1374,9 @@ int moho::cfunc_SetArmyColorL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyColorL`.
  */
-int moho::cfunc_SetArmyColor(lua_State* const luaContext)
+int moho::cfunc_SetArmyColor(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetArmyColorL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1363,12 +1390,7 @@ int moho::cfunc_SetArmyColor(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetArmyColor_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
-    "SetArmyColor",
-    &moho::cfunc_SetArmyColor,
-    nullptr,
-    "<global>",
-    kSetArmyColorHelpText
+    SimLuaInitSet(), "SetArmyColor", &moho::cfunc_SetArmyColor, nullptr, "<global>", kSetArmyColorHelpText
   );
   return &binder;
 }
@@ -1382,12 +1404,7 @@ moho::CScrLuaInitForm* moho::func_SetArmyColor_LuaFuncDef()
 moho::CScrLuaInitForm* moho::func_SetPlayableRect_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    SimLuaInitSet(),
-    "SetPlayableRect",
-    &moho::cfunc_SetPlayableRect,
-    nullptr,
-    "<global>",
-    kSetPlayableRectHelpText
+    SimLuaInitSet(), "SetPlayableRect", &moho::cfunc_SetPlayableRect, nullptr, "<global>", kSetPlayableRectHelpText
   );
   return &binder;
 }

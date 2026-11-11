@@ -77,11 +77,19 @@ namespace faf::editor
    * The cells where the ground crosses `depth` below the water (`heights`: (width + 1) x (height + 1) samples), each
    * facing uphill; only those whose heading is within `rangeDegrees` of `centreDegrees` (180: all).
    */
-  std::vector<ShorePoint> FindShorePoints(const std::vector<float>& heights, int width, int height, float waterLevel, float depth,
-                                          float centreDegrees, float rangeDegrees);
+  std::vector<ShorePoint> FindShorePoints(
+    const std::vector<float>& heights,
+    int width,
+    int height,
+    float waterLevel,
+    float depth,
+    float centreDegrees,
+    float rangeDegrees
+  );
 
   /** About `density` (0 to 1) of the points, none closer than `spacing` to another, picked by `seed`. */
-  std::vector<ShorePoint> PickShorePoints(std::vector<ShorePoint> points, float density, float spacing, std::uint32_t seed);
+  std::vector<ShorePoint>
+  PickShorePoints(std::vector<ShorePoint> points, float density, float spacing, std::uint32_t seed);
 
   /** A generator of `pattern` at a point, on the water, travelling to the shore; `seed` varies its speed and scale. */
   WaveRecord MakeShoreWave(const WavePattern& pattern, const ShorePoint& point, float waterLevel, std::uint32_t& seed);

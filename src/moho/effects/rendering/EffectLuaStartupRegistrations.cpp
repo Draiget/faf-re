@@ -48,7 +48,7 @@ namespace moho
     CArmyImpl* focusArmy,
     EntitySetTemplate<Unit>* selectedUnits
   );
-}
+} // namespace moho
 
 namespace
 {
@@ -77,8 +77,7 @@ namespace
     "CreateBeamToEntityBone(entity, bone, other, bone, army, thickness, texture_filename)";
   constexpr const char* kAttachBeamEntityToEntityHelpText =
     "AttachBeamEntityToEntity(self, bone, other, bone, army, blueprint)";
-  constexpr const char* kAttachBeamToEntityHelpText =
-    "AttachBeamToEntity(emitter, entity, tobone, army )";
+  constexpr const char* kAttachBeamToEntityHelpText = "AttachBeamToEntity(emitter, entity, tobone, army )";
   constexpr const char* kCreateLightParticleHelpText =
     "CreateLightParticle(entity, bone, army, size, lifetime, textureName, rampName)";
   constexpr const char* kCreateLightParticleIntelHelpText =
@@ -88,8 +87,8 @@ namespace
     "effect:SetEmitterParam('name', value)returns the effect so you can chain calls like:\n"
     "    effect:SetEmitterParam('x',1):ScaleEmitter(3.7)";
   constexpr const char* kIEffectScaleEmitterHelpText = "effect:ScaleEmitter(param, scale)\n"
-                                                        "returns the effect so you can chain calls like:\n"
-                                                        "    effect:SetEmitterParam('x',1):ScaleEmitter(3.7)";
+                                                       "returns the effect so you can chain calls like:\n"
+                                                       "    effect:SetEmitterParam('x',1):ScaleEmitter(3.7)";
   constexpr const char* kIEffectResizeEmitterCurveHelpText =
     "Effect:ResizeEmitterCurve(parameter, time_in_ticks)Resize the emitter curve to the number of ticks passed in.\n"
     "This is so if we change the lifetime of the emitter we can rescale some of the curves to match if needed.\n"
@@ -97,8 +96,7 @@ namespace
     "\n"
     "returns the effect so you can chain calls like:\n"
     "    effect:SetEmitterParam('x',1):ScaleEmitter(3.7)";
-  constexpr const char* kIEffectSetEmitterCurveParamHelpText =
-    "Effect:SetEmitterCurveParam(param_name, height, size)";
+  constexpr const char* kIEffectSetEmitterCurveParamHelpText = "Effect:SetEmitterCurveParam(param_name, height, size)";
   constexpr const char* kIEffectOffsetEmitterHelpText = "Effect:OffsetEmitter(x,y,z)";
   constexpr const char* kIEffectDestroyHelpText = "Effect:Destroy()";
   constexpr const char* kCDecalHandleDestroyHelpText = "DecalHandle:Destroy()";
@@ -131,12 +129,16 @@ namespace
     return fallbackSet;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(
+    lua_State* const luaContext
+  ) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
   }
 
-  [[nodiscard]] moho::Sim* ResolveGlobalSim(lua_State* const luaContext) noexcept
+  [[nodiscard]] moho::Sim* ResolveGlobalSim(
+    lua_State* const luaContext
+  ) noexcept
   {
     if (!luaContext || !luaContext->l_G) {
       return nullptr;
@@ -144,7 +146,9 @@ namespace
     return luaContext->l_G->globalUserData;
   }
 
-  [[nodiscard]] Wm3::Vec3f NormalizeXZ(const Wm3::Vec3f& value) noexcept
+  [[nodiscard]] Wm3::Vec3f NormalizeXZ(
+    const Wm3::Vec3f& value
+  ) noexcept
   {
     const float lengthXZ = std::sqrt((value.x * value.x) + (value.z * value.z));
     if (lengthXZ <= 0.0f) {
@@ -155,7 +159,10 @@ namespace
     return {value.x * invLength, 0.0f, value.z * invLength};
   }
 
-  [[nodiscard]] std::uint32_t ComputeDecalStartTick(const moho::Sim* const sim, const float duration) noexcept
+  [[nodiscard]] std::uint32_t ComputeDecalStartTick(
+    const moho::Sim* const sim,
+    const float duration
+  ) noexcept
   {
     if (!sim || duration <= 0.0f) {
       return 0u;
@@ -165,7 +172,10 @@ namespace
     return sim->mCurTick + durationTicks;
   }
 
-  [[nodiscard]] moho::VTransform BuildHeadingTransform(const Wm3::Vec3f& position, const float heading) noexcept
+  [[nodiscard]] moho::VTransform BuildHeadingTransform(
+    const Wm3::Vec3f& position,
+    const float heading
+  ) noexcept
   {
     const float halfHeading = heading * 0.5f;
     const float sinHalf = std::sin(halfHeading);
@@ -282,7 +292,10 @@ namespace
     return sCachedType ? sCachedType->IsEnumType() : nullptr;
   }
 
-  [[nodiscard]] int ResolveEmitterCurveParamIndexOrThrow(lua_State* const rawState, const char* const paramName)
+  [[nodiscard]] int ResolveEmitterCurveParamIndexOrThrow(
+    lua_State* const rawState,
+    const char* const paramName
+  )
   {
     int paramIndex = 0;
     const gpg::REnumType* const enumType = ResolveEEmitterCurveType();
@@ -294,7 +307,9 @@ namespace
     return paramIndex;
   }
 
-  [[maybe_unused]] void RecomputeEmitterCurveYBounds(moho::SEfxCurve& curve)
+  [[maybe_unused]] void RecomputeEmitterCurveYBounds(
+    moho::SEfxCurve& curve
+  )
   {
     curve.mBoundsMin.y = std::numeric_limits<float>::infinity();
     curve.mBoundsMax.y = -std::numeric_limits<float>::infinity();
@@ -317,7 +332,10 @@ namespace
    * applies arg #3 as float via `IEffect::SetFloatParam`, and returns the
    * effect Lua object for call chaining.
    */
-  int ApplyIEffectNamedFloatParam(LuaPlus::LuaState* const state, const gpg::REnumType* const enumType)
+  int ApplyIEffectNamedFloatParam(
+    LuaPlus::LuaState* const state,
+    const gpg::REnumType* const enumType
+  )
   {
     lua_State* const rawState = state->m_state;
     LuaPlus::LuaObject effectObject(LuaPlus::LuaStackObject(state, 1));
@@ -385,7 +403,11 @@ namespace
    * Address: 0x00BD4210 (FUN_00BD4210, dynamic initializer for `gTConVar_efx_WaterOffset`)
    * Address: 0x00BFBCB0 (FUN_00BFBCB0, dynamic atexit destructor for `gTConVar_efx_WaterOffset`)
    */
-  moho::TConVar<float> gTConVar_efx_WaterOffset("efx_WaterOffset", "Amount that particles which are clamped to the waters surfaces are offset from it.", &moho::efx_WaterOffset);
+  moho::TConVar<float> gTConVar_efx_WaterOffset(
+    "efx_WaterOffset",
+    "Amount that particles which are clamped to the waters surfaces are offset from it.",
+    &moho::efx_WaterOffset
+  );
 
   /**
    * Address: 0x00BD4250 (FUN_00BD4250, dynamic initializer for `gTConVar_dbg_Emitter`)
@@ -510,7 +532,9 @@ namespace moho
    * What it does:
    * Unwraps the Lua callback context and forwards to `cfunc_CreateBeamEmitterL`.
    */
-  int cfunc_CreateBeamEmitter(lua_State* const luaContext)
+  int cfunc_CreateBeamEmitter(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateBeamEmitterL(ResolveBindingState(luaContext));
   }
@@ -522,7 +546,9 @@ namespace moho
    * Validates `(blueprintName, armyIndex)`, resolves one beam blueprint id,
    * creates the beam effect instance, and pushes the effect Lua object.
    */
-  int cfunc_CreateBeamEmitterL(LuaPlus::LuaState* const state)
+  int cfunc_CreateBeamEmitterL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -569,12 +595,7 @@ namespace moho
   CScrLuaInitForm* func_CreateBeamEmitter_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
-      "CreateBeamEmitter",
-      &cfunc_CreateBeamEmitter,
-      nullptr,
-      "<global>",
-      kCreateBeamEmitterHelpText
+      SimLuaInitSet(), "CreateBeamEmitter", &cfunc_CreateBeamEmitter, nullptr, "<global>", kCreateBeamEmitterHelpText
     );
     return &binder;
   }
@@ -586,7 +607,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_CreateBeamEmitterOnEntityL`.
    */
-  int cfunc_CreateBeamEmitterOnEntity(lua_State* const luaContext)
+  int cfunc_CreateBeamEmitterOnEntity(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateBeamEmitterOnEntityL(ResolveBindingState(luaContext));
   }
@@ -619,7 +642,9 @@ namespace moho
    * effect from blueprint/army, attaches it to entity-or-bone, and pushes the
    * effect Lua object on success.
    */
-  int cfunc_CreateBeamEmitterOnEntityL(LuaPlus::LuaState* const state)
+  int cfunc_CreateBeamEmitterOnEntityL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -676,7 +701,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_CreateBeamEntityToEntityL`.
    */
-  int cfunc_CreateBeamEntityToEntity(lua_State* const luaContext)
+  int cfunc_CreateBeamEntityToEntity(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateBeamEntityToEntityL(ResolveBindingState(luaContext));
   }
@@ -709,7 +736,9 @@ namespace moho
    * resolves one beam blueprint, creates one beam between both entity lanes,
    * and pushes the effect Lua object on success.
    */
-  int cfunc_CreateBeamEntityToEntityL(LuaPlus::LuaState* const state)
+  int cfunc_CreateBeamEntityToEntityL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -756,12 +785,7 @@ namespace moho
     }
 
     IEffect* const effect = sim->mEffectManager->CreateBeamEntityToEntity(
-      sourceEntity,
-      sourceBoneIndex,
-      targetEntity,
-      targetBoneIndex,
-      beamBlueprint,
-      armyIndex
+      sourceEntity, sourceBoneIndex, targetEntity, targetBoneIndex, beamBlueprint, armyIndex
     );
     if (!effect) {
       return 0;
@@ -778,7 +802,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_AttachBeamEntityToEntityL`.
    */
-  int cfunc_AttachBeamEntityToEntity(lua_State* const luaContext)
+  int cfunc_AttachBeamEntityToEntity(
+    lua_State* const luaContext
+  )
   {
     return cfunc_AttachBeamEntityToEntityL(ResolveBindingState(luaContext));
   }
@@ -811,7 +837,9 @@ namespace moho
    * resolves the beam blueprint, attaches one beam between both entity lanes,
    * and pushes the resulting effect Lua object on success.
    */
-  int cfunc_AttachBeamEntityToEntityL(LuaPlus::LuaState* const state)
+  int cfunc_AttachBeamEntityToEntityL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -853,8 +881,9 @@ namespace moho
       LuaPlus::LuaState::Error(state, kUnknownBeamKindErrorText, blueprintName);
     }
 
-    IEffect* const effect = sim->mEffectManager
-      ->AttachBeamEntityToEntity(sourceEntity, sourceBoneIndex, targetEntity, targetBoneIndex, beamBlueprint, armyIndex);
+    IEffect* const effect = sim->mEffectManager->AttachBeamEntityToEntity(
+      sourceEntity, sourceBoneIndex, targetEntity, targetBoneIndex, beamBlueprint, armyIndex
+    );
     if (!effect) {
       return 0;
     }
@@ -869,7 +898,9 @@ namespace moho
    * What it does:
    * Unwraps the Lua callback context and forwards to `cfunc_AttachBeamToEntityL`.
    */
-  int cfunc_AttachBeamToEntity(lua_State* const luaContext)
+  int cfunc_AttachBeamToEntity(
+    lua_State* const luaContext
+  )
   {
     return cfunc_AttachBeamToEntityL(ResolveBindingState(luaContext));
   }
@@ -883,12 +914,7 @@ namespace moho
   CScrLuaInitForm* func_AttachBeamToEntity_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
-      "AttachBeamToEntity",
-      &cfunc_AttachBeamToEntity,
-      nullptr,
-      "<global>",
-      kAttachBeamToEntityHelpText
+      SimLuaInitSet(), "AttachBeamToEntity", &cfunc_AttachBeamToEntity, nullptr, "<global>", kAttachBeamToEntityHelpText
     );
     return &binder;
   }
@@ -930,7 +956,9 @@ namespace moho
    * Validates `(effect, entity, targetBone, army)`, then retargets the beam to
    * either the entity root or one specific target bone lane.
    */
-  int cfunc_AttachBeamToEntityL(LuaPlus::LuaState* const state)
+  int cfunc_AttachBeamToEntityL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -969,7 +997,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_CreateAttachedEmitterL`.
    */
-  int cfunc_CreateAttachedEmitter(lua_State* const luaContext)
+  int cfunc_CreateAttachedEmitter(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateAttachedEmitterL(ResolveBindingState(luaContext));
   }
@@ -1002,7 +1032,9 @@ namespace moho
    * effect manager lane, creates one attached emitter effect, and pushes the
    * resulting Lua object.
    */
-  int cfunc_CreateAttachedEmitterL(LuaPlus::LuaState* const state)
+  int cfunc_CreateAttachedEmitterL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1042,7 +1074,9 @@ namespace moho
    * What it does:
    * Unwraps the Lua callback context and forwards to `cfunc_CreateTrailL`.
    */
-  int cfunc_CreateTrail(lua_State* const luaContext)
+  int cfunc_CreateTrail(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateTrailL(ResolveBindingState(luaContext));
   }
@@ -1056,12 +1090,7 @@ namespace moho
   CScrLuaInitForm* func_CreateTrail_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
-      "CreateTrail",
-      &cfunc_CreateTrail,
-      nullptr,
-      "<global>",
-      kCreateTrailHelpText
+      SimLuaInitSet(), "CreateTrail", &cfunc_CreateTrail, nullptr, "<global>", kCreateTrailHelpText
     );
     return &binder;
   }
@@ -1074,7 +1103,9 @@ namespace moho
    * effect manager lane, creates one attached trail effect, and pushes the
    * resulting Lua object.
    */
-  int cfunc_CreateTrailL(LuaPlus::LuaState* const state)
+  int cfunc_CreateTrailL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1115,7 +1146,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_CreateAttachedBeamL`.
    */
-  int cfunc_CreateAttachedBeam(lua_State* const luaContext)
+  int cfunc_CreateAttachedBeam(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateAttachedBeamL(ResolveBindingState(luaContext));
   }
@@ -1129,12 +1162,7 @@ namespace moho
   CScrLuaInitForm* func_CreateAttachedBeam_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
-      "CreateAttachedBeam",
-      &cfunc_CreateAttachedBeam,
-      nullptr,
-      "<global>",
-      kCreateAttachedBeamHelpText
+      SimLuaInitSet(), "CreateAttachedBeam", &cfunc_CreateAttachedBeam, nullptr, "<global>", kCreateAttachedBeamHelpText
     );
     return &binder;
   }
@@ -1147,7 +1175,9 @@ namespace moho
    * builds one attached-beam create payload, spawns the effect, and pushes its
    * Lua object on success.
    */
-  int cfunc_CreateAttachedBeamL(LuaPlus::LuaState* const state)
+  int cfunc_CreateAttachedBeamL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1212,7 +1242,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_CreateBeamToEntityBoneL`.
    */
-  int cfunc_CreateBeamToEntityBone(lua_State* const luaContext)
+  int cfunc_CreateBeamToEntityBone(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateBeamToEntityBoneL(ResolveBindingState(luaContext));
   }
@@ -1245,7 +1277,9 @@ namespace moho
    * thickness, texture)`, resolves both bone world-space lanes, spawns one
    * beam, and pushes the effect Lua object on success.
    */
-  int cfunc_CreateBeamToEntityBoneL(LuaPlus::LuaState* const state)
+  int cfunc_CreateBeamToEntityBoneL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1319,7 +1353,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_CreateEmitterAtEntityL`.
    */
-  int cfunc_CreateEmitterAtEntity(lua_State* const luaContext)
+  int cfunc_CreateEmitterAtEntity(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateEmitterAtEntityL(ResolveBindingState(luaContext));
   }
@@ -1331,7 +1367,9 @@ namespace moho
    * Reads `(entity, army, emitterBlueprint)`, creates one emitter anchored to
    * an entity, and pushes the effect Lua object on success.
    */
-  int cfunc_CreateEmitterAtEntityL(LuaPlus::LuaState* const state)
+  int cfunc_CreateEmitterAtEntityL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1389,7 +1427,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_CreateEmitterOnEntityL`.
    */
-  int cfunc_CreateEmitterOnEntity(lua_State* const luaContext)
+  int cfunc_CreateEmitterOnEntity(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateEmitterOnEntityL(ResolveBindingState(luaContext));
   }
@@ -1401,7 +1441,9 @@ namespace moho
    * Reads `(entity, army, emitterBlueprint)`, creates one emitter attached to
    * an entity lane, and pushes the effect Lua object on success.
    */
-  int cfunc_CreateEmitterOnEntityL(LuaPlus::LuaState* const state)
+  int cfunc_CreateEmitterOnEntityL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1458,7 +1500,9 @@ namespace moho
    * What it does:
    * Unwraps the Lua callback context and forwards to `cfunc_CreateLightParticleL`.
    */
-  int cfunc_CreateLightParticle(lua_State* const luaContext)
+  int cfunc_CreateLightParticle(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateLightParticleL(ResolveBindingState(luaContext));
   }
@@ -1490,7 +1534,9 @@ namespace moho
    * bone world position lane, and emits one light particle through the active
    * effect manager.
    */
-  int cfunc_CreateLightParticleL(LuaPlus::LuaState* const state)
+  int cfunc_CreateLightParticleL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1554,7 +1600,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_CreateLightParticleIntelL`.
    */
-  int cfunc_CreateLightParticleIntel(lua_State* const luaContext)
+  int cfunc_CreateLightParticleIntel(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateLightParticleIntelL(ResolveBindingState(luaContext));
   }
@@ -1586,7 +1634,9 @@ namespace moho
    * Resolves one `(entity, bone)` world lane and only emits a light particle
    * when the focus army (if any) has LOS detection for that probe position.
    */
-  int cfunc_CreateLightParticleIntelL(LuaPlus::LuaState* const state)
+  int cfunc_CreateLightParticleIntelL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1653,8 +1703,9 @@ namespace moho
     }
 
     if (emitParticle) {
-      sim->mEffectManager
-        ->CreateLightParticle(bonePosition, texturePrimary, textureSecondary, size, lifetime, armyIndex);
+      sim->mEffectManager->CreateLightParticle(
+        bonePosition, texturePrimary, textureSecondary, size, lifetime, armyIndex
+      );
     }
     return 0;
   }
@@ -1666,7 +1717,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_CreateEmitterAtBoneL`.
    */
-  int cfunc_CreateEmitterAtBone(lua_State* const luaContext)
+  int cfunc_CreateEmitterAtBone(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateEmitterAtBoneL(ResolveBindingState(luaContext));
   }
@@ -1679,7 +1732,9 @@ namespace moho
    * effect manager lane, creates one emitter-at-bone effect, and pushes the
    * resulting Lua object.
    */
-  int cfunc_CreateEmitterAtBoneL(LuaPlus::LuaState* const state)
+  int cfunc_CreateEmitterAtBoneL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1740,7 +1795,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_IEffectSetBeamParamL`.
    */
-  int cfunc_IEffectSetBeamParam(lua_State* const luaContext)
+  int cfunc_IEffectSetBeamParam(
+    lua_State* const luaContext
+  )
   {
     return cfunc_IEffectSetBeamParamL(ResolveBindingState(luaContext));
   }
@@ -1753,7 +1810,9 @@ namespace moho
    * token from arg #2, and applies arg #3 as float through the shared
    * named-param lane.
    */
-  int cfunc_IEffectSetBeamParamL(LuaPlus::LuaState* const state)
+  int cfunc_IEffectSetBeamParamL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 3, kIEffectSetBeamParamHelpText);
 
@@ -1787,7 +1846,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_IEffectSetEmitterParamL`.
    */
-  int cfunc_IEffectSetEmitterParam(lua_State* const luaContext)
+  int cfunc_IEffectSetEmitterParam(
+    lua_State* const luaContext
+  )
   {
     return cfunc_IEffectSetEmitterParamL(ResolveBindingState(luaContext));
   }
@@ -1800,7 +1861,9 @@ namespace moho
    * `EEmitterParam` token from arg #2, and applies arg #3 as float through the
    * shared named-param lane.
    */
-  int cfunc_IEffectSetEmitterParamL(LuaPlus::LuaState* const state)
+  int cfunc_IEffectSetEmitterParamL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 3, kIEffectSetEmitterParamHelpText);
 
@@ -1834,7 +1897,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_IEffectScaleEmitterL`.
    */
-  int cfunc_IEffectScaleEmitter(lua_State* const luaContext)
+  int cfunc_IEffectScaleEmitter(
+    lua_State* const luaContext
+  )
   {
     return cfunc_IEffectScaleEmitterL(ResolveBindingState(luaContext));
   }
@@ -1847,7 +1912,9 @@ namespace moho
    * emitter-float parameter lane `18`, and returns the effect Lua object for
    * chaining.
    */
-  int cfunc_IEffectScaleEmitterL(LuaPlus::LuaState* const state)
+  int cfunc_IEffectScaleEmitterL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kIEffectScaleEmitterHelpText);
 
@@ -1875,7 +1942,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_IEffectResizeEmitterCurveL`.
    */
-  int cfunc_IEffectResizeEmitterCurve(lua_State* const luaContext)
+  int cfunc_IEffectResizeEmitterCurve(
+    lua_State* const luaContext
+  )
   {
     return cfunc_IEffectResizeEmitterCurveL(ResolveBindingState(luaContext));
   }
@@ -1889,7 +1958,9 @@ namespace moho
    * to `[0,newTicks]`, recomputes Y bounds, writes the curve back, and returns
    * the effect Lua object for chaining.
    */
-  int cfunc_IEffectResizeEmitterCurveL(LuaPlus::LuaState* const state)
+  int cfunc_IEffectResizeEmitterCurveL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 3, kIEffectResizeEmitterCurveHelpText);
 
@@ -1932,7 +2003,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_IEffectSetEmitterCurveParamL`.
    */
-  int cfunc_IEffectSetEmitterCurveParam(lua_State* const luaContext)
+  int cfunc_IEffectSetEmitterCurveParam(
+    lua_State* const luaContext
+  )
   {
     return cfunc_IEffectSetEmitterCurveParamL(ResolveBindingState(luaContext));
   }
@@ -1945,7 +2018,9 @@ namespace moho
    * `EEmitterCurve` lane by name, builds a one-key curve `(x=0,height,size)`,
    * writes it to the effect, and returns the effect Lua object for chaining.
    */
-  int cfunc_IEffectSetEmitterCurveParamL(LuaPlus::LuaState* const state)
+  int cfunc_IEffectSetEmitterCurveParamL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 4, kIEffectSetEmitterCurveParamHelpText);
 
@@ -1985,7 +2060,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_IEffectOffsetEmitterL`.
    */
-  int cfunc_IEffectOffsetEmitter(lua_State* const luaContext)
+  int cfunc_IEffectOffsetEmitter(
+    lua_State* const luaContext
+  )
   {
     return cfunc_IEffectOffsetEmitterL(ResolveBindingState(luaContext));
   }
@@ -1998,7 +2075,9 @@ namespace moho
    * current float params `(0,1,2)`, writes the updated vector through
    * `SetNParam(0, ..., 3)`, and returns the effect Lua object for chaining.
    */
-  int cfunc_IEffectOffsetEmitterL(LuaPlus::LuaState* const state)
+  int cfunc_IEffectOffsetEmitterL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 4, kIEffectOffsetEmitterHelpText);
 
@@ -2043,7 +2122,9 @@ namespace moho
    * What it does:
    * Unwraps the Lua callback context and forwards to `cfunc_IEffectDestroyL`.
    */
-  int cfunc_IEffectDestroy(lua_State* const luaContext)
+  int cfunc_IEffectDestroy(
+    lua_State* const luaContext
+  )
   {
     return cfunc_IEffectDestroyL(ResolveBindingState(luaContext));
   }
@@ -2055,7 +2136,9 @@ namespace moho
    * Validates `IEffect:Destroy()`, resolves one optional effect object, and
    * dispatches destroy through the owning effect manager.
    */
-  int cfunc_IEffectDestroyL(LuaPlus::LuaState* const state)
+  int cfunc_IEffectDestroyL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kIEffectDestroyHelpText);
 
@@ -2077,7 +2160,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_CDecalHandleDestroyL`.
    */
-  int cfunc_CDecalHandleDestroy(lua_State* const luaContext)
+  int cfunc_CDecalHandleDestroy(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CDecalHandleDestroyL(ResolveBindingState(luaContext));
   }
@@ -2089,7 +2174,9 @@ namespace moho
    * Validates `CDecalHandle:Destroy()`, resolves one optional decal handle,
    * and destroys it through the sim-owned decal buffer lane.
    */
-  int cfunc_CDecalHandleDestroyL(LuaPlus::LuaState* const state)
+  int cfunc_CDecalHandleDestroyL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kCDecalHandleDestroyHelpText);
 
@@ -2228,7 +2315,9 @@ namespace moho
    * What it does:
    * Unwraps the Lua callback context and forwards to `cfunc_CreateDecalL`.
    */
-  int cfunc_CreateDecal(lua_State* const luaContext)
+  int cfunc_CreateDecal(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateDecalL(ResolveBindingState(luaContext));
   }
@@ -2242,12 +2331,7 @@ namespace moho
   CScrLuaInitForm* func_CreateDecal_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
-      "CreateDecal",
-      &cfunc_CreateDecal,
-      nullptr,
-      "<global>",
-      kCreateDecalHelpText
+      SimLuaInitSet(), "CreateDecal", &cfunc_CreateDecal, nullptr, "<global>", kCreateDecalHelpText
     );
     return &binder;
   }
@@ -2259,7 +2343,9 @@ namespace moho
    * Reads decal construction arguments from Lua, creates one tracked decal
    * handle in the sim decal buffer, and returns the handle Lua object (or nil).
    */
-  int cfunc_CreateDecalL(LuaPlus::LuaState* const state)
+  int cfunc_CreateDecalL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2374,7 +2460,9 @@ namespace moho
    * What it does:
    * Unwraps the Lua callback context and forwards to `cfunc_CreateSplatL`.
    */
-  int cfunc_CreateSplat(lua_State* const luaContext)
+  int cfunc_CreateSplat(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateSplatL(ResolveBindingState(luaContext));
   }
@@ -2388,12 +2476,7 @@ namespace moho
   CScrLuaInitForm* func_CreateSplat_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
-      "CreateSplat",
-      &cfunc_CreateSplat,
-      nullptr,
-      "<global>",
-      kCreateSplatHelpText
+      SimLuaInitSet(), "CreateSplat", &cfunc_CreateSplat, nullptr, "<global>", kCreateSplatHelpText
     );
     return &binder;
   }
@@ -2405,7 +2488,9 @@ namespace moho
    * Reads splat parameters from Lua and enqueues one non-handle splat decal in
    * the active sim decal buffer.
    */
-  int cfunc_CreateSplatL(LuaPlus::LuaState* const state)
+  int cfunc_CreateSplatL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2500,7 +2585,9 @@ namespace moho
    * Unwraps the Lua callback context and forwards to
    * `cfunc_CreateSplatOnBoneL`.
    */
-  int cfunc_CreateSplatOnBone(lua_State* const luaContext)
+  int cfunc_CreateSplatOnBone(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateSplatOnBoneL(ResolveBindingState(luaContext));
   }
@@ -2514,12 +2601,7 @@ namespace moho
   CScrLuaInitForm* func_CreateSplatOnBone_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      SimLuaInitSet(),
-      "CreateSplatOnBone",
-      &cfunc_CreateSplatOnBone,
-      nullptr,
-      "<global>",
-      kCreateSplatOnBoneHelpText
+      SimLuaInitSet(), "CreateSplatOnBone", &cfunc_CreateSplatOnBone, nullptr, "<global>", kCreateSplatOnBoneHelpText
     );
     return &binder;
   }
@@ -2531,7 +2613,9 @@ namespace moho
    * Builds one splat transform from entity bone world transform plus optional
    * local offset, then enqueues one splat decal in the sim decal buffer.
    */
-  int cfunc_CreateSplatOnBoneL(LuaPlus::LuaState* const state)
+  int cfunc_CreateSplatOnBoneL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2746,7 +2830,11 @@ namespace moho
    * Address: 0x00BD4350 (FUN_00BD4350, dynamic initializer for `gConAlias_efx_NewEmitter`)
    * Address: 0x00BFBDE0 (FUN_00BFBDE0, dynamic atexit destructor for `gConAlias_efx_NewEmitter`)
    */
-  moho::CConAlias gConAlias_efx_NewEmitter("efx_NewEmitter", "Create an emitter, must specify blueprint", "DoSimCommand efx_NewEmitter");
+  moho::CConAlias gConAlias_efx_NewEmitter(
+    "efx_NewEmitter",
+    "Create an emitter, must specify blueprint",
+    "DoSimCommand efx_NewEmitter"
+  );
 
   /**
    * Address: 0x00BD4380 (FUN_00BD4380, dynamic initializer for `gSimConFunc_efx_NewEmitter`)
@@ -2758,7 +2846,11 @@ namespace moho
    * Address: 0x00BD43C0 (FUN_00BD43C0, dynamic initializer for `gConAlias_efx_AttachEmitter`)
    * Address: 0x00BFBE40 (FUN_00BFBE40, dynamic atexit destructor for `gConAlias_efx_AttachEmitter`)
    */
-  moho::CConAlias gConAlias_efx_AttachEmitter("efx_AttachEmitter", "Attach an emitter to selected unit, must specify bone name and blueprint", "DoSimCommand efx_AttachEmitter");
+  moho::CConAlias gConAlias_efx_AttachEmitter(
+    "efx_AttachEmitter",
+    "Attach an emitter to selected unit, must specify bone name and blueprint",
+    "DoSimCommand efx_AttachEmitter"
+  );
 
   /**
    * Address: 0x00BD43F0 (FUN_00BD43F0, dynamic initializer for `gSimConFunc_efx_AttachEmitter`)
@@ -2770,7 +2862,11 @@ namespace moho
    * Address: 0x00BD4640 (FUN_00BD4640, dynamic initializer for `gConAlias_AddLightParticle`)
    * Address: 0x00BFC090 (FUN_00BFC090, dynamic atexit destructor for `gConAlias_AddLightParticle`)
    */
-  moho::CConAlias gConAlias_AddLightParticle("AddLightParticle", "Add a light to the world under the cursor", "DoSimCommand AddLightParticle");
+  moho::CConAlias gConAlias_AddLightParticle(
+    "AddLightParticle",
+    "Add a light to the world under the cursor",
+    "DoSimCommand AddLightParticle"
+  );
 
   /**
    * Address: 0x00BD4670 (FUN_00BD4670, dynamic initializer for `gSimConFunc_AddLightParticle`)
@@ -2787,9 +2883,7 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInitFormListAnchor()
   {
-    return RegisterRecoveredSimInitLinkerLane<
-      &gRecoveredSimLuaInitFormPrevious,
-      &gRecoveredSimLuaInitFormAnchor>();
+    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrevious, &gRecoveredSimLuaInitFormAnchor>();
   }
 
   /**
@@ -2959,7 +3053,10 @@ namespace moho
    * Writes the cached `IEffect` Lua metatable object into the caller-provided
    * destination and returns that destination pointer.
    */
-  LuaPlus::LuaObject* func_CreateLuaIEffect(LuaPlus::LuaObject* object, LuaPlus::LuaState* state)
+  LuaPlus::LuaObject* func_CreateLuaIEffect(
+    LuaPlus::LuaObject* object,
+    LuaPlus::LuaState* state
+  )
   {
     *object = CScrLuaMetatableFactory<IEffect>::Instance().Get(state);
     return object;
@@ -2972,7 +3069,10 @@ namespace moho
    * Writes the cached `CDecalHandle` Lua metatable object into the
    * caller-provided destination and returns that destination pointer.
    */
-  LuaPlus::LuaObject* func_CreateCDecalHandleObject(LuaPlus::LuaObject* object, LuaPlus::LuaState* state)
+  LuaPlus::LuaObject* func_CreateCDecalHandleObject(
+    LuaPlus::LuaObject* object,
+    LuaPlus::LuaState* state
+  )
   {
     *object = CScrLuaMetatableFactory<CDecalHandle>::Instance().Get(state);
     return object;

@@ -46,9 +46,8 @@ namespace moho
    * then, and always for a load with the switch off or without an early map (`wld_LoadMapEarly`).
    * Both stay the scenario's; nothing else in the load changes them.
    */
-  [[nodiscard]] bool WLD_GetEarlySimInputs(
-    const SWldScenarioInfo* scenario, RRuleGameRules** outRules, CWldMap** outMap
-  ) noexcept;
+  [[nodiscard]] bool
+  WLD_GetEarlySimInputs(const SWldScenarioInfo* scenario, RRuleGameRules** outRules, CWldMap** outMap) noexcept;
 
   // Every virtual below except the destructor is pure. IWldSessionLoader's
   // vftable (0x00E49FA4) has all 7 of its slots pointing at _purecall
@@ -137,7 +136,7 @@ namespace moho
   {
   public:
     /**
-       * Address: 0x008855B0 (FUN_008855B0)
+     * Address: 0x008855B0 (FUN_008855B0)
      */
     CWldSessionLoaderImpl();
 
@@ -204,17 +203,21 @@ namespace moho
 
   static_assert(sizeof(CWldSessionLoaderImpl) == 0x18, "CWldSessionLoaderImpl size must be 0x18");
   static_assert(
-    offsetof(CWldSessionLoaderImpl, mCreated) == 0x04, "CWldSessionLoaderImpl::mCreated offset must be 0x04"
+    offsetof(CWldSessionLoaderImpl, mCreated) == 0x04,
+    "CWldSessionLoaderImpl::mCreated offset must be 0x04"
   );
   static_assert(offsetof(CWldSessionLoaderImpl, mLoaded) == 0x05, "CWldSessionLoaderImpl::mLoaded offset must be 0x05");
   static_assert(
-    offsetof(CWldSessionLoaderImpl, mFinalized) == 0x06, "CWldSessionLoaderImpl::mFinalized offset must be 0x06"
+    offsetof(CWldSessionLoaderImpl, mFinalized) == 0x06,
+    "CWldSessionLoaderImpl::mFinalized offset must be 0x06"
   );
   static_assert(
-    offsetof(CWldSessionLoaderImpl, mScenarioHead) == 0x08, "CWldSessionLoaderImpl::mScenarioHead offset must be 0x08"
+    offsetof(CWldSessionLoaderImpl, mScenarioHead) == 0x08,
+    "CWldSessionLoaderImpl::mScenarioHead offset must be 0x08"
   );
   static_assert(
-    offsetof(CWldSessionLoaderImpl, mGameData) == 0x10, "CWldSessionLoaderImpl::mGameData offset must be 0x10"
+    offsetof(CWldSessionLoaderImpl, mGameData) == 0x10,
+    "CWldSessionLoaderImpl::mGameData offset must be 0x10"
   );
   static_assert(
     offsetof(CWldSessionLoaderImpl, mActiveLoadScenario) == 0x14,
@@ -222,7 +225,7 @@ namespace moho
   );
 
   /**
-    * Alias of FUN_008855B0 (non-canonical helper lane).
+   * Alias of FUN_008855B0 (non-canonical helper lane).
    */
   CWldSessionLoaderImpl* GetWldSessionLoader();
 } // namespace moho

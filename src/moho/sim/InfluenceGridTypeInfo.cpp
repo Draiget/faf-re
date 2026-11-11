@@ -64,4 +64,7 @@ namespace moho
 // Phase-1 pre-registration: InfluenceGridSerializer and CInfluenceMap resolve
 // InfluenceGrid through gpg::LookupRType, so the descriptor must exist before
 // those consumers run. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_InfluenceGridTypeInfo_717bb0, moho::preregister_InfluenceGridTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_InfluenceGridTypeInfo_717bb0,
+  moho::preregister_InfluenceGridTypeInfo
+)

@@ -59,8 +59,8 @@ namespace moho
      */
     ~SVFSMountPoint();
 
-    fa::string mDir;        // +0x00
-    fa::string mMountpoint; // +0x1C
+    fa::string mDir;             // +0x00
+    fa::string mMountpoint;      // +0x1C
     SFileWaitHandle* mZipHandle; // +0x38
   };
 
@@ -79,7 +79,8 @@ namespace moho
     /**
      * Address: 0x00466250 (FUN_00466250, ??0CVFSImpl@Moho@@QAE@@Z)
      *
-     * std::vector<Moho::SVFSMountPoint> const &,boost::filesystem::basic_path<std::string,boost::filesystem::path_traits> const &
+     * std::vector<Moho::SVFSMountPoint> const
+     * &,boost::filesystem::basic_path<std::string,boost::filesystem::path_traits> const &
      *
      * What it does:
      * Initializes VFS mountpoint storage and expands configured mount lanes.
@@ -191,10 +192,8 @@ namespace moho
    * Allocates and returns one concrete `CVFSImpl` instance as the
    * `CVirtualFileSystem` interface.
    */
-  [[nodiscard]] CVirtualFileSystem* VFS_Create(
-    const fa::vector<SVFSMountPoint>& mountpoints,
-    const std::filesystem::path& launchDir
-  );
+  [[nodiscard]] CVirtualFileSystem*
+  VFS_Create(const fa::vector<SVFSMountPoint>& mountpoints, const std::filesystem::path& launchDir);
 
   static_assert(offsetof(CVFSImpl, mMountpoints) == 0x04, "CVFSImpl::mMountpoints offset must be 0x04");
   static_assert(sizeof(CVFSImpl) == 0x14, "CVFSImpl size must be 0x14");
@@ -224,7 +223,11 @@ namespace moho
    * order (plan risk R10). Off, it does nothing.
    */
   template <class Iterator, class NameOf>
-  void DISK_FuzzEnumerationOrder(const Iterator first, const Iterator last, const NameOf nameOf)
+  void DISK_FuzzEnumerationOrder(
+    const Iterator first,
+    const Iterator last,
+    const NameOf nameOf
+  )
   {
     const std::uint32_t seed = DISK_EnumerationOrderFuzzSeed();
     if (seed == 0u || last - first < 2) {

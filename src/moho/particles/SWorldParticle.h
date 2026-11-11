@@ -12,7 +12,7 @@ namespace gpg
   class ReadArchive;
   class WriteArchive;
   class RType;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -57,12 +57,24 @@ namespace moho
      * Address: 0x0049BD30 (FUN_0049BD30, `??1SParticle@Moho@@QAE@@Z` -- the implicit
      * destructor: `mTypeTag` then both counted handles. Formerly
      * `DestroyWorldParticleForVectorTail`, removed.)
-     * Address: 0x0049FAB0 (FUN_0049FAB0 -- the compiler-generated copy assignment of `SWorldParticle` as emitted for its `fa::vector` instantiation; callers 0x0049DE20, 0x0049E400, 0x0049E430; formerly `CopyAssignWorldParticleAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0049FF50 (FUN_0049FF50 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SWorldParticle` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopyConstructWorldParticleIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0049FFA0 (FUN_0049FFA0 -- the implicit destructor of `SWorldParticle` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlace` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A05C0 (FUN_004A05C0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SWorldParticle` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopyConstructWorldParticleIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A0610 (FUN_004A0610 -- the implicit destructor of `SWorldParticle` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlaceDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A0710 (FUN_004A0710 -- the implicit destructor of `SWorldParticle` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlaceAndReturnSelf` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0049FAB0 (FUN_0049FAB0 -- the compiler-generated copy assignment of `SWorldParticle` as emitted for
+     * its `fa::vector` instantiation; callers 0x0049DE20, 0x0049E400, 0x0049E430; formerly
+     * `CopyAssignWorldParticleAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed
+     * 2026-09-10.) Address: 0x0049FF50 (FUN_0049FF50 -- the compiler-generated copy constructor (placement copy into a
+     * raw slot) of `SWorldParticle` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly
+     * `CopyConstructWorldParticleIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed
+     * 2026-09-10.) Address: 0x0049FFA0 (FUN_0049FFA0 -- the implicit destructor of `SWorldParticle` as emitted for its
+     * `fa::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlace` in
+     * moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.) Address: 0x004A05C0 (FUN_004A05C0 -- the
+     * compiler-generated copy constructor (placement copy into a raw slot) of `SWorldParticle` as emitted for its
+     * `fa::vector` instantiation; zero callers, unreachable; formerly
+     * `CopyConstructWorldParticleIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE),
+     * removed 2026-09-10.) Address: 0x004A0610 (FUN_004A0610 -- the implicit destructor of `SWorldParticle` as emitted
+     * for its `fa::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlaceDuplicateA`
+     * in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.) Address: 0x004A0710 (FUN_004A0710 -- the
+     * implicit destructor of `SWorldParticle` as emitted for its `fa::vector` instantiation; zero callers, unreachable;
+     * formerly `DestroyWorldParticleInPlaceAndReturnSelf` in moho/particles/CWorldParticles.cpp (RULE ONE), removed
+     * 2026-09-10.)
      */
     /**
      * Air drag, from `REmitterBlueprint::ParticleResistance`. Not an "is this
@@ -71,30 +83,30 @@ namespace moho
      * `SParticleRenderBucket::SelectTechnique` publishes it to the
      * particle shader's drag-enabled variable.
      */
-    bool mDragEnabled = false;                        // +0x00
-    std::uint8_t mPadding01[3]{};                     // +0x01
-    float mResistance = 0.0f;                         // +0x04
-    Wm3::Vector3<float> mPos;                         // +0x08
-    Wm3::Vector3<float> mDir;                         // +0x14
-    Wm3::Vector3<float> mAccel;                       // +0x20
-    float mInterop = 0.0f;                            // +0x2C
-    float mLifetime = 0.0f;                           // +0x30
-    float mFramerate = 0.0f;                          // +0x34
-    float mValue1 = 0.0f;                             // +0x38
-    float mTextureSelection = 0.0f;                   // +0x3C
-    float mValue3 = 0.0f;                             // +0x40
-    float mRampSelection = 0.0f;                      // +0x44
-    float mBeginSize = 0.0f;                          // +0x48
-    float mEndSize = 0.0f;                            // +0x4C
-    float mAngle = 0.0f;                              // +0x50
-    float mRotationCurve = 0.0f;                      // +0x54
-    float mReserved54 = 0.0f;                         // +0x58
-    CountedPtr_CParticleTexture mTexture;             // +0x5C
-    CountedPtr_CParticleTexture mRampTexture;         // +0x60
-    fa::string mTypeTag;                           // +0x64
-    std::int32_t mArmyIndex = 0;                      // +0x80
-    BlendMode mBlendMode = BlendMode::Mode0;          // +0x84
-    ZMode mZMode = ZMode::Mode0;                      // +0x88
+    bool mDragEnabled = false;                // +0x00
+    std::uint8_t mPadding01[3]{};             // +0x01
+    float mResistance = 0.0f;                 // +0x04
+    Wm3::Vector3<float> mPos;                 // +0x08
+    Wm3::Vector3<float> mDir;                 // +0x14
+    Wm3::Vector3<float> mAccel;               // +0x20
+    float mInterop = 0.0f;                    // +0x2C
+    float mLifetime = 0.0f;                   // +0x30
+    float mFramerate = 0.0f;                  // +0x34
+    float mValue1 = 0.0f;                     // +0x38
+    float mTextureSelection = 0.0f;           // +0x3C
+    float mValue3 = 0.0f;                     // +0x40
+    float mRampSelection = 0.0f;              // +0x44
+    float mBeginSize = 0.0f;                  // +0x48
+    float mEndSize = 0.0f;                    // +0x4C
+    float mAngle = 0.0f;                      // +0x50
+    float mRotationCurve = 0.0f;              // +0x54
+    float mReserved54 = 0.0f;                 // +0x58
+    CountedPtr_CParticleTexture mTexture;     // +0x5C
+    CountedPtr_CParticleTexture mRampTexture; // +0x60
+    fa::string mTypeTag;                      // +0x64
+    std::int32_t mArmyIndex = 0;              // +0x80
+    BlendMode mBlendMode = BlendMode::Mode0;  // +0x84
+    ZMode mZMode = ZMode::Mode0;              // +0x88
 
     /**
      * Address: 0x00490570 (FUN_00490570, Moho::SWorldParticle::MemberDeserialize)
@@ -127,26 +139,14 @@ namespace moho
     "SWorldParticle::mTextureSelection offset must be 0x3C"
   );
   static_assert(offsetof(SWorldParticle, mValue3) == 0x40, "SWorldParticle::mValue3 offset must be 0x40");
-  static_assert(
-    offsetof(SWorldParticle, mRampSelection) == 0x44,
-    "SWorldParticle::mRampSelection offset must be 0x44"
-  );
+  static_assert(offsetof(SWorldParticle, mRampSelection) == 0x44, "SWorldParticle::mRampSelection offset must be 0x44");
   static_assert(offsetof(SWorldParticle, mBeginSize) == 0x48, "SWorldParticle::mBeginSize offset must be 0x48");
   static_assert(offsetof(SWorldParticle, mEndSize) == 0x4C, "SWorldParticle::mEndSize offset must be 0x4C");
   static_assert(offsetof(SWorldParticle, mAngle) == 0x50, "SWorldParticle::mAngle offset must be 0x50");
-  static_assert(
-    offsetof(SWorldParticle, mRotationCurve) == 0x54,
-    "SWorldParticle::mRotationCurve offset must be 0x54"
-  );
-  static_assert(
-    offsetof(SWorldParticle, mReserved54) == 0x58,
-    "SWorldParticle::mReserved54 offset must be 0x58"
-  );
+  static_assert(offsetof(SWorldParticle, mRotationCurve) == 0x54, "SWorldParticle::mRotationCurve offset must be 0x54");
+  static_assert(offsetof(SWorldParticle, mReserved54) == 0x58, "SWorldParticle::mReserved54 offset must be 0x58");
   static_assert(offsetof(SWorldParticle, mTexture) == 0x5C, "SWorldParticle::mTexture offset must be 0x5C");
-  static_assert(
-    offsetof(SWorldParticle, mRampTexture) == 0x60,
-    "SWorldParticle::mRampTexture offset must be 0x60"
-  );
+  static_assert(offsetof(SWorldParticle, mRampTexture) == 0x60, "SWorldParticle::mRampTexture offset must be 0x60");
   static_assert(offsetof(SWorldParticle, mTypeTag) == 0x64, "SWorldParticle::mTypeTag offset must be 0x64");
   static_assert(offsetof(SWorldParticle, mArmyIndex) == 0x80, "SWorldParticle::mArmyIndex offset must be 0x80");
   static_assert(offsetof(SWorldParticle, mBlendMode) == 0x84, "SWorldParticle::mBlendMode offset must be 0x84");

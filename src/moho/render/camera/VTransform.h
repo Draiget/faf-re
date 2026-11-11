@@ -38,7 +38,9 @@ namespace moho
     Wm3::Vec3f pos_;    // 0x10
 
     /// Byte copies of both lanes (`Wm3::System::Memcpy` copies bytes too, so NaN payloads survive).
-    void CopyLanesFrom(const VTransform& rhs) noexcept
+    void CopyLanesFrom(
+      const VTransform& rhs
+    ) noexcept
     {
       if (mem_InlineTransformCopy) {
         std::memcpy(static_cast<void*>(&orient_), &rhs.orient_, sizeof(orient_));
@@ -103,7 +105,9 @@ namespace moho
      * `Wm3::System::Memcpy` (`memcpy_s`), a call per transform copy on the sim's hottest paths. The
      * bytes copied are the same.
      */
-    VTransform(const VTransform& rhs) noexcept
+    VTransform(
+      const VTransform& rhs
+    ) noexcept
     {
       CopyLanesFrom(rhs);
     }
@@ -114,7 +118,9 @@ namespace moho
      * What it does:
      * Copies quaternion + translation lanes from rhs (inline byte copies, as the copy constructor).
      */
-    VTransform& operator=(const VTransform& rhs) noexcept
+    VTransform& operator=(
+      const VTransform& rhs
+    ) noexcept
     {
       CopyLanesFrom(rhs);
       return *this;
@@ -268,7 +274,10 @@ namespace moho
    * transformed plane is `N' = R*N`, `C' = C + Dot(N', p)`.
    */
   template <class T>
-  Wm3::Plane3<T> ApplyTransform(const Wm3::Plane3<T>& plane, const VTransform& transform)
+  Wm3::Plane3<T> ApplyTransform(
+    const Wm3::Plane3<T>& plane,
+    const VTransform& transform
+  )
   {
     static_assert(std::is_floating_point_v<T>, "ApplyTransform requires floating-point T");
 

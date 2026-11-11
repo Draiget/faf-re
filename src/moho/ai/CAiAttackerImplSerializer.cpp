@@ -36,12 +36,14 @@ namespace
  * Loads owned `UnitWeapon*` and `CAcquireTargetTask*` pointer vectors from the
  * archive and rewrites vector lanes to match serialized counts.
  */
-void CAiAttackerImpl::DeserializePointerVectors(gpg::ReadArchive* const archive, CAiAttackerImpl* const object)
+void CAiAttackerImpl::DeserializePointerVectors(
+  gpg::ReadArchive* const archive,
+  CAiAttackerImpl* const object
+)
 {
   if (!archive || !object) {
     return;
   }
-
 
   unsigned int weaponCount = 0;
   archive->ReadUInt(&weaponCount);
@@ -69,7 +71,10 @@ void CAiAttackerImpl::DeserializePointerVectors(gpg::ReadArchive* const archive,
  * Saves owned `UnitWeapon*` and `CAcquireTargetTask*` pointer vectors using
  * tracked-pointer ownership mode.
  */
-void CAiAttackerImpl::SerializePointerVectors(gpg::WriteArchive* const archive, const CAiAttackerImpl* const object)
+void CAiAttackerImpl::SerializePointerVectors(
+  gpg::WriteArchive* const archive,
+  const CAiAttackerImpl* const object
+)
 {
   if (!archive || !object) {
     return;
@@ -80,13 +85,17 @@ void CAiAttackerImpl::SerializePointerVectors(gpg::WriteArchive* const archive, 
   const unsigned int weaponCount = static_cast<unsigned int>(object->mWeapons.size());
   archive->WriteUInt(weaponCount);
   for (unsigned int i = 0; i < weaponCount; ++i) {
-    archive->WritePointer<moho::UnitWeapon>(object->mWeapons[static_cast<std::size_t>(i)], gpg::TrackedPointerState::Owned, ownerRef);
+    archive->WritePointer<moho::UnitWeapon>(
+      object->mWeapons[static_cast<std::size_t>(i)], gpg::TrackedPointerState::Owned, ownerRef
+    );
   }
 
   const unsigned int taskCount = static_cast<unsigned int>(object->mTasks.size());
   archive->WriteUInt(taskCount);
   for (unsigned int i = 0; i < taskCount; ++i) {
-    archive->WritePointer<moho::CAcquireTargetTask>(object->mTasks[static_cast<std::size_t>(i)], gpg::TrackedPointerState::Owned, ownerRef);
+    archive->WritePointer<moho::CAcquireTargetTask>(
+      object->mTasks[static_cast<std::size_t>(i)], gpg::TrackedPointerState::Owned, ownerRef
+    );
   }
 }
 
@@ -97,7 +106,9 @@ void CAiAttackerImpl::SerializePointerVectors(gpg::WriteArchive* const archive, 
  * Restores attacker base/interface payload plus serialized member lanes in the
  * original read order.
  */
-void CAiAttackerImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+void CAiAttackerImpl::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -149,7 +160,9 @@ void CAiAttackerImpl::MemberDeserialize(gpg::ReadArchive* const archive)
  * Serializes attacker base/interface payload plus serialized member lanes in
  * the original write order.
  */
-void CAiAttackerImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+void CAiAttackerImpl::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;

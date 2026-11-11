@@ -15,7 +15,9 @@ namespace moho
   /**
    * Address: 0x00447DD0 (FUN_00447DD0, Moho::SBatchTextureDataFactory::LoadImpl)
    */
-  boost::shared_ptr<SBatchTextureData> SBatchTextureDataFactory::LoadImpl(const gpg::StrArg path)
+  boost::shared_ptr<SBatchTextureData> SBatchTextureDataFactory::LoadImpl(
+    const gpg::StrArg path
+  )
   {
     if (path == nullptr || !gpg::gal::Device::IsReady()) {
       return {};

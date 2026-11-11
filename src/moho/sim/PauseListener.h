@@ -48,9 +48,7 @@ namespace moho
    * broadcaster at `session + 0x08` (FUN_00869700); the selection listeners
    * use the one at `session + 0x00`.
    */
-  class PauseListener
-    : public ISessionListener
-    , public Listener<SPauseEvent>
+  class PauseListener : public ISessionListener, public Listener<SPauseEvent>
   {
   public:
     /**

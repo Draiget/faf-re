@@ -47,10 +47,12 @@ namespace faf::editor
     std::string textures[6];
 
     /** The values the editor changes (the textures aren't edited). */
-    bool operator==(const WaterState& other) const
+    bool operator==(
+      const WaterState& other
+    ) const
     {
       return enabled == other.enabled && elevation == other.elevation && deep == other.deep && abyss == other.abyss &&
-             std::memcmp(&shader, &other.shader, sizeof(shader)) == 0;
+        std::memcmp(&shader, &other.shader, sizeof(shader)) == 0;
     }
   };
 } // namespace faf::editor

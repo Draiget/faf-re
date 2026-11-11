@@ -236,7 +236,9 @@ namespace
   using InfluenceEntryIterator = UIntInfluenceMapEntryMap::iterator;
 
   template <class TMap>
-  [[nodiscard]] std::size_t CountLegacyMapElements(const void* const object) noexcept
+  [[nodiscard]] std::size_t CountLegacyMapElements(
+    const void* const object
+  ) noexcept
   {
     if (object == nullptr) {
       return 0u;
@@ -246,7 +248,9 @@ namespace
   }
 
   template <class TValue>
-  [[nodiscard]] std::size_t CountLegacyVectorElements(const void* const object) noexcept
+  [[nodiscard]] std::size_t CountLegacyVectorElements(
+    const void* const object
+  ) noexcept
   {
     if (object == nullptr) {
       return 0u;
@@ -257,18 +261,25 @@ namespace
   }
 
   template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(const std::intptr_t objectPtr)
+  [[nodiscard]] TObject* PointerFromArchiveInt(
+    const std::intptr_t objectPtr
+  )
   {
     return reinterpret_cast<TObject*>(objectPtr);
   }
 
   template <class TObject>
-  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(const std::intptr_t objectPtr)
+  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(
+    const std::intptr_t objectPtr
+  )
   {
     return reinterpret_cast<const TObject*>(objectPtr);
   }
 
-  [[nodiscard]] float DecayThreatLane(const float value, const float decay) noexcept
+  [[nodiscard]] float DecayThreatLane(
+    const float value,
+    const float decay
+  ) noexcept
   {
     if (value <= 0.0f) {
       return value;
@@ -287,7 +298,10 @@ namespace
     return candidate;
   }
 
-  [[nodiscard]] bool IsAlliedOrSameArmy(const moho::CArmyImpl* const owner, const moho::CArmyImpl* const source) noexcept
+  [[nodiscard]] bool IsAlliedOrSameArmy(
+    const moho::CArmyImpl* const owner,
+    const moho::CArmyImpl* const source
+  ) noexcept
   {
     if (!owner || !source) {
       return false;
@@ -317,7 +331,10 @@ namespace
    * `sim->mContext.Update(&value, sizeof(float))` step `CInfluenceMap::Update`
    * performs per entry.
    */
-  [[maybe_unused]] void UpdateSimChecksumWord(const void* const word, moho::Sim* const sim)
+  [[maybe_unused]] void UpdateSimChecksumWord(
+    const void* const word,
+    moho::Sim* const sim
+  )
   {
     sim->mContext.Update(word, 4u);
   }
@@ -525,7 +542,12 @@ namespace
    * What it does:
    * Loads one `map<unsigned int,int>` payload from archive lanes.
    */
-  void LoadUIntIntMap(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
+  void LoadUIntIntMap(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef*
+  )
   {
     auto* const mapObject = PointerFromArchiveInt<UIntIntMap>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -553,7 +575,12 @@ namespace
    * What it does:
    * Saves one `map<unsigned int,int>` payload into archive lanes.
    */
-  void SaveUIntIntMap(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
+  void SaveUIntIntMap(
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef*
+  )
   {
     const auto* const mapObject = ConstPointerFromArchiveInt<UIntIntMap>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -575,7 +602,12 @@ namespace
    * What it does:
    * Loads one `map<unsigned int,InfluenceMapEntry>` payload from archive lanes.
    */
-  void LoadUIntInfluenceMapEntryMap(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
+  void LoadUIntInfluenceMapEntryMap(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
   {
     auto* const mapObject = PointerFromArchiveInt<UIntInfluenceMapEntryMap>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -836,7 +868,6 @@ namespace
     }
   }
 
-
   /**
    * Address: 0x007181A0 (FUN_007181A0, sub_7181A0)
    *
@@ -859,7 +890,10 @@ namespace
    * map lookup lane.
    */
   template <class TEntries>
-  [[nodiscard]] auto FindInfluenceMapEntry(TEntries& entries, const std::uint32_t entityId)
+  [[nodiscard]] auto FindInfluenceMapEntry(
+    TEntries& entries,
+    const std::uint32_t entityId
+  )
   {
     auto it = entries.lower_bound(entityId);
     if (it == entries.end() || it->first != entityId) {
@@ -912,10 +946,14 @@ const char* gpg::RMapType_uint_int::GetName() const
  * What it does:
  * Formats inherited map lexical text with current element count.
  */
-fa::string gpg::RMapType_uint_int::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RMapType_uint_int::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
-  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements<fa::map<unsigned int, int>>(ref.mObj)));
+  return gpg::STR_Printf(
+    "%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements<fa::map<unsigned int, int>>(ref.mObj))
+  );
 }
 
 /**
@@ -942,8 +980,11 @@ void gpg::RMapType_uint_int::Init()
  */
 const char* gpg::RMapType_uint_InfluenceMapEntry::GetName() const
 {
-  static const fa::string sName =
-    gpg::STR_Printf("map<%s,%s>", CachedUIntType()->GetName(), gpg::CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType)->GetName());
+  static const fa::string sName = gpg::STR_Printf(
+    "map<%s,%s>",
+    CachedUIntType()->GetName(),
+    gpg::CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType)->GetName()
+  );
   return sName.c_str();
 }
 
@@ -953,10 +994,16 @@ const char* gpg::RMapType_uint_InfluenceMapEntry::GetName() const
  * What it does:
  * Formats inherited map lexical text with current element count.
  */
-fa::string gpg::RMapType_uint_InfluenceMapEntry::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RMapType_uint_InfluenceMapEntry::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
-  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyMapElements<fa::map<unsigned int, moho::InfluenceMapEntry>>(ref.mObj)));
+  return gpg::STR_Printf(
+    "%s, size=%d",
+    base.c_str(),
+    static_cast<int>(CountLegacyMapElements<fa::map<unsigned int, moho::InfluenceMapEntry>>(ref.mObj))
+  );
 }
 
 /**
@@ -967,7 +1014,10 @@ fa::string gpg::RMapType_uint_InfluenceMapEntry::GetLexical(const gpg::RRef& ref
  */
 void gpg::RMapType_uint_InfluenceMapEntry::Init()
 {
-  static_assert(sizeof(fa::map<unsigned int, moho::InfluenceMapEntry>) == 0x0C, "fa::map<unsigned int, moho::InfluenceMapEntry> is 0x0C bytes on x86");
+  static_assert(
+    sizeof(fa::map<unsigned int, moho::InfluenceMapEntry>) == 0x0C,
+    "fa::map<unsigned int, moho::InfluenceMapEntry> is 0x0C bytes on x86"
+  );
   size_ = sizeof(fa::map<unsigned int, moho::InfluenceMapEntry>);
   version_ = 1;
   serLoadFunc_ = &LoadUIntInfluenceMapEntryMap;
@@ -1047,7 +1097,8 @@ void gpg::RMapType_uint_InfluenceMapEntry::Init()
  */
 const char* gpg::RVectorType_InfluenceGrid::GetName() const
 {
-  static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)->GetName());
+  static const fa::string sName =
+    gpg::STR_Printf("vector<%s>", gpg::CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)->GetName());
   return sName.c_str();
 }
 
@@ -1057,13 +1108,13 @@ const char* gpg::RVectorType_InfluenceGrid::GetName() const
  * What it does:
  * Formats inherited vector lexical text with current `InfluenceGrid` count.
  */
-fa::string gpg::RVectorType_InfluenceGrid::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_InfluenceGrid::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf(
-    "%s, size=%d",
-    base.c_str(),
-    static_cast<int>(CountLegacyVectorElements<moho::InfluenceGrid>(ref.mObj))
+    "%s, size=%d", base.c_str(), static_cast<int>(CountLegacyVectorElements<moho::InfluenceGrid>(ref.mObj))
   );
 }
 
@@ -1076,7 +1127,9 @@ fa::string gpg::RVectorType_InfluenceGrid::GetLexical(const gpg::RRef& ref) cons
  */
 void gpg::RVectorType_InfluenceGrid::Init()
 {
-  static_assert(sizeof(fa::vector<moho::InfluenceGrid>) == 0x10, "fa::vector<moho::InfluenceGrid> is 0x10 bytes on x86");
+  static_assert(
+    sizeof(fa::vector<moho::InfluenceGrid>) == 0x10, "fa::vector<moho::InfluenceGrid> is 0x10 bytes on x86"
+  );
   size_ = sizeof(fa::vector<moho::InfluenceGrid>);
   version_ = 1;
   serLoadFunc_ = &LoadInfluenceGridVectorArchive;
@@ -1110,7 +1163,10 @@ const gpg::RIndexed* gpg::RVectorType_InfluenceGrid::IsIndexed() const
  * Forms `&vec[ind]` as `first + ind * 0x8C` (0x00718FA8/0x00718FAE) and wraps
  * it as one `gpg::RRef_InfluenceGrid` reference, returned by value.
  */
-gpg::RRef gpg::RVectorType_InfluenceGrid::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType_InfluenceGrid::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   auto* const storage = static_cast<InfluenceGridVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -1138,7 +1194,9 @@ gpg::RRef gpg::RVectorType_InfluenceGrid::SubscriptIndex(void* const obj, const 
  * Returns `(last - first) / 0x8C`, short-circuiting to 0 when the lane has no
  * storage (0x00718F47).
  */
-std::size_t gpg::RVectorType_InfluenceGrid::GetCount(void* const obj) const
+std::size_t gpg::RVectorType_InfluenceGrid::GetCount(
+  void* const obj
+) const
 {
   if (!obj) {
     return 0u;
@@ -1160,7 +1218,10 @@ std::size_t gpg::RVectorType_InfluenceGrid::GetCount(void* const obj) const
  * with that grid as the fill value, passing it by value to the resize lane
  * (0x00718F94 -> FUN_0071B860).
  */
-void gpg::RVectorType_InfluenceGrid::SetCount(void* const obj, const int count) const
+void gpg::RVectorType_InfluenceGrid::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   auto* const storage = static_cast<InfluenceGridVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -1181,7 +1242,8 @@ void gpg::RVectorType_InfluenceGrid::SetCount(void* const obj, const int count) 
  */
 const char* gpg::RVectorType_SThreat::GetName() const
 {
-  static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType)->GetName());
+  static const fa::string sName =
+    gpg::STR_Printf("vector<%s>", gpg::CachedLookup<moho::SThreat>(moho::SThreat::sType)->GetName());
   return sName.c_str();
 }
 
@@ -1191,10 +1253,14 @@ const char* gpg::RVectorType_SThreat::GetName() const
  * What it does:
  * Formats inherited vector lexical text with current `SThreat` count.
  */
-fa::string gpg::RVectorType_SThreat::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_SThreat::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
-  return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(CountLegacyVectorElements<moho::SThreat>(ref.mObj)));
+  return gpg::STR_Printf(
+    "%s, size=%d", base.c_str(), static_cast<int>(CountLegacyVectorElements<moho::SThreat>(ref.mObj))
+  );
 }
 
 void gpg::RVectorType_SThreat::Init()
@@ -1232,7 +1298,10 @@ const gpg::RIndexed* gpg::RVectorType_SThreat::IsIndexed() const
  * Forms `&vec[ind]` as `first + ind * 0x38` and wraps it as one
  * `gpg::RRef_SThreat` reference, returned by value.
  */
-gpg::RRef gpg::RVectorType_SThreat::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType_SThreat::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   auto* const storage = static_cast<SThreatVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -1260,7 +1329,9 @@ gpg::RRef gpg::RVectorType_SThreat::SubscriptIndex(void* const obj, const int in
  * Returns `(last - first) / 0x38`, short-circuiting to 0 when the lane has no
  * storage.
  */
-std::size_t gpg::RVectorType_SThreat::GetCount(void* const obj) const
+std::size_t gpg::RVectorType_SThreat::GetCount(
+  void* const obj
+) const
 {
   if (!obj) {
     return 0u;
@@ -1281,7 +1352,10 @@ std::size_t gpg::RVectorType_SThreat::GetCount(void* const obj) const
  * the reflected `vector<SThreat>` to `count`, filling any appended cells with
  * a zero-initialized `SThreat`.
  */
-void gpg::RVectorType_SThreat::SetCount(void* const obj, const int count) const
+void gpg::RVectorType_SThreat::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   auto* const storage = static_cast<SThreatVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -1348,7 +1422,11 @@ namespace moho
    * Address: 0x00BDA460 (FUN_00BDA460, dynamic initializer for `gConAlias_imap_debug_grid`)
    * Address: 0x00BFFD30 (FUN_00BFFD30, dynamic atexit destructor for `gConAlias_imap_debug_grid`)
    */
-  moho::CConAlias gConAlias_imap_debug_grid("imap_debug_grid", "Toggle influence map debug grid info.", "DoSimCommand imap_debug_grid");
+  moho::CConAlias gConAlias_imap_debug_grid(
+    "imap_debug_grid",
+    "Toggle influence map debug grid info.",
+    "DoSimCommand imap_debug_grid"
+  );
 
   /**
    * Address: 0x00BDA490 (FUN_00BDA490, dynamic initializer for `gSimConVar_imap_debug_grid`)
@@ -1360,7 +1438,11 @@ namespace moho
    * Address: 0x00BDA4E0 (FUN_00BDA4E0, dynamic initializer for `gConAlias_imap_debug_path_graph`)
    * Address: 0x00BFFD90 (FUN_00BFFD90, dynamic atexit destructor for `gConAlias_imap_debug_path_graph`)
    */
-  moho::CConAlias gConAlias_imap_debug_path_graph("imap_debug_path_graph", "Toggle map hints path graph.", "DoSimCommand imap_debug_path_graph");
+  moho::CConAlias gConAlias_imap_debug_path_graph(
+    "imap_debug_path_graph",
+    "Toggle map hints path graph.",
+    "DoSimCommand imap_debug_path_graph"
+  );
 
   /**
    * Address: 0x00BDA510 (FUN_00BDA510, dynamic initializer for `gSimConVar_imap_debug_path_graph`)
@@ -1372,7 +1454,11 @@ namespace moho
    * Address: 0x00BDA560 (FUN_00BDA560, dynamic initializer for `gConAlias_imap_debug_grid_type`)
    * Address: 0x00BFFDF0 (FUN_00BFFDF0, dynamic atexit destructor for `gConAlias_imap_debug_grid_type`)
    */
-  moho::CConAlias gConAlias_imap_debug_grid_type("imap_debug_grid_type", "Set influence map debug grid threat type.", "DoSimCommand imap_debug_grid_type");
+  moho::CConAlias gConAlias_imap_debug_grid_type(
+    "imap_debug_grid_type",
+    "Set influence map debug grid threat type.",
+    "DoSimCommand imap_debug_grid_type"
+  );
 
   /**
    * Address: 0x00BDA590 (FUN_00BDA590, dynamic initializer for `gSimConVar_imap_debug_grid_type`)
@@ -1384,7 +1470,11 @@ namespace moho
    * Address: 0x00BDA5E0 (FUN_00BDA5E0, dynamic initializer for `gConAlias_imap_debug_grid_army`)
    * Address: 0x00BFFE50 (FUN_00BFFE50, dynamic atexit destructor for `gConAlias_imap_debug_grid_army`)
    */
-  moho::CConAlias gConAlias_imap_debug_grid_army("imap_debug_grid_army", "Set influence map debug grid for which army threat type.", "DoSimCommand imap_debug_grid_army");
+  moho::CConAlias gConAlias_imap_debug_grid_army(
+    "imap_debug_grid_army",
+    "Set influence map debug grid for which army threat type.",
+    "DoSimCommand imap_debug_grid_army"
+  );
 
   /**
    * Address: 0x00BDA610 (FUN_00BDA610, dynamic initializer for `gSimConVar_imap_debug_grid_army`)
@@ -1414,12 +1504,14 @@ namespace moho
   {
     // 0x0071539F..0x007153DB: lanes +0x28,+0x18,+0x08,+0x2C,+0x1C,+0x0C,+0x30,
     // +0x20,+0x10,+0x34,+0x24,+0x14,+0x04 summed left to right.
-    overallInfluence = antiSurfaceInfluence + experimentalInfluence + influenceStructuresNotMex + antiSubInfluence
-      + commanderInfluence + navalInfluence + economyInfluence + artilleryInfluence + landInfluence + unknownInfluence
-      + antiAirInfluence + airInfluence + influenceStructures;
+    overallInfluence = antiSurfaceInfluence + experimentalInfluence + influenceStructuresNotMex + antiSubInfluence +
+      commanderInfluence + navalInfluence + economyInfluence + artilleryInfluence + landInfluence + unknownInfluence +
+      antiAirInfluence + airInfluence + influenceStructures;
   }
 
-  void SThreat::DecayBy(const SThreat& decayRate) noexcept
+  void SThreat::DecayBy(
+    const SThreat& decayRate
+  ) noexcept
   {
     influenceStructures = DecayThreatLane(influenceStructures, decayRate.influenceStructures);
     influenceStructuresNotMex = DecayThreatLane(influenceStructuresNotMex, decayRate.influenceStructuresNotMex);
@@ -1437,40 +1529,42 @@ namespace moho
     RecomputeOverall();
   }
 
-  [[nodiscard]] float SThreat::ValueByType(const EThreatType threatType) const noexcept
+  [[nodiscard]] float SThreat::ValueByType(
+    const EThreatType threatType
+  ) const noexcept
   {
     // GetThreat's jump table (0x00715B80): type N >= 2 reads lane +(N-1)*4.
     switch (threatType) {
-      case THREATTYPE_Overall:
-      case THREATTYPE_OverallNotAssigned:
-        return overallInfluence;
-      case THREATTYPE_StructuresNotMex:
-        return influenceStructuresNotMex;
-      case THREATTYPE_Structures:
-        return influenceStructures;
-      case THREATTYPE_Naval:
-        return navalInfluence;
-      case THREATTYPE_Air:
-        return airInfluence;
-      case THREATTYPE_Land:
-        return landInfluence;
-      case THREATTYPE_Experimental:
-        return experimentalInfluence;
-      case THREATTYPE_Commander:
-        return commanderInfluence;
-      case THREATTYPE_Artillery:
-        return artilleryInfluence;
-      case THREATTYPE_AntiAir:
-        return antiAirInfluence;
-      case THREATTYPE_AntiSurface:
-        return antiSurfaceInfluence;
-      case THREATTYPE_AntiSub:
-        return antiSubInfluence;
-      case THREATTYPE_Economy:
-        return economyInfluence;
-      case THREATTYPE_Unknown:
-      default:
-        return unknownInfluence;
+    case THREATTYPE_Overall:
+    case THREATTYPE_OverallNotAssigned:
+      return overallInfluence;
+    case THREATTYPE_StructuresNotMex:
+      return influenceStructuresNotMex;
+    case THREATTYPE_Structures:
+      return influenceStructures;
+    case THREATTYPE_Naval:
+      return navalInfluence;
+    case THREATTYPE_Air:
+      return airInfluence;
+    case THREATTYPE_Land:
+      return landInfluence;
+    case THREATTYPE_Experimental:
+      return experimentalInfluence;
+    case THREATTYPE_Commander:
+      return commanderInfluence;
+    case THREATTYPE_Artillery:
+      return artilleryInfluence;
+    case THREATTYPE_AntiAir:
+      return antiAirInfluence;
+    case THREATTYPE_AntiSurface:
+      return antiSurfaceInfluence;
+    case THREATTYPE_AntiSub:
+      return antiSubInfluence;
+    case THREATTYPE_Economy:
+      return economyInfluence;
+    case THREATTYPE_Unknown:
+    default:
+      return unknownInfluence;
     }
   }
 
@@ -1480,7 +1574,10 @@ namespace moho
    * What it does:
    * Serializes the 14 contiguous `float` lanes of one `SThreat` record.
    */
-  void SerializeSThreatFloatLanesRaw(gpg::WriteArchive* const archive, const SThreat* const threat)
+  void SerializeSThreatFloatLanesRaw(
+    gpg::WriteArchive* const archive,
+    const SThreat* const threat
+  )
   {
     if (archive == nullptr || threat == nullptr) {
       return;
@@ -1498,7 +1595,10 @@ namespace moho
    * What it does:
    * Serializes one `SThreat` record in named field order.
    */
-  void SerializeSThreatFields(gpg::WriteArchive* const archive, const SThreat& threat)
+  void SerializeSThreatFields(
+    gpg::WriteArchive* const archive,
+    const SThreat& threat
+  )
   {
     if (archive == nullptr) {
       return;
@@ -1567,29 +1667,38 @@ namespace moho
    * This is the element copy lane the `fa::vector<InfluenceGrid>` growth and
    * fill paths use (`_Insert_n` at FUN_0071B970 takes its `_Tmp` copy through
    * it at 0x0071B9A2).
-   * Address: 0x0071EE20 (FUN_0071EE20 -- `InfluenceGrid::InfluenceGrid(const InfluenceGrid&)` -- member-wise copy of the entry set and the threat vector; zero callers, unreachable; formerly `CopyConstructInfluenceGridIfPresentPrimary` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0071F770 (FUN_0071F770 -- `InfluenceGrid::InfluenceGrid(const InfluenceGrid&)` (second copy); zero callers, unreachable; formerly `CopyConstructInfluenceGridIfPresentSecondary` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0071AA60 (FUN_0071AA60 -- the entry-set half of `InfluenceGrid`'s copy constructor; callers 0x00715440, 0x00716140, 0x00716350; formerly `CopyInfluenceGridEntries` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0071C1F0 (FUN_0071C1F0 -- the entry-set half of `InfluenceGrid`'s copy constructor (the placement-new form); callers 0x0071C150, 0x0071C1E0; formerly `CopyConstructInfluenceGridEntries` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0071C6C0/0x0071C9A0 (FUN_0071C6C0, FUN_0071C9A0 -- the outer clone and
-   * `fa::_Tree<InfluenceMapEntry>::_Copy` it wraps, now absorbed by the
-   * `entries(other.entries)` member-init and `entries = source.entries` in
+   * Address: 0x0071EE20 (FUN_0071EE20 -- `InfluenceGrid::InfluenceGrid(const InfluenceGrid&)` -- member-wise copy of
+   * the entry set and the threat vector; zero callers, unreachable; formerly
+   * `CopyConstructInfluenceGridIfPresentPrimary` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071F770 (FUN_0071F770 -- `InfluenceGrid::InfluenceGrid(const InfluenceGrid&)` (second copy); zero
+   * callers, unreachable; formerly `CopyConstructInfluenceGridIfPresentSecondary` in moho/sim/CInfluenceMap.cpp (RULE
+   * ONE), removed 2026-09-10.) Address: 0x0071AA60 (FUN_0071AA60 -- the entry-set half of `InfluenceGrid`'s copy
+   * constructor; callers 0x00715440, 0x00716140, 0x00716350; formerly `CopyInfluenceGridEntries` in
+   * moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0071C1F0 (FUN_0071C1F0 -- the entry-set half
+   * of `InfluenceGrid`'s copy constructor (the placement-new form); callers 0x0071C150, 0x0071C1E0; formerly
+   * `CopyConstructInfluenceGridEntries` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.) Address:
+   * 0x0071C6C0/0x0071C9A0 (FUN_0071C6C0, FUN_0071C9A0 -- the outer clone and `fa::_Tree<InfluenceMapEntry>::_Copy` it
+   * wraps, now absorbed by the `entries(other.entries)` member-init and `entries = source.entries` in
    * AssignInfluenceGridValue; formerly `CopyInfluenceEntryTreeStorage` (RULE ONE), removed 2026-10-03.)
    */
-  InfluenceGrid::InfluenceGrid(const InfluenceGrid& other)
+  InfluenceGrid::InfluenceGrid(
+    const InfluenceGrid& other
+  )
     : entries(other.entries)
     , threats(other.threats)
     , threat(other.threat)
     , decay(other.decay)
-  {
-  }
+  {}
 
   /**
    * Address: 0x00716350 (FUN_00716350, ??1InfluenceGrid@Moho@@QAE@@Z)
    * Address: 0x0071EE70 (FUN_0071EE70)
    * Address: 0x0071F7C0 (FUN_0071F7C0)
-   * Address: 0x0071F7F0 (FUN_0071F7F0 -- `InfluenceGrid::~InfluenceGrid()` -- the entry set and the per-army threat vector released by their own destructors; zero callers, unreachable; formerly `DestroyInfluenceGridAndReturnSelf` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00719C00 (FUN_00719C00 -- the entry-set half of `InfluenceGrid`'s destructor; callers 0x00716140, 0x007163A0, 0x007186CC; formerly `DestroyInfluenceGridEntries` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071F7F0 (FUN_0071F7F0 -- `InfluenceGrid::~InfluenceGrid()` -- the entry set and the per-army threat
+   * vector released by their own destructors; zero callers, unreachable; formerly `DestroyInfluenceGridAndReturnSelf`
+   * in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00719C00 (FUN_00719C00 -- the entry-set
+   * half of `InfluenceGrid`'s destructor; callers 0x00716140, 0x007163A0, 0x007186CC; formerly
+   * `DestroyInfluenceGridEntries` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
    */
   InfluenceGrid::~InfluenceGrid()
   {
@@ -1605,7 +1714,10 @@ namespace moho
    * and per-army threat-vector contents, then copying aggregate threat and decay
    * lanes. Preserves self-assignment semantics.
    */
-  InfluenceGrid& AssignInfluenceGridValue(InfluenceGrid& destination, const InfluenceGrid& source)
+  InfluenceGrid& AssignInfluenceGridValue(
+    InfluenceGrid& destination,
+    const InfluenceGrid& source
+  )
   {
     if (&destination != &source) {
       destination.entries = source.entries;
@@ -1657,7 +1769,9 @@ namespace moho
    * Allocates contiguous storage for `count` `SThreat` elements with the same
    * overflow guard semantics as the original VC8 array-allocation helper.
    */
-  [[maybe_unused]] static SThreat* func_NewArray_SThreat(const unsigned int count)
+  [[maybe_unused]] static SThreat* func_NewArray_SThreat(
+    const unsigned int count
+  )
   {
     if (count != 0u && (0xFFFFFFFFu / count) < sizeof(SThreat)) {
       throw std::bad_alloc{};
@@ -1673,7 +1787,9 @@ namespace moho
    * Allocates contiguous storage for `count` `InfluenceGrid` elements with the
    * same overflow guard semantics as the original VC8 array-allocation helper.
    */
-  [[maybe_unused]] static InfluenceGrid* func_NewArray_InfluenceMap(const unsigned int count)
+  [[maybe_unused]] static InfluenceGrid* func_NewArray_InfluenceMap(
+    const unsigned int count
+  )
   {
     if (count != 0u && (0xFFFFFFFFu / count) < sizeof(InfluenceGrid)) {
       throw std::bad_alloc{};
@@ -1688,7 +1804,9 @@ namespace moho
    * What it does:
    * Releases one raw allocation lane with `operator delete`.
    */
-  void DeleteSThreatArrayOrZeroSizeBlockThunk(void* const allocation) noexcept
+  void DeleteSThreatArrayOrZeroSizeBlockThunk(
+    void* const allocation
+  ) noexcept
   {
     ::operator delete(allocation);
   }
@@ -1699,7 +1817,9 @@ namespace moho
    * What it does:
    * Releases one raw allocation lane with `operator delete`.
    */
-  void DeleteInfluenceGridArrayOrZeroSizeBlockThunk(void* const allocation) noexcept
+  void DeleteInfluenceGridArrayOrZeroSizeBlockThunk(
+    void* const allocation
+  ) noexcept
   {
     ::operator delete(allocation);
   }
@@ -1707,7 +1827,10 @@ namespace moho
   /**
    * Address: 0x00715750 (FUN_00715750, ?GetThreat@InfluenceGrid@Moho@@QBEMW4EThreatType@2@H@Z)
    */
-  float InfluenceGrid::GetThreat(const EThreatType threatType, const int army) const
+  float InfluenceGrid::GetThreat(
+    const EThreatType threatType,
+    const int army
+  ) const
   {
     // `cmp edx, 0Eh; ja` (0x00715750) returns 0 for any type outside 0..14.
     if (static_cast<std::uint32_t>(threatType) > static_cast<std::uint32_t>(THREATTYPE_Unknown)) {
@@ -1747,7 +1870,9 @@ namespace moho
     threat.DecayBy(decay);
   }
 
-  void InfluenceGrid::EnsureThreatSlots(const std::size_t armyCount)
+  void InfluenceGrid::EnsureThreatSlots(
+    const std::size_t armyCount
+  )
   {
     threats.resize(armyCount, moho::SThreat{});
   }
@@ -1759,7 +1884,9 @@ namespace moho
     }
   }
 
-  InfluenceMapEntry* InfluenceGrid::FindEntry(const std::uint32_t entityId)
+  InfluenceMapEntry* InfluenceGrid::FindEntry(
+    const std::uint32_t entityId
+  )
   {
     const auto it = FindInfluenceEntryLowerBoundByEntityId(*this, entityId);
     if (it == entries.end()) {
@@ -1772,7 +1899,9 @@ namespace moho
     return &it->second;
   }
 
-  const InfluenceMapEntry* InfluenceGrid::FindEntry(const std::uint32_t entityId) const
+  const InfluenceMapEntry* InfluenceGrid::FindEntry(
+    const std::uint32_t entityId
+  ) const
   {
     const auto it = FindInfluenceMapEntry(entries, entityId);
     if (it == entries.end()) {
@@ -1782,7 +1911,9 @@ namespace moho
     return &it->second;
   }
 
-  bool InfluenceGrid::RemoveEntry(const std::uint32_t entityId)
+  bool InfluenceGrid::RemoveEntry(
+    const std::uint32_t entityId
+  )
   {
     const auto it = FindInfluenceEntryLowerBoundByEntityId(*this, entityId);
     if (it == entries.end()) {
@@ -1815,7 +1946,11 @@ namespace moho
   /**
    * Address: 0x00716140 (FUN_00716140, ??0CInfluenceMap@Moho@@QAE@Z)
    */
-  CInfluenceMap::CInfluenceMap(const std::int32_t gridSize, Sim* const sim, CArmyImpl* const army)
+  CInfluenceMap::CInfluenceMap(
+    const std::int32_t gridSize,
+    Sim* const sim,
+    CArmyImpl* const army
+  )
     : mArmy(army)
     , mTotal(0)
     , mWidth(0)
@@ -1860,7 +1995,9 @@ namespace moho
   /**
    * Address: 0x00715C60 (FUN_00715C60, ?VectorToCoords@CInfluenceMap@Moho@@AAEHPAV?$Vector3@M@Wm3@@@Z)
    */
-  std::int32_t CInfluenceMap::VectorToCoords(const Wm3::Vec3f& pos) const
+  std::int32_t CInfluenceMap::VectorToCoords(
+    const Wm3::Vec3f& pos
+  ) const
   {
     if (mGridSize <= 0 || mWidth <= 0 || mHeight <= 0) {
       return 0;
@@ -1886,10 +2023,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x00715F30 (FUN_00715F30, ?UpdateBlipPosition@CInfluenceMap@Moho@@QAEXHABV?$Vector3@M@Wm3@@PBVRUnitBlueprint@2@@Z)
+   * Address: 0x00715F30 (FUN_00715F30,
+   * ?UpdateBlipPosition@CInfluenceMap@Moho@@QAEXHABV?$Vector3@M@Wm3@@PBVRUnitBlueprint@2@@Z)
    */
   void CInfluenceMap::UpdateBlipPosition(
-    const std::uint32_t blipId, const Wm3::Vec3f& position, const RUnitBlueprint* const sourceBlueprint
+    const std::uint32_t blipId,
+    const Wm3::Vec3f& position,
+    const RUnitBlueprint* const sourceBlueprint
   )
   {
     // 0x00715F4C..0x00715F58: a blip with no cell record is left alone -- the
@@ -1921,7 +2061,12 @@ namespace moho
    * Address: 0x00715FF0 (FUN_00715FF0, ?GetThreatRect@CInfluenceMap@Moho@@QBEMHHH_W4EThreatType@2@H@Z)
    */
   float CInfluenceMap::GetThreatRect(
-    const int x, const int z, const int radius, const bool onMap, const EThreatType threatType, const int army
+    const int x,
+    const int z,
+    const int radius,
+    const bool onMap,
+    const EThreatType threatType,
+    const int army
   ) const
   {
     if (mWidth <= 0 || mHeight <= 0 || mMapEntries.empty()) {
@@ -1975,7 +2120,8 @@ namespace moho
   }
 
   /**
-   * Address: 0x00716E60 (FUN_00716E60, ?GetThreatBetweenPositions@CInfluenceMap@Moho@@QBEMABV?$Vector3@M@Wm3@@0_W4EThreatType@2@H@Z)
+   * Address: 0x00716E60 (FUN_00716E60,
+   * ?GetThreatBetweenPositions@CInfluenceMap@Moho@@QBEMABV?$Vector3@M@Wm3@@0_W4EThreatType@2@H@Z)
    */
   float CInfluenceMap::GetThreatBetweenPositions(
     const Wm3::Vec3f& pos1,
@@ -2019,7 +2165,8 @@ namespace moho
   }
 
   /**
-   * Address: 0x007171D0 (FUN_007171D0, ?GetThreatsAroundPosition@CInfluenceMap@Moho@@QBE?AV?$vector@USPositionThreat@Moho@@V?$allocator@USPositionThreat@Moho@@@std@@@std@@ABV?$Vector3@M@Wm3@@HH_NW4EThreatType@2@H@Z)
+   * Address: 0x007171D0 (FUN_007171D0,
+   * ?GetThreatsAroundPosition@CInfluenceMap@Moho@@QBE?AV?$vector@USPositionThreat@Moho@@V?$allocator@USPositionThreat@Moho@@@std@@@std@@ABV?$Vector3@M@Wm3@@HH_NW4EThreatType@2@H@Z)
    *
    * IDA signature (corrected — the mis-recovered mangled form claimed a
    * `LuaObject*` return, but the binary fills a `vector<SPositionThreat>`):
@@ -2041,7 +2188,10 @@ namespace moho
    */
   struct ThreatDescending
   {
-    [[nodiscard]] bool operator()(const SPositionThreat& lhs, const SPositionThreat& rhs) const noexcept
+    [[nodiscard]] bool operator()(
+      const SPositionThreat& lhs,
+      const SPositionThreat& rhs
+    ) const noexcept
     {
       return rhs.threat < lhs.threat;
     }
@@ -2211,8 +2361,8 @@ namespace moho
         }
 
         if (
-          sourceArmyIndex >= 0 && static_cast<std::size_t>(sourceArmyIndex) < cell->threats.size()
-          && entry.sourceBlueprint != nullptr
+          sourceArmyIndex >= 0 && static_cast<std::size_t>(sourceArmyIndex) < cell->threats.size() &&
+          entry.sourceBlueprint != nullptr
         ) {
           SThreat& armyThreat = cell->threats[static_cast<std::size_t>(sourceArmyIndex)];
           const float strength = entry.threatStrength;
@@ -2241,7 +2391,9 @@ namespace moho
               armyThreat.airInfluence += total;
             } else if (entry.sourceLayer == LAYER_Land) {
               armyThreat.landInfluence += total;
-            } else if (entry.sourceLayer == LAYER_Water || entry.sourceLayer == LAYER_Seabed || entry.sourceLayer == LAYER_Sub) {
+            } else if (
+              entry.sourceLayer == LAYER_Water || entry.sourceLayer == LAYER_Seabed || entry.sourceLayer == LAYER_Sub
+            ) {
               armyThreat.navalInfluence += total;
             }
           }
@@ -2280,7 +2432,9 @@ namespace moho
     }
   }
 
-  CArmyImpl* CInfluenceMap::ResolveSourceArmy(const std::uint32_t blipId) const
+  CArmyImpl* CInfluenceMap::ResolveSourceArmy(
+    const std::uint32_t blipId
+  ) const
   {
     if (!mArmy) {
       return nullptr;
@@ -2299,7 +2453,9 @@ namespace moho
     return sim->mArmiesList[armyIndex];
   }
 
-  const std::int32_t* CInfluenceMap::FindBlipCell(const std::uint32_t blipId) const
+  const std::int32_t* CInfluenceMap::FindBlipCell(
+    const std::uint32_t blipId
+  ) const
   {
     const auto it = mBlipCells.find(blipId);
     if (it == mBlipCells.end()) {
@@ -2313,12 +2469,17 @@ namespace moho
    * Covered by typed source construct: fa::map<uint32_t,int32_t>::operator[].
    * The binary emits FUN_00718360 for the actual InsertEntry callsite.
    */
-  void CInfluenceMap::UpsertBlipCell(const std::uint32_t blipId, const std::int32_t cellIndex)
+  void CInfluenceMap::UpsertBlipCell(
+    const std::uint32_t blipId,
+    const std::int32_t cellIndex
+  )
   {
     mBlipCells[blipId] = cellIndex;
   }
 
-  void CInfluenceMap::RemoveBlipCell(const std::uint32_t blipId)
+  void CInfluenceMap::RemoveBlipCell(
+    const std::uint32_t blipId
+  )
   {
     const auto it = mBlipCells.find(blipId);
     if (it != mBlipCells.end()) {
@@ -2334,7 +2495,9 @@ namespace moho
    * the owning cell lane, and stores the blip-to-cell lookup mapping.
    */
   void CInfluenceMap::InsertEntry(
-    const std::uint32_t blipId, const Wm3::Vec3f& position, const RUnitBlueprint* const sourceBlueprint
+    const std::uint32_t blipId,
+    const Wm3::Vec3f& position,
+    const RUnitBlueprint* const sourceBlueprint
   )
   {
     const std::int32_t cellIndex = VectorToCoords(position);
@@ -2369,7 +2532,9 @@ namespace moho
    * Removes one blip entry from the owning influence cell and drops the
    * corresponding blip-to-cell index lane.
    */
-  void CInfluenceMap::RemoveEntry(const std::uint32_t blipId)
+  void CInfluenceMap::RemoveEntry(
+    const std::uint32_t blipId
+  )
   {
     const std::int32_t* const blipCell = FindBlipCell(blipId);
     if (!blipCell) {
@@ -2387,7 +2552,10 @@ namespace moho
     RemoveBlipCell(blipId);
   }
 
-  bool CInfluenceMap::IsInCategory(const EntityCategorySet* const category, const std::uint32_t categoryBitIndex)
+  bool CInfluenceMap::IsInCategory(
+    const EntityCategorySet* const category,
+    const std::uint32_t categoryBitIndex
+  )
   {
     return category && category->ContainsBit(categoryBitIndex);
   }
@@ -2432,48 +2600,48 @@ namespace moho
     };
 
     switch (threatType) {
-      case THREATTYPE_Overall:
-      case THREATTYPE_Unknown:
-        applyThreat(cell.threat.unknownInfluence, cell.decay.unknownInfluence);
-        break;
-      case THREATTYPE_StructuresNotMex:
-        applyThreat(cell.threat.influenceStructuresNotMex, cell.decay.influenceStructuresNotMex);
-        break;
-      case THREATTYPE_Structures:
-        applyThreat(cell.threat.influenceStructures, cell.decay.influenceStructures);
-        break;
-      case THREATTYPE_Naval:
-        applyThreat(cell.threat.navalInfluence, cell.decay.navalInfluence);
-        break;
-      case THREATTYPE_Air:
-        applyThreat(cell.threat.airInfluence, cell.decay.airInfluence);
-        break;
-      case THREATTYPE_Land:
-        applyThreat(cell.threat.landInfluence, cell.decay.landInfluence);
-        break;
-      case THREATTYPE_Experimental:
-        applyThreat(cell.threat.experimentalInfluence, cell.decay.experimentalInfluence);
-        break;
-      case THREATTYPE_Commander:
-        applyThreat(cell.threat.commanderInfluence, cell.decay.commanderInfluence);
-        break;
-      case THREATTYPE_Artillery:
-        applyThreat(cell.threat.artilleryInfluence, cell.decay.artilleryInfluence);
-        break;
-      case THREATTYPE_AntiAir:
-        applyThreat(cell.threat.antiAirInfluence, cell.decay.antiAirInfluence);
-        break;
-      case THREATTYPE_AntiSurface:
-        applyThreat(cell.threat.antiSurfaceInfluence, cell.decay.antiSurfaceInfluence);
-        break;
-      case THREATTYPE_AntiSub:
-        applyThreat(cell.threat.antiSubInfluence, cell.decay.antiSubInfluence);
-        break;
-      case THREATTYPE_Economy:
-        applyThreat(cell.threat.economyInfluence, cell.decay.economyInfluence);
-        break;
-      default:
-        break;
+    case THREATTYPE_Overall:
+    case THREATTYPE_Unknown:
+      applyThreat(cell.threat.unknownInfluence, cell.decay.unknownInfluence);
+      break;
+    case THREATTYPE_StructuresNotMex:
+      applyThreat(cell.threat.influenceStructuresNotMex, cell.decay.influenceStructuresNotMex);
+      break;
+    case THREATTYPE_Structures:
+      applyThreat(cell.threat.influenceStructures, cell.decay.influenceStructures);
+      break;
+    case THREATTYPE_Naval:
+      applyThreat(cell.threat.navalInfluence, cell.decay.navalInfluence);
+      break;
+    case THREATTYPE_Air:
+      applyThreat(cell.threat.airInfluence, cell.decay.airInfluence);
+      break;
+    case THREATTYPE_Land:
+      applyThreat(cell.threat.landInfluence, cell.decay.landInfluence);
+      break;
+    case THREATTYPE_Experimental:
+      applyThreat(cell.threat.experimentalInfluence, cell.decay.experimentalInfluence);
+      break;
+    case THREATTYPE_Commander:
+      applyThreat(cell.threat.commanderInfluence, cell.decay.commanderInfluence);
+      break;
+    case THREATTYPE_Artillery:
+      applyThreat(cell.threat.artilleryInfluence, cell.decay.artilleryInfluence);
+      break;
+    case THREATTYPE_AntiAir:
+      applyThreat(cell.threat.antiAirInfluence, cell.decay.antiAirInfluence);
+      break;
+    case THREATTYPE_AntiSurface:
+      applyThreat(cell.threat.antiSurfaceInfluence, cell.decay.antiSurfaceInfluence);
+      break;
+    case THREATTYPE_AntiSub:
+      applyThreat(cell.threat.antiSubInfluence, cell.decay.antiSubInfluence);
+      break;
+    case THREATTYPE_Economy:
+      applyThreat(cell.threat.economyInfluence, cell.decay.economyInfluence);
+      break;
+    default:
+      break;
     }
   }
 
@@ -2526,9 +2694,8 @@ namespace moho
       const std::int32_t cellX = cellIndex % mWidth;
       const std::int32_t cellZ = cellIndex / mWidth;
 
-      const float currentThreat = (radius != 0)
-        ? GetThreatRect(cellX, cellZ, radius, onMap, threatType, armyIndex)
-        : cell.GetThreat(threatType, armyIndex);
+      const float currentThreat = (radius != 0) ? GetThreatRect(cellX, cellZ, radius, onMap, threatType, armyIndex)
+                                                : cell.GetThreat(threatType, armyIndex);
 
       const std::int32_t halfStep = mGridSize / 2;
       const float cellCenterX = static_cast<float>(halfStep + cellX * mGridSize);
@@ -2562,17 +2729,34 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_RMapType_uint_int_9e247f, preregister_RMapType_uint_int)
-GPG_PREREGISTER_INIT(preregister_RMapType_uint_InfluenceMapEntry_9e247f, preregister_RMapType_uint_InfluenceMapEntry)
-GPG_PREREGISTER_INIT(preregister_RVectorType_InfluenceGrid_9e247f, preregister_RVectorType_InfluenceGrid)
-GPG_PREREGISTER_INIT(preregister_RVectorType_SThreat_9e247f, preregister_RVectorType_SThreat)
+GPG_PREREGISTER_INIT(
+  preregister_RMapType_uint_int_9e247f,
+  preregister_RMapType_uint_int
+)
+GPG_PREREGISTER_INIT(
+  preregister_RMapType_uint_InfluenceMapEntry_9e247f,
+  preregister_RMapType_uint_InfluenceMapEntry
+)
+GPG_PREREGISTER_INIT(
+  preregister_RVectorType_InfluenceGrid_9e247f,
+  preregister_RVectorType_InfluenceGrid
+)
+GPG_PREREGISTER_INIT(
+  preregister_RVectorType_SThreat_9e247f,
+  preregister_RVectorType_SThreat
+)
 
 namespace moho
 {
   /**
    * Address: 0x00717670 (FUN_00717670)
    */
-  void CInfluenceMap::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CInfluenceMap::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CInfluenceMap()), 0u);
   }
@@ -2605,7 +2789,11 @@ namespace moho
    * Deserializes one `InfluenceGrid` payload in archive field order:
    * `entries`, `threats`, aggregate threat, and decay lanes.
    */
-  void InfluenceGrid::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef&)
+  void InfluenceGrid::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    const int,
+    const gpg::RRef&
+  )
   {
     if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
@@ -2643,7 +2831,11 @@ namespace moho
    * Serializes one `InfluenceGrid` payload in archive field order:
    * `entries`, `threats`, aggregate threat, and decay lanes.
    */
-  void InfluenceGrid::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef&) const
+  void InfluenceGrid::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    const int,
+    const gpg::RRef&
+  ) const
   {
     if (archive == nullptr || static_cast<const void*>(this) == nullptr) {
       return;
@@ -2682,12 +2874,15 @@ namespace moho
    * `EntId`, `SimArmy*`, `Vector3f` position, `RUnitBlueprint*`, `ELayer`,
    * detail flag, threat magnitude/decay, and decay tick count.
    */
-  void InfluenceMapEntry::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef&)
+  void InfluenceMapEntry::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    const int,
+    const gpg::RRef&
+  )
   {
     if (archive == nullptr) {
       return;
     }
-
 
     const gpg::RRef ownerRef{};
 
@@ -2733,12 +2928,15 @@ namespace moho
    * Serializes one `InfluenceMapEntry` payload in archive field order using
    * unowned pointer lanes for `SimArmy*` and `RUnitBlueprint*`.
    */
-  void InfluenceMapEntry::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef&) const
+  void InfluenceMapEntry::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    const int,
+    const gpg::RRef&
+  ) const
   {
     if (archive == nullptr) {
       return;
     }
-
 
     const gpg::RRef ownerRef{};
 
@@ -2748,7 +2946,9 @@ namespace moho
     }
     archive->Write(entIdType, &entityId, ownerRef);
 
-    archive->WritePointer<moho::SimArmy>(static_cast<moho::SimArmy*>(sourceArmy), gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::SimArmy>(
+      static_cast<moho::SimArmy*>(sourceArmy), gpg::TrackedPointerState::Unowned, ownerRef
+    );
 
     static gpg::RType* vector3fType = nullptr;
     if (vector3fType == nullptr) {
@@ -2756,7 +2956,9 @@ namespace moho
     }
     archive->Write(vector3fType, &lastPosition, ownerRef);
 
-    archive->WritePointer<moho::RUnitBlueprint>(const_cast<moho::RUnitBlueprint*>(sourceBlueprint), gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::RUnitBlueprint>(
+      const_cast<moho::RUnitBlueprint*>(sourceBlueprint), gpg::TrackedPointerState::Unowned, ownerRef
+    );
 
     static gpg::RType* layerType = nullptr;
     if (layerType == nullptr) {

@@ -53,7 +53,10 @@ namespace
    * Deserializes one reflected `Entity` payload lane with a null-owner
    * fallback.
    */
-  [[maybe_unused]] void DeserializeEntityReflectedPayloadA(gpg::ReadArchive* const archive, void* const payload)
+  [[maybe_unused]] void DeserializeEntityReflectedPayloadA(
+    gpg::ReadArchive* const archive,
+    void* const payload
+  )
   {
     (void)ReadReflectedPayload(archive, gpg::RTypeOf<moho::Entity>(), payload);
   }
@@ -64,7 +67,10 @@ namespace
    * What it does:
    * Serializes one reflected `Entity` payload lane with a null-owner fallback.
    */
-  [[maybe_unused]] void SerializeEntityReflectedPayloadA(gpg::WriteArchive* const archive, const void* const payload)
+  [[maybe_unused]] void SerializeEntityReflectedPayloadA(
+    gpg::WriteArchive* const archive,
+    const void* const payload
+  )
   {
     (void)WriteReflectedPayload(archive, gpg::RTypeOf<moho::Entity>(), payload);
   }
@@ -75,7 +81,10 @@ namespace
    * What it does:
    * Secondary deserializer entrypoint for one reflected `Entity` payload lane.
    */
-  [[maybe_unused]] void DeserializeEntityReflectedPayloadB(gpg::ReadArchive* const archive, void* const payload)
+  [[maybe_unused]] void DeserializeEntityReflectedPayloadB(
+    gpg::ReadArchive* const archive,
+    void* const payload
+  )
   {
     (void)ReadReflectedPayload(archive, gpg::RTypeOf<moho::Entity>(), payload);
   }
@@ -86,7 +95,10 @@ namespace
    * What it does:
    * Secondary serializer entrypoint for one reflected `Entity` payload lane.
    */
-  [[maybe_unused]] void SerializeEntityReflectedPayloadB(gpg::WriteArchive* const archive, const void* const payload)
+  [[maybe_unused]] void SerializeEntityReflectedPayloadB(
+    gpg::WriteArchive* const archive,
+    const void* const payload
+  )
   {
     (void)WriteReflectedPayload(archive, gpg::RTypeOf<moho::Entity>(), payload);
   }
@@ -98,7 +110,10 @@ namespace
    * Deserializes one reflected `Entity` payload lane using swapped callback
    * argument order.
    */
-  [[maybe_unused]] void DeserializeEntityReflectedPayloadSwappedArgs(void* const payload, gpg::ReadArchive* const archive)
+  [[maybe_unused]] void DeserializeEntityReflectedPayloadSwappedArgs(
+    void* const payload,
+    gpg::ReadArchive* const archive
+  )
   {
     (void)ReadReflectedPayload(archive, gpg::RTypeOf<moho::Entity>(), payload);
   }
@@ -110,7 +125,10 @@ namespace
    * Serializes one reflected `Entity` payload lane using swapped callback
    * argument order.
    */
-  [[maybe_unused]] void SerializeEntityReflectedPayloadSwappedArgs(const void* const payload, gpg::WriteArchive* const archive)
+  [[maybe_unused]] void SerializeEntityReflectedPayloadSwappedArgs(
+    const void* const payload,
+    gpg::WriteArchive* const archive
+  )
   {
     (void)WriteReflectedPayload(archive, gpg::RTypeOf<moho::Entity>(), payload);
   }
@@ -231,8 +249,11 @@ namespace
    * Deserializes one reflected `SScroller` payload lane and returns the input
    * archive pointer for callback chaining.
    */
-  [[maybe_unused]] gpg::ReadArchive*
-  DeserializeScrollerPayload(gpg::ReadArchive* const archive, void* const payload, gpg::RRef* const ownerRef)
+  [[maybe_unused]] gpg::ReadArchive* DeserializeScrollerPayload(
+    gpg::ReadArchive* const archive,
+    void* const payload,
+    gpg::RRef* const ownerRef
+  )
   {
     if (archive == nullptr || payload == nullptr) {
       return archive;
@@ -246,7 +267,9 @@ namespace
     return archive;
   }
 
-  [[nodiscard]] gpg::RRef MakeTextureScrollerRef(moho::CTextureScroller* const object) noexcept
+  [[nodiscard]] gpg::RRef MakeTextureScrollerRef(
+    moho::CTextureScroller* const object
+  ) noexcept
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -273,7 +296,9 @@ namespace
    * Placement-constructs one `CTextureScroller` in caller-provided storage and
    * returns a typed reflected reference.
    */
-  gpg::RRef CtrTextureScrollerRef(void* const objectPtr)
+  gpg::RRef CtrTextureScrollerRef(
+    void* const objectPtr
+  )
   {
     auto* const object = reinterpret_cast<moho::CTextureScroller*>(objectPtr);
     if (object != nullptr) {
@@ -288,7 +313,9 @@ namespace
    * What it does:
    * Releases storage for one `CTextureScroller` object pointer.
    */
-  void DeleteTextureScrollerObject(void* const objectPtr)
+  void DeleteTextureScrollerObject(
+    void* const objectPtr
+  )
   {
     if (objectPtr != nullptr) {
       operator delete(objectPtr);
@@ -301,7 +328,9 @@ namespace
    * What it does:
    * No-op destruct callback lane used by legacy texture-scroller type-info.
    */
-  void DestructTextureScrollerObject(void* const)
+  void DestructTextureScrollerObject(
+    void* const
+  )
   {}
 
   // NOTE: 0x00777F30 (the "assign lifecycle callbacks" shape) had zero code
@@ -379,11 +408,7 @@ namespace moho
   {
     size_ = sizeof(CTextureScroller);
     (void)gpg::BindRTypeLifecycleCallbacks(
-      this,
-      &NewTextureScrollerRef,
-      &CtrTextureScrollerRef,
-      &DeleteTextureScrollerObject,
-      &DestructTextureScrollerObject
+      this, &NewTextureScrollerRef, &CtrTextureScrollerRef, &DeleteTextureScrollerObject, &DestructTextureScrollerObject
     );
     gpg::RType::Init();
     Finish();
@@ -422,7 +447,9 @@ namespace moho
    * Binds one owning entity pointer and seeds one default "none" scroller
    * payload with zero direction/speed lanes.
    */
-  CTextureScroller::CTextureScroller(Entity* const owner)
+  CTextureScroller::CTextureScroller(
+    Entity* const owner
+  )
     : mEntity(owner)
   {
     mDir[0] = 0u;
@@ -441,7 +468,9 @@ namespace moho
    * snaps the owner's scroll lanes together, `PingPong` clears its direction
    * flags and phase countdowns.
    */
-  void CTextureScroller::SetScroller(const SScroller& scroller) noexcept
+  void CTextureScroller::SetScroller(
+    const SScroller& scroller
+  ) noexcept
   {
     mScroller = scroller;
 
@@ -559,21 +588,26 @@ namespace moho
 
       const float avgBasisX =
         ((((cur.z * cur.x) + (cur.w * cur.y)) * 2.0f) + (((last.z * last.x) + (last.w * last.y)) * 2.0f)) * 0.5f;
-      const float avgBasisY =
-        ((1.0f - (((cur.x * cur.x) + (cur.y * cur.y)) * 2.0f)) + (1.0f - (((last.x * last.x) + (last.y * last.y)) * 2.0f))) * 0.5f;
+      const float avgBasisY = ((1.0f - (((cur.x * cur.x) + (cur.y * cur.y)) * 2.0f)) +
+                               (1.0f - (((last.x * last.x) + (last.y * last.y)) * 2.0f))) *
+        0.5f;
       const float avgBasisZ =
         ((((cur.y * cur.z) - (cur.w * cur.x)) * 2.0f) + (((last.y * last.z) - (last.w * last.x)) * 2.0f)) * 0.5f;
 
       const float scrollScale = mScroller.mFloat28;
-      const float scrollDeltaX = ((avgBasisY * leadDeltaZ) + (avgBasisZ * leadDeltaY) + (avgBasisX * leadDeltaX)) * scrollScale;
-      const float scrollDeltaY = ((avgBasisX * trailDeltaX) + (avgBasisY * trailDeltaZ) + (avgBasisZ * trailDeltaY)) * scrollScale;
+      const float scrollDeltaX =
+        ((avgBasisY * leadDeltaZ) + (avgBasisZ * leadDeltaY) + (avgBasisX * leadDeltaX)) * scrollScale;
+      const float scrollDeltaY =
+        ((avgBasisX * trailDeltaX) + (avgBasisY * trailDeltaZ) + (avgBasisZ * trailDeltaY)) * scrollScale;
 
       // Orientation-only motion can move the two tread contact points even
       // when the chassis center is fixed. Keep the old no-motion behavior if
       // that projection is zero (including q/-q) or cannot be used.
-      if (!positionChanged &&
-          ((!std::isfinite(scrollDeltaX) || !std::isfinite(scrollDeltaY)) ||
-           (scrollDeltaX == 0.0f && scrollDeltaY == 0.0f))) {
+      if (
+        !positionChanged &&
+        ((!std::isfinite(scrollDeltaX) || !std::isfinite(scrollDeltaY)) ||
+         (scrollDeltaX == 0.0f && scrollDeltaY == 0.0f))
+      ) {
         return;
       }
 
@@ -598,7 +632,9 @@ namespace moho
    * Deserializes owner entity pointer, scroller configuration payload, then
    * reads direction/speed lanes.
    */
-  void CTextureScroller::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CTextureScroller::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -636,7 +672,9 @@ namespace moho
    * Serializes owner entity pointer, scroller configuration payload, then
    * emits direction/speed lanes.
    */
-  void CTextureScroller::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CTextureScroller::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -667,8 +705,18 @@ namespace
 {
   // Forward declarations: CTextureScrollerSerializer's constructor binds
   // these as its load/save callback pointers; bodies defined below.
-  void DeserializeCTextureScrollerSerializerCallback(gpg::ReadArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
-  void SerializeCTextureScrollerSerializerCallback(gpg::WriteArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
+  void DeserializeCTextureScrollerSerializerCallback(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int unusedTag,
+    gpg::RRef* ownerRef
+  );
+  void SerializeCTextureScrollerSerializerCallback(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int unusedTag,
+    gpg::RRef* ownerRef
+  );
 
   [[maybe_unused]] void DeserializeCTextureScrollerSerializerCallback(
     gpg::ReadArchive* const archive,
@@ -724,7 +772,10 @@ namespace moho
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CTextureScrollerTypeInfo_6b8f21, moho::register_CTextureScrollerTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CTextureScrollerTypeInfo_6b8f21,
+  moho::register_CTextureScrollerTypeInfo
+)
 
 namespace moho
 {
@@ -756,7 +807,9 @@ namespace moho
    * Deserializes one `SScroller` payload by loading its reflected
    * `EScrollType` lane followed by all ten float lanes in binary order.
    */
-  void SScroller::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SScroller::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     const gpg::RRef ownerRef{};
     archive->Read(gpg::RTypeOf<moho::EScrollType>(), &mType, ownerRef);
@@ -779,7 +832,9 @@ namespace moho
    * Serializes one `SScroller` payload by writing its reflected
    * `EScrollType` lane followed by all ten float lanes in binary order.
    */
-  void SScroller::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SScroller::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef ownerRef{};
     archive->Write(gpg::RTypeOf<moho::EScrollType>(), &mType, ownerRef);

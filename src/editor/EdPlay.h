@@ -62,7 +62,8 @@ namespace faf::editor
     int aiCount = 0;
     /** The game's "Prebuilt units" option: each army starts with a base. */
     bool prebuilt = false;
-    /** The commanders there at once, without FAF's warp-in (3 s hidden, then 2.1 s of effect), and the camera over yours. */
+    /** The commanders there at once, without FAF's warp-in (3 s hidden, then 2.1 s of effect), and the camera over
+     * yours. */
     bool quickStart = true;
     /** The sim mods played with (uids); the chosen AI's own mod comes along anyway. */
     std::vector<std::string> mods;
@@ -102,10 +103,19 @@ namespace faf::editor
     void FindMaps();
 
     /** The scenario paths, in the list's order. */
-    [[nodiscard]] const std::vector<std::string>& Maps() const noexcept { return mMaps; }
+    [[nodiscard]] const std::vector<std::string>& Maps() const noexcept
+    {
+      return mMaps;
+    }
     /** Each map's title ("Seton's Clutch"), or its folder name when the scenario gives none. */
-    [[nodiscard]] const std::vector<std::string>& Titles() const noexcept { return mTitles; }
-    [[nodiscard]] int Selected() const noexcept { return mSelected; }
+    [[nodiscard]] const std::vector<std::string>& Titles() const noexcept
+    {
+      return mTitles;
+    }
+    [[nodiscard]] int Selected() const noexcept
+    {
+      return mSelected;
+    }
     /** Picks a map and takes the setup remembered for it, or the last one used. */
     void Select(int index);
 
@@ -115,7 +125,10 @@ namespace faf::editor
      */
     void SetSetupsFile(std::string path);
     /** The selected map keeps its own setup (else it plays with the last one used). */
-    [[nodiscard]] bool KeepsOwnSetup() const noexcept { return mKeepOwnSetup; }
+    [[nodiscard]] bool KeepsOwnSetup() const noexcept
+    {
+      return mKeepOwnSetup;
+    }
     void SetKeepsOwnSetup(bool keep);
 
     /** A session can start: none is loading or running. */
@@ -126,9 +139,15 @@ namespace faf::editor
     [[nodiscard]] const char* StateText() const;
 
     /** The game's AI types (FAF's /lua/ui/lobby/aitypes.lua) and factions (/lua/factions.lua). */
-    [[nodiscard]] const std::vector<PlayChoice>& AiTypes() const noexcept { return mAiTypes; }
+    [[nodiscard]] const std::vector<PlayChoice>& AiTypes() const noexcept
+    {
+      return mAiTypes;
+    }
     /** The sim mods the game data has, AI mods among them (their AI types are in AiTypes, after the game's). */
-    [[nodiscard]] const std::vector<PlayMod>& Mods() const noexcept { return mMods; }
+    [[nodiscard]] const std::vector<PlayMod>& Mods() const noexcept
+    {
+      return mMods;
+    }
     /** The mods the setup plays with: its own and the chosen AI's; a uid set as Lua text (`{ ['uid'] = true }`). */
     [[nodiscard]] std::vector<std::string> PlayedMods() const;
     /** After the setup's mods change: the game's rules for them built ahead on a thread, so the next Play is quick. */
@@ -139,8 +158,14 @@ namespace faf::editor
     void ApplyProfile(const std::string& name, int slots);
     /** The setup as it is, saved as a profile of that name (written to play_setups.ini). */
     void SaveProfile(const std::string& name);
-    [[nodiscard]] const std::vector<PlayChoice>& Factions() const noexcept { return mFactions; }
-    [[nodiscard]] PlaySetup& Setup() noexcept { return mSetup; }
+    [[nodiscard]] const std::vector<PlayChoice>& Factions() const noexcept
+    {
+      return mFactions;
+    }
+    [[nodiscard]] PlaySetup& Setup() noexcept
+    {
+      return mSetup;
+    }
 
     /**
      * During play: the view shows the whole map as an observer does (focus army -1), or the player's army
@@ -158,9 +183,15 @@ namespace faf::editor
     void SetFogHidden(bool hidden);
 
     /** Starts the selected map on the next frame. */
-    void Play() noexcept { mPlayRequested = true; }
+    void Play() noexcept
+    {
+      mPlayRequested = true;
+    }
     /** Ends the session on the next frame. */
-    void Stop() noexcept { mStopRequested = true; }
+    void Stop() noexcept
+    {
+      mStopRequested = true;
+    }
 
     /** Applies Play and Stop, and catches the session's own Exit; runs before the game's frame. */
     void BeforeGameFrame();
@@ -176,7 +207,10 @@ namespace faf::editor
     void ReadCommandLine();
 
     /** The command line's runs are over and asked for the editor to close. */
-    [[nodiscard]] bool QuitRequested() const noexcept { return mQuitRequested; }
+    [[nodiscard]] bool QuitRequested() const noexcept
+    {
+      return mQuitRequested;
+    }
 
   private:
     /** A setup as remembered: AI and faction by key, so they survive a change of the game's lists. */
@@ -256,7 +290,7 @@ namespace faf::editor
     bool mQuickStartSimSent = false;
     double mQuickStartUntil = 0.0;
     void DriveQuickStart();
-    int mAutoProfile = 0; // `/playprofile <n>`
+    int mAutoProfile = 0;        // `/playprofile <n>`
     bool mAutoLogArmies = false; // `/playlogarmies` // `/playnofog`: Hide the fog once play starts
     float mAutoDelay = 0.0f;
     int mAutoAi = -1; // `/playai`: this AI for every test play, over the map's remembered setup

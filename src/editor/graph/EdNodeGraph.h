@@ -76,7 +76,10 @@ namespace faf::editor
   public:
     const NodeType& Add(NodeType type);
     [[nodiscard]] const NodeType* Find(const std::string& name) const;
-    [[nodiscard]] const std::vector<std::unique_ptr<NodeType>>& All() const noexcept { return mTypes; }
+    [[nodiscard]] const std::vector<std::unique_ptr<NodeType>>& All() const noexcept
+    {
+      return mTypes;
+    }
 
   private:
     std::vector<std::unique_ptr<NodeType>> mTypes;
@@ -95,7 +98,8 @@ namespace faf::editor
     float x = 0.0f;
     float y = 0.0f;
     std::vector<ParamValue> params;
-    /** New whenever a parameter or an input link changes, unique in the graph's life: what an evaluator caches against. */
+    /** New whenever a parameter or an input link changes, unique in the graph's life: what an evaluator caches against.
+     */
     std::uint64_t revision = 0;
   };
 
@@ -119,11 +123,24 @@ namespace faf::editor
   class NodeGraph
   {
   public:
-    explicit NodeGraph(const NodeTypeRegistry& registry) : mRegistry(&registry) {}
+    explicit NodeGraph(
+      const NodeTypeRegistry& registry
+    )
+      : mRegistry(&registry)
+    {}
 
-    [[nodiscard]] const NodeTypeRegistry& Registry() const noexcept { return *mRegistry; }
-    [[nodiscard]] const std::vector<GraphNode>& Nodes() const noexcept { return mNodes; }
-    [[nodiscard]] const std::vector<GraphLink>& Links() const noexcept { return mLinks; }
+    [[nodiscard]] const NodeTypeRegistry& Registry() const noexcept
+    {
+      return *mRegistry;
+    }
+    [[nodiscard]] const std::vector<GraphNode>& Nodes() const noexcept
+    {
+      return mNodes;
+    }
+    [[nodiscard]] const std::vector<GraphLink>& Links() const noexcept
+    {
+      return mLinks;
+    }
 
     /** A node of the type at (x, y) with its parameters' initial values; its id, or 0 for an unknown type. */
     int AddNode(const std::string& type, float x, float y);
@@ -152,11 +169,15 @@ namespace faf::editor
     [[nodiscard]] std::vector<int> OrderFor(int id) const;
 
     /** Any change to nodes, links or parameters: what an editor saves against. */
-    [[nodiscard]] std::uint64_t Changes() const noexcept { return mChanges; }
+    [[nodiscard]] std::uint64_t Changes() const noexcept
+    {
+      return mChanges;
+    }
 
     /** The graph file (JSON): nodes with their parameters by name, links. */
     [[nodiscard]] std::string Save() const;
-    /** Reads a graph file; unknown node types and parameters are dropped, missing parameters take their initial value. */
+    /** Reads a graph file; unknown node types and parameters are dropped, missing parameters take their initial value.
+     */
     bool Load(const std::string& text, std::string& error);
     void Clear();
 

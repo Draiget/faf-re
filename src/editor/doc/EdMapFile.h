@@ -74,7 +74,12 @@ namespace faf::editor
    * lives in the game's archives, or anywhere new), the path is the caller's. Terrain is written as
    * version 60, which every game version reads. False with `error` set when it can't.
    */
-  bool WriteMapFile(moho::CWldMap& map, const MapFileRecords& records, const std::filesystem::path& path, std::string& error);
+  bool WriteMapFile(
+    moho::CWldMap& map,
+    const MapFileRecords& records,
+    const std::filesystem::path& path,
+    std::string& error
+  );
 
   /**
    * Reads a `.scmap` file from `path` on disk into a new map, through the same chunk loaders as
@@ -99,6 +104,7 @@ namespace faf::editor
    */
   PropRecord PropRecordFor(const std::string& path, const moho::VTransform& transform);
 
-  /** A whole game file (`/maps/...`, from a folder or an archive), resolved as MapLoad does; false if it can't be read. */
+  /** A whole game file (`/maps/...`, from a folder or an archive), resolved as MapLoad does; false if it can't be read.
+   */
   bool ReadGameFile(const std::string& virtualPath, std::string& out);
 } // namespace faf::editor

@@ -24,10 +24,11 @@ namespace moho
    * behind the polymorphic ones. `CTask` must sit at +0x10 (0x005A7CBB
    * stores 0x10, 0x005A7D1B puts `CScriptObject` at 0x28).
    */
-  class MOHO_CLANG_EMPTY_BASE_LAYOUT CAiNavigatorImpl : public IAiNavigator,
-                           public CTask,
-                           public CScriptObject,
-                           public InstanceCounter<CAiNavigatorImpl>
+  class MOHO_CLANG_EMPTY_BASE_LAYOUT CAiNavigatorImpl :
+    public IAiNavigator,
+    public CTask,
+    public CScriptObject,
+    public InstanceCounter<CAiNavigatorImpl>
   {
   public:
     /**
@@ -143,7 +144,8 @@ namespace moho
 
   protected:
     /**
-     * Address: 0x005A3610 (FUN_005A3610, ?GetMetatable@CAiNavigatorImpl@Moho@@QAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+     * Address: 0x005A3610 (FUN_005A3610,
+     * ?GetMetatable@CAiNavigatorImpl@Moho@@QAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
      *
      * What it does:
      * Loads `/lua/sim/Navigator.lua`, resolves `Navigator` table, then falls back
@@ -155,16 +157,17 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    Unit* mUnit;                     // +0x5C
-    std::uint8_t mIgnoreFormation;   // +0x60
-    std::uint8_t mPad61[3];          // +0x61
-    EAiNavigatorStatus mStatus;      // +0x64
+    Unit* mUnit;                   // +0x5C
+    std::uint8_t mIgnoreFormation; // +0x60
+    std::uint8_t mPad61[3];        // +0x61
+    EAiNavigatorStatus mStatus;    // +0x64
   };
 
   static_assert(sizeof(CAiNavigatorImpl) == 0x68, "CAiNavigatorImpl size must be 0x68");
   static_assert(offsetof(CAiNavigatorImpl, mUnit) == 0x5C, "CAiNavigatorImpl::mUnit offset must be 0x5C");
   static_assert(
-    offsetof(CAiNavigatorImpl, mIgnoreFormation) == 0x60, "CAiNavigatorImpl::mIgnoreFormation offset must be 0x60"
+    offsetof(CAiNavigatorImpl, mIgnoreFormation) == 0x60,
+    "CAiNavigatorImpl::mIgnoreFormation offset must be 0x60"
   );
   static_assert(offsetof(CAiNavigatorImpl, mStatus) == 0x64, "CAiNavigatorImpl::mStatus offset must be 0x64");
 
@@ -186,7 +189,8 @@ namespace moho
 
   protected:
     /**
-     * Address: 0x005A7310 (FUN_005A7310, ?Create@?$CScrLuaMetatableFactory@VCAiNavigatorImpl@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+     * Address: 0x005A7310 (FUN_005A7310,
+     * ?Create@?$CScrLuaMetatableFactory@VCAiNavigatorImpl@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
      */
     LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
 

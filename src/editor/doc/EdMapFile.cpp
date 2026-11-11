@@ -30,7 +30,9 @@ namespace faf::editor
     constexpr std::size_t kPropFloats = 15;
 
     /** The real path a game path resolves to, as MapLoad finds it (0x00890DA0), or the path itself. */
-    [[nodiscard]] std::string Resolved(const std::string& path)
+    [[nodiscard]] std::string Resolved(
+      const std::string& path
+    )
     {
       moho::FWaitHandleSet* const files = moho::FILE_GetWaitHandleSet();
       if (files == nullptr || files->mHandle == nullptr) {
@@ -41,8 +43,11 @@ namespace faf::editor
       return resolved.empty() ? path : std::string(resolved.c_str());
     }
 
-    /** A file opened for reading (a real path, or one Resolved gives), or null: DISK_OpenFileRead throws when it isn't there. */
-    [[nodiscard]] fa::auto_ptr<gpg::Stream> OpenRead(const std::string& path)
+    /** A file opened for reading (a real path, or one Resolved gives), or null: DISK_OpenFileRead throws when it isn't
+     * there. */
+    [[nodiscard]] fa::auto_ptr<gpg::Stream> OpenRead(
+      const std::string& path
+    )
     {
       try {
         return moho::DISK_OpenFileRead(path.c_str());
@@ -52,7 +57,10 @@ namespace faf::editor
     }
 
     /** The last `count` bytes of a file (game or disk path), or empty. */
-    [[nodiscard]] std::vector<char> FileTail(const std::string& file, const std::size_t count)
+    [[nodiscard]] std::vector<char> FileTail(
+      const std::string& file,
+      const std::size_t count
+    )
     {
       fa::auto_ptr<gpg::Stream> stream = OpenRead(Resolved(file));
       if (stream.get() == nullptr) {
@@ -73,7 +81,10 @@ namespace faf::editor
     }
   } // namespace
 
-  std::vector<std::string> ReadImageRecords(const std::string& file, const std::size_t previewBytes)
+  std::vector<std::string> ReadImageRecords(
+    const std::string& file,
+    const std::size_t previewBytes
+  )
   {
     std::vector<std::string> images;
     std::string bytes;
@@ -86,7 +97,9 @@ namespace faf::editor
     return images;
   }
 
-  std::vector<char> ReadPreviewRecord(const std::string& file)
+  std::vector<char> ReadPreviewRecord(
+    const std::string& file
+  )
   {
     // RWldMapPreviewChunk::Load's layout: magic 0xBEEFFEED, version, width and height, the name in UTF-16
     // up to a 0, a count of tag/value pairs, then (version 2 on) the payload's size and the payload.
@@ -142,7 +155,10 @@ namespace faf::editor
     return chunk;
   }
 
-  std::vector<PropRecord> ReadPropRecords(const std::string& file, const moho::CWldMap& map)
+  std::vector<PropRecord> ReadPropRecords(
+    const std::string& file,
+    const moho::CWldMap& map
+  )
   {
     if (map.mProps == nullptr) {
       return {};
@@ -177,7 +193,12 @@ namespace faf::editor
     return records;
   }
 
-  bool WriteMapFile(moho::CWldMap& map, const MapFileRecords& records, const std::filesystem::path& path, std::string& error)
+  bool WriteMapFile(
+    moho::CWldMap& map,
+    const MapFileRecords& records,
+    const std::filesystem::path& path,
+    std::string& error
+  )
   {
     if (map.mMapPreviewChunk == nullptr || map.mTerrainRes == nullptr || map.mProps == nullptr) {
       error = "the map is incomplete";
@@ -231,16 +252,20 @@ namespace faf::editor
       for (std::size_t i = 0; i < entries.size(); ++i) {
         const moho::CWldPropEntry& entry = entries[i];
         writer.Write(entry.mBlueprintPath.c_str(), entry.mBlueprintPath.size() + 1u);
-        if (i < props.size() && props[i].path == entry.mBlueprintPath.c_str() &&
-            std::memcmp(&props[i].loaded, &entry.mTransform, sizeof(entry.mTransform)) == 0) {
+        if (
+          i < props.size() && props[i].path == entry.mBlueprintPath.c_str() &&
+          std::memcmp(&props[i].loaded, &entry.mTransform, sizeof(entry.mTransform)) == 0
+        ) {
           for (const float value : props[i].values) {
             writer.Write(value);
           }
           continue;
         }
         // Moved but not turned: the new position with the rotation and scale floats as read.
-        if (i < props.size() && props[i].path == entry.mBlueprintPath.c_str() &&
-            std::memcmp(&props[i].loaded.orient_, &entry.mTransform.orient_, sizeof(entry.mTransform.orient_)) == 0) {
+        if (
+          i < props.size() && props[i].path == entry.mBlueprintPath.c_str() &&
+          std::memcmp(&props[i].loaded.orient_, &entry.mTransform.orient_, sizeof(entry.mTransform.orient_)) == 0
+        ) {
           writer.Write(entry.mTransform.pos_.x);
           writer.Write(entry.mTransform.pos_.y);
           writer.Write(entry.mTransform.pos_.z);
@@ -274,8 +299,12 @@ namespace faf::editor
     }
   }
 
-  std::unique_ptr<moho::CWldMap>
-  ReadMapFile(const std::filesystem::path& path, LuaPlus::LuaState* const state, MapFileRecords& records, std::string& error)
+  std::unique_ptr<moho::CWldMap> ReadMapFile(
+    const std::filesystem::path& path,
+    LuaPlus::LuaState* const state,
+    MapFileRecords& records,
+    std::string& error
+  )
   {
     try {
       fa::auto_ptr<gpg::Stream> stream = OpenRead(path.string());
@@ -297,7 +326,10 @@ namespace faf::editor
       map->mMapPreviewChunk = new moho::RWldMapPreviewChunk();
       map->mTerrainRes = moho::WLD_CreateTerrainRes();
       map->mProps = moho::WLD_CreateProps();
-      if (!map->mMapPreviewChunk->Load(reader, control) || !map->mTerrainRes->Load(reader, state, control) || !map->mProps->Load(reader, control)) {
+      if (
+        !map->mMapPreviewChunk->Load(reader, control) || !map->mTerrainRes->Load(reader, state, control) ||
+        !map->mProps->Load(reader, control)
+      ) {
         error = "the map file did not load";
         return nullptr;
       }
@@ -311,21 +343,40 @@ namespace faf::editor
     }
   }
 
-  std::filesystem::path DiskFileOf(const std::string& virtualPath)
+  std::filesystem::path DiskFileOf(
+    const std::string& virtualPath
+  )
   {
     std::error_code ignored;
     const std::filesystem::path path(Resolved(virtualPath));
     return std::filesystem::is_regular_file(path, ignored) ? path : std::filesystem::path{};
   }
 
-  PropRecord PropRecordFor(const std::string& path, const moho::VTransform& transform)
+  PropRecord PropRecordFor(
+    const std::string& path,
+    const moho::VTransform& transform
+  )
   {
     PropRecord record;
     record.path = path;
     const moho::VAxes3 matrix(transform.orient_);
-    const float values[15] = {transform.pos_.x, transform.pos_.y, transform.pos_.z, matrix.vX.x, matrix.vX.y, matrix.vX.z, matrix.vY.x,
-                              matrix.vY.y,      matrix.vY.z,      matrix.vZ.x,      matrix.vZ.y, matrix.vZ.z, 1.0f,          1.0f,
-                              1.0f};
+    const float values[15] = {
+      transform.pos_.x,
+      transform.pos_.y,
+      transform.pos_.z,
+      matrix.vX.x,
+      matrix.vX.y,
+      matrix.vX.z,
+      matrix.vY.x,
+      matrix.vY.y,
+      matrix.vY.z,
+      matrix.vZ.x,
+      matrix.vZ.y,
+      matrix.vZ.z,
+      1.0f,
+      1.0f,
+      1.0f
+    };
     std::copy(std::begin(values), std::end(values), record.values);
     record.loaded = transform;
     // Read back by the engine's own loader, from the same floats the writer will write.
@@ -348,7 +399,10 @@ namespace faf::editor
     return record;
   }
 
-  bool ReadGameFile(const std::string& virtualPath, std::string& out)
+  bool ReadGameFile(
+    const std::string& virtualPath,
+    std::string& out
+  )
   {
     out.clear();
     fa::auto_ptr<gpg::Stream> stream = OpenRead(Resolved(virtualPath));

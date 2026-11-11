@@ -17,19 +17,28 @@ namespace faf::editor
 {
   namespace
   {
-    [[nodiscard]] std::string Lower(std::string text)
+    [[nodiscard]] std::string Lower(
+      std::string text
+    )
     {
-      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return text;
     }
 
-    [[nodiscard]] bool EndsWith(const std::string& text, const std::string& tail)
+    [[nodiscard]] bool EndsWith(
+      const std::string& text,
+      const std::string& tail
+    )
     {
       return text.size() >= tail.size() && text.compare(text.size() - tail.size(), tail.size(), tail) == 0;
     }
   } // namespace
 
-  std::string LayerTextureName(const std::string& path)
+  std::string LayerTextureName(
+    const std::string& path
+  )
   {
     if (path.empty()) {
       return "(empty)";
@@ -78,7 +87,9 @@ namespace faf::editor
     }
     for (const std::string& path : all) {
       const std::string lower = Lower(path);
-      if (lower.find("/layers/") == std::string::npos || EndsWith(lower, "_normals.dds") || EndsWith(lower, "_normal.dds")) {
+      if (
+        lower.find("/layers/") == std::string::npos || EndsWith(lower, "_normals.dds") || EndsWith(lower, "_normal.dds")
+      ) {
         continue;
       }
       LayerTexture texture;
@@ -108,7 +119,10 @@ namespace faf::editor
     return mTextures;
   }
 
-  std::uint64_t EdTextureLibrary::Thumbnail(const std::string& path, const bool withAlpha)
+  std::uint64_t EdTextureLibrary::Thumbnail(
+    const std::string& path,
+    const bool withAlpha
+  )
   {
     if (path.empty()) {
       return 0U;
@@ -125,7 +139,9 @@ namespace faf::editor
     return 0U;
   }
 
-  void EdTextureLibrary::Pump(const int count)
+  void EdTextureLibrary::Pump(
+    const int count
+  )
   {
     gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
     for (int i = 0; i < count && !mWanted.empty() && codec != nullptr; ++i) {
@@ -142,15 +158,18 @@ namespace faf::editor
       options.height = kThumbnail;
       options.mipLevels = 1;
       gpg::gal::imaging::Image image;
-      if (FAILED(codec->Decode(bytes.data(), bytes.size(), options, image)) || image.subresources.empty() ||
-          image.format != DXGI_FORMAT_B8G8R8A8_UNORM) {
+      if (
+        FAILED(codec->Decode(bytes.data(), bytes.size(), options, image)) || image.subresources.empty() ||
+        image.format != DXGI_FORMAT_B8G8R8A8_UNORM
+      ) {
         continue;
       }
       const auto& level = image.subresources.front();
       const std::uint32_t opaque = mWithAlpha.count(path) != 0 ? 0u : 0xFF000000u;
       std::vector<std::uint32_t> pixels(static_cast<std::size_t>(level.width) * level.height);
       for (std::uint32_t y = 0; y < level.height; ++y) {
-        const std::uint8_t* const row = image.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch;
+        const std::uint8_t* const row =
+          image.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch;
         for (std::uint32_t x = 0; x < level.width; ++x) {
           std::uint32_t pixel = 0;
           std::memcpy(&pixel, row + static_cast<std::size_t>(x) * 4U, 4U);
@@ -158,7 +177,8 @@ namespace faf::editor
           pixels[static_cast<std::size_t>(y) * level.width + x] = pixel | opaque;
         }
       }
-      mThumbnails[path] = EdImGuiRenderer::CreateImage(static_cast<int>(level.width), static_cast<int>(level.height), pixels.data());
+      mThumbnails[path] =
+        EdImGuiRenderer::CreateImage(static_cast<int>(level.width), static_cast<int>(level.height), pixels.data());
     }
   }
 } // namespace faf::editor

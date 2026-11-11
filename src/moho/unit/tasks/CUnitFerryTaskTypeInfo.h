@@ -70,4 +70,3 @@ namespace moho
 
   static_assert(sizeof(CUnitFerryTaskTypeInfo) == 0x64, "CUnitFerryTaskTypeInfo size must be 0x64");
 } // namespace moho
-

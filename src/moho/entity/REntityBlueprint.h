@@ -20,7 +20,7 @@ namespace LuaPlus
 {
   class LuaObject;
   class LuaState;
-}
+} // namespace LuaPlus
 
 namespace moho
 {
@@ -60,11 +60,11 @@ namespace moho
     // fills in a hand-rolled table. Being polymorphic is also what lets the
     // blueprint-kind test work: 0x00677360 asks the reflection system to
     // upcast the blueprint to RUnitBlueprint, which needs a dynamic type.
-    RRuleGameRules* mOwner;                                   // +0x04 (owner game-rules pointer)
-    fa::string mBlueprintId;                               // +0x08
-    fa::string mBlueprintLabel;                            // +0x24 (optional label used by unique-name formatting)
-    fa::string mSource;                                    // +0x40 (source blueprint path/id string)
-    std::uint32_t mCategoryBitIndex;                          // +0x5C
+    RRuleGameRules* mOwner;          // +0x04 (owner game-rules pointer)
+    fa::string mBlueprintId;         // +0x08
+    fa::string mBlueprintLabel;      // +0x24 (optional label used by unique-name formatting)
+    fa::string mSource;              // +0x40 (source blueprint path/id string)
+    std::uint32_t mCategoryBitIndex; // +0x5C
     /**
      * Address: 0x00512870 (`Moho::REntityBlueprintTypeInfo::AddFields`) --
      * `push 60h` / `push offset "Categories"` / `call
@@ -103,42 +103,42 @@ namespace moho
      * neither is read anywhere in this binary. All four sources therefore
      * agree on one layout; none actually conflicts.
      */
-    fa::vector<fa::string> mCategories;                // +0x60
-    fa::string mScriptModule;                              // +0x70
-    fa::string mScriptClass;                               // +0x8C
-    ECollisionShape mCollisionShape;                          // +0xA8
-    float mSizeX;                                             // +0xAC
-    float mSizeY;                                             // +0xB0
-    float mSizeZ;                                             // +0xB4
-    float mAverageDensity;                                    // +0xB8
-    float mInertiaTensorX;                                    // +0xBC
-    float mInertiaTensorY;                                    // +0xC0
-    float mInertiaTensorZ;                                    // +0xC4
-    float mCollisionOffsetX;                                  // +0xC8
-    float mCollisionOffsetY;                                  // +0xCC
-    float mCollisionOffsetZ;                                  // +0xD0
-    std::int32_t mDesiredShooterCap;                          // +0xD4
-    SFootprint mFootprint;                                    // +0xD8
-    SFootprint mAltFootprint;                                 // +0xE8
-    std::uint8_t mLifeBarRender;                              // +0xF8
-    std::uint8_t mLifeBarPadding00F9_00FB[3];                 // +0xF9
-    float mLifeBarOffset;                                     // +0xFC
-    float mLifeBarSize;                                       // +0x100
-    float mLifeBarHeight;                                     // +0x104
-    float mSelectionSizeX;                                    // +0x108
-    float mSelectionSizeY;                                    // +0x10C
-    float mSelectionSizeZ;                                    // +0x110
-    float mSelectionCenterOffsetX;                            // +0x114
-    float mSelectionCenterOffsetY;                            // +0x118
-    float mSelectionCenterOffsetZ;                            // +0x11C
-    float mSelectionYOffset;                                  // +0x120
-    float mSelectionMeshScaleX;                               // +0x124
-    float mSelectionMeshScaleY;                               // +0x128
-    float mSelectionMeshScaleZ;                               // +0x12C
-    float mSelectionMeshUseTopAmount;                         // +0x130
-    float mSelectionThickness;                                // +0x134
-    float mUseOOBTestZoom;                                    // +0x138
-    fa::string mStrategicIconName;                         // +0x13C
+    fa::vector<fa::string> mCategories;       // +0x60
+    fa::string mScriptModule;                 // +0x70
+    fa::string mScriptClass;                  // +0x8C
+    ECollisionShape mCollisionShape;          // +0xA8
+    float mSizeX;                             // +0xAC
+    float mSizeY;                             // +0xB0
+    float mSizeZ;                             // +0xB4
+    float mAverageDensity;                    // +0xB8
+    float mInertiaTensorX;                    // +0xBC
+    float mInertiaTensorY;                    // +0xC0
+    float mInertiaTensorZ;                    // +0xC4
+    float mCollisionOffsetX;                  // +0xC8
+    float mCollisionOffsetY;                  // +0xCC
+    float mCollisionOffsetZ;                  // +0xD0
+    std::int32_t mDesiredShooterCap;          // +0xD4
+    SFootprint mFootprint;                    // +0xD8
+    SFootprint mAltFootprint;                 // +0xE8
+    std::uint8_t mLifeBarRender;              // +0xF8
+    std::uint8_t mLifeBarPadding00F9_00FB[3]; // +0xF9
+    float mLifeBarOffset;                     // +0xFC
+    float mLifeBarSize;                       // +0x100
+    float mLifeBarHeight;                     // +0x104
+    float mSelectionSizeX;                    // +0x108
+    float mSelectionSizeY;                    // +0x10C
+    float mSelectionSizeZ;                    // +0x110
+    float mSelectionCenterOffsetX;            // +0x114
+    float mSelectionCenterOffsetY;            // +0x118
+    float mSelectionCenterOffsetZ;            // +0x11C
+    float mSelectionYOffset;                  // +0x120
+    float mSelectionMeshScaleX;               // +0x124
+    float mSelectionMeshScaleY;               // +0x128
+    float mSelectionMeshScaleZ;               // +0x12C
+    float mSelectionMeshUseTopAmount;         // +0x130
+    float mSelectionThickness;                // +0x134
+    float mUseOOBTestZoom;                    // +0x138
+    fa::string mStrategicIconName;            // +0x13C
     /**
      * Strategic-icon draw-order tier. `CWldSession::RenderStrategicIcons`
      * (0x0085B6E0) reads it with a single-byte compare against `'A'` (0x41)
@@ -148,8 +148,8 @@ namespace moho
      * this lane used to be typed as; the three bytes at +0x159..+0x15B are
      * unused padding up to `mStrategicIconRest`.
      */
-    std::uint8_t mStrategicIconSortPriority;                  // +0x158
-    std::uint8_t mStrategicIconSortPriorityPad0159_015B[3];    // +0x159
+    std::uint8_t mStrategicIconSortPriority;                // +0x158
+    std::uint8_t mStrategicIconSortPriorityPad0159_015B[3]; // +0x159
     /**
      * Four cached strategic-icon textures for this blueprint - rest, selected,
      * mouse-over and selected+mouse-over - read by the icon-texture picker
@@ -166,9 +166,9 @@ namespace moho
      * `shared_ptr` copy-construct (unconditional increment when the control
      * block pointer is non-null), not a weak-to-shared promotion.
      */
-    boost::shared_ptr<CD3DBatchTexture> mStrategicIconRest;     // +0x15C
-    boost::shared_ptr<CD3DBatchTexture> mStrategicIconSelected; // +0x164
-    boost::shared_ptr<CD3DBatchTexture> mStrategicIconOver;     // +0x16C
+    boost::shared_ptr<CD3DBatchTexture> mStrategicIconRest;         // +0x15C
+    boost::shared_ptr<CD3DBatchTexture> mStrategicIconSelected;     // +0x164
+    boost::shared_ptr<CD3DBatchTexture> mStrategicIconOver;         // +0x16C
     boost::shared_ptr<CD3DBatchTexture> mStrategicIconSelectedOver; // +0x174
 
     static gpg::RType* sType;
@@ -241,46 +241,67 @@ namespace moho
   static_assert(offsetof(REntityBlueprint, mOwner) == 0x04, "REntityBlueprint::mOwner offset must be 0x04");
   static_assert(offsetof(REntityBlueprint, mBlueprintId) == 0x08, "REntityBlueprint::mBlueprintId offset must be 0x08");
   static_assert(
-    offsetof(REntityBlueprint, mBlueprintLabel) == 0x24, "REntityBlueprint::mBlueprintLabel offset must be 0x24"
+    offsetof(REntityBlueprint, mBlueprintLabel) == 0x24,
+    "REntityBlueprint::mBlueprintLabel offset must be 0x24"
   );
   static_assert(offsetof(REntityBlueprint, mSource) == 0x40, "REntityBlueprint::mSource offset must be 0x40");
   static_assert(
-    offsetof(REntityBlueprint, mCategoryBitIndex) == 0x5C, "REntityBlueprint::mCategoryBitIndex offset must be 0x5C"
+    offsetof(REntityBlueprint, mCategoryBitIndex) == 0x5C,
+    "REntityBlueprint::mCategoryBitIndex offset must be 0x5C"
   );
+  static_assert(offsetof(REntityBlueprint, mCategories) == 0x60, "REntityBlueprint::mCategories offset must be 0x60");
   static_assert(
-    offsetof(REntityBlueprint, mCategories) == 0x60, "REntityBlueprint::mCategories offset must be 0x60"
-  );
-  static_assert(
-    offsetof(REntityBlueprint, mScriptModule) == 0x70, "REntityBlueprint::mScriptModule offset must be 0x70"
+    offsetof(REntityBlueprint, mScriptModule) == 0x70,
+    "REntityBlueprint::mScriptModule offset must be 0x70"
   );
   static_assert(offsetof(REntityBlueprint, mScriptClass) == 0x8C, "REntityBlueprint::mScriptClass offset must be 0x8C");
   static_assert(
-    offsetof(REntityBlueprint, mCollisionShape) == 0xA8, "REntityBlueprint::mCollisionShape offset must be 0xA8"
+    offsetof(REntityBlueprint, mCollisionShape) == 0xA8,
+    "REntityBlueprint::mCollisionShape offset must be 0xA8"
   );
   static_assert(offsetof(REntityBlueprint, mSizeX) == 0xAC, "REntityBlueprint::mSizeX offset must be 0xAC");
   static_assert(offsetof(REntityBlueprint, mSizeY) == 0xB0, "REntityBlueprint::mSizeY offset must be 0xB0");
   static_assert(offsetof(REntityBlueprint, mSizeZ) == 0xB4, "REntityBlueprint::mSizeZ offset must be 0xB4");
   static_assert(
-    offsetof(REntityBlueprint, mCollisionOffsetX) == 0xC8, "REntityBlueprint::mCollisionOffsetX offset must be 0xC8"
+    offsetof(REntityBlueprint, mCollisionOffsetX) == 0xC8,
+    "REntityBlueprint::mCollisionOffsetX offset must be 0xC8"
   );
   static_assert(
-    offsetof(REntityBlueprint, mDesiredShooterCap) == 0xD4, "REntityBlueprint::mDesiredShooterCap offset must be 0xD4"
+    offsetof(REntityBlueprint, mDesiredShooterCap) == 0xD4,
+    "REntityBlueprint::mDesiredShooterCap offset must be 0xD4"
   );
   static_assert(offsetof(REntityBlueprint, mFootprint) == 0xD8, "REntityBlueprint::mFootprint offset must be 0xD8");
   static_assert(
-    offsetof(REntityBlueprint, mAltFootprint) == 0xE8, "REntityBlueprint::mAltFootprint offset must be 0xE8"
+    offsetof(REntityBlueprint, mAltFootprint) == 0xE8,
+    "REntityBlueprint::mAltFootprint offset must be 0xE8"
   );
-  static_assert(offsetof(REntityBlueprint, mLifeBarRender) == 0xF8, "REntityBlueprint::mLifeBarRender offset must be 0xF8");
-  static_assert(offsetof(REntityBlueprint, mLifeBarOffset) == 0xFC, "REntityBlueprint::mLifeBarOffset offset must be 0xFC");
-  static_assert(offsetof(REntityBlueprint, mLifeBarSize) == 0x100, "REntityBlueprint::mLifeBarSize offset must be 0x100");
-  static_assert(offsetof(REntityBlueprint, mLifeBarHeight) == 0x104, "REntityBlueprint::mLifeBarHeight offset must be 0x104");
-  static_assert(offsetof(REntityBlueprint, mSelectionSizeX) == 0x108, "REntityBlueprint::mSelectionSizeX offset must be 0x108");
+  static_assert(
+    offsetof(REntityBlueprint, mLifeBarRender) == 0xF8,
+    "REntityBlueprint::mLifeBarRender offset must be 0xF8"
+  );
+  static_assert(
+    offsetof(REntityBlueprint, mLifeBarOffset) == 0xFC,
+    "REntityBlueprint::mLifeBarOffset offset must be 0xFC"
+  );
+  static_assert(
+    offsetof(REntityBlueprint, mLifeBarSize) == 0x100,
+    "REntityBlueprint::mLifeBarSize offset must be 0x100"
+  );
+  static_assert(
+    offsetof(REntityBlueprint, mLifeBarHeight) == 0x104,
+    "REntityBlueprint::mLifeBarHeight offset must be 0x104"
+  );
+  static_assert(
+    offsetof(REntityBlueprint, mSelectionSizeX) == 0x108,
+    "REntityBlueprint::mSelectionSizeX offset must be 0x108"
+  );
   static_assert(
     offsetof(REntityBlueprint, mSelectionCenterOffsetX) == 0x114,
     "REntityBlueprint::mSelectionCenterOffsetX offset must be 0x114"
   );
   static_assert(
-    offsetof(REntityBlueprint, mSelectionYOffset) == 0x120, "REntityBlueprint::mSelectionYOffset offset must be 0x120"
+    offsetof(REntityBlueprint, mSelectionYOffset) == 0x120,
+    "REntityBlueprint::mSelectionYOffset offset must be 0x120"
   );
   static_assert(
     offsetof(REntityBlueprint, mSelectionMeshScaleX) == 0x124,
@@ -291,24 +312,28 @@ namespace moho
     "REntityBlueprint::mSelectionMeshUseTopAmount offset must be 0x130"
   );
   static_assert(
-    offsetof(REntityBlueprint, mUseOOBTestZoom) == 0x138, "REntityBlueprint::mUseOOBTestZoom offset must be 0x138"
+    offsetof(REntityBlueprint, mUseOOBTestZoom) == 0x138,
+    "REntityBlueprint::mUseOOBTestZoom offset must be 0x138"
   );
   static_assert(
-    offsetof(REntityBlueprint, mStrategicIconName) == 0x13C, "REntityBlueprint::mStrategicIconName offset must be 0x13C"
+    offsetof(REntityBlueprint, mStrategicIconName) == 0x13C,
+    "REntityBlueprint::mStrategicIconName offset must be 0x13C"
   );
   static_assert(
     offsetof(REntityBlueprint, mStrategicIconSortPriority) == 0x158,
     "REntityBlueprint::mStrategicIconSortPriority offset must be 0x158"
   );
   static_assert(
-    offsetof(REntityBlueprint, mStrategicIconRest) == 0x15C, "REntityBlueprint::mStrategicIconRest offset must be 0x15C"
+    offsetof(REntityBlueprint, mStrategicIconRest) == 0x15C,
+    "REntityBlueprint::mStrategicIconRest offset must be 0x15C"
   );
   static_assert(
     offsetof(REntityBlueprint, mStrategicIconSelected) == 0x164,
     "REntityBlueprint::mStrategicIconSelected offset must be 0x164"
   );
   static_assert(
-    offsetof(REntityBlueprint, mStrategicIconOver) == 0x16C, "REntityBlueprint::mStrategicIconOver offset must be 0x16C"
+    offsetof(REntityBlueprint, mStrategicIconOver) == 0x16C,
+    "REntityBlueprint::mStrategicIconOver offset must be 0x16C"
   );
   static_assert(
     offsetof(REntityBlueprint, mStrategicIconSelectedOver) == 0x174,

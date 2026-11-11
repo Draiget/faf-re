@@ -167,7 +167,10 @@ union ULARGE_INTEGER
 };
 
 // -1, 0 or 1 as the first time is earlier than, equal to or later than the second.
-inline LONG CompareFileTime(const FILETIME* const first, const FILETIME* const second) noexcept
+inline LONG CompareFileTime(
+  const FILETIME* const first,
+  const FILETIME* const second
+) noexcept
 {
   const std::uint64_t a = (static_cast<std::uint64_t>(first->dwHighDateTime) << 32) | first->dwLowDateTime;
   const std::uint64_t b = (static_cast<std::uint64_t>(second->dwHighDateTime) << 32) | second->dwLowDateTime;
@@ -254,23 +257,33 @@ struct SRWLOCK
   pthread_rwlock_t lock;
 };
 #define SRWLOCK_INIT {PTHREAD_RWLOCK_INITIALIZER}
-inline void InitializeSRWLock(SRWLOCK* const lock) noexcept
+inline void InitializeSRWLock(
+  SRWLOCK* const lock
+) noexcept
 {
   (void)::pthread_rwlock_init(&lock->lock, nullptr);
 }
-inline void AcquireSRWLockExclusive(SRWLOCK* const lock) noexcept
+inline void AcquireSRWLockExclusive(
+  SRWLOCK* const lock
+) noexcept
 {
   (void)::pthread_rwlock_wrlock(&lock->lock);
 }
-inline void ReleaseSRWLockExclusive(SRWLOCK* const lock) noexcept
+inline void ReleaseSRWLockExclusive(
+  SRWLOCK* const lock
+) noexcept
 {
   (void)::pthread_rwlock_unlock(&lock->lock);
 }
-inline void AcquireSRWLockShared(SRWLOCK* const lock) noexcept
+inline void AcquireSRWLockShared(
+  SRWLOCK* const lock
+) noexcept
 {
   (void)::pthread_rwlock_rdlock(&lock->lock);
 }
-inline void ReleaseSRWLockShared(SRWLOCK* const lock) noexcept
+inline void ReleaseSRWLockShared(
+  SRWLOCK* const lock
+) noexcept
 {
   (void)::pthread_rwlock_unlock(&lock->lock);
 }
@@ -336,33 +349,51 @@ struct SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
 /// Physical cores and NUMA nodes from sysfs, as fixed-size records in group 0. With no topology to
 /// report: FALSE with ERROR_NOT_SUPPORTED and a length of 0.
 BOOL GetLogicalProcessorInformationEx(
-  LOGICAL_PROCESSOR_RELATIONSHIP relation, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* buffer, DWORD* length
+  LOGICAL_PROCESSOR_RELATIONSHIP relation,
+  SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* buffer,
+  DWORD* length
 );
 
 // --- Interlocked operations on 32- and 64-bit values -------------------------------------
-inline LONG InterlockedIncrement(volatile LONG* value) noexcept
+inline LONG InterlockedIncrement(
+  volatile LONG* value
+) noexcept
 {
   return __atomic_add_fetch(value, 1, __ATOMIC_SEQ_CST);
 }
-inline LONG InterlockedDecrement(volatile LONG* value) noexcept
+inline LONG InterlockedDecrement(
+  volatile LONG* value
+) noexcept
 {
   return __atomic_sub_fetch(value, 1, __ATOMIC_SEQ_CST);
 }
-inline LONG InterlockedExchange(volatile LONG* target, const LONG value) noexcept
+inline LONG InterlockedExchange(
+  volatile LONG* target,
+  const LONG value
+) noexcept
 {
   return __atomic_exchange_n(target, value, __ATOMIC_SEQ_CST);
 }
-inline LONG InterlockedExchangeAdd(volatile LONG* target, const LONG value) noexcept
+inline LONG InterlockedExchangeAdd(
+  volatile LONG* target,
+  const LONG value
+) noexcept
 {
   return __atomic_fetch_add(target, value, __ATOMIC_SEQ_CST);
 }
-inline LONG InterlockedCompareExchange(volatile LONG* target, const LONG exchange, LONG comparand) noexcept
+inline LONG InterlockedCompareExchange(
+  volatile LONG* target,
+  const LONG exchange,
+  LONG comparand
+) noexcept
 {
   __atomic_compare_exchange_n(target, &comparand, exchange, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
   return comparand;
 }
 inline std::int64_t InterlockedCompareExchange64(
-  volatile std::int64_t* target, const std::int64_t exchange, std::int64_t comparand
+  volatile std::int64_t* target,
+  const std::int64_t exchange,
+  std::int64_t comparand
 ) noexcept
 {
   __atomic_compare_exchange_n(target, &comparand, exchange, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
@@ -423,19 +454,25 @@ HLOCAL LocalFree(HLOCAL memory);
 // The multimedia timer's resolution (timeapi.h): Linux timers and sleeps are already fine-grained,
 // so raising it always succeeds and changes nothing.
 #define TIMERR_NOERROR 0u
-inline UINT timeBeginPeriod(const UINT period) noexcept
+inline UINT timeBeginPeriod(
+  const UINT period
+) noexcept
 {
   (void)period;
   return TIMERR_NOERROR;
 }
-inline UINT timeEndPeriod(const UINT period) noexcept
+inline UINT timeEndPeriod(
+  const UINT period
+) noexcept
 {
   (void)period;
   return TIMERR_NOERROR;
 }
 
 // A Win32 error as an HRESULT (FACILITY_WIN32).
-inline HRESULT HRESULT_FROM_WIN32(const unsigned long error) noexcept
+inline HRESULT HRESULT_FROM_WIN32(
+  const unsigned long error
+) noexcept
 {
   return static_cast<HRESULT>(error) <= 0 ? static_cast<HRESULT>(error)
                                           : static_cast<HRESULT>((error & 0x0000FFFFu) | (7u << 16) | 0x80000000u);
@@ -487,7 +524,12 @@ struct FILE_STORAGE_INFO
   ULONG ByteOffsetForSectorAlignment;
   ULONG ByteOffsetForPartitionAlignment;
 };
-inline BOOL GetFileInformationByHandleEx(HANDLE, FILE_INFO_BY_HANDLE_CLASS, void*, DWORD) noexcept
+inline BOOL GetFileInformationByHandleEx(
+  HANDLE,
+  FILE_INFO_BY_HANDLE_CLASS,
+  void*,
+  DWORD
+) noexcept
 {
   return FALSE;
 }
@@ -499,7 +541,14 @@ inline BOOL GetFileInformationByHandleEx(HANDLE, FILE_INFO_BY_HANDLE_CLASS, void
 #define INVALID_SET_FILE_POINTER 0xFFFFFFFFu
 #define INVALID_FILE_ATTRIBUTES 0xFFFFFFFFu
 #define MOVEFILE_REPLACE_EXISTING 0x00000001u
-BOOL ReplaceFileW(const wchar_t* replacedFile, const wchar_t* replacementFile, const wchar_t* backupFile, DWORD flags, void* exclude, void* reserved);
+BOOL ReplaceFileW(
+  const wchar_t* replacedFile,
+  const wchar_t* replacementFile,
+  const wchar_t* backupFile,
+  DWORD flags,
+  void* exclude,
+  void* reserved
+);
 BOOL PathFileExistsW(const wchar_t* path);
 
 // Heaps: every heap is the C library's (HeapSize is malloc_usable_size, at least the
@@ -521,8 +570,24 @@ void FAF_SetPathSpellingTrace(std::FILE* file);
 #define CP_ACP 0u
 #define CP_OEMCP 1u
 #define CP_UTF8 65001u
-int WideCharToMultiByte(UINT codePage, DWORD flags, const wchar_t* wide, int wideLength, char* multiByte, int multiByteLength, const char* defaultChar, BOOL* usedDefaultChar);
-int MultiByteToWideChar(UINT codePage, DWORD flags, const char* multiByte, int multiByteLength, wchar_t* wide, int wideLength);
+int WideCharToMultiByte(
+  UINT codePage,
+  DWORD flags,
+  const wchar_t* wide,
+  int wideLength,
+  char* multiByte,
+  int multiByteLength,
+  const char* defaultChar,
+  BOOL* usedDefaultChar
+);
+int MultiByteToWideChar(
+  UINT codePage,
+  DWORD flags,
+  const char* multiByte,
+  int multiByteLength,
+  wchar_t* wide,
+  int wideLength
+);
 // The secure scanf takes a buffer size after each %s, %c and %[ argument; the shared code
 // scans numbers only, where it is sscanf.
 #define sscanf_s sscanf
@@ -581,10 +646,22 @@ int SHFileOperationW(SHFILEOPSTRUCTW* operation);
 #define MOVEFILE_WRITE_THROUGH 0x00000008u
 
 HANDLE CreateFileW(
-  const wchar_t* path, DWORD desiredAccess, DWORD shareMode, void* security, DWORD creation, DWORD flags, HANDLE templateFile
+  const wchar_t* path,
+  DWORD desiredAccess,
+  DWORD shareMode,
+  void* security,
+  DWORD creation,
+  DWORD flags,
+  HANDLE templateFile
 );
 HANDLE CreateFileA(
-  const char* path, DWORD desiredAccess, DWORD shareMode, void* security, DWORD creation, DWORD flags, HANDLE templateFile
+  const char* path,
+  DWORD desiredAccess,
+  DWORD shareMode,
+  void* security,
+  DWORD creation,
+  DWORD flags,
+  HANDLE templateFile
 );
 BOOL ReadFile(HANDLE file, void* buffer, DWORD bytesToRead, DWORD* bytesRead, void* overlapped);
 BOOL WriteFile(HANDLE file, const void* buffer, DWORD bytesToWrite, DWORD* bytesWritten, void* overlapped);
@@ -595,7 +672,14 @@ DWORD GetFileSize(HANDLE file, DWORD* sizeHigh);
 BOOL FlushFileBuffers(HANDLE file);
 // Read-only views of a whole file (the only mapping the shared code makes).
 #define FILE_MAP_READ 0x0004u
-HANDLE CreateFileMappingW(HANDLE file, void* attributes, DWORD protect, DWORD maximumSizeHigh, DWORD maximumSizeLow, const wchar_t* name);
+HANDLE CreateFileMappingW(
+  HANDLE file,
+  void* attributes,
+  DWORD protect,
+  DWORD maximumSizeHigh,
+  DWORD maximumSizeLow,
+  const wchar_t* name
+);
 void* MapViewOfFile(HANDLE mapping, DWORD desiredAccess, DWORD offsetHigh, DWORD offsetLow, std::size_t bytes);
 BOOL UnmapViewOfFile(const void* view);
 BOOL SetEndOfFile(HANDLE file);
@@ -623,12 +707,30 @@ BOOL DosDateTimeToFileTime(WORD fatDate, WORD fatTime, FILETIME* fileTime);
 #define MAKELANGID(p, s) ((static_cast<WORD>(s) << 10) | static_cast<WORD>(p))
 /// FORMAT_MESSAGE_FROM_SYSTEM: the text of `messageId` read as an errno value (strerror),
 /// the only source the engine formats from.
-DWORD FormatMessageW(DWORD flags, const void* source, DWORD messageId, DWORD languageId, wchar_t* buffer, DWORD size, va_list* arguments);
-DWORD FormatMessageA(DWORD flags, const void* source, DWORD messageId, DWORD languageId, char* buffer, DWORD size, va_list* arguments);
+DWORD FormatMessageW(
+  DWORD flags,
+  const void* source,
+  DWORD messageId,
+  DWORD languageId,
+  wchar_t* buffer,
+  DWORD size,
+  va_list* arguments
+);
+DWORD FormatMessageA(
+  DWORD flags,
+  const void* source,
+  DWORD messageId,
+  DWORD languageId,
+  char* buffer,
+  DWORD size,
+  va_list* arguments
+);
 
 // --- MSVC CRT names ----------------------------------------------------------------------
 using __time64_t = std::int64_t;
-inline __time64_t _time64(__time64_t* out) noexcept
+inline __time64_t _time64(
+  __time64_t* out
+) noexcept
 {
   const __time64_t now = static_cast<__time64_t>(std::time(nullptr));
   if (out != nullptr) {
@@ -646,13 +748,20 @@ struct __timeb64
   short dstflag;
 };
 void _ftime64(__timeb64* out) noexcept;
-inline int _ftime64_s(__timeb64* out) noexcept
+inline int _ftime64_s(
+  __timeb64* out
+) noexcept
 {
   _ftime64(out);
   return 0;
 }
 
-inline int memcpy_s(void* const dest, const std::size_t destSize, const void* const src, const std::size_t count) noexcept
+inline int memcpy_s(
+  void* const dest,
+  const std::size_t destSize,
+  const void* const src,
+  const std::size_t count
+) noexcept
 {
   if (count == 0) {
     return 0;
@@ -664,7 +773,12 @@ inline int memcpy_s(void* const dest, const std::size_t destSize, const void* co
   return 0;
 }
 
-inline int memmove_s(void* const dest, const std::size_t destSize, const void* const src, const std::size_t count) noexcept
+inline int memmove_s(
+  void* const dest,
+  const std::size_t destSize,
+  const void* const src,
+  const std::size_t count
+) noexcept
 {
   if (count == 0) {
     return 0;
@@ -681,19 +795,30 @@ int _wfopen_s(std::FILE** file, const wchar_t* path, const wchar_t* mode) noexce
 
 int strncpy_s(char* dest, std::size_t destSize, const char* src, std::size_t count) noexcept;
 template <std::size_t N>
-inline int strncpy_s(char (&dest)[N], const char* const src, const std::size_t count) noexcept
+inline int strncpy_s(
+  char (&dest)[N],
+  const char* const src,
+  const std::size_t count
+) noexcept
 {
   return strncpy_s(dest, N, src, count);
 }
 int strcpy_s(char* dest, std::size_t destSize, const char* src) noexcept;
 template <std::size_t N>
-inline int strcpy_s(char (&dest)[N], const char* const src) noexcept
+inline int strcpy_s(
+  char (&dest)[N],
+  const char* const src
+) noexcept
 {
   return strcpy_s(dest, N, src);
 }
 int sprintf_s(char* buffer, std::size_t size, const char* format, ...) noexcept;
 template <std::size_t N, class... Args>
-inline int sprintf_s(char (&buffer)[N], const char* const format, Args... args) noexcept
+inline int sprintf_s(
+  char (&buffer)[N],
+  const char* const format,
+  Args... args
+) noexcept
 {
   return sprintf_s(buffer, N, format, args...);
 }
@@ -703,7 +828,10 @@ int vsprintf_s(char* buffer, std::size_t size, const char* format, va_list argum
 int _memicmp(const void* lhs, const void* rhs, std::size_t count) noexcept;
 
 using _locale_t = void*;
-inline wint_t _towlower_l(const wint_t c, _locale_t) noexcept
+inline wint_t _towlower_l(
+  const wint_t c,
+  _locale_t
+) noexcept
 {
   return std::towlower(c);
 }
@@ -855,25 +983,36 @@ BOOL GetNumaNodeProcessorMask(UCHAR node, ULONGLONG* processorMask);
 int _vsnprintf(char* buffer, std::size_t count, const char* format, va_list arguments) noexcept;
 int _vsnwprintf(wchar_t* buffer, std::size_t count, const wchar_t* format, va_list arguments) noexcept;
 int _snprintf(char* buffer, std::size_t count, const char* format, ...) noexcept;
-inline std::tm* _localtime64(const __time64_t* const time) noexcept
+inline std::tm* _localtime64(
+  const __time64_t* const time
+) noexcept
 {
   const std::time_t value = static_cast<std::time_t>(*time);
   return std::localtime(&value);
 }
-inline std::tm* _gmtime64(const __time64_t* const time) noexcept
+inline std::tm* _gmtime64(
+  const __time64_t* const time
+) noexcept
 {
   const std::time_t value = static_cast<std::time_t>(*time);
   return std::gmtime(&value);
 }
-inline __time64_t _mktime64(std::tm* const brokenDown) noexcept
+inline __time64_t _mktime64(
+  std::tm* const brokenDown
+) noexcept
 {
   return static_cast<__time64_t>(std::mktime(brokenDown));
 }
-inline std::FILE* _popen(const char* const command, const char* const mode) noexcept
+inline std::FILE* _popen(
+  const char* const command,
+  const char* const mode
+) noexcept
 {
   return ::popen(command, mode);
 }
-inline int _pclose(std::FILE* const stream) noexcept
+inline int _pclose(
+  std::FILE* const stream
+) noexcept
 {
   return ::pclose(stream);
 }
@@ -889,7 +1028,12 @@ USHORT RtlCaptureStackBackTrace(DWORD skip, DWORD count, void** frames, DWORD* h
 // The MSVC CRT's getenv_s: *required is the value's length with its terminator, 0 when the
 // variable is unset (the buffer then holds ""); ERANGE when the buffer is too small for it. A null
 // buffer with size 0 only asks for the length.
-inline int getenv_s(std::size_t* const required, char* const buffer, const std::size_t size, const char* const name) noexcept
+inline int getenv_s(
+  std::size_t* const required,
+  char* const buffer,
+  const std::size_t size,
+  const char* const name
+) noexcept
 {
   const char* const value = name != nullptr ? std::getenv(name) : nullptr;
   if (value == nullptr) {
@@ -1032,9 +1176,10 @@ int MessageBoxW(HWND window, const wchar_t* text, const wchar_t* caption, UINT t
 using HGDIOBJ = void*;
 using HBRUSH = void*;
 using COLORREF = DWORD;
-#define RGB(r, g, b) \
-  (static_cast<COLORREF>( \
-    static_cast<BYTE>(r) | (static_cast<WORD>(static_cast<BYTE>(g)) << 8) | (static_cast<DWORD>(static_cast<BYTE>(b)) << 16) \
+#define RGB(r, g, b)                                                                                                   \
+  (static_cast<COLORREF>(                                                                                              \
+    static_cast<BYTE>(r) | (static_cast<WORD>(static_cast<BYTE>(g)) << 8) |                                            \
+    (static_cast<DWORD>(static_cast<BYTE>(b)) << 16)                                                                   \
   ))
 #define GDI_ERROR 0xFFFFFFFFu
 #define LF_FACESIZE 32
@@ -1091,8 +1236,20 @@ struct BITMAP
 HANDLE AddFontMemResourceEx(void* fontData, DWORD size, void* reserved, DWORD* fontCount);
 BOOL RemoveFontMemResourceEx(HANDLE fontHandle);
 HFONT CreateFontA(
-  int height, int width, int escapement, int orientation, int weight, DWORD italic, DWORD underline, DWORD strikeOut,
-  DWORD charSet, DWORD outPrecision, DWORD clipPrecision, DWORD quality, DWORD pitchAndFamily, const char* faceName
+  int height,
+  int width,
+  int escapement,
+  int orientation,
+  int weight,
+  DWORD italic,
+  DWORD underline,
+  DWORD strikeOut,
+  DWORD charSet,
+  DWORD outPrecision,
+  DWORD clipPrecision,
+  DWORD quality,
+  DWORD pitchAndFamily,
+  const char* faceName
 );
 HDC CreateCompatibleDC(HDC dc);
 HBITMAP CreateBitmap(int width, int height, UINT planes, UINT bitsPerPixel, const void* bits);

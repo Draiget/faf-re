@@ -19,11 +19,14 @@ namespace faf::headless
   namespace
   {
     /** The fields a record names other entities in (the spy's reference check). */
-    constexpr const char* kSpyFields[7] = {"attachment parent", "attachment", "creator", "selection inheritor",
-                                           "focus", "guarded unit", "target blip"};
+    constexpr const char* kSpyFields[7] =
+      {"attachment parent", "attachment", "creator", "selection inheritor", "focus", "guarded unit", "target blip"};
 
     /** The codec `--wire-stats` uses: positions over the map, no dead reckoning. */
-    [[nodiscard]] remote::wire::SFrameCodec MakeCodec(const float mapSizeX, const float mapSizeZ)
+    [[nodiscard]] remote::wire::SFrameCodec MakeCodec(
+      const float mapSizeX,
+      const float mapSizeZ
+    )
     {
       remote::wire::SFrameCodec codec{};
       codec.position = remote::wire::SPositionQuantizer::ForMap(mapSizeX, mapSizeZ);
@@ -33,7 +36,10 @@ namespace faf::headless
   } // namespace
 
   CReplayViewFrameStats::CReplayViewFrameStats(
-    const std::string& path, const remote::wire::SContentTables& tables, const float mapSizeX, const float mapSizeZ
+    const std::string& path,
+    const remote::wire::SContentTables& tables,
+    const float mapSizeX,
+    const float mapSizeZ
   )
     : remote::CViewFrames(tables, MakeCodec(mapSizeX, mapSizeZ))
     , mCodec(MakeCodec(mapSizeX, mapSizeZ))
@@ -66,7 +72,9 @@ namespace faf::headless
     moho::Sim::SetSyncObserver(nullptr);
   }
 
-  void CReplayViewFrameStats::OnViewFrames(moho::Sim& sim)
+  void CReplayViewFrameStats::OnViewFrames(
+    moho::Sim& sim
+  )
   {
     const auto armyCount = static_cast<std::size_t>(ArmyCount());
     while (mPrevious.size() < armyCount) {
@@ -124,9 +132,11 @@ namespace faf::headless
       }
       remote::wire::BitWriter reckonedWriter;
       std::uint32_t reckonedBytes = 0;
-      if (remote::wire::EncodeFrame(
-            reckoned, mHavePrevious[army] ? &mPreviousReckoned[army] : nullptr, mReckonedCodec, reckonedWriter
-          )) {
+      if (
+        remote::wire::EncodeFrame(
+          reckoned, mHavePrevious[army] ? &mPreviousReckoned[army] : nullptr, mReckonedCodec, reckonedWriter
+        )
+      ) {
         reckonedBytes = static_cast<std::uint32_t>(reckonedWriter.Bytes().size());
         mReckonedBytes[army] += reckonedBytes;
       } else {
@@ -139,8 +149,15 @@ namespace faf::headless
       mGridBytes[army] += gridBytes;
       if (mFile != nullptr) {
         std::fprintf(
-          mFile, "%u,%zu,%zu,%u,%u,%u,%u\n", sim.mCurBeat, army, frame.entities.size(),
-          Withheld(static_cast<std::int32_t>(army)), bytes, gridBytes, reckonedBytes
+          mFile,
+          "%u,%zu,%zu,%u,%u,%u,%u\n",
+          sim.mCurBeat,
+          army,
+          frame.entities.size(),
+          Withheld(static_cast<std::int32_t>(army)),
+          bytes,
+          gridBytes,
+          reckonedBytes
         );
       }
       mPrevious[army] = frame;
@@ -148,7 +165,10 @@ namespace faf::headless
     }
   }
 
-  std::uint32_t CReplayViewFrameStats::SendGrids(const moho::Sim& sim, const std::size_t view)
+  std::uint32_t CReplayViewFrameStats::SendGrids(
+    const moho::Sim& sim,
+    const std::size_t view
+  )
   {
     const auto viewIndex = static_cast<std::uint32_t>(view);
     std::uint32_t total = 0;
@@ -159,7 +179,9 @@ namespace faf::headless
       if (army == nullptr || (index != view && !army->mVarDat.mAllies.Contains(viewIndex))) {
         continue;
       }
-      const moho::CIntelGrid* const grids[2] = {army->mConstDat.mVisionReconGrid.get(), army->mConstDat.mWaterReconGrid.get()};
+      const moho::CIntelGrid* const grids[2] = {
+        army->mConstDat.mVisionReconGrid.get(), army->mConstDat.mWaterReconGrid.get()
+      };
       for (int kind = 0; kind < 2; ++kind) {
         const moho::CIntelGrid* const grid = grids[kind];
         if (grid == nullptr) {
@@ -181,8 +203,10 @@ namespace faf::headless
         }
         remote::wire::BitReader reader(writer.Bytes());
         remote::wire::SGridBits decoded;
-        if (!remote::wire::DecodeGridDelta(reader, sent.cells.empty() ? nullptr : &sent, 1u << 24, decoded)
-            || !(decoded == bits)) {
+        if (
+          !remote::wire::DecodeGridDelta(reader, sent.cells.empty() ? nullptr : &sent, 1u << 24, decoded) ||
+          !(decoded == bits)
+        ) {
           ++mGridFailures;
         }
         total += static_cast<std::uint32_t>(writer.Bytes().size());
@@ -197,26 +221,37 @@ namespace faf::headless
     std::string summary;
     char text[320];
     std::snprintf(
-      text, sizeof(text), "view frames: %llu beats, %zu armies, %llu encode failures, %llu round-trip failures",
-      static_cast<unsigned long long>(mBeats), mBytes.size(), static_cast<unsigned long long>(mEncodeFailures),
+      text,
+      sizeof(text),
+      "view frames: %llu beats, %zu armies, %llu encode failures, %llu round-trip failures",
+      static_cast<unsigned long long>(mBeats),
+      mBytes.size(),
+      static_cast<unsigned long long>(mEncodeFailures),
       static_cast<unsigned long long>(mRoundTripFailures)
     );
     summary = text;
     std::snprintf(
-      text, sizeof(text), "; views built in %.2f ms per beat (%s)",
-      mBeats > 0 ? BuildSeconds() * 1000.0 / static_cast<double>(mBeats) : 0.0, Parallel() ? "parallel" : "serial"
+      text,
+      sizeof(text),
+      "; views built in %.2f ms per beat (%s)",
+      mBeats > 0 ? BuildSeconds() * 1000.0 / static_cast<double>(mBeats) : 0.0,
+      Parallel() ? "parallel" : "serial"
     );
     summary += text;
     for (std::size_t army = 0; army < mBytes.size(); ++army) {
       // 10 beats a second: bytes per beat x 10 / 1000 = KB/s.
       const double beats = mBeats > 0 ? static_cast<double>(mBeats) : 1.0;
       std::snprintf(
-        text, sizeof(text),
+        text,
+        sizeof(text),
         "\n  army %zu: %.0f entities and %.0f bytes per frame on average (%.1f KB/s; with dead reckoning %.1f KB/s); "
         "grids %.0f bytes per beat (%.2f KB/s)",
-        army, static_cast<double>(mEntities[army]) / beats, static_cast<double>(mBytes[army]) / beats,
+        army,
+        static_cast<double>(mEntities[army]) / beats,
+        static_cast<double>(mBytes[army]) / beats,
         static_cast<double>(mBytes[army]) / beats * 10.0 / 1000.0,
-        static_cast<double>(mReckonedBytes[army]) / beats * 10.0 / 1000.0, static_cast<double>(mGridBytes[army]) / beats,
+        static_cast<double>(mReckonedBytes[army]) / beats * 10.0 / 1000.0,
+        static_cast<double>(mGridBytes[army]) / beats,
         static_cast<double>(mGridBytes[army]) / beats * 10.0 / 1000.0
       );
       summary += text;
@@ -224,11 +259,15 @@ namespace faf::headless
       const remote::CDeadReckoner& reckoner = mReckoners[army];
       const remote::CDeadReckoner::SReanchorCauses& causes = reckoner.Causes();
       std::snprintf(
-        text, sizeof(text),
+        text,
+        sizeof(text),
         "\n    re-anchors %.1f per beat (units %llu, stopped %llu, after 1 beat %llu, 2-3 %llu, 4-9 %llu, 10+ %llu)",
-        static_cast<double>(reckoner.Reanchors()) / beats, static_cast<unsigned long long>(causes.units),
-        static_cast<unsigned long long>(causes.stopped), static_cast<unsigned long long>(causes.afterBeats[0]),
-        static_cast<unsigned long long>(causes.afterBeats[1]), static_cast<unsigned long long>(causes.afterBeats[2]),
+        static_cast<double>(reckoner.Reanchors()) / beats,
+        static_cast<unsigned long long>(causes.units),
+        static_cast<unsigned long long>(causes.stopped),
+        static_cast<unsigned long long>(causes.afterBeats[0]),
+        static_cast<unsigned long long>(causes.afterBeats[1]),
+        static_cast<unsigned long long>(causes.afterBeats[2]),
         static_cast<unsigned long long>(causes.afterBeats[3])
       );
       summary += text;
@@ -238,11 +277,16 @@ namespace faf::headless
       // 0x006924F3); then the non-unit blueprints anchored most.
       const std::array<std::uint64_t, 16>& families = mAnchoredByFamily[army];
       std::snprintf(
-        text, sizeof(text),
-        "\n    anchored per beat: units %.1f, projectiles %.1f, props %.1f, blips %.1f, shields %.1f, script entities %.1f; most:",
-        static_cast<double>(families[0]) / beats, static_cast<double>(families[1]) / beats,
-        static_cast<double>(families[2]) / beats, static_cast<double>(families[3]) / beats,
-        static_cast<double>(families[4]) / beats, static_cast<double>(families[5]) / beats
+        text,
+        sizeof(text),
+        "\n    anchored per beat: units %.1f, projectiles %.1f, props %.1f, blips %.1f, shields %.1f, script entities "
+        "%.1f; most:",
+        static_cast<double>(families[0]) / beats,
+        static_cast<double>(families[1]) / beats,
+        static_cast<double>(families[2]) / beats,
+        static_cast<double>(families[3]) / beats,
+        static_cast<double>(families[4]) / beats,
+        static_cast<double>(families[5]) / beats
       );
       summary += text;
       for (std::size_t nibble = 6; nibble < families.size(); ++nibble) {
@@ -264,7 +308,11 @@ namespace faf::headless
           name = "(no-blueprint)";
         }
         std::snprintf(
-          text, sizeof(text), " %.*s %.1f", static_cast<int>(name.size()), name.data(),
+          text,
+          sizeof(text),
+          " %.*s %.1f",
+          static_cast<int>(name.size()),
+          name.data(),
           static_cast<double>(top[i].first) / beats
         );
         summary += text;
@@ -272,10 +320,15 @@ namespace faf::headless
       if (mChannelOn && army < mChannels.size()) {
         const SChannel& channel = mChannels[army];
         std::snprintf(
-          text, sizeof(text),
-          "\n    channel (%u %% lost, acks %u beats late): %.1f KB/s, %llu frames lost, %llu sent in full, %zu kept at the end",
-          mLossPercent, mAckDelay, static_cast<double>(channel.bytes) / beats * 10.0 / 1000.0,
-          static_cast<unsigned long long>(channel.lost), static_cast<unsigned long long>(channel.server.FullFrames()),
+          text,
+          sizeof(text),
+          "\n    channel (%u %% lost, acks %u beats late): %.1f KB/s, %llu frames lost, %llu sent in full, %zu kept at "
+          "the end",
+          mLossPercent,
+          mAckDelay,
+          static_cast<double>(channel.bytes) / beats * 10.0 / 1000.0,
+          static_cast<unsigned long long>(channel.lost),
+          static_cast<unsigned long long>(channel.server.FullFrames()),
           channel.server.Kept()
         );
         summary += text;
@@ -283,25 +336,36 @@ namespace faf::headless
       if (IdMapsOn()) {
         const remote::CViewIdMap& map = IdMap(static_cast<std::int32_t>(army));
         std::snprintf(
-          text, sizeof(text),
+          text,
+          sizeof(text),
           "\n    view ids: %llu entities and %llu commands renumbered, %zu and %zu live at the end, %llu overflows",
-          static_cast<unsigned long long>(map.EntitiesMapped()), static_cast<unsigned long long>(map.CommandsMapped()),
-          map.LiveEntities(), map.LiveCommands(), static_cast<unsigned long long>(map.Overflows())
+          static_cast<unsigned long long>(map.EntitiesMapped()),
+          static_cast<unsigned long long>(map.CommandsMapped()),
+          map.LiveEntities(),
+          map.LiveCommands(),
+          static_cast<unsigned long long>(map.Overflows())
         );
         summary += text;
       }
     }
     if (mSpyOn) {
       std::snprintf(
-        text, sizeof(text),
+        text,
+        sizeof(text),
         "\n  spy: %llu records held, %llu outside the view, %llu orphans; %llu references, not held:",
-        static_cast<unsigned long long>(mSpyRecords), static_cast<unsigned long long>(mSpyOutside),
-        static_cast<unsigned long long>(mSpyOrphans), static_cast<unsigned long long>(mSpyReferences)
+        static_cast<unsigned long long>(mSpyRecords),
+        static_cast<unsigned long long>(mSpyOutside),
+        static_cast<unsigned long long>(mSpyOrphans),
+        static_cast<unsigned long long>(mSpyReferences)
       );
       summary += text;
       for (std::size_t field = 0; field < mSpyUnheld.size(); ++field) {
         std::snprintf(
-          text, sizeof(text), "%s %s %llu", field == 0 ? "" : ",", kSpyFields[field],
+          text,
+          sizeof(text),
+          "%s %s %llu",
+          field == 0 ? "" : ",",
+          kSpyFields[field],
           static_cast<unsigned long long>(mSpyUnheld[field])
         );
         summary += text;
@@ -312,15 +376,20 @@ namespace faf::headless
     }
     if (mChannelOn) {
       std::snprintf(
-        text, sizeof(text), "\n  channel: %llu frames arrived and did not decode to the frame sent",
+        text,
+        sizeof(text),
+        "\n  channel: %llu frames arrived and did not decode to the frame sent",
         static_cast<unsigned long long>(mChannelFailures)
       );
       summary += text;
     }
     if (IdMapsOn()) {
       std::snprintf(
-        text, sizeof(text), "\n  view ids checked in the frames: %llu, not mapping back to their family and source: %llu",
-        static_cast<unsigned long long>(mIdsChecked), static_cast<unsigned long long>(mIdFailures)
+        text,
+        sizeof(text),
+        "\n  view ids checked in the frames: %llu, not mapping back to their family and source: %llu",
+        static_cast<unsigned long long>(mIdsChecked),
+        static_cast<unsigned long long>(mIdFailures)
       );
       summary += text;
     }
@@ -328,7 +397,9 @@ namespace faf::headless
   }
 
   void CReplayViewFrameStats::SendOverChannel(
-    const std::size_t army, const remote::wire::SViewFrame& frame, const std::uint32_t beat
+    const std::size_t army,
+    const remote::wire::SViewFrame& frame,
+    const std::uint32_t beat
   )
   {
     while (mChannels.size() <= army) {
@@ -364,14 +435,20 @@ namespace faf::headless
     channel.acks.emplace_back(beat + mAckDelay, channel.client.Newest());
   }
 
-  void CReplayViewFrameStats::Spy(const moho::Sim& sim, const std::size_t army, const remote::wire::SViewFrame& held)
+  void CReplayViewFrameStats::Spy(
+    const moho::Sim& sim,
+    const std::size_t army,
+    const remote::wire::SViewFrame& held
+  )
   {
     const auto viewArmy = static_cast<std::int32_t>(army);
     const remote::CViewIdMap* const map = IdMapsOn() ? &IdMap(viewArmy) : nullptr;
     const auto example = [&](const char* what, const std::uint32_t id, const std::uint32_t named) {
       if (mSpyExamples.size() < 12u) {
         char text[160];
-        std::snprintf(text, sizeof(text), "beat %u, army %d: %s 0x%08x names 0x%08x", held.beat, viewArmy, what, id, named);
+        std::snprintf(
+          text, sizeof(text), "beat %u, army %d: %s 0x%08x names 0x%08x", held.beat, viewArmy, what, id, named
+        );
         mSpyExamples.emplace_back(text);
       }
     };
@@ -397,7 +474,9 @@ namespace faf::headless
         ++mSpyOrphans;
         continue;
       }
-      if (!remote::ResolveViewVisibility(sim, viewArmy, *entity).published || !remote::CanViewSee(sim, viewArmy, *entity)) {
+      if (
+        !remote::ResolveViewVisibility(sim, viewArmy, *entity).published || !remote::CanViewSee(sim, viewArmy, *entity)
+      ) {
         ++mSpyOutside;
         example("record outside the view", record.id, simId);
       }
@@ -431,7 +510,10 @@ namespace faf::headless
     }
   }
 
-  void CReplayViewFrameStats::CheckIds(const remote::wire::SViewFrame& frame, const remote::CViewIdMap& map)
+  void CReplayViewFrameStats::CheckIds(
+    const remote::wire::SViewFrame& frame,
+    const remote::CViewIdMap& map
+  )
   {
     const auto entity = [&](const std::uint32_t viewId) {
       if (!map.MapsEntity(viewId)) {

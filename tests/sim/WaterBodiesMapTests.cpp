@@ -36,7 +36,8 @@ namespace
         if (x >= 36 && x <= 44 && z >= 20 && z <= 28) {
           level = 40.0f;
         }
-        field->data[static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width) + static_cast<std::size_t>(x)] =
+        field
+          ->data[static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width) + static_cast<std::size_t>(x)] =
           static_cast<std::uint16_t>(level * 128.0f);
       }
     }
@@ -48,7 +49,9 @@ namespace
     return map;
   }
 
-  void AddLake(STIMap& map)
+  void AddLake(
+    STIMap& map
+  )
   {
     SWaterBodyDesc lake;
     lake.elevation = kLake;
@@ -61,7 +64,11 @@ namespace
     map.mWaterBodies = CWaterBodies::Build(field->data, field->width, field->height, kScale, {lake}, nullptr);
   }
 
-  SFootprint Footprint(const EOccupancyCaps caps, const float minDepth, const float maxDepth)
+  SFootprint Footprint(
+    const EOccupancyCaps caps,
+    const float minDepth,
+    const float maxDepth
+  )
   {
     SFootprint footprint{};
     footprint.mSizeX = 1;
@@ -73,7 +80,10 @@ namespace
     return footprint;
   }
 
-  SOCellPos Cell(const std::int16_t x, const std::int16_t z)
+  SOCellPos Cell(
+    const std::int16_t x,
+    const std::int16_t z
+  )
   {
     SOCellPos pos{};
     pos.x = x;
@@ -81,7 +91,10 @@ namespace
     return pos;
   }
 
-  moho::GeomLine3 DownAt(const float x, const float z)
+  moho::GeomLine3 DownAt(
+    const float x,
+    const float z
+  )
   {
     moho::GeomLine3 line{};
     line.pos = Wm3::Vec3f(x, 200.0f, z);
@@ -92,7 +105,10 @@ namespace
   }
 } // namespace
 
-TEST(WaterBodiesMap, WithoutBodiesTheSeaIsEverywhere)
+TEST(
+  WaterBodiesMap,
+  WithoutBodiesTheSeaIsEverywhere
+)
 {
   const auto map = MakeMap();
   EXPECT_FALSE(map->HasWaterBodies());
@@ -102,7 +118,10 @@ TEST(WaterBodiesMap, WithoutBodiesTheSeaIsEverywhere)
   EXPECT_TRUE(map->AboveWater(Wm3::Vec3f(40.0f, 0.0f, 24.0f)));
 }
 
-TEST(WaterBodiesMap, LakeSurfaceStandsAtItsLevel)
+TEST(
+  WaterBodiesMap,
+  LakeSurfaceStandsAtItsLevel
+)
 {
   const auto map = MakeMap();
   AddLake(*map);
@@ -122,7 +141,10 @@ TEST(WaterBodiesMap, LakeSurfaceStandsAtItsLevel)
   EXPECT_EQ(map->GetElevation(8, 8), kSea);
 }
 
-TEST(WaterBodiesMap, OccupancySeesTheLakeAsWater)
+TEST(
+  WaterBodiesMap,
+  OccupancySeesTheLakeAsWater
+)
 {
   const auto map = MakeMap();
   const SFootprint naval = Footprint(EOccupancyCaps::OC_WATER, 1.5f, std::numeric_limits<float>::max());
@@ -130,21 +152,32 @@ TEST(WaterBodiesMap, OccupancySeesTheLakeAsWater)
 
   // Sea only: the basin is dry land.
   EXPECT_EQ(static_cast<int>(map->OccupancyCapsOfFootprintAt(Cell(40, 24), naval)), 0);
-  EXPECT_EQ(static_cast<int>(map->OccupancyCapsOfFootprintAt(Cell(40, 24), land)), static_cast<int>(EOccupancyCaps::OC_LAND));
+  EXPECT_EQ(
+    static_cast<int>(map->OccupancyCapsOfFootprintAt(Cell(40, 24), land)), static_cast<int>(EOccupancyCaps::OC_LAND)
+  );
 
   AddLake(*map);
-  EXPECT_EQ(static_cast<int>(map->OccupancyCapsOfFootprintAt(Cell(40, 24), naval)), static_cast<int>(EOccupancyCaps::OC_WATER));
+  EXPECT_EQ(
+    static_cast<int>(map->OccupancyCapsOfFootprintAt(Cell(40, 24), naval)), static_cast<int>(EOccupancyCaps::OC_WATER)
+  );
   EXPECT_EQ(static_cast<int>(map->OccupancyCapsOfFootprintAt(Cell(40, 24), land)), 0);
   EXPECT_EQ(
     static_cast<int>(moho::OCCUPY_MobileCheck(naval, *map, Cell(38, 22))), static_cast<int>(EOccupancyCaps::OC_WATER)
   );
 
   // The plateau stays land, the sea stays water.
-  EXPECT_EQ(static_cast<int>(map->OccupancyCapsOfFootprintAt(Cell(55, 50), land)), static_cast<int>(EOccupancyCaps::OC_LAND));
-  EXPECT_EQ(static_cast<int>(map->OccupancyCapsOfFootprintAt(Cell(5, 5), naval)), static_cast<int>(EOccupancyCaps::OC_WATER));
+  EXPECT_EQ(
+    static_cast<int>(map->OccupancyCapsOfFootprintAt(Cell(55, 50), land)), static_cast<int>(EOccupancyCaps::OC_LAND)
+  );
+  EXPECT_EQ(
+    static_cast<int>(map->OccupancyCapsOfFootprintAt(Cell(5, 5), naval)), static_cast<int>(EOccupancyCaps::OC_WATER)
+  );
 }
 
-TEST(WaterBodiesMap, RaysHitTheWaterTheyMeetFirst)
+TEST(
+  WaterBodiesMap,
+  RaysHitTheWaterTheyMeetFirst
+)
 {
   const auto map = MakeMap();
   AddLake(*map);
@@ -169,14 +202,18 @@ TEST(WaterBodiesMap, RaysHitTheWaterTheyMeetFirst)
   EXPECT_FLOAT_EQ(underHit.y, 45.0f);
 }
 
-TEST(WaterBodiesMap, BoundsIncludeTheLake)
+TEST(
+  WaterBodiesMap,
+  BoundsIncludeTheLake
+)
 {
   auto map = MakeMap();
   // Lower the plateau under the lake level so the lake is the highest thing.
   moho::CHeightField* const field = map->mHeightField.get();
   for (std::int32_t z = 0; z < field->height; ++z) {
     for (std::int32_t x = 16; x < field->width; ++x) {
-      std::uint16_t& sample = field->data[static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width) + static_cast<std::size_t>(x)];
+      std::uint16_t& sample =
+        field->data[static_cast<std::size_t>(z) * static_cast<std::size_t>(field->width) + static_cast<std::size_t>(x)];
       if (sample == static_cast<std::uint16_t>(60.0f * 128.0f)) {
         sample = static_cast<std::uint16_t>(45.0f * 128.0f);
       }
@@ -193,7 +230,10 @@ TEST(WaterBodiesMap, BoundsIncludeTheLake)
   EXPECT_GE(map->GetBounds3D().Max.y, kLake);
 }
 
-TEST(WaterBodiesMap, CloneKeepsTheBodies)
+TEST(
+  WaterBodiesMap,
+  CloneKeepsTheBodies
+)
 {
   auto map = MakeMap();
   AddLake(*map);

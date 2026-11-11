@@ -94,8 +94,8 @@ namespace moho
    */
   struct SOccupationResult
   {
-    std::int32_t layers;     // +0x00 (ELayer bitmask)
-    Wm3::Vec3f pos;          // +0x04
+    std::int32_t layers; // +0x00 (ELayer bitmask)
+    Wm3::Vec3f pos;      // +0x04
   };
   static_assert(offsetof(SOccupationResult, layers) == 0x00, "SOccupationResult::layers offset must be 0x00");
   static_assert(offsetof(SOccupationResult, pos) == 0x04, "SOccupationResult::pos offset must be 0x04");

@@ -30,12 +30,12 @@ namespace
   struct WindowState
   {
     std::mutex mutex;
-    std::unordered_map<HWND, RECT> windowRects;  // screen rectangle of each window
+    std::unordered_map<HWND, RECT> windowRects; // screen rectangle of each window
     POINT cursor{};
     HWND capture = nullptr;
     HWND focus = nullptr;
-    std::unordered_set<HWND> hidden;  // windows ShowWindow hid or minimized
-    std::unordered_set<HWND> minimized;  // windows minimized by ShowWindow or the window system
+    std::unordered_set<HWND> hidden;    // windows ShowWindow hid or minimized
+    std::unordered_set<HWND> minimized; // windows minimized by ShowWindow or the window system
     HCURSOR cursorShape = nullptr;
     int cursorShowCount = 0;
     std::array<bool, 256> keysDown{};
@@ -51,14 +51,22 @@ namespace
 
 namespace platform::posix
 {
-  void SetWindowScreenRect(void* const window, const int left, const int top, const int right, const int bottom)
+  void SetWindowScreenRect(
+    void* const window,
+    const int left,
+    const int top,
+    const int right,
+    const int bottom
+  )
   {
     WindowState& state = State();
     const std::lock_guard<std::mutex> lock(state.mutex);
     state.windowRects[window] = RECT{left, top, right, bottom};
   }
 
-  void ForgetWindow(void* const window)
+  void ForgetWindow(
+    void* const window
+  )
   {
     WindowState& state = State();
     const std::lock_guard<std::mutex> lock(state.mutex);
@@ -68,14 +76,20 @@ namespace platform::posix
     }
   }
 
-  void SetCursorScreenPos(const int x, const int y)
+  void SetCursorScreenPos(
+    const int x,
+    const int y
+  )
   {
     WindowState& state = State();
     const std::lock_guard<std::mutex> lock(state.mutex);
     state.cursor = POINT{x, y};
   }
 
-  void SetKeyDown(const int virtualKey, const bool down)
+  void SetKeyDown(
+    const int virtualKey,
+    const bool down
+  )
   {
     if (virtualKey < 0 || virtualKey >= 256) {
       return;
@@ -83,19 +97,25 @@ namespace platform::posix
     WindowState& state = State();
     const std::lock_guard<std::mutex> lock(state.mutex);
     if (down && !state.keysDown[static_cast<std::size_t>(virtualKey)]) {
-      state.keysToggled[static_cast<std::size_t>(virtualKey)] = !state.keysToggled[static_cast<std::size_t>(virtualKey)];
+      state.keysToggled[static_cast<std::size_t>(virtualKey)] =
+        !state.keysToggled[static_cast<std::size_t>(virtualKey)];
     }
     state.keysDown[static_cast<std::size_t>(virtualKey)] = down;
   }
 
-  void SetFocusedWindow(void* const window)
+  void SetFocusedWindow(
+    void* const window
+  )
   {
     WindowState& state = State();
     const std::lock_guard<std::mutex> lock(state.mutex);
     state.focus = static_cast<HWND>(window);
   }
 
-  void SetWindowMinimized(void* const window, const bool minimized)
+  void SetWindowMinimized(
+    void* const window,
+    const bool minimized
+  )
   {
     WindowState& state = State();
     const std::lock_guard<std::mutex> lock(state.mutex);
@@ -113,7 +133,9 @@ namespace platform::posix
   bool (*gOpenUrlHook)(const char* utf8Url) = nullptr;
   bool (*gWindowEventsPendingHook)() = nullptr;
 
-  void OpenUrl(const char* const utf8Url)
+  void OpenUrl(
+    const char* const utf8Url
+  )
   {
     if (utf8Url == nullptr || utf8Url[0] == '\0') {
       return;
@@ -145,7 +167,9 @@ namespace platform::posix
   void (*gClipCursorHook)(bool clip, int left, int top, int right, int bottom) = nullptr;
 } // namespace platform::posix
 
-BOOL GetCursorPos(POINT* const point)
+BOOL GetCursorPos(
+  POINT* const point
+)
 {
   if (point == nullptr) {
     return FALSE;
@@ -156,7 +180,10 @@ BOOL GetCursorPos(POINT* const point)
   return TRUE;
 }
 
-BOOL SetCursorPos(const int x, const int y)
+BOOL SetCursorPos(
+  const int x,
+  const int y
+)
 {
   {
     WindowState& state = State();
@@ -169,7 +196,10 @@ BOOL SetCursorPos(const int x, const int y)
   return TRUE;
 }
 
-BOOL GetWindowRect(const HWND window, RECT* const rect)
+BOOL GetWindowRect(
+  const HWND window,
+  RECT* const rect
+)
 {
   if (rect == nullptr) {
     return FALSE;
@@ -185,7 +215,10 @@ BOOL GetWindowRect(const HWND window, RECT* const rect)
   return TRUE;
 }
 
-BOOL GetClientRect(const HWND window, RECT* const rect)
+BOOL GetClientRect(
+  const HWND window,
+  RECT* const rect
+)
 {
   RECT screen{};
   if (!GetWindowRect(window, &screen)) {
@@ -198,7 +231,10 @@ BOOL GetClientRect(const HWND window, RECT* const rect)
   return TRUE;
 }
 
-BOOL ScreenToClient(const HWND window, POINT* const point)
+BOOL ScreenToClient(
+  const HWND window,
+  POINT* const point
+)
 {
   RECT screen{};
   if (point == nullptr || !GetWindowRect(window, &screen)) {
@@ -209,7 +245,10 @@ BOOL ScreenToClient(const HWND window, POINT* const point)
   return TRUE;
 }
 
-BOOL ClientToScreen(const HWND window, POINT* const point)
+BOOL ClientToScreen(
+  const HWND window,
+  POINT* const point
+)
 {
   RECT screen{};
   if (point == nullptr || !GetWindowRect(window, &screen)) {
@@ -220,7 +259,9 @@ BOOL ClientToScreen(const HWND window, POINT* const point)
   return TRUE;
 }
 
-HWND SetCapture(const HWND window)
+HWND SetCapture(
+  const HWND window
+)
 {
   WindowState& state = State();
   const std::lock_guard<std::mutex> lock(state.mutex);
@@ -244,7 +285,9 @@ HWND GetCapture()
   return state.capture;
 }
 
-SHORT GetKeyState(const int virtualKey)
+SHORT GetKeyState(
+  const int virtualKey
+)
 {
   if (virtualKey < 0 || virtualKey >= 256) {
     return 0;
@@ -262,12 +305,16 @@ SHORT GetKeyState(const int virtualKey)
   return result;
 }
 
-SHORT GetAsyncKeyState(const int virtualKey)
+SHORT GetAsyncKeyState(
+  const int virtualKey
+)
 {
   return static_cast<SHORT>(GetKeyState(virtualKey) & static_cast<SHORT>(0x8000));
 }
 
-HCURSOR SetCursor(const HCURSOR cursor)
+HCURSOR SetCursor(
+  const HCURSOR cursor
+)
 {
   HCURSOR previous = nullptr;
   {
@@ -282,7 +329,9 @@ HCURSOR SetCursor(const HCURSOR cursor)
   return previous;
 }
 
-int ShowCursor(const BOOL show)
+int ShowCursor(
+  const BOOL show
+)
 {
   int count = 0;
   bool crossed = false;
@@ -301,7 +350,9 @@ int ShowCursor(const BOOL show)
   return count;
 }
 
-BOOL DestroyIcon(const HICON icon)
+BOOL DestroyIcon(
+  const HICON icon
+)
 {
   if (icon == nullptr) {
     return FALSE;
@@ -317,7 +368,7 @@ namespace
   struct Monitors
   {
     std::mutex mutex;
-    std::vector<RECT> rects;  // screen rectangles; the first is the primary
+    std::vector<RECT> rects; // screen rectangles; the first is the primary
   };
 
   Monitors& AllMonitors()
@@ -327,15 +378,23 @@ namespace
   }
 
   // The squared distance from `point` to `rect` (0 inside).
-  long long DistanceSquared(const POINT point, const RECT& rect)
+  long long DistanceSquared(
+    const POINT point,
+    const RECT& rect
+  )
   {
-    const long long dx = point.x < rect.left ? rect.left - point.x : (point.x >= rect.right ? point.x - rect.right + 1 : 0);
-    const long long dy = point.y < rect.top ? rect.top - point.y : (point.y >= rect.bottom ? point.y - rect.bottom + 1 : 0);
+    const long long dx =
+      point.x < rect.left ? rect.left - point.x : (point.x >= rect.right ? point.x - rect.right + 1 : 0);
+    const long long dy =
+      point.y < rect.top ? rect.top - point.y : (point.y >= rect.bottom ? point.y - rect.bottom + 1 : 0);
     return dx * dx + dy * dy;
   }
 } // namespace
 
-void platform::posix::SetMonitors(const int* const rects, const int count)
+void platform::posix::SetMonitors(
+  const int* const rects,
+  const int count
+)
 {
   Monitors& monitors = AllMonitors();
   const std::lock_guard<std::mutex> lock(monitors.mutex);
@@ -346,7 +405,10 @@ void platform::posix::SetMonitors(const int* const rects, const int count)
 }
 
 // A monitor handle is its index plus one.
-HMONITOR MonitorFromPoint(const POINT point, const DWORD flags)
+HMONITOR MonitorFromPoint(
+  const POINT point,
+  const DWORD flags
+)
 {
   Monitors& monitors = AllMonitors();
   const std::lock_guard<std::mutex> lock(monitors.mutex);
@@ -371,7 +433,10 @@ HMONITOR MonitorFromPoint(const POINT point, const DWORD flags)
   return flags == MONITOR_DEFAULTTOPRIMARY ? reinterpret_cast<HMONITOR>(std::size_t{1}) : nullptr;
 }
 
-BOOL GetMonitorInfoW(const HMONITOR monitor, MONITORINFO* const info)
+BOOL GetMonitorInfoW(
+  const HMONITOR monitor,
+  MONITORINFO* const info
+)
 {
   if (info == nullptr || monitor == nullptr) {
     return FALSE;
@@ -383,21 +448,30 @@ BOOL GetMonitorInfoW(const HMONITOR monitor, MONITORINFO* const info)
     return FALSE;
   }
   info->rcMonitor = monitors.rects[index];
-  info->rcWork = monitors.rects[index];  // the window system doesn't report panels apart
+  info->rcWork = monitors.rects[index]; // the window system doesn't report panels apart
   info->dwFlags = index == 0 ? MONITORINFOF_PRIMARY : 0u;
   return TRUE;
 }
 
-BOOL ClipCursor(const RECT* const rect)
+BOOL ClipCursor(
+  const RECT* const rect
+)
 {
   if (platform::posix::gClipCursorHook != nullptr) {
-    platform::posix::gClipCursorHook(rect != nullptr, rect != nullptr ? rect->left : 0, rect != nullptr ? rect->top : 0,
-                                     rect != nullptr ? rect->right : 0, rect != nullptr ? rect->bottom : 0);
+    platform::posix::gClipCursorHook(
+      rect != nullptr,
+      rect != nullptr ? rect->left : 0,
+      rect != nullptr ? rect->top : 0,
+      rect != nullptr ? rect->right : 0,
+      rect != nullptr ? rect->bottom : 0
+    );
   }
   return TRUE;
 }
 
-HWND SetFocus(const HWND window)
+HWND SetFocus(
+  const HWND window
+)
 {
   WindowState& state = State();
   const std::lock_guard<std::mutex> lock(state.mutex);
@@ -443,7 +517,10 @@ void DebugBreak()
   (void)::raise(SIGTRAP);
 }
 
-BOOL ShowWindow(const HWND window, const int command)
+BOOL ShowWindow(
+  const HWND window,
+  const int command
+)
 {
   {
     WindowState& state = State();
@@ -465,7 +542,9 @@ BOOL ShowWindow(const HWND window, const int command)
   return TRUE;
 }
 
-BOOL IsIconic(const HWND window)
+BOOL IsIconic(
+  const HWND window
+)
 {
   if (window == nullptr) {
     return FALSE;
@@ -475,13 +554,19 @@ BOOL IsIconic(const HWND window)
   return state.minimized.count(window) != 0 ? TRUE : FALSE;
 }
 
-HWND GetAncestor(const HWND window, const UINT flags)
+HWND GetAncestor(
+  const HWND window,
+  const UINT flags
+)
 {
   (void)flags;
   return window;
 }
 
-BOOL SetWindowTextA(const HWND window, const char* const text)
+BOOL SetWindowTextA(
+  const HWND window,
+  const char* const text
+)
 {
   if (window == nullptr || text == nullptr) {
     return FALSE;
@@ -492,7 +577,10 @@ BOOL SetWindowTextA(const HWND window, const char* const text)
   return TRUE;
 }
 
-BOOL SetWindowTextW(const HWND window, const wchar_t* const text)
+BOOL SetWindowTextW(
+  const HWND window,
+  const wchar_t* const text
+)
 {
   if (text == nullptr) {
     return FALSE;
@@ -525,38 +613,48 @@ namespace
   std::atomic<bool> gScreenSaverActive{true};
 } // namespace
 
-BOOL SystemParametersInfoW(const UINT action, const UINT parameter, void* const data, const UINT winIni)
+BOOL SystemParametersInfoW(
+  const UINT action,
+  const UINT parameter,
+  void* const data,
+  const UINT winIni
+)
 {
   (void)winIni;
   switch (action) {
-    case SPI_GETSCREENSAVEACTIVE:
-      if (data == nullptr) {
-        return FALSE;
-      }
-      *static_cast<BOOL*>(data) = gScreenSaverActive.load() ? TRUE : FALSE;
-      return TRUE;
-    case SPI_SETSCREENSAVEACTIVE:
-      gScreenSaverActive.store(parameter != 0u);
-      if (platform::posix::gScreenSaverHook != nullptr) {
-        platform::posix::gScreenSaverHook(parameter != 0u);
-      }
-      return TRUE;
-    case SPI_GETFONTSMOOTHING:
-    case SPI_GETFONTSMOOTHINGTYPE:
-    case SPI_GETFONTSMOOTHINGCONTRAST:
-    case SPI_GETFONTSMOOTHINGORIENTATION:
-      // Glyphs come from FreeType (GdiOverFreeType.cpp), which these settings don't change.
-      if (data == nullptr) {
-        return FALSE;
-      }
-      *static_cast<UINT*>(data) = 0u;
-      return TRUE;
-    default:
+  case SPI_GETSCREENSAVEACTIVE:
+    if (data == nullptr) {
       return FALSE;
+    }
+    *static_cast<BOOL*>(data) = gScreenSaverActive.load() ? TRUE : FALSE;
+    return TRUE;
+  case SPI_SETSCREENSAVEACTIVE:
+    gScreenSaverActive.store(parameter != 0u);
+    if (platform::posix::gScreenSaverHook != nullptr) {
+      platform::posix::gScreenSaverHook(parameter != 0u);
+    }
+    return TRUE;
+  case SPI_GETFONTSMOOTHING:
+  case SPI_GETFONTSMOOTHINGTYPE:
+  case SPI_GETFONTSMOOTHINGCONTRAST:
+  case SPI_GETFONTSMOOTHINGORIENTATION:
+    // Glyphs come from FreeType (GdiOverFreeType.cpp), which these settings don't change.
+    if (data == nullptr) {
+      return FALSE;
+    }
+    *static_cast<UINT*>(data) = 0u;
+    return TRUE;
+  default:
+    return FALSE;
   }
 }
 
-int MessageBoxW(const HWND window, const wchar_t* const text, const wchar_t* const caption, const UINT type)
+int MessageBoxW(
+  const HWND window,
+  const wchar_t* const text,
+  const wchar_t* const caption,
+  const UINT type
+)
 {
   const auto utf8 = [](const wchar_t* const wide) {
     std::string out;
@@ -579,15 +677,18 @@ int MessageBoxW(const HWND window, const wchar_t* const text, const wchar_t* con
   const std::string utf8Caption = utf8(caption);
   const bool yesNo = (type & MB_TYPEMASK) == MB_YESNO;
   if (platform::posix::gMessageBoxHook != nullptr) {
-    return platform::posix::gMessageBoxHook(window, utf8Text.c_str(), utf8Caption.c_str(), yesNo) ? (yesNo ? IDYES : IDOK)
-                                                                                                    : (yesNo ? IDNO : IDOK);
+    return platform::posix::gMessageBoxHook(window, utf8Text.c_str(), utf8Caption.c_str(), yesNo)
+      ? (yesNo ? IDYES : IDOK)
+      : (yesNo ? IDNO : IDOK);
   }
   std::fprintf(stderr, "[%s] %s\n", utf8Caption.c_str(), utf8Text.c_str());
   std::fflush(stderr);
   return yesNo ? IDNO : IDOK;
 }
 
-BOOL IsWindowVisible(const HWND window)
+BOOL IsWindowVisible(
+  const HWND window
+)
 {
   if (window == nullptr) {
     return FALSE;
@@ -598,10 +699,16 @@ BOOL IsWindowVisible(const HWND window)
 }
 
 BOOL SetWindowPos(
-  const HWND window, const HWND insertAfter, const int x, const int y, const int width, const int height, const UINT flags
+  const HWND window,
+  const HWND insertAfter,
+  const int x,
+  const int y,
+  const int width,
+  const int height,
+  const UINT flags
 )
 {
-  (void)insertAfter;  // stacking order is the window system's
+  (void)insertAfter; // stacking order is the window system's
   {
     WindowState& state = State();
     const std::lock_guard<std::mutex> lock(state.mutex);
@@ -641,7 +748,11 @@ void platform::posix::WakeMessageWait()
 }
 
 DWORD MsgWaitForMultipleObjectsEx(
-  const DWORD count, const HANDLE* const handles, const DWORD milliseconds, const DWORD wakeMask, const DWORD flags
+  const DWORD count,
+  const HANDLE* const handles,
+  const DWORD milliseconds,
+  const DWORD wakeMask,
+  const DWORD flags
 )
 {
   (void)wakeMask;
@@ -679,7 +790,12 @@ DWORD MsgWaitForMultipleObjectsEx(
   }
 }
 
-USHORT RtlCaptureStackBackTrace(const DWORD skip, const DWORD count, void** const frames, DWORD* const hash)
+USHORT RtlCaptureStackBackTrace(
+  const DWORD skip,
+  const DWORD count,
+  void** const frames,
+  DWORD* const hash
+)
 {
   void* buffer[128];
   const int captured = ::backtrace(buffer, 128);

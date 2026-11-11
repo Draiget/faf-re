@@ -64,7 +64,10 @@ namespace moho
    * Constructs a "Mesh" control with no sheet, no mesh, the identity
    * orientation and color 0xFFFFFFFF, and asks for per-frame updates.
    */
-  CMauiMesh::CMauiMesh(LuaPlus::LuaObject* const luaObject, CMauiControl* const parent)
+  CMauiMesh::CMauiMesh(
+    LuaPlus::LuaObject* const luaObject,
+    CMauiControl* const parent
+  )
     : CMauiControl(luaObject, parent, "Mesh")
     , mThumbnailSheet()
     , mThumbnailDirty(false)
@@ -92,7 +95,9 @@ namespace moho
    * Resolves the mesh blueprint by name from the active session's rules and
    * marks the thumbnail dirty.
    */
-  void CMauiMesh::SetMesh(const char* const meshBlueprintName)
+  void CMauiMesh::SetMesh(
+    const char* const meshBlueprintName
+  )
   {
     CWldSession* const worldSession = WLD_GetActiveSession();
     if (worldSession == nullptr) {
@@ -141,7 +146,9 @@ namespace moho
    * released first (`reset`, 0x0043A860). Only a resize marks the thumbnail
    * dirty; the first creation leaves that to `SetMesh`/`SetOrientation`.
    */
-  void CMauiMesh::Frame(const float deltaSeconds)
+  void CMauiMesh::Frame(
+    const float deltaSeconds
+  )
   {
     (void)deltaSeconds;
 
@@ -159,8 +166,10 @@ namespace moho
     if (mThumbnailSheet) {
       Wm3::Vector3f dimensions{};
       (void)mThumbnailSheet->GetDimensions(&dimensions);
-      if (dimensions.x != CScriptLazyVar_float::GetValue(&mWidthLV)
-          || dimensions.y != CScriptLazyVar_float::GetValue(&mHeightLV)) {
+      if (
+        dimensions.x != CScriptLazyVar_float::GetValue(&mWidthLV) ||
+        dimensions.y != CScriptLazyVar_float::GetValue(&mHeightLV)
+      ) {
         mThumbnailSheet.reset();
         mThumbnailSheet = newThumbnailSheet();
         mThumbnailDirty = true;
@@ -191,7 +200,10 @@ namespace moho
    * `SetTexture`, 0x00438870) and draws it as one quad over the control's
    * rectangle with 0..1 UVs.
    */
-  void CMauiMesh::DoRender(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
+  void CMauiMesh::DoRender(
+    CD3DPrimBatcher* const primBatcher,
+    const std::int32_t drawMask
+  )
   {
     (void)drawMask;
 
@@ -228,7 +240,9 @@ namespace moho
    */
   void CMauiMesh::Dump() {}
 
-  void CMauiMesh::SetOrientation(const Wm3::Quaternionf& orientation)
+  void CMauiMesh::SetOrientation(
+    const Wm3::Quaternionf& orientation
+  )
   {
     mOrientation = orientation;
     mThumbnailDirty = true;

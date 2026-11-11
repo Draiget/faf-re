@@ -15,7 +15,7 @@ namespace gpg
   class RRef;
   class RType;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -60,7 +60,8 @@ namespace moho
      * Allocates one load-units task and forwards constructor arguments into
      * in-place construction.
      */
-    [[nodiscard]] static CUnitLoadUnits* Create(CCommandTask* parentTask, const EntitySetTemplate<Unit>* requestedUnits);
+    [[nodiscard]] static CUnitLoadUnits*
+    Create(CCommandTask* parentTask, const EntitySetTemplate<Unit>* requestedUnits);
 
     /**
      * Address: 0x00625110 (FUN_00625110, Moho::CUnitLoadUnits::DoTask)
@@ -101,26 +102,41 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
-    fa::vector<SPickUpInfo> mPickupQueue;  // 0x30
-    EntitySetTemplate<Unit> mRequestedUnits;   // 0x40
-    Wm3::Vector3f mPickupCenter;              // 0x68
-    std::int32_t mReadyUnitCount;             // 0x74
-    std::int32_t mLoadedUnitCount;            // 0x78
-    std::int32_t mProcessingTicks;            // 0x7C
-    bool mIsStagingPlatform;                  // 0x80
-    bool mIsTeleporter;                       // 0x81
-    bool mCompletedSuccessfully;              // 0x82
-    std::uint8_t mPadding83_87[5];            // 0x83
+    fa::vector<SPickUpInfo> mPickupQueue;    // 0x30
+    EntitySetTemplate<Unit> mRequestedUnits; // 0x40
+    Wm3::Vector3f mPickupCenter;             // 0x68
+    std::int32_t mReadyUnitCount;            // 0x74
+    std::int32_t mLoadedUnitCount;           // 0x78
+    std::int32_t mProcessingTicks;           // 0x7C
+    bool mIsStagingPlatform;                 // 0x80
+    bool mIsTeleporter;                      // 0x81
+    bool mCompletedSuccessfully;             // 0x82
+    std::uint8_t mPadding83_87[5];           // 0x83
   };
 
   static_assert(sizeof(CUnitLoadUnits) == 0x88, "CUnitLoadUnits size must be 0x88");
   static_assert(offsetof(CUnitLoadUnits, mPickupQueue) == 0x30, "CUnitLoadUnits::mPickupQueue offset must be 0x30");
-  static_assert(offsetof(CUnitLoadUnits, mRequestedUnits) == 0x40, "CUnitLoadUnits::mRequestedUnits offset must be 0x40");
+  static_assert(
+    offsetof(CUnitLoadUnits, mRequestedUnits) == 0x40,
+    "CUnitLoadUnits::mRequestedUnits offset must be 0x40"
+  );
   static_assert(offsetof(CUnitLoadUnits, mPickupCenter) == 0x68, "CUnitLoadUnits::mPickupCenter offset must be 0x68");
-  static_assert(offsetof(CUnitLoadUnits, mReadyUnitCount) == 0x74, "CUnitLoadUnits::mReadyUnitCount offset must be 0x74");
-  static_assert(offsetof(CUnitLoadUnits, mLoadedUnitCount) == 0x78, "CUnitLoadUnits::mLoadedUnitCount offset must be 0x78");
-  static_assert(offsetof(CUnitLoadUnits, mProcessingTicks) == 0x7C, "CUnitLoadUnits::mProcessingTicks offset must be 0x7C");
-  static_assert(offsetof(CUnitLoadUnits, mIsStagingPlatform) == 0x80, "CUnitLoadUnits::mIsStagingPlatform offset must be 0x80");
+  static_assert(
+    offsetof(CUnitLoadUnits, mReadyUnitCount) == 0x74,
+    "CUnitLoadUnits::mReadyUnitCount offset must be 0x74"
+  );
+  static_assert(
+    offsetof(CUnitLoadUnits, mLoadedUnitCount) == 0x78,
+    "CUnitLoadUnits::mLoadedUnitCount offset must be 0x78"
+  );
+  static_assert(
+    offsetof(CUnitLoadUnits, mProcessingTicks) == 0x7C,
+    "CUnitLoadUnits::mProcessingTicks offset must be 0x7C"
+  );
+  static_assert(
+    offsetof(CUnitLoadUnits, mIsStagingPlatform) == 0x80,
+    "CUnitLoadUnits::mIsStagingPlatform offset must be 0x80"
+  );
   static_assert(offsetof(CUnitLoadUnits, mIsTeleporter) == 0x81, "CUnitLoadUnits::mIsTeleporter offset must be 0x81");
   static_assert(
     offsetof(CUnitLoadUnits, mCompletedSuccessfully) == 0x82,

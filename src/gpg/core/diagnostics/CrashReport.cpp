@@ -51,7 +51,11 @@ namespace gpg::diag
 
     // One fprintf + flush per line. If the process dies mid-report, every
     // completed line is already on disk.
-    void ReportLine(std::FILE* const sink, const char* const format, ...)
+    void ReportLine(
+      std::FILE* const sink,
+      const char* const format,
+      ...
+    )
     {
       if (sink == nullptr) {
         return;
@@ -68,7 +72,10 @@ namespace gpg::diag
     // Path resolution (beside the executable, like faf_diag.log)
     // ------------------------------------------------------------------
 
-    void ResolveExeDir(char* outDir, const std::size_t bytes)
+    void ResolveExeDir(
+      char* outDir,
+      const std::size_t bytes
+    )
     {
       char exePath[MAX_PATH * 2] = {};
       const DWORD written = ::GetModuleFileNameA(nullptr, exePath, static_cast<DWORD>(sizeof(exePath)));
@@ -100,8 +107,16 @@ namespace gpg::diag
       SYSTEMTIME now{};
       ::GetLocalTime(&now);
       (void)::sprintf_s(
-        sPath, sizeof(sPath), "%sfaf_crash_%04u%02u%02u_%02u%02u%02u.txt", exeDir, now.wYear, now.wMonth, now.wDay,
-        now.wHour, now.wMinute, now.wSecond
+        sPath,
+        sizeof(sPath),
+        "%sfaf_crash_%04u%02u%02u_%02u%02u%02u.txt",
+        exeDir,
+        now.wYear,
+        now.wMonth,
+        now.wDay,
+        now.wHour,
+        now.wMinute,
+        now.wSecond
       );
     }
     return sPath;
@@ -143,7 +158,9 @@ namespace gpg::diag
     // Header sections
     // ------------------------------------------------------------------
 
-    void WriteBuildSection(std::FILE* const sink)
+    void WriteBuildSection(
+      std::FILE* const sink
+    )
     {
 #if defined(_M_IX86)
       ReportLine(sink, "Arch      : x86");
@@ -177,9 +194,8 @@ namespace gpg::diag
             if (nt->Signature == IMAGE_NT_SIGNATURE) {
               const auto& debugDirectory = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG];
               if (debugDirectory.Size != 0) {
-                const auto* const debug = reinterpret_cast<const IMAGE_DEBUG_DIRECTORY*>(
-                  base + debugDirectory.VirtualAddress
-                );
+                const auto* const debug =
+                  reinterpret_cast<const IMAGE_DEBUG_DIRECTORY*>(base + debugDirectory.VirtualAddress);
                 const DWORD entries = debugDirectory.Size / sizeof(IMAGE_DEBUG_DIRECTORY);
                 for (DWORD e = 0; e < entries; ++e) {
                   if (debug[e].Type != IMAGE_DEBUG_TYPE_CODEVIEW || debug[e].AddressOfRawData == 0) {
@@ -188,16 +204,26 @@ namespace gpg::diag
                   // CV_INFO_PDB70: 'RSDS', GUID, age, zero-terminated path.
                   // AddressOfRawData is the mapped RVA (PointerToRawData is a
                   // file offset and does not map into memory).
-                  const auto* const cv =
-                    reinterpret_cast<const unsigned char*>(base) + debug[e].AddressOfRawData;
+                  const auto* const cv = reinterpret_cast<const unsigned char*>(base) + debug[e].AddressOfRawData;
                   if (cv[0] == 'R' && cv[1] == 'S' && cv[2] == 'D' && cv[3] == 'S') {
                     const GUID& sig = *reinterpret_cast<const GUID*>(cv + 4);
                     const DWORD age = *reinterpret_cast<const DWORD*>(cv + 20);
                     const char* const pdbPath = reinterpret_cast<const char*>(cv + 24);
                     ReportLine(
-                      sink, "PDB       : {%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X} age=%lu",
-                      sig.Data1, sig.Data2, sig.Data3, sig.Data4[0], sig.Data4[1], sig.Data4[2], sig.Data4[3],
-                      sig.Data4[4], sig.Data4[5], sig.Data4[6], sig.Data4[7], age
+                      sink,
+                      "PDB       : {%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X} age=%lu",
+                      sig.Data1,
+                      sig.Data2,
+                      sig.Data3,
+                      sig.Data4[0],
+                      sig.Data4[1],
+                      sig.Data4[2],
+                      sig.Data4[3],
+                      sig.Data4[4],
+                      sig.Data4[5],
+                      sig.Data4[6],
+                      sig.Data4[7],
+                      age
                     );
                     ReportLine(sink, "PDB file  : %s", pdbPath);
                     break;
@@ -210,7 +236,9 @@ namespace gpg::diag
       }
     }
 
-    void WriteProcessSection(std::FILE* const sink)
+    void WriteProcessSection(
+      std::FILE* const sink
+    )
     {
       ReportLine(sink, "");
       ReportLine(sink, "--- Process ---");
@@ -221,15 +249,24 @@ namespace gpg::diag
       ReportLine(sink, "exe       : %s", (exeLen != 0u) ? exePath : "(unknown)");
 
       if (exeLen != 0u) {
-        HANDLE exeFile = ::CreateFileA(exePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-                                       OPEN_EXISTING, 0, nullptr);
+        HANDLE exeFile =
+          ::CreateFileA(exePath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
         if (exeFile != INVALID_HANDLE_VALUE) {
           FILETIME mtime{};
           SYSTEMTIME st{};
-          if (::GetFileTime(exeFile, nullptr, nullptr, &mtime) != FALSE
-              && ::FileTimeToSystemTime(&mtime, &st) != FALSE) {
-            ReportLine(sink, "exe stamp : %04u-%02u-%02u %02u:%02u:%02u", st.wYear, st.wMonth, st.wDay, st.wHour,
-                       st.wMinute, st.wSecond);
+          if (
+            ::GetFileTime(exeFile, nullptr, nullptr, &mtime) != FALSE && ::FileTimeToSystemTime(&mtime, &st) != FALSE
+          ) {
+            ReportLine(
+              sink,
+              "exe stamp : %04u-%02u-%02u %02u:%02u:%02u",
+              st.wYear,
+              st.wMonth,
+              st.wDay,
+              st.wHour,
+              st.wMinute,
+              st.wSecond
+            );
           }
           LARGE_INTEGER size{};
           if (::GetFileSizeEx(exeFile, &size) != FALSE) {
@@ -243,20 +280,23 @@ namespace gpg::diag
       ReportLine(sink, "cmdline   : %s", (cmd != nullptr) ? cmd : "(null)");
     }
 
-    void WriteSystemSection(std::FILE* const sink)
+    void WriteSystemSection(
+      std::FILE* const sink
+    )
     {
       ReportLine(sink, "");
       ReportLine(sink, "--- System ---");
 
       using RtlGetVersionFn = LONG(WINAPI*)(PRTL_OSVERSIONINFOW);
-      const auto rtlGetVersion = reinterpret_cast<RtlGetVersionFn>(
-        ::GetProcAddress(::GetModuleHandleA("ntdll.dll"), "RtlGetVersion"));
+      const auto rtlGetVersion =
+        reinterpret_cast<RtlGetVersionFn>(::GetProcAddress(::GetModuleHandleA("ntdll.dll"), "RtlGetVersion"));
       if (rtlGetVersion != nullptr) {
         RTL_OSVERSIONINFOW info{};
         info.dwOSVersionInfoSize = sizeof(info);
         if (rtlGetVersion(&info) == 0) {
-          ReportLine(sink, "OS        : Windows %lu.%lu.%lu", info.dwMajorVersion, info.dwMinorVersion,
-                     info.dwBuildNumber);
+          ReportLine(
+            sink, "OS        : Windows %lu.%lu.%lu", info.dwMajorVersion, info.dwMinorVersion, info.dwBuildNumber
+          );
         }
       }
 
@@ -284,16 +324,30 @@ namespace gpg::diag
       const unsigned edx1 = static_cast<unsigned>(regs[3]);
       __cpuidex(regs, 7, 0);
       const unsigned ebx7 = static_cast<unsigned>(regs[1]);
-      ReportLine(sink, "CPU flags :%s%s%s%s%s%s%s%s%s%s", (edx1 >> 26) & 1u ? " sse2" : "", (ecx1 >> 0) & 1u ? " sse3" : "",
-                 (ecx1 >> 9) & 1u ? " ssse3" : "", (ecx1 >> 19) & 1u ? " sse4.1" : "", (ecx1 >> 20) & 1u ? " sse4.2" : "",
-                 (ecx1 >> 28) & 1u ? " avx" : "", (ecx1 >> 12) & 1u ? " fma" : "", (ebx7 >> 5) & 1u ? " avx2" : "",
-                 (ebx7 >> 16) & 1u ? " avx512f" : "", (ecx1 >> 29) & 1u ? " f16c" : "");
+      ReportLine(
+        sink,
+        "CPU flags :%s%s%s%s%s%s%s%s%s%s",
+        (edx1 >> 26) & 1u ? " sse2" : "",
+        (ecx1 >> 0) & 1u ? " sse3" : "",
+        (ecx1 >> 9) & 1u ? " ssse3" : "",
+        (ecx1 >> 19) & 1u ? " sse4.1" : "",
+        (ecx1 >> 20) & 1u ? " sse4.2" : "",
+        (ecx1 >> 28) & 1u ? " avx" : "",
+        (ecx1 >> 12) & 1u ? " fma" : "",
+        (ebx7 >> 5) & 1u ? " avx2" : "",
+        (ebx7 >> 16) & 1u ? " avx512f" : "",
+        (ecx1 >> 29) & 1u ? " f16c" : ""
+      );
 
       MEMORYSTATUSEX mem{};
       mem.dwLength = sizeof(mem);
       if (::GlobalMemoryStatusEx(&mem) != FALSE) {
-        ReportLine(sink, "RAM       : %llu MB total / %llu MB available", mem.ullTotalPhys / (1024ULL * 1024ULL),
-                   mem.ullAvailPhys / (1024ULL * 1024ULL));
+        ReportLine(
+          sink,
+          "RAM       : %llu MB total / %llu MB available",
+          mem.ullTotalPhys / (1024ULL * 1024ULL),
+          mem.ullAvailPhys / (1024ULL * 1024ULL)
+        );
       }
     }
 
@@ -301,34 +355,60 @@ namespace gpg::diag
     // Exception + registers
     // ------------------------------------------------------------------
 
-    const char* ExceptionName(const DWORD code)
+    const char* ExceptionName(
+      const DWORD code
+    )
     {
       switch (code) {
-        case EXCEPTION_ACCESS_VIOLATION: return "EXCEPTION_ACCESS_VIOLATION";
-        case EXCEPTION_DATATYPE_MISALIGNMENT: return "EXCEPTION_DATATYPE_MISALIGNMENT";
-        case EXCEPTION_BREAKPOINT: return "EXCEPTION_BREAKPOINT";
-        case EXCEPTION_SINGLE_STEP: return "EXCEPTION_SINGLE_STEP";
-        case EXCEPTION_IN_PAGE_ERROR: return "EXCEPTION_IN_PAGE_ERROR";
-        case EXCEPTION_ILLEGAL_INSTRUCTION: return "EXCEPTION_ILLEGAL_INSTRUCTION";
-        case EXCEPTION_NONCONTINUABLE_EXCEPTION: return "EXCEPTION_NONCONTINUABLE_EXCEPTION";
-        case EXCEPTION_INVALID_DISPOSITION: return "EXCEPTION_INVALID_DISPOSITION";
-        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: return "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
-        case EXCEPTION_FLT_DENORMAL_OPERAND: return "EXCEPTION_FLT_DENORMAL_OPERAND";
-        case EXCEPTION_FLT_DIVIDE_BY_ZERO: return "EXCEPTION_FLT_DIVIDE_BY_ZERO";
-        case EXCEPTION_FLT_INEXACT_RESULT: return "EXCEPTION_FLT_INEXACT_RESULT";
-        case EXCEPTION_FLT_INVALID_OPERATION: return "EXCEPTION_FLT_INVALID_OPERATION";
-        case EXCEPTION_FLT_OVERFLOW: return "EXCEPTION_FLT_OVERFLOW";
-        case EXCEPTION_FLT_STACK_CHECK: return "EXCEPTION_FLT_STACK_CHECK";
-        case EXCEPTION_FLT_UNDERFLOW: return "EXCEPTION_FLT_UNDERFLOW";
-        case EXCEPTION_INT_DIVIDE_BY_ZERO: return "EXCEPTION_INT_DIVIDE_BY_ZERO";
-        case EXCEPTION_INT_OVERFLOW: return "EXCEPTION_INT_OVERFLOW";
-        case EXCEPTION_PRIV_INSTRUCTION: return "EXCEPTION_PRIV_INSTRUCTION";
-        case EXCEPTION_STACK_OVERFLOW: return "EXCEPTION_STACK_OVERFLOW";
-        default: return "Unknown";
+      case EXCEPTION_ACCESS_VIOLATION:
+        return "EXCEPTION_ACCESS_VIOLATION";
+      case EXCEPTION_DATATYPE_MISALIGNMENT:
+        return "EXCEPTION_DATATYPE_MISALIGNMENT";
+      case EXCEPTION_BREAKPOINT:
+        return "EXCEPTION_BREAKPOINT";
+      case EXCEPTION_SINGLE_STEP:
+        return "EXCEPTION_SINGLE_STEP";
+      case EXCEPTION_IN_PAGE_ERROR:
+        return "EXCEPTION_IN_PAGE_ERROR";
+      case EXCEPTION_ILLEGAL_INSTRUCTION:
+        return "EXCEPTION_ILLEGAL_INSTRUCTION";
+      case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+        return "EXCEPTION_NONCONTINUABLE_EXCEPTION";
+      case EXCEPTION_INVALID_DISPOSITION:
+        return "EXCEPTION_INVALID_DISPOSITION";
+      case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+        return "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
+      case EXCEPTION_FLT_DENORMAL_OPERAND:
+        return "EXCEPTION_FLT_DENORMAL_OPERAND";
+      case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+        return "EXCEPTION_FLT_DIVIDE_BY_ZERO";
+      case EXCEPTION_FLT_INEXACT_RESULT:
+        return "EXCEPTION_FLT_INEXACT_RESULT";
+      case EXCEPTION_FLT_INVALID_OPERATION:
+        return "EXCEPTION_FLT_INVALID_OPERATION";
+      case EXCEPTION_FLT_OVERFLOW:
+        return "EXCEPTION_FLT_OVERFLOW";
+      case EXCEPTION_FLT_STACK_CHECK:
+        return "EXCEPTION_FLT_STACK_CHECK";
+      case EXCEPTION_FLT_UNDERFLOW:
+        return "EXCEPTION_FLT_UNDERFLOW";
+      case EXCEPTION_INT_DIVIDE_BY_ZERO:
+        return "EXCEPTION_INT_DIVIDE_BY_ZERO";
+      case EXCEPTION_INT_OVERFLOW:
+        return "EXCEPTION_INT_OVERFLOW";
+      case EXCEPTION_PRIV_INSTRUCTION:
+        return "EXCEPTION_PRIV_INSTRUCTION";
+      case EXCEPTION_STACK_OVERFLOW:
+        return "EXCEPTION_STACK_OVERFLOW";
+      default:
+        return "Unknown";
       }
     }
 
-    void WriteExceptionSection(std::FILE* const sink, const CrashReportContext& context)
+    void WriteExceptionSection(
+      std::FILE* const sink,
+      const CrashReportContext& context
+    )
     {
       ReportLine(sink, "");
       ReportLine(sink, "--- Exception ---");
@@ -346,29 +426,43 @@ namespace gpg::diag
       ReportLine(sink, "Address   : 0x%016llX", static_cast<unsigned long long>(faultAddress));
 
       HMODULE module = nullptr;
-      if (::GetModuleHandleExA(
-            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-            static_cast<LPCSTR>(record.ExceptionAddress), &module
-          ) != FALSE
-          && module != nullptr) {
+      if (
+        ::GetModuleHandleExA(
+          GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+          static_cast<LPCSTR>(record.ExceptionAddress),
+          &module
+        ) != FALSE &&
+        module != nullptr
+      ) {
         char modulePath[MAX_PATH * 2] = {};
         if (::GetModuleFileNameA(module, modulePath, static_cast<DWORD>(sizeof(modulePath))) != 0u) {
           const auto base = reinterpret_cast<std::uintptr_t>(module);
-          ReportLine(sink, "Module    : %s + 0x%llX (base 0x%016llX)", modulePath,
-                     static_cast<unsigned long long>(faultAddress - base),
-                     static_cast<unsigned long long>(base));
+          ReportLine(
+            sink,
+            "Module    : %s + 0x%llX (base 0x%016llX)",
+            modulePath,
+            static_cast<unsigned long long>(faultAddress - base),
+            static_cast<unsigned long long>(base)
+          );
         }
       }
 
       if (record.ExceptionCode == EXCEPTION_ACCESS_VIOLATION && record.NumberParameters >= 2) {
         static const char* const kAccessKinds[] = {"read", "write", "execute"};
         const ULONG_PTR kind = record.ExceptionInformation[0];
-        ReportLine(sink, "AV target : 0x%016llX (%s)", static_cast<unsigned long long>(record.ExceptionInformation[1]),
-                   (kind < 3) ? kAccessKinds[kind] : "unknown kind");
+        ReportLine(
+          sink,
+          "AV target : 0x%016llX (%s)",
+          static_cast<unsigned long long>(record.ExceptionInformation[1]),
+          (kind < 3) ? kAccessKinds[kind] : "unknown kind"
+        );
       }
     }
 
-    void WriteRegistersSection(std::FILE* const sink, const CrashReportContext& context)
+    void WriteRegistersSection(
+      std::FILE* const sink,
+      const CrashReportContext& context
+    )
     {
       ReportLine(sink, "");
       ReportLine(sink, "--- Registers (faulting thread) ---");
@@ -397,7 +491,11 @@ namespace gpg::diag
     // Symbolised stacks for every thread
     // ------------------------------------------------------------------
 
-    std::uint32_t CaptureThreadFrames(HANDLE thread, CONTEXT& context, std::uintptr_t* frames)
+    std::uint32_t CaptureThreadFrames(
+      HANDLE thread,
+      CONTEXT& context,
+      std::uintptr_t* frames
+    )
     {
       std::uint32_t count = 0;
       STACKFRAME64 frame{};
@@ -421,10 +519,19 @@ namespace gpg::diag
       frame.AddrFrame.Mode = AddrModeFlat;
 
       while (count < kMaxFramesPerThread && machine != 0) {
-        if (::StackWalk64(
-              machine, ::GetCurrentProcess(), thread, &frame, &context, nullptr, ::SymFunctionTableAccess64,
-              ::SymGetModuleBase64, nullptr
-            ) == FALSE) {
+        if (
+          ::StackWalk64(
+            machine,
+            ::GetCurrentProcess(),
+            thread,
+            &frame,
+            &context,
+            nullptr,
+            ::SymFunctionTableAccess64,
+            ::SymGetModuleBase64,
+            nullptr
+          ) == FALSE
+        ) {
           break;
         }
         if (frame.AddrPC.Offset == 0) {
@@ -436,8 +543,13 @@ namespace gpg::diag
       return count;
     }
 
-    void WriteThreadStackLines(std::FILE* const sink, const char* const tag, const std::uint32_t threadId,
-                               const std::uintptr_t* frames, const std::uint32_t frameCount)
+    void WriteThreadStackLines(
+      std::FILE* const sink,
+      const char* const tag,
+      const std::uint32_t threadId,
+      const std::uintptr_t* frames,
+      const std::uint32_t frameCount
+    )
     {
       ReportLine(sink, "[%s] tid=%lu frames=%u", tag, threadId, frameCount);
       for (std::uint32_t i = 0; i < frameCount; ++i) {
@@ -453,7 +565,10 @@ namespace gpg::diag
       HANDLE handle = nullptr;
     };
 
-    void WriteFaultingThreadStack(std::FILE* const sink, const CrashReportContext& context)
+    void WriteFaultingThreadStack(
+      std::FILE* const sink,
+      const CrashReportContext& context
+    )
     {
       ReportLine(sink, "");
       ReportLine(sink, "--- Threads ---");
@@ -463,15 +578,17 @@ namespace gpg::diag
         // this IS the faulting thread.
         CONTEXT contextCopy = *context.exceptionInfo->ContextRecord;
         std::uintptr_t frames[kMaxFramesPerThread] = {};
-        const std::uint32_t frameCount =
-          CaptureThreadFrames(::GetCurrentThread(), contextCopy, frames);
+        const std::uint32_t frameCount = CaptureThreadFrames(::GetCurrentThread(), contextCopy, frames);
         WriteThreadStackLines(sink, "fault", ::GetCurrentThreadId(), frames, frameCount);
       } else {
         ReportLine(sink, "[fault] no SEH context; see faf_diag.log [STACK] records");
       }
     }
 
-    void WriteThreadsSection(std::FILE* const sink, const CrashReportContext& context)
+    void WriteThreadsSection(
+      std::FILE* const sink,
+      const CrashReportContext& context
+    )
     {
       WriteFaultingThreadStack(sink, context);
 
@@ -499,8 +616,9 @@ namespace gpg::diag
           continue;
         }
 
-        HANDLE thread = ::OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE,
-                                     entry.th32ThreadID);
+        HANDLE thread = ::OpenThread(
+          THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, entry.th32ThreadID
+        );
         if (thread == nullptr) {
           continue;
         }
@@ -529,7 +647,9 @@ namespace gpg::diag
     // Module list
     // ------------------------------------------------------------------
 
-    void WriteModulesSection(std::FILE* const sink)
+    void WriteModulesSection(
+      std::FILE* const sink
+    )
     {
       ReportLine(sink, "");
       ReportLine(sink, "--- Modules ---");
@@ -548,10 +668,13 @@ namespace gpg::diag
       }
 
       do {
-        ReportLine(sink, "%016llX %8lu %ls", static_cast<unsigned long long>(
-                                             reinterpret_cast<std::uintptr_t>(module.modBaseAddr)
-                                           ),
-                   module.modBaseSize, module.szModule);
+        ReportLine(
+          sink,
+          "%016llX %8lu %ls",
+          static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(module.modBaseAddr)),
+          module.modBaseSize,
+          module.szModule
+        );
       } while (::Module32NextW(snapshot, &module) != FALSE);
       (void)::CloseHandle(snapshot);
     }
@@ -559,7 +682,9 @@ namespace gpg::diag
     // Recent log tail: one line per history entry, flushed as we go. The
     // gpg log ring is the engine's own; reading it needs no lock on the
     // crash path (the process is dying; a torn line is acceptable).
-    void WriteRecentLogTail(std::FILE* const sink)
+    void WriteRecentLogTail(
+      std::FILE* const sink
+    )
     {
       // gpg::GetRecentLogLines returns one UTF-8 blob; split it into lines so
       // each gets its own flush (the blob can be a few hundred KB).
@@ -662,7 +787,11 @@ namespace gpg::diag
 
   } // namespace
 
-  void AddCrashSection(const char* const name, const CrashSectionWriter writer, const int priority)
+  void AddCrashSection(
+    const char* const name,
+    const CrashSectionWriter writer,
+    const int priority
+  )
   {
     SectionRegistry& registry = SectionRegistryInstance();
     if (name == nullptr || writer == nullptr || registry.count >= kMaxSections) {
@@ -674,19 +803,25 @@ namespace gpg::diag
     ++registry.count;
   }
 
-  void WriteEnvironmentReport(std::FILE* const sink)
+  void WriteEnvironmentReport(
+    std::FILE* const sink
+  )
   {
     WriteBuildSection(sink);
     WriteProcessSection(sink);
     WriteSystemSection(sink);
   }
 
-  void WriteModuleList(std::FILE* const sink)
+  void WriteModuleList(
+    std::FILE* const sink
+  )
   {
     WriteModulesSection(sink);
   }
 
-  bool WriteCrashReport(const CrashReportContext& context)
+  bool WriteCrashReport(
+    const CrashReportContext& context
+  )
   {
     if (::InterlockedCompareExchange(&sReportInProgress, 1, 0) != 0) {
       return false; // a nested fault while a report is already being written
@@ -700,8 +835,10 @@ namespace gpg::diag
     CrashSectionInfo sectionInfo{};
     if (context.exceptionInfo != nullptr && context.exceptionInfo->ExceptionRecord != nullptr) {
       sectionInfo.faultAddress = context.exceptionInfo->ExceptionRecord->ExceptionAddress;
-      if (context.exceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION
-          && context.exceptionInfo->ExceptionRecord->NumberParameters >= 2) {
+      if (
+        context.exceptionInfo->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
+        context.exceptionInfo->ExceptionRecord->NumberParameters >= 2
+      ) {
         sectionInfo.accessTarget =
           reinterpret_cast<const void*>(context.exceptionInfo->ExceptionRecord->ExceptionInformation[1]);
       }
@@ -764,7 +901,9 @@ namespace gpg::diag
     return true;
   }
 
-  void HandleFatalPath(const CrashReportContext& context)
+  void HandleFatalPath(
+    const CrashReportContext& context
+  )
   {
     const bool wroteReport = WriteCrashReport(context);
     if (!wroteReport) {
@@ -779,7 +918,9 @@ namespace gpg::diag
 
   CrashReportDialogHook sCrashReportDialog = nullptr;
 
-  bool WriteCrashMinidump(_EXCEPTION_POINTERS* const exceptionInfo)
+  bool WriteCrashMinidump(
+    _EXCEPTION_POINTERS* const exceptionInfo
+  )
   {
     // FAF_MINIDUMP=0 disables; anything else (including unset) leaves the
     // dump on. Default-on per operator decision.
@@ -789,9 +930,8 @@ namespace gpg::diag
       return false;
     }
 
-    HANDLE file = ::CreateFileA(
-      CrashDumpPath(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr
-    );
+    HANDLE file =
+      ::CreateFileA(CrashDumpPath(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) {
       return false;
     }
@@ -842,12 +982,14 @@ namespace gpg::diag
     return written != FALSE;
   }
 
-  void NoteSimLuaError(const char* const message)
+  void NoteSimLuaError(
+    const char* const message
+  )
   {
     struct SDumpOnErrorConfig
     {
-      int budget = 0;           // FAF_DUMP_ON_SIM_LUA_ERROR: dumps left to write
-      char ignore[1024] = {};   // FAF_DUMP_ON_SIM_LUA_ERROR_IGNORE: ';'-separated substrings
+      int budget = 0;         // FAF_DUMP_ON_SIM_LUA_ERROR: dumps left to write
+      char ignore[1024] = {}; // FAF_DUMP_ON_SIM_LUA_ERROR_IGNORE: ';'-separated substrings
     };
     static SDumpOnErrorConfig sConfig = [] {
       SDumpOnErrorConfig config{};
@@ -870,7 +1012,8 @@ namespace gpg::diag
     }
     for (const char* entry = sConfig.ignore; *entry != '\0';) {
       const char* const separator = std::strchr(entry, ';');
-      const std::size_t length = separator != nullptr ? static_cast<std::size_t>(separator - entry) : std::strlen(entry);
+      const std::size_t length =
+        separator != nullptr ? static_cast<std::size_t>(separator - entry) : std::strlen(entry);
       if (length != 0u) {
         char needle[256] = {};
         (void)::strncpy_s(needle, sizeof(needle), entry, length < sizeof(needle) ? length : sizeof(needle) - 1u);
@@ -888,8 +1031,17 @@ namespace gpg::diag
     ::GetLocalTime(&now);
     char stem[MAX_PATH * 2] = {};
     (void)::sprintf_s(
-      stem, sizeof(stem), "%sfaf_luaerr_%04u%02u%02u_%02u%02u%02u_%d", exeDir, now.wYear, now.wMonth, now.wDay,
-      now.wHour, now.wMinute, now.wSecond, sWritten
+      stem,
+      sizeof(stem),
+      "%sfaf_luaerr_%04u%02u%02u_%02u%02u%02u_%d",
+      exeDir,
+      now.wYear,
+      now.wMonth,
+      now.wDay,
+      now.wHour,
+      now.wMinute,
+      now.wSecond,
+      sWritten
     );
 
     char path[MAX_PATH * 2 + 8] = {};

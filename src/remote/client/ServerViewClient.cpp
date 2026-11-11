@@ -15,7 +15,10 @@
 
 namespace faf::remote::client
 {
-  bool ReadGameInfo(const std::span<const std::uint8_t> message, SServerGameInfo& out)
+  bool ReadGameInfo(
+    const std::span<const std::uint8_t> message,
+    SServerGameInfo& out
+  )
   {
     constexpr std::size_t kSize = 1u + 2u * sizeof(float) + 2u * sizeof(std::int32_t);
     if (message.size() != kSize || message[0] != static_cast<std::uint8_t>(net::ESeatMessage::GameInfo)) {
@@ -32,7 +35,10 @@ namespace faf::remote::client
     return true;
   }
 
-  bool ReadViewMessage(const std::span<const std::uint8_t> message, SViewMessage& out)
+  bool ReadViewMessage(
+    const std::span<const std::uint8_t> message,
+    SViewMessage& out
+  )
   {
     if (message.empty() || message[0] != static_cast<std::uint8_t>(net::ESeatMessage::View)) {
       return false;
@@ -64,7 +70,10 @@ namespace faf::remote::client
     return reader.AtEnd();
   }
 
-  bool ReadTablesMessage(const std::span<const std::uint8_t> message, STablesMessage& out)
+  bool ReadTablesMessage(
+    const std::span<const std::uint8_t> message,
+    STablesMessage& out
+  )
   {
     if (message.empty() || message[0] != static_cast<std::uint8_t>(net::ESeatMessage::SessionTables)) {
       return false;
@@ -81,7 +90,10 @@ namespace faf::remote::client
     return !out.reset || out.record.empty();
   }
 
-  CServerViewClient::CServerViewClient(moho::RRuleGameRules& rules, const SServerGameInfo& info)
+  CServerViewClient::CServerViewClient(
+    moho::RRuleGameRules& rules,
+    const SServerGameInfo& info
+  )
     : mInfo(info)
     , mCodec(MakeViewCodec(info.mapSizeX, info.mapSizeZ))
   {
@@ -99,7 +111,9 @@ namespace faf::remote::client
     mMerger.SetArmy(info.army);
   }
 
-  bool CServerViewClient::ApplyTables(const STablesMessage& tables)
+  bool CServerViewClient::ApplyTables(
+    const STablesMessage& tables
+  )
   {
     if (tables.reset) {
       // Every record follows from the first, before the next view. The ids come out as before (the server's never
@@ -119,7 +133,10 @@ namespace faf::remote::client
     return true;
   }
 
-  bool CServerViewClient::Apply(const SViewMessage& view, moho::SSyncData& packet)
+  bool CServerViewClient::Apply(
+    const SViewMessage& view,
+    moho::SSyncData& packet
+  )
   {
     ++mStats.views;
     // Army lane: every army's record, each against the one this client holds.
@@ -155,8 +172,8 @@ namespace faf::remote::client
     }
     mRebuilder->SetPoseLane(view.hasPoses ? &mPoses : nullptr);
     wire::SViewFrame merged;
-    const bool applied = mMerger.Decode(view.own, view.team, mCodec, merged)
-                      && mRebuilder->ApplyFrame(std::move(merged), view.own.size() + view.team.size(), packet);
+    const bool applied = mMerger.Decode(view.own, view.team, mCodec, merged) &&
+      mRebuilder->ApplyFrame(std::move(merged), view.own.size() + view.team.size(), packet);
     mRebuilder->SetPoseLane(nullptr);
     if (!applied) {
       ++mStats.frameFailures;

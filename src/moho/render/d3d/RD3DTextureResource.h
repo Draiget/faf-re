@@ -166,8 +166,14 @@ namespace moho
     TextureHandle mBaseTex;                             // +0x60
   };
 
-  static_assert(sizeof(RD3DTextureResource::TextureHandle) == 0x08, "RD3DTextureResource::TextureHandle size must be 0x08");
-  static_assert(offsetof(RD3DTextureResource, mResources) == 0x04, "RD3DTextureResource::mResources offset must be 0x04");
+  static_assert(
+    sizeof(RD3DTextureResource::TextureHandle) == 0x08,
+    "RD3DTextureResource::TextureHandle size must be 0x08"
+  );
+  static_assert(
+    offsetof(RD3DTextureResource, mResources) == 0x04,
+    "RD3DTextureResource::mResources offset must be 0x04"
+  );
   static_assert(offsetof(RD3DTextureResource, mContext) == 0x0C, "RD3DTextureResource::mContext offset must be 0x0C");
   static_assert(offsetof(RD3DTextureResource, mBaseTex) == 0x60, "RD3DTextureResource::mBaseTex offset must be 0x60");
   static_assert(sizeof(RD3DTextureResource) == 0x68, "RD3DTextureResource size must be 0x68");

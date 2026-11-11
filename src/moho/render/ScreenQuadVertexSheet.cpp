@@ -31,8 +31,7 @@ namespace moho
   )
   {
     ID3DVertexStream* const vertexStream = vertexSheet.GetVertStream(0U);
-    auto* const vertices =
-      static_cast<ScreenQuadVertex*>(vertexStream->Lock(0, kScreenQuadVertexCount, false, false));
+    auto* const vertices = static_cast<ScreenQuadVertex*>(vertexStream->Lock(0, kScreenQuadVertexCount, false, false));
 
     // Raw GPU upload: static screen-quad vertex blob into the locked stream.
     std::copy(std::begin(kUnitScreenQuad), std::end(kUnitScreenQuad), vertices);

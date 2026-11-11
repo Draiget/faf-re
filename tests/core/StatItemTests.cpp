@@ -10,14 +10,19 @@
 
 namespace
 {
-  std::int32_t FloatBits(const float value)
+  std::int32_t FloatBits(
+    const float value
+  )
   {
     std::int32_t bits = 0;
     std::memcpy(&bits, &value, sizeof(bits));
     return bits;
   }
 
-  std::string Text(moho::StatItem& stat, const bool realtime)
+  std::string Text(
+    moho::StatItem& stat,
+    const bool realtime
+  )
   {
     fa::string value;
     stat.GetString(realtime, &value);
@@ -25,7 +30,10 @@ namespace
   }
 
   /** A child the parent owns: StatItem's destructor deletes its children. */
-  moho::StatItem* NewChild(moho::StatItem& parent, const char* const name)
+  moho::StatItem* NewChild(
+    moho::StatItem& parent,
+    const char* const name
+  )
   {
     auto* const child = new moho::StatItem(name);
     parent.AttachChild(child);
@@ -35,7 +43,10 @@ namespace
 
 // An integer stat reads its primary slot as int, float and "%i" text (0x00418750 formats with "%i" at 0xE00F54);
 // the realtime slot is separate and stays 0 until a pulse publishes the value.
-TEST(MohoStatItem, IntegerStatReadsAsIntFloatAndText)
+TEST(
+  MohoStatItem,
+  IntegerStatReadsAsIntFloatAndText
+)
 {
   moho::StatItem stat("Units_Built");
   stat.SynchronizeAsInt();
@@ -51,7 +62,10 @@ TEST(MohoStatItem, IntegerStatReadsAsIntFloatAndText)
 }
 
 // A float stat keeps the float's bits; AddFloat adds atomically, and the text is "%.2f" (0xE00F58).
-TEST(MohoStatItem, FloatStatAddsAndPrintsTwoDecimals)
+TEST(
+  MohoStatItem,
+  FloatStatAddsAndPrintsTwoDecimals
+)
 {
   moho::StatItem stat("Economy_Mass");
   stat.SynchronizeAsFloat();
@@ -67,7 +81,10 @@ TEST(MohoStatItem, FloatStatAddsAndPrintsTwoDecimals)
 }
 
 // A string stat parses its text for the numeric reads, as atoi and atof do.
-TEST(MohoStatItem, StringStatParsesItsText)
+TEST(
+  MohoStatItem,
+  StringStatParsesItsText
+)
 {
   moho::StatItem stat("Name");
   stat.mType = moho::EStatType::kString;
@@ -81,7 +98,10 @@ TEST(MohoStatItem, StringStatParsesItsText)
 
 // A tick pulse (ClearChildren(1), 0x00418A90) publishes each tick-mode stat's primary value to its realtime slot
 // and clears the primary; stats in another pulse mode keep their values.
-TEST(MohoStatItem, TickPulsePublishesAndClearsOnlyTickStats)
+TEST(
+  MohoStatItem,
+  TickPulsePublishesAndClearsOnlyTickStats
+)
 {
   moho::StatItem root("Root");
   moho::StatItem* const perTick = NewChild(root, "PerTick");
@@ -101,7 +121,10 @@ TEST(MohoStatItem, TickPulsePublishesAndClearsOnlyTickStats)
 }
 
 // Clear(true) clears the whole subtree; Clear(false) only the stat itself (0x00418B00).
-TEST(MohoStatItem, RecursiveClearReachesEveryDescendant)
+TEST(
+  MohoStatItem,
+  RecursiveClearReachesEveryDescendant
+)
 {
   moho::StatItem root("Root");
   root.SynchronizeAsInt();
@@ -121,7 +144,10 @@ TEST(MohoStatItem, RecursiveClearReachesEveryDescendant)
 }
 
 // Children are found by exact name among the direct children only; re-attaching moves a child between parents.
-TEST(MohoStatItem, ChildrenAreFoundByNameAndMove)
+TEST(
+  MohoStatItem,
+  ChildrenAreFoundByNameAndMove
+)
 {
   moho::StatItem root("Root");
   moho::StatItem* const a = NewChild(root, "A");

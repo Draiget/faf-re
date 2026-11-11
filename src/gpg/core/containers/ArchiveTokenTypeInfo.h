@@ -14,7 +14,7 @@ namespace gpg
   {
   public:
     /**
-       * Address: 0x00952AB0 (FUN_00952AB0)
+     * Address: 0x00952AB0 (FUN_00952AB0)
      */
     ArchiveTokenTypeInfo();
 

@@ -60,7 +60,9 @@ namespace moho
   /**
    * Address: 0x004E4E80 (FUN_004E4E80, Moho::HSoundTypeInfo::AddBase_CScriptEvent)
    */
-  void HSoundTypeInfo::AddBase_CScriptEvent(gpg::RType* const typeInfo)
+  void HSoundTypeInfo::AddBase_CScriptEvent(
+    gpg::RType* const typeInfo
+  )
   {
     audio_reflection::AddBase(typeInfo, audio_reflection::ResolveCScriptEventType());
   }
@@ -89,4 +91,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_HSoundTypeInfo_6cd9a3, moho::register_HSoundTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_HSoundTypeInfo_6cd9a3,
+  moho::register_HSoundTypeInfo
+)

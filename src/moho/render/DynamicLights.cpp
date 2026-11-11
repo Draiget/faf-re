@@ -34,19 +34,25 @@ namespace moho
   {
     TConVar<int> gTConVar_ren_DynamicLights(
       "ren_DynamicLights",
-      "Direct3D 12 and Vulkan: explosions, muzzle flashes, engines, projectiles and beams light the ground and the units "
+      "Direct3D 12 and Vulkan: explosions, muzzle flashes, engines, projectiles and beams light the ground and the "
+      "units "
       "around them (from the effects' additive particles and beams). 1 on, 0 off (default).",
       &ren_DynamicLights
     );
     TConVar<float> gTConVar_ren_DynamicLightIntensity(
-      "ren_DynamicLightIntensity", "ren_DynamicLights: how bright the lights are (1 the default).", &ren_DynamicLightIntensity
+      "ren_DynamicLightIntensity",
+      "ren_DynamicLights: how bright the lights are (1 the default).",
+      &ren_DynamicLightIntensity
     );
     TConVar<float> gTConVar_ren_DynamicLightTest(
-      "ren_DynamicLightTest", "ren_DynamicLights diagnostics: a white light this many units wide on the view's centre; 0 none.",
+      "ren_DynamicLightTest",
+      "ren_DynamicLights diagnostics: a white light this many units wide on the view's centre; 0 none.",
       &ren_DynamicLightTest
     );
     TConVar<float> gTConVar_ren_DynamicLightRadius(
-      "ren_DynamicLightRadius", "ren_DynamicLights: how far the lights reach, times their size (1 the default).", &ren_DynamicLightRadius
+      "ren_DynamicLightRadius",
+      "ren_DynamicLights: how far the lights reach, times their size (1 the default).",
+      &ren_DynamicLightRadius
     );
 
     /** Must match the cbuffer in DynamicLightsShader.h. */
@@ -59,23 +65,34 @@ namespace moho
       float params[4];
       float lights[kDynamicLightSlots * 2][4];
     };
-    static_assert(sizeof(LightConstants) == 64 + 4 * 16 + kDynamicLightSlots * 2 * 16, "LightConstants matches the shader's cbuffer");
-    static_assert(sizeof(LightConstants) <= gpg::gal::kGpuMaxConstantBytes, "LightConstants fits the GPU program's constants");
+    static_assert(
+      sizeof(LightConstants) == 64 + 4 * 16 + kDynamicLightSlots * 2 * 16,
+      "LightConstants matches the shader's cbuffer"
+    );
+    static_assert(
+      sizeof(LightConstants) <= gpg::gal::kGpuMaxConstantBytes,
+      "LightConstants fits the GPU program's constants"
+    );
 
     // Merged per cell of this size (world units) and beat: an explosion's dozens of particles become one light.
     constexpr float kCellSize = 3.0f;
     // A light lasts no longer than this many ticks, whatever its source's life (smoke that glows for seconds).
     constexpr float kMaxLifetime = 12.0f;
 
-    [[nodiscard]] bool BackendReadsBoundDepth(gpg::gal::Device& device)
+    [[nodiscard]] bool BackendReadsBoundDepth(
+      gpg::gal::Device& device
+    )
     {
       const gpg::gal::DeviceContext* const context = device.GetDeviceContext();
       return context != nullptr &&
-        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 || context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
+        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
+         context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
     }
   } // namespace
 
-  const DynamicLights::RampColor& DynamicLights::ColorOfRamp(const char* const path)
+  const DynamicLights::RampColor& DynamicLights::ColorOfRamp(
+    const char* const path
+  )
   {
     const std::string key = (path != nullptr) ? path : "";
     const auto found = mRampColors.find(key);
@@ -94,8 +111,11 @@ namespace moho
       gpg::gal::imaging::DecodeOptions options{};
       options.format = DXGI_FORMAT_R8G8B8A8_UNORM;
       gpg::gal::imaging::Image image;
-      if (file.mBegin != nullptr && file.Size() != 0U && codec != nullptr &&
-          SUCCEEDED(codec->Decode(file.mBegin, file.Size(), options, image)) && !image.subresources.empty() && image.width != 0U) {
+      if (
+        file.mBegin != nullptr && file.Size() != 0U && codec != nullptr &&
+        SUCCEEDED(codec->Decode(file.mBegin, file.Size(), options, image)) && !image.subresources.empty() &&
+        image.width != 0U
+      ) {
         // A ramp runs over the particle's life left to right (one row per ramp selection): the light is its
         // alpha-weighted colour over the first 60 %, where effects are brightest.
         const gpg::gal::imaging::Image::Subresource& top = image.subresources.front();
@@ -103,7 +123,8 @@ namespace moho
         double sum[3]{};
         double samples = 0.0;
         for (std::uint32_t row = 0U; row < top.height; ++row) {
-          const std::uint8_t* const pixels = image.bytes.data() + top.offset + static_cast<std::size_t>(row) * top.rowPitch;
+          const std::uint8_t* const pixels =
+            image.bytes.data() + top.offset + static_cast<std::size_t>(row) * top.rowPitch;
           for (std::uint32_t column = 0U; column < columns; ++column) {
             const std::uint8_t* const pixel = pixels + static_cast<std::size_t>(column) * 4U;
             const double a = pixel[3] / 255.0;
@@ -133,7 +154,12 @@ namespace moho
   }
 
   void DynamicLights::AddSource(
-    const float position[3], const float velocity[3], const float color[3], const float size, const float birth, const float lifetime
+    const float position[3],
+    const float velocity[3],
+    const float color[3],
+    const float size,
+    const float birth,
+    const float lifetime
   )
   {
     Light light;
@@ -147,7 +173,10 @@ namespace moho
     mLights.push_back(light);
   }
 
-  void DynamicLights::AddParticles(const SParticleBuffer& batch, const int tick)
+  void DynamicLights::AddParticles(
+    const SParticleBuffer& batch,
+    const int tick
+  )
   {
     if (ren_DynamicLights <= 0) {
       mLights.clear();
@@ -169,8 +198,11 @@ namespace moho
       const float velocity[3] = {particle.mDir.x, particle.mDir.y, particle.mDir.z};
       const float size = 0.5f * (particle.mBeginSize + particle.mEndSize);
       // The particle's own colour: its ramp texture's (UEF build effects blue, Cybran red, fire orange).
-      const RampColor& ramp = ColorOfRamp(particle.mRampTexture.tex != nullptr ? particle.mRampTexture.tex->mTexturePath.c_str() : nullptr);
-      AddSource(position, velocity, ramp.color, light ? size * 1.5f : size, now + particle.mInterop, particle.mLifetime);
+      const RampColor& ramp =
+        ColorOfRamp(particle.mRampTexture.tex != nullptr ? particle.mRampTexture.tex->mTexturePath.c_str() : nullptr);
+      AddSource(
+        position, velocity, ramp.color, light ? size * 1.5f : size, now + particle.mInterop, particle.mLifetime
+      );
       mLights.back().intensity *= ramp.strength;
     }
     for (const SWorldTrail& trail : batch.mTrails) {
@@ -180,7 +212,8 @@ namespace moho
       // The trail's newest end follows its projectile or engine.
       const float position[3] = {trail.mEndPos.x, trail.mEndPos.y, trail.mEndPos.z};
       const float still[3]{};
-      const RampColor& ramp = ColorOfRamp(trail.mRampTexture.tex != nullptr ? trail.mRampTexture.tex->mTexturePath.c_str() : nullptr);
+      const RampColor& ramp =
+        ColorOfRamp(trail.mRampTexture.tex != nullptr ? trail.mRampTexture.tex->mTexturePath.c_str() : nullptr);
       AddSource(position, still, ramp.color, trail.mSize, now, 2.0f);
       mLights.back().intensity *= ramp.strength;
     }
@@ -216,7 +249,8 @@ namespace moho
     for (std::size_t index = first; index < mLights.size(); ++index) {
       const Light source = mLights[index];
       const auto key = std::make_tuple(
-        static_cast<int>(std::floor(source.position[0] / kCellSize)), static_cast<int>(std::floor(source.position[1] / kCellSize)),
+        static_cast<int>(std::floor(source.position[0] / kCellSize)),
+        static_cast<int>(std::floor(source.position[1] / kCellSize)),
         static_cast<int>(std::floor(source.position[2] / kCellSize))
       );
       const auto found = cells.find(key);
@@ -228,8 +262,10 @@ namespace moho
       Light& merged = mLights[found->second];
       const float total = merged.intensity + source.intensity;
       for (int axis = 0; axis < 3; ++axis) {
-        merged.position[axis] = (merged.position[axis] * merged.intensity + source.position[axis] * source.intensity) / total;
-        merged.velocity[axis] = (merged.velocity[axis] * merged.intensity + source.velocity[axis] * source.intensity) / total;
+        merged.position[axis] =
+          (merged.position[axis] * merged.intensity + source.position[axis] * source.intensity) / total;
+        merged.velocity[axis] =
+          (merged.velocity[axis] * merged.intensity + source.velocity[axis] * source.intensity) / total;
         merged.color[axis] = (merged.color[axis] * merged.intensity + source.color[axis] * source.intensity) / total;
       }
       merged.intensity = std::min(merged.intensity + source.intensity * 0.35f, 2.5f);
@@ -241,8 +277,11 @@ namespace moho
     // Old lights go once their life is over (and the list stays bounded in a long battle).
     mLights.erase(
       std::remove_if(
-        mLights.begin(), mLights.end(),
-        [now](const Light& light) { return now - light.birth > light.lifetime + 1.0f || light.birth > now + 2.0f; }
+        mLights.begin(),
+        mLights.end(),
+        [now](const Light& light) {
+      return now - light.birth > light.lifetime + 1.0f || light.birth > now + 2.0f;
+    }
       ),
       mLights.end()
     );
@@ -283,7 +322,7 @@ namespace moho
         composite.vertexEntry = "LightsCompositeVS";
         composite.pixelEntry = "LightsCompositePS";
         composite.blend = gpg::gal::GpuBlend::Brighten; // colour * (1 + light): lit ground keeps its hue
-        composite.colorWriteMask = 0x07U; // alpha is the glow amount and the water mask
+        composite.colorWriteMask = 0x07U;               // alpha is the glow amount and the water mask
         composite.depthTest = false;
         composite.depthWrite = false;
         composite.cullBackFaces = false;
@@ -297,7 +336,13 @@ namespace moho
     return mSupported;
   }
 
-  void DynamicLights::Render(const GeomCamera3& camera, const int x, const int y, const int width, const int height)
+  void DynamicLights::Render(
+    const GeomCamera3& camera,
+    const int x,
+    const int y,
+    const int width,
+    const int height
+  )
   {
     if (!mSupported || width < 8 || height < 8 || (mLights.empty() && ren_DynamicLightTest <= 0.0f)) {
       return;

@@ -14,8 +14,8 @@ namespace
 {
   struct Library
   {
-    void* signer = nullptr;    // libdxil.so
-    void* compiler = nullptr;  // libdxcompiler.so
+    void* signer = nullptr;   // libdxil.so
+    void* compiler = nullptr; // libdxcompiler.so
     DxcCreateInstanceProc create = nullptr;
   };
 
@@ -36,8 +36,10 @@ namespace
     thread_local bool tried = false;
     if (!tried && gLibrary.create != nullptr) {
       tried = true;
-      if (FAILED(gLibrary.create(CLSID_DxcUtils, IID_PPV_ARGS(&instance.utils))) ||
-          FAILED(gLibrary.create(CLSID_DxcCompiler, IID_PPV_ARGS(&instance.dxc)))) {
+      if (
+        FAILED(gLibrary.create(CLSID_DxcUtils, IID_PPV_ARGS(&instance.utils))) ||
+        FAILED(gLibrary.create(CLSID_DxcCompiler, IID_PPV_ARGS(&instance.dxc)))
+      ) {
         instance.utils.Release();
         instance.dxc.Release();
       }
@@ -46,13 +48,16 @@ namespace
   }
 
   platform::posix::dxc::Output Run(
-    const std::string_view source, const std::vector<std::wstring>& arguments, const bool preprocessed
+    const std::string_view source,
+    const std::vector<std::wstring>& arguments,
+    const bool preprocessed
   )
   {
     platform::posix::dxc::Output output;
     ThreadDxc* const dxc = ThisThreadDxc();
     if (dxc == nullptr) {
-      output.messages = gLibrary.create == nullptr ? "libdxcompiler.so is not loaded" : "DxcCreateInstance failed on this thread";
+      output.messages =
+        gLibrary.create == nullptr ? "libdxcompiler.so is not loaded" : "DxcCreateInstance failed on this thread";
       return output;
     }
     std::vector<LPCWSTR> pointers;
@@ -66,9 +71,8 @@ namespace
     buffer.Encoding = DXC_CP_UTF8;
 
     CComPtr<IDxcResult> result;
-    const HRESULT hr = dxc->dxc->Compile(
-      &buffer, pointers.data(), static_cast<UINT32>(pointers.size()), nullptr, IID_PPV_ARGS(&result)
-    );
+    const HRESULT hr =
+      dxc->dxc->Compile(&buffer, pointers.data(), static_cast<UINT32>(pointers.size()), nullptr, IID_PPV_ARGS(&result));
     if (FAILED(hr) || result == nullptr) {
       char message[64]{};
       std::snprintf(message, sizeof(message), "IDxcCompiler3::Compile failed (0x%08X)", static_cast<unsigned>(hr));
@@ -76,8 +80,10 @@ namespace
       return output;
     }
     CComPtr<IDxcBlobUtf8> errors;
-    if (SUCCEEDED(result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr)) && errors != nullptr &&
-        errors->GetStringLength() != 0U) {
+    if (
+      SUCCEEDED(result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr)) && errors != nullptr &&
+      errors->GetStringLength() != 0U
+    ) {
       output.messages.assign(errors->GetStringPointer(), errors->GetStringLength());
     }
     HRESULT status = E_FAIL;
@@ -105,7 +111,9 @@ namespace
     return output;
   }
 
-  std::wstring Widen(const std::string_view text)
+  std::wstring Widen(
+    const std::string_view text
+  )
   {
     // Arguments and names are ASCII (entry points, profiles, macro names, VFS paths).
     std::wstring wide;
@@ -117,7 +125,10 @@ namespace
   }
 } // namespace
 
-std::string platform::posix::dxc::Load(const std::vector<std::string>& directories, std::string& version)
+std::string platform::posix::dxc::Load(
+  const std::vector<std::string>& directories,
+  std::string& version
+)
 {
   const std::lock_guard<std::mutex> lock(gLoadMutex);
   if (gLibrary.create != nullptr) {
@@ -130,7 +141,7 @@ std::string platform::posix::dxc::Load(const std::vector<std::string>& directori
     }
     candidates.push_back(directory);
   }
-  candidates.emplace_back();  // the system's library path
+  candidates.emplace_back(); // the system's library path
   for (const std::string& directory : candidates) {
     // The signer first, by path, so libdxcompiler's own dlopen("libdxil.so") finds it.
     gLibrary.signer = ::dlopen((directory + "libdxil.so").c_str(), RTLD_NOW | RTLD_GLOBAL);
@@ -160,9 +171,13 @@ std::string platform::posix::dxc::Load(const std::vector<std::string>& directori
   CComPtr<IDxcVersionInfo> versionInfo;
   UINT32 major = 0U;
   UINT32 minor = 0U;
-  if (SUCCEEDED(probe->QueryInterface(IID_PPV_ARGS(&versionInfo))) && SUCCEEDED(versionInfo->GetVersion(&major, &minor))) {
+  if (
+    SUCCEEDED(probe->QueryInterface(IID_PPV_ARGS(&versionInfo))) && SUCCEEDED(versionInfo->GetVersion(&major, &minor))
+  ) {
     char text[64]{};
-    std::snprintf(text, sizeof(text), "dxc %u.%u%s", major, minor, gLibrary.signer != nullptr ? " signed" : " unsigned");
+    std::snprintf(
+      text, sizeof(text), "dxc %u.%u%s", major, minor, gLibrary.signer != nullptr ? " signed" : " unsigned"
+    );
     version = text;
   } else {
     version = "dxc";
@@ -177,14 +192,17 @@ bool platform::posix::dxc::Loaded()
 }
 
 platform::posix::dxc::Output platform::posix::dxc::Compile(
-  const std::string_view source, const std::vector<std::wstring>& arguments
+  const std::string_view source,
+  const std::vector<std::wstring>& arguments
 )
 {
   return Run(source, arguments, false);
 }
 
 platform::posix::dxc::Output platform::posix::dxc::Preprocess(
-  const std::string_view source, const std::string_view sourceName, const std::vector<std::pair<std::string, std::string>>& defines
+  const std::string_view source,
+  const std::string_view sourceName,
+  const std::vector<std::pair<std::string, std::string>>& defines
 )
 {
   std::vector<std::wstring> arguments{Widen(sourceName), L"-P"};

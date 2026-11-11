@@ -24,7 +24,9 @@ namespace moho
    * variable. Returns null when the name is unknown or names a command that is
    * not a variable.
    */
-  [[nodiscard]] inline CSimConVarBase* FindSimConVarByName(const char* const name)
+  [[nodiscard]] inline CSimConVarBase* FindSimConVarByName(
+    const char* const name
+  )
   {
     if (name == nullptr || *name == '\0') {
       return nullptr;
@@ -39,7 +41,11 @@ namespace moho
    * and returning false if any hop in the walk comes up empty.
    */
   template <typename TValue>
-  [[nodiscard]] bool ReadSimConVarValue(Sim* const sim, const char* const name, TValue& outValue)
+  [[nodiscard]] bool ReadSimConVarValue(
+    Sim* const sim,
+    const char* const name,
+    TValue& outValue
+  )
   {
     if (sim == nullptr) {
       return false;
@@ -71,7 +77,10 @@ namespace moho
    * by-name registry search is involved.
    */
   template <typename TValue>
-  [[nodiscard]] TValue ReadSimConVar(Sim* const sim, TSimConVar<TValue>& conVar)
+  [[nodiscard]] TValue ReadSimConVar(
+    Sim* const sim,
+    TSimConVar<TValue>& conVar
+  )
   {
     return *static_cast<const TValue*>(sim->GetSimVar(&conVar)->GetValueStorage());
   }

@@ -64,14 +64,15 @@ namespace faf::editor
     /** No setting creates it. */
     [[nodiscard]] bool Never() const;
   };
-  GroupLobbyRule LobbyRuleOfGroup(const std::string& script, const std::vector<LobbyOptionInfo>& options, const std::string& group);
+  GroupLobbyRule
+  LobbyRuleOfGroup(const std::string& script, const std::vector<LobbyOptionInfo>& options, const std::string& group);
 
   /** The rule as lines for the Properties panel: which option, and what each of its values does to the group. */
   std::vector<std::string> DescribeLobbyRule(const GroupLobbyRule& rule, const std::vector<LobbyOptionInfo>& options);
 
   /**
-   * A level loop in a map's script: `for w = 2, optional_wreckage do CreateArmyGroup('ARMY_17', 'Optional_Wreckage_' .. w,
-   * true) end`: the lobby option's value v creates the groups `<prefix>from` .. `<prefix>v`.
+   * A level loop in a map's script: `for w = 2, optional_wreckage do CreateArmyGroup('ARMY_17', 'Optional_Wreckage_' ..
+   * w, true) end`: the lobby option's value v creates the groups `<prefix>from` .. `<prefix>v`.
    */
   struct ScriptGroupLoop
   {
@@ -108,6 +109,10 @@ namespace faf::editor
     /** What `optionsWith` adds, in a few words. */
     std::string optionsChange;
   };
-  std::vector<SpawnTarget> SpawnTargets(const std::string& script, const std::string& optionsText, const std::string& army,
-                                        const std::vector<std::vector<std::string>>& groupPaths);
+  std::vector<SpawnTarget> SpawnTargets(
+    const std::string& script,
+    const std::string& optionsText,
+    const std::string& army,
+    const std::vector<std::vector<std::string>>& groupPaths
+  );
 } // namespace faf::editor

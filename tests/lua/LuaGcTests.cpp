@@ -20,10 +20,16 @@ namespace
   class LuaGc : public faf_lua_tests::LuaFixture
   {
   protected:
-    int CountKb() { return lua_getgccount(L()); }
+    int CountKb()
+    {
+      return lua_getgccount(L());
+    }
   };
 
-  TEST_F(LuaGc, CollectFreesUnreachableObjects)
+  TEST_F(
+    LuaGc,
+    CollectFreesUnreachableObjects
+  )
   {
     Run("big = {} for i = 1, 20000 do big[i] = {i, 'payload' .. i} end");
     const int withGarbage = CountKb();
@@ -35,7 +41,10 @@ namespace
 
   // 5.0 weak tables: a weak entry goes when its object is collected; strings, numbers and booleans
   // are values, never weak.
-  TEST_F(LuaGc, WeakTables)
+  TEST_F(
+    LuaGc,
+    WeakTables
+  )
   {
     EXPECT_TRUE(Bool(R"(
       local wv = setmetatable({}, {__mode = 'v'})
@@ -55,9 +64,13 @@ namespace
          and wkvCount == 1 and wkv[keep] == keep)"));
   }
 
-  TEST_F(LuaGc, ReachableGraphsSurvive)
+  TEST_F(
+    LuaGc,
+    ReachableGraphsSurvive
+  )
   {
-    EXPECT_EQ(Num(R"(
+    EXPECT_EQ(
+      Num(R"(
       local function make()
         local hidden = {count = 0}
         return function() hidden.count = hidden.count + 1 return hidden.count end
@@ -66,10 +79,15 @@ namespace
       ring = {} ring.next = {back = ring} ring.next.next = {back = ring.next}
       for i = 1, 3 do collectgarbage() end
       counter() counter()
-      return counter() + (ring.next.next.back.back == ring and 100 or 0))"), 103.0);
+      return counter() + (ring.next.next.back.back == ring and 100 or 0))"),
+      103.0
+    );
   }
 
-  TEST_F(LuaGc, ThresholdAndGcinfo)
+  TEST_F(
+    LuaGc,
+    ThresholdAndGcinfo
+  )
   {
     Run("collectgarbage(1000000)");
     EXPECT_EQ(Num("local count, threshold = gcinfo() return threshold"), 1000000.0);
@@ -78,7 +96,10 @@ namespace
     EXPECT_TRUE(Bool("local count, threshold = gcinfo() return threshold >= count"));
   }
 
-  TEST_F(LuaGc, StringsAreInternedAndCollected)
+  TEST_F(
+    LuaGc,
+    StringsAreInternedAndCollected
+  )
   {
     EXPECT_TRUE(Bool(R"(
       local parts = {}
@@ -99,9 +120,8 @@ namespace
     {
       mPrevious = moho::lua_IncrementalGC;
       moho::lua_IncrementalGC = true;
-      mState = std::make_unique<LuaState>(
-        LuaState::LIB_BASE, static_cast<int>(moho::lua_incremental::ELuaVmRole::FrontendUi)
-      );
+      mState =
+        std::make_unique<LuaState>(LuaState::LIB_BASE, static_cast<int>(moho::lua_incremental::ELuaVmRole::FrontendUi));
     }
 
     void TearDown() override
@@ -110,10 +130,18 @@ namespace
       moho::lua_IncrementalGC = mPrevious;
     }
 
-    lua_State* L() const { return mState->GetCState(); }
-    global_State* G() const { return L()->l_G; }
+    lua_State* L() const
+    {
+      return mState->GetCState();
+    }
+    global_State* G() const
+    {
+      return L()->l_G;
+    }
 
-    LuaObject Run(const std::string& source)
+    LuaObject Run(
+      const std::string& source
+    )
     {
       const int top = lua_gettop(L());
       if (luaL_loadbuffer(L(), source.data(), source.size(), "=test") != 0 || LuaCallProtected(L(), 0, 1) != 0) {
@@ -127,7 +155,9 @@ namespace
       return result;
     }
 
-    bool Bool(const std::string& source)
+    bool Bool(
+      const std::string& source
+    )
     {
       const LuaObject result = Run(source);
       EXPECT_TRUE(result.IsBoolean()) << source;
@@ -135,7 +165,9 @@ namespace
     }
 
     /** Slices with `budget` until the cycle reaches its pause again; the number of slices it took. */
-    int FinishCycle(const int budget)
+    int FinishCycle(
+      const int budget
+    )
     {
       int slices = 1;
       bool done = faf_lua51_gc_slice(L(), budget, true);
@@ -151,7 +183,10 @@ namespace
     bool mPrevious = false;
   };
 
-  TEST_F(LuaIncrementalGc, StateIsRegisteredAsAUiVm)
+  TEST_F(
+    LuaIncrementalGc,
+    StateIsRegisteredAsAUiVm
+  )
   {
     EXPECT_TRUE(moho::lua_incremental::UsesIncrementalGc(G()));
     const moho::lua_incremental::SState* const collector = moho::lua_incremental::Find(G());
@@ -164,7 +199,10 @@ namespace
     EXPECT_FALSE(moho::lua_incremental::UsesIncrementalGc(baseline.GetCState()->l_G));
   }
 
-  TEST_F(LuaIncrementalGc, FullCycleClearsWeakEntriesAndKeepsLiveOnes)
+  TEST_F(
+    LuaIncrementalGc,
+    FullCycleClearsWeakEntriesAndKeepsLiveOnes
+  )
   {
     Run(R"(
       keep = {name = 'kept', list = {1, 2, 3}}
@@ -185,7 +223,10 @@ namespace
 
   // UI_ProcessIdleGC's way: a forced start, then small slices until the cycle ends. A small budget
   // must take several slices, and the result must be the full cycle's.
-  TEST_F(LuaIncrementalGc, SlicesFinishACycle)
+  TEST_F(
+    LuaIncrementalGc,
+    SlicesFinishACycle
+  )
   {
     Run(R"(
       keep = {}
@@ -205,7 +246,10 @@ namespace
   // The write barriers: while a cycle is under way, new objects are stored into tables the
   // collector may already have marked, the old references are dropped, and the cycle continues.
   // Everything still reachable must come through intact.
-  TEST_F(LuaIncrementalGc, MutationDuringACycleKeepsReachableObjects)
+  TEST_F(
+    LuaIncrementalGc,
+    MutationDuringACycleKeepsReachableObjects
+  )
   {
     Run(R"(
       holder = {}
@@ -244,7 +288,10 @@ namespace
 
   // Allocation alone drives the collector through luaC_checkGC -> faf_lua51_gc_step while the
   // state is not frame-driven: a long run of short-lived tables keeps the heap bounded.
-  TEST_F(LuaIncrementalGc, AllocationDrivesSteps)
+  TEST_F(
+    LuaIncrementalGc,
+    AllocationDrivesSteps
+  )
   {
     const int before = lua_getgccount(L());
     Run("for i = 1, 200000 do local t = {i, i + 1} end");
@@ -255,7 +302,10 @@ namespace
 
   // In a frame-driven state, collectgarbage() runs the incremental collector's full cycle
   // (luaB_collectgarbage's engine addition).
-  TEST_F(LuaIncrementalGc, CollectgarbageRunsAFullCycleWhenFrameDriven)
+  TEST_F(
+    LuaIncrementalGc,
+    CollectgarbageRunsAFullCycleWhenFrameDriven
+  )
   {
     (void)FinishCycle(1 << 20); // makes the state frame-driven
     const moho::lua_incremental::SState* const collector = moho::lua_incremental::Find(G());
@@ -272,7 +322,10 @@ namespace
   }
 
   // Coroutines and their open upvalues across slices.
-  TEST_F(LuaIncrementalGc, CoroutinesAndUpvaluesAcrossSlices)
+  TEST_F(
+    LuaIncrementalGc,
+    CoroutinesAndUpvaluesAcrossSlices
+  )
   {
     Run(R"(
       co = coroutine.create(function()
@@ -300,7 +353,10 @@ namespace
   }
 
   // A C++ root held across incremental cycles stays alive.
-  TEST_F(LuaIncrementalGc, LuaObjectRootsSurvive)
+  TEST_F(
+    LuaIncrementalGc,
+    LuaObjectRootsSurvive
+  )
   {
     LuaObject held;
     held.AssignNewTable(mState.get(), 0, 0);
@@ -318,7 +374,10 @@ namespace
 
   // Abandoning mid-cycle finishes it, drops the registration and hands the state back to the
   // shipped collector, which then collects as before.
-  TEST_F(LuaIncrementalGc, AbandonReturnsToTheShippedCollector)
+  TEST_F(
+    LuaIncrementalGc,
+    AbandonReturnsToTheShippedCollector
+  )
   {
     Run("keep = {x = 1} for i = 1, 3000 do local t = {i} end");
     (void)faf_lua51_gc_slice(L(), 16, true);

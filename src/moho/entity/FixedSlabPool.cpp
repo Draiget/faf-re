@@ -9,7 +9,10 @@ namespace moho
 {
   namespace
   {
-    constexpr std::size_t AlignUp(const std::size_t value, const std::size_t alignment) noexcept
+    constexpr std::size_t AlignUp(
+      const std::size_t value,
+      const std::size_t alignment
+    ) noexcept
     {
       return (value + (alignment - 1u)) & ~(alignment - 1u);
     }
@@ -25,7 +28,11 @@ namespace moho
     static std::vector<std::size_t> gFreeSlabOffsets;
     static std::size_t gNextOffset = 0;
 
-    static BOOL CALLBACK InitReserve(PINIT_ONCE, PVOID, PVOID*) noexcept
+    static BOOL CALLBACK InitReserve(
+      PINIT_ONCE,
+      PVOID,
+      PVOID*
+    ) noexcept
     {
 #if defined(_WIN32)
       void* const base = ::VirtualAlloc(nullptr, kReserveBytes, MEM_RESERVE, PAGE_NOACCESS);
@@ -45,7 +52,9 @@ namespace moho
       (void)::InitOnceExecuteOnce(&gInitOnce, &InitReserve, nullptr, nullptr);
     }
 
-    bool Owns(const void* const ptr) noexcept
+    bool Owns(
+      const void* const ptr
+    ) noexcept
     {
       // No reservation yet means no slab block exists, so a free with sim_EntityPools off never reserves the region.
       if (!gReserved.load(std::memory_order_acquire)) {
@@ -81,7 +90,9 @@ namespace moho
       return committed;
     }
 
-    void FreeSlab(void* const slab) noexcept
+    void FreeSlab(
+      void* const slab
+    ) noexcept
     {
       if (slab == nullptr) {
         return;
@@ -100,7 +111,10 @@ namespace moho
     }
   } // namespace slab_region
 
-  FixedSlabPool::FixedSlabPool(const std::size_t blockSize, const std::size_t alignment)
+  FixedSlabPool::FixedSlabPool(
+    const std::size_t blockSize,
+    const std::size_t alignment
+  )
     : mBlockSize(blockSize)
   {
     const std::size_t reqAlign = (alignment < 16u) ? 16u : alignment;
@@ -184,15 +198,16 @@ namespace moho
     return static_cast<void*>(node);
   }
 
-  void FixedSlabPool::Deallocate(void* const ptr) noexcept
+  void FixedSlabPool::Deallocate(
+    void* const ptr
+  ) noexcept
   {
     if (ptr == nullptr) {
       return;
     }
 
-    SlabHeader* const slab = reinterpret_cast<SlabHeader*>(
-      reinterpret_cast<std::uintptr_t>(ptr) & ~std::uintptr_t(kSlabBytes - 1u)
-    );
+    SlabHeader* const slab =
+      reinterpret_cast<SlabHeader*>(reinterpret_cast<std::uintptr_t>(ptr) & ~std::uintptr_t(kSlabBytes - 1u));
 
     assert(slab->magic == kSlabMagic);
     assert(slab->ownerPool == this);
@@ -270,7 +285,9 @@ namespace moho
     return header;
   }
 
-  void FixedSlabPool::FreeSlabToOs(SlabHeader* const slab) noexcept
+  void FixedSlabPool::FreeSlabToOs(
+    SlabHeader* const slab
+  ) noexcept
   {
     if (slab != nullptr) {
       slab->magic = 0;
@@ -279,7 +296,10 @@ namespace moho
     }
   }
 
-  void FixedSlabPool::LinkSlab(SlabHeader*& listHead, SlabHeader* const slab) noexcept
+  void FixedSlabPool::LinkSlab(
+    SlabHeader*& listHead,
+    SlabHeader* const slab
+  ) noexcept
   {
     slab->nextSlab = listHead;
     slab->prevSlab = nullptr;
@@ -289,7 +309,10 @@ namespace moho
     listHead = slab;
   }
 
-  void FixedSlabPool::UnlinkSlab(SlabHeader*& listHead, SlabHeader* const slab) noexcept
+  void FixedSlabPool::UnlinkSlab(
+    SlabHeader*& listHead,
+    SlabHeader* const slab
+  ) noexcept
   {
     if (slab->prevSlab != nullptr) {
       slab->prevSlab->nextSlab = slab->nextSlab;

@@ -25,7 +25,10 @@
 
 namespace faf::remote
 {
-  CViewFrames::CViewFrames(const wire::SContentTables& tables, const wire::SFrameCodec& codec)
+  CViewFrames::CViewFrames(
+    const wire::SContentTables& tables,
+    const wire::SFrameCodec& codec
+  )
     : mTables(tables)
     , mCodec(codec)
     , mSharedRecords(tables, codec)
@@ -35,12 +38,15 @@ namespace faf::remote
 
   namespace
   {
-    constexpr std::uint32_t kNone = 0xF0000000u; // the sim's invalid entity id (`EntityId.h`)
+    constexpr std::uint32_t kNone = 0xF0000000u;  // the sim's invalid entity id (`EntityId.h`)
     constexpr std::uint32_t kNoOwn = 0xFFFFFFFFu; // `SHeldView::ownSlot`: the view's record is the world's
 
     /** References `unheld` says the view holds no record of become the sim's "none" (plan WP5.12). */
     template <class Unheld>
-    void ClearRecordReferences(wire::SEntityRecord& record, const Unheld& unheld)
+    void ClearRecordReferences(
+      wire::SEntityRecord& record,
+      const Unheld& unheld
+    )
     {
       if (unheld(record.appearance.attachParent)) {
         record.appearance.attachParent = wire::SAppearance::kNoAttachParent;
@@ -51,8 +57,10 @@ namespace faf::remote
         return;
       }
       const wire::SUnitDetail& shared = *record.unit.detail;
-      if (!unheld(shared.creator) && !unheld(shared.selectionInheritor) && !unheld(shared.focusUnit)
-          && !unheld(shared.guardedUnit) && !unheld(shared.targetBlip)) {
+      if (
+        !unheld(shared.creator) && !unheld(shared.selectionInheritor) && !unheld(shared.focusUnit) &&
+        !unheld(shared.guardedUnit) && !unheld(shared.targetBlip)
+      ) {
         return; // shared with the builder's world as it is
       }
       wire::SUnitDetail detail = shared;
@@ -67,7 +75,11 @@ namespace faf::remote
 
     /** Whether the view's record differs from the world's: ids to renumber, or names it cannot hold. */
     template <class Unheld>
-    [[nodiscard]] bool NeedsOwnRecord(const wire::SEntityRecord& record, const CViewIdMap& map, const Unheld& unheld)
+    [[nodiscard]] bool NeedsOwnRecord(
+      const wire::SEntityRecord& record,
+      const CViewIdMap& map,
+      const Unheld& unheld
+    )
     {
       if (record.isUnit || map.MapsEntity(record.id)) {
         return true;
@@ -82,13 +94,17 @@ namespace faf::remote
     }
 
     /** One bit of a 64-bit filter for a sim id. */
-    [[nodiscard]] constexpr std::uint64_t ReferenceBit(const std::uint32_t id) noexcept
+    [[nodiscard]] constexpr std::uint64_t ReferenceBit(
+      const std::uint32_t id
+    ) noexcept
     {
       return std::uint64_t{1} << ((id * 0x9E3779B1u) >> 26u);
     }
 
     /** A filter of the sim ids `record` names: a false hit only costs a look at the record. */
-    [[nodiscard]] std::uint64_t ReferenceFilter(const wire::SEntityRecord& record) noexcept
+    [[nodiscard]] std::uint64_t ReferenceFilter(
+      const wire::SEntityRecord& record
+    ) noexcept
     {
       std::uint64_t filter = 0;
       const auto add = [&filter](const std::uint32_t id) {
@@ -112,7 +128,9 @@ namespace faf::remote
     }
   } // namespace
 
-  void CViewFrames::ClearUnheldReferences(wire::SViewFrame& frame)
+  void CViewFrames::ClearUnheldReferences(
+    wire::SViewFrame& frame
+  )
   {
     // The records are in ascending id order (`SViewFrame::entities`) and only their fields change
     // below, so a held id is found by binary search, without a set of every id per view and beat.
@@ -123,8 +141,8 @@ namespace faf::remote
       }
       const auto found = std::lower_bound(
         records.begin(), records.end(), id, [](const wire::SEntityRecord& record, const std::uint32_t value) {
-          return record.id < value;
-        }
+        return record.id < value;
+      }
       );
       return found == records.end() || found->id != id;
     };
@@ -133,7 +151,10 @@ namespace faf::remote
     }
   }
 
-  void CViewFrames::AdvanceIdMap(const std::size_t army, CViewIdMap& map)
+  void CViewFrames::AdvanceIdMap(
+    const std::size_t army,
+    CViewIdMap& map
+  )
   {
     // What the last beat retired goes first: its frame could still name those ids (a unit's
     // target blip deleted on the same beat), and named them with the ids the view had. A
@@ -150,7 +171,9 @@ namespace faf::remote
     }
   }
 
-  bool CViewFrames::AdvanceEntityIndex(const moho::EntityDB& database)
+  bool CViewFrames::AdvanceEntityIndex(
+    const moho::EntityDB& database
+  )
   {
     // A walk over the sim's entity map takes a cache miss per entity, all on the sim thread, with
     // tens of thousands of props on some maps. An entity comes in through the change set, and goes
@@ -207,7 +230,9 @@ namespace faf::remote
     return false;
   }
 
-  void CViewFrames::WalkEntityIndex(const moho::EntityDB& database)
+  void CViewFrames::WalkEntityIndex(
+    const moho::EntityDB& database
+  )
   {
     const auto& entities = database.mAllUnits;
     mEntityIndex.reserve(entities.size());
@@ -224,26 +249,39 @@ namespace faf::remote
         ++next;
       }
       const bool synced = next < changed.size() && changed[next].entity == entity;
-      if (!synced && last < mLastEntityIndex.size() && mLastEntityIndex[last].id == key && mLastEntityPointers[last] == entity
-          && !mLastEntityIndex[last].readEveryBeat) {
+      if (
+        !synced && last < mLastEntityIndex.size() && mLastEntityIndex[last].id == key &&
+        mLastEntityPointers[last] == entity && !mLastEntityIndex[last].readEveryBeat
+      ) {
         mEntityIndex.push_back(mLastEntityIndex[last]);
       } else {
-        mEntityReads.push_back({static_cast<std::uint32_t>(mEntityIndex.size()), synced ? static_cast<std::uint32_t>(next) : kNotChanged});
+        mEntityReads.push_back(
+          {static_cast<std::uint32_t>(mEntityIndex.size()), synced ? static_cast<std::uint32_t>(next) : kNotChanged}
+        );
         mEntityIndex.push_back({key, 0u, false, false});
       }
       mEntityPointers.push_back(entity);
     }
   }
 
-  bool CViewFrames::KeptByView(const std::uint32_t id, const std::uint32_t viewBit) const
+  bool CViewFrames::KeptByView(
+    const std::uint32_t id,
+    const std::uint32_t viewBit
+  ) const
   {
-    const auto found = std::lower_bound(mEntityIndex.begin(), mEntityIndex.end(), id, [](const SEntityKeep& entry, const std::uint32_t value) {
+    const auto found = std::lower_bound(
+      mEntityIndex.begin(), mEntityIndex.end(), id, [](const SEntityKeep& entry, const std::uint32_t value) {
       return entry.id < value;
-    });
+    }
+    );
     return found == mEntityIndex.end() || found->id != id || (found->views & viewBit) != 0u;
   }
 
-  void CViewFrames::ApplyHeldFrame(moho::Sim& sim, const std::size_t army, const moho::SSyncData& packet)
+  void CViewFrames::ApplyHeldFrame(
+    moho::Sim& sim,
+    const std::size_t army,
+    const moho::SSyncData& packet
+  )
   {
     CViewFrameBuilder& builder = *mBuilders[army];
     SHeldView& held = mHeld[army];
@@ -256,7 +294,10 @@ namespace faf::remote
     held.beat = stamp.beat;
   }
 
-  void CViewFrames::FinishHeldFrame(const std::size_t army, [[maybe_unused]] const moho::SSyncData& packet)
+  void CViewFrames::FinishHeldFrame(
+    const std::size_t army,
+    [[maybe_unused]] const moho::SSyncData& packet
+  )
   {
     CViewFrameBuilder& builder = *mBuilders[army];
     SHeldView& held = mHeld[army];
@@ -368,7 +409,8 @@ namespace faf::remote
     // In ascending sim id order, as a whole frame hands out new view ids.
     // A player cut from their team holds nothing of its view any more.
     const bool cut = CutFromTeam(army);
-    const CViewFrameBuilder* const teamBuilder = TeamsOn() && mapSlot != army && !cut ? mBuilders[mapSlot].get() : nullptr;
+    const CViewFrameBuilder* const teamBuilder =
+      TeamsOn() && mapSlot != army && !cut ? mBuilders[mapSlot].get() : nullptr;
     const SHeldView* const teamHeld = teamBuilder != nullptr ? &mHeld[mapSlot] : nullptr;
     // A team's view names its players' real units, which each player's client may or may not hold, as a
     // lockstep client finds out by looking: they're allied, so it gives nothing away.
@@ -477,9 +519,13 @@ namespace faf::remote
     while (!held.recentlyGone.empty() && held.recentlyGone.front().first + CViewIdMap::kInboundGraceBeats < held.beat) {
       held.recentlyGone.pop_front();
     }
-    std::sort(held.created.begin(), held.created.end(), [](const wire::SEntityRecord* const a, const wire::SEntityRecord* const b) {
+    std::sort(
+      held.created.begin(),
+      held.created.end(),
+      [](const wire::SEntityRecord* const a, const wire::SEntityRecord* const b) {
       return a->id < b->id;
-    });
+    }
+    );
     std::sort(held.changed.begin(), held.changed.end(), [](const wire::SFrameChange& a, const wire::SFrameChange& b) {
       return a.after->id < b.after->id;
     });
@@ -490,7 +536,11 @@ namespace faf::remote
     builder.ClearChanges();
   }
 
-  void CViewFrames::CheckHeldFrame(moho::Sim& sim, const std::size_t army, const CViewIdMap::OwnCommandTest& isOwnCommand)
+  void CViewFrames::CheckHeldFrame(
+    moho::Sim& sim,
+    const std::size_t army,
+    const CViewIdMap::OwnCommandTest& isOwnCommand
+  )
   {
     CViewFrameBuilder& builder = *mBuilders[army];
     SHeldView& held = mHeld[army];
@@ -542,15 +592,24 @@ namespace faf::remote
     wire::BitWriter heldBytes;
     wire::BitWriter wholeBytes;
     const bool heldOk = EncodeHeldFrame(static_cast<std::int32_t>(army), heldBytes);
-    const bool wholeOk = wire::EncodeFrame(whole, held.haveCheckPrevious ? &held.checkPrevious : nullptr, mCodec, wholeBytes);
-    if (heldOk != wholeOk || !std::equal(heldBytes.Bytes().begin(), heldBytes.Bytes().end(), wholeBytes.Bytes().begin(), wholeBytes.Bytes().end())) {
+    const bool wholeOk =
+      wire::EncodeFrame(whole, held.haveCheckPrevious ? &held.checkPrevious : nullptr, mCodec, wholeBytes);
+    if (
+      heldOk != wholeOk ||
+      !std::equal(
+        heldBytes.Bytes().begin(), heldBytes.Bytes().end(), wholeBytes.Bytes().begin(), wholeBytes.Bytes().end()
+      )
+    ) {
       report("bytes differ", 0u);
     }
     held.checkPrevious = std::move(whole);
     held.haveCheckPrevious = true;
   }
 
-  bool CViewFrames::EncodeHeldFrame(const std::int32_t army, wire::BitWriter& writer) const
+  bool CViewFrames::EncodeHeldFrame(
+    const std::int32_t army,
+    wire::BitWriter& writer
+  ) const
   {
     const SHeldView& held = mHeld[static_cast<std::size_t>(army)];
     wire::SFrameChanges changes{};
@@ -566,7 +625,10 @@ namespace faf::remote
     return wire::EncodeFrameChanges(changes, mCodec, writer);
   }
 
-  bool CViewFrames::EncodeWholeHeldFrame(const std::int32_t army, wire::BitWriter& writer) const
+  bool CViewFrames::EncodeWholeHeldFrame(
+    const std::int32_t army,
+    wire::BitWriter& writer
+  ) const
   {
     const auto slot = static_cast<std::size_t>(army);
     const SHeldView& held = mHeld[slot];
@@ -575,10 +637,16 @@ namespace faf::remote
     records.reserve(held.count);
     for (std::uint32_t recordSlot = 0; recordSlot < held.sent.size(); ++recordSlot) {
       if (held.sent[recordSlot] != 0u) {
-        records.push_back(held.ownSlot[recordSlot] != kNoOwn ? &held.own[held.ownSlot[recordSlot]] : &builder.RecordAt(recordSlot));
+        records.push_back(
+          held.ownSlot[recordSlot] != kNoOwn ? &held.own[held.ownSlot[recordSlot]] : &builder.RecordAt(recordSlot)
+        );
       }
     }
-    std::sort(records.begin(), records.end(), [](const wire::SEntityRecord* const a, const wire::SEntityRecord* const b) { return a->id < b->id; });
+    std::sort(
+      records.begin(), records.end(), [](const wire::SEntityRecord* const a, const wire::SEntityRecord* const b) {
+      return a->id < b->id;
+    }
+    );
     if (records.size() != held.count) {
       return false;
     }
@@ -593,7 +661,9 @@ namespace faf::remote
     return wire::EncodeFrameChanges(changes, mCodec, writer);
   }
 
-  std::uint64_t CViewFrames::HeldFrameHash(const std::int32_t army) const
+  std::uint64_t CViewFrames::HeldFrameHash(
+    const std::int32_t army
+  ) const
   {
     const auto slot = static_cast<std::size_t>(army);
     const SHeldView& held = mHeld[slot];
@@ -601,13 +671,18 @@ namespace faf::remote
     std::uint64_t hash = 0;
     for (std::uint32_t recordSlot = 0; recordSlot < held.sent.size(); ++recordSlot) {
       if (held.sent[recordSlot] != 0u) {
-        hash += wire::HashRecord(held.ownSlot[recordSlot] != kNoOwn ? held.own[held.ownSlot[recordSlot]] : builder.RecordAt(recordSlot));
+        hash += wire::HashRecord(
+          held.ownSlot[recordSlot] != kNoOwn ? held.own[held.ownSlot[recordSlot]] : builder.RecordAt(recordSlot)
+        );
       }
     }
     return hash;
   }
 
-  bool CViewFrames::SlotHoldsEntity(const std::size_t slot, const std::uint32_t id) const
+  bool CViewFrames::SlotHoldsEntity(
+    const std::size_t slot,
+    const std::uint32_t id
+  ) const
   {
     if (slot >= mHeld.size()) {
       return false;
@@ -617,17 +692,25 @@ namespace faf::remote
     if (mBuilders[slot]->FindSlot(id, found) && found < held.sent.size() && held.sent[found] != 0u) {
       return true;
     }
-    return std::any_of(held.recentlyGone.begin(), held.recentlyGone.end(), [id](const auto& gone) { return gone.second == id; });
+    return std::any_of(held.recentlyGone.begin(), held.recentlyGone.end(), [id](const auto& gone) {
+      return gone.second == id;
+    });
   }
 
-  void CViewFrames::HeldUnitIds(const std::size_t army, std::vector<std::uint32_t>& out) const
+  void CViewFrames::HeldUnitIds(
+    const std::size_t army,
+    std::vector<std::uint32_t>& out
+  ) const
   {
     out.clear();
     if (army >= mBuilders.size()) {
       return;
     }
     mBuilders[army]->AppendUnitIds(out);
-    if (const std::size_t teamSlot = TeamSlotOf(army); TeamsOn() && teamSlot != army && !CutFromTeam(army) && teamSlot < mBuilders.size()) {
+    if (
+      const std::size_t teamSlot = TeamSlotOf(army);
+      TeamsOn() && teamSlot != army && !CutFromTeam(army) && teamSlot < mBuilders.size()
+    ) {
       // Own units and the team's: both ascending, merged.
       const std::size_t own = out.size();
       mBuilders[teamSlot]->AppendUnitIds(out);
@@ -637,7 +720,9 @@ namespace faf::remote
   }
 
   void CViewFrames::HeldUnitKeys(
-    const std::size_t army, const std::span<const std::uint32_t> ids, const std::span<const SCameraReport> cameras,
+    const std::size_t army,
+    const std::span<const std::uint32_t> ids,
+    const std::span<const SCameraReport> cameras,
     std::vector<float>& out
   ) const
   {
@@ -652,7 +737,8 @@ namespace faf::remote
     const CViewFrameBuilder* const own = mBuilders[army].get();
     const std::size_t teamSlot = TeamSlotOf(army);
     const CViewFrameBuilder* const team =
-      TeamsOn() && teamSlot != army && !CutFromTeam(army) && teamSlot < mBuilders.size() ? mBuilders[teamSlot].get() : nullptr;
+      TeamsOn() && teamSlot != army && !CutFromTeam(army) && teamSlot < mBuilders.size() ? mBuilders[teamSlot].get()
+                                                                                         : nullptr;
     std::size_t ownCursor = 0;
     std::size_t teamCursor = 0;
     for (std::size_t i = 0; i < ids.size(); ++i) {
@@ -685,8 +771,8 @@ namespace faf::remote
         const auto& m = camera.viewProjection; // row-major, row vectors: clip = (x, y, z, 1) * M (GeomCamera3.cpp)
         float clip[4];
         for (int j = 0; j < 4; ++j) {
-          clip[j] = p[0] * m[static_cast<std::size_t>(j)] + p[1] * m[static_cast<std::size_t>(4 + j)] + p[2] * m[static_cast<std::size_t>(8 + j)]
-                  + m[static_cast<std::size_t>(12 + j)];
+          clip[j] = p[0] * m[static_cast<std::size_t>(j)] + p[1] * m[static_cast<std::size_t>(4 + j)] +
+            p[2] * m[static_cast<std::size_t>(8 + j)] + m[static_cast<std::size_t>(12 + j)];
         }
         if (clip[3] <= 0.0f) {
           continue; // behind the camera
@@ -699,12 +785,18 @@ namespace faf::remote
     }
   }
 
-  bool CViewFrames::ViewHoldsEntity(const std::size_t army, const std::uint32_t id) const
+  bool CViewFrames::ViewHoldsEntity(
+    const std::size_t army,
+    const std::uint32_t id
+  ) const
   {
-    return SlotHoldsEntity(army, id) || (TeamSlotOf(army) != army && !CutFromTeam(army) && SlotHoldsEntity(TeamSlotOf(army), id));
+    return SlotHoldsEntity(army, id) ||
+      (TeamSlotOf(army) != army && !CutFromTeam(army) && SlotHoldsEntity(TeamSlotOf(army), id));
   }
 
-  CViewIdMap::OwnCommandTest CViewFrames::OwnCommands(const std::size_t slot) const
+  CViewIdMap::OwnCommandTest CViewFrames::OwnCommands(
+    const std::size_t slot
+  ) const
   {
     // A command is the view's own when its top byte is one of the command sources allowed to
     // command the view's army (`UserCommandIssue.cpp:372` packs the client's source there).
@@ -728,13 +820,16 @@ namespace faf::remote
       addArmy(slot);
     }
     return [sources = std::move(sources)](const std::uint32_t commandId) {
-      return std::any_of(sources.begin(), sources.end(), [commandId](const moho::BVIntSet* const set) { return set->Contains(commandId >> 24u); });
+      return std::any_of(sources.begin(), sources.end(), [commandId](const moho::BVIntSet* const set) {
+        return set->Contains(commandId >> 24u);
+      });
     };
   }
 
   void CViewFrames::DumpViews()
   {
-    // Each army's client: its own view, with its team's less the blips of its own units. Props only as a sum, as there are so many.
+    // Each army's client: its own view, with its team's less the blips of its own units. Props only as a sum, as there
+    // are so many.
     const auto armies = static_cast<std::size_t>(ArmyCount());
     for (std::size_t army = 0; army < armies; ++army) {
       if (!HasView(static_cast<std::int32_t>(army))) {
@@ -753,20 +848,34 @@ namespace faf::remote
             return;
           }
           const wire::SEntityRecord& record = builder.RecordAt(recordSlot);
-          const std::uint64_t hash = wire::HashBlipUpdate(record, record.isUnit ? *record.unit.detail : wire::SUnitDetail{});
+          const std::uint64_t hash =
+            wire::HashBlipUpdate(record, record.isUnit ? *record.unit.detail : wire::SUnitDetail{});
           if ((id >> 28u) == 2u) {
             propSum += hash;
             ++propCount;
           } else if ((id >> 28u) == 3u) {
             // A blip's fields too, to tell which of them a difference is in.
             std::fprintf(
-              mViewDump, "%u %zu %08x %016llx mesh=%x vision=%x radar=%x flags=%x health=%08x max=%08x built=%08x x=%x z=%x\n", mViewBeat, army, id,
-              static_cast<unsigned long long>(hash), record.appearance.mesh, record.appearance.intel[0], record.appearance.intel[2], record.flags,
-              std::bit_cast<std::uint32_t>(record.health), std::bit_cast<std::uint32_t>(record.maxHealth), std::bit_cast<std::uint32_t>(record.fractionComplete),
-              record.position[0], record.position[2]
+              mViewDump,
+              "%u %zu %08x %016llx mesh=%x vision=%x radar=%x flags=%x health=%08x max=%08x built=%08x x=%x z=%x\n",
+              mViewBeat,
+              army,
+              id,
+              static_cast<unsigned long long>(hash),
+              record.appearance.mesh,
+              record.appearance.intel[0],
+              record.appearance.intel[2],
+              record.flags,
+              std::bit_cast<std::uint32_t>(record.health),
+              std::bit_cast<std::uint32_t>(record.maxHealth),
+              std::bit_cast<std::uint32_t>(record.fractionComplete),
+              record.position[0],
+              record.position[2]
             );
           } else {
-            std::fprintf(mViewDump, "%u %zu %08x %016llx\n", mViewBeat, army, id, static_cast<unsigned long long>(hash));
+            std::fprintf(
+              mViewDump, "%u %zu %08x %016llx\n", mViewBeat, army, id, static_cast<unsigned long long>(hash)
+            );
           }
         });
       };
@@ -774,12 +883,22 @@ namespace faf::remote
       if (TeamSlotOf(army) != army && !CutFromTeam(army)) {
         dump(TeamSlotOf(army), true);
       }
-      std::fprintf(mViewDump, "%u %zu props %llu %016llx\n", mViewBeat, army, static_cast<unsigned long long>(propCount), static_cast<unsigned long long>(propSum));
+      std::fprintf(
+        mViewDump,
+        "%u %zu props %llu %016llx\n",
+        mViewBeat,
+        army,
+        static_cast<unsigned long long>(propCount),
+        static_cast<unsigned long long>(propSum)
+      );
     }
     std::fflush(mViewDump);
   }
 
-  std::uint32_t CViewFrames::ViewEntityId(const std::size_t view, const std::uint32_t simId)
+  std::uint32_t CViewFrames::ViewEntityId(
+    const std::size_t view,
+    const std::uint32_t simId
+  )
   {
     if (view >= mIdMaps.size()) {
       return simId;
@@ -800,7 +919,9 @@ namespace faf::remote
     return mismatches;
   }
 
-  void CViewFrames::EnablePipeline(const unsigned int threads)
+  void CViewFrames::EnablePipeline(
+    const unsigned int threads
+  )
   {
     if (mHeldOn && !mHeldCheck && threads > 0u) {
       mJobs = std::make_unique<CViewJobs>(threads);
@@ -823,7 +944,9 @@ namespace faf::remote
     return mViewWaitSeconds;
   }
 
-  void CViewFrames::FinishFrame(const std::size_t army)
+  void CViewFrames::FinishFrame(
+    const std::size_t army
+  )
   {
     const auto view = static_cast<std::int32_t>(army);
     if (!HasView(view)) {
@@ -852,7 +975,9 @@ namespace faf::remote
     }
   }
 
-  void CViewFrames::OnViewPackets(moho::Sim& sim)
+  void CViewFrames::OnViewPackets(
+    moho::Sim& sim
+  )
   {
     mViewBeat = sim.mCurBeat;
     mLastSim = &sim;
@@ -903,7 +1028,8 @@ namespace faf::remote
     const auto readFacts = [this, &sim](const std::size_t begin, const std::size_t end) {
       for (std::size_t i = begin; i < end; ++i) {
         const std::uint32_t entry = mEntityReads[i].entry;
-        const SEntityFacts facts = mEntityReads[i].changed != kNotChanged ? ChangedFacts(mEntityReads[i].changed) : ReadEntityFacts(*mEntityPointers[entry]);
+        const SEntityFacts facts = mEntityReads[i].changed != kNotChanged ? ChangedFacts(mEntityReads[i].changed)
+                                                                          : ReadEntityFacts(*mEntityPointers[entry]);
         mEntityIndex[entry].views = ViewsKeeping(sim, facts);
         mEntityIndex[entry].readEveryBeat = !ViewsFollowFactsAlone(facts);
         mEntityIndex[entry].leaving = facts.destroyed;
@@ -927,9 +1053,17 @@ namespace faf::remote
       if (sim.mEntityDB != nullptr) {
         std::size_t entry = 0;
         for (const auto& [id, entity] : sim.mEntityDB->mAllUnits) {
-          if (entry >= mEntityIndex.size() || mEntityIndex[entry].id != static_cast<std::uint32_t>(id) || mEntityPointers[entry] != entity) {
+          if (
+            entry >= mEntityIndex.size() || mEntityIndex[entry].id != static_cast<std::uint32_t>(id) ||
+            mEntityPointers[entry] != entity
+          ) {
             if (++mEntityIndexMismatches <= 5u) {
-              std::fprintf(stderr, "view frames check: beat %u: the entity index differs from the sim's at id %08x\n", sim.mCurBeat, static_cast<std::uint32_t>(id));
+              std::fprintf(
+                stderr,
+                "view frames check: beat %u: the entity index differs from the sim's at id %08x\n",
+                sim.mCurBeat,
+                static_cast<std::uint32_t>(id)
+              );
             }
             break;
           }
@@ -940,8 +1074,13 @@ namespace faf::remote
         const SEntityFacts facts = ReadEntityFacts(*mEntityPointers[i]);
         if (ViewsKeeping(sim, facts) != mEntityIndex[i].views && ++mEntityIndexMismatches <= 5u) {
           std::fprintf(
-            stderr, "view frames check: beat %u: entity %08x kept views %08x, a read says %08x (kind %d)\n", sim.mCurBeat, mEntityIndex[i].id,
-            mEntityIndex[i].views, ViewsKeeping(sim, facts), static_cast<int>(facts.kind)
+            stderr,
+            "view frames check: beat %u: entity %08x kept views %08x, a read says %08x (kind %d)\n",
+            sim.mCurBeat,
+            mEntityIndex[i].id,
+            mEntityIndex[i].views,
+            ViewsKeeping(sim, facts),
+            static_cast<int>(facts.kind)
           );
         }
       }
@@ -955,7 +1094,10 @@ namespace faf::remote
       std::size_t last = 0;
       std::size_t now = 0;
       while (last < mLastEntityIndex.size() || now < mEntityIndex.size()) {
-        if (now == mEntityIndex.size() || (last < mLastEntityIndex.size() && mLastEntityIndex[last].id < mEntityIndex[now].id)) {
+        if (
+          now == mEntityIndex.size() ||
+          (last < mLastEntityIndex.size() && mLastEntityIndex[last].id < mEntityIndex[now].id)
+        ) {
           mKeepChanges.push_back({mLastEntityIndex[last].id, kEveryView, ~mLastEntityIndex[last].views});
           ++last;
         } else if (last == mLastEntityIndex.size() || mEntityIndex[now].id < mLastEntityIndex[last].id) {
@@ -963,7 +1105,9 @@ namespace faf::remote
           ++now;
         } else {
           if (mLastEntityIndex[last].views != mEntityIndex[now].views) {
-            mKeepChanges.push_back({mEntityIndex[now].id, mEntityIndex[now].views, mLastEntityIndex[last].views ^ mEntityIndex[now].views});
+            mKeepChanges.push_back(
+              {mEntityIndex[now].id, mEntityIndex[now].views, mLastEntityIndex[last].views ^ mEntityIndex[now].views}
+            );
           }
           ++last;
           ++now;
@@ -982,7 +1126,11 @@ namespace faf::remote
     }
     mReleasedCommands.clear();
     std::set_difference(
-      mLastCommands.begin(), mLastCommands.end(), mLiveCommands.begin(), mLiveCommands.end(), std::back_inserter(mReleasedCommands)
+      mLastCommands.begin(),
+      mLastCommands.end(),
+      mLiveCommands.begin(),
+      mLiveCommands.end(),
+      std::back_inserter(mReleasedCommands)
     );
     MarkPhase(EViewPhase::Keep);
 
@@ -991,7 +1139,8 @@ namespace faf::remote
     std::size_t units = 0;
     if (mSession != nullptr || mPosesOn) {
       mUnitIds.clear();
-      while (units < mEntityIndex.size() && mEntityIndex[units].id < moho::ToRaw(moho::EEntityIdSentinel::FirstNonUnitFamily)) {
+      while (units < mEntityIndex.size() &&
+             mEntityIndex[units].id < moho::ToRaw(moho::EEntityIdSentinel::FirstNonUnitFamily)) {
         mUnitIds.push_back(mEntityIndex[units].id);
         ++units;
       }
@@ -1006,12 +1155,17 @@ namespace faf::remote
       // rectangles with the heights there now), and every unit's stats.
       const moho::SSyncData* const syncPacket = SyncPacket();
       mEdits.Collect(
-        sim.mSimResources.px, sim.mMapData != nullptr ? sim.mMapData->mHeightField.get() : nullptr,
-        syncPacket != nullptr ? std::span<const gpg::Rect2i>(syncPacket->mPlayableRectUpdates.data(), syncPacket->mPlayableRectUpdates.size())
+        sim.mSimResources.px,
+        sim.mMapData != nullptr ? sim.mMapData->mHeightField.get() : nullptr,
+        syncPacket != nullptr ? std::span<const gpg::Rect2i>(
+                                  syncPacket->mPlayableRectUpdates.data(), syncPacket->mPlayableRectUpdates.size()
+                                )
                               : std::span<const gpg::Rect2i>(),
         *mSession
       );
-      mSharedStats.Refresh(mUnitIds, std::span<moho::Entity* const>(mEntityPointers.data(), units), *mSession, Parallel());
+      mSharedStats.Refresh(
+        mUnitIds, std::span<moho::Entity* const>(mEntityPointers.data(), units), *mSession, Parallel()
+      );
     }
     if (mSession != nullptr) {
       MarkPhase(EViewPhase::Tables);
@@ -1088,19 +1242,27 @@ namespace faf::remote
       // jobs, then the armies' views.
       const std::size_t armies = static_cast<std::size_t>(ArmyCount());
       const std::size_t teams = armyCount > armies ? armyCount - armies : 0u;
-      moho::CSimWorkerPool::Get().ParallelFor(armyCount + sideJobs, 1u, [this, &buildFrame, teams, armies, sideJobs](const std::size_t begin, const std::size_t end) {
+      moho::CSimWorkerPool::Get().ParallelFor(
+        armyCount + sideJobs,
+        1u,
+        [this, &buildFrame, teams, armies, sideJobs](const std::size_t begin, const std::size_t end) {
         for (std::size_t job = begin; job < end; ++job) {
           if (job >= teams && job < teams + sideJobs) {
             this->RunSideJob(job - teams);
             continue;
           }
           const std::size_t army = job < teams ? armies + job : job - teams - sideJobs;
-          this->TimeView(army, [&] { buildFrame(army); });
+          this->TimeView(army, [&] {
+            buildFrame(army);
+          });
         }
-      });
+      }
+      );
     } else {
       for (std::size_t army = 0; army < armyCount; ++army) {
-        TimeView(army, [&] { buildFrame(army); });
+        TimeView(army, [&] {
+          buildFrame(army);
+        });
       }
       for (std::size_t job = 0; job < sideJobs; ++job) {
         RunSideJob(job);

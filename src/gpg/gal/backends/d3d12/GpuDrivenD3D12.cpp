@@ -41,16 +41,21 @@ namespace gpg::gal
         return nullptr;
       }
       const DeviceContext* const context = device->GetDeviceContext();
-      return (context != nullptr && context->mDeviceType == DeviceApi::Direct3D12) ? static_cast<DeviceD3D12*>(device) : nullptr;
+      return (context != nullptr && context->mDeviceType == DeviceApi::Direct3D12) ? static_cast<DeviceD3D12*>(device)
+                                                                                   : nullptr;
     }
 
-    [[nodiscard]] D3D12_COMPARISON_FUNC ToD3D12(const GpuCompare compare) noexcept
+    [[nodiscard]] D3D12_COMPARISON_FUNC ToD3D12(
+      const GpuCompare compare
+    ) noexcept
     {
       // GpuCompare follows D3D12_COMPARISON_FUNC's order, one below it.
       return static_cast<D3D12_COMPARISON_FUNC>(static_cast<int>(compare) + 1);
     }
 
-    [[nodiscard]] D3D12_STENCIL_OP ToD3D12(const GpuStencilOp op) noexcept
+    [[nodiscard]] D3D12_STENCIL_OP ToD3D12(
+      const GpuStencilOp op
+    ) noexcept
     {
       switch (op) {
       case GpuStencilOp::Zero:
@@ -73,12 +78,20 @@ namespace gpg::gal
       }
     }
 
-    [[nodiscard]] D3D12_DEPTH_STENCILOP_DESC ToD3D12(const GpuStencilFace& face) noexcept
+    [[nodiscard]] D3D12_DEPTH_STENCILOP_DESC ToD3D12(
+      const GpuStencilFace& face
+    ) noexcept
     {
-      return D3D12_DEPTH_STENCILOP_DESC{ToD3D12(face.fail), ToD3D12(face.depthFail), ToD3D12(face.pass), ToD3D12(face.func)};
+      return D3D12_DEPTH_STENCILOP_DESC{
+        ToD3D12(face.fail), ToD3D12(face.depthFail), ToD3D12(face.pass), ToD3D12(face.func)
+      };
     }
 
-    [[nodiscard]] std::vector<std::uint8_t> CompileStage(const GpuProgramDesc& desc, const char* const entry, const wchar_t* const profile)
+    [[nodiscard]] std::vector<std::uint8_t> CompileStage(
+      const GpuProgramDesc& desc,
+      const char* const entry,
+      const wchar_t* const profile
+    )
     {
       const effects::ShaderCompiler& compiler = effects::ShaderCompiler::Instance();
       // HLSL 2018 and no row-major default: the sources are written for FXC
@@ -89,9 +102,12 @@ namespace gpg::gal
       if (source.find("RayQuery<") != std::string_view::npos) {
         rayProfile.back() = L'5';
       }
-      const effects::CompiledShader compiled = compiler.CompileRaw(source, entry, rayProfile.c_str(), {L"-HV", L"2018"});
+      const effects::CompiledShader compiled =
+        compiler.CompileRaw(source, entry, rayProfile.c_str(), {L"-HV", L"2018"});
       if (!compiled.succeeded) {
-        gpg::Warnf("D3D12: GPU program %s, %ls %s does not compile: %s", desc.name, profile, entry, compiled.messages.c_str());
+        gpg::Warnf(
+          "D3D12: GPU program %s, %ls %s does not compile: %s", desc.name, profile, entry, compiled.messages.c_str()
+        );
         return {};
       }
       return compiled.code;
@@ -101,7 +117,10 @@ namespace gpg::gal
   // ---------------------------------------------------------------------------
   // GpuBufferD3D12
 
-  GpuBufferD3D12::GpuBufferD3D12(DeviceD3D12& device, const GpuBufferDesc& desc)
+  GpuBufferD3D12::GpuBufferD3D12(
+    DeviceD3D12& device,
+    const GpuBufferDesc& desc
+  )
     : GpuBuffer(desc)
   {
     const bool indirect = desc.kind == GpuBufferKind::IndirectArgs;
@@ -123,9 +142,15 @@ namespace gpg::gal
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     resourceDesc.Flags = desc.shaderWrite ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
     CheckHresult(
-      "GpuDrivenD3D12.cpp", __LINE__,
+      "GpuDrivenD3D12.cpp",
+      __LINE__,
       device.Native()->CreateCommittedResource(
-        &heap, D3D12_HEAP_FLAG_NONE, &resourceDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource.resource)
+        &heap,
+        D3D12_HEAP_FLAG_NONE,
+        &resourceDesc,
+        D3D12_RESOURCE_STATE_COMMON,
+        nullptr,
+        IID_PPV_ARGS(&mResource.resource)
       )
     );
     mResource.state = D3D12_RESOURCE_STATE_COMMON;
@@ -232,8 +257,9 @@ namespace gpg::gal
       D3D12_STATIC_SAMPLER_DESC sampler{};
       sampler.Filter = (static_cast<GpuSampler>(kind) == GpuSampler::PointClamp) ? D3D12_FILTER_MIN_MAG_MIP_POINT
                                                                                  : D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-      const D3D12_TEXTURE_ADDRESS_MODE address =
-        (static_cast<GpuSampler>(kind) == GpuSampler::LinearWrap) ? D3D12_TEXTURE_ADDRESS_MODE_WRAP : D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+      const D3D12_TEXTURE_ADDRESS_MODE address = (static_cast<GpuSampler>(kind) == GpuSampler::LinearWrap)
+        ? D3D12_TEXTURE_ADDRESS_MODE_WRAP
+        : D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
       sampler.AddressU = address;
       sampler.AddressV = address;
       sampler.AddressW = address;
@@ -258,8 +284,11 @@ namespace gpg::gal
         return;
       }
       CheckHresult(
-        "GpuDrivenD3D12.cpp", __LINE__,
-        mDevice->CreateRootSignature(0U, serialized->GetBufferPointer(), serialized->GetBufferSize(), IID_PPV_ARGS(&mGpuRootSignatures[kind]))
+        "GpuDrivenD3D12.cpp",
+        __LINE__,
+        mDevice->CreateRootSignature(
+          0U, serialized->GetBufferPointer(), serialized->GetBufferSize(), IID_PPV_ARGS(&mGpuRootSignatures[kind])
+        )
       );
     }
 
@@ -269,7 +298,11 @@ namespace gpg::gal
     signature.ByteStride = sizeof(D3D12_DRAW_ARGUMENTS);
     signature.NumArgumentDescs = 1U;
     signature.pArgumentDescs = &draw;
-    CheckHresult("GpuDrivenD3D12.cpp", __LINE__, mDevice->CreateCommandSignature(&signature, nullptr, IID_PPV_ARGS(&mDrawIndirectSignature)));
+    CheckHresult(
+      "GpuDrivenD3D12.cpp",
+      __LINE__,
+      mDevice->CreateCommandSignature(&signature, nullptr, IID_PPV_ARGS(&mDrawIndirectSignature))
+    );
 
     // Null views for unbound buffer slots (a texture-typed null view is not a buffer).
     D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
@@ -311,11 +344,18 @@ namespace gpg::gal
     readbackDesc.MipLevels = 1U;
     readbackDesc.SampleDesc.Count = 1U;
     readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    if (SUCCEEDED(mQueue->GetTimestampFrequency(&frequency)) && frequency != 0U &&
-        SUCCEEDED(mDevice->CreateQueryHeap(&queries, IID_PPV_ARGS(&mTimestampHeap))) &&
-        SUCCEEDED(mDevice->CreateCommittedResource(
-          &readbackHeap, D3D12_HEAP_FLAG_NONE, &readbackDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&mTimestampReadback)
-        ))) {
+    if (
+      SUCCEEDED(mQueue->GetTimestampFrequency(&frequency)) && frequency != 0U &&
+      SUCCEEDED(mDevice->CreateQueryHeap(&queries, IID_PPV_ARGS(&mTimestampHeap))) &&
+      SUCCEEDED(mDevice->CreateCommittedResource(
+        &readbackHeap,
+        D3D12_HEAP_FLAG_NONE,
+        &readbackDesc,
+        D3D12_RESOURCE_STATE_COPY_DEST,
+        nullptr,
+        IID_PPV_ARGS(&mTimestampReadback)
+      ))
+    ) {
       mTimestampToMilliseconds = 1000.0 / static_cast<double>(frequency);
       mGpuFeatures |= kGpuFeatureTimestamps;
     }
@@ -356,7 +396,8 @@ namespace gpg::gal
     // Direct3D 11.
     // World shapes (ren_GpuShapes): a paused same-process A/B of FAF's shapes plus a 2,000-segment
     // UI_DrawLine stroke against the path off, pixel-identical outside two animated unit glows.
-    return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets | kGpuPathProjectileIcons |
+    return kGpuPathStrategicIcons | kGpuPathIconClassify | kGpuPathFogOfWar | kGpuPathSelectBrackets |
+      kGpuPathProjectileIcons |
       // MSDF text and the interface's quads: 0 pixels differ in a same-process A/B of a panel of text.
       kGpuPathWorldShapes | kGpuPathMsdfText | MsdfCookVerified();
   }
@@ -365,11 +406,14 @@ namespace gpg::gal
   {
     // The GPU font cook (ren_GpuFontCook): GPU and CPU atlases compared per font, and a device reset during
     // a cook, on NVIDIA only; other vendors keep the CPU cook until it has run there (issue #309).
-    const bool nvidia = mAdapterIndex < mFactory.Adapters().size() && mFactory.Adapters()[mAdapterIndex].desc.VendorId == kPciVendorNvidia;
+    const bool nvidia = mAdapterIndex < mFactory.Adapters().size() &&
+      mFactory.Adapters()[mAdapterIndex].desc.VendorId == kPciVendorNvidia;
     return nvidia ? kGpuPathMsdfCook : 0U;
   }
 
-  boost::shared_ptr<GpuBuffer> DeviceD3D12::CreateGpuBuffer(const GpuBufferDesc& desc)
+  boost::shared_ptr<GpuBuffer> DeviceD3D12::CreateGpuBuffer(
+    const GpuBufferDesc& desc
+  )
   {
     if ((mGpuFeatures & kGpuFeatureVertexPulling) == 0U) {
       return {};
@@ -378,7 +422,12 @@ namespace gpg::gal
     return boost::shared_ptr<GpuBuffer>(new GpuBufferD3D12(*this, desc));
   }
 
-  void DeviceD3D12::UpdateGpuBuffer(GpuBuffer& buffer, const std::uint32_t firstElement, const std::uint32_t count, const void* const data)
+  void DeviceD3D12::UpdateGpuBuffer(
+    GpuBuffer& buffer,
+    const std::uint32_t firstElement,
+    const std::uint32_t count,
+    const void* const data
+  )
   {
     const GpuBufferDesc& desc = buffer.Desc();
     if (count == 0U || data == nullptr || firstElement >= desc.capacity) {
@@ -387,11 +436,21 @@ namespace gpg::gal
     const std::uint32_t elements = std::min(count, desc.capacity - firstElement);
     const std::uint64_t bytes = static_cast<std::uint64_t>(elements) * desc.stride;
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
-    UploadBuffer(static_cast<GpuBufferD3D12&>(buffer).Resource(), static_cast<std::uint64_t>(firstElement) * desc.stride, data, bytes);
+    UploadBuffer(
+      static_cast<GpuBufferD3D12&>(buffer).Resource(),
+      static_cast<std::uint64_t>(firstElement) * desc.stride,
+      data,
+      bytes
+    );
     RecordUpload(bytes);
   }
 
-  bool DeviceD3D12::ReadGpuBuffer(GpuBuffer& buffer, const std::uint32_t firstElement, const std::uint32_t count, void* const out)
+  bool DeviceD3D12::ReadGpuBuffer(
+    GpuBuffer& buffer,
+    const std::uint32_t firstElement,
+    const std::uint32_t count,
+    void* const out
+  )
   {
     const GpuBufferDesc& desc = buffer.Desc();
     if (count == 0U || out == nullptr || firstElement >= desc.capacity || count > desc.capacity - firstElement) {
@@ -410,15 +469,19 @@ namespace gpg::gal
     readbackDesc.SampleDesc.Count = 1U;
     readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     ComPtr<ID3D12Resource> readback;
-    if (FAILED(mDevice->CreateCommittedResource(
-          &heap, D3D12_HEAP_FLAG_NONE, &readbackDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback)
-        ))) {
+    if (
+      FAILED(mDevice->CreateCommittedResource(
+        &heap, D3D12_HEAP_FLAG_NONE, &readbackDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback)
+      ))
+    ) {
       return false;
     }
     d3d12::TrackedResource& source = static_cast<GpuBufferD3D12&>(buffer).Resource();
     Transition(source, D3D12_RESOURCE_STATE_COPY_SOURCE);
     FlushBarriers();
-    mList->CopyBufferRegion(readback.Get(), 0U, source.resource.Get(), static_cast<UINT64>(firstElement) * desc.stride, bytes);
+    mList->CopyBufferRegion(
+      readback.Get(), 0U, source.resource.Get(), static_cast<UINT64>(firstElement) * desc.stride, bytes
+    );
     Submit(true);
     void* mapped = nullptr;
     const D3D12_RANGE readRange{0U, static_cast<SIZE_T>(bytes)};
@@ -431,7 +494,9 @@ namespace gpg::gal
     return true;
   }
 
-  boost::shared_ptr<GpuProgram> DeviceD3D12::CreateGpuProgram(const GpuProgramDesc& desc)
+  boost::shared_ptr<GpuProgram> DeviceD3D12::CreateGpuProgram(
+    const GpuProgramDesc& desc
+  )
   {
     if ((mGpuFeatures & kGpuFeatureVertexPulling) == 0U || desc.source == nullptr) {
       return {};
@@ -470,7 +535,9 @@ namespace gpg::gal
     return program;
   }
 
-  ID3D12PipelineState* DeviceD3D12::GpuPipelineFor(GpuProgramD3D12& program)
+  ID3D12PipelineState* DeviceD3D12::GpuPipelineFor(
+    GpuProgramD3D12& program
+  )
   {
     DXGI_FORMAT renderFormat = DXGI_FORMAT_UNKNOWN;
     DXGI_FORMAT depthFormat = DXGI_FORMAT_UNKNOWN;
@@ -497,13 +564,13 @@ namespace gpg::gal
     D3D12_RENDER_TARGET_BLEND_DESC& target = desc.BlendState.RenderTarget[0];
     target.BlendEnable = (state.blend != GpuBlend::Opaque) ? TRUE : FALSE;
     target.SrcBlend = (state.blend == GpuBlend::Opaque) ? D3D12_BLEND_ONE
-      : (state.blend == GpuBlend::Multiply)               ? D3D12_BLEND_ZERO
-      : (state.blend == GpuBlend::Brighten)               ? D3D12_BLEND_DEST_COLOR
-                                                          : D3D12_BLEND_SRC_ALPHA;
-    target.DestBlend = (state.blend == GpuBlend::AlphaBlend) ? D3D12_BLEND_INV_SRC_ALPHA
+      : (state.blend == GpuBlend::Multiply)             ? D3D12_BLEND_ZERO
+      : (state.blend == GpuBlend::Brighten)             ? D3D12_BLEND_DEST_COLOR
+                                                        : D3D12_BLEND_SRC_ALPHA;
+    target.DestBlend = (state.blend == GpuBlend::AlphaBlend)                     ? D3D12_BLEND_INV_SRC_ALPHA
       : (state.blend == GpuBlend::Additive || state.blend == GpuBlend::Brighten) ? D3D12_BLEND_ONE
-      : (state.blend == GpuBlend::Multiply)                   ? D3D12_BLEND_SRC_COLOR
-                                                              : D3D12_BLEND_ZERO;
+      : (state.blend == GpuBlend::Multiply)                                      ? D3D12_BLEND_SRC_COLOR
+                                                                                 : D3D12_BLEND_ZERO;
     target.BlendOp = D3D12_BLEND_OP_ADD;
     target.SrcBlendAlpha = D3D12_BLEND_ONE;
     target.DestBlendAlpha = D3D12_BLEND_ZERO;
@@ -519,15 +586,18 @@ namespace gpg::gal
     if (inherit) {
       const effects::DepthStencilDesc& depth = mCurrent.depthStencil;
       desc.DepthStencilState.DepthEnable = depth.depthEnable ? TRUE : FALSE;
-      desc.DepthStencilState.DepthWriteMask = depth.depthWrite ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
+      desc.DepthStencilState.DepthWriteMask =
+        depth.depthWrite ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
       desc.DepthStencilState.DepthFunc = static_cast<D3D12_COMPARISON_FUNC>(depth.depthFunc);
       desc.DepthStencilState.StencilEnable = depth.stencilEnable ? TRUE : FALSE;
       desc.DepthStencilState.StencilReadMask = depth.stencilReadMask;
       desc.DepthStencilState.StencilWriteMask = depth.stencilWriteMask;
       const auto face = [](const effects::StencilFaceDesc& source) {
         return D3D12_DEPTH_STENCILOP_DESC{
-          static_cast<D3D12_STENCIL_OP>(source.failOp), static_cast<D3D12_STENCIL_OP>(source.depthFailOp),
-          static_cast<D3D12_STENCIL_OP>(source.passOp), static_cast<D3D12_COMPARISON_FUNC>(source.func),
+          static_cast<D3D12_STENCIL_OP>(source.failOp),
+          static_cast<D3D12_STENCIL_OP>(source.depthFailOp),
+          static_cast<D3D12_STENCIL_OP>(source.passOp),
+          static_cast<D3D12_COMPARISON_FUNC>(source.func),
         };
       };
       desc.DepthStencilState.FrontFace = face(depth.front);
@@ -535,7 +605,8 @@ namespace gpg::gal
       desc.DSVFormat = depthFormat;
     } else if (depthFormat != DXGI_FORMAT_UNKNOWN) {
       desc.DepthStencilState.DepthEnable = state.depthTest ? TRUE : FALSE;
-      desc.DepthStencilState.DepthWriteMask = state.depthWrite ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
+      desc.DepthStencilState.DepthWriteMask =
+        state.depthWrite ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
       desc.DepthStencilState.DepthFunc = ToD3D12(state.depthFunc);
       desc.DepthStencilState.StencilEnable = state.stencil.enable ? TRUE : FALSE;
       desc.DepthStencilState.StencilReadMask = state.stencil.readMask;
@@ -549,15 +620,22 @@ namespace gpg::gal
     desc.RTVFormats[0] = renderFormat;
     desc.SampleDesc.Count = 1U;
     if (FAILED(mDevice->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipeline)))) {
-      gpg::Warnf("D3D12: GPU program %s: no pipeline for render format %d, depth format %d", program.mName.c_str(),
-                 static_cast<int>(renderFormat), static_cast<int>(depthFormat));
+      gpg::Warnf(
+        "D3D12: GPU program %s: no pipeline for render format %d, depth format %d",
+        program.mName.c_str(),
+        static_cast<int>(renderFormat),
+        static_cast<int>(depthFormat)
+      );
       return nullptr;
     }
     return pipeline.Get();
   }
 
   void DeviceD3D12::PrepareGpuBindings(
-    const GpuBindings& bindings, const bool compute, D3D12_GPU_VIRTUAL_ADDRESS& constants, D3D12_GPU_DESCRIPTOR_HANDLE& readTable,
+    const GpuBindings& bindings,
+    const bool compute,
+    D3D12_GPU_VIRTUAL_ADDRESS& constants,
+    D3D12_GPU_DESCRIPTOR_HANDLE& readTable,
     D3D12_GPU_DESCRIPTOR_HANDLE& writeTable
   )
   {
@@ -584,7 +662,8 @@ namespace gpg::gal
     constants = 0U;
     if (bindings.constants != nullptr && bindings.constantBytes != 0U) {
       const std::uint32_t bytes = std::min(bindings.constantBytes, kGpuMaxConstantBytes);
-      const d3d12::UploadAllocation upload = AllocateUpload((bytes + 255U) & ~255U, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+      const d3d12::UploadAllocation upload =
+        AllocateUpload((bytes + 255U) & ~255U, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
       std::memcpy(upload.cpu, bindings.constants, bytes);
       constants = upload.gpu;
       RecordUpload(bytes);
@@ -630,7 +709,9 @@ namespace gpg::gal
     cpu = writeCpu;
     for (std::uint32_t slot = 0U; slot < kGpuMaxWriteBuffers; ++slot) {
       D3D12_CPU_DESCRIPTOR_HANDLE view = mNullWriteView;
-      if (auto* const buffer = static_cast<GpuBufferD3D12*>(bindings.writeBuffers[slot]); buffer != nullptr && compute) {
+      if (
+        auto* const buffer = static_cast<GpuBufferD3D12*>(bindings.writeBuffers[slot]); buffer != nullptr && compute
+      ) {
         if (buffer->WriteView().ptr != 0U) {
           view = buffer->WriteView();
           Transition(buffer->Resource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -642,7 +723,9 @@ namespace gpg::gal
     }
   }
 
-  void DeviceD3D12::DrawGpuProgram(const GpuDrawCall& call)
+  void DeviceD3D12::DrawGpuProgram(
+    const GpuDrawCall& call
+  )
   {
     auto* const program = static_cast<GpuProgramD3D12*>(call.program);
     if (program == nullptr || program->mVertexCode.empty()) {
@@ -662,8 +745,17 @@ namespace gpg::gal
     struct Preparing
     {
       bool& flag;
-      explicit Preparing(bool& value) noexcept : flag(value) { flag = true; }
-      ~Preparing() { flag = false; }
+      explicit Preparing(
+        bool& value
+      ) noexcept
+        : flag(value)
+      {
+        flag = true;
+      }
+      ~Preparing()
+      {
+        flag = false;
+      }
     } preparing{mPreparingDraw};
     D3D12_GPU_VIRTUAL_ADDRESS indexAddress = 0U;
     auto* const indices = static_cast<IndexBufferD3D12*>(call.indexBuffer);
@@ -695,16 +787,24 @@ namespace gpg::gal
       const D3D12_INDEX_BUFFER_VIEW indexView{indexAddress, indices->Storage().ByteWidth(), indices->IndexFormat()};
       mList->IASetIndexBuffer(&indexView);
       mList->DrawIndexedInstanced(call.vertexCountPerInstance, call.instanceCount, 0U, 0, call.firstInstance);
-      RecordDraw((call.vertexCountPerInstance / 3U) * call.instanceCount, call.vertexCountPerInstance * call.instanceCount);
+      RecordDraw(
+        (call.vertexCountPerInstance / 3U) * call.instanceCount, call.vertexCountPerInstance * call.instanceCount
+      );
     } else if (call.indirectArgs != nullptr) {
       mList->ExecuteIndirect(
-        mDrawIndirectSignature.Get(), 1U, static_cast<GpuBufferD3D12*>(call.indirectArgs)->Resource().resource.Get(),
-        call.indirectArgsOffset, nullptr, 0U
+        mDrawIndirectSignature.Get(),
+        1U,
+        static_cast<GpuBufferD3D12*>(call.indirectArgs)->Resource().resource.Get(),
+        call.indirectArgsOffset,
+        nullptr,
+        0U
       );
       RecordDraw(0U, 0U);
     } else {
       mList->DrawInstanced(call.vertexCountPerInstance, call.instanceCount, 0U, call.firstInstance);
-      RecordDraw((call.vertexCountPerInstance / 3U) * call.instanceCount, call.vertexCountPerInstance * call.instanceCount);
+      RecordDraw(
+        (call.vertexCountPerInstance / 3U) * call.instanceCount, call.vertexCountPerInstance * call.instanceCount
+      );
     }
     FinishDraw();
 
@@ -713,7 +813,9 @@ namespace gpg::gal
     mList->SetGraphicsRootSignature(mRootSignature.Get());
   }
 
-  void DeviceD3D12::DispatchGpuProgram(const GpuDispatch& dispatch)
+  void DeviceD3D12::DispatchGpuProgram(
+    const GpuDispatch& dispatch
+  )
   {
     auto* const program = static_cast<GpuProgramD3D12*>(dispatch.program);
     if (program == nullptr || program->mCompute == nullptr) {
@@ -739,7 +841,9 @@ namespace gpg::gal
 
     // What the dispatch wrote is complete before anything reads or writes it again.
     for (GpuBuffer* const written : dispatch.bindings.writeBuffers) {
-      if (auto* const buffer = static_cast<GpuBufferD3D12*>(written); buffer != nullptr && buffer->WriteView().ptr != 0U) {
+      if (
+        auto* const buffer = static_cast<GpuBufferD3D12*>(written); buffer != nullptr && buffer->WriteView().ptr != 0U
+      ) {
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
         barrier.UAV.pResource = buffer->Resource().resource.Get();
@@ -752,7 +856,9 @@ namespace gpg::gal
   // ---------------------------------------------------------------------------
   // Timestamps
 
-  void DeviceD3D12::BeginProfileRegion(const std::uint32_t region)
+  void DeviceD3D12::BeginProfileRegion(
+    const std::uint32_t region
+  )
   {
     if ((mGpuFeatures & kGpuFeatureTimestamps) == 0U) {
       return;
@@ -781,7 +887,9 @@ namespace gpg::gal
     frame.regions.push_back(TimedRegion{region, pair});
   }
 
-  void DeviceD3D12::EndProfileRegion(const std::uint32_t region)
+  void DeviceD3D12::EndProfileRegion(
+    const std::uint32_t region
+  )
   {
     static_cast<void>(region);
     if ((mGpuFeatures & kGpuFeatureTimestamps) == 0U) {
@@ -810,7 +918,11 @@ namespace gpg::gal
       const UINT base = mProfileFrame * 2U * (kMaxTimedRegionsPerFrame + 1U);
       mList->EndQuery(mTimestampHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, base + 1U);
       mList->ResolveQueryData(
-        mTimestampHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, base, 2U * frame.usedPairs, mTimestampReadback.Get(),
+        mTimestampHeap.Get(),
+        D3D12_QUERY_TYPE_TIMESTAMP,
+        base,
+        2U * frame.usedPairs,
+        mTimestampReadback.Get(),
         static_cast<UINT64>(base) * sizeof(UINT64)
       );
       frame.open = false;
@@ -833,7 +945,9 @@ namespace gpg::gal
       }
       frame.pending = false;
       const UINT base = index * 2U * (kMaxTimedRegionsPerFrame + 1U);
-      const D3D12_RANGE range{static_cast<SIZE_T>(base) * sizeof(UINT64), static_cast<SIZE_T>(base + 2U * frame.usedPairs) * sizeof(UINT64)};
+      const D3D12_RANGE range{
+        static_cast<SIZE_T>(base) * sizeof(UINT64), static_cast<SIZE_T>(base + 2U * frame.usedPairs) * sizeof(UINT64)
+      };
       void* mapped = nullptr;
       if (FAILED(mTimestampReadback->Map(0U, &range, &mapped))) {
         continue;

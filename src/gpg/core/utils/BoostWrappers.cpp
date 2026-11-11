@@ -48,9 +48,7 @@ namespace moho
  * Placeholder TSS cleanup hook used by the boost thread-local bootstrap lane;
  * this binary variant is a no-op.
  */
-void tss_cleanup_implemented()
-{
-}
+void tss_cleanup_implemented() {}
 
 namespace
 {
@@ -175,7 +173,9 @@ namespace boost
    * Clears one current-thread TSS payload lane and then destroys one
    * `boost::detail::tss` descriptor, preserving destructor-unwind semantics.
    */
-  void ResetCurrentThreadValueAndDestroyTss(detail::tss* const tssSlot)
+  void ResetCurrentThreadValueAndDestroyTss(
+    detail::tss* const tssSlot
+  )
   {
     struct ScopedTssDestroy
     {
@@ -184,7 +184,7 @@ namespace boost
       {
         slot->~tss();
       }
-    } destroyGuard{ tssSlot };
+    } destroyGuard{tssSlot};
 
     void* const currentValue = tssSlot->get();
     if (currentValue != nullptr) {
@@ -208,7 +208,10 @@ namespace boost
     // CD3DDevice.cpp, ResourceManager.cpp) so their names are kept stable;
     // only the body is corrected here.
     template <typename OutPairT, typename SourcePairT>
-    SharedCountPair* AssignWeakPairFromSharedCore(OutPairT* const outPair, const SourcePairT* const sourcePair) noexcept
+    SharedCountPair* AssignWeakPairFromSharedCore(
+      OutPairT* const outPair,
+      const SourcePairT* const sourcePair
+    ) noexcept
     {
       outPair->px = sourcePair->px;
 
@@ -227,7 +230,10 @@ namespace boost
     }
 
     template <typename OutPairT, typename SourcePairT>
-    SharedCountPair* AssignSharedPairRetainCore(OutPairT* const outPair, const SourcePairT* const sourcePair) noexcept
+    SharedCountPair* AssignSharedPairRetainCore(
+      OutPairT* const outPair,
+      const SourcePairT* const sourcePair
+    ) noexcept
     {
       outPair->px = sourcePair->px;
       outPair->pi = sourcePair->pi;
@@ -467,12 +473,16 @@ namespace boost
     );
   }
 
-  bool HasSharedResource(const boost::shared_ptr<moho::RScmResource>& resource) noexcept
+  bool HasSharedResource(
+    const boost::shared_ptr<moho::RScmResource>& resource
+  ) noexcept
   {
     return reinterpret_cast<const SharedPtrRaw<moho::RScmResource>*>(&resource)->px != nullptr;
   }
 
-  void ReleaseSharedResource(boost::shared_ptr<moho::RScmResource>& resource) noexcept
+  void ReleaseSharedResource(
+    boost::shared_ptr<moho::RScmResource>& resource
+  ) noexcept
   {
     reinterpret_cast<SharedPtrRaw<moho::RScmResource>*>(&resource)->release();
   }
@@ -499,7 +509,8 @@ namespace boost
 
   /**
    * Address: 0x00539450 (FUN_00539450, boost::enable_shared_from_this<Moho::RScmResource>::shared_from_this)
-   * Mangled: ?shared_from_this@?$enable_shared_from_this@VRScmResource@Moho@@@boost@@QAE?AV?$shared_ptr@VRScmResource@Moho@@@2@XZ
+   * Mangled:
+   * ?shared_from_this@?$enable_shared_from_this@VRScmResource@Moho@@@boost@@QAE?AV?$shared_ptr@VRScmResource@Moho@@@2@XZ
    *
    * What it does:
    * Constructs one `shared_ptr<RScmResource>` from one
@@ -517,7 +528,8 @@ namespace boost
 
   /**
    * Address: 0x00796D40 (FUN_00796D40, boost::enable_shared_from_this<Moho::CMauiFrame>::shared_from_this)
-   * Mangled: ?shared_from_this@?$enable_shared_from_this@VCMauiFrame@Moho@@@boost@@QAE?AV?$shared_ptr@VCMauiFrame@Moho@@@2@XZ
+   * Mangled:
+   * ?shared_from_this@?$enable_shared_from_this@VCMauiFrame@Moho@@@boost@@QAE?AV?$shared_ptr@VCMauiFrame@Moho@@@2@XZ
    *
    * What it does:
    * Constructs one `shared_ptr<CMauiFrame>` from one
@@ -628,7 +640,9 @@ namespace boost
    * What it does:
    * Clears one two-dword lane and returns the caller-owned output slot.
    */
-  [[nodiscard]] SharedCountPair* ZeroDwordPairLane(SharedCountPair* const outLane) noexcept
+  [[nodiscard]] SharedCountPair* ZeroDwordPairLane(
+    SharedCountPair* const outLane
+  ) noexcept
   {
     outLane->px = nullptr;
     outLane->pi = nullptr;
@@ -696,7 +710,9 @@ namespace boost
    * What it does:
    * Clears one shared-count payload pair `(px,pi)` to null lanes.
    */
-  SharedCountPair* ClearSharedCountPair(SharedCountPair* const pair) noexcept
+  SharedCountPair* ClearSharedCountPair(
+    SharedCountPair* const pair
+  ) noexcept
   {
     pair->px = nullptr;
     pair->pi = nullptr;
@@ -749,7 +765,9 @@ namespace boost
    * Releases one shared control block and disposes/destroys the control block
    * on the final strong and weak transitions.
    */
-  void ReleaseSharedCount(detail::sp_counted_base* const control) noexcept
+  void ReleaseSharedCount(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     if (control != nullptr) {
       control->release();
@@ -763,7 +781,9 @@ namespace boost
    * Invokes one deleting-destructor vtable lane with delete flag `1` when the
    * control pointer is non-null.
    */
-  [[nodiscard]] int InvokeSpCountedDeletingDtorIfPresent(detail::sp_counted_base* const control) noexcept
+  [[nodiscard]] int InvokeSpCountedDeletingDtorIfPresent(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     if (control == nullptr) {
       return 0;
@@ -783,7 +803,9 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<TextureD3D9>` control lane when present.
    */
-  int DeleteSpCountedImplTextureD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplTextureD3D9IfPresent(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -795,7 +817,9 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<RenderTargetD3D9>` control lane when present.
    */
-  int DeleteSpCountedImplRenderTargetD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplRenderTargetD3D9IfPresent(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -807,7 +831,9 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<CubeRenderTargetD3D9>` control lane when present.
    */
-  int DeleteSpCountedImplCubeRenderTargetD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplCubeRenderTargetD3D9IfPresent(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -819,7 +845,9 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<DepthStencilTargetD3D9>` control lane when present.
    */
-  int DeleteSpCountedImplDepthStencilTargetD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplDepthStencilTargetD3D9IfPresent(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -831,7 +859,9 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<VertexFormatD3D9>` control lane when present.
    */
-  int DeleteSpCountedImplVertexFormatD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplVertexFormatD3D9IfPresent(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -843,7 +873,9 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<VertexBufferD3D9>` control lane when present.
    */
-  int DeleteSpCountedImplVertexBufferD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplVertexBufferD3D9IfPresent(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -855,7 +887,9 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<IndexBufferD3D9>` control lane when present.
    */
-  int DeleteSpCountedImplIndexBufferD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplIndexBufferD3D9IfPresent(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -867,7 +901,9 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<EffectD3D9>` control lane when present.
    */
-  int DeleteSpCountedImplEffectD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplEffectD3D9IfPresent(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -879,7 +915,9 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<PipelineStateD3D9>` control lane when present.
    */
-  int DeleteSpCountedImplPipelineStateD3D9IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplPipelineStateD3D9IfPresent(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -891,7 +929,9 @@ namespace boost
    * Runs one deleting-destructor thunk for one
    * `sp_counted_impl_p<EffectD3D10>` control lane when present.
    */
-  int DeleteSpCountedImplEffectD3D10IfPresent(detail::sp_counted_base* const control) noexcept
+  int DeleteSpCountedImplEffectD3D10IfPresent(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     return InvokeSpCountedDeletingDtorIfPresent(control);
   }
@@ -909,7 +949,9 @@ namespace boost
    * Releases the shared control block stored in one `(px,pi)` pair lane without
    * mutating the pair fields, then returns the original pair pointer.
    */
-  SharedCountPair* ReleaseSharedPairControlNoReset(SharedCountPair* const pair) noexcept
+  SharedCountPair* ReleaseSharedPairControlNoReset(
+    SharedCountPair* const pair
+  ) noexcept
   {
     if (pair != nullptr && pair->pi != nullptr) {
       pair->pi->release();
@@ -948,7 +990,9 @@ namespace boost
    * Clears one `(px,pi)` pair to `{nullptr,nullptr}` and releases the shared
    * control block that used to be bound.
    */
-  SharedCountPair* ReleaseSharedPairAndClear(SharedCountPair* const pair) noexcept
+  SharedCountPair* ReleaseSharedPairAndClear(
+    SharedCountPair* const pair
+  ) noexcept
   {
     pair->px = nullptr;
     detail::sp_counted_base* const control = pair->pi;
@@ -979,7 +1023,9 @@ namespace boost
    * What it does:
    * Releases one raw storage lane with global `operator delete`.
    */
-  void DeleteSharedPairStorage(void* const storage) noexcept
+  void DeleteSharedPairStorage(
+    void* const storage
+  ) noexcept
   {
     ::operator delete(storage);
   }
@@ -1108,7 +1154,9 @@ namespace boost
    * Attempts to acquire one shared-owner reference only when the current
    * use-count is non-zero.
    */
-  bool SpCountedBaseAddRefLock(detail::sp_counted_base* const control) noexcept
+  bool SpCountedBaseAddRefLock(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     return control != nullptr && control->add_ref_lock();
   }
@@ -1126,7 +1174,9 @@ namespace boost
    * `weak_add_ref()` is void, and none of this function's callers ever read
    * it. So it dispatches to the member instead of reaching past it.
    */
-  void SpCountedBaseWeakAddRef(detail::sp_counted_base* const control) noexcept
+  void SpCountedBaseWeakAddRef(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     if (control == nullptr) {
       return;
@@ -1141,7 +1191,9 @@ namespace boost
    * What it does:
    * Returns one shared-owner use-count lane.
    */
-  std::int32_t SpCountedBaseUseCount(const detail::sp_counted_base* const control) noexcept
+  std::int32_t SpCountedBaseUseCount(
+    const detail::sp_counted_base* const control
+  ) noexcept
   {
     if (control == nullptr) {
       return 0;
@@ -1155,7 +1207,9 @@ namespace boost
    * What it does:
    * Increments one weak-count lane and returns the same control pointer.
    */
-  detail::sp_counted_base* SpCountedBaseWeakAddRefReturn(detail::sp_counted_base* const control) noexcept
+  detail::sp_counted_base* SpCountedBaseWeakAddRefReturn(
+    detail::sp_counted_base* const control
+  ) noexcept
   {
     SpCountedBaseWeakAddRef(control);
     return control;
@@ -1174,7 +1228,9 @@ namespace boost
    * What it does:
    * Releases one weak-owner reference from one control-pointer slot.
    */
-  detail::sp_counted_base* SpCountedBaseWeakReleaseFromSlot(detail::sp_counted_base** const controlSlot) noexcept
+  detail::sp_counted_base* SpCountedBaseWeakReleaseFromSlot(
+    detail::sp_counted_base** const controlSlot
+  ) noexcept
   {
     if (controlSlot == nullptr) {
       return nullptr;
@@ -1203,8 +1259,7 @@ namespace boost
       return nullptr;
     }
 
-    detail::sp_counted_base* const incomingControl =
-      sourceControlSlot != nullptr ? *sourceControlSlot : nullptr;
+    detail::sp_counted_base* const incomingControl = sourceControlSlot != nullptr ? *sourceControlSlot : nullptr;
     if (incomingControl != nullptr) {
       SpCountedBaseWeakAddRef(incomingControl);
     }
@@ -1244,7 +1299,9 @@ namespace boost
    * Returns shared-owner use-count from one control-pointer slot, or zero when
    * no control block is present.
    */
-  std::int32_t SpCountedBaseUseCountFromSlotOrZero(detail::sp_counted_base* const* const controlSlot) noexcept
+  std::int32_t SpCountedBaseUseCountFromSlotOrZero(
+    detail::sp_counted_base* const* const controlSlot
+  ) noexcept
   {
     if (controlSlot == nullptr || *controlSlot == nullptr) {
       return 0;
@@ -1324,7 +1381,9 @@ namespace boost
    * Constructs one `boost::bad_weak_ptr` exception object in caller-provided
    * storage.
    */
-  boost::bad_weak_ptr* ConstructBadWeakPtr(boost::bad_weak_ptr* const outException)
+  boost::bad_weak_ptr* ConstructBadWeakPtr(
+    boost::bad_weak_ptr* const outException
+  )
   {
     return ::new (static_cast<void*>(outException)) boost::bad_weak_ptr();
   }
@@ -1473,7 +1532,9 @@ namespace boost
   }
   namespace
   {
-    [[nodiscard]] void* SpCountedImplGetDeleterNullResult(boost::detail::sp_typeinfo const&) noexcept
+    [[nodiscard]] void* SpCountedImplGetDeleterNullResult(
+      boost::detail::sp_typeinfo const&
+    ) noexcept
     {
       return nullptr;
     }
@@ -1500,7 +1561,9 @@ namespace boost
      * depends on the pointee type at this point.
      */
     template <class TStorage>
-    void DestroySpCountedImplSelf(TStorage* const self) noexcept
+    void DestroySpCountedImplSelf(
+      TStorage* const self
+    ) noexcept
     {
       delete self;
     }
@@ -1545,11 +1608,11 @@ namespace boost
     class RecoveredSpCountedBaseVtableProbe final : public detail::sp_counted_base
     {
     public:
-      void dispose() noexcept override
-      {
-      }
+      void dispose() noexcept override {}
 
-      void* get_deleter(detail::sp_typeinfo const&) noexcept override
+      void* get_deleter(
+        detail::sp_typeinfo const&
+      ) noexcept override
       {
         return nullptr;
       }
@@ -1574,7 +1637,9 @@ namespace boost
         SpCountedImplPDisposeClusterCacheImpl(reinterpret_cast<SpCountedImplStorage<void>*>(this));
       }
 
-      void* get_deleter(detail::sp_typeinfo const& requestedType) noexcept override
+      void* get_deleter(
+        detail::sp_typeinfo const& requestedType
+      ) noexcept override
       {
         return SpCountedImplPGetDeleterNullClusterCacheImpl(requestedType);
       }
@@ -1588,7 +1653,8 @@ namespace boost
   } // namespace
 
   /**
-   * Address: 0x00931EB0 (FUN_00931EB0, boost::detail::sp_counted_impl_p<gpg::HaStar::ClusterCache::Impl>::sp_counted_impl_p)
+   * Address: 0x00931EB0 (FUN_00931EB0,
+   * boost::detail::sp_counted_impl_p<gpg::HaStar::ClusterCache::Impl>::sp_counted_impl_p)
    *
    * What it does:
    * Initializes one recovered shared-count control block for one owned
@@ -1612,7 +1678,6 @@ namespace boost
 
     return InitSpCountedImplStorage(countedImpl, RecoveredSpCountedImplPVtableClusterCacheImpl(), ownedPointee);
   }
-
 
   /**
    * Address: 0x0053B3D0 (FUN_0053B3D0, boost::detail::sp_counted_impl_p<Moho::RScaResource>::dispose)
@@ -1655,7 +1720,6 @@ namespace boost
   {
     DisposeSpCountedImplPointee(countedImpl);
   }
-
 
   /**
    * Address: 0x00765720 (FUN_00765720, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::dispose)
@@ -1713,7 +1777,8 @@ namespace boost
   );
 
   /**
-   * Address: 0x0054EDC0 (FUN_0054EDC0, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void *)>::dispose)
+   * Address: 0x0054EDC0 (FUN_0054EDC0, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void
+   * *)>::dispose)
    *
    * What it does:
    * Invokes the stored raw-function deleter lane for one `CAniDefaultSkel*`
@@ -1732,7 +1797,8 @@ namespace boost
   }
 
   /**
-   * Address: 0x0054EE00 (FUN_0054EE00, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void *)>::destroy)
+   * Address: 0x0054EE00 (FUN_0054EE00, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void
+   * *)>::destroy)
    *
    * What it does:
    * Frees the control block itself once both use and weak counts reach
@@ -1746,7 +1812,8 @@ namespace boost
   }
 
   /**
-   * Address: 0x0054EDD0 (FUN_0054EDD0, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void *)>::get_deleter)
+   * Address: 0x0054EDD0 (FUN_0054EDD0, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void
+   * *)>::get_deleter)
    *
    * What it does:
    * Returns the stored raw-function deleter lane at offset `+0x10` when the
@@ -1764,7 +1831,8 @@ namespace boost
   }
 
   /**
-   * Address: 0x00923920 (FUN_00923920, boost::detail::sp_counted_impl_p<std::basic_stringstream<char, std::char_traits<char>, std::allocator<char>>>::dispose)
+   * Address: 0x00923920 (FUN_00923920, boost::detail::sp_counted_impl_p<std::basic_stringstream<char,
+   * std::char_traits<char>, std::allocator<char>>>::dispose)
    *
    * What it does:
    * Deletes one owned `std::basic_stringstream<char,...>` pointee bound to
@@ -1916,7 +1984,6 @@ namespace boost
     return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
   }
 
-
   /**
    * Address: 0x00765770 (FUN_00765770, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::dtr)
    *
@@ -1931,7 +1998,6 @@ namespace boost
   {
     return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
   }
-
 
   /**
    * Address: 0x007FBE80 (FUN_007FBE80, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::dtr)
@@ -1978,7 +2044,6 @@ namespace boost
     return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
   }
 
-
   /**
    * Address: 0x00884870 (FUN_00884870, boost::detail::sp_counted_impl_pd<_iobuf*,Moho::SFileStarCloser>::dtr)
    *
@@ -1993,7 +2058,6 @@ namespace boost
   {
     return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
   }
-
 
   /**
    * Address: 0x0089B910 (FUN_0089B910, boost::detail::sp_counted_impl_p<Moho::SSessionSaveData>::dtr)
@@ -2061,7 +2125,8 @@ namespace boost
   }
 
   /**
-   * Address: 0x00923940 (FUN_00923940, boost::detail::sp_counted_impl_p<std::basic_stringstream<char, std::char_traits<char>, std::allocator<char>>>::dtr)
+   * Address: 0x00923940 (FUN_00923940, boost::detail::sp_counted_impl_p<std::basic_stringstream<char,
+   * std::char_traits<char>, std::allocator<char>>>::dtr)
    *
    * What it does:
    * Executes one scalar-deleting destructor thunk for this control-block
@@ -2253,7 +2318,6 @@ namespace boost
     return SpCountedImplGetDeleterNullResult(requestedType);
   }
 
-
   /**
    * Address: 0x00765760 (FUN_00765760, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::get_deleter)
    *
@@ -2266,7 +2330,6 @@ namespace boost
   {
     return SpCountedImplGetDeleterNullResult(requestedType);
   }
-
 
   /**
    * Address: 0x007FBE70 (FUN_007FBE70, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::get_deleter)
@@ -2334,7 +2397,8 @@ namespace boost
   }
 
   /**
-   * Address: 0x00923720 (FUN_00923720, boost::detail::sp_counted_impl_p<std::basic_stringstream<char, std::char_traits<char>, std::allocator<char>>>::get_deleter)
+   * Address: 0x00923720 (FUN_00923720, boost::detail::sp_counted_impl_p<std::basic_stringstream<char,
+   * std::char_traits<char>, std::allocator<char>>>::get_deleter)
    *
    * What it does:
    * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
@@ -2427,7 +2491,6 @@ namespace boost
     moho::LaunchInfoLoad* const rawLaunchInfo
   )
   {
-    return ::new (static_cast<void*>(outLaunchInfo))
-      boost::shared_ptr<moho::LaunchInfoLoad>(rawLaunchInfo);
+    return ::new (static_cast<void*>(outLaunchInfo)) boost::shared_ptr<moho::LaunchInfoLoad>(rawLaunchInfo);
   }
 } // namespace boost

@@ -76,7 +76,9 @@ void IAiAttackerTypeInfo::Init()
  * Unlike the offset-0 AddBase helpers this base lives at +4 inside
  * `IAiAttacker`, which the emission spells as `a2.mOffset = 4`.
  */
-void IAiAttackerTypeInfo::AddBase_Broadcaster_EAiAttackerEvent(gpg::RType* const typeInfo)
+void IAiAttackerTypeInfo::AddBase_Broadcaster_EAiAttackerEvent(
+  gpg::RType* const typeInfo
+)
 {
   gpg::RType* baseType = Broadcaster<EAiAttackerEvent>::sType;
   if (!baseType) {
@@ -105,6 +107,12 @@ void moho::register_IAiAttackerTypeInfo()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_IAiAttackerTypeInfo_d7aa45, moho::register_IAiAttackerTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_IAiAttackerTypeInfo_d7aa45,
+  moho::register_IAiAttackerTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_IAiAttackerTypeInfoStartup_d7aa45, preregister_IAiAttackerTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  preregister_IAiAttackerTypeInfoStartup_d7aa45,
+  preregister_IAiAttackerTypeInfoStartup
+)

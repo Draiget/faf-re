@@ -33,7 +33,7 @@ namespace gpg
   class RRef;
   class SerConstructResult;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -415,9 +415,8 @@ namespace moho
      * Builds a default attacker for an archive load and hands it back
      * unowned; its members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     // `WeaponExtraData` / `TryGetWeaponExtraData` / `ReadExtraDataValue` used to
     // sit here, reading a weapon through a `WeaponEmitterEntryView` reach-in
@@ -432,13 +431,13 @@ namespace moho
     /// serializer/construct helpers resolve lazily).
     static gpg::RType* sType;
 
-    Unit* mUnit = nullptr;                             // +0x40
-    CTaskStage mStage;                                 // +0x44
-    fa::vector<UnitWeapon*> mWeapons;               // +0x58
-    WeakPtr<CTaskThread> mThread;                      // +0x68
-    fa::vector<CAcquireTargetTask*> mTasks;         // +0x70
-    CAiTarget mDesiredTarget;                          // +0x80
-    EAiAttackerEvent mReportingState{};                // +0xA0
+    Unit* mUnit = nullptr;                  // +0x40
+    CTaskStage mStage;                      // +0x44
+    fa::vector<UnitWeapon*> mWeapons;       // +0x58
+    WeakPtr<CTaskThread> mThread;           // +0x68
+    fa::vector<CAcquireTargetTask*> mTasks; // +0x70
+    CAiTarget mDesiredTarget;               // +0x80
+    EAiAttackerEvent mReportingState{};     // +0xA0
   };
 
   static_assert(offsetof(CAiAttackerImpl, mUnit) == 0x40, "CAiAttackerImpl::mUnit offset must be 0x40");
@@ -447,10 +446,12 @@ namespace moho
   static_assert(offsetof(CAiAttackerImpl, mThread) == 0x68, "CAiAttackerImpl::mThread offset must be 0x68");
   static_assert(offsetof(CAiAttackerImpl, mTasks) == 0x70, "CAiAttackerImpl::mTasks offset must be 0x70");
   static_assert(
-    offsetof(CAiAttackerImpl, mDesiredTarget) == 0x80, "CAiAttackerImpl::mDesiredTarget offset must be 0x80"
+    offsetof(CAiAttackerImpl, mDesiredTarget) == 0x80,
+    "CAiAttackerImpl::mDesiredTarget offset must be 0x80"
   );
   static_assert(
-    offsetof(CAiAttackerImpl, mReportingState) == 0xA0, "CAiAttackerImpl::mReportingState offset must be 0xA0"
+    offsetof(CAiAttackerImpl, mReportingState) == 0xA0,
+    "CAiAttackerImpl::mReportingState offset must be 0xA0"
   );
   static_assert(sizeof(CAiAttackerImpl) == 0xA4, "CAiAttackerImpl size must be 0xA4");
 

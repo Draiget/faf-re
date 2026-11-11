@@ -14,4 +14,3 @@ namespace moho
 
   static_assert(sizeof(ECompareType) == 0x04, "ECompareType size must be 0x04");
 } // namespace moho
-

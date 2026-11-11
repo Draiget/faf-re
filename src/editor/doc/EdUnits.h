@@ -5,7 +5,8 @@
 
 namespace faf::editor
 {
-  /** A unit of an army's `_save.lua` group: `['UNIT_328'] = { type = 'ueb2101', orders, platoon, Position, Orientation }`. */
+  /** A unit of an army's `_save.lua` group: `['UNIT_328'] = { type = 'ueb2101', orders, platoon, Position, Orientation
+   * }`. */
   struct SaveUnit
   {
     std::string name;

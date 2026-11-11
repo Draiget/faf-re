@@ -17,10 +17,10 @@
 
 namespace moho
 {
-  bool res_EnablePrefetching = true;     // 0x00F58027
-  int res_PrefetcherActivityDelay = 3;   // 0x00F58DA4, seconds
-  int res_AfterPrefetchDelay = 250;      // 0x00F58DA8, milliseconds
-  bool res_SpewLoadSpam = false;         // 0x010A6394
+  bool res_EnablePrefetching = true;   // 0x00F58027
+  int res_PrefetcherActivityDelay = 3; // 0x00F58DA4, seconds
+  int res_AfterPrefetchDelay = 250;    // 0x00F58DA8, milliseconds
+  bool res_SpewLoadSpam = false;       // 0x010A6394
 } // namespace moho
 
 namespace
@@ -30,7 +30,7 @@ namespace
   // enumerator everywhere outside that header.
   constexpr int kClockUtc = 1;
 
-  moho::ResourceManager* sResourceManager = nullptr; // 0x010A6398
+  moho::ResourceManager* sResourceManager = nullptr;       // 0x010A6398
   boost::once_flag sResourceManagerOnce = BOOST_ONCE_INIT; // 0x010A639C
 
   /**
@@ -38,7 +38,9 @@ namespace
    * Address: 0x00BF04F0 (FUN_00BF04F0, dynamic atexit destructor for `gTConVar_res_SpewLoadSpam`)
    */
   moho::TConVar<bool> gTConVar_res_SpewLoadSpam(
-    "res_SpewLoadSpam", "If true, spew spam with each resource load.", &moho::res_SpewLoadSpam
+    "res_SpewLoadSpam",
+    "If true, spew spam with each resource load.",
+    &moho::res_SpewLoadSpam
   );
 
   /**
@@ -46,7 +48,9 @@ namespace
    * Address: 0x00BF0520 (FUN_00BF0520, dynamic atexit destructor for `gTConVar_res_EnablePrefetching`)
    */
   moho::TConVar<bool> gTConVar_res_EnablePrefetching(
-    "res_EnablePrefetching", "If true, enable prefetching.", &moho::res_EnablePrefetching
+    "res_EnablePrefetching",
+    "If true, enable prefetching.",
+    &moho::res_EnablePrefetching
   );
 
   /**
@@ -65,7 +69,8 @@ namespace
    */
   moho::TConVar<int> gTConVar_res_AfterPrefetchDelay(
     "res_AfterPrefetchDelay",
-    "Number of milliseconds to nap after prefetching something.  So the prefetcher thread doesn't bog us down too much.",
+    "Number of milliseconds to nap after prefetching something.  So the prefetcher thread doesn't bog us down too "
+    "much.",
     &moho::res_AfterPrefetchDelay
   );
 
@@ -75,7 +80,9 @@ namespace
    * `fa::set` follows the modern rule, so those writes go through this one
    * accessor; the two ordering fields are never touched.
    */
-  [[nodiscard]] moho::ResourceRecord& Record(const moho::ResourceRecordSet::iterator it) noexcept
+  [[nodiscard]] moho::ResourceRecord& Record(
+    const moho::ResourceRecordSet::iterator it
+  ) noexcept
   {
     return const_cast<moho::ResourceRecord&>(*it);
   }
@@ -85,7 +92,9 @@ namespace
    * starting with a single `/` (a relative name, or `//host/...`) is used as
    * given.
    */
-  [[nodiscard]] bool IsLiteralName(const char* const path) noexcept
+  [[nodiscard]] bool IsLiteralName(
+    const char* const path
+  ) noexcept
   {
     return path != nullptr && path[0] != '\0' && (path[0] != '/' || path[1] == '/');
   }
@@ -93,7 +102,9 @@ namespace
   /**
    * Where the mounted file system puts `path`; empty when it has no such file.
    */
-  [[nodiscard]] fa::string FindMountedFile(const char* const path)
+  [[nodiscard]] fa::string FindMountedFile(
+    const char* const path
+  )
   {
     fa::string found;
     (void)moho::FILE_GetWaitHandleSet()->mHandle->FindFile(&found, path, nullptr);
@@ -103,7 +114,10 @@ namespace
   /**
    * Sleeps until `until` with the manager unlocked.
    */
-  void SleepUnlocked(boost::recursive_mutex::scoped_lock& lock, const boost::xtime& until)
+  void SleepUnlocked(
+    boost::recursive_mutex::scoped_lock& lock,
+    const boost::xtime& until
+  )
   {
     lock.unlock();
     boost::thread::sleep(until);
@@ -116,7 +130,10 @@ namespace moho
   /**
    * Address: 0x004A99C0 (FUN_004A99C0)
    */
-  ResourceWatch::ResourceWatch(const gpg::StrArg path, CResourceWatcher* const watcher)
+  ResourceWatch::ResourceWatch(
+    const gpg::StrArg path,
+    CResourceWatcher* const watcher
+  )
     : mPath(path)
     , mWatcher(watcher)
     , mNotifying(false)
@@ -125,7 +142,10 @@ namespace moho
   /**
    * Address: 0x004A9A40 (FUN_004A9A40)
    */
-  ResourceRecord::ResourceRecord(const gpg::StrArg name, const gpg::RType* const type)
+  ResourceRecord::ResourceRecord(
+    const gpg::StrArg name,
+    const gpg::RType* const type
+  )
     : mId{fa::string(name)}
     , mType(type)
     , mLoading(false)
@@ -136,7 +156,9 @@ namespace moho
   /**
    * Address: 0x004A9AA0 (FUN_004A9AA0)
    */
-  ResourceRecord::ResourceRecord(const ResourceRecord& other)
+  ResourceRecord::ResourceRecord(
+    const ResourceRecord& other
+  )
     : mId(other.mId)
     , mType(other.mType)
     , mLoading(false)
@@ -167,7 +189,9 @@ namespace moho
    * What it does:
    * Takes every event: the records decide what a path means.
    */
-  bool ResourceManager::FilterEvent(const SDiskWatchEvent&)
+  bool ResourceManager::FilterEvent(
+    const SDiskWatchEvent&
+  )
   {
     return true;
   }
@@ -182,7 +206,9 @@ namespace moho
    * A watch whose watcher died during its own callback is freed here, since
    * `DetachWatcher` left it for this loop.
    */
-  void ResourceManager::OnDiskWatchEvent(const SDiskWatchEvent& event)
+  void ResourceManager::OnDiskWatchEvent(
+    const SDiskWatchEvent& event
+  )
   {
     boost::recursive_mutex::scoped_lock lock(mLock);
 
@@ -246,7 +272,9 @@ namespace moho
    * Before the manager starts, a factory waits in the pending list; after, it
    * registers under its resource type straight away.
    */
-  void ResourceManager::AttachFactory(ResourceFactoryBase* const factory)
+  void ResourceManager::AttachFactory(
+    ResourceFactoryBase* const factory
+  )
   {
     boost::recursive_mutex::scoped_lock lock(mLock);
     if (mRunning) {
@@ -259,7 +287,9 @@ namespace moho
   /**
    * Address: 0x004A9FC0 (FUN_004A9FC0)
    */
-  void ResourceManager::DetachFactory(ResourceFactoryBase* const factory)
+  void ResourceManager::DetachFactory(
+    ResourceFactoryBase* const factory
+  )
   {
     boost::recursive_mutex::scoped_lock lock(mLock);
 
@@ -277,7 +307,9 @@ namespace moho
   /**
    * Address: 0x004AB600 (FUN_004AB600)
    */
-  ResourceFactoryBase* ResourceManager::FindFactory(const gpg::RType* const type)
+  ResourceFactoryBase* ResourceManager::FindFactory(
+    const gpg::RType* const type
+  )
   {
     return mFactories.find(type)->second;
   }
@@ -285,7 +317,9 @@ namespace moho
   /**
    * Address: 0x004AB620 (FUN_004AB620, func_ManageWatchedResources)
    */
-  void ResourceManager::DetachWatcher(CResourceWatcher* const watcher)
+  void ResourceManager::DetachWatcher(
+    CResourceWatcher* const watcher
+  )
   {
     boost::recursive_mutex::scoped_lock lock(mLock);
     for (ResourceWatch* const watch : watcher->mWatches) {
@@ -406,7 +440,10 @@ namespace moho
   /**
    * Address: 0x004AAC20 (FUN_004AAC20, func_CreatePrefetchData)
    */
-  PrefetchHandleBase ResourceManager::PrefetchResource(const gpg::StrArg path, const gpg::RType* const type)
+  PrefetchHandleBase ResourceManager::PrefetchResource(
+    const gpg::StrArg path,
+    const gpg::RType* const type
+  )
   {
     boost::recursive_mutex::scoped_lock lock(mLock);
 
@@ -446,7 +483,9 @@ namespace moho
    * path the caller gave.
    */
   boost::shared_ptr<void> ResourceManager::GetResource(
-    const gpg::StrArg path, CResourceWatcher* const watcher, const gpg::RType* const type
+    const gpg::StrArg path,
+    CResourceWatcher* const watcher,
+    const gpg::RType* const type
   )
   {
     boost::recursive_mutex::scoped_lock lock(mLock);
@@ -487,7 +526,10 @@ namespace moho
   /**
    * Address: 0x004AA690 (FUN_004AA690)
    */
-  boost::shared_ptr<void> ResourceManager::LoadRecord(ResourceRecord& record, boost::recursive_mutex::scoped_lock& lock)
+  boost::shared_ptr<void> ResourceManager::LoadRecord(
+    ResourceRecord& record,
+    boost::recursive_mutex::scoped_lock& lock
+  )
   {
     const boost::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
     while (record.mLoading) {
@@ -508,7 +550,8 @@ namespace moho
         if (res_SpewLoadSpam) {
           gpg::Debugf("Finishing %s resource prefetched from %s", record.mType->GetName(), record.mId.name.c_str());
         }
-        resource = factory->LoadFrom(record.mId.name.c_str(), record.mType, prefetch->mPrefetchData, factory->mPrefetchType);
+        resource =
+          factory->LoadFrom(record.mId.name.c_str(), record.mType, prefetch->mPrefetchData, factory->mPrefetchType);
         prefetch->mPrefetchData.reset();
       } else {
         if (res_SpewLoadSpam) {
@@ -557,10 +600,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x004ABEE0 (FUN_004ABEE0, ?RES_GetResource@Moho@@YA?AV?$shared_ptr@X@boost@@VStrArg@gpg@@PAVCResourceWatcher@1@PBVRType@5@@Z)
+   * Address: 0x004ABEE0 (FUN_004ABEE0,
+   * ?RES_GetResource@Moho@@YA?AV?$shared_ptr@X@boost@@VStrArg@gpg@@PAVCResourceWatcher@1@PBVRType@5@@Z)
    */
   boost::shared_ptr<void> RES_GetResource(
-    const gpg::StrArg path, CResourceWatcher* const resourceWatcher, const gpg::RType* const resourceType
+    const gpg::StrArg path,
+    CResourceWatcher* const resourceWatcher,
+    const gpg::RType* const resourceType
   )
   {
     return RES_GetResourceManager()->GetResource(path, resourceWatcher, resourceType);

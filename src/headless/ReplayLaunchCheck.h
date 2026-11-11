@@ -12,11 +12,11 @@ namespace faf::headless
 {
   struct SLaunchCheckResult
   {
-    bool ran = false;        // false: the replay or its config could not be read (see `error`)
+    bool ran = false; // false: the replay or its config could not be read (see `error`)
     int differences = 0;
-    int orderOnly = 0;       // serialised Lua values with the same content in another key order
+    int orderOnly = 0; // serialised Lua values with the same content in another key order
     std::string error;
-    std::string report;      // one line per difference, then a summary line
+    std::string report; // one line per difference, then a summary line
   };
 
   /**

@@ -71,4 +71,3 @@ namespace moho
 
   static_assert(sizeof(CUnitCarrierRetrieveTypeInfo) == 0x64, "CUnitCarrierRetrieveTypeInfo size must be 0x64");
 } // namespace moho
-

@@ -4,7 +4,9 @@
 
 namespace faf::editor
 {
-  std::string WaterToScmwtr(const WaterState& water)
+  std::string WaterToScmwtr(
+    const WaterState& water
+  )
   {
     const WaterNumbers& s = water.shader;
     std::string out = "{\n";
@@ -44,7 +46,11 @@ namespace faf::editor
     return out + "}";
   }
 
-  bool WaterFromScmwtr(const std::string& text, WaterState& water, std::string& error)
+  bool WaterFromScmwtr(
+    const std::string& text,
+    WaterState& water,
+    std::string& error
+  )
   {
     std::string probe;
     if (!JsonValue(text, "SurfaceColor", probe) || !JsonValue(text, "WaveTextures", probe)) {

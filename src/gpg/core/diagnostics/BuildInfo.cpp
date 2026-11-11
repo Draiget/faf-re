@@ -13,8 +13,7 @@ namespace gpg::diag
 #else
     constexpr char kCommitShort[] = FAF_BUILD_COMMIT_SHORT;
 #endif
-    constexpr char kIdentity[] =
-      FAF_BUILD_COMMIT_SHORT
+    constexpr char kIdentity[] = FAF_BUILD_COMMIT_SHORT
 #if FAF_BUILD_DIRTY
       "-dirty"
 #endif

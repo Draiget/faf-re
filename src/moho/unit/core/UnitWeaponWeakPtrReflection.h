@@ -87,4 +87,3 @@ namespace moho
    */
   void register_WeakPtr_UnitWeapon_Type();
 } // namespace moho
-

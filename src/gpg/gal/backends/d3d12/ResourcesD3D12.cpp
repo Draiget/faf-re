@@ -33,10 +33,14 @@ namespace gpg::gal
         return nullptr;
       }
       const DeviceContext* const context = device->GetDeviceContext();
-      return (context != nullptr && context->mDeviceType == DeviceApi::Direct3D12) ? static_cast<DeviceD3D12*>(device) : nullptr;
+      return (context != nullptr && context->mDeviceType == DeviceApi::Direct3D12) ? static_cast<DeviceD3D12*>(device)
+                                                                                   : nullptr;
     }
 
-    [[nodiscard]] DeviceD3D12& RequireDevice(const char* const file, const int line)
+    [[nodiscard]] DeviceD3D12& RequireDevice(
+      const char* const file,
+      const int line
+    )
     {
       DeviceD3D12* const device = ActiveDevice();
       if (device == nullptr) {
@@ -45,12 +49,17 @@ namespace gpg::gal
       return *device;
     }
 
-    [[nodiscard]] bool HasFlag(const std::uint32_t flags, const MohoD3DLockFlags flag) noexcept
+    [[nodiscard]] bool HasFlag(
+      const std::uint32_t flags,
+      const MohoD3DLockFlags flag
+    ) noexcept
     {
       return (flags & static_cast<std::uint32_t>(flag)) != 0U;
     }
 
-    void RetireResource(ComPtr<ID3D12Resource>& resource)
+    void RetireResource(
+      ComPtr<ID3D12Resource>& resource
+    )
     {
       if (resource == nullptr) {
         return;
@@ -61,7 +70,10 @@ namespace gpg::gal
       resource.Reset();
     }
 
-    void RetireView(const D3D12_DESCRIPTOR_HEAP_TYPE type, D3D12_CPU_DESCRIPTOR_HANDLE& handle)
+    void RetireView(
+      const D3D12_DESCRIPTOR_HEAP_TYPE type,
+      D3D12_CPU_DESCRIPTOR_HANDLE& handle
+    )
     {
       if (handle.ptr == 0U) {
         return;
@@ -135,7 +147,11 @@ namespace gpg::gal
     return &mContext;
   }
 
-  TextureLockRect TextureD3D12::Lock(const int level, const RECT& rect, const int flags)
+  TextureLockRect TextureD3D12::Lock(
+    const int level,
+    const RECT& rect,
+    const int flags
+  )
   {
     if (mResource.resource == nullptr || IsVolume()) {
       ThrowError("TextureD3D12.cpp", __LINE__, "attempt to map invalid texture");
@@ -168,9 +184,11 @@ namespace gpg::gal
     if (rect.left != rect.right) {
       const std::uint32_t elementBytes = dxgi::FormatElementBytes(mDesc.Format);
       if (dxgi::IsBlockCompressed(mDesc.Format)) {
-        offset = static_cast<std::size_t>(rect.top / 4) * layout.rowPitch + static_cast<std::size_t>(rect.left / 4) * elementBytes;
+        offset = static_cast<std::size_t>(rect.top / 4) * layout.rowPitch +
+          static_cast<std::size_t>(rect.left / 4) * elementBytes;
       } else {
-        offset = static_cast<std::size_t>(rect.top) * layout.rowPitch + static_cast<std::size_t>(rect.left) * elementBytes;
+        offset =
+          static_cast<std::size_t>(rect.top) * layout.rowPitch + static_cast<std::size_t>(rect.left) * elementBytes;
       }
     }
 
@@ -187,12 +205,16 @@ namespace gpg::gal
     return lock;
   }
 
-  int TextureD3D12::Unlock(const TextureLockRect lock)
+  int TextureD3D12::Unlock(
+    const TextureLockRect lock
+  )
   {
     return Unlock(lock.level);
   }
 
-  int TextureD3D12::Unlock(const int level)
+  int TextureD3D12::Unlock(
+    const int level
+  )
   {
     if (!mLocked || level != mLockedLevel) {
       ThrowError("TextureD3D12.cpp", __LINE__, "texture lock/unlock mismatch");
@@ -202,9 +224,12 @@ namespace gpg::gal
     if (!HasFlag(static_cast<std::uint32_t>(mLockedFlags), MohoD3DLockFlags::ReadOnly)) {
       RecordUpload(bytes.size());
       const dxgi::LevelLayout layout = dxgi::ComputeLevelLayout(
-        mDesc.Format, std::max(1U, static_cast<std::uint32_t>(mDesc.Width) >> levelIndex), std::max(1U, mDesc.Height >> levelIndex)
+        mDesc.Format,
+        std::max(1U, static_cast<std::uint32_t>(mDesc.Width) >> levelIndex),
+        std::max(1U, mDesc.Height >> levelIndex)
       );
-      RequireDevice("TextureD3D12.cpp", __LINE__).UploadSubresource(mResource, levelIndex, bytes.data(), layout.rowPitch);
+      RequireDevice("TextureD3D12.cpp", __LINE__)
+        .UploadSubresource(mResource, levelIndex, bytes.data(), layout.rowPitch);
     } else if (!mContentsFromEngine) {
       // A read of a file texture (the cursor icon): the GPU copy stays the authority.
       std::vector<std::uint8_t>().swap(bytes);
@@ -216,7 +241,9 @@ namespace gpg::gal
     return 0;
   }
 
-  void TextureD3D12::SaveToBuffer(gpg::MemBuffer<char>* const outBuffer)
+  void TextureD3D12::SaveToBuffer(
+    gpg::MemBuffer<char>* const outBuffer
+  )
   {
     imaging::ImageCodec* const codec = imaging::ImageCodec::Instance();
     if (codec == nullptr || mResource.resource == nullptr) {
@@ -245,7 +272,10 @@ namespace gpg::gal
   // ---------------------------------------------------------------------------
   // RenderTargetD3D12 / DepthStencilTargetD3D12 / CubeRenderTargetD3D12
 
-  RenderTargetD3D12::RenderTargetD3D12(std::vector<Buffer> buffers, const dxgi::SwapChain* const swapChain)
+  RenderTargetD3D12::RenderTargetD3D12(
+    std::vector<Buffer> buffers,
+    const dxgi::SwapChain* const swapChain
+  )
     : mBuffers(std::move(buffers))
     , mSwapChain(swapChain)
   {
@@ -310,7 +340,9 @@ namespace gpg::gal
     return &mContext;
   }
 
-  CubeRenderTargetD3D12::CubeRenderTargetD3D12(const CubeRenderTargetContext& context)
+  CubeRenderTargetD3D12::CubeRenderTargetD3D12(
+    const CubeRenderTargetContext& context
+  )
     : mContext(context)
   {}
 
@@ -325,7 +357,10 @@ namespace gpg::gal
   // Buffers
 
   BufferStorageD3D12::BufferStorageD3D12(
-    const std::uint32_t byteWidth, const bool dynamic, const D3D12_RESOURCE_STATES readState, const char* const kind
+    const std::uint32_t byteWidth,
+    const bool dynamic,
+    const D3D12_RESOURCE_STATES readState,
+    const char* const kind
   )
     : mByteWidth(std::max(byteWidth, 4U))
     , mKind(kind)
@@ -337,7 +372,10 @@ namespace gpg::gal
       return;
     }
     DeviceD3D12& device = RequireDevice(mKind, __LINE__);
-    if (gPlacedResources && gSharedBuffers && device.SharedBuffers().Take(mByteWidth, mTracked, mResourceOffset, mSharedRange)) {
+    if (
+      gPlacedResources && gSharedBuffers &&
+      device.SharedBuffers().Take(mByteWidth, mTracked, mResourceOffset, mSharedRange)
+    ) {
       mReadState = d3d12::kSharedBufferRead;
       mUnwritten = true; // the large buffer is placed, and other buffers' uploads leave this range alone
       return;
@@ -359,7 +397,8 @@ namespace gpg::gal
       mUnwritten = true;
     } else {
       CheckHresult(
-        mKind, __LINE__,
+        mKind,
+        __LINE__,
         device.Native()->CreateCommittedResource(
           &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&mResource.resource)
         )
@@ -368,7 +407,9 @@ namespace gpg::gal
     mResource.state = D3D12_RESOURCE_STATE_COMMON;
   }
 
-  void BufferStorageD3D12::FillUnwritten(DeviceD3D12& device)
+  void BufferStorageD3D12::FillUnwritten(
+    DeviceD3D12& device
+  )
   {
     if (!mUnwritten) {
       return;
@@ -397,7 +438,11 @@ namespace gpg::gal
     RetireResource(mResource.resource);
   }
 
-  std::uint8_t* BufferStorageD3D12::Lock(const std::uint32_t offset, const std::uint32_t size, const MohoD3DLockFlags flags)
+  std::uint8_t* BufferStorageD3D12::Lock(
+    const std::uint32_t offset,
+    const std::uint32_t size,
+    const MohoD3DLockFlags flags
+  )
   {
     if (mLocked) {
       ThrowError(mKind, __LINE__, "buffer lock/unlock mismatch");
@@ -454,7 +499,10 @@ namespace gpg::gal
       return;
     }
 
-    if (HasFlag(mLockFlags, MohoD3DLockFlags::NoOverwrite) && mChunkCpu != nullptr && mChunkSerial == device.RecordingSerial()) {
+    if (
+      HasFlag(mLockFlags, MohoD3DLockFlags::NoOverwrite) && mChunkCpu != nullptr &&
+      mChunkSerial == device.RecordingSerial()
+    ) {
       // The caller promises not to touch what earlier draws read.
       std::memcpy(mChunkCpu + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
       return;
@@ -480,7 +528,10 @@ namespace gpg::gal
     return (mCopyWrittenOnly && gCopyWrittenOnly && mWrittenEnd < mByteWidth) ? mWrittenEnd : mByteWidth;
   }
 
-  void BufferStorageD3D12::TakeChunk(DeviceD3D12& device, const d3d12::UploadAllocation& chunk)
+  void BufferStorageD3D12::TakeChunk(
+    DeviceD3D12& device,
+    const d3d12::UploadAllocation& chunk
+  )
   {
     mChunk = chunk.gpu;
     mChunkCpu = chunk.cpu;
@@ -489,7 +540,9 @@ namespace gpg::gal
     mChunkSerial = device.RecordingSerial();
   }
 
-  D3D12_GPU_VIRTUAL_ADDRESS BufferStorageD3D12::PrepareForDraw(DeviceD3D12& device)
+  D3D12_GPU_VIRTUAL_ADDRESS BufferStorageD3D12::PrepareForDraw(
+    DeviceD3D12& device
+  )
   {
     if (!mDynamic) {
       FillUnwritten(device);
@@ -505,11 +558,17 @@ namespace gpg::gal
     return mChunk;
   }
 
-  void BufferStorageD3D12::PrepareForCopySource(DeviceD3D12& device, ID3D12Resource*& resource, std::uint64_t& offset)
+  void BufferStorageD3D12::PrepareForCopySource(
+    DeviceD3D12& device,
+    ID3D12Resource*& resource,
+    std::uint64_t& offset
+  )
   {
     if (!mDynamic) {
       FillUnwritten(device);
-      device.Transition(*mTracked, mSharedRange != nullptr ? d3d12::kSharedBufferRead : D3D12_RESOURCE_STATE_COPY_SOURCE);
+      device.Transition(
+        *mTracked, mSharedRange != nullptr ? d3d12::kSharedBufferRead : D3D12_RESOURCE_STATE_COPY_SOURCE
+      );
       resource = mTracked->resource.Get();
       offset = mResourceOffset;
       return;
@@ -520,7 +579,9 @@ namespace gpg::gal
     offset = mChunkOffset;
   }
 
-  VertexBufferD3D12::VertexBufferD3D12(const VertexBufferContext& context)
+  VertexBufferD3D12::VertexBufferD3D12(
+    const VertexBufferContext& context
+  )
     : mContext(context)
     , mStorage(
         context.vertexCount_ * context.stride_,
@@ -537,7 +598,11 @@ namespace gpg::gal
     return &mContext;
   }
 
-  void* VertexBufferD3D12::Lock(const unsigned int offset, const unsigned int size, const MohoD3DLockFlags lockFlags)
+  void* VertexBufferD3D12::Lock(
+    const unsigned int offset,
+    const unsigned int size,
+    const MohoD3DLockFlags lockFlags
+  )
   {
     return mStorage.Lock(offset, size, lockFlags);
   }
@@ -547,10 +612,15 @@ namespace gpg::gal
     mStorage.Unlock();
   }
 
-  IndexBufferD3D12::IndexBufferD3D12(const IndexBufferContext& context)
+  IndexBufferD3D12::IndexBufferD3D12(
+    const IndexBufferContext& context
+  )
     : mContext(context)
     , mStorage(
-        context.size_ * ((context.format_ == 1U) ? 2U : 4U), context.type_ == 2U, D3D12_RESOURCE_STATE_INDEX_BUFFER, "IndexBufferD3D12.cpp"
+        context.size_ * ((context.format_ == 1U) ? 2U : 4U),
+        context.type_ == 2U,
+        D3D12_RESOURCE_STATE_INDEX_BUFFER,
+        "IndexBufferD3D12.cpp"
       )
   {}
 
@@ -561,7 +631,11 @@ namespace gpg::gal
     return &mContext;
   }
 
-  std::int16_t* IndexBufferD3D12::Lock(const unsigned int offset, const unsigned int size, const MohoD3DLockFlags lockFlags)
+  std::int16_t* IndexBufferD3D12::Lock(
+    const unsigned int offset,
+    const unsigned int size,
+    const MohoD3DLockFlags lockFlags
+  )
   {
     return reinterpret_cast<std::int16_t*>(mStorage.Lock(offset, size, lockFlags));
   }
@@ -576,7 +650,9 @@ namespace gpg::gal
     return (mContext.format_ == 1U) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
   }
 
-  VertexFormatD3D12::VertexFormatD3D12(const std::uint32_t formatCode)
+  VertexFormatD3D12::VertexFormatD3D12(
+    const std::uint32_t formatCode
+  )
   {
     formatCode_ = formatCode;
     for (const D3D11_INPUT_ELEMENT_DESC& element : d3d11::VertexLayoutElements(formatCode)) {

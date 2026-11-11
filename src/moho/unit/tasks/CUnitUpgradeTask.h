@@ -10,7 +10,7 @@ namespace gpg
 {
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -90,13 +90,10 @@ namespace moho
   };
 
   static_assert(sizeof(CUnitUpgradeTask) == 0x80, "CUnitUpgradeTask size must be 0x80");
+  static_assert(offsetof(CUnitUpgradeTask, mToBlueprint) == 0x30, "CUnitUpgradeTask::mToBlueprint offset must be 0x30");
+  static_assert(offsetof(CUnitUpgradeTask, mBuildHelper) == 0x34, "CUnitUpgradeTask::mBuildHelper offset must be 0x34");
   static_assert(
-    offsetof(CUnitUpgradeTask, mToBlueprint) == 0x30, "CUnitUpgradeTask::mToBlueprint offset must be 0x30"
-  );
-  static_assert(
-    offsetof(CUnitUpgradeTask, mBuildHelper) == 0x34, "CUnitUpgradeTask::mBuildHelper offset must be 0x34"
-  );
-  static_assert(
-    offsetof(CUnitUpgradeTask, mUpgradedUnit) == 0x78, "CUnitUpgradeTask::mUpgradedUnit offset must be 0x78"
+    offsetof(CUnitUpgradeTask, mUpgradedUnit) == 0x78,
+    "CUnitUpgradeTask::mUpgradedUnit offset must be 0x78"
   );
 } // namespace moho

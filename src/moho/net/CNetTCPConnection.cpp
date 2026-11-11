@@ -16,13 +16,18 @@ using namespace moho;
 
 namespace
 {
-  void DispatchConnectionEvent(CNetTCPConnection& connection, const ELobbyMsg messageType)
+  void DispatchConnectionEvent(
+    CNetTCPConnection& connection,
+    const ELobbyMsg messageType
+  )
   {
     CMessage event{messageType};
     connection.Dispatch(&event);
   }
 
-  void QueueConnectorLocalPortHandshake(CNetTCPConnection& connection)
+  void QueueConnectorLocalPortHandshake(
+    CNetTCPConnection& connection
+  )
   {
     CMessage handshake{MessageType{0}};
     CMessageStream payload{handshake};
@@ -45,7 +50,10 @@ namespace
    * 0x0048448F): a null slot returns at once, otherwise
    * `mScheduleDestroy` decides.
    */
-  bool DestroyedByHandler(CNetTCPConnection& connection, const WeakPtr<CNetTCPConnector>& connector)
+  bool DestroyedByHandler(
+    CNetTCPConnection& connection,
+    const WeakPtr<CNetTCPConnector>& connector
+  )
   {
     if (connector.GetObjectPtr() == nullptr) {
       return true;
@@ -105,7 +113,9 @@ ENetConnectionState CNetTCPConnection::GetState() const noexcept
  * What it does:
  * Attaches an accepted socket and transitions state to establishing.
  */
-void CNetTCPConnection::AdoptSocketAndSetEstablishing(const platform::net::Socket socket) noexcept
+void CNetTCPConnection::AdoptSocketAndSetEstablishing(
+  const platform::net::Socket socket
+) noexcept
 {
   mSocket = socket;
   mState = kNetStateEstablishing;
@@ -142,7 +152,9 @@ float CNetTCPConnection::GetTime()
  * What it does:
  * Queues span bytes into outbound pipe stream.
  */
-void CNetTCPConnection::Write(NetDataSpan* const data)
+void CNetTCPConnection::Write(
+  NetDataSpan* const data
+)
 {
   const auto* const begin = reinterpret_cast<const char*>(data->start);
   const size_t size = static_cast<size_t>(data->end - data->start);
@@ -465,7 +477,9 @@ void CNetTCPConnection::Push()
 /**
  * Address: 0x00484640 (FUN_00484640, Moho::CNetTCPConnection::SelectSocket)
  */
-int CNetTCPConnection::SelectSocket(void* const eventHandle)
+int CNetTCPConnection::SelectSocket(
+  void* const eventHandle
+)
 {
   return platform::net::SelectSocketEvents(
     mSocket, eventHandle, platform::net::kEventRead | platform::net::kEventConnect | platform::net::kEventClose

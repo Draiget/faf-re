@@ -93,5 +93,11 @@
 #include "moho/terrain/MediumFidelityTerrain.h"
 #include "moho/ui/IUIManager.h"
 
-#define EVT_LOG_ADDITION_EVENT(fn)                                                                             DECLARE_EVENT_TABLE_ENTRY(                                                                                     moho::EVT_LOG_ADDITION, -1, -1,                                                                              (wxObjectEventFunction)(wxEventFunction)(moho::CLogAdditionEventFunction)&fn, (wxObject*)NULL              ),
-
+#define EVT_LOG_ADDITION_EVENT(fn)                                                                                     \
+  DECLARE_EVENT_TABLE_ENTRY(                                                                                           \
+    moho::EVT_LOG_ADDITION,                                                                                            \
+    -1,                                                                                                                \
+    -1,                                                                                                                \
+    (wxObjectEventFunction)(wxEventFunction)(moho::CLogAdditionEventFunction) & fn,                                    \
+    (wxObject*)NULL                                                                                                    \
+  ),

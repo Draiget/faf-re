@@ -11,7 +11,10 @@
 namespace
 {
   // A chunk: the length, "DDS ", the header size 124, then filler to `length`.
-  std::string Chunk(const std::size_t length, const char fill)
+  std::string Chunk(
+    const std::size_t length,
+    const char fill
+  )
   {
     std::string chunk(4 + length, fill);
     const std::int32_t size = static_cast<std::int32_t>(length);
@@ -22,7 +25,10 @@ namespace
     return chunk;
   }
 
-  TEST(ImageChunks, FindsThemAndPutsTheOriginalsBack)
+  TEST(
+    ImageChunks,
+    FindsThemAndPutsTheOriginalsBack
+  )
   {
     const std::string a = Chunk(200, 'a');
     // An image whose data happens to hold "DDS " is still one image.

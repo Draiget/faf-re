@@ -32,7 +32,9 @@ namespace moho
    *     `SMassInfoSerializer::Deserialize`, which forwards to this
    *     `SMassInfo::MemberDeserialize`.
    */
-  void SMassInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SMassInfo::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -60,7 +62,9 @@ namespace moho
    *     `SMassInfoSerializer::Serialize`, which forwards to this
    *     `SMassInfo::MemberSerialize`.
    */
-  void SMassInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SMassInfo::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;

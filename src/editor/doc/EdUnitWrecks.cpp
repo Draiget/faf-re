@@ -25,7 +25,9 @@ namespace faf::editor
     };
 
     /** A blueprint's costs and `.bp` text, read once per id (not cached until the rules are built). */
-    const BlueprintFacts* FactsOf(const std::string& id)
+    const BlueprintFacts* FactsOf(
+      const std::string& id
+    )
     {
       static std::map<std::string, BlueprintFacts> cache;
       if (const auto found = cache.find(id); found != cache.end()) {
@@ -47,8 +49,11 @@ namespace faf::editor
     }
 
     /** Each unit of a group tree with the groups from the root down to it. */
-    void Walk(const UnitGroup& group, std::vector<std::string>& path,
-              std::vector<std::pair<const SaveUnit*, std::vector<std::string>>>& out)
+    void Walk(
+      const UnitGroup& group,
+      std::vector<std::string>& path,
+      std::vector<std::pair<const SaveUnit*, std::vector<std::string>>>& out
+    )
     {
       for (const SaveUnit& unit : group.units) {
         out.emplace_back(&unit, path);
@@ -61,7 +66,10 @@ namespace faf::editor
     }
   } // namespace
 
-  BlueprintWreck UnitBlueprintWreck(const std::string& id, const bool underwater)
+  BlueprintWreck UnitBlueprintWreck(
+    const std::string& id,
+    const bool underwater
+  )
   {
     BlueprintWreck result;
     const BlueprintFacts* const facts = FactsOf(id);
@@ -75,16 +83,23 @@ namespace faf::editor
     return result;
   }
 
-  bool UnderWater(const EdDocument& document, const float x, const float z)
+  bool UnderWater(
+    const EdDocument& document,
+    const float x,
+    const float z
+  )
   {
     const moho::CWldMap* const map = document.Map();
     if (map == nullptr || map->mTerrainRes == nullptr || !document.Facts().water) {
       return false;
     }
-    return map->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z)) < document.Facts().waterElevation;
+    return map->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z)) <
+      document.Facts().waterElevation;
   }
 
-  UnitWreckTotals MapUnitWrecks(const EdDocument& document)
+  UnitWreckTotals MapUnitWrecks(
+    const EdDocument& document
+  )
   {
     UnitWreckTotals totals;
     for (const SaveEntry& army : document.SaveData().Armies()) {
@@ -99,10 +114,14 @@ namespace faf::editor
       for (const auto& [unit, groups] : units) {
         const UnitFate fate = FateOfUnit(groups, true, document.Script());
         // A group the lobby may make wrecks or units counts with the script's wreck groups (all options on).
-        if (fate.kind != UnitFate::Kind::Wreck && fate.kind != UnitFate::Kind::ScriptWreck && fate.kind != UnitFate::Kind::ScriptEither) {
+        if (
+          fate.kind != UnitFate::Kind::Wreck && fate.kind != UnitFate::Kind::ScriptWreck &&
+          fate.kind != UnitFate::Kind::ScriptEither
+        ) {
           continue;
         }
-        const BlueprintWreck value = UnitBlueprintWreck(unit->type, UnderWater(document, unit->position[0], unit->position[2]));
+        const BlueprintWreck value =
+          UnitBlueprintWreck(unit->type, UnderWater(document, unit->position[0], unit->position[2]));
         if (!value.known) {
           ++totals.unknown;
           continue;

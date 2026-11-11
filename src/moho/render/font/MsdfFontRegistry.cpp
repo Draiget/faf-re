@@ -79,7 +79,9 @@ namespace moho
       return registry;
     }
 
-    [[nodiscard]] std::string LowerName(const char* const name)
+    [[nodiscard]] std::string LowerName(
+      const char* const name
+    )
     {
       std::string text(name != nullptr ? name : "");
       std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
@@ -89,7 +91,10 @@ namespace moho
     }
 
     /** The cache file of one font: a hash of its bytes, the cook version and the settings. */
-    [[nodiscard]] std::filesystem::path MakeCachePath(const FontFile& file, const SMsdfCookOptions& options)
+    [[nodiscard]] std::filesystem::path MakeCachePath(
+      const FontFile& file,
+      const SMsdfCookOptions& options
+    )
     {
       gpg::SHA256 hash;
       hash.Update(file.mBytes.data(), file.mBytes.size());
@@ -115,7 +120,10 @@ namespace moho
       return cacheDir.parent_path() / "fontcache" / (std::string(name) + ".msdf");
     }
 
-    [[nodiscard]] bool ReadCache(const std::filesystem::path& path, SMsdfFontAtlas& atlas)
+    [[nodiscard]] bool ReadCache(
+      const std::filesystem::path& path,
+      SMsdfFontAtlas& atlas
+    )
     {
       std::ifstream in(path, std::ios::binary);
       if (!in) {
@@ -126,7 +134,10 @@ namespace moho
     }
 
     /** Through a temporary and a rename: games started together on one machine share this folder. */
-    void WriteCache(const std::filesystem::path& path, const SMsdfFontAtlas& atlas)
+    void WriteCache(
+      const std::filesystem::path& path,
+      const SMsdfFontAtlas& atlas
+    )
     {
       const std::vector<std::uint8_t> packed = MSDF_SaveAtlas(atlas);
       if (packed.empty()) {
@@ -150,7 +161,9 @@ namespace moho
       }
     }
 
-    [[nodiscard]] std::uintmax_t FontCacheBytes(const std::filesystem::path& folder)
+    [[nodiscard]] std::uintmax_t FontCacheBytes(
+      const std::filesystem::path& folder
+    )
     {
       std::uintmax_t total = 0u;
       std::error_code error;
@@ -163,7 +176,10 @@ namespace moho
     }
 
     /** A refused font is remembered beside the atlas it would have had, so it doesn't run again on each start. */
-    void RememberRefusal(const std::filesystem::path& path, const std::string& reason)
+    void RememberRefusal(
+      const std::filesystem::path& path,
+      const std::string& reason
+    )
     {
       std::error_code error;
       std::filesystem::create_directories(path.parent_path(), error);
@@ -171,19 +187,25 @@ namespace moho
       out << reason;
     }
 
-    [[nodiscard]] std::filesystem::path RefusalPath(std::filesystem::path cachePath)
+    [[nodiscard]] std::filesystem::path RefusalPath(
+      std::filesystem::path cachePath
+    )
     {
       cachePath.replace_extension(".refused");
       return cachePath;
     }
 
-    [[nodiscard]] std::filesystem::path CookingPath(std::filesystem::path cachePath)
+    [[nodiscard]] std::filesystem::path CookingPath(
+      std::filesystem::path cachePath
+    )
     {
       cachePath.replace_extension(".cooking");
       return cachePath;
     }
 
-    [[nodiscard]] bool IsProcessRunning(const unsigned long processId)
+    [[nodiscard]] bool IsProcessRunning(
+      const unsigned long processId
+    )
     {
 #if !FAFRE_PLATFORM_WINDOWS
       // The Linux client (issue #255): signal 0 only checks the process exists (EPERM: it does,
@@ -207,7 +229,9 @@ namespace moho
      * counts as a start that ended there, and after `kMaxUnfinishedCooks` the font is refused. Another game
      * cooking the same font at the moment doesn't count. False when the font is to be refused.
      */
-    [[nodiscard]] bool MarkCooking(const std::filesystem::path& markerPath)
+    [[nodiscard]] bool MarkCooking(
+      const std::filesystem::path& markerPath
+    )
     {
       unsigned long processId = 0u;
       int unfinished = 0;
@@ -229,7 +253,9 @@ namespace moho
       return true;
     }
 
-    void ClearCooking(const std::filesystem::path& markerPath)
+    void ClearCooking(
+      const std::filesystem::path& markerPath
+    )
     {
       std::error_code error;
       std::filesystem::remove(markerPath, error);
@@ -239,9 +265,12 @@ namespace moho
      * Game fonts and mod fonts take the same steps; a mod's font has its own options, with limits on work,
      * memory and time, its cache file checked against them, and its refusals remembered.
      */
-    [[nodiscard]] std::shared_ptr<const SMsdfFontAtlas> LoadOrCook(const FontFile& file)
+    [[nodiscard]] std::shared_ptr<const SMsdfFontAtlas> LoadOrCook(
+      const FontFile& file
+    )
     {
-      SMsdfCookOptions options = file.mFromMod ? MSDF_MakeModCookOptions(kCookThreads) : MSDF_MakeCookOptions(kCookThreads);
+      SMsdfCookOptions options =
+        file.mFromMod ? MSDF_MakeModCookOptions(kCookThreads) : MSDF_MakeCookOptions(kCookThreads);
       options.mCancel = &gCancelCooks;
       const char* const kind = file.mFromMod ? "mod font " : "";
       const char* const path = file.mPath.c_str();
@@ -250,7 +279,9 @@ namespace moho
       const bool useGpu = MSDF_IsGpuCookAvailable();
       const bool compare = useGpu && ren_GpuFontCookCompare;
       std::string error;
-      if (!compare && ReadCache(cachePath, *atlas) && (!file.mFromMod || MSDF_CheckCookedAtlas(*atlas, options, error))) {
+      if (
+        !compare && ReadCache(cachePath, *atlas) && (!file.mFromMod || MSDF_CheckCookedAtlas(*atlas, options, error))
+      ) {
         gpg::Logf("MSDF: %s%s from the cache, %zu glyphs", kind, path, atlas->mGlyphs.size());
         return atlas;
       }
@@ -305,15 +336,24 @@ namespace moho
         if (MSDF_CookFont(file.mBytes.data(), file.mBytes.size(), options, onCpu, error)) {
           const auto cpuElapsed = std::chrono::steady_clock::now() - cpuStart;
           MSDF_LogAtlasComparison(
-            path, *atlas, onCpu, std::chrono::duration<double, std::milli>(elapsed).count(),
+            path,
+            *atlas,
+            onCpu,
+            std::chrono::duration<double, std::milli>(elapsed).count(),
             std::chrono::duration<double, std::milli>(cpuElapsed).count()
           );
         }
       }
       ClearCooking(markerPath);
       gpg::Logf(
-        "MSDF: cooked %s%s on the %s, %zu glyphs, %u missing, %dx%d, %lld ms", kind, path, cookedOnGpu ? "GPU" : "CPU", atlas->mGlyphs.size(),
-        atlas->mMissing, atlas->mWidth, atlas->mHeight,
+        "MSDF: cooked %s%s on the %s, %zu glyphs, %u missing, %dx%d, %lld ms",
+        kind,
+        path,
+        cookedOnGpu ? "GPU" : "CPU",
+        atlas->mGlyphs.size(),
+        atlas->mMissing,
+        atlas->mWidth,
+        atlas->mHeight,
         static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count())
       );
       WriteCache(cachePath, *atlas);
@@ -323,7 +363,9 @@ namespace moho
     void WorkerMain();
 
     /** Reads the names of files registered since the last call, in the order they came. */
-    void ReadNewFontNames(Registry& registry)
+    void ReadNewFontNames(
+      Registry& registry
+    )
     {
       for (; registry.mNamedFiles < registry.mFiles.size(); ++registry.mNamedFiles) {
         FontFile* const file = registry.mFiles[registry.mNamedFiles].get();
@@ -338,7 +380,10 @@ namespace moho
     }
 
     /** With the registry's lock held. */
-    void EnqueueLocked(Registry& registry, FontFile* const file)
+    void EnqueueLocked(
+      Registry& registry,
+      FontFile* const file
+    )
     {
       if (file->mQueued || registry.mStop) {
         return;
@@ -358,7 +403,9 @@ namespace moho
       Registry& registry = GetRegistry();
       std::unique_lock<std::mutex> lock(registry.mMutex);
       for (;;) {
-        registry.mWake.wait(lock, [&registry]() { return registry.mStop || !registry.mQueue.empty(); });
+        registry.mWake.wait(lock, [&registry]() {
+          return registry.mStop || !registry.mQueue.empty();
+        });
         if (registry.mStop) {
           return;
         }
@@ -373,7 +420,11 @@ namespace moho
     }
   } // namespace
 
-  void MSDF_RegisterFontFile(const char* const path, const void* const fontBytes, const std::size_t byteCount)
+  void MSDF_RegisterFontFile(
+    const char* const path,
+    const void* const fontBytes,
+    const std::size_t byteCount
+  )
   {
     auto file = std::make_unique<FontFile>();
     file->mPath = path != nullptr ? path : "";
@@ -385,7 +436,11 @@ namespace moho
     registry.mFiles.push_back(std::move(file));
   }
 
-  std::string MSDF_RegisterModFont(const char* const path, const void* const fontBytes, const std::size_t byteCount)
+  std::string MSDF_RegisterModFont(
+    const char* const path,
+    const void* const fontBytes,
+    const std::size_t byteCount
+  )
   {
     const char* const shownPath = path != nullptr ? path : "";
     if (!ren_ModFonts) {
@@ -439,7 +494,9 @@ namespace moho
     return family;
   }
 
-  std::shared_ptr<const SMsdfFontAtlas> MSDF_FindAtlas(const char* const faceName)
+  std::shared_ptr<const SMsdfFontAtlas> MSDF_FindAtlas(
+    const char* const faceName
+  )
   {
     Registry& registry = GetRegistry();
     const std::lock_guard<std::mutex> lock(registry.mMutex);

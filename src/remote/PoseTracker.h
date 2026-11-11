@@ -23,7 +23,7 @@ namespace moho
   class CAniPose;
   class Entity;
   class Unit;
-}
+} // namespace moho
 
 namespace faf::remote
 {
@@ -36,8 +36,8 @@ namespace faf::remote
     ~CPoseTracker();
 
     /**
-     * #118: from now on the animation step tells this tracker which bones it changed (`moho::gAniPoseUpdatedHook`), while
-     * they're in cache on the pose jobs' threads; `Refresh` then reads only those. One tracker per process.
+     * #118: from now on the animation step tells this tracker which bones it changed (`moho::gAniPoseUpdatedHook`),
+     * while they're in cache on the pose jobs' threads; `Refresh` then reads only those. One tracker per process.
      */
     void InstallHook();
     /** A bone's local transform and flags as last read, to skip the ones that didn't change at all. */
@@ -56,30 +56,30 @@ namespace faf::remote
     struct SHookState
     {
       std::vector<SRawBone> raw;
-      std::vector<std::uint64_t> dirty;           // a bit per bone that moved past the tolerance: `pending` holds it
-      std::vector<wire::SPoseBone> mirror;        // `SUnit::sent` as of the last beat (the hook's own copy)
-      std::vector<wire::SPoseBone> pending;       // a marked bone's quantised value, for `Refresh`
-      const void* skeleton = nullptr;              // the hook only marks a pose of this skeleton and `raw`'s size
+      std::vector<std::uint64_t> dirty;              // a bit per bone that moved past the tolerance: `pending` holds it
+      std::vector<wire::SPoseBone> mirror;           // `SUnit::sent` as of the last beat (the hook's own copy)
+      std::vector<wire::SPoseBone> pending;          // a marked bone's quantised value, for `Refresh`
+      const void* skeleton = nullptr;                // the hook only marks a pose of this skeleton and `raw`'s size
       const moho::CAniActor* indexedUnder = nullptr; // its key in the hook's index, if any
-      SUnit* owner = nullptr;                      // the unit (units keep their addresses)
-      bool queued = false;                         // in this beat's list of marked units
+      SUnit* owner = nullptr;                        // the unit (units keep their addresses)
+      bool queued = false;                           // in this beat's list of marked units
     };
 
     struct SUnit
     {
       std::uint32_t id = 0;
       moho::Entity* entity = nullptr;
-      moho::Unit* unit = nullptr;          // null: not a unit
-      const void* skeleton = nullptr;      // the skeleton of the pose read last
-      const moho::CAniActor* actor = nullptr; // the actor read last
-      std::uint8_t quietReads = 0;         // reads in a row with no enabled manipulator (past 2: not read)
-      std::vector<wire::SPoseBone> sent;   // every bone as the clients that held the unit since hold it
-      std::unique_ptr<SHookState> hook;    // its own address: the hook's index points at it while units move
-      std::vector<std::uint16_t> changed;  // this beat's, ascending
+      moho::Unit* unit = nullptr;               // null: not a unit
+      const void* skeleton = nullptr;           // the skeleton of the pose read last
+      const moho::CAniActor* actor = nullptr;   // the actor read last
+      std::uint8_t quietReads = 0;              // reads in a row with no enabled manipulator (past 2: not read)
+      std::vector<wire::SPoseBone> sent;        // every bone as the clients that held the unit since hold it
+      std::unique_ptr<SHookState> hook;         // its own address: the hook's index points at it while units move
+      std::vector<std::uint16_t> changed;       // this beat's, ascending
       std::vector<wire::SPoseBone> differences; // each changed bone's step from what the clients held
-      bool reset = false;                  // this beat: every client gets it whole (a new unit, or a new skeleton)
-      std::uint32_t visited = 0;           // the beat (+1) `ReadAll` last listed it in
-      bool dropped = false;                // left the sim this beat; freed after the beat's read
+      bool reset = false;                       // this beat: every client gets it whole (a new unit, or a new skeleton)
+      std::uint32_t visited = 0;                // the beat (+1) `ReadAll` last listed it in
+      bool dropped = false;                     // left the sim this beat; freed after the beat's read
     };
 
     /**
@@ -94,7 +94,10 @@ namespace faf::remote
      * this beat's changed bones, if any. From any thread between `Refresh` calls.
      */
     [[nodiscard]] bool EncodeView(
-      std::span<const std::uint32_t> held, std::span<const std::uint32_t> heldBefore, bool fresh, wire::BitWriter& out
+      std::span<const std::uint32_t> held,
+      std::span<const std::uint32_t> heldBefore,
+      bool fresh,
+      wire::BitWriter& out
     ) const;
 
     /**
@@ -122,18 +125,36 @@ namespace faf::remote
      * client must drop always go). `budgetBytes` 0: `EncodeView`, and `owed` emptied.
      */
     [[nodiscard]] bool EncodeViewBudgeted(
-      std::span<const std::uint32_t> held, std::span<const std::uint32_t> heldBefore, bool fresh, std::size_t budgetBytes,
-      std::span<const float> priority, std::uint32_t beat, std::vector<SOwedPose>& owed, wire::BitWriter& out
+      std::span<const std::uint32_t> held,
+      std::span<const std::uint32_t> heldBefore,
+      bool fresh,
+      std::size_t budgetBytes,
+      std::span<const float> priority,
+      std::uint32_t beat,
+      std::vector<SOwedPose>& owed,
+      wire::BitWriter& out
     ) const;
 
     /** Units with a pose now (counted on asking); bones changed this beat. */
     [[nodiscard]] std::size_t PosedUnits() const noexcept;
-    [[nodiscard]] std::size_t ChangedBones() const noexcept { return mChangedBones; }
+    [[nodiscard]] std::size_t ChangedBones() const noexcept
+    {
+      return mChangedBones;
+    }
     /** Since the first beat: bones changed, and beats. */
-    [[nodiscard]] std::uint64_t TotalChangedBones() const noexcept { return mTotalChangedBones; }
-    [[nodiscard]] std::uint64_t Beats() const noexcept { return mBeats; }
+    [[nodiscard]] std::uint64_t TotalChangedBones() const noexcept
+    {
+      return mTotalChangedBones;
+    }
+    [[nodiscard]] std::uint64_t Beats() const noexcept
+    {
+      return mBeats;
+    }
     /** Since the first beat: unit-beats read from the hook's marks (the rest were read whole or skipped). */
-    [[nodiscard]] std::uint64_t TotalHookedUnits() const noexcept { return mTotalHookedUnits; }
+    [[nodiscard]] std::uint64_t TotalHookedUnits() const noexcept
+    {
+      return mTotalHookedUnits;
+    }
 
   private:
     /** Beats over which every unit is read whole once anyway (catches what the hook can't see). */
@@ -156,10 +177,10 @@ namespace faf::remote
     std::unordered_map<const moho::CAniActor*, SHookState*> mByActor; // read by the hook during ticks
     bool mHooked = false;
     // #118: units the hook marked this tick (each once), so a beat visits only these, new units and a sweep share.
-    std::vector<SUnit*> mMarked;              // sized to the units before each tick
+    std::vector<SUnit*> mMarked; // sized to the units before each tick
     std::atomic<std::size_t> mMarkedCount{0};
-    std::vector<SUnit*> mNewUnits;            // made by this beat's merge
-    std::vector<SUnit*> mTouched;             // last beat's units with changes, to clear
+    std::vector<SUnit*> mNewUnits; // made by this beat's merge
+    std::vector<SUnit*> mTouched;  // last beat's units with changes, to clear
     struct SWork
     {
       SUnit* unit;

@@ -143,17 +143,26 @@ namespace moho
 
   public:
     // Half the head's extent (0x007F4D2E..0x007F4D49 shift the head size by 1).
-    std::uint32_t mWidth;                                    // +0x00
-    std::uint32_t mHeight;                                   // +0x04
-    boost::shared_ptr<ID3DRenderTarget> mRenderTargets[2];  // +0x08
-    CRenFrame mExtractFrame;                                 // +0x18
-    CRenFrame mCompositeFrame;                               // +0x60
-    std::uint32_t mHead;                                     // +0xA8
+    std::uint32_t mWidth;                                  // +0x00
+    std::uint32_t mHeight;                                 // +0x04
+    boost::shared_ptr<ID3DRenderTarget> mRenderTargets[2]; // +0x08
+    CRenFrame mExtractFrame;                               // +0x18
+    CRenFrame mCompositeFrame;                             // +0x60
+    std::uint32_t mHead;                                   // +0xA8
   };
 
-  static_assert(offsetof(CBloomRenderer, mRenderTargets) == 0x08, "moho::CBloomRenderer::mRenderTargets offset must be 0x08");
-  static_assert(offsetof(CBloomRenderer, mExtractFrame) == 0x18, "moho::CBloomRenderer::mExtractFrame offset must be 0x18");
-  static_assert(offsetof(CBloomRenderer, mCompositeFrame) == 0x60, "moho::CBloomRenderer::mCompositeFrame offset must be 0x60");
+  static_assert(
+    offsetof(CBloomRenderer, mRenderTargets) == 0x08,
+    "moho::CBloomRenderer::mRenderTargets offset must be 0x08"
+  );
+  static_assert(
+    offsetof(CBloomRenderer, mExtractFrame) == 0x18,
+    "moho::CBloomRenderer::mExtractFrame offset must be 0x18"
+  );
+  static_assert(
+    offsetof(CBloomRenderer, mCompositeFrame) == 0x60,
+    "moho::CBloomRenderer::mCompositeFrame offset must be 0x60"
+  );
   static_assert(offsetof(CBloomRenderer, mHead) == 0xA8, "moho::CBloomRenderer::mHead offset must be 0xA8");
   static_assert(sizeof(CBloomRenderer) == 0xAC, "moho::CBloomRenderer size must be 0xAC");
 
@@ -165,9 +174,9 @@ namespace moho
    */
   struct SWorldViewInfo
   {
-    IRenderWorldView* mView;                  // +0x00
-    std::int32_t mHead;                       // +0x04
-    std::int32_t mDepth;                      // +0x08
+    IRenderWorldView* mView;                   // +0x00
+    std::int32_t mHead;                        // +0x04
+    std::int32_t mDepth;                       // +0x08
     boost::shared_ptr<TerrainCommon> mTerrain; // +0x0C
   };
 
@@ -325,7 +334,8 @@ namespace moho
   private:
     /**
      * Address: 0x007F90D0 (FUN_007F90D0)
-     * Mangled: ?Render@WRenViewport@Moho@@AAEXHAAV?$vector@USWorldViewInfo@Moho@@V?$allocator@USWorldViewInfo@Moho@@@std@@@std@@@Z
+     * Mangled:
+     * ?Render@WRenViewport@Moho@@AAEXHAAV?$vector@USWorldViewInfo@Moho@@V?$allocator@USWorldViewInfo@Moho@@@std@@@std@@@Z
      *
      * What it does:
      * Renders one head: binds its targets, then runs the terrain, mesh,
@@ -336,7 +346,8 @@ namespace moho
 
     /**
      * Address: 0x007F88B0 (FUN_007F88B0)
-     * Mangled: ?RenderUI@WRenViewport@Moho@@AAEXABV?$vector@USWorldViewInfo@Moho@@V?$allocator@USWorldViewInfo@Moho@@@std@@@std@@@Z
+     * Mangled:
+     * ?RenderUI@WRenViewport@Moho@@AAEXABV?$vector@USWorldViewInfo@Moho@@V?$allocator@USWorldViewInfo@Moho@@@std@@@std@@@Z
      *
      * What it does:
      * Draws the UI and the debug overlays over the head's full extent.
@@ -354,7 +365,8 @@ namespace moho
 
     /**
      * Address: 0x007F8BA0 (FUN_007F8BA0)
-     * Mangled: ?RenderCartographic@WRenViewport@Moho@@AAEIHAAV?$vector@USWorldViewInfo@Moho@@V?$allocator@USWorldViewInfo@Moho@@@std@@@std@@@Z
+     * Mangled:
+     * ?RenderCartographic@WRenViewport@Moho@@AAEIHAAV?$vector@USWorldViewInfo@Moho@@V?$allocator@USWorldViewInfo@Moho@@@std@@@std@@@Z
      *
      * What it does:
      * Renders the cartographic (map-mode) views of `head`; returns how many it
@@ -461,9 +473,8 @@ namespace moho
     /**
      * Engine addition: one world view of `Render`'s per-view loop.
      */
-    void RenderWorldView(
-      const SWorldViewInfo* worldView, int head, const SWorldViewInfo* begin, bool regenerateShoreline
-    );
+    void
+    RenderWorldView(const SWorldViewInfo* worldView, int head, const SWorldViewInfo* begin, bool regenerateShoreline);
 
     /**
      * Engine addition: FXAA, sharpening and grading (ren_Fxaa, ren_Sharpen, ren_Grade) over the world
@@ -492,66 +503,105 @@ namespace moho
     void RenderTerrainNormals(TerrainCommon* terrain);
 
   public:
-    CBloomRenderer mBloomRenderers[2];                                // +0x0128
-    CRenFrame mFrame;                                                 // +0x0280
-    CDebugCanvas mDebugCanvas;                                        // +0x02C8
-    Wm3::Vector2i mScreenPos;                                         // +0x0308
-    Wm3::Vector2i mScreenSize;                                        // +0x0310
-    Wm3::Vector2i mFullScreen;                                        // +0x0318
-    std::int32_t mHead;                                               // +0x0320
-    bool mHasSecondaryHead;                                           // +0x0324
-    std::int32_t mNumHeads;                                           // +0x0328
-    MapImager mMapImager;                                             // +0x032C
-    MeshThumbnailRenderer mThumbnailRenderer;                         // +0x0340
-    RangeRenderer mRangeRenderer;                                     // +0x037C
-    VisionRenderer mVisionRenderer;                                   // +0x0410
-    BoundaryRenderer mBoundaryRenderer;                               // +0x0488
-    Shadow mShadowRenderer;                                           // +0x04F0
-    Clutter mClutter;                                                 // +0x0808
-    Silhouette mSilhouetteRenderer;                                   // +0x2134
+    CBloomRenderer mBloomRenderers[2];        // +0x0128
+    CRenFrame mFrame;                         // +0x0280
+    CDebugCanvas mDebugCanvas;                // +0x02C8
+    Wm3::Vector2i mScreenPos;                 // +0x0308
+    Wm3::Vector2i mScreenSize;                // +0x0310
+    Wm3::Vector2i mFullScreen;                // +0x0318
+    std::int32_t mHead;                       // +0x0320
+    bool mHasSecondaryHead;                   // +0x0324
+    std::int32_t mNumHeads;                   // +0x0328
+    MapImager mMapImager;                     // +0x032C
+    MeshThumbnailRenderer mThumbnailRenderer; // +0x0340
+    RangeRenderer mRangeRenderer;             // +0x037C
+    VisionRenderer mVisionRenderer;           // +0x0410
+    BoundaryRenderer mBoundaryRenderer;       // +0x0488
+    Shadow mShadowRenderer;                   // +0x04F0
+    Clutter mClutter;                         // +0x0808
+    Silhouette mSilhouetteRenderer;           // +0x2134
     // The session Render is drawing: stored at 0x007F9379, read at 0x007F95CE
     // and cleared at 0x007F9709. The fog-of-war guard reads [ebx+488h] from
     // the same register, CWldSession::FocusArmy, which pins the type.
-    CWldSession* mSession;                                            // +0x2140
-    fa::vector<SWorldViewInfo> mWorldViews;                        // +0x2144
-    boost::shared_ptr<CD3DTextureBatcher> mTexBatcher;                // +0x2154
-    boost::shared_ptr<CD3DPrimBatcher> mPrimBatcher;                  // +0x215C
+    CWldSession* mSession;                             // +0x2140
+    fa::vector<SWorldViewInfo> mWorldViews;            // +0x2144
+    boost::shared_ptr<CD3DTextureBatcher> mTexBatcher; // +0x2154
+    boost::shared_ptr<CD3DPrimBatcher> mPrimBatcher;   // +0x215C
     // Concrete types, not the interfaces: D3DWindowOnDeviceInit fills them
     // from ID3DDeviceResources::CreateRenderTarget / CreateDepthStencil.
-    boost::shared_ptr<CD3DRenderTarget> mPrimaryTargetLocks[2];       // +0x2164
-    boost::shared_ptr<CD3DRenderTarget> mSecondaryTargetLocks[2];     // +0x2174
-    boost::shared_ptr<CD3DDepthStencil> mDepthStencilLocks[2];        // +0x2184
-    boost::shared_ptr<CD3DDynamicTextureSheet> mDynamicTextureSheet;  // +0x2194
-    GeomCamera3* mCam;                                                // +0x219C
-    CountedPtr<CD3DFont> mFont;                                       // +0x21A0
+    boost::shared_ptr<CD3DRenderTarget> mPrimaryTargetLocks[2];      // +0x2164
+    boost::shared_ptr<CD3DRenderTarget> mSecondaryTargetLocks[2];    // +0x2174
+    boost::shared_ptr<CD3DDepthStencil> mDepthStencilLocks[2];       // +0x2184
+    boost::shared_ptr<CD3DDynamicTextureSheet> mDynamicTextureSheet; // +0x2194
+    GeomCamera3* mCam;                                               // +0x219C
+    CountedPtr<CD3DFont> mFont;                                      // +0x21A0
 
     DECLARE_EVENT_TABLE()
   };
 
-  static_assert(offsetof(WRenViewport, mBloomRenderers) == 0x128, "moho::WRenViewport::mBloomRenderers offset must be 0x128");
+  static_assert(
+    offsetof(WRenViewport, mBloomRenderers) == 0x128,
+    "moho::WRenViewport::mBloomRenderers offset must be 0x128"
+  );
   static_assert(offsetof(WRenViewport, mFrame) == 0x280, "moho::WRenViewport::mFrame offset must be 0x280");
   static_assert(offsetof(WRenViewport, mDebugCanvas) == 0x2C8, "moho::WRenViewport::mDebugCanvas offset must be 0x2C8");
   static_assert(offsetof(WRenViewport, mScreenPos) == 0x308, "moho::WRenViewport::mScreenPos offset must be 0x308");
   static_assert(offsetof(WRenViewport, mFullScreen) == 0x318, "moho::WRenViewport::mFullScreen offset must be 0x318");
   static_assert(offsetof(WRenViewport, mHead) == 0x320, "moho::WRenViewport::mHead offset must be 0x320");
-  static_assert(offsetof(WRenViewport, mHasSecondaryHead) == 0x324, "moho::WRenViewport::mHasSecondaryHead offset must be 0x324");
+  static_assert(
+    offsetof(WRenViewport, mHasSecondaryHead) == 0x324,
+    "moho::WRenViewport::mHasSecondaryHead offset must be 0x324"
+  );
   static_assert(offsetof(WRenViewport, mNumHeads) == 0x328, "moho::WRenViewport::mNumHeads offset must be 0x328");
   static_assert(offsetof(WRenViewport, mMapImager) == 0x32C, "moho::WRenViewport::mMapImager offset must be 0x32C");
-  static_assert(offsetof(WRenViewport, mThumbnailRenderer) == 0x340, "moho::WRenViewport::mThumbnailRenderer offset must be 0x340");
-  static_assert(offsetof(WRenViewport, mRangeRenderer) == 0x37C, "moho::WRenViewport::mRangeRenderer offset must be 0x37C");
-  static_assert(offsetof(WRenViewport, mVisionRenderer) == 0x410, "moho::WRenViewport::mVisionRenderer offset must be 0x410");
-  static_assert(offsetof(WRenViewport, mBoundaryRenderer) == 0x488, "moho::WRenViewport::mBoundaryRenderer offset must be 0x488");
-  static_assert(offsetof(WRenViewport, mShadowRenderer) == 0x4F0, "moho::WRenViewport::mShadowRenderer offset must be 0x4F0");
+  static_assert(
+    offsetof(WRenViewport, mThumbnailRenderer) == 0x340,
+    "moho::WRenViewport::mThumbnailRenderer offset must be 0x340"
+  );
+  static_assert(
+    offsetof(WRenViewport, mRangeRenderer) == 0x37C,
+    "moho::WRenViewport::mRangeRenderer offset must be 0x37C"
+  );
+  static_assert(
+    offsetof(WRenViewport, mVisionRenderer) == 0x410,
+    "moho::WRenViewport::mVisionRenderer offset must be 0x410"
+  );
+  static_assert(
+    offsetof(WRenViewport, mBoundaryRenderer) == 0x488,
+    "moho::WRenViewport::mBoundaryRenderer offset must be 0x488"
+  );
+  static_assert(
+    offsetof(WRenViewport, mShadowRenderer) == 0x4F0,
+    "moho::WRenViewport::mShadowRenderer offset must be 0x4F0"
+  );
   static_assert(offsetof(WRenViewport, mClutter) == 0x808, "moho::WRenViewport::mClutter offset must be 0x808");
-  static_assert(offsetof(WRenViewport, mSilhouetteRenderer) == 0x2134, "moho::WRenViewport::mSilhouetteRenderer offset must be 0x2134");
+  static_assert(
+    offsetof(WRenViewport, mSilhouetteRenderer) == 0x2134,
+    "moho::WRenViewport::mSilhouetteRenderer offset must be 0x2134"
+  );
   static_assert(offsetof(WRenViewport, mSession) == 0x2140, "moho::WRenViewport::mSession offset must be 0x2140");
   static_assert(offsetof(WRenViewport, mWorldViews) == 0x2144, "moho::WRenViewport::mWorldViews offset must be 0x2144");
   static_assert(offsetof(WRenViewport, mTexBatcher) == 0x2154, "moho::WRenViewport::mTexBatcher offset must be 0x2154");
-  static_assert(offsetof(WRenViewport, mPrimBatcher) == 0x215C, "moho::WRenViewport::mPrimBatcher offset must be 0x215C");
-  static_assert(offsetof(WRenViewport, mPrimaryTargetLocks) == 0x2164, "moho::WRenViewport::mPrimaryTargetLocks offset must be 0x2164");
-  static_assert(offsetof(WRenViewport, mSecondaryTargetLocks) == 0x2174, "moho::WRenViewport::mSecondaryTargetLocks offset must be 0x2174");
-  static_assert(offsetof(WRenViewport, mDepthStencilLocks) == 0x2184, "moho::WRenViewport::mDepthStencilLocks offset must be 0x2184");
-  static_assert(offsetof(WRenViewport, mDynamicTextureSheet) == 0x2194, "moho::WRenViewport::mDynamicTextureSheet offset must be 0x2194");
+  static_assert(
+    offsetof(WRenViewport, mPrimBatcher) == 0x215C,
+    "moho::WRenViewport::mPrimBatcher offset must be 0x215C"
+  );
+  static_assert(
+    offsetof(WRenViewport, mPrimaryTargetLocks) == 0x2164,
+    "moho::WRenViewport::mPrimaryTargetLocks offset must be 0x2164"
+  );
+  static_assert(
+    offsetof(WRenViewport, mSecondaryTargetLocks) == 0x2174,
+    "moho::WRenViewport::mSecondaryTargetLocks offset must be 0x2174"
+  );
+  static_assert(
+    offsetof(WRenViewport, mDepthStencilLocks) == 0x2184,
+    "moho::WRenViewport::mDepthStencilLocks offset must be 0x2184"
+  );
+  static_assert(
+    offsetof(WRenViewport, mDynamicTextureSheet) == 0x2194,
+    "moho::WRenViewport::mDynamicTextureSheet offset must be 0x2194"
+  );
   static_assert(offsetof(WRenViewport, mCam) == 0x219C, "moho::WRenViewport::mCam offset must be 0x219C");
   static_assert(offsetof(WRenViewport, mFont) == 0x21A0, "moho::WRenViewport::mFont offset must be 0x21A0");
   // mFont ends at +0x21A4; the last four bytes are tail padding (nothing in the
@@ -570,9 +620,8 @@ namespace moho
    * The mangled size type is Wm3::IVector2<int>, which this tree spells
    * Wm3::Vector2i.
    */
-  [[nodiscard]] WD3DViewport* REN_CreateGameViewport(
-    wxWindow* parent, gpg::StrArg title, const Wm3::Vector2i& size, bool hasSecondHead
-  );
+  [[nodiscard]] WD3DViewport*
+  REN_CreateGameViewport(wxWindow* parent, gpg::StrArg title, const Wm3::Vector2i& size, bool hasSecondHead);
 
   /**
    * Address: 0x007F6530 (FUN_007F6530)

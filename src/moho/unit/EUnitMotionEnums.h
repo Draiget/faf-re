@@ -56,4 +56,3 @@ namespace moho
     UMTE_SharpTurn = 2,
   };
 } // namespace moho
-

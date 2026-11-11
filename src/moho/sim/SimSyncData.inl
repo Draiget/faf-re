@@ -17,7 +17,9 @@ SSyncSizes SSyncData::GetSizes() const
 /**
  * Address: 0x00560A00 (FUN_00560A00, Moho::SSyncData::ReserveSizes)
  */
-void SSyncData::ReserveSizes(const SSyncSizes& sizes)
+void SSyncData::ReserveSizes(
+  const SSyncSizes& sizes
+)
 {
   mAudioRequests.Reserve(static_cast<std::size_t>(sizes.mAudioRequests));
   mArmyUpdates.reserve(static_cast<std::size_t>(sizes.mArmyUpdates));
@@ -36,7 +38,12 @@ void SSyncData::ReserveSizes(const SSyncSizes& sizes)
  * Ser-load callback thunk: forwards archive/object args to 0x00754C60.
  * Extra serializer callback args are ignored in retail.
  */
-void moho::SimSerializerLoadThunk(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
+void moho::SimSerializerLoadThunk(
+  gpg::ReadArchive* archive,
+  std::intptr_t objectPtr,
+  int,
+  gpg::RRef*
+)
 {
   if (objectPtr == 0) {
     return;
@@ -55,7 +62,12 @@ void moho::SimSerializerLoadThunk(gpg::ReadArchive* archive, std::intptr_t objec
  * Ser-save callback thunk: forwards archive/object args to 0x007551C0.
  * Extra serializer callback args are ignored in retail.
  */
-void moho::SimSerializerSaveThunk(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
+void moho::SimSerializerSaveThunk(
+  gpg::WriteArchive* archive,
+  std::intptr_t objectPtr,
+  int,
+  gpg::RRef*
+)
 {
   if (objectPtr == 0) {
     return;
@@ -76,7 +88,9 @@ void moho::SimSerializerSaveThunk(gpg::WriteArchive* archive, std::intptr_t obje
  * What it does:
  * Returns the cached Sim convar instance for `var->mIndex`, creating it on first access.
  */
-CSimConVarInstanceBase* Sim::GetSimVar(CSimConVarBase* var)
+CSimConVarInstanceBase* Sim::GetSimVar(
+  CSimConVarBase* var
+)
 {
   if (!var) {
     return nullptr;
@@ -97,7 +111,6 @@ CSimConVarInstanceBase* Sim::GetSimVar(CSimConVarBase* var)
   return instance;
 }
 
-
 #if FAF_SERVER_MODE
 namespace moho
 {
@@ -115,7 +128,9 @@ namespace
   {
     Sim& sim;
     ISyncRouting* routing;
-    explicit SSyncRoutingCommand(Sim& owner)
+    explicit SSyncRoutingCommand(
+      Sim& owner
+    )
       : sim(owner)
       , routing(sSyncRouting)
     {
@@ -132,12 +147,16 @@ namespace
   };
 } // namespace
 
-void Sim::SetSyncRouting(ISyncRouting* const routing) noexcept
+void Sim::SetSyncRouting(
+  ISyncRouting* const routing
+) noexcept
 {
   sSyncRouting = routing;
 }
 
-void Sim::SetSyncObserver(CSyncObserver* const observer) noexcept
+void Sim::SetSyncObserver(
+  CSyncObserver* const observer
+) noexcept
 {
   const std::lock_guard<std::mutex> guard(sSyncObserverLock);
   sSyncObserver = observer;
@@ -156,7 +175,10 @@ CSyncObserver* Sim::SyncObserver() noexcept
  * What it does:
  * Builds one checksum-log file path as `<prefix>beat%05d.log`.
  */
-[[nodiscard]] static fa::string FormatBeatLogFilePath(const fa::string& logFilePrefix, const int beat)
+[[nodiscard]] static fa::string FormatBeatLogFilePath(
+  const fa::string& logFilePrefix,
+  const int beat
+)
 {
   return gpg::STR_Printf("%sbeat%05d.log", logFilePrefix.c_str(), beat);
 }
@@ -209,7 +231,7 @@ namespace
   // kAllUnitsMidFamilyBoundaryKey / kAllUnitsShieldFamilyBoundaryKey pair).
   constexpr std::uint32_t kReconBlipFamilyBeginId = 0x30000000u;
   constexpr std::uint32_t kReconBlipFamilyEndId = 0x40000000u;
-}
+} // namespace
 
 namespace moho
 {
@@ -223,7 +245,7 @@ namespace moho
   bool sim_ParallelUnitSyncRefresh = true;
 
   bool sim_ChecksumBatching = true;
-}
+} // namespace moho
 
 namespace moho
 {
@@ -236,17 +258,20 @@ namespace moho
 
   TConVar<bool> gTConVar_sim_ParallelCoords(
     "sim_ParallelCoords",
-    "Advance entity coordinates (transforms, history, collision bounds) on sim workers; relinks and intel stay serial (needs sim_Workers > 0).",
+    "Advance entity coordinates (transforms, history, collision bounds) on sim workers; relinks and intel stay serial "
+    "(needs sim_Workers > 0).",
     &sim_ParallelCoords
   );
   TConVar<bool> gTConVar_sim_ReconOverlap(
     "sim_ReconOverlap",
-    "With sim_ParallelRecon, refresh the recon blips of the armies before the beat's ReconTick army on sim workers while that ReconTick runs; any engine call from its Lua waits for them first (same recon).",
+    "With sim_ParallelRecon, refresh the recon blips of the armies before the beat's ReconTick army on sim workers "
+    "while that ReconTick runs; any engine call from its Lua waits for them first (same recon).",
     &sim_ReconOverlap
   );
   TConVar<bool> gTConVar_sim_ParallelUnitSyncRefresh(
     "sim_ParallelUnitSyncRefresh",
-    "Refresh each synced unit's own sync block (weapon info, silo counts, target ids, poses) on sim workers before the sync walk (needs sim_Workers > 0; same packet).",
+    "Refresh each synced unit's own sync block (weapon info, silo counts, target ids, poses) on sim workers before the "
+    "sync walk (needs sim_Workers > 0; same packet).",
     &sim_ParallelUnitSyncRefresh
   );
   TConVar<bool> gTConVar_sim_ChecksumBatching(
@@ -266,9 +291,7 @@ namespace moho
     "x86 allocator: find a block's size class by table instead of a binary search (same class).",
     &gpg::mem_SmallBlockIndexTable
   );
-}
-
-
+} // namespace moho
 
 /**
  * Address: 0x005C3710 (FUN_005C3710, sub_5C3710)
@@ -288,7 +311,10 @@ void Sim::RefreshBlips()
   }
 }
 
-void moho::SIM_DescribeStateForDesync(const Sim& sim, std::string& out)
+void moho::SIM_DescribeStateForDesync(
+  const Sim& sim,
+  std::string& out
+)
 {
   const auto line = [&out](const char* const format, auto... args) {
     char buffer[512];
@@ -308,7 +334,9 @@ void moho::SIM_DescribeStateForDesync(const Sim& sim, std::string& out)
     }
     const SEconTotals& economy = army->GetEconomy()->economy;
     line(
-      "  %d \"%s\" [%s]\n", army->mConstDat.mArmyIndex, army->mConstDat.mPlayerName.raw_data_unsafe(),
+      "  %d \"%s\" [%s]\n",
+      army->mConstDat.mArmyIndex,
+      army->mConstDat.mPlayerName.raw_data_unsafe(),
       army->mConstDat.mArmyName.raw_data_unsafe()
     );
     line("    mStored=%.9g,%.9g\n", economy.mStored.ENERGY, economy.mStored.MASS);
@@ -332,36 +360,65 @@ void moho::SIM_DescribeStateForDesync(const Sim& sim, std::string& out)
     ReadEntityVelocity(entity, &velocity);
     const char* const blueprintId = ResolveBlueprintIdCString(entity);
     line(
-      "0x%08x bp=%s army=%d layer=%d health=%.9g [0x%08x]\n", static_cast<std::uint32_t>(entity->id_),
-      blueprintId != nullptr ? blueprintId : "", entity->ArmyRef != nullptr ? entity->ArmyRef->mConstDat.mArmyIndex : -1,
-      static_cast<int>(entity->mVarDat.mLayerMask), health, FloatBits(health)
+      "0x%08x bp=%s army=%d layer=%d health=%.9g [0x%08x]\n",
+      static_cast<std::uint32_t>(entity->id_),
+      blueprintId != nullptr ? blueprintId : "",
+      entity->ArmyRef != nullptr ? entity->ArmyRef->mConstDat.mArmyIndex : -1,
+      static_cast<int>(entity->mVarDat.mLayerMask),
+      health,
+      FloatBits(health)
     );
     line(
-      "  pos=<%.9g,%.9g,%.9g> [0x%08x 0x%08x 0x%08x]\n", pos[0], pos[1], pos[2], FloatBits(pos[0]), FloatBits(pos[1]),
+      "  pos=<%.9g,%.9g,%.9g> [0x%08x 0x%08x 0x%08x]\n",
+      pos[0],
+      pos[1],
+      pos[2],
+      FloatBits(pos[0]),
+      FloatBits(pos[1]),
       FloatBits(pos[2])
     );
     line(
-      "  rot=<%.9g,%.9g,%.9g,%.9g> [0x%08x 0x%08x 0x%08x 0x%08x]\n", rot[0], rot[1], rot[2], rot[3], FloatBits(rot[0]),
-      FloatBits(rot[1]), FloatBits(rot[2]), FloatBits(rot[3])
+      "  rot=<%.9g,%.9g,%.9g,%.9g> [0x%08x 0x%08x 0x%08x 0x%08x]\n",
+      rot[0],
+      rot[1],
+      rot[2],
+      rot[3],
+      FloatBits(rot[0]),
+      FloatBits(rot[1]),
+      FloatBits(rot[2]),
+      FloatBits(rot[3])
     );
     line(
-      "  vel=<%.9g,%.9g,%.9g> [0x%08x 0x%08x 0x%08x]\n", velocity.x, velocity.y, velocity.z, FloatBits(velocity.x),
-      FloatBits(velocity.y), FloatBits(velocity.z)
+      "  vel=<%.9g,%.9g,%.9g> [0x%08x 0x%08x 0x%08x]\n",
+      velocity.x,
+      velocity.y,
+      velocity.z,
+      FloatBits(velocity.x),
+      FloatBits(velocity.y),
+      FloatBits(velocity.z)
     );
     if (Unit* const unit = entity->IsUnit(); unit != nullptr && unit->CommandQueue != nullptr) {
       if (const CUnitCommand* const command = unit->CommandQueue->GetCurrentCommand(); command != nullptr) {
-        line("  command=0x%08x type=%d\n", static_cast<std::uint32_t>(command->mConstDat.cmd), static_cast<int>(command->mVarDat.mCmdType));
+        line(
+          "  command=0x%08x type=%d\n",
+          static_cast<std::uint32_t>(command->mConstDat.cmd),
+          static_cast<int>(command->mVarDat.mCmdType)
+        );
       }
     }
   }
 }
 
-int moho::SIM_GetChecksumPeriod(const Sim& sim)
+int moho::SIM_GetChecksumPeriod(
+  const Sim& sim
+)
 {
   return ReadSimConVarInt(const_cast<Sim*>(&sim), &gSimConVar_sim_ChecksumPeriod, 1);
 }
 
-void moho::SIM_ApplyDesyncTestNudge(Sim& sim)
+void moho::SIM_ApplyDesyncTestNudge(
+  Sim& sim
+)
 {
   // Once per sim: the first checksum beat at or after the requested one, on the lowest-id unit the
   // checksum covers that beat (the dirty entities), so the next hash differs.
@@ -384,7 +441,10 @@ void moho::SIM_ApplyDesyncTestNudge(Sim& sim)
   target->mVarDat.mHealth = std::nextafter(before, std::numeric_limits<float>::infinity());
   gpg::Warnf(
     "sim_DesyncTestNudgeBeat: unit 0x%08x health %.9g -> %.9g at beat %u (this client only)",
-    static_cast<std::uint32_t>(target->id_), before, static_cast<double>(target->mVarDat.mHealth), sim.mCurBeat
+    static_cast<std::uint32_t>(target->id_),
+    before,
+    static_cast<double>(target->mVarDat.mHealth),
+    sim.mCurBeat
   );
 }
 namespace
@@ -397,7 +457,9 @@ namespace
    * the binary's early-out for uninitialized vectors.
    */
   template <class TDebugRecord>
-  [[nodiscard]] std::size_t DebugVectorSizeThunk(const fa::vector<TDebugRecord>* const vec) noexcept
+  [[nodiscard]] std::size_t DebugVectorSizeThunk(
+    const fa::vector<TDebugRecord>* const vec
+  ) noexcept
   {
     const TDebugRecord* const first = vec ? vec->data() : nullptr;
     if (first == nullptr) {
@@ -405,9 +467,7 @@ namespace
     }
     return vec->size();
   }
-}
-
-
+} // namespace
 
 /**
  * Address: 0x00452110 (FUN_00452110, sub_452110)
@@ -422,7 +482,9 @@ namespace
  * early-out; otherwise returns `(last_ - first_) / sizeof(SDebugWorldText)`
  * (element size `0x30`).
  */
-std::size_t GetDebugWorldTextCount(const fa::vector<SDebugWorldText>* const worldText) noexcept
+std::size_t GetDebugWorldTextCount(
+  const fa::vector<SDebugWorldText>* const worldText
+) noexcept
 {
   return DebugVectorSizeThunk<SDebugWorldText>(worldText);
 }
@@ -438,7 +500,9 @@ std::size_t GetDebugWorldTextCount(const fa::vector<SDebugWorldText>* const worl
  * thunk (element size `0x48`). Same shape as
  * `GetDebugWorldTextCount`.
  */
-std::size_t GetDebugScreenTextCount(const fa::vector<SDebugScreenText>* const screenText) noexcept
+std::size_t GetDebugScreenTextCount(
+  const fa::vector<SDebugScreenText>* const screenText
+) noexcept
 {
   return DebugVectorSizeThunk<SDebugScreenText>(screenText);
 }
@@ -454,7 +518,9 @@ std::size_t GetDebugScreenTextCount(const fa::vector<SDebugScreenText>* const sc
  * thunk (element size `0x34`). Same shape as
  * `GetDebugWorldTextCount`.
  */
-std::size_t GetDebugDecalCount(const fa::vector<SDebugDecal>* const decals) noexcept
+std::size_t GetDebugDecalCount(
+  const fa::vector<SDebugDecal>* const decals
+) noexcept
 {
   return DebugVectorSizeThunk<SDebugDecal>(decals);
 }
@@ -494,7 +560,10 @@ std::size_t GetDebugDecalCount(const fa::vector<SDebugDecal>* const decals) noex
  * (0x00453EF0) and `DRAW_Circle` (0x00456220), all (1,0,0).
  */
 Wm3::Quaternionf* moho::QuatCrossAdd(
-  Wm3::Quaternionf* const dest, Wm3::Vector3f v1, Wm3::Vector3f v2, const Wm3::Vector3f& fallbackAxis
+  Wm3::Quaternionf* const dest,
+  Wm3::Vector3f v1,
+  Wm3::Vector3f v2,
+  const Wm3::Vector3f& fallbackAxis
 )
 {
   Wm3::Vector3f::Normalize(&v1);
@@ -531,7 +600,10 @@ Wm3::Quaternionf* moho::QuatCrossAdd(
  * What it does:
  * Writes one formatted line into the active sim log stream when logging is enabled.
  */
-void Sim::Logf(const char* fmt, ...)
+void Sim::Logf(
+  const char* fmt,
+  ...
+)
 {
   va_list args;
   va_start(args, fmt);
@@ -555,7 +627,10 @@ void Sim::Logf(const char* fmt, ...)
  * What it does:
  * Formats one line and appends it into `mPrintField`.
  */
-void Sim::Printf(const char* fmt, ...)
+void Sim::Printf(
+  const char* fmt,
+  ...
+)
 {
   va_list args;
   va_start(args, fmt);
@@ -589,7 +664,9 @@ namespace
    * thread or ahead of it (SIM_PrepareLuaState). The binding of the sim itself to the state
    * follows in the constructor.
    */
-  LuaPlus::LuaState* BuildSimLuaState(RRuleGameRules* const rules)
+  LuaPlus::LuaState* BuildSimLuaState(
+    RRuleGameRules* const rules
+  )
   {
     auto* const state = new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
     lua::NameLuaVm(state->m_state, "Sim"); // diagnostics label only
@@ -624,7 +701,9 @@ namespace
   }
 
   // With `prepared.lock` held: waits for the builder and hands over what it built, or null.
-  LuaPlus::LuaState* TakePreparedLocked(PreparedSimLuaState& prepared)
+  LuaPlus::LuaState* TakePreparedLocked(
+    PreparedSimLuaState& prepared
+  )
   {
     if (prepared.builder.joinable()) {
       prepared.builder.join();
@@ -634,7 +713,9 @@ namespace
   }
 
   // With `prepared.lock` held: drops what the builder made, export binding first.
-  void DiscardPreparedLocked(PreparedSimLuaState& prepared)
+  void DiscardPreparedLocked(
+    PreparedSimLuaState& prepared
+  )
   {
     RRuleGameRules* const rules = const_cast<RRuleGameRules*>(prepared.rules);
     if (LuaPlus::LuaState* const state = TakePreparedLocked(prepared); state != nullptr) {
@@ -644,7 +725,9 @@ namespace
   }
 
   // The state prepared for `rules`, once its builder is done, or null.
-  LuaPlus::LuaState* TakePreparedLuaState(const RRuleGameRules* const rules)
+  LuaPlus::LuaState* TakePreparedLuaState(
+    const RRuleGameRules* const rules
+  )
   {
     PreparedSimLuaState& prepared = Prepared();
     const std::lock_guard<std::mutex> guard(prepared.lock);
@@ -652,7 +735,9 @@ namespace
   }
 } // namespace
 
-void moho::SIM_PrepareLuaState(RRuleGameRules* const rules)
+void moho::SIM_PrepareLuaState(
+  RRuleGameRules* const rules
+)
 {
   if (rules == nullptr || !sim_PrepareLuaStateEarly) {
     return;
@@ -692,7 +777,9 @@ void moho::SIM_FinishPreparingLuaState()
   }
 }
 
-void moho::SIM_DiscardPreparedLuaState(const RRuleGameRules* const rules)
+void moho::SIM_DiscardPreparedLuaState(
+  const RRuleGameRules* const rules
+)
 {
   PreparedSimLuaState& prepared = Prepared();
   const std::lock_guard<std::mutex> guard(prepared.lock);
@@ -719,7 +806,9 @@ Sim* Sim::sInstance = nullptr;
  * allocates the occupation grid and path tables, then exports the rules to Lua
  * and seeds the rolling sim checksum.
  */
-Sim::Sim(LaunchInfoBase* const info)
+Sim::Sim(
+  LaunchInfoBase* const info
+)
   : ICommandSink()
   , mLog(nullptr)
   , mIsDesyncFree(true)

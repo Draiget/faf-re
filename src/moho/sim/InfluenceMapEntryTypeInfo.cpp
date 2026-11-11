@@ -72,7 +72,9 @@ namespace
   InfluenceMapEntryTypeInfoBootstrap gInfluenceMapEntryTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_InfluenceMapEntryTypeInfo_c13fe8, moho::register_InfluenceMapEntryTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_InfluenceMapEntryTypeInfo_c13fe8,
+  moho::register_InfluenceMapEntryTypeInfo
+)

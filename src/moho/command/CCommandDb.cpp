@@ -28,7 +28,9 @@ namespace
   }
 
   void WriteCommandEntryDump(
-    std::ostringstream& stream, const moho::CmdId key, const moho::CUnitCommand* const command
+    std::ostringstream& stream,
+    const moho::CmdId key,
+    const moho::CUnitCommand* const command
   )
   {
     stream << gpg::STR_Printf("  0x%08x =>", static_cast<std::uint32_t>(key)).c_str();
@@ -63,7 +65,9 @@ namespace
    * Dies with a dump of every still-owned command when the command map is
    * destroyed non-empty.
    */
-  void ValidateCommandMapEmptyOrDie(const moho::CCommandDB::CommandMap& commands)
+  void ValidateCommandMapEmptyOrDie(
+    const moho::CCommandDB::CommandMap& commands
+  )
   {
     if (commands.empty()) {
       return;
@@ -108,13 +112,14 @@ namespace moho
    * `_Myfirst`/`_Mylast`/`_Myend`, matching the binary's explicit
    * zero-stores.
    */
-  CCommandDB::CCommandDB(Sim* const sim)
+  CCommandDB::CCommandDB(
+    Sim* const sim
+  )
     : sim(sim)
     , commands()
     , pool()
     , pendingReleasedCmdIds()
-  {
-  }
+  {}
 
   /**
    * Address: 0x006E0A70 (FUN_006E0A70, ??1CommandDatabase@Moho@@QAE@@Z)
@@ -147,7 +152,9 @@ namespace moho
    * one command from issue-data lanes, inserts it into the command map, and
    * returns the command pointer.
    */
-  CUnitCommand* CCommandDB::AddIssueData(SSTICommandIssueData issueData)
+  CUnitCommand* CCommandDB::AddIssueData(
+    SSTICommandIssueData issueData
+  )
   {
     CmdId commandId = issueData.nextCommandId;
 
@@ -191,7 +198,10 @@ namespace moho
    * swaps pending released command-id vectors with packet storage, and updates
    * id-pool recycle state.
    */
-  void CCommandDB::PublishSyncData(SSyncData* const syncData, const bool forceRefresh)
+  void CCommandDB::PublishSyncData(
+    SSyncData* const syncData,
+    const bool forceRefresh
+  )
   {
     // The iterator is advanced *before* the call, exactly as 0x006E0F67 does:
     // it loads the mapped command into `ecx` first, then runs the successor
@@ -224,7 +234,9 @@ namespace moho
    * at 0x006E0EF6 is `IdPool::QueueReleasedLowId` (0x004039F0) inlined, and the
    * tail call is the `fa::vector<CmdId>::push_back` emission FUN_006E1A10.
    */
-  void CCommandDB::RemoveCmd(const CmdId cmdId)
+  void CCommandDB::RemoveCmd(
+    const CmdId cmdId
+  )
   {
     if (const auto it = commands.find(cmdId); it != commands.end()) {
       commands.erase(it);
@@ -244,7 +256,9 @@ namespace moho
    * Runs one `CCommandDB` destructor lane and then releases the object storage
    * with scalar `operator delete`, returning the same pointer.
    */
-  [[maybe_unused]] CCommandDB* ReleaseCommandDbInstance(CCommandDB* const db)
+  [[maybe_unused]] CCommandDB* ReleaseCommandDbInstance(
+    CCommandDB* const db
+  )
   {
     db->~CCommandDB();
     ::operator delete(db);
@@ -258,7 +272,9 @@ namespace moho
    * Serializes each stored command pointer as `OWNED`, then writes the
    * terminating null command-pointer lane.
    */
-  void CCommandDB::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CCommandDB::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -292,7 +308,9 @@ namespace moho
    * never calls) -- deserialization only ever runs against a freshly
    * constructed, still-empty command database.
    */
-  void CCommandDB::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CCommandDB::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -399,7 +417,12 @@ namespace moho
 
 namespace moho
 {
-  void CCommandDB::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CCommandDB::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     Sim* sim = nullptr;
     const gpg::RRef owner{};
@@ -408,7 +431,10 @@ namespace moho
   }
 
   void CCommandDB::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     archive.WritePointer(sim, gpg::TrackedPointerState::Unowned, gpg::RRef{});

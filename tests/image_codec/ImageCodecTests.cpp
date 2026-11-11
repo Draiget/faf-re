@@ -22,7 +22,11 @@ using gpg::gal::imaging::ImageCodec;
 
 namespace
 {
-  void Check(const bool condition, const char* const what, const char* const detail = "")
+  void Check(
+    const bool condition,
+    const char* const what,
+    const char* const detail = ""
+  )
   {
     EXPECT_TRUE(condition) << what << (detail[0] != '\0' ? " - " : "") << detail;
     std::printf("%s: %s%s%s\n", condition ? "PASS" : "FAIL", what, detail[0] != '\0' ? " - " : "", detail);
@@ -55,7 +59,9 @@ namespace
   };
 
   /** Fills the image with varied bytes that survive a format round trip: no NaN, X8 opaque. */
-  void FillPattern(Image& image)
+  void FillPattern(
+    Image& image
+  )
   {
     std::uint32_t state = 0x12345678U;
     const auto next = [&state] {
@@ -64,7 +70,9 @@ namespace
       state ^= state << 5U;
       return state;
     };
-    const auto put = [&image](const std::size_t at, const auto value) { std::memcpy(image.bytes.data() + at, &value, sizeof(value)); };
+    const auto put = [&image](const std::size_t at, const auto value) {
+      std::memcpy(image.bytes.data() + at, &value, sizeof(value));
+    };
     switch (image.format) {
     case DXGI_FORMAT_R16_FLOAT:
     case DXGI_FORMAT_R16G16_FLOAT:
@@ -93,7 +101,13 @@ namespace
     }
   }
 
-  [[nodiscard]] Image MakeImage(const DXGI_FORMAT format, const std::uint32_t width, const std::uint32_t height, const std::uint32_t mips, const bool cube = false)
+  [[nodiscard]] Image MakeImage(
+    const DXGI_FORMAT format,
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const std::uint32_t mips,
+    const bool cube = false
+  )
   {
     Image image;
     image.Allocate(format, width, height, mips, cube ? 6U : 1U);
@@ -103,7 +117,15 @@ namespace
   }
 
   /** The reload UpdateSurface does: the destination's format, size and level count. */
-  [[nodiscard]] HRESULT Reload(ImageCodec& codec, const std::vector<std::uint8_t>& file, const DXGI_FORMAT format, const std::uint32_t width, const std::uint32_t height, const std::uint32_t mips, Image& out)
+  [[nodiscard]] HRESULT Reload(
+    ImageCodec& codec,
+    const std::vector<std::uint8_t>& file,
+    const DXGI_FORMAT format,
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const std::uint32_t mips,
+    Image& out
+  )
   {
     DecodeOptions options;
     options.format = format;
@@ -114,11 +136,25 @@ namespace
   }
 
   /** Levels under 4x4 of a block format are left out: D3DX11's round trip changes their bytes. */
-  [[nodiscard]] bool SameLevels(const Image& a, const Image& b)
+  [[nodiscard]] bool SameLevels(
+    const Image& a,
+    const Image& b
+  )
   {
-    if (a.format != b.format || a.width != b.width || a.height != b.height || a.mipLevels != b.mipLevels || a.subresources.size() != b.subresources.size()) {
+    if (
+      a.format != b.format || a.width != b.width || a.height != b.height || a.mipLevels != b.mipLevels ||
+      a.subresources.size() != b.subresources.size()
+    ) {
       std::printf(
-        "  shape: format %d, then %d; %ux%u, then %ux%u; %u levels, then %u\n", static_cast<int>(a.format), static_cast<int>(b.format), a.width, a.height, b.width, b.height, a.mipLevels, b.mipLevels
+        "  shape: format %d, then %d; %ux%u, then %ux%u; %u levels, then %u\n",
+        static_cast<int>(a.format),
+        static_cast<int>(b.format),
+        a.width,
+        a.height,
+        b.width,
+        b.height,
+        a.mipLevels,
+        b.mipLevels
       );
       return false;
     }
@@ -135,7 +171,13 @@ namespace
           continue;
         }
         if (a.bytes[level.offset + at] != b.bytes[b.subresources[index].offset + at]) {
-          std::printf("  subresource %zu byte %u: %02X, then %02X\n", index, at, a.bytes[level.offset + at], b.bytes[b.subresources[index].offset + at]);
+          std::printf(
+            "  subresource %zu byte %u: %02X, then %02X\n",
+            index,
+            at,
+            a.bytes[level.offset + at],
+            b.bytes[b.subresources[index].offset + at]
+          );
           return false;
         }
       }
@@ -144,16 +186,22 @@ namespace
   }
 
   /** True when this D3DX11 can't load the format even from a file it wrote itself. */
-  [[nodiscard]] bool D3dxRefusesFormat(ImageCodec& codec, const Image& source)
+  [[nodiscard]] bool D3dxRefusesFormat(
+    ImageCodec& codec,
+    const Image& source
+  )
   {
     std::vector<std::uint8_t> encoded;
     std::vector<std::uint8_t> own;
     Image reloaded;
-    return SUCCEEDED(codec.Encode(source, FileFormat::Dds, encoded)) && SUCCEEDED(ImageCodec::WriteDds(source, own)) && encoded != own &&
+    return SUCCEEDED(codec.Encode(source, FileFormat::Dds, encoded)) && SUCCEEDED(ImageCodec::WriteDds(source, own)) &&
+      encoded != own &&
       FAILED(Reload(codec, encoded, source.format, source.width, source.height, source.mipLevels, reloaded));
   }
 
-  void TestEveryFormatRoundTrips(ImageCodec& codec)
+  void TestEveryFormatRoundTrips(
+    ImageCodec& codec
+  )
   {
     for (const NamedFormat& entry : kFormats) {
       const Image source = MakeImage(entry.format, 16U, 16U, 5U);
@@ -166,19 +214,30 @@ namespace
         continue;
       }
       char detail[96]{};
-      std::snprintf(detail, sizeof(detail), "write 0x%08lX, read 0x%08lX", static_cast<unsigned long>(written), static_cast<unsigned long>(read));
+      std::snprintf(
+        detail,
+        sizeof(detail),
+        "write 0x%08lX, read 0x%08lX",
+        static_cast<unsigned long>(written),
+        static_cast<unsigned long>(read)
+      );
       Check(SUCCEEDED(read) && SameLevels(source, reloaded), entry.name, detail);
     }
   }
 
   // The stratum masks: a file D3DX11 loaded as R8G8B8A8 going into a B8G8R8A8 engine texture.
-  void TestSwizzleKeepsChannels(ImageCodec& codec)
+  void TestSwizzleKeepsChannels(
+    ImageCodec& codec
+  )
   {
     const Image source = MakeImage(DXGI_FORMAT_R8G8B8A8_UNORM, 32U, 16U, 1U);
     std::vector<std::uint8_t> file;
     Image reloaded;
-    const HRESULT result = SUCCEEDED(ImageCodec::WriteDds(source, file)) ? Reload(codec, file, DXGI_FORMAT_B8G8R8A8_UNORM, 32U, 16U, 1U, reloaded) : E_FAIL;
-    bool same = SUCCEEDED(result) && reloaded.format == DXGI_FORMAT_B8G8R8A8_UNORM && reloaded.bytes.size() == source.bytes.size();
+    const HRESULT result = SUCCEEDED(ImageCodec::WriteDds(source, file))
+      ? Reload(codec, file, DXGI_FORMAT_B8G8R8A8_UNORM, 32U, 16U, 1U, reloaded)
+      : E_FAIL;
+    bool same = SUCCEEDED(result) && reloaded.format == DXGI_FORMAT_B8G8R8A8_UNORM &&
+      reloaded.bytes.size() == source.bytes.size();
     for (std::size_t at = 0U; same && at + 4U <= source.bytes.size(); at += 4U) {
       same = reloaded.bytes[at] == source.bytes[at + 2U] && reloaded.bytes[at + 1U] == source.bytes[at + 1U] &&
         reloaded.bytes[at + 2U] == source.bytes[at] && reloaded.bytes[at + 3U] == source.bytes[at + 3U];
@@ -188,7 +247,9 @@ namespace
 
   // A format D3DX11 may refuse to load as itself still has to be a readable file: one solid colour
   // comes back as that colour in 8 bits per channel.
-  void TestB5G6R5FileIsReadable(ImageCodec& codec)
+  void TestB5G6R5FileIsReadable(
+    ImageCodec& codec
+  )
   {
     Image source;
     source.Allocate(DXGI_FORMAT_B5G6R5_UNORM, 8U, 8U, 1U, 1U);
@@ -198,10 +259,13 @@ namespace
     }
     std::vector<std::uint8_t> file;
     Image reloaded;
-    const HRESULT result = SUCCEEDED(ImageCodec::WriteDds(source, file)) ? Reload(codec, file, DXGI_FORMAT_B8G8R8A8_UNORM, 8U, 8U, 1U, reloaded) : E_FAIL;
+    const HRESULT result = SUCCEEDED(ImageCodec::WriteDds(source, file))
+      ? Reload(codec, file, DXGI_FORMAT_B8G8R8A8_UNORM, 8U, 8U, 1U, reloaded)
+      : E_FAIL;
     bool same = SUCCEEDED(result) && reloaded.format == DXGI_FORMAT_B8G8R8A8_UNORM;
     for (std::size_t at = 0U; same && at + 4U <= reloaded.bytes.size(); at += 4U) {
-      same = std::abs(reloaded.bytes[at] - 82) <= 2 && std::abs(reloaded.bytes[at + 1U] - 170) <= 2 && std::abs(reloaded.bytes[at + 2U] - 173) <= 2 && reloaded.bytes[at + 3U] == 255U;
+      same = std::abs(reloaded.bytes[at] - 82) <= 2 && std::abs(reloaded.bytes[at + 1U] - 170) <= 2 &&
+        std::abs(reloaded.bytes[at + 2U] - 173) <= 2 && reloaded.bytes[at + 3U] == 255U;
     }
     char detail[64]{};
     std::snprintf(detail, sizeof(detail), "read 0x%08lX", static_cast<unsigned long>(result));
@@ -209,7 +273,9 @@ namespace
   }
 
   // A mask of another size: one solid colour stays that colour through the resize.
-  void TestResizeKeepsColour(ImageCodec& codec)
+  void TestResizeKeepsColour(
+    ImageCodec& codec
+  )
   {
     Image source;
     source.Allocate(DXGI_FORMAT_R8G8B8A8_UNORM, 64U, 64U, 1U, 1U);
@@ -219,8 +285,11 @@ namespace
     }
     std::vector<std::uint8_t> file;
     Image reloaded;
-    const HRESULT result = SUCCEEDED(ImageCodec::WriteDds(source, file)) ? Reload(codec, file, DXGI_FORMAT_B8G8R8A8_UNORM, 32U, 32U, 1U, reloaded) : E_FAIL;
-    bool same = SUCCEEDED(result) && reloaded.width == 32U && reloaded.height == 32U && reloaded.format == DXGI_FORMAT_B8G8R8A8_UNORM;
+    const HRESULT result = SUCCEEDED(ImageCodec::WriteDds(source, file))
+      ? Reload(codec, file, DXGI_FORMAT_B8G8R8A8_UNORM, 32U, 32U, 1U, reloaded)
+      : E_FAIL;
+    bool same = SUCCEEDED(result) && reloaded.width == 32U && reloaded.height == 32U &&
+      reloaded.format == DXGI_FORMAT_B8G8R8A8_UNORM;
     for (std::size_t at = 0U; same && at + 4U <= reloaded.bytes.size(); at += 4U) {
       same = std::abs(reloaded.bytes[at] - kColour[2]) <= 1 && std::abs(reloaded.bytes[at + 1U] - kColour[1]) <= 1 &&
         std::abs(reloaded.bytes[at + 2U] - kColour[0]) <= 1 && std::abs(reloaded.bytes[at + 3U] - kColour[3]) <= 1;
@@ -229,31 +298,49 @@ namespace
   }
 
   // The water map: the engine's texture is BC3 (gal format 12), the file's may not be.
-  void TestReloadInBlockFormat(ImageCodec& codec)
+  void TestReloadInBlockFormat(
+    ImageCodec& codec
+  )
   {
     const Image source = MakeImage(DXGI_FORMAT_R8G8B8A8_UNORM, 64U, 64U, 1U);
     std::vector<std::uint8_t> file;
     Image reloaded;
-    const HRESULT result = SUCCEEDED(ImageCodec::WriteDds(source, file)) ? Reload(codec, file, DXGI_FORMAT_BC3_UNORM, 32U, 32U, 1U, reloaded) : E_FAIL;
+    const HRESULT result = SUCCEEDED(ImageCodec::WriteDds(source, file))
+      ? Reload(codec, file, DXGI_FORMAT_BC3_UNORM, 32U, 32U, 1U, reloaded)
+      : E_FAIL;
     char detail[64]{};
     std::snprintf(detail, sizeof(detail), "read 0x%08lX", static_cast<unsigned long>(result));
-    Check(SUCCEEDED(result) && reloaded.format == DXGI_FORMAT_BC3_UNORM && reloaded.width == 32U && reloaded.height == 32U, "R8G8B8A8 reloaded as smaller BC3", detail);
+    Check(
+      SUCCEEDED(result) && reloaded.format == DXGI_FORMAT_BC3_UNORM && reloaded.width == 32U && reloaded.height == 32U,
+      "R8G8B8A8 reloaded as smaller BC3",
+      detail
+    );
   }
 
-  void TestCube(ImageCodec& codec)
+  void TestCube(
+    ImageCodec& codec
+  )
   {
     const Image source = MakeImage(DXGI_FORMAT_BC3_UNORM, 16U, 16U, 5U, true);
     std::vector<std::uint8_t> file;
     Image reloaded;
-    const HRESULT result = SUCCEEDED(ImageCodec::WriteDds(source, file)) ? Reload(codec, file, DXGI_FORMAT_BC3_UNORM, 16U, 16U, 5U, reloaded) : E_FAIL;
+    const HRESULT result = SUCCEEDED(ImageCodec::WriteDds(source, file))
+      ? Reload(codec, file, DXGI_FORMAT_BC3_UNORM, 16U, 16U, 5U, reloaded)
+      : E_FAIL;
     char detail[64]{};
     std::snprintf(detail, sizeof(detail), "read 0x%08lX", static_cast<unsigned long>(result));
-    Check(SUCCEEDED(result) && reloaded.cube && reloaded.arraySize == 6U && SameLevels(source, reloaded), "a BC3 cube keeps its six faces", detail);
+    Check(
+      SUCCEEDED(result) && reloaded.cube && reloaded.arraySize == 6U && SameLevels(source, reloaded),
+      "a BC3 cube keeps its six faces",
+      detail
+    );
   }
 
   // The original applies texture-quality skip only to 2D. Run both decode
   // routes; RGB cubes always use D3DX, while full-chain BC cubes can load direct.
-  void TestQualityKeepsCubeTopMip(ImageCodec& codec)
+  void TestQualityKeepsCubeTopMip(
+    ImageCodec& codec
+  )
   {
     const bool oldDirect = gpg::gal::imaging::gDdsDirectLoad;
     for (const bool direct : {false, true}) {
@@ -264,8 +351,8 @@ namespace
           std::vector<std::uint8_t> file;
           const HRESULT written = ImageCodec::WriteDds(source, file);
           Image baseline;
-          const HRESULT baselineRead = SUCCEEDED(written) ?
-            codec.Decode(file.data(), file.size(), DecodeOptions{}, baseline) : written;
+          const HRESULT baselineRead =
+            SUCCEEDED(written) ? codec.Decode(file.data(), file.size(), DecodeOptions{}, baseline) : written;
           const bool baselineShape = SUCCEEDED(baselineRead) && baseline.width == 64U && baseline.height == 64U &&
             baseline.mipLevels == 7U && baseline.arraySize == (cube ? 6U : 1U) && baseline.cube == cube;
           Check(baselineShape, "zero-skip baseline has the source dimensions");
@@ -312,7 +399,9 @@ namespace
   }
 
   // A synthetic uncompressed DDS volume: WriteDds deliberately does not encode volumes.
-  void TestQualityKeepsVolumeTopMip(ImageCodec& codec)
+  void TestQualityKeepsVolumeTopMip(
+    ImageCodec& codec
+  )
   {
     std::vector<std::uint8_t> file(128U, 0U);
     const auto word = [&file](const std::size_t offset, const std::uint32_t value) {
@@ -351,9 +440,9 @@ namespace
         const std::uint32_t side = 8U >> mip;
         const Image::Subresource& level = reloaded.subresources[mip];
         const std::size_t levelBytes = static_cast<std::size_t>(side) * side * side * 4U;
-        same = level.width == side && level.height == side && level.depth == side &&
-          level.rowPitch == side * 4U && level.rowCount == side && level.slicePitch == side * side * 4U &&
-          level.offset == expectedOffset && expectedOffset + levelBytes <= reloaded.bytes.size();
+        same = level.width == side && level.height == side && level.depth == side && level.rowPitch == side * 4U &&
+          level.rowCount == side && level.slicePitch == side * side * 4U && level.offset == expectedOffset &&
+          expectedOffset + levelBytes <= reloaded.bytes.size();
         for (std::size_t at = expectedOffset; same && at < expectedOffset + levelBytes; ++at) {
           same = reloaded.bytes[at] == static_cast<std::uint8_t>(32U + mip);
         }
@@ -367,7 +456,9 @@ namespace
   // The original's D3DX9 load, measured on d3dx9_35: a 2D DDS with more than one level drops
   // min(skip, levels - 1) top levels and keeps the rest byte for byte; a one-level DDS and a PNG
   // load whole. The levels D3DX builds past a short chain are kept the same way.
-  void TestQualitySkipFollowsD3dx9(ImageCodec& codec)
+  void TestQualitySkipFollowsD3dx9(
+    ImageCodec& codec
+  )
   {
     const bool oldDirect = gpg::gal::imaging::gDdsDirectLoad;
     for (const bool direct : {false, true}) {
@@ -377,7 +468,8 @@ namespace
           std::vector<std::uint8_t> file;
           const HRESULT written = ImageCodec::WriteDds(MakeImage(format, 64U, 64U, levels), file);
           Image baseline;
-          const HRESULT baselineRead = SUCCEEDED(written) ? codec.Decode(file.data(), file.size(), DecodeOptions{}, baseline) : written;
+          const HRESULT baselineRead =
+            SUCCEEDED(written) ? codec.Decode(file.data(), file.size(), DecodeOptions{}, baseline) : written;
           if (!SUCCEEDED(baselineRead)) {
             Check(false, "quality baseline loads");
             continue;
@@ -388,15 +480,29 @@ namespace
             expected.Allocate(baseline.format, 64U >> dropped, 64U >> dropped, baseline.mipLevels - dropped, 1U);
             for (std::uint32_t mip = 0U; mip < expected.mipLevels; ++mip) {
               const Image::Subresource& from = baseline.subresources[mip + dropped];
-              std::memcpy(expected.bytes.data() + expected.subresources[mip].offset, baseline.bytes.data() + from.offset, from.slicePitch);
+              std::memcpy(
+                expected.bytes.data() + expected.subresources[mip].offset,
+                baseline.bytes.data() + from.offset,
+                from.slicePitch
+              );
             }
             DecodeOptions options;
             options.skipMipLevels = skip;
             Image reloaded;
             const HRESULT read = codec.Decode(file.data(), file.size(), options, reloaded);
             char detail[96]{};
-            std::snprintf(detail, sizeof(detail), "format %d, %u levels, direct %u, skip %u", static_cast<int>(format), levels, direct ? 1U : 0U, skip);
-            Check(SUCCEEDED(read) && SameLevels(expected, reloaded), "texture quality drops levels as D3DX9 does", detail);
+            std::snprintf(
+              detail,
+              sizeof(detail),
+              "format %d, %u levels, direct %u, skip %u",
+              static_cast<int>(format),
+              levels,
+              direct ? 1U : 0U,
+              skip
+            );
+            Check(
+              SUCCEEDED(read) && SameLevels(expected, reloaded), "texture quality drops levels as D3DX9 does", detail
+            );
           }
         }
       }
@@ -419,7 +525,9 @@ namespace
   }
 
   /** Encode, which is D3DX11's writer where it has one: the same texels come back either way. */
-  void TestEncodeMatchesWriteDds(ImageCodec& codec)
+  void TestEncodeMatchesWriteDds(
+    ImageCodec& codec
+  )
   {
     for (const NamedFormat& entry : kFormats) {
       const Image source = MakeImage(entry.format, 16U, 16U, 5U);
@@ -429,7 +537,8 @@ namespace
       (void)ImageCodec::WriteDds(source, own);
       Image fromEncoded;
       Image fromOwn;
-      const HRESULT readEncoded = FAILED(result) ? result : Reload(codec, encoded, entry.format, 16U, 16U, 5U, fromEncoded);
+      const HRESULT readEncoded =
+        FAILED(result) ? result : Reload(codec, encoded, entry.format, 16U, 16U, 5U, fromEncoded);
       const HRESULT readOwn = Reload(codec, own, entry.format, 16U, 16U, 5U, fromOwn);
       const bool read = SUCCEEDED(readEncoded) && SUCCEEDED(readOwn);
       if (FAILED(readEncoded) && FAILED(readOwn) && SUCCEEDED(result) && encoded != own) {
@@ -437,7 +546,15 @@ namespace
         continue;
       }
       char detail[128]{};
-      std::snprintf(detail, sizeof(detail), "encode 0x%08lX, read 0x%08lX and 0x%08lX, %s", static_cast<unsigned long>(result), static_cast<unsigned long>(readEncoded), static_cast<unsigned long>(readOwn), encoded == own ? "same file as WriteDds" : "D3DX11's file");
+      std::snprintf(
+        detail,
+        sizeof(detail),
+        "encode 0x%08lX, read 0x%08lX and 0x%08lX, %s",
+        static_cast<unsigned long>(result),
+        static_cast<unsigned long>(readEncoded),
+        static_cast<unsigned long>(readOwn),
+        encoded == own ? "same file as WriteDds" : "D3DX11's file"
+      );
       Check(read && SameLevels(fromEncoded, fromOwn), entry.name, detail);
     }
   }
@@ -470,57 +587,90 @@ protected:
   ImageCodec* codec{nullptr};
 };
 
-TEST_F(Existing_ImageCodec, RefusesWhatItCannotWrite)
+TEST_F(
+  Existing_ImageCodec,
+  RefusesWhatItCannotWrite
+)
 {
   TestRefusesWhatItCannotWrite();
 }
 
-TEST_F(Existing_ImageCodec, EveryFormatRoundTrips)
+TEST_F(
+  Existing_ImageCodec,
+  EveryFormatRoundTrips
+)
 {
   TestEveryFormatRoundTrips(*codec);
 }
 
-TEST_F(Existing_ImageCodec, B5G6R5FileIsReadable)
+TEST_F(
+  Existing_ImageCodec,
+  B5G6R5FileIsReadable
+)
 {
   TestB5G6R5FileIsReadable(*codec);
 }
 
-TEST_F(Existing_ImageCodec, SwizzleKeepsChannels)
+TEST_F(
+  Existing_ImageCodec,
+  SwizzleKeepsChannels
+)
 {
   TestSwizzleKeepsChannels(*codec);
 }
 
-TEST_F(Existing_ImageCodec, ResizeKeepsColour)
+TEST_F(
+  Existing_ImageCodec,
+  ResizeKeepsColour
+)
 {
   TestResizeKeepsColour(*codec);
 }
 
-TEST_F(Existing_ImageCodec, ReloadInBlockFormat)
+TEST_F(
+  Existing_ImageCodec,
+  ReloadInBlockFormat
+)
 {
   TestReloadInBlockFormat(*codec);
 }
 
-TEST_F(Existing_ImageCodec, Cube)
+TEST_F(
+  Existing_ImageCodec,
+  Cube
+)
 {
   TestCube(*codec);
 }
 
-TEST_F(Existing_ImageCodec, QualityKeepsCubeTopMip)
+TEST_F(
+  Existing_ImageCodec,
+  QualityKeepsCubeTopMip
+)
 {
   TestQualityKeepsCubeTopMip(*codec);
 }
 
-TEST_F(Existing_ImageCodec, QualityKeepsVolumeTopMip)
+TEST_F(
+  Existing_ImageCodec,
+  QualityKeepsVolumeTopMip
+)
 {
   TestQualityKeepsVolumeTopMip(*codec);
 }
 
-TEST_F(Existing_ImageCodec, QualitySkipFollowsD3dx9)
+TEST_F(
+  Existing_ImageCodec,
+  QualitySkipFollowsD3dx9
+)
 {
   TestQualitySkipFollowsD3dx9(*codec);
 }
 
-TEST_F(Existing_ImageCodec, EncodeMatchesWriteDds)
+TEST_F(
+  Existing_ImageCodec,
+  EncodeMatchesWriteDds
+)
 {
   TestEncodeMatchesWriteDds(*codec);
 }

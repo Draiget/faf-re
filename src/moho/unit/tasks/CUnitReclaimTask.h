@@ -17,7 +17,6 @@ namespace moho
   class CUnitCommand;
   class Entity;
 
-
   /**
    * Recovered runtime layout used by reclaim-task reflection constructors.
    */
@@ -100,16 +99,16 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
-    CUnitCommand* mCommand;           // +0x40
-    WeakPtr<Entity> mTargetEntity;    // +0x44
-    bool mTargetHasNoMotor;           // +0x4C
-    std::uint8_t mPad4D[0x03];        // +0x4D
-    Wm3::Vector3f mTargetPosition;    // +0x50
-    bool mHasStarted;                 // +0x5C
-    std::uint8_t mPad5D[0x03];        // +0x5D
-    CEconRequest* mConsumptionData;   // +0x60
-    float mReclaimRate;               // +0x64
-    SEconValue mReclaimPerSecond;     // +0x68
+    CUnitCommand* mCommand;         // +0x40
+    WeakPtr<Entity> mTargetEntity;  // +0x44
+    bool mTargetHasNoMotor;         // +0x4C
+    std::uint8_t mPad4D[0x03];      // +0x4D
+    Wm3::Vector3f mTargetPosition;  // +0x50
+    bool mHasStarted;               // +0x5C
+    std::uint8_t mPad5D[0x03];      // +0x5D
+    CEconRequest* mConsumptionData; // +0x60
+    float mReclaimRate;             // +0x64
+    SEconValue mReclaimPerSecond;   // +0x68
 
   private:
     /**
@@ -125,25 +124,26 @@ namespace moho
   static_assert(sizeof(CUnitReclaimTask) == 0x70, "CUnitReclaimTask size must be 0x70");
   static_assert(offsetof(CUnitReclaimTask, mCommand) == 0x40, "CUnitReclaimTask::mCommand offset must be 0x40");
   static_assert(
-    offsetof(CUnitReclaimTask, mTargetEntity) == 0x44, "CUnitReclaimTask::mTargetEntity offset must be 0x44"
+    offsetof(CUnitReclaimTask, mTargetEntity) == 0x44,
+    "CUnitReclaimTask::mTargetEntity offset must be 0x44"
   );
   static_assert(
-    offsetof(CUnitReclaimTask, mTargetHasNoMotor) == 0x4C, "CUnitReclaimTask::mTargetHasNoMotor offset must be 0x4C"
+    offsetof(CUnitReclaimTask, mTargetHasNoMotor) == 0x4C,
+    "CUnitReclaimTask::mTargetHasNoMotor offset must be 0x4C"
   );
   static_assert(
-    offsetof(CUnitReclaimTask, mTargetPosition) == 0x50, "CUnitReclaimTask::mTargetPosition offset must be 0x50"
+    offsetof(CUnitReclaimTask, mTargetPosition) == 0x50,
+    "CUnitReclaimTask::mTargetPosition offset must be 0x50"
   );
+  static_assert(offsetof(CUnitReclaimTask, mHasStarted) == 0x5C, "CUnitReclaimTask::mHasStarted offset must be 0x5C");
   static_assert(
-    offsetof(CUnitReclaimTask, mHasStarted) == 0x5C, "CUnitReclaimTask::mHasStarted offset must be 0x5C"
+    offsetof(CUnitReclaimTask, mConsumptionData) == 0x60,
+    "CUnitReclaimTask::mConsumptionData offset must be 0x60"
   );
+  static_assert(offsetof(CUnitReclaimTask, mReclaimRate) == 0x64, "CUnitReclaimTask::mReclaimRate offset must be 0x64");
   static_assert(
-    offsetof(CUnitReclaimTask, mConsumptionData) == 0x60, "CUnitReclaimTask::mConsumptionData offset must be 0x60"
-  );
-  static_assert(
-    offsetof(CUnitReclaimTask, mReclaimRate) == 0x64, "CUnitReclaimTask::mReclaimRate offset must be 0x64"
-  );
-  static_assert(
-    offsetof(CUnitReclaimTask, mReclaimPerSecond) == 0x68, "CUnitReclaimTask::mReclaimPerSecond offset must be 0x68"
+    offsetof(CUnitReclaimTask, mReclaimPerSecond) == 0x68,
+    "CUnitReclaimTask::mReclaimPerSecond offset must be 0x68"
   );
 
   /**

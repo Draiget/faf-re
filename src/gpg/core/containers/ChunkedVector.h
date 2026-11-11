@@ -21,22 +21,31 @@ namespace gpg::core
   public:
     static constexpr std::size_t kChunkSize = std::size_t{1} << kChunkLog2;
 
-    [[nodiscard]] std::size_t size() const noexcept { return mSize; }
+    [[nodiscard]] std::size_t size() const noexcept
+    {
+      return mSize;
+    }
 
-    [[nodiscard]] T& operator[](const std::size_t index) noexcept
+    [[nodiscard]] T& operator[](
+      const std::size_t index
+    ) noexcept
     {
       assert(index < mSize);
       return mChunks[index >> kChunkLog2][index & (kChunkSize - 1u)];
     }
 
-    [[nodiscard]] const T& operator[](const std::size_t index) const noexcept
+    [[nodiscard]] const T& operator[](
+      const std::size_t index
+    ) const noexcept
     {
       assert(index < mSize);
       return mChunks[index >> kChunkLog2][index & (kChunkSize - 1u)];
     }
 
     /** Grows to `size` elements; it never shrinks. New elements are default-made. */
-    void grow_to(const std::size_t size)
+    void grow_to(
+      const std::size_t size
+    )
     {
       while (mChunks.size() * kChunkSize < size) {
         mChunks.push_back(std::make_unique<T[]>(kChunkSize));
@@ -47,7 +56,9 @@ namespace gpg::core
     }
 
     template <class U>
-    T& push_back(U&& value)
+    T& push_back(
+      U&& value
+    )
     {
       grow_to(mSize + 1u);
       T& element = (*this)[mSize - 1u];
@@ -55,7 +66,10 @@ namespace gpg::core
       return element;
     }
 
-    void clear() noexcept { mSize = 0u; }
+    void clear() noexcept
+    {
+      mSize = 0u;
+    }
 
   private:
     std::vector<std::unique_ptr<T[]>> mChunks;

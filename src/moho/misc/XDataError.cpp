@@ -8,7 +8,9 @@ namespace
    * What it does:
    * Runs base `XException` destruction for one throw/unwind lane.
    */
-  [[maybe_unused]] void DestroyXDataErrorThrowObject(moho::XException* const exception) noexcept
+  [[maybe_unused]] void DestroyXDataErrorThrowObject(
+    moho::XException* const exception
+  ) noexcept
   {
     if (exception) {
       exception->moho::XException::~XException();
@@ -24,10 +26,11 @@ using namespace moho;
  * What it does:
  * Constructs one data-error object from a message payload.
  */
-XDataError::XDataError(const char* const message)
+XDataError::XDataError(
+  const char* const message
+)
   : XException(message)
-{
-}
+{}
 
 /**
  * Address: 0x004B2E40 (FUN_004B2E40)
@@ -35,10 +38,11 @@ XDataError::XDataError(const char* const message)
  * What it does:
  * Copy-constructs data-error payload and inherited exception lanes.
  */
-XDataError::XDataError(const XDataError& other)
+XDataError::XDataError(
+  const XDataError& other
+)
   : XException(other)
-{
-}
+{}
 
 /**
  * Address: 0x004B2B20 (FUN_004B2B20)

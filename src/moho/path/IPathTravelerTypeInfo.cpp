@@ -73,9 +73,10 @@ namespace
 {
   using PathTravelerList = gpg::DList<moho::IPathTraveler>;
 
-
   template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(const std::intptr_t objectPtr)
+  [[nodiscard]] TObject* PointerFromArchiveInt(
+    const std::intptr_t objectPtr
+  )
   {
     return reinterpret_cast<TObject*>(objectPtr);
   }
@@ -104,7 +105,9 @@ const char* gpg::RDListType_IPathTraveler::GetName() const
  * What it does:
  * Returns inherited lexical text for the reflected DList lane.
  */
-fa::string gpg::RDListType_IPathTraveler::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RDListType_IPathTraveler::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s", base.c_str());
@@ -246,5 +249,11 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_RDListType_IPathTraveler_4b32d3, preregister_RDListType_IPathTraveler)
-GPG_PREREGISTER_INIT(preregister_IPathTravelerTypeInfo_4b32d3, preregister_IPathTravelerTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_RDListType_IPathTraveler_4b32d3,
+  preregister_RDListType_IPathTraveler
+)
+GPG_PREREGISTER_INIT(
+  preregister_IPathTravelerTypeInfo_4b32d3,
+  preregister_IPathTravelerTypeInfo
+)

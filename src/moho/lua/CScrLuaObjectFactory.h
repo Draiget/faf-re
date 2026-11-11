@@ -78,7 +78,8 @@ namespace moho
   void SCR_ExpectExactArgs(LuaPlus::LuaState* state, int expectedArgs, const char* helpText);
 
   /**
-   * Address: 0x004D2F70 (FUN_004D2F70, ?SCR_ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVLuaObject@LuaPlus@@@Z)
+   * Address: 0x004D2F70 (FUN_004D2F70,
+   * ?SCR_ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVLuaObject@LuaPlus@@@Z)
    *
    * What it does:
    * Serializes one Lua object with SCR byte-stream encoding and returns the raw encoded bytes as `fa::string`.
@@ -123,7 +124,8 @@ namespace moho
   };
 
   /**
-   * Address: 0x004D23D0 (FUN_004D23D0, ?SCR_QuoteLuaString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z)
+   * Address: 0x004D23D0 (FUN_004D23D0,
+   * ?SCR_QuoteLuaString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z)
    *
    * What it does:
    * Returns a Lua-quoted/escaped string literal choosing `'` or `"` based on
@@ -157,7 +159,8 @@ namespace moho
    * Recursively applies one Lua value/table into a reflected destination reference,
    * handling lexical, indexed, enum-flag, and named-field paths with warning logs.
    */
-  [[nodiscard]] bool SCR_LuaBuildObject(LuaPlus::LuaObject valueObject, const gpg::RRef& destination, bool ignoreMissingFields);
+  [[nodiscard]] bool
+  SCR_LuaBuildObject(LuaPlus::LuaObject valueObject, const gpg::RRef& destination, bool ignoreMissingFields);
 
   /**
    * Address: 0x004D2550 (FUN_004D2550, ?SCR_GetEnum@Moho@@YAXPAVLuaState@LuaPlus@@VStrArg@gpg@@AAVRRef@5@@Z)
@@ -181,7 +184,8 @@ namespace moho
    * Address: 0x004CE020 (FUN_004CE020, ?SCR_LuaDoFile@Moho@@YA_NPAVLuaState@LuaPlus@@VStrArg@gpg@@PAVLuaObject@3@@Z)
    *
    * IDA signature:
-   * bool __usercall Moho::SCR_LuaDoFile@<al>(LuaPlus::LuaState *state@<edi>, const char *filename, LuaPlus::LuaObject *env);
+   * bool __usercall Moho::SCR_LuaDoFile@<al>(LuaPlus::LuaState *state@<edi>, const char *filename, LuaPlus::LuaObject
+   * *env);
    *
    * What it does:
    * Memory-maps one Lua source file, runs it through `lua_load` with the
@@ -198,7 +202,8 @@ namespace moho
    * Executes one resolved script file through `func_LuaDoScript`, restores the
    * caller's Lua stack top, and reports exceptions with file-context warnings.
    */
-  [[nodiscard]] bool SCR_LuaDoScript(LuaPlus::LuaState* state, gpg::StrArg scriptPath, LuaPlus::LuaObject* outEnvironment);
+  [[nodiscard]] bool
+  SCR_LuaDoScript(LuaPlus::LuaState* state, gpg::StrArg scriptPath, LuaPlus::LuaObject* outEnvironment);
 
   /**
    * Address: 0x004CECD0 (FUN_004CECD0, Moho::SCR_LuaDoFileConcat)
@@ -207,11 +212,7 @@ namespace moho
    * Concatenates and executes one ordered Lua file list as a single chunk,
    * optionally setting one table environment before execution.
    */
-  void SCR_LuaDoFileConcat(
-    LuaPlus::LuaState* state,
-    LuaPlus::LuaObject* outEnvironment,
-    fa::vector<fa::string> files
-  );
+  void SCR_LuaDoFileConcat(LuaPlus::LuaState* state, LuaPlus::LuaObject* outEnvironment, fa::vector<fa::string> files);
 
   /**
    * Address: 0x004CE2C0 (FUN_004CE2C0, func_LuaDoScript)
@@ -234,7 +235,7 @@ namespace moho
   {
   public:
     /**
-      * Alias of FUN_10015880 (non-canonical helper lane).
+     * Alias of FUN_10015880 (non-canonical helper lane).
      *
      * What it does:
      * Initializes the base factory and assigns a unique cached object index.
@@ -275,7 +276,9 @@ namespace moho
      * Recovery helper:
      * Overrides the cached factory index lane on an already-materialized factory object.
      */
-    void SetFactoryObjectIndexForRecovery(const int32_t factoryObjectIndex) noexcept
+    void SetFactoryObjectIndexForRecovery(
+      const int32_t factoryObjectIndex
+    ) noexcept
     {
       mFactoryObjectIndex = factoryObjectIndex;
     }
@@ -330,7 +333,9 @@ namespace moho
      * `CScrLuaMetatableFactory<CAimManipulator>::Create` at 0x00632C40, which
      * is byte-identical apart from that displacement.
      */
-    LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override
+    LuaPlus::LuaObject Create(
+      LuaPlus::LuaState* state
+    ) override
     {
       return SCR_CreateSimpleMetatable(state);
     }
@@ -373,7 +378,10 @@ namespace moho
    * Instantiated in the file that calls it, where `T`'s factory specialization is visible.
    */
   template <class T>
-  LuaPlus::LuaObject* SCR_WriteMetatable(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject* SCR_WriteMetatable(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
   {
     if (object == nullptr) {
       return nullptr;
@@ -410,7 +418,8 @@ namespace moho
     static CScrLuaMetatableFactory sInstance;
   };
   static_assert(
-    sizeof(CScrLuaMetatableFactory<CScriptObject*>) == 0x8, "CScrLuaMetatableFactory<CScriptObject*> must be 0x8"
+    sizeof(CScrLuaMetatableFactory<CScriptObject*>) == 0x8,
+    "CScrLuaMetatableFactory<CScriptObject*> must be 0x8"
   );
 
   /**

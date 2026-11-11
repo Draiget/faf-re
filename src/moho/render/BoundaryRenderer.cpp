@@ -39,7 +39,10 @@ namespace
   constexpr int kBoundaryBoxVertexCount = 8;
   constexpr int kBoundaryBoxIndexCount = 36;
 
-  [[nodiscard]] bool BoundaryEdgesDiffer(const float mapEdge, const float playableEdge) noexcept
+  [[nodiscard]] bool BoundaryEdgesDiffer(
+    const float mapEdge,
+    const float playableEdge
+  ) noexcept
   {
     const float delta = mapEdge - playableEdge;
     return (delta * delta) >= kBoundaryEdgeMatchToleranceSq;
@@ -86,22 +89,17 @@ namespace
 
     const boost::shared_ptr<gpg::gal::Effect> effect = moho::AcquireVisionBaseEffect();
 
-    const boost::shared_ptr<gpg::gal::EffectTechnique> technique =
-      effect->GetTechnique(techniqueName.c_str());
+    const boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique(techniqueName.c_str());
     const boost::shared_ptr<gpg::gal::EffectVariable> viewMatrix = effect->GetVariable("viewMatrix");
     const boost::shared_ptr<gpg::gal::EffectVariable> projMatrix = effect->GetVariable("projMatrix");
     const boost::shared_ptr<gpg::gal::EffectVariable> boxCenter = effect->GetVariable("boxCenter");
     const boost::shared_ptr<gpg::gal::EffectVariable> boxExtent = effect->GetVariable("boxExtent");
 
     const float center[3] = {
-      (volume.Min.x + volume.Max.x) * 0.5f,
-      (volume.Min.y + volume.Max.y) * 0.5f,
-      (volume.Min.z + volume.Max.z) * 0.5f
+      (volume.Min.x + volume.Max.x) * 0.5f, (volume.Min.y + volume.Max.y) * 0.5f, (volume.Min.z + volume.Max.z) * 0.5f
     };
     const float halfExtent[3] = {
-      (volume.Max.x - volume.Min.x) * 0.5f,
-      (volume.Max.y - volume.Min.y) * 0.5f,
-      (volume.Max.z - volume.Min.z) * 0.5f
+      (volume.Max.x - volume.Min.x) * 0.5f, (volume.Max.y - volume.Min.y) * 0.5f, (volume.Max.z - volume.Min.z) * 0.5f
     };
 
     viewMatrix->SetMatrix4x4(&camera.view);
@@ -147,7 +145,9 @@ namespace moho
   /**
    * Address: 0x007D05D0 (FUN_007D05D0, Moho::BoundaryRenderer::Init)
    */
-  void BoundaryRenderer::Init(BoxRenderer* const boundaryRendererBody)
+  void BoundaryRenderer::Init(
+    BoxRenderer* const boundaryRendererBody
+  )
   {
     if (!boundaryRendererBody) {
       return;
@@ -202,11 +202,9 @@ namespace moho
     mapVolume.Min.y = kBoundaryVolumeFloor;
     mapVolume.Max.y = kBoundaryVolumeCeiling;
 
-    const bool boundaryIsVisible =
-      BoundaryEdgesDiffer(mapVolume.Min.x, playableMinX)
-      || BoundaryEdgesDiffer(mapVolume.Max.x, playableMaxX)
-      || BoundaryEdgesDiffer(mapVolume.Min.z, playableMinZ)
-      || BoundaryEdgesDiffer(mapVolume.Max.z, playableMaxZ);
+    const bool boundaryIsVisible = BoundaryEdgesDiffer(mapVolume.Min.x, playableMinX) ||
+      BoundaryEdgesDiffer(mapVolume.Max.x, playableMaxX) || BoundaryEdgesDiffer(mapVolume.Min.z, playableMinZ) ||
+      BoundaryEdgesDiffer(mapVolume.Max.z, playableMaxZ);
     if (!boundaryIsVisible) {
       return;
     }

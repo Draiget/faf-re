@@ -23,7 +23,10 @@ namespace
    * What it does:
    * Replaces replay worker thread pointer and destroys the previous thread object.
    */
-  void ReplaceReplayThread(boost::thread*& slot, boost::thread* replacement)
+  void ReplaceReplayThread(
+    boost::thread*& slot,
+    boost::thread* replacement
+  )
   {
     boost::thread* const previous = slot;
     slot = replacement;
@@ -33,7 +36,9 @@ namespace
     }
   }
 
-  void SignalCurrentEventIfManagerIdle(CClientManagerImpl* const manager)
+  void SignalCurrentEventIfManagerIdle(
+    CClientManagerImpl* const manager
+  )
   {
     if (manager == nullptr) {
       return;
@@ -68,7 +73,9 @@ namespace
    * An earlier reconstruction modelled this as a `void (*)(CReplayClient*)` /
    * self-pointer pair, which has the same size but the wrong call shape.
    */
-  [[nodiscard]] boost::function0<void> MakeReplayThreadCallback(CReplayClient* const self)
+  [[nodiscard]] boost::function0<void> MakeReplayThreadCallback(
+    CReplayClient* const self
+  )
   {
     return boost::function0<void>(boost::bind(&CReplayClient::ReplayThread, self));
   }
@@ -77,7 +84,11 @@ namespace
 /**
  * Address: 0x0053BA50 (FUN_0053BA50)
  */
-CReplayClient::CReplayClient(CClientManagerImpl* const manager, BVIntSet& commandSources, gpg::Stream*& replayStream)
+CReplayClient::CReplayClient(
+  CClientManagerImpl* const manager,
+  BVIntSet& commandSources,
+  gpg::Stream*& replayStream
+)
   : CClientBase(0, manager, "Replay", -1, commandSources, 0xFFu)
   , mReplayStream(replayStream)
 {
@@ -139,7 +150,9 @@ float CReplayClient::GetStatusMetricB()
 /**
  * Address: 0x0053D900 (FUN_0053D900)
  */
-void CReplayClient::Process(CMessage& msg)
+void CReplayClient::Process(
+  CMessage& msg
+)
 {
   std::scoped_lock lock(mManager->mLock);
 
@@ -161,9 +174,7 @@ void CReplayClient::Process(CMessage& msg)
     // lane for the local peer never advances, `EveryoneResponsiveSince`
     // never unlocks `mAvailableBeat`, and replay playback deadlocks on beat 0.
     const IClient* const localClient = mManager->GetLocalClient();
-    const auto localClientIndex = static_cast<std::uint8_t>(
-      localClient != nullptr ? localClient->GetIndex() : mIndex
-    );
+    const auto localClientIndex = static_cast<std::uint8_t>(localClient != nullptr ? localClient->GetIndex() : mIndex);
     ackStream.Write(localClientIndex);
 
     std::int32_t ackBeat = beatDelta;
@@ -210,8 +221,9 @@ void CReplayClient::Process(CMessage& msg)
  */
 void CReplayClient::Start()
 {
-  if (mReplayPollRequested || mReplayStream == nullptr ||
-      static_cast<std::int32_t>(mQueuedBeat - mDispatchedBeat) > 0) {
+  if (
+    mReplayPollRequested || mReplayStream == nullptr || static_cast<std::int32_t>(mQueuedBeat - mDispatchedBeat) > 0
+  ) {
     return;
   }
 
@@ -281,7 +293,9 @@ void CReplayClient::Start()
   mReplayWorkerCondition.notify_all();
 }
 
-void CReplayClient::SkipBeats(const std::int32_t beats)
+void CReplayClient::SkipBeats(
+  const std::int32_t beats
+)
 {
   std::scoped_lock lock(mManager->mLock);
 

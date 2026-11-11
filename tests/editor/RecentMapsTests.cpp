@@ -1,4 +1,5 @@
-// The map editor's recent maps (src/editor/doc/EdRecentMaps.cpp): newest first, no repeats, a limit, read back as written.
+// The map editor's recent maps (src/editor/doc/EdRecentMaps.cpp): newest first, no repeats, a limit, read back as
+// written.
 
 #include "editor/doc/EdRecentMaps.h"
 
@@ -9,7 +10,10 @@
 
 namespace
 {
-  TEST(RecentMaps, NewestFirstWithoutRepeats)
+  TEST(
+    RecentMaps,
+    NewestFirstWithoutRepeats
+  )
   {
     std::vector<std::string> list;
     list = faf::editor::WithRecentMap(list, "/maps/a/a_scenario.lua");
@@ -19,7 +23,10 @@ namespace
     EXPECT_EQ(list, expected);
   }
 
-  TEST(RecentMaps, OldestDroppedPastTheLimit)
+  TEST(
+    RecentMaps,
+    OldestDroppedPastTheLimit
+  )
   {
     std::vector<std::string> list;
     for (int i = 0; i < 5; ++i) {
@@ -29,7 +36,10 @@ namespace
     EXPECT_EQ(list, expected);
   }
 
-  TEST(RecentMaps, ReadBackAsWritten)
+  TEST(
+    RecentMaps,
+    ReadBackAsWritten
+  )
   {
     const std::string file = (std::filesystem::temp_directory_path() / "faf_editor_recent_maps_test.txt").string();
     const std::vector<std::string> list = {"/maps/scmp_009/scmp_009_scenario.lua", "/maps/x y/x y_scenario.lua"};

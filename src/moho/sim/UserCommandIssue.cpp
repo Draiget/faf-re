@@ -191,7 +191,8 @@ namespace moho
    * `gpg::Die`, matching CDecoder::DecodeEntIdSet's wire-decode guard.
    */
   void func_DecodeEntIdSet(
-    moho::BVSet<moho::EntId, moho::EntIdUniverse>& out, const gpg::fastvector<moho::UserUnit*>& units
+    moho::BVSet<moho::EntId, moho::EntIdUniverse>& out,
+    const gpg::fastvector<moho::UserUnit*>& units
   )
   {
     // out->mSet default-empty: mFirstWordIndex/reserved cleared, SBO words
@@ -239,7 +240,10 @@ namespace
    * one first. The unit goes in through `WeakSet<UserUnit>::Add` (0x00822270).
    */
   void QueueCommandIssueUnitEvent(
-    UserCommandIssueHelper& helper, const CmdId cmdId, const ECommandIssueEvent kind, UserUnit* const unit
+    UserCommandIssueHelper& helper,
+    const CmdId cmdId,
+    const ECommandIssueEvent kind,
+    UserUnit* const unit
   )
   {
     fa::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
@@ -266,7 +270,9 @@ namespace
    * `AITARGET_None` with the sentinel id. Sole caller is
    * `Moho::ISSUE_SetCommandTarget` (0x008B0EE0).
    */
-  [[nodiscard]] SSTITarget ConvertUserCommandTargetToSSTITarget(const UserTarget& source) noexcept
+  [[nodiscard]] SSTITarget ConvertUserCommandTargetToSSTITarget(
+    const UserTarget& source
+  ) noexcept
   {
     constexpr std::uint32_t kUnresolvedTargetEntityId = 0xF0000000u;
 
@@ -297,7 +303,11 @@ namespace
    * body with kind 1; zero callers and no references in the image, a
    * linker-retained copy nothing runs.)
    */
-  void QueueCommandIssueDecreaseCountEvent(UserCommandIssueHelper& helper, const CmdId cmdId, const std::int32_t deltaCount)
+  void QueueCommandIssueDecreaseCountEvent(
+    UserCommandIssueHelper& helper,
+    const CmdId cmdId,
+    const std::int32_t deltaCount
+  )
   {
     UserCommandIssueLocalEvent event(cmdId, ECommandIssueEvent::DecreaseCount);
     event.mCount = deltaCount;
@@ -312,7 +322,11 @@ namespace
    * copy assignment, 0x008B3E50), pushed (0x008B4E80) and destroyed
    * (0x008B4800). Sole caller is `Moho::ISSUE_SetCommandTarget` (0x008B0EE0).
    */
-  void QueueCommandIssueSetTargetEvent(UserCommandIssueHelper& helper, const CmdId cmdId, const UserTarget& target)
+  void QueueCommandIssueSetTargetEvent(
+    UserCommandIssueHelper& helper,
+    const CmdId cmdId,
+    const UserTarget& target
+  )
   {
     UserCommandIssueLocalEvent event(cmdId, ECommandIssueEvent::SetTarget);
     event.mTarget = target;
@@ -329,7 +343,9 @@ namespace
    * 0x008B4AF8). Sole caller is `Moho::ReissueCommandIssueEntryAsType`.
    */
   void QueueCommandIssueSetTypeEvent(
-    UserCommandIssueHelper& helper, const CmdId cmdId, const EUnitCommandType newCommandType
+    UserCommandIssueHelper& helper,
+    const CmdId cmdId,
+    const EUnitCommandType newCommandType
   )
   {
     UserCommandIssueLocalEvent event(cmdId, ECommandIssueEvent::SetCommandType);
@@ -337,7 +353,6 @@ namespace
     helper.mLocalQueue.push_back(event);
   }
 } // namespace
-
 
 // External linkage: moho::ISSUE_FactoryCommand (CWldSession.cpp) references
 // this as moho::, so an anonymous-namespace body here could never resolve it.
@@ -402,7 +417,10 @@ namespace moho
    * publishes it through the active sim driver, then queues the matching
    * local "set-target" update event via `QueueCommandIssueSetTargetEvent`.
    */
-  void ISSUE_SetCommandTarget(UserCommandIssueHelper* const helper, const UserTarget& target)
+  void ISSUE_SetCommandTarget(
+    UserCommandIssueHelper* const helper,
+    const UserTarget& target
+  )
   {
     CWldSession* const session = WLD_GetActiveSession();
     auto* const playableMap = session->mWldMap->mTerrainRes->mMap;
@@ -413,8 +431,10 @@ namespace moho
       if (!IsValidVector3f(targetPosition)) {
         shouldRetarget = true;
       } else if (session->FocusArmy >= 0) {
-        if (UserArmy* const focusArmyByIndex = session->userArmies[static_cast<std::size_t>(session->FocusArmy)];
-            focusArmyByIndex != nullptr) {
+        if (
+          UserArmy* const focusArmyByIndex = session->userArmies[static_cast<std::size_t>(session->FocusArmy)];
+          focusArmyByIndex != nullptr
+        ) {
           const bool insidePlayableArea = focusArmyByIndex->mVarDat.mUseWholeMap != 0u || playableMap == nullptr ||
             playableMap->IsPlayable(targetPosition);
           if (insidePlayableArea) {
@@ -422,8 +442,10 @@ namespace moho
             if (focusArmy->mVarDat.mNoRushTimer <= 0) {
               shouldRetarget = true;
             } else {
-              const float deltaX = (focusArmy->mVarDat.mArmyStart.x + focusArmy->mVarDat.mNoRushOffset.x) - targetPosition.x;
-              const float deltaZ = (focusArmy->mVarDat.mArmyStart.y + focusArmy->mVarDat.mNoRushOffset.y) - targetPosition.z;
+              const float deltaX =
+                (focusArmy->mVarDat.mArmyStart.x + focusArmy->mVarDat.mNoRushOffset.x) - targetPosition.x;
+              const float deltaZ =
+                (focusArmy->mVarDat.mArmyStart.y + focusArmy->mVarDat.mNoRushOffset.y) - targetPosition.z;
               const float distance = std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ));
               shouldRetarget = (distance <= focusArmy->mVarDat.mNoRushRadius);
             }
@@ -477,7 +499,8 @@ namespace moho
     // where the drain expects a beat.
     CmdId resultCookie = helper->mConstantData.cmd;
     if (ISTIDriver* const simDriver = WLD_GetDriver()) {
-      resultCookie = simDriver->SetCommandTarget(helper->mConstantData.cmd, ConvertUserCommandTargetToSSTITarget(target));
+      resultCookie =
+        simDriver->SetCommandTarget(helper->mConstantData.cmd, ConvertUserCommandTargetToSSTITarget(target));
     }
     QueueCommandIssueSetTargetEvent(*helper, resultCookie, target);
   }
@@ -503,9 +526,7 @@ namespace moho
     const EUnitCommandType newCommandType
   ) noexcept
   {
-    QueueCommandIssueSetTypeEvent(
-      helper, newCmdId, newCommandType
-    );
+    QueueCommandIssueSetTypeEvent(helper, newCmdId, newCommandType);
   }
 
   /**
@@ -516,7 +537,9 @@ namespace moho
    * themselves: `IdPool` seeds its recycle history and the command map stands
    * up its own head sentinel.
    */
-  CommandManager::CommandManager(const std::uint32_t sourceId)
+  CommandManager::CommandManager(
+    const std::uint32_t sourceId
+  )
     : mIdPool()
     , mSourceId(static_cast<std::uint8_t>(sourceId))
     , pad_0CB1_0CB4{}
@@ -640,7 +663,11 @@ namespace moho
    * Adds `unit` to the helper's newest "select unit" edit for `cmdId`,
    * queueing a fresh one first when the newest edit is anything else.
    */
-  void QueueCommandIssueSelectUnitEvent(UserCommandIssueHelper* const helper, const CmdId cmdId, UserUnit* const unit)
+  void QueueCommandIssueSelectUnitEvent(
+    UserCommandIssueHelper* const helper,
+    const CmdId cmdId,
+    UserUnit* const unit
+  )
   {
     ::QueueCommandIssueUnitEvent(*helper, cmdId, ECommandIssueEvent::SelectUnit, unit);
   }
@@ -651,7 +678,11 @@ namespace moho
    * What it does:
    * The "deselect unit" twin of `QueueCommandIssueSelectUnitEvent`.
    */
-  void QueueCommandIssueDeselectUnitEvent(UserCommandIssueHelper* const helper, const CmdId cmdId, UserUnit* const unit)
+  void QueueCommandIssueDeselectUnitEvent(
+    UserCommandIssueHelper* const helper,
+    const CmdId cmdId,
+    UserUnit* const unit
+  )
   {
     ::QueueCommandIssueUnitEvent(*helper, cmdId, ECommandIssueEvent::DeselectUnit, unit);
   }
@@ -679,7 +710,10 @@ namespace moho
    * command-issue helper (`[helper+0x04]` is `mConstantData.cmd`, and the
    * update event is appended to the helper's own local ring queue).
    */
-  void ISSUE_DecreaseCommandCount(UserCommandIssueHelper* const helper, const int count)
+  void ISSUE_DecreaseCommandCount(
+    UserCommandIssueHelper* const helper,
+    const int count
+  )
   {
     ISTIDriver* const simDriver = WLD_GetDriver();
     const CmdId resultCookie = simDriver->DecreaseCommandCount(helper->mConstantData.cmd, count);
@@ -704,7 +738,11 @@ namespace moho
    * manager (respecting the 500-entry depth cap and the clear flag), and finally
    * notifies the UI script layer and dirties the command graph.
    */
-  void ISSUE_Command(const gpg::fastvector<UserUnit*>& units, SSTICommandIssueData data, const bool clearQueue)
+  void ISSUE_Command(
+    const gpg::fastvector<UserUnit*>& units,
+    SSTICommandIssueData data,
+    const bool clearQueue
+  )
   {
     CWldSession* const session = WLD_GetActiveSession();
 
@@ -717,7 +755,8 @@ namespace moho
 
     // Allocate the next command id and stamp it into the issue payload.
     std::uint32_t packedCommandId = 0u;
-    data.nextCommandId = static_cast<std::int32_t>(*AllocatePackedCommandIdFromManager(commandManager, &packedCommandId));
+    data.nextCommandId =
+      static_cast<std::int32_t>(*AllocatePackedCommandIdFromManager(commandManager, &packedCommandId));
     if ((static_cast<std::uint32_t>(data.nextCommandId) & 0xFF000000u) == 0xFF000000u) {
       return; // id-pool exhausted for this command source; nothing to issue.
     }
@@ -739,8 +778,10 @@ namespace moho
       }
 
       const std::int32_t focusArmyIndex = session->FocusArmy;
-      if (IsValidVector3f(targetPoint) && focusArmyIndex >= 0 &&
-          session->userArmies[static_cast<std::size_t>(focusArmyIndex)] != nullptr) {
+      if (
+        IsValidVector3f(targetPoint) && focusArmyIndex >= 0 &&
+        session->userArmies[static_cast<std::size_t>(focusArmyIndex)] != nullptr
+      ) {
         const UserArmy* const focusArmy = session->GetFocusArmy();
         const bool insidePlayableArea =
           focusArmy->mVarDat.mUseWholeMap != 0u || playableMap == nullptr || playableMap->IsPlayable(targetPoint);
@@ -835,4 +876,3 @@ namespace moho
     session->DirtyCommandGraph();
   }
 } // namespace moho
-

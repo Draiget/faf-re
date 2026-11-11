@@ -12,13 +12,22 @@ public:
   int y = 0;
 
   wxSize() = default;
-  wxSize(const int width, const int height)
+  wxSize(
+    const int width,
+    const int height
+  )
     : x(width)
     , y(height)
   {}
 
-  int GetWidth() const { return x; }
-  int GetHeight() const { return y; }
+  int GetWidth() const
+  {
+    return x;
+  }
+  int GetHeight() const
+  {
+    return y;
+  }
 };
 
 class wxPoint
@@ -28,7 +37,10 @@ public:
   int y = 0;
 
   wxPoint() = default;
-  wxPoint(const int px, const int py)
+  wxPoint(
+    const int px,
+    const int py
+  )
     : x(px)
     , y(py)
   {}
@@ -43,7 +55,10 @@ public:
   int height = 0;
 
   wxRect() = default;
-  wxRect(const wxPoint& pos, const wxSize& size)
+  wxRect(
+    const wxPoint& pos,
+    const wxSize& size
+  )
     : x(pos.x)
     , y(pos.y)
     , width(size.x)
@@ -51,7 +66,10 @@ public:
   {}
 
   // wx 2.4.2 src/common/gdicmn.cpp: the right and bottom edges are outside.
-  bool Inside(const int cx, const int cy) const
+  bool Inside(
+    const int cx,
+    const int cy
+  ) const
   {
     return cx >= x && cy >= y && cy < y + height && cx < x + width;
   }

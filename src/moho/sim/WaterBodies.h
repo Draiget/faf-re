@@ -105,14 +105,28 @@ namespace moho
     CWaterBodies(const CWaterBodies&) = default;
     CWaterBodies& operator=(const CWaterBodies&) = default;
 
-    [[nodiscard]] std::int32_t CellWidth() const noexcept { return mVertexWidth - 1; }
-    [[nodiscard]] std::int32_t CellHeight() const noexcept { return mVertexHeight - 1; }
+    [[nodiscard]] std::int32_t CellWidth() const noexcept
+    {
+      return mVertexWidth - 1;
+    }
+    [[nodiscard]] std::int32_t CellHeight() const noexcept
+    {
+      return mVertexHeight - 1;
+    }
 
     /// Number of bodies; body numbers run from 1 to this.
-    [[nodiscard]] std::size_t BodyCount() const noexcept { return mBodies.size(); }
+    [[nodiscard]] std::size_t BodyCount() const noexcept
+    {
+      return mBodies.size();
+    }
 
     /// Body `number` (1-based).
-    [[nodiscard]] const SWaterBody& Body(std::uint8_t number) const { return mBodies[number - 1u]; }
+    [[nodiscard]] const SWaterBody& Body(
+      std::uint8_t number
+    ) const
+    {
+      return mBodies[number - 1u];
+    }
 
     /// The body of a cell, clamped to the map; 0 for the sea.
     [[nodiscard]] std::uint8_t BodyOfCell(std::int32_t x, std::int32_t z) const noexcept;
@@ -137,7 +151,10 @@ namespace moho
 
     /// Different for every `Build` in this process (a copy keeps it), so a renderer can tell
     /// that the bodies it drew are no longer the map's.
-    [[nodiscard]] std::uint32_t Generation() const noexcept { return mGeneration; }
+    [[nodiscard]] std::uint32_t Generation() const noexcept
+    {
+      return mGeneration;
+    }
 
   private:
     CWaterBodies() = default;

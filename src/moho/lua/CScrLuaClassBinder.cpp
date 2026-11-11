@@ -28,7 +28,9 @@ namespace moho
    * What it does:
    * Copy-constructs class binder base metadata and class factory pointer.
    */
-  CScrLuaClassBinder::CScrLuaClassBinder(const CScrLuaClassBinder& other)
+  CScrLuaClassBinder::CScrLuaClassBinder(
+    const CScrLuaClassBinder& other
+  )
     : CScrLuaInitForm(other)
     , mClassFactory(other.mClassFactory)
   {}
@@ -39,7 +41,9 @@ namespace moho
    * What it does:
    * Ensures dotted path prefixes exist as tables under globals, then writes the class object at the tail symbol.
    */
-  void CScrLuaClassBinder::Run(LuaPlus::LuaState* const state)
+  void CScrLuaClassBinder::Run(
+    LuaPlus::LuaState* const state
+  )
   {
     const char* segmentStart = mName;
     LuaPlus::LuaObject scope = state->GetGlobals();

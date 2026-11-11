@@ -16,7 +16,7 @@ namespace gpg
   class RRef;
   class RType;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -26,11 +26,11 @@ namespace moho
   enum EFormationdStatus : std::int32_t;
   struct SOCellPos;
 
-  class CUnitMoveTask
-    : public CCommandTask
-    , public Listener<EAiNavigatorEvent>
-    , public Listener<EFormationdStatus>
-    , public Listener<ECommandEvent>
+  class CUnitMoveTask :
+    public CCommandTask,
+    public Listener<EAiNavigatorEvent>,
+    public Listener<EFormationdStatus>,
+    public Listener<ECommandEvent>
   {
   public:
     static gpg::RType* sType;
@@ -157,31 +157,31 @@ namespace moho
     void OnEvent(ECommandEvent event) override;
 
   public:
-    CCommandTask* mDispatchTask; // 0x60
-    SNavGoal mMoveGoal; // 0x64
-    WeakPtr<CUnitCommand> mCommandRef; // 0x88
-    std::uint8_t mNextCmdIsInstant; // 0x90
+    CCommandTask* mDispatchTask;                  // 0x60
+    SNavGoal mMoveGoal;                           // 0x64
+    WeakPtr<CUnitCommand> mCommandRef;            // 0x88
+    std::uint8_t mNextCmdIsInstant;               // 0x90
     std::uint8_t mRequiresTransportCategoryCheck; // 0x91
-    std::uint8_t mIsOccupying; // 0x92
-    std::uint8_t mTransportDispatchIssued; // 0x93
-    std::uint8_t mMoveVariant; // 0x94
-    std::uint8_t mHasPreparedDynamicGoal; // 0x95
-    std::uint8_t mPad_0096_0098[2]; // 0x96
+    std::uint8_t mIsOccupying;                    // 0x92
+    std::uint8_t mTransportDispatchIssued;        // 0x93
+    std::uint8_t mMoveVariant;                    // 0x94
+    std::uint8_t mHasPreparedDynamicGoal;         // 0x95
+    std::uint8_t mPad_0096_0098[2];               // 0x96
   };
 
   static_assert(sizeof(CUnitMoveTask) == 0x98, "CUnitMoveTask size must be 0x98");
   static_assert(offsetof(CUnitMoveTask, mDispatchTask) == 0x60, "CUnitMoveTask::mDispatchTask offset must be 0x60");
   static_assert(offsetof(CUnitMoveTask, mMoveGoal) == 0x64, "CUnitMoveTask::mMoveGoal offset must be 0x64");
   static_assert(offsetof(CUnitMoveTask, mCommandRef) == 0x88, "CUnitMoveTask::mCommandRef offset must be 0x88");
-  static_assert(offsetof(CUnitMoveTask, mNextCmdIsInstant) == 0x90, "CUnitMoveTask::mNextCmdIsInstant offset must be 0x90");
+  static_assert(
+    offsetof(CUnitMoveTask, mNextCmdIsInstant) == 0x90,
+    "CUnitMoveTask::mNextCmdIsInstant offset must be 0x90"
+  );
   static_assert(
     offsetof(CUnitMoveTask, mRequiresTransportCategoryCheck) == 0x91,
     "CUnitMoveTask::mRequiresTransportCategoryCheck offset must be 0x91"
   );
-  static_assert(
-    offsetof(CUnitMoveTask, mIsOccupying) == 0x92,
-    "CUnitMoveTask::mIsOccupying offset must be 0x92"
-  );
+  static_assert(offsetof(CUnitMoveTask, mIsOccupying) == 0x92, "CUnitMoveTask::mIsOccupying offset must be 0x92");
   static_assert(
     offsetof(CUnitMoveTask, mTransportDispatchIssued) == 0x93,
     "CUnitMoveTask::mTransportDispatchIssued offset must be 0x93"

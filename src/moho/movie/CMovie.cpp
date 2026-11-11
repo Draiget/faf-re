@@ -45,7 +45,7 @@ namespace moho
     constexpr std::int32_t kSofdecStatPlayEnd = 3;
     constexpr std::int32_t kMovieMaxBitsPerSecond = 6000000;
     constexpr std::int32_t kSofdecHeaderProbeBytes = 5000;
-  }
+  } // namespace
 
   /**
    * Address: 0x00873C40 (FUN_00873C40)
@@ -173,7 +173,9 @@ namespace moho
    * Allocates one `CMovie`, constructs it with constructor-failure cleanup,
    * writes the result into caller output storage, and returns that storage.
    */
-  CMovie** CMovie::AllocateAndConstruct(CMovie** const outMovie)
+  CMovie** CMovie::AllocateAndConstruct(
+    CMovie** const outMovie
+  )
   {
     CMovie* allocatedStorage = static_cast<CMovie*>(::operator new(sizeof(CMovie), std::nothrow));
     CMovie* constructedMovie = nullptr;
@@ -203,8 +205,7 @@ namespace moho
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
     (void)resources->CreateDynamicTextureSheet2(dynamicSheet, mWidth, mHeight, 2);
 
-    const boost::shared_ptr<ID3DTextureSheet> textureSheet =
-      boost::static_pointer_cast<ID3DTextureSheet>(dynamicSheet);
+    const boost::shared_ptr<ID3DTextureSheet> textureSheet = boost::static_pointer_cast<ID3DTextureSheet>(dynamicSheet);
     mTextureSheet.assign_retain(boost::SharedPtrRawFromSharedBorrow(textureSheet));
 
     bool textureReady = false;
@@ -231,7 +232,9 @@ namespace moho
    * buffer, creates the player, waits out the prepare status loop, builds the
    * movie texture, allocates the subtitle buffer, and uploads the first frame.
    */
-  bool CMovie::OpenMovie(const char* const path)
+  bool CMovie::OpenMovie(
+    const char* const path
+  )
   {
     gpg::Debugf("OpenMovie %s: %i", path, snd_index);
     if (path == nullptr || *path == '\0') {
@@ -325,9 +328,8 @@ namespace moho
 
     // Cache decoded dimensions (height halved for interlaced composition mode).
     mWidth = createParams.maxWidth;
-    mHeight = (::mwPlyFxGetCompoMode(mPly) == kSofdecInterlacedCompoMode)
-      ? (createParams.maxHeight / 2)
-      : createParams.maxHeight;
+    mHeight = (::mwPlyFxGetCompoMode(mPly) == kSofdecInterlacedCompoMode) ? (createParams.maxHeight / 2)
+                                                                          : createParams.maxHeight;
 
     if (!CreateTexture()) {
       gpg::Warnf("CreateTexture failed for movie %s", path);
@@ -454,10 +456,7 @@ namespace moho
       MoviePlaybackInfoDebug playbackInfo{};
       (void)::mwPlyGetPlyInf(mPly, reinterpret_cast<std::int32_t*>(&playbackInfo));
       gpg::Debugf(
-        "skip_disp %i, no_supply %i, skip_dec %i",
-        playbackInfo.skipDisp,
-        playbackInfo.noSupply,
-        playbackInfo.skipDec
+        "skip_disp %i, no_supply %i, skip_dec %i", playbackInfo.skipDisp, playbackInfo.noSupply, playbackInfo.skipDec
       );
     }
   }
@@ -596,9 +595,8 @@ namespace moho
       Wm3::Vector3f textureDimensions{};
       (void)textureSheet->GetDimensions(&textureDimensions);
       const std::int32_t textureHeight = static_cast<std::int32_t>(textureDimensions.y);
-      const std::int32_t outputHeight = (::mwPlyFxGetCompoMode(mPly) == kSofdecInterlacedCompoMode)
-        ? (textureHeight / 2)
-        : textureHeight;
+      const std::int32_t outputHeight =
+        (::mwPlyFxGetCompoMode(mPly) == kSofdecInterlacedCompoMode) ? (textureHeight / 2) : textureHeight;
 
       ::mwPlyFxSetOutBufSize(mPly, static_cast<std::int32_t>(outputPitch), outputHeight);
       ::mwPlyFxCnvFrmARGB8888(mPly, &frameInfo, outputBits);
@@ -617,7 +615,9 @@ namespace moho
    * Handles one movie texture lifecycle event lane from the D3D listener path:
    * release-on-exit and rebuild-and-clear-on-init.
    */
-  void CMovie::OnEvent(const SD3DDeviceEvent& event)
+  void CMovie::OnEvent(
+    const SD3DDeviceEvent& event
+  )
   {
     if (event.mEventType == 1u) {
       mTextureSheet.release();

@@ -141,7 +141,9 @@ namespace moho
      * caller can produce that value here, and the guard only turns a fault into
      * a no-op, so it is kept.
      */
-    void SetListener(ManyToOneListener<TEvent>* const listener) noexcept
+    void SetListener(
+      ManyToOneListener<TEvent>* const listener
+    ) noexcept
     {
       mListener.Set(listener);
     }

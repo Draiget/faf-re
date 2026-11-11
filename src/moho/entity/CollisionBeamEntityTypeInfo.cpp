@@ -63,7 +63,9 @@ namespace moho
    * cache the rest of the `Entity` reflection paths read, so the store is not
    * incidental.
    */
-  void CollisionBeamEntityTypeInfo::AddBase_Entity(gpg::RType* const typeInfo)
+  void CollisionBeamEntityTypeInfo::AddBase_Entity(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<Entity>(typeInfo);
   }
@@ -92,4 +94,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CollisionBeamEntityTypeInfo_1d0c25, moho::register_CollisionBeamEntityTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CollisionBeamEntityTypeInfo_1d0c25,
+  moho::register_CollisionBeamEntityTypeInfo
+)

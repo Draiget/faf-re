@@ -12,7 +12,8 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x005201F0 (FUN_005201F0, Moho::ERuleBPUnitBuildRestrictionTypeInfo::ERuleBPUnitBuildRestrictionTypeInfo)
+     * Address: 0x005201F0 (FUN_005201F0,
+     * Moho::ERuleBPUnitBuildRestrictionTypeInfo::ERuleBPUnitBuildRestrictionTypeInfo)
      *
      * What it does:
      * Constructs and preregisters the reflected enum descriptor for
@@ -46,7 +47,8 @@ namespace moho
   };
 
   static_assert(
-    sizeof(ERuleBPUnitBuildRestrictionTypeInfo) == 0x78, "ERuleBPUnitBuildRestrictionTypeInfo size must be 0x78"
+    sizeof(ERuleBPUnitBuildRestrictionTypeInfo) == 0x78,
+    "ERuleBPUnitBuildRestrictionTypeInfo size must be 0x78"
   );
 
   /**
@@ -56,7 +58,8 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00520310 (FUN_00520310, Moho::ERuleBPUnitWeaponBallisticArcTypeInfo::ERuleBPUnitWeaponBallisticArcTypeInfo)
+     * Address: 0x00520310 (FUN_00520310,
+     * Moho::ERuleBPUnitWeaponBallisticArcTypeInfo::ERuleBPUnitWeaponBallisticArcTypeInfo)
      *
      * What it does:
      * Constructs and preregisters the reflected enum descriptor for
@@ -91,7 +94,8 @@ namespace moho
   };
 
   static_assert(
-    sizeof(ERuleBPUnitWeaponBallisticArcTypeInfo) == 0x78, "ERuleBPUnitWeaponBallisticArcTypeInfo size must be 0x78"
+    sizeof(ERuleBPUnitWeaponBallisticArcTypeInfo) == 0x78,
+    "ERuleBPUnitWeaponBallisticArcTypeInfo size must be 0x78"
   );
 
   /**
@@ -101,7 +105,8 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x00520420 (FUN_00520420, Moho::ERuleBPUnitWeaponTargetTypeTypeInfo::ERuleBPUnitWeaponTargetTypeTypeInfo)
+     * Address: 0x00520420 (FUN_00520420,
+     * Moho::ERuleBPUnitWeaponTargetTypeTypeInfo::ERuleBPUnitWeaponTargetTypeTypeInfo)
      *
      * What it does:
      * Constructs and preregisters the reflected enum descriptor for
@@ -136,7 +141,8 @@ namespace moho
   };
 
   static_assert(
-    sizeof(ERuleBPUnitWeaponTargetTypeTypeInfo) == 0x78, "ERuleBPUnitWeaponTargetTypeTypeInfo size must be 0x78"
+    sizeof(ERuleBPUnitWeaponTargetTypeTypeInfo) == 0x78,
+    "ERuleBPUnitWeaponTargetTypeTypeInfo size must be 0x78"
   );
 
   /**

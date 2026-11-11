@@ -25,7 +25,10 @@ namespace gpg::gal::imaging
 {
   namespace
   {
-    [[nodiscard]] bool IsDds(const void* const data, const std::size_t bytes) noexcept
+    [[nodiscard]] bool IsDds(
+      const void* const data,
+      const std::size_t bytes
+    ) noexcept
     {
       return bytes >= 4U && std::memcmp(data, "DDS ", 4U) == 0;
     }
@@ -35,7 +38,9 @@ namespace gpg::gal::imaging
     class ComScope
     {
     public:
-      ComScope() noexcept : mResult(::CoInitializeEx(nullptr, COINIT_MULTITHREADED)) {}
+      ComScope() noexcept
+        : mResult(::CoInitializeEx(nullptr, COINIT_MULTITHREADED))
+      {}
       ~ComScope()
       {
         if (SUCCEEDED(mResult)) {
@@ -53,15 +58,23 @@ namespace gpg::gal::imaging
      * The files WIC decodes for the game: PNG, BMP, JPG, by their signatures. D3DX11 and WIC refuse
      * TGA, so stb isn't asked for it either.
      */
-    [[nodiscard]] bool IsWicFile(const std::uint8_t* const data, const std::size_t bytes) noexcept
+    [[nodiscard]] bool IsWicFile(
+      const std::uint8_t* const data,
+      const std::size_t bytes
+    ) noexcept
     {
       static constexpr std::uint8_t kPng[4] = {0x89U, 'P', 'N', 'G'};
       return bytes >= 4U &&
-        (std::memcmp(data, kPng, 4U) == 0 || (data[0] == 'B' && data[1] == 'M') || (data[0] == 0xFFU && data[1] == 0xD8U));
+        (std::memcmp(data, kPng, 4U) == 0 || (data[0] == 'B' && data[1] == 'M') ||
+         (data[0] == 0xFFU && data[1] == 0xD8U));
     }
 
     /** RGBA8, as WIC decodes these files for the engine. */
-    HRESULT LoadWithStb(const std::uint8_t* const data, const std::size_t bytes, DirectX::ScratchImage& outImage)
+    HRESULT LoadWithStb(
+      const std::uint8_t* const data,
+      const std::size_t bytes,
+      DirectX::ScratchImage& outImage
+    )
     {
       if (!IsWicFile(data, bytes)) {
         return E_FAIL;
@@ -73,19 +86,29 @@ namespace gpg::gal::imaging
       if (pixels == nullptr) {
         return E_FAIL;
       }
-      HRESULT result = outImage.Initialize2D(DXGI_FORMAT_R8G8B8A8_UNORM, static_cast<std::size_t>(width), static_cast<std::size_t>(height), 1U, 1U);
+      HRESULT result = outImage.Initialize2D(
+        DXGI_FORMAT_R8G8B8A8_UNORM, static_cast<std::size_t>(width), static_cast<std::size_t>(height), 1U, 1U
+      );
       if (SUCCEEDED(result)) {
         const DirectX::Image& image = *outImage.GetImage(0U, 0U, 0U);
         const std::size_t rowBytes = static_cast<std::size_t>(width) * 4U;
         for (int row = 0; row < height; ++row) {
-          std::memcpy(image.pixels + static_cast<std::size_t>(row) * image.rowPitch, pixels + static_cast<std::size_t>(row) * rowBytes, rowBytes);
+          std::memcpy(
+            image.pixels + static_cast<std::size_t>(row) * image.rowPitch,
+            pixels + static_cast<std::size_t>(row) * rowBytes,
+            rowBytes
+          );
         }
       }
       stbi_image_free(pixels);
       return result;
     }
 
-    void AppendBytes(void* const context, void* const data, const int size)
+    void AppendBytes(
+      void* const context,
+      void* const data,
+      const int size
+    )
     {
       auto& out = *static_cast<std::vector<std::uint8_t>*>(context);
       const auto* const begin = static_cast<const std::uint8_t*>(data);
@@ -96,7 +119,11 @@ namespace gpg::gal::imaging
     // Luminance expands to grey RGBA as D3DX11 does (a plain R8 would read as red).
     constexpr DirectX::DDS_FLAGS kDdsFlags = DirectX::DDS_FLAGS_EXPAND_LUMINANCE;
 
-    HRESULT LoadFile(const void* const data, const std::size_t bytes, DirectX::ScratchImage& outImage)
+    HRESULT LoadFile(
+      const void* const data,
+      const std::size_t bytes,
+      DirectX::ScratchImage& outImage
+    )
     {
       const auto* const source = static_cast<const std::uint8_t*>(data);
       if (IsDds(data, bytes)) {
@@ -111,7 +138,10 @@ namespace gpg::gal::imaging
 #endif
     }
 
-    [[nodiscard]] std::uint32_t FullChain(const std::size_t width, const std::size_t height) noexcept
+    [[nodiscard]] std::uint32_t FullChain(
+      const std::size_t width,
+      const std::size_t height
+    ) noexcept
     {
       std::uint32_t levels = 1U;
       for (std::size_t side = std::max(width, height); side > 1U; side >>= 1U) {
@@ -121,18 +151,29 @@ namespace gpg::gal::imaging
     }
 
     /** The format D3DX11 decodes a file into: block-compressed and A8 files keep theirs, the rest is RGBA8. */
-    [[nodiscard]] DXGI_FORMAT DefaultFormat(const DXGI_FORMAT fileFormat) noexcept
+    [[nodiscard]] DXGI_FORMAT DefaultFormat(
+      const DXGI_FORMAT fileFormat
+    ) noexcept
     {
-      if (DirectX::IsCompressed(fileFormat) || fileFormat == DXGI_FORMAT_A8_UNORM || fileFormat == DXGI_FORMAT_R8G8B8A8_UNORM) {
+      if (
+        DirectX::IsCompressed(fileFormat) || fileFormat == DXGI_FORMAT_A8_UNORM ||
+        fileFormat == DXGI_FORMAT_R8G8B8A8_UNORM
+      ) {
         return fileFormat;
       }
       return DXGI_FORMAT_R8G8B8A8_UNORM;
     }
 
-    void CopyLevelInto(const DirectX::Image& from, const DirectX::Image& to)
+    void CopyLevelInto(
+      const DirectX::Image& from,
+      const DirectX::Image& to
+    )
     {
       const std::size_t rowBytes = std::min(from.rowPitch, to.rowPitch);
-      const std::size_t rows = std::min(from.slicePitch / std::max<std::size_t>(from.rowPitch, 1U), to.slicePitch / std::max<std::size_t>(to.rowPitch, 1U));
+      const std::size_t rows = std::min(
+        from.slicePitch / std::max<std::size_t>(from.rowPitch, 1U),
+        to.slicePitch / std::max<std::size_t>(to.rowPitch, 1U)
+      );
       for (std::size_t row = 0U; row < rows; ++row) {
         std::memcpy(to.pixels + row * to.rowPitch, from.pixels + row * from.rowPitch, rowBytes);
       }
@@ -142,8 +183,14 @@ namespace gpg::gal::imaging
      * One level in `format` at width x height: stretched (D3DX11's default filter) or placed at the
      * top left with transparent black around it (ResizeFilter::None) when the size differs.
      */
-    HRESULT ToFormat(const DirectX::Image& from, const DXGI_FORMAT format, const std::size_t width, const std::size_t height,
-                     const ResizeFilter filter, DirectX::ScratchImage& outLevel)
+    HRESULT ToFormat(
+      const DirectX::Image& from,
+      const DXGI_FORMAT format,
+      const std::size_t width,
+      const std::size_t height,
+      const ResizeFilter filter,
+      DirectX::ScratchImage& outLevel
+    )
     {
       if (from.format == format && from.width == width && from.height == height) {
         return outLevel.InitializeFromImage(from);
@@ -169,7 +216,8 @@ namespace gpg::gal::imaging
             std::memset(sized.GetPixels(), 0, sized.GetPixelsSize());
             const DirectX::Image& source = *work.GetImage(0U, 0U, 0U);
             const DirectX::Rect area(0U, 0U, std::min(source.width, width), std::min(source.height, height));
-            result = DirectX::CopyRectangle(source, area, *sized.GetImage(0U, 0U, 0U), DirectX::TEX_FILTER_DEFAULT, 0U, 0U);
+            result =
+              DirectX::CopyRectangle(source, area, *sized.GetImage(0U, 0U, 0U), DirectX::TEX_FILTER_DEFAULT, 0U, 0U);
           }
         } else {
           result = DirectX::Resize(*work.GetImage(0U, 0U, 0U), width, height, DirectX::TEX_FILTER_TRIANGLE, sized);
@@ -195,7 +243,11 @@ namespace gpg::gal::imaging
      * byte when the format stays), and the rest is built from the smallest of them, here
      * filtered and encoded with DirectXTex: within about 32-45 dB of D3DX11's (issue #318).
      */
-    HRESULT Shape(DirectX::ScratchImage& file, const DecodeOptions& options, DirectX::ScratchImage& outImage)
+    HRESULT Shape(
+      DirectX::ScratchImage& file,
+      const DecodeOptions& options,
+      DirectX::ScratchImage& outImage
+    )
     {
       const DirectX::TexMetadata meta = file.GetMetadata();
       const DXGI_FORMAT format = options.format != DXGI_FORMAT_UNKNOWN ? options.format : DefaultFormat(meta.format);
@@ -210,7 +262,8 @@ namespace gpg::gal::imaging
       }
       std::uint32_t levels = options.mipLevels;
       if (levels == 0U) {
-        levels = meta.mipLevels == FullChain(meta.width, meta.height) ? static_cast<std::uint32_t>(meta.mipLevels) : FullChain(width, height);
+        levels = meta.mipLevels == FullChain(meta.width, meta.height) ? static_cast<std::uint32_t>(meta.mipLevels)
+                                                                      : FullChain(width, height);
       }
       levels = std::min(levels, FullChain(width, height));
 
@@ -248,7 +301,14 @@ namespace gpg::gal::imaging
             continue;
           }
           DirectX::ScratchImage level;
-          result = ToFormat(from, format, std::max<std::size_t>(1U, width >> mip), std::max<std::size_t>(1U, height >> mip), options.filter, level);
+          result = ToFormat(
+            from,
+            format,
+            std::max<std::size_t>(1U, width >> mip),
+            std::max<std::size_t>(1U, height >> mip),
+            options.filter,
+            level
+          );
           if (FAILED(result)) {
             return result;
           }
@@ -260,8 +320,14 @@ namespace gpg::gal::imaging
         // A float copy of the last kept level: the 8-bit route goes through WIC's scaler, which was
         // 20-30 dB off on DXT3/DXT5 files with alpha.
         DirectX::ScratchImage base;
-        result = ToFormat(*file.GetImage(kept - 1U, slice, 0U), DXGI_FORMAT_R32G32B32A32_FLOAT, std::max<std::size_t>(1U, width >> (kept - 1U)),
-                          std::max<std::size_t>(1U, height >> (kept - 1U)), options.filter, base);
+        result = ToFormat(
+          *file.GetImage(kept - 1U, slice, 0U),
+          DXGI_FORMAT_R32G32B32A32_FLOAT,
+          std::max<std::size_t>(1U, width >> (kept - 1U)),
+          std::max<std::size_t>(1U, height >> (kept - 1U)),
+          options.filter,
+          base
+        );
         DirectX::ScratchImage chain;
         if (SUCCEEDED(result)) {
           // The filter closer to D3DX11's on the game's files (tmp numbers in issue #318, mean PSNR
@@ -272,7 +338,9 @@ namespace gpg::gal::imaging
           const DirectX::Image& top = *base.GetImage(0U, 0U, 0U);
           const bool powerOfTwo = (top.width & (top.width - 1U)) == 0U && (top.height & (top.height - 1U)) == 0U;
           const bool box = powerOfTwo && compressed && (format != DXGI_FORMAT_BC3_UNORM || meta.IsCubemap());
-          result = DirectX::GenerateMipMaps(top, box ? DirectX::TEX_FILTER_BOX : DirectX::TEX_FILTER_LINEAR, levels - kept + 1U, chain);
+          result = DirectX::GenerateMipMaps(
+            top, box ? DirectX::TEX_FILTER_BOX : DirectX::TEX_FILTER_LINEAR, levels - kept + 1U, chain
+          );
         }
         for (std::size_t mip = kept; SUCCEEDED(result) && mip < levels; ++mip) {
           DirectX::ScratchImage level;
@@ -289,7 +357,12 @@ namespace gpg::gal::imaging
       return S_OK;
     }
 
-    void CopyLevel(const DirectX::Image& from, std::uint8_t* const to, const std::uint32_t rowPitch, const std::uint32_t rowCount)
+    void CopyLevel(
+      const DirectX::Image& from,
+      std::uint8_t* const to,
+      const std::uint32_t rowPitch,
+      const std::uint32_t rowCount
+    )
     {
       const std::size_t rowBytes = std::min<std::size_t>(rowPitch, from.rowPitch);
       for (std::uint32_t row = 0U; row < rowCount; ++row) {
@@ -298,7 +371,12 @@ namespace gpg::gal::imaging
     }
   } // namespace
 
-  HRESULT DecodeWithDirectXTex(const void* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage)
+  HRESULT DecodeWithDirectXTex(
+    const void* const data,
+    const std::size_t bytes,
+    const DecodeOptions& options,
+    Image& outImage
+  )
   {
     DirectX::ScratchImage file;
     HRESULT result = LoadFile(data, bytes, file);
@@ -342,8 +420,12 @@ namespace gpg::gal::imaging
       for (std::uint32_t mip = 0U; mip < levels; ++mip) {
         const Image::Subresource& subresource = outImage.subresources[mip];
         for (std::uint32_t slice = 0U; slice < subresource.depth; ++slice) {
-          CopyLevel(*shaped.GetImage(mip, 0U, slice), outImage.bytes.data() + subresource.offset + slice * subresource.slicePitch,
-                    subresource.rowPitch, subresource.rowCount);
+          CopyLevel(
+            *shaped.GetImage(mip, 0U, slice),
+            outImage.bytes.data() + subresource.offset + slice * subresource.slicePitch,
+            subresource.rowPitch,
+            subresource.rowCount
+          );
         }
       }
       return S_OK;
@@ -353,7 +435,8 @@ namespace gpg::gal::imaging
     // block-compressed top level stays a whole number of blocks.
     const bool cube = meta.IsCubemap() && meta.arraySize == 6U;
     std::uint32_t skip = meta.IsCubemap() ? 0U : std::min(options.skipMipLevels, levels - 1U);
-    while (skip != 0U && dxgi::IsBlockCompressed(format) && (((width >> skip) % 4U) != 0U || ((height >> skip) % 4U) != 0U)) {
+    while (skip != 0U && dxgi::IsBlockCompressed(format) &&
+           (((width >> skip) % 4U) != 0U || ((height >> skip) % 4U) != 0U)) {
       --skip;
     }
     outImage.Allocate(format, width >> skip, height >> skip, levels - skip, static_cast<std::uint32_t>(meta.arraySize));
@@ -367,7 +450,12 @@ namespace gpg::gal::imaging
     return S_OK;
   }
 
-  HRESULT GetImageSizeWithDirectXTex(const void* const data, const std::size_t bytes, std::uint32_t& outWidth, std::uint32_t& outHeight)
+  HRESULT GetImageSizeWithDirectXTex(
+    const void* const data,
+    const std::size_t bytes,
+    std::uint32_t& outWidth,
+    std::uint32_t& outHeight
+  )
   {
     DirectX::TexMetadata meta{};
     const auto* const source = static_cast<const std::uint8_t*>(data);
@@ -379,7 +467,8 @@ namespace gpg::gal::imaging
       int width = 0;
       int height = 0;
       int channels = 0;
-      result = (IsWicFile(source, bytes) && stbi_info_from_memory(source, static_cast<int>(bytes), &width, &height, &channels) != 0)
+      result = (IsWicFile(source, bytes) &&
+                stbi_info_from_memory(source, static_cast<int>(bytes), &width, &height, &channels) != 0)
         ? S_OK
         : E_FAIL;
       meta.width = static_cast<std::size_t>(width);
@@ -396,7 +485,11 @@ namespace gpg::gal::imaging
     return result;
   }
 
-  HRESULT EncodeWithDirectXTex(const Image& image, const FileFormat format, std::vector<std::uint8_t>& outBytes)
+  HRESULT EncodeWithDirectXTex(
+    const Image& image,
+    const FileFormat format,
+    std::vector<std::uint8_t>& outBytes
+  )
   {
     if (format == FileFormat::Dds) {
       return ImageCodec::WriteDds(image, outBytes);
@@ -442,12 +535,17 @@ namespace gpg::gal::imaging
       // stbi's BMP writer takes tightly packed rows.
       std::vector<std::uint8_t> packed(static_cast<std::size_t>(width) * height * 4U);
       for (int row = 0; row < height; ++row) {
-        std::memcpy(packed.data() + static_cast<std::size_t>(row) * width * 4U, level.pixels + static_cast<std::size_t>(row) * level.rowPitch,
-                    static_cast<std::size_t>(width) * 4U);
+        std::memcpy(
+          packed.data() + static_cast<std::size_t>(row) * width * 4U,
+          level.pixels + static_cast<std::size_t>(row) * level.rowPitch,
+          static_cast<std::size_t>(width) * 4U
+        );
       }
       written = stbi_write_bmp_to_func(&AppendBytes, &outBytes, width, height, 4, packed.data());
     } else {
-      written = stbi_write_png_to_func(&AppendBytes, &outBytes, width, height, 4, level.pixels, static_cast<int>(level.rowPitch));
+      written = stbi_write_png_to_func(
+        &AppendBytes, &outBytes, width, height, 4, level.pixels, static_cast<int>(level.rowPitch)
+      );
     }
     return written != 0 ? S_OK : E_FAIL;
 #else

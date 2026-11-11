@@ -41,19 +41,26 @@ namespace moho
      * Address: 0x0049BE90 (FUN_0049BE90 -- the implicit destructor: both
      * `CountedPtr` handles release their texture. Formerly
      * a deleted overlay, removed.)
-     * Address: 0x0049FBF0 (FUN_0049FBF0 -- the compiler-generated copy assignment as emitted for the `fa::vector` instantiation; callers 0x00495850, 0x0049DE60, 0x0049E4E0; formerly `CopyAssignTrailRuntimeAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0049FFB0 (FUN_0049FFB0 -- a second emission of that copy assignment; zero callers, unreachable; formerly `CopyAssignTrailRuntimeIfDestinationPresent`, removed 2026-09-10.)
-     * Address: 0x0049FFC0 (FUN_0049FFC0 -- the implicit destructor as emitted for the `fa::vector` instantiation; zero callers, unreachable; formerly `DestroyTrailRuntimeInPlace`, removed 2026-09-10.)
-     * Address: 0x004A0620 (FUN_004A0620 -- the placement copy constructor as emitted for the `fa::vector` instantiation; zero callers, unreachable; formerly `CopyConstructTrailRuntimeIfDestinationPresent`, removed 2026-09-10.)
-     * Address: 0x004A0630 (FUN_004A0630 -- another emission of the implicit destructor; zero callers, unreachable; formerly `DestroyTrailRuntimeInPlaceDuplicateA`, removed 2026-09-10.)
-     * Address: 0x004A0720 (FUN_004A0720 -- another emission of the implicit destructor; zero callers, unreachable; formerly `DestroyTrailRuntimeInPlaceAndReturnSelf`, removed 2026-09-10.)
+     * Address: 0x0049FBF0 (FUN_0049FBF0 -- the compiler-generated copy assignment as emitted for the `fa::vector`
+     * instantiation; callers 0x00495850, 0x0049DE60, 0x0049E4E0; formerly `CopyAssignTrailRuntimeAndReturnDestination`
+     * in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0049FFB0 (FUN_0049FFB0 -- a
+     * second emission of that copy assignment; zero callers, unreachable; formerly
+     * `CopyAssignTrailRuntimeIfDestinationPresent`, removed 2026-09-10.) Address: 0x0049FFC0 (FUN_0049FFC0 -- the
+     * implicit destructor as emitted for the `fa::vector` instantiation; zero callers, unreachable; formerly
+     * `DestroyTrailRuntimeInPlace`, removed 2026-09-10.) Address: 0x004A0620 (FUN_004A0620 -- the placement copy
+     * constructor as emitted for the `fa::vector` instantiation; zero callers, unreachable; formerly
+     * `CopyConstructTrailRuntimeIfDestinationPresent`, removed 2026-09-10.) Address: 0x004A0630 (FUN_004A0630 --
+     * another emission of the implicit destructor; zero callers, unreachable; formerly
+     * `DestroyTrailRuntimeInPlaceDuplicateA`, removed 2026-09-10.) Address: 0x004A0720 (FUN_004A0720 -- another
+     * emission of the implicit destructor; zero callers, unreachable; formerly
+     * `DestroyTrailRuntimeInPlaceAndReturnSelf`, removed 2026-09-10.)
      */
 
     /// Ribbon start, the trail point interpolated at `(tick, 0.0)`.
-    Wm3::Vector3<float> mStartPos;                // +0x00
+    Wm3::Vector3<float> mStartPos; // +0x00
 
     /// Ribbon end, the trail point interpolated at `(tick, interpScale)`.
-    Wm3::Vector3<float> mEndPos;                  // +0x0C
+    Wm3::Vector3<float> mEndPos; // +0x0C
 
     /**
      * Ribbon tangent at `mStartPos`: the *previous* segment's normalized
@@ -63,10 +70,10 @@ namespace moho
      * quad and plain for the other, which is what makes it a tangent and not a
      * position.
      */
-    Wm3::Vector3<float> mStartTangent;            // +0x18
+    Wm3::Vector3<float> mStartTangent; // +0x18
 
     /// Ribbon tangent at `mEndPos`: this segment's normalized direction.
-    Wm3::Vector3<float> mEndTangent;              // +0x24
+    Wm3::Vector3<float> mEndTangent; // +0x24
 
     /**
      * Age in frames of each ribbon end, counted from the segment's emission:
@@ -74,37 +81,37 @@ namespace moho
      * end. `UploadPendingTrailsIntoWorkItem` advances both by `frameDelta + 1`
      * every time the segment is uploaded, so they run up towards `mLifetime`.
      */
-    float mStartAge = 0.0f;                       // +0x30
-    float mEndAge = 0.0f;                         // +0x34
+    float mStartAge = 0.0f; // +0x30
+    float mEndAge = 0.0f;   // +0x34
 
     /// Lifetime in frames (blueprint `TrailLength`); the work-item interval is `mLifetime + 1`.
-    float mLifetime = 0.0f;                       // +0x38
+    float mLifetime = 0.0f; // +0x38
 
     /// Emitter age when this segment was emitted, negated; advanced with the two ages above.
-    float mEmitterAge = 0.0f;                     // +0x3C
+    float mEmitterAge = 0.0f; // +0x3C
 
     /**
      * Texture U coordinate at each ribbon end: blueprint `TextureRepeatRate`
      * times the accumulated trail length before and after this segment, so the
      * sheet scrolls with distance travelled rather than with time.
      */
-    float mTexCoordStart = 0.0f;                  // +0x40
-    float mTexCoordEnd = 0.0f;                    // +0x44
+    float mTexCoordStart = 0.0f; // +0x40
+    float mTexCoordEnd = 0.0f;   // +0x44
 
     /// Blueprint `SortOrder`; the primary bucket-key sort scalar (float compare at 0x00492520).
-    float mSortOrder = 0.0f;                      // +0x48
+    float mSortOrder = 0.0f; // +0x48
 
     /// Blueprint `StartSize`; the ribbon half-width handed to every vertex.
-    float mSize = 0.0f;                           // +0x4C
+    float mSize = 0.0f; // +0x4C
 
     /// Blueprint `RepeatTexture`, resolved through `CEfxTrailEmitter::mParticleTextures[0]`.
-    CountedPtr_CParticleTexture mTexture;         // +0x50
+    CountedPtr_CParticleTexture mTexture; // +0x50
 
     /// Blueprint `RampTexture`, resolved through `CEfxTrailEmitter::mParticleTextures[1]`.
-    CountedPtr_CParticleTexture mRampTexture;     // +0x54
+    CountedPtr_CParticleTexture mRampTexture; // +0x54
 
     /// Effect technique family; always the literal `"TPolyTrail"`.
-    const char* mTypeTag = nullptr;               // +0x58
+    const char* mTypeTag = nullptr; // +0x58
 
     /**
      * Blueprint `BlendMode`, a `std::int32_t` and not a float: the bucket-key
@@ -114,7 +121,7 @@ namespace moho
      * all three structs it flows through, with a `std::memcpy` at each end of
      * the chain to launder the type back.
      */
-    std::int32_t mBlendMode = 0;                  // +0x5C
+    std::int32_t mBlendMode = 0; // +0x5C
   };
 
   static_assert(offsetof(SWorldTrail, mStartPos) == 0x00, "SWorldTrail::mStartPos offset must be 0x00");

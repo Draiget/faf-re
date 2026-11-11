@@ -179,7 +179,8 @@ namespace moho
 
   static_assert(sizeof(wxWindow) == 0x124, "wxWindow size must be 0x124");
   static_assert(
-    offsetof(WD3DViewport, mBackgroundImage) == 0x124, "moho::WD3DViewport::mBackgroundImage offset must be 0x124"
+    offsetof(WD3DViewport, mBackgroundImage) == 0x124,
+    "moho::WD3DViewport::mBackgroundImage offset must be 0x124"
   );
   static_assert(sizeof(WD3DViewport) == 0x128, "moho::WD3DViewport size must be 0x128");
 } // namespace moho

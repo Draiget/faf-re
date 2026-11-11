@@ -16,7 +16,9 @@
 namespace
 {
   template <typename TUnsigned>
-  [[nodiscard]] TUnsigned AlignToPowerOfTwo(const TUnsigned value)
+  [[nodiscard]] TUnsigned AlignToPowerOfTwo(
+    const TUnsigned value
+  )
   {
     static_assert(std::is_unsigned_v<TUnsigned>, "AlignToPowerOfTwo requires an unsigned integer type");
     return std::bit_ceil(value == 0 ? static_cast<TUnsigned>(1) : value);
@@ -40,7 +42,11 @@ namespace moho
   /**
    * Address: 0x004470F0 (FUN_004470F0)
    */
-  CD3DBatchTexture::CD3DBatchTexture(const std::uint32_t width, const std::uint32_t height, const std::uint32_t border)
+  CD3DBatchTexture::CD3DBatchTexture(
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const std::uint32_t border
+  )
     : mWidth(width)
     , mHeight(height)
     , mBorder(border)
@@ -79,7 +85,9 @@ namespace moho
    * Address: 0x00447520 (FUN_00447520, Moho::CD3DBatchTexture::GetTextureSheet)
    */
   CD3DBatchTexture::TextureSheetHandle& CD3DBatchTexture::GetTextureSheet(
-    TextureSheetHandle& outTextureSheet, Wm3::Vector2f& outUvScale, Wm3::Vector2f& outUvBorder
+    TextureSheetHandle& outTextureSheet,
+    Wm3::Vector2f& outUvScale,
+    Wm3::Vector2f& outUvBorder
   )
   {
     const std::uint32_t paddedWidth = mWidth + (mBorder * 2u);
@@ -91,10 +99,7 @@ namespace moho
       if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
         if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
           (void)resources->NewDynamicTextureSheet(
-            mTextureSheet,
-            static_cast<int>(sheetWidth),
-            static_cast<int>(sheetHeight),
-            12
+            mTextureSheet, static_cast<int>(sheetWidth), static_cast<int>(sheetHeight), 12
           );
         }
       }

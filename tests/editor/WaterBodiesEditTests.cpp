@@ -40,7 +40,10 @@ string]],
 }
 )lua";
 
-  TEST(WaterBodiesEdit, LuaTextReadsFieldsItemsAndWhereTheyAre)
+  TEST(
+    WaterBodiesEdit,
+    LuaTextReadsFieldsItemsAndWhereTheyAre
+  )
   {
     faf::editor::LuaText info;
     std::string error;
@@ -71,7 +74,10 @@ string]],
     EXPECT_EQ(faf::editor::LuaNumber(12.34567), "12.346");
   }
 
-  TEST(WaterBodiesEdit, ReadsEachField)
+  TEST(
+    WaterBodiesEdit,
+    ReadsEachField
+  )
   {
     const faf::editor::WaterBodiesRead read = faf::editor::ReadWaterBodies(kScenario);
     ASSERT_TRUE(read.error.empty()) << read.error;
@@ -102,19 +108,27 @@ string]],
     EXPECT_EQ(polder.fillTo, 3.0f);
   }
 
-  TEST(WaterBodiesEdit, ScenarioWithoutBodies)
+  TEST(
+    WaterBodiesEdit,
+    ScenarioWithoutBodies
+  )
   {
-    const faf::editor::WaterBodiesRead read = faf::editor::ReadWaterBodies("ScenarioInfo = { name = 'x', map = '/maps/x.scmap' }\n");
+    const faf::editor::WaterBodiesRead read =
+      faf::editor::ReadWaterBodies("ScenarioInfo = { name = 'x', map = '/maps/x.scmap' }\n");
     EXPECT_TRUE(read.error.empty());
     EXPECT_FALSE(read.present);
     EXPECT_TRUE(read.bodies.empty());
     EXPECT_FALSE(faf::editor::ReadWaterBodies("-- nothing here\n").error.empty());
   }
 
-  TEST(WaterBodiesEdit, UnreadableBodyIsKeptAsItsText)
+  TEST(
+    WaterBodiesEdit,
+    UnreadableBodyIsKeptAsItsText
+  )
   {
-    const std::string scenario = "ScenarioInfo = {\n    WaterBodies = {\n        { Elevation = 20 + 5, Seed = { 1, 2 } },\n"
-                                 "        { Elevation = 10, Seed = { 3, 4 }, Colour = 'blue' },\n    },\n}\n";
+    const std::string scenario =
+      "ScenarioInfo = {\n    WaterBodies = {\n        { Elevation = 20 + 5, Seed = { 1, 2 } },\n"
+      "        { Elevation = 10, Seed = { 3, 4 }, Colour = 'blue' },\n    },\n}\n";
     const faf::editor::WaterBodiesRead read = faf::editor::ReadWaterBodies(scenario);
     ASSERT_EQ(read.bodies.size(), 2u);
     EXPECT_FALSE(read.bodies[1].raw.empty());
@@ -129,7 +143,10 @@ string]],
     EXPECT_NE(log[0].find("can't read"), std::string::npos);
   }
 
-  TEST(WaterBodiesEdit, WrittenBackReadsTheSame)
+  TEST(
+    WaterBodiesEdit,
+    WrittenBackReadsTheSame
+  )
   {
     const faf::editor::WaterBodiesRead read = faf::editor::ReadWaterBodies(kScenario);
     const std::string written = faf::editor::WithWaterBodies(kScenario, read.bodies);
@@ -140,12 +157,19 @@ string]],
     EXPECT_NE(written.find("version = 3 -- Lua Version. Dont touch this"), std::string::npos);
     EXPECT_NE(written.find("description = 'Water at { many } levels',"), std::string::npos);
     EXPECT_NE(written.find("        ['standard'] = {"), std::string::npos);
-    EXPECT_NE(written.find("    WaterBodies = {\n        { Elevation = 30, Deep = 28, Abyss = 25, Outline = { { 10, 10 }, { 20, 10 }, { 15, 20 } } },\n"),
-              std::string::npos)
-      << written;
+    EXPECT_NE(
+      written.find(
+        "    WaterBodies = {\n        { Elevation = 30, Deep = 28, Abyss = 25, Outline = { { 10, 10 }, { 20, 10 }, { "
+        "15, 20 } } },\n"
+      ),
+      std::string::npos
+    ) << written;
   }
 
-  TEST(WaterBodiesEdit, EditedAddedAndRemoved)
+  TEST(
+    WaterBodiesEdit,
+    EditedAddedAndRemoved
+  )
   {
     faf::editor::WaterBodiesRead read = faf::editor::ReadWaterBodies(kScenario);
     read.bodies[1].elevation = 21.5f;
@@ -155,7 +179,9 @@ string]],
     read.bodies[1].x1 = 164;
     read.bodies[1].z1 = 164;
     std::string written = faf::editor::WithWaterBodies(kScenario, read.bodies);
-    EXPECT_NE(written.find("{ Elevation = 21.5, Seed = { 152, 152 }, Bounds = { 140, 140, 164, 164 } },"), std::string::npos) << written;
+    EXPECT_NE(
+      written.find("{ Elevation = 21.5, Seed = { 152, 152 }, Bounds = { 140, 140, 164, 164 } },"), std::string::npos
+    ) << written;
 
     // All taken out: the table and its line go, the rest stays.
     written = faf::editor::WithWaterBodies(written, {});
@@ -169,15 +195,21 @@ string]],
     lake.seedX = 256.0f;
     lake.seedZ = 300.25f;
     written = faf::editor::WithWaterBodies(written, {lake});
-    EXPECT_NE(written.find("ScenarioInfo = {\n    WaterBodies = {\n        { Elevation = 12, Seed = { 256, 300.25 } },\n    },\n    name"),
-              std::string::npos)
-      << written;
+    EXPECT_NE(
+      written.find(
+        "ScenarioInfo = {\n    WaterBodies = {\n        { Elevation = 12, Seed = { 256, 300.25 } },\n    },\n    name"
+      ),
+      std::string::npos
+    ) << written;
     const faf::editor::WaterBodiesRead again = faf::editor::ReadWaterBodies(written);
     ASSERT_EQ(again.bodies.size(), 1u);
     EXPECT_EQ(again.bodies[0], lake);
   }
 
-  TEST(WaterBodiesEdit, DescsFollowTheGamesDefaultsAndSkips)
+  TEST(
+    WaterBodiesEdit,
+    DescsFollowTheGamesDefaultsAndSkips
+  )
   {
     std::vector<WaterBody> bodies(6);
     // 1: a lake with only a level and a seed: Deep and Abyss from the sea's distances.
@@ -224,7 +256,10 @@ string]],
     EXPECT_EQ(log, expected);
   }
 
-  TEST(WaterBodiesEdit, FilledOverAHeightField)
+  TEST(
+    WaterBodiesEdit,
+    FilledOverAHeightField
+  )
   {
     // A 17 x 17 bowl: ground at 10 with a pit at 2 in the middle 5 x 5; a lake at 6 seeded in it.
     constexpr int kSize = 17;
@@ -248,7 +283,10 @@ string]],
     EXPECT_EQ(filled->BodyOfVertex(1, 1), 0);
   }
 
-  TEST(WaterBodiesEdit, EveryRetailScenarioReadsAndTakesABody)
+  TEST(
+    WaterBodiesEdit,
+    EveryRetailScenarioReadsAndTakesABody
+  )
   {
     const std::string folderText = faf::editor::test::EnvText("FAF_RETAIL_MAPS");
     const char* const folder = folderText.empty() ? nullptr : folderText.c_str();

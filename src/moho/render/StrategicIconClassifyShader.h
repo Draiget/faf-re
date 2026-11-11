@@ -35,7 +35,7 @@ namespace moho
   {
     enum Flags : std::uint32_t
     {
-      kValid = 1U << 0U,                ///< the classifier did not drop it before the per-frame tests
+      kValid = 1U << 0U, ///< the classifier did not drop it before the per-frame tests
       kFriendly = 1U << 1U,
       kStunned = 1U << 2U,
       kPaused = 1U << 3U,
@@ -51,8 +51,8 @@ namespace moho
     float mImpact = 0.0f;
     float mCurrentPosition[3] = {};
     std::uint32_t mFlags = 0U;
-    float mIconFadeInZoom = 0.0f;       ///< the mesh's `mIconFadeInZoom` (with kHasMesh)
-    std::uint32_t mColor = 0U;          ///< the base icon's tint, `PlaceUnitIcon`'s colour before the blink test
+    float mIconFadeInZoom = 0.0f;           ///< the mesh's `mIconFadeInZoom` (with kHasMesh)
+    std::uint32_t mColor = 0U;              ///< the base icon's tint, `PlaceUnitIcon`'s colour before the blink test
     std::uint32_t mIconSlots = 0xFFFFFFFFU; ///< atlas slot of the icon (low 16 bits) and the selected icon (high)
     std::int32_t mUnderlaySlotOrNone = -1;  ///< atlas slot of the identified underlay, -1 for none
     std::int32_t mLastFocusDamageTick = 0;  ///< `mLastFocusDamageGameTick`
@@ -69,17 +69,17 @@ namespace moho
       kNisRenderIcons = 1U << 0U,
       kRenderIcons = 1U << 1U,
       kAlwaysRenderIcons = 1U << 2U,
-      kBlinkHidden = 1U << 3U,          ///< the shared blink phase is in its hidden half
+      kBlinkHidden = 1U << 3U, ///< the shared blink phase is in its hidden half
       kHasPlayableRect = 1U << 4U,
     };
 
-    float mViewProjection[16] = {};     ///< `GeomCamera3::viewProjection`, rows r[0]..r[3]
-    float mViewport[4] = {};            ///< `Project`'s x0, x1, y0, y1
-    float mPlayableRect[4] = {};        ///< x0, z0, x1, z1
+    float mViewProjection[16] = {}; ///< `GeomCamera3::viewProjection`, rows r[0]..r[3]
+    float mViewport[4] = {};        ///< `Project`'s x0, x1, y0, y1
+    float mPlayableRect[4] = {};    ///< x0, z0, x1, z1
     float mTickFraction = 0.0f;
     float mCurrentZoom = 0.0f;
-    float mMaxZoomFade = 0.0f;          ///< `GetMaxZoom() * 0.89f`
-    float mBlinkTicks = 0.0f;           ///< `ui_StrategicIconBlinkDuration * 10`
+    float mMaxZoomFade = 0.0f; ///< `GetMaxZoom() * 0.89f`
+    float mBlinkTicks = 0.0f;  ///< `ui_StrategicIconBlinkDuration * 10`
     std::uint32_t mCount = 0U;
     std::uint32_t mFlags = 0U;
     std::uint32_t mHovered = 0xFFFFFFFFU; ///< source index of the hovered unit, or none

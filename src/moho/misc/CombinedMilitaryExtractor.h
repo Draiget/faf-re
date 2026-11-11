@@ -24,8 +24,11 @@ namespace moho
      * What it does:
      * Blueprint path is intentionally disabled for this overlay extractor.
      */
-    [[nodiscard]] bool
-    Range(SRangeExtractionPayload* outRange, const RUnitBlueprint* unitBlueprint, const Wm3::Vec3f& center) const override;
+    [[nodiscard]] bool Range(
+      SRangeExtractionPayload* outRange,
+      const RUnitBlueprint* unitBlueprint,
+      const Wm3::Vec3f& center
+    ) const override;
 
     /**
      * Address: 0x007EC3A0 (FUN_007EC3A0, Moho::CombinedMilitaryExtractor::Extract)

@@ -105,7 +105,10 @@ namespace moho
       }
     }
 
-    void WorkerMain(const unsigned int index, std::uint64_t seenGeneration)
+    void WorkerMain(
+      const unsigned int index,
+      std::uint64_t seenGeneration
+    )
     {
       tInsideUserJob = true;
       char name[32];
@@ -117,7 +120,9 @@ namespace moho
         SFpuControlState jobFpu{};
         {
           std::unique_lock<std::mutex> lock(mutex);
-          wake.wait(lock, [&] { return stopping || generation != seenGeneration; });
+          wake.wait(lock, [&] {
+            return stopping || generation != seenGeneration;
+          });
           if (stopping) {
             return;
           }
@@ -145,7 +150,9 @@ namespace moho
       }
       threads.reserve(workerCount);
       for (unsigned int index = 0; index < workerCount; ++index) {
-        threads.emplace_back([this, index, startGeneration] { WorkerMain(index, startGeneration); });
+        threads.emplace_back([this, index, startGeneration] {
+          WorkerMain(index, startGeneration);
+        });
       }
       gpg::Logf("UserWorkerPool: started %u worker threads", workerCount);
     }
@@ -199,7 +206,12 @@ namespace moho
     return ::GetCurrentThreadId() == sDispatcherThreadId;
   }
 
-  void CUserWorkerPool::Run(const std::size_t count, std::size_t grain, const RangeFunction fn, void* const context)
+  void CUserWorkerPool::Run(
+    const std::size_t count,
+    std::size_t grain,
+    const RangeFunction fn,
+    void* const context
+  )
   {
     if (count == 0u || fn == nullptr) {
       return;
@@ -238,7 +250,9 @@ namespace moho
 
     {
       std::unique_lock<std::mutex> lock(impl.mutex);
-      impl.done.wait(lock, [&] { return impl.activeWorkers == 0u; });
+      impl.done.wait(lock, [&] {
+        return impl.activeWorkers == 0u;
+      });
 
       impl.fn = fn;
       impl.context = context;

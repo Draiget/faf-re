@@ -37,7 +37,10 @@ namespace moho
    * pointer, matching the traversal used by `CreateHandle`/`DestroyHandle`.
    * Terminates with a null owned-pointer sentinel so the reader stops.
    */
-  void WriteDecalHandles(const CDecalBuffer* const buf, gpg::WriteArchive* const ar)
+  void WriteDecalHandles(
+    const CDecalBuffer* const buf,
+    gpg::WriteArchive* const ar
+  )
   {
     const auto* const listHead = static_cast<const CDecalHandleListNode*>(&buf->mHandleListHead);
 
@@ -65,7 +68,9 @@ namespace moho
    * its own zeroed owner reference, matching the two locals the binary clears
    * at 0x0077F106 and 0x0077F11A.
    */
-  void CDecalBuffer::MemberDeserialize(gpg::ReadArchive* const ar)
+  void CDecalBuffer::MemberDeserialize(
+    gpg::ReadArchive* const ar
+  )
   {
     const gpg::RRef simRef{};
     (void)ar->ReadPointer(&mSim, &simRef);
@@ -86,7 +91,9 @@ namespace moho
    * unowned tracked pointer, the `IdPool` sub-object (+0x08) via reflection with
    * a lazily-resolved `RType`, then the owned decal-handle list.
    */
-  void CDecalBuffer::MemberSerialize(gpg::WriteArchive* const ar) const
+  void CDecalBuffer::MemberSerialize(
+    gpg::WriteArchive* const ar
+  ) const
   {
     ar->WritePointer<moho::Sim>(mSim, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 

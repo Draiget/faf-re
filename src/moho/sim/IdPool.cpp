@@ -19,10 +19,12 @@ namespace
   constexpr int kHistoryCapacity = 100;
 
   static_assert(
-    offsetof(SimSubRes3, mValue) == offsetof(BVIntSet, mFirstWordIndex), "SimSubRes3/BVIntSet offset mismatch"
+    offsetof(SimSubRes3, mValue) == offsetof(BVIntSet, mFirstWordIndex),
+    "SimSubRes3/BVIntSet offset mismatch"
   );
   static_assert(
-    offsetof(SimSubRes3, mReserved04) == offsetof(BVIntSet, mReservedMetaWord), "SimSubRes3/BVIntSet offset mismatch"
+    offsetof(SimSubRes3, mReserved04) == offsetof(BVIntSet, mReservedMetaWord),
+    "SimSubRes3/BVIntSet offset mismatch"
   );
   static_assert(offsetof(SimSubRes3, mValues) == offsetof(BVIntSet, mWords), "SimSubRes3/BVIntSet offset mismatch");
   static_assert(sizeof(SimSubRes3) == sizeof(BVIntSet), "SimSubRes3/BVIntSet size mismatch");
@@ -33,12 +35,16 @@ namespace
     return kNullOwner;
   }
 
-  [[nodiscard]] BVIntSet& AsBitSet(SimSubRes3& slot) noexcept
+  [[nodiscard]] BVIntSet& AsBitSet(
+    SimSubRes3& slot
+  ) noexcept
   {
     return *reinterpret_cast<BVIntSet*>(&slot);
   }
 
-  [[nodiscard]] const BVIntSet& AsBitSet(const SimSubRes3& slot) noexcept
+  [[nodiscard]] const BVIntSet& AsBitSet(
+    const SimSubRes3& slot
+  ) noexcept
   {
     return *reinterpret_cast<const BVIntSet*>(&slot);
   }
@@ -50,7 +56,10 @@ namespace
    * Returns `{set, value}` when `value` is currently set; otherwise advances to
    * the next set bit and returns that index pair.
    */
-  [[nodiscard]] BVIntSetIndex ResolveExistingOrNextIndex(BVIntSet& set, unsigned int value)
+  [[nodiscard]] BVIntSetIndex ResolveExistingOrNextIndex(
+    BVIntSet& set,
+    unsigned int value
+  )
   {
     if (!set.Contains(value)) {
       value = set.GetNext(value);
@@ -96,9 +105,7 @@ namespace
     moho::IdPool mPayload; // +0x08
   };
   static_assert(offsetof(IdPoolMapLaneCopy, mKey) == 0x00, "IdPoolMapLaneCopy::mKey offset must be 0x00");
-  static_assert(
-    offsetof(IdPoolMapLaneCopy, mPayload) == 0x08, "IdPoolMapLaneCopy::mPayload offset must be 0x08"
-  );
+  static_assert(offsetof(IdPoolMapLaneCopy, mPayload) == 0x08, "IdPoolMapLaneCopy::mPayload offset must be 0x08");
 
   /**
    * Address: 0x00686D10 (FUN_00686D10)
@@ -159,7 +166,9 @@ namespace
  * What it does:
  * Copies one BVIntSet snapshot into the tail slot and advances `mEnd` modulo 100.
  */
-void SimSubRes2::PushSnapshot(const BVIntSet& snapshot)
+void SimSubRes2::PushSnapshot(
+  const BVIntSet& snapshot
+)
 {
   BVIntSet& destination = AsBitSet(mData[mEnd]);
   destination.mFirstWordIndex = snapshot.mFirstWordIndex;
@@ -209,7 +218,9 @@ void SimSubRes2::Reset()
  * EntityDb's address range because `IdPool`'s implicit copy (0x00686DF0,
  * the `map<uint, IdPool>` node build) is its first user.
  */
-SimSubRes2& SimSubRes2::operator=(const SimSubRes2& other)
+SimSubRes2& SimSubRes2::operator=(
+  const SimSubRes2& other
+)
 {
   if (this != &other) {
     Reset();
@@ -242,7 +253,9 @@ IdPool::IdPool()
  * What it does:
  * Queues one released low-id bit into the current recycle-history tail bucket.
  */
-BVIntSetAddResult IdPool::QueueReleasedLowId(const unsigned int lowId)
+BVIntSetAddResult IdPool::QueueReleasedLowId(
+  const unsigned int lowId
+)
 {
   const int bucketIndex = (mSubRes2.mEnd + (kHistoryCapacity - 1)) % kHistoryCapacity;
   return AsBitSet(mSubRes2.mData[bucketIndex]).Add(lowId);
@@ -296,7 +309,9 @@ void IdPool::Update()
  * What it does:
  * Reads the next low-id cursor and released-id set from archive.
  */
-void IdPool::MemberDeserialize(gpg::ReadArchive* const archive)
+void IdPool::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   std::uint32_t nextLowId = 0;
   archive->ReadUInt(&nextLowId);
@@ -323,7 +338,9 @@ void IdPool::MemberDeserialize(gpg::ReadArchive* const archive)
  * What it does:
  * Compacts the released-id set with the recycle ring and writes it to archive.
  */
-void IdPool::MemberSerialize(gpg::WriteArchive* const archive) const
+void IdPool::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   // Engine addition (replay keyframes): a retail save hands every id the ring still holds back to
   // the free set, so after a load they are reused up to 100 beats sooner than in the game that

@@ -30,7 +30,9 @@ namespace moho
    * Deserializes one `CArmyStatItem` lane by loading `StatItem` base state and
    * the blueprint-weight map payload.
    */
-  void CArmyStatItem::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CArmyStatItem::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -48,7 +50,9 @@ namespace moho
    * Serializes one `CArmyStatItem` lane by saving `StatItem` base state and
    * the blueprint-weight map payload.
    */
-  void CArmyStatItem::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CArmyStatItem::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;

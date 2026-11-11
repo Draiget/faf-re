@@ -15,7 +15,9 @@ namespace gpg
 namespace moho
 {
   template <typename TUnsigned>
-  [[nodiscard]] constexpr TUnsigned DXT_BlockCount(const TUnsigned texelCount)
+  [[nodiscard]] constexpr TUnsigned DXT_BlockCount(
+    const TUnsigned texelCount
+  )
   {
     static_assert(std::is_unsigned_v<TUnsigned>, "DXT_BlockCount requires an unsigned integer type");
     return (texelCount + static_cast<TUnsigned>(3)) >> static_cast<TUnsigned>(2);
@@ -25,9 +27,9 @@ namespace moho
   {
     static gpg::RType* sType;
 
-    std::uint32_t mWidth = 0;                       // +0x00
-    std::uint32_t mHeight = 0;                      // +0x04
-    fa::vector<std::uint8_t> mDxt5Blocks = {};  // +0x08
+    std::uint32_t mWidth = 0;                  // +0x00
+    std::uint32_t mHeight = 0;                 // +0x04
+    fa::vector<std::uint8_t> mDxt5Blocks = {}; // +0x08
   };
 
   /**
@@ -52,10 +54,8 @@ namespace moho
    * Copies one decoded block byte-range from a temporary mem-buffer into
    * `SBatchTextureData` owned storage.
    */
-  [[nodiscard]] bool CopyBatchTextureDataFromMemBuffer(
-    SBatchTextureData& outData,
-    const gpg::MemBuffer<char>& sourceBuffer
-  );
+  [[nodiscard]] bool
+  CopyBatchTextureDataFromMemBuffer(SBatchTextureData& outData, const gpg::MemBuffer<char>& sourceBuffer);
 
   static_assert(offsetof(SBatchTextureData, mWidth) == 0x00, "SBatchTextureData::mWidth offset must be 0x00");
   static_assert(offsetof(SBatchTextureData, mHeight) == 0x04, "SBatchTextureData::mHeight offset must be 0x04");

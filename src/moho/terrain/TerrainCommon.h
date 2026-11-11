@@ -32,12 +32,12 @@ namespace moho
    */
   struct TerrainDecalDrawCommand
   {
-    std::int32_t startIndex;   // +0x00 -> SD3DIndexRange::startIndex
-    std::int32_t indexCount;   // +0x04 -> SD3DIndexRange::indexCount
-    std::int32_t startVertex;  // +0x08 -> SD3DVertexRange::startVertex (min referenced vertex)
-    std::int32_t endVertex;    // +0x0C -> SD3DVertexRange::endVertex
-    float alpha;               // +0x10 -> DecalAlpha shader-var value
-    CWldTerrainDecal* decal;   // +0x14 -> owning decal (textures + matrices)
+    std::int32_t startIndex;  // +0x00 -> SD3DIndexRange::startIndex
+    std::int32_t indexCount;  // +0x04 -> SD3DIndexRange::indexCount
+    std::int32_t startVertex; // +0x08 -> SD3DVertexRange::startVertex (min referenced vertex)
+    std::int32_t endVertex;   // +0x0C -> SD3DVertexRange::endVertex
+    float alpha;              // +0x10 -> DecalAlpha shader-var value
+    CWldTerrainDecal* decal;  // +0x14 -> owning decal (textures + matrices)
   };
   static_assert(sizeof(TerrainDecalDrawCommand) == 0x18, "TerrainDecalDrawCommand size must be 0x18");
 
@@ -190,7 +190,8 @@ namespace moho
       GeomCamera3* camera,
       const std::int32_t* viewportBlock,
       bool minimapPass,
-      std::int32_t forceRegenerate) = 0;
+      std::int32_t forceRegenerate
+    ) = 0;
 
     /**
      * Primary vtable slot 6.
@@ -233,7 +234,8 @@ namespace moho
       std::int32_t gameTick,
       float deltaSeconds,
       const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
-      Shadow* shadowContext) = 0;
+      Shadow* shadowContext
+    ) = 0;
 
     /**
      * Primary vtable slot 9.
@@ -277,7 +279,8 @@ namespace moho
       std::int32_t tick,
       float tickLerp,
       boost::shared_ptr<ID3DRenderTarget> refractionTexture,
-      boost::shared_ptr<ID3DRenderTarget> reflectionTexture) = 0;
+      boost::shared_ptr<ID3DRenderTarget> reflectionTexture
+    ) = 0;
 
     /**
      * Primary vtable slot 12.
@@ -312,9 +315,8 @@ namespace moho
      * raw words go by. The same 12 argument bytes are the same two parameters
      * in all three classes.
      */
-    virtual void DrawTerrain(
-      boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
-      const fa::string* techniqueName) = 0;
+    virtual void
+    DrawTerrain(boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture, const fa::string* techniqueName) = 0;
 
     /**
      * Primary vtable slot 14.

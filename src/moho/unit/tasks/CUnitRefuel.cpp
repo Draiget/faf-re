@@ -36,7 +36,9 @@ namespace
   // attach facing (land units skip the test entirely).
   constexpr float kAttachFacingAlignment = 0.95f;
 
-  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  [[nodiscard]] moho::ETaskState NextTaskState(
+    const moho::ETaskState state
+  ) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
@@ -50,7 +52,9 @@ namespace
    * health (a Seraphim Restoration Field does that), so the aircraft stayed docked forever; the
    * patch's `jb` makes it `health >= maxHealth`.
    */
-  [[nodiscard]] bool IsRepairedForUndock(const moho::Unit& unit) noexcept
+  [[nodiscard]] bool IsRepairedForUndock(
+    const moho::Unit& unit
+  ) noexcept
   {
     if (moho::FAF_IsSimFixActive(moho::EFafSimFix::RefuelUndockAboveMaxHealth)) {
       return unit.mVarDat.mHealth >= unit.mVarDat.mMaxHealth;
@@ -69,7 +73,9 @@ namespace
    * have no copy in this TU (its initializers run 0x00BD1880 Stats,
    * 0x00BD1890 type info, 0x00BD18B0, with no yaw quaternion between).
    */
-  [[nodiscard]] Wm3::Vec3f OrientationForwardAxis(const Wm3::Quatf& orientation) noexcept
+  [[nodiscard]] Wm3::Vec3f OrientationForwardAxis(
+    const Wm3::Quatf& orientation
+  ) noexcept
   {
     const Wm3::Quatf& q = orientation;
     return Wm3::Vec3f{
@@ -79,7 +85,10 @@ namespace
     };
   }
 
-  [[nodiscard]] float DotProduct(const Wm3::Vec3f& lhs, const Wm3::Vec3f& rhs) noexcept
+  [[nodiscard]] float DotProduct(
+    const Wm3::Vec3f& lhs,
+    const Wm3::Vec3f& rhs
+  ) noexcept
   {
     // 0x00621D22..0x00621D42: summed z, y, then x.
     return ((lhs.z * rhs.z) + (lhs.y * rhs.y)) + (lhs.x * rhs.x);
@@ -89,7 +98,10 @@ namespace
    * One-cell navigation goal covering `worldPos`, sized against `footprint`
    * (the moving unit's own footprint, never the platform's).
    */
-  [[nodiscard]] moho::SNavGoal SingleCellGoalAt(const Wm3::Vec3f& worldPos, const moho::SFootprint& footprint)
+  [[nodiscard]] moho::SNavGoal SingleCellGoalAt(
+    const Wm3::Vec3f& worldPos,
+    const moho::SFootprint& footprint
+  )
   {
     return moho::SNavGoal{footprint.ToCellPos(worldPos)};
   }
@@ -136,7 +148,11 @@ namespace
    * trying to reach the pad. Without it this is the plain "go stand there and
    * let the task die" tail.
    */
-  void SteerTowardPlatform(moho::Unit& unit, moho::Unit& platform, const bool speedThrough)
+  void SteerTowardPlatform(
+    moho::Unit& unit,
+    moho::Unit& platform,
+    const bool speedThrough
+  )
   {
     const moho::SNavGoal goal = SingleCellGoalAt(platform.GetPosition(), unit.GetFootprint());
 
@@ -154,7 +170,6 @@ namespace
     }
     navigator->SetGoal(goal);
   }
-
 
 } // namespace
 
@@ -175,13 +190,15 @@ namespace moho
     , mHasTransportReservation(false)
     , mIsCarrier(false)
     , mPad3A{}
-  {
-  }
+  {}
 
   /**
    * Address: 0x00620F50 (FUN_00620F50, ??0CUnitRefuel@Moho@@QAE@@Z)
    */
-  CUnitRefuel::CUnitRefuel(Unit* const targetUnit, IAiCommandDispatchImpl* const dispatchTask)
+  CUnitRefuel::CUnitRefuel(
+    Unit* const targetUnit,
+    IAiCommandDispatchImpl* const dispatchTask
+  )
     : CCommandTask(static_cast<CCommandTask*>(dispatchTask))
     , mTargetUnit{}
     , mHasTransportReservation(false)
@@ -254,7 +271,9 @@ namespace moho
    * Reads `CCommandTask` base state, then reads target weak pointer and
    * refuel-mode booleans from archive lanes.
    */
-  void CUnitRefuel::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitRefuel::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     const gpg::RRef baseRef{};
     archive->Read(gpg::RTypeOf<moho::CCommandTask>(), this, baseRef);
@@ -273,7 +292,9 @@ namespace moho
    * Writes `CCommandTask` base state, then writes target weak pointer and
    * refuel-mode booleans into archive lanes.
    */
-  void CUnitRefuel::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitRefuel::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef baseRef{};
     archive->Write(gpg::RTypeOf<moho::CCommandTask>(), this, baseRef);
@@ -384,9 +405,7 @@ namespace moho
         const Wm3::Vec3f launchDirection = OrientationForwardAxis(launchTransform.orient_);
         const float launchSpeed = unit->GetBlueprint()->Air.MaxAirspeed;
         const Wm3::Vec3f launchVelocity{
-          launchDirection.x * launchSpeed,
-          launchDirection.y * launchSpeed,
-          launchDirection.z * launchSpeed
+          launchDirection.x * launchSpeed, launchDirection.y * launchSpeed, launchDirection.z * launchSpeed
         };
 
         if (unit->UnitMotion != nullptr) {
@@ -407,8 +426,10 @@ namespace moho
           return -1;
         }
 
-        if (unit->CommandQueue != nullptr
-            && CommandHasRefuellingAirUnit(unit->CommandQueue->GetCurrentCommand(), "CARRIER")) {
+        if (
+          unit->CommandQueue != nullptr &&
+          CommandHasRefuellingAirUnit(unit->CommandQueue->GetCurrentCommand(), "CARRIER")
+        ) {
           SteerTowardPlatform(*unit, *platform, true);
           return 10;
         }
@@ -517,8 +538,10 @@ namespace moho
         return -1;
       }
 
-      if (unit->CommandQueue != nullptr && unit->CommandQueue->GetNextCommand() != nullptr
-          && CommandHasRefuellingAirUnit(unit->CommandQueue->GetCurrentCommand(), "AIRSTAGINGPLATFORM")) {
+      if (
+        unit->CommandQueue != nullptr && unit->CommandQueue->GetNextCommand() != nullptr &&
+        CommandHasRefuellingAirUnit(unit->CommandQueue->GetCurrentCommand(), "AIRSTAGINGPLATFORM")
+      ) {
         SteerTowardPlatform(*unit, *platform, true);
         return 10;
       }
@@ -541,7 +564,10 @@ namespace gpg
    * Builds one typed reflection reference for `moho::CUnitRefuel*`,
    * preserving dynamic-derived ownership and base-offset adjustment.
    */
-  gpg::RRef* RRef_CUnitRefuel(gpg::RRef* const outRef, moho::CUnitRefuel* const value)
+  gpg::RRef* RRef_CUnitRefuel(
+    gpg::RRef* const outRef,
+    moho::CUnitRefuel* const value
+  )
   {
     return gpg::WriteDerivedRef(outRef, value);
   }

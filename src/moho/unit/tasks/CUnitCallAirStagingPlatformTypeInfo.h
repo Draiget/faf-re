@@ -74,7 +74,7 @@ namespace moho
   void register_CUnitCallAirStagingPlatformTypeInfo();
 
   static_assert(
-    sizeof(CUnitCallAirStagingPlatformTypeInfo) == 0x64, "CUnitCallAirStagingPlatformTypeInfo size must be 0x64"
+    sizeof(CUnitCallAirStagingPlatformTypeInfo) == 0x64,
+    "CUnitCallAirStagingPlatformTypeInfo size must be 0x64"
   );
 } // namespace moho
-

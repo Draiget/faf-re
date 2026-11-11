@@ -74,7 +74,14 @@ namespace moho
 
     std::map<std::string, RampColor> mRampColors;
 
-    void AddSource(const float position[3], const float velocity[3], const float color[3], float size, float birth, float lifetime);
+    void AddSource(
+      const float position[3],
+      const float velocity[3],
+      const float color[3],
+      float size,
+      float birth,
+      float lifetime
+    );
 
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;

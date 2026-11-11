@@ -63,7 +63,11 @@ namespace
     std::string props;        // every prop's blueprint path and transform
   };
 
-  void AppendBytes(std::string& out, const void* const data, const std::size_t size)
+  void AppendBytes(
+    std::string& out,
+    const void* const data,
+    const std::size_t size
+  )
   {
     out.append(static_cast<const char*>(data), size);
   }
@@ -72,7 +76,10 @@ namespace
    * CWldMap::MapLoad's reads (magic, version, preview chunk, terrain, props) into the
    * terrain resource `terrainRes` takes; the preview is read without its texture.
    */
-  SLoadedMap LoadMap(const std::string& path, moho::IWldTerrainRes* const terrainRes)
+  SLoadedMap LoadMap(
+    const std::string& path,
+    moho::IWldTerrainRes* const terrainRes
+  )
   {
     SLoadedMap result{};
     std::unique_ptr<moho::IWldTerrainRes> owner(terrainRes);
@@ -149,7 +156,9 @@ namespace
 
   std::string gMapList; // --maps
 
-  [[noreturn]] void EndProcess(const int exitCode)
+  [[noreturn]] void EndProcess(
+    const int exitCode
+  )
   {
     std::fflush(stdout);
     std::fflush(stderr);
@@ -158,7 +167,9 @@ namespace
     std::_Exit(exitCode);
   }
 
-  void TerrainCheckDieHandler(const char* const message)
+  void TerrainCheckDieHandler(
+    const char* const message
+  )
   {
     std::printf("TERRAINCHECK FATAL %s\n", message != nullptr ? message : "engine Die()");
     EndProcess(kExitFatal);
@@ -172,14 +183,20 @@ namespace
       : moho::IWinApp("SupCom", "SupremeCommander")
     {}
 
-    bool Init() override { return AppInitCommonServices(); }
+    bool Init() override
+    {
+      return AppInitCommonServices();
+    }
     void Main() override {}
     void Destroy() override {}
   };
 } // namespace
 
 // Every map in the list, through the client's and the headless terrain resource.
-TEST(TerrainCheck, ClientAndHeadlessLoadTheSame)
+TEST(
+  TerrainCheck,
+  ClientAndHeadlessLoadTheSame
+)
 {
   if (gMapList.empty()) {
     GTEST_SKIP() << "needs --maps <list> /init <init.lua> and the game data";
@@ -213,17 +230,24 @@ TEST(TerrainCheck, ClientAndHeadlessLoadTheSame)
         ++differences;
       }
       verdict = "LOADFAIL client=" + (client.loaded ? std::string("ok") : client.error) +
-                " headless=" + (headless.loaded ? std::string("ok") : headless.error);
+        " headless=" + (headless.loaded ? std::string("ok") : headless.error);
     } else {
       // The parts compared as bytes, named; gtest would print megabytes of heightfield.
       std::string diffs;
-      if (client.terrainEnd != headless.terrainEnd) diffs += " terrain-end";
-      if (client.propsEnd != headless.propsEnd) diffs += " props-end";
-      if (client.width != headless.width || client.height != headless.height) diffs += " size";
-      if (client.heights != headless.heights) diffs += " heights";
-      if (client.terrainTypes != headless.terrainTypes) diffs += " terrain-types";
-      if (client.water != headless.water) diffs += " water";
-      if (client.props != headless.props) diffs += " props";
+      if (client.terrainEnd != headless.terrainEnd)
+        diffs += " terrain-end";
+      if (client.propsEnd != headless.propsEnd)
+        diffs += " props-end";
+      if (client.width != headless.width || client.height != headless.height)
+        diffs += " size";
+      if (client.heights != headless.heights)
+        diffs += " heights";
+      if (client.terrainTypes != headless.terrainTypes)
+        diffs += " terrain-types";
+      if (client.water != headless.water)
+        diffs += " water";
+      if (client.props != headless.props)
+        diffs += " props";
       EXPECT_EQ(diffs, "") << "parts that differ between the client and the headless load";
       verdict = diffs.empty() ? "same" : "DIFF" + diffs;
       differences += diffs.empty() ? 0 : 1;
@@ -242,7 +266,10 @@ TEST(TerrainCheck, ClientAndHeadlessLoadTheSame)
   EXPECT_GT(maps, 0) << "the list names no map";
 }
 
-int main(int argc, char** argv)
+int main(
+  int argc,
+  char** argv
+)
 {
   ::testing::InitGoogleTest(&argc, argv);
   ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);

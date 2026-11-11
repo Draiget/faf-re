@@ -33,7 +33,6 @@ namespace
   constexpr std::uint32_t kResolvePolicyUnresolved = 0u;
   constexpr std::uint32_t kSndParamsHashSalt = 0x7BEF2693u;
 
-
   /**
    * Address: 0x004DFC80 (FUN_004DFC80) -- the constructor group for the sound
    *   subsystem's seven file-scope globals, which occupy one contiguous
@@ -163,7 +162,9 @@ namespace
    * Registers one `CSndParams` instance into the process-global parameter
    * registry lane guarded by the sound-parameter mutex.
    */
-  void RegisterSndParamsInstance(moho::CSndParams* const params)
+  void RegisterSndParamsInstance(
+    moho::CSndParams* const params
+  )
   {
     if (params == nullptr) {
       return;
@@ -173,23 +174,29 @@ namespace
     gSndParamsRegistry.push_back(params);
   }
 
-
   constexpr const char* kSoundHelpText = "Sound( {cue,bank,cutoff} ) - Make a sound parameters object";
   constexpr const char* kRpcSoundHelpText = "RPCSound( {cue,bank,cutoff} ) - Make a sound parameters object";
   constexpr const char* kGetCueBankHelpText = "cue,bank = GetCueBank(params)";
 
-  [[nodiscard]] fa::string SndVarNameOrEmpty(const moho::CSndVar* const value)
+  [[nodiscard]] fa::string SndVarNameOrEmpty(
+    const moho::CSndVar* const value
+  )
   {
     return value != nullptr ? value->mName : fa::string("");
   }
 
-  [[nodiscard]] std::uint32_t HashStringWithSalt(const fa::string& value, const std::uint32_t salt)
+  [[nodiscard]] std::uint32_t HashStringWithSalt(
+    const fa::string& value,
+    const std::uint32_t salt
+  )
   {
     const std::string hashInput(value.c_str(), value.size());
     return gpg::Hash(hashInput, salt);
   }
 
-  [[nodiscard]] std::uint32_t HashSParamKey(const moho::SParamKey& key)
+  [[nodiscard]] std::uint32_t HashSParamKey(
+    const moho::SParamKey& key
+  )
   {
     std::uint32_t hash = HashStringWithSalt(key.mCueName, kSndParamsHashSalt);
     hash = HashStringWithSalt(key.mBankName, hash);
@@ -205,7 +212,9 @@ namespace
    * Copies one live `CSndParams` descriptor into its serializable `SParamKey`
    * key representation.
    */
-  [[nodiscard]] moho::SParamKey BuildSParamKeyFromParams(const moho::CSndParams& params)
+  [[nodiscard]] moho::SParamKey BuildSParamKeyFromParams(
+    const moho::CSndParams& params
+  )
   {
     moho::SParamKey key{};
     key.mCueName = params.mCue;
@@ -245,11 +254,13 @@ namespace
    * Returns true when two sound-parameter keys match across all four string
    * lanes (`Cue`, `Bank`, `LodCutoff`, `RPC loop var`).
    */
-  [[nodiscard]] bool SParamKeyMatches(const moho::SParamKey& lhs, const moho::SParamKey& rhs)
+  [[nodiscard]] bool SParamKeyMatches(
+    const moho::SParamKey& lhs,
+    const moho::SParamKey& rhs
+  )
   {
-    return lhs.mCueName == rhs.mCueName && lhs.mBankName == rhs.mBankName
-      && lhs.mLodCutoffVariableName == rhs.mLodCutoffVariableName
-      && lhs.mRpcLoopVariableName == rhs.mRpcLoopVariableName;
+    return lhs.mCueName == rhs.mCueName && lhs.mBankName == rhs.mBankName &&
+      lhs.mLodCutoffVariableName == rhs.mLodCutoffVariableName && lhs.mRpcLoopVariableName == rhs.mRpcLoopVariableName;
   }
 
   /**
@@ -259,7 +270,9 @@ namespace
    * Releases all four temporary string lanes used during Lua sound-parameter
    * parsing and restores empty SSO state.
    */
-  void ResetSndParamsTemp(CSndParamsTemp& temp)
+  void ResetSndParamsTemp(
+    CSndParamsTemp& temp
+  )
   {
     temp.mCue2.tidy(true, 0U);
     temp.mLodCutoff.tidy(true, 0U);
@@ -267,7 +280,10 @@ namespace
     temp.mCue1.tidy(true, 0U);
   }
 
-  [[nodiscard]] moho::CSndParams* FindCachedSndParamsByHashLocked(const moho::SParamKey& key, const std::uint32_t hash)
+  [[nodiscard]] moho::CSndParams* FindCachedSndParamsByHashLocked(
+    const moho::SParamKey& key,
+    const std::uint32_t hash
+  )
   {
     const auto [first, last] = gSndParamsHashCache.equal_range(hash);
     for (auto it = first; it != last; ++it) {
@@ -292,7 +308,10 @@ namespace
    * Inserts one `(hash -> CSndParams*)` cache association into the global
    * sound-parameter lookup lane.
    */
-  void InsertSndParamsCacheEntryLocked(const std::uint32_t hash, moho::CSndParams* const params)
+  void InsertSndParamsCacheEntryLocked(
+    const std::uint32_t hash,
+    moho::CSndParams* const params
+  )
   {
     (void)gSndParamsHashCache.insert({hash, params});
   }
@@ -311,7 +330,9 @@ namespace
    * What it does:
    * Clears one two-word runtime state pair to zero.
    */
-  [[maybe_unused]] [[nodiscard]] TwoWordState* ClearTwoWordState(TwoWordState* const state) noexcept
+  [[maybe_unused]] [[nodiscard]] TwoWordState* ClearTwoWordState(
+    TwoWordState* const state
+  ) noexcept
   {
     if (state == nullptr) {
       return state;
@@ -336,7 +357,9 @@ namespace
    * What it does:
    * Advances one intrusive cursor slot to its current node's `next` link.
    */
-  [[maybe_unused]] [[nodiscard]] IntrusiveLinkNode** AdvanceIntrusiveCursor(IntrusiveLinkNode** const cursorSlot) noexcept
+  [[maybe_unused]] [[nodiscard]] IntrusiveLinkNode** AdvanceIntrusiveCursor(
+    IntrusiveLinkNode** const cursorSlot
+  ) noexcept
   {
     if (cursorSlot != nullptr && *cursorSlot != nullptr) {
       *cursorSlot = (*cursorSlot)->mNext;
@@ -414,8 +437,8 @@ namespace
 
   struct HeaderPointerOwner
   {
-    std::uint32_t mReserved00;   // +0x00
-    std::uint32_t* mHeaderSlot;  // +0x04
+    std::uint32_t mReserved00;  // +0x00
+    std::uint32_t* mHeaderSlot; // +0x04
   };
 
   static_assert(sizeof(HeaderPointerOwner) == 0x8, "HeaderPointerOwner size must be 0x8");
@@ -537,7 +560,9 @@ namespace
    * Looks up one `CSndParams` by hashed `SParamKey` and creates/registers a new
    * descriptor when no matching key is cached.
    */
-  [[nodiscard]] moho::CSndParams* FindOrCreateSndParamsByKey(const moho::SParamKey& key)
+  [[nodiscard]] moho::CSndParams* FindOrCreateSndParamsByKey(
+    const moho::SParamKey& key
+  )
   {
     std::lock_guard<std::recursive_mutex> lock(gSndParamsRegistryMutex);
 
@@ -555,7 +580,9 @@ namespace
     return created;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(
+    lua_State* const luaContext
+  ) noexcept
   {
     return luaContext != nullptr ? luaContext->stateUserData : nullptr;
   }
@@ -567,7 +594,9 @@ namespace
    * Returns one cached ambient-loop handle for the provided `CSndParams`
    * descriptor, creating and caching a new handle on first use.
    */
-  [[nodiscard]] moho::HSndEntityLoop* GetOrCreateSharedAmbientLoop(moho::CSndParams* const params)
+  [[nodiscard]] moho::HSndEntityLoop* GetOrCreateSharedAmbientLoop(
+    moho::CSndParams* const params
+  )
   {
     if (params == nullptr) {
       return &gDefaultSharedAmbientLoop;
@@ -681,7 +710,9 @@ namespace
      * What it does:
      * Builds the Lua metatable shell used for `CSndParams*` userdata objects.
      */
-    LuaPlus::LuaObject Create(LuaPlus::LuaState* const state) override
+    LuaPlus::LuaObject Create(
+      LuaPlus::LuaState* const state
+    ) override
     {
       return moho::SCR_CreateSimpleMetatable(state);
     }
@@ -714,7 +745,9 @@ namespace
    * Upcasts one reflected reference to a `CSndParams*` slot and throws
    * `BadRefCast` on mismatch.
    */
-  [[nodiscard]] moho::CSndParams** TryUpcastCSndParamsSlotOrThrow(const gpg::RRef& source)
+  [[nodiscard]] moho::CSndParams** TryUpcastCSndParamsSlotOrThrow(
+    const gpg::RRef& source
+  )
   {
     gpg::RType* const targetType = moho::CSndParams::GetPointerType();
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, targetType);
@@ -740,8 +773,11 @@ namespace moho
    * Wraps one `CSndParams*` slot in Lua userdata and attaches the
    * `CSndParams` metatable.
    */
-  LuaPlus::LuaObject*
-  func_NewCSndParams(LuaPlus::LuaState* const state, LuaPlus::LuaObject* const outObject, CSndParams** const paramsSlot)
+  LuaPlus::LuaObject* func_NewCSndParams(
+    LuaPlus::LuaState* const state,
+    LuaPlus::LuaObject* const outObject,
+    CSndParams** const paramsSlot
+  )
   {
     LuaPlus::LuaObject metatable = CSndParamsPointerMetatableFactory::Instance().Get(state);
     *outObject = LuaPlus::LuaObject();
@@ -760,7 +796,9 @@ namespace moho
    * Resolves one Lua object/table `_c_object` lane and returns the
    * `CSndParams*` slot pointer.
    */
-  CSndParams** func_GetCObj_CSndParams(LuaPlus::LuaObject object)
+  CSndParams** func_GetCObj_CSndParams(
+    LuaPlus::LuaObject object
+  )
   {
     if (object.IsTable()) {
       object = object.GetByName("_c_object");
@@ -772,7 +810,8 @@ namespace moho
 
   /**
    * Address: 0x004E0740 (FUN_004E0740)
-   * Mangled: ??0CSndParams@Moho@@QAE@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@0PAVCSndVar@1@1ABV?$weak_ptr@VAudioEngine@Moho@@@boost@@@Z
+   * Mangled:
+   * ??0CSndParams@Moho@@QAE@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@0PAVCSndVar@1@1ABV?$weak_ptr@VAudioEngine@Moho@@@boost@@@Z
    *
    * What it does:
    * Caches cue/bank names, optional cue variables, and one weak engine handle
@@ -848,14 +887,15 @@ namespace moho
     return cached;
   }
 
-
   /**
    * Address: 0x004DFD90 (FUN_004DFD90, cfunc_Sound)
    *
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_SoundL`.
    */
-  int cfunc_Sound(lua_State* const luaContext)
+  int cfunc_Sound(
+    lua_State* const luaContext
+  )
   {
     return cfunc_SoundL(ResolveBindingState(luaContext));
   }
@@ -867,7 +907,9 @@ namespace moho
    * Builds one `CSndParams` from a Lua `{Cue,Bank,LodCutoff}` table and
    * returns it as a Lua object.
    */
-  int cfunc_SoundL(LuaPlus::LuaState* const state)
+  int cfunc_SoundL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -902,7 +944,9 @@ namespace moho
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_RPCSoundL`.
    */
-  int cfunc_RPCSound(lua_State* const luaContext)
+  int cfunc_RPCSound(
+    lua_State* const luaContext
+  )
   {
     return cfunc_RPCSoundL(ResolveBindingState(luaContext));
   }
@@ -913,7 +957,9 @@ namespace moho
    * What it does:
    * Builds one RPC-loop-enabled `CSndParams` from Lua and returns it.
    */
-  int cfunc_RPCSoundL(LuaPlus::LuaState* const state)
+  int cfunc_RPCSoundL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -938,7 +984,9 @@ namespace moho
    */
   CScrLuaInitForm* func_RPCSound_LuaFuncDef()
   {
-    static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "RPCSound", &cfunc_RPCSound, nullptr, "<global>", kRpcSoundHelpText);
+    static CScrLuaBinder binder(
+      moho::SCR_CoreLuaInitSet(), "RPCSound", &cfunc_RPCSound, nullptr, "<global>", kRpcSoundHelpText
+    );
     return &binder;
   }
 
@@ -948,7 +996,9 @@ namespace moho
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_GetCueBankL`.
    */
-  int cfunc_GetCueBank(lua_State* const luaContext)
+  int cfunc_GetCueBank(
+    lua_State* const luaContext
+  )
   {
     return cfunc_GetCueBankL(ResolveBindingState(luaContext));
   }
@@ -959,7 +1009,9 @@ namespace moho
    * What it does:
    * Extracts cue/bank strings from one `CSndParams` Lua object and returns both.
    */
-  int cfunc_GetCueBankL(LuaPlus::LuaState* const state)
+  int cfunc_GetCueBankL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -983,7 +1035,9 @@ namespace moho
    * What it does:
    * Thin API wrapper around the shared ambient-loop cache lookup path.
    */
-  HSndEntityLoop* SND_GetSharedAmbientHandle(CSndParams* const params)
+  HSndEntityLoop* SND_GetSharedAmbientHandle(
+    CSndParams* const params
+  )
   {
     return GetOrCreateSharedAmbientLoop(params);
   }
@@ -996,15 +1050,19 @@ namespace moho
    */
   CScrLuaInitForm* func_GetCueBank_LuaFuncDef()
   {
-    static CScrLuaBinder
-      binder(moho::SCR_CoreLuaInitSet(), "GetCueBank", &cfunc_GetCueBank, nullptr, "<global>", kGetCueBankHelpText);
+    static CScrLuaBinder binder(
+      moho::SCR_CoreLuaInitSet(), "GetCueBank", &cfunc_GetCueBank, nullptr, "<global>", kGetCueBankHelpText
+    );
     return &binder;
   }
 } // namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(PreregisterCSndParamsPointerType_ce959d, moho::PreregisterCSndParamsPointerType)
+GPG_PREREGISTER_INIT(
+  PreregisterCSndParamsPointerType_ce959d,
+  moho::PreregisterCSndParamsPointerType
+)
 
 namespace
 {
@@ -1018,7 +1076,11 @@ namespace
   moho::CScrLuaInitForm* register_moho_sound_methods()
   {
     static moho::CScrLuaClassBinder binder(
-      moho::SCR_CoreLuaInitSet(), "moho.sound_methods", &moho::CScrLuaMetatableFactory<moho::HSound>::Instance(), "HSound", ""
+      moho::SCR_CoreLuaInitSet(),
+      "moho.sound_methods",
+      &moho::CScrLuaMetatableFactory<moho::HSound>::Instance(),
+      "HSound",
+      ""
     );
     return &binder;
   }
@@ -1054,7 +1116,12 @@ namespace
 
 namespace moho
 {
-  void CSndParams::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CSndParams::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     SParamKey key{};
     const gpg::RRef owner{};
@@ -1066,7 +1133,10 @@ namespace moho
    * Address: 0x004E0CD0 (FUN_004E0CD0)
    */
   void CSndParams::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     const SParamKey key = BuildSParamKeyFromParams(*this);
@@ -1100,7 +1170,9 @@ namespace moho
   // Engine addition, server mode: see the declaration.
 #if FAF_SERVER_MODE
   CSndParams* SND_FindOrCreateParams(
-    const fa::string& bankName, const fa::string& cueName, const fa::string& lodCutoffName,
+    const fa::string& bankName,
+    const fa::string& cueName,
+    const fa::string& lodCutoffName,
     const fa::string& rpcLoopName
   )
   {

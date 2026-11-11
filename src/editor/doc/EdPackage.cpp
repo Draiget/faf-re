@@ -12,20 +12,28 @@ namespace faf::editor
 {
   namespace
   {
-    void Put16(std::string& out, const std::uint32_t value)
+    void Put16(
+      std::string& out,
+      const std::uint32_t value
+    )
     {
       out += static_cast<char>(value & 0xFF);
       out += static_cast<char>((value >> 8) & 0xFF);
     }
 
-    void Put32(std::string& out, const std::uint32_t value)
+    void Put32(
+      std::string& out,
+      const std::uint32_t value
+    )
     {
       Put16(out, value & 0xFFFF);
       Put16(out, value >> 16);
     }
 
     /** Raw deflate (no zlib header), as zip's method 8 wants; empty when it fails. */
-    std::string Deflate(const std::string& data)
+    std::string Deflate(
+      const std::string& data
+    )
     {
       z_stream stream{};
       if (deflateInit2(&stream, Z_BEST_COMPRESSION, Z_DEFLATED, -MAX_WBITS, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
@@ -49,27 +57,36 @@ namespace faf::editor
       return out;
     }
 
-    std::string Lower(std::string text)
+    std::string Lower(
+      std::string text
+    )
     {
-      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return text;
     }
   } // namespace
 
-  std::string WriteZip(const std::vector<ZipEntry>& entries)
+  std::string WriteZip(
+    const std::vector<ZipEntry>& entries
+  )
   {
     // The DOS date and time of now, for every entry.
     const std::time_t now = std::time(nullptr);
     std::tm local{};
     localtime_s(&local, &now);
-    const std::uint32_t dosTime = static_cast<std::uint32_t>((local.tm_hour << 11) | (local.tm_min << 5) | (local.tm_sec / 2));
-    const std::uint32_t dosDate = static_cast<std::uint32_t>(((std::max(local.tm_year, 80) - 80) << 9) | ((local.tm_mon + 1) << 5) | local.tm_mday);
+    const std::uint32_t dosTime =
+      static_cast<std::uint32_t>((local.tm_hour << 11) | (local.tm_min << 5) | (local.tm_sec / 2));
+    const std::uint32_t dosDate =
+      static_cast<std::uint32_t>(((std::max(local.tm_year, 80) - 80) << 9) | ((local.tm_mon + 1) << 5) | local.tm_mday);
 
     std::string zip;
     std::string central;
     for (const ZipEntry& entry : entries) {
-      const std::uint32_t crc = static_cast<std::uint32_t>(
-        crc32(crc32(0L, Z_NULL, 0), reinterpret_cast<const Bytef*>(entry.data.data()), static_cast<uInt>(entry.data.size())));
+      const std::uint32_t crc = static_cast<std::uint32_t>(crc32(
+        crc32(0L, Z_NULL, 0), reinterpret_cast<const Bytef*>(entry.data.data()), static_cast<uInt>(entry.data.size())
+      ));
       std::string body = Deflate(entry.data);
       std::uint32_t method = 8;
       if (body.empty() && !entry.data.empty()) {
@@ -128,7 +145,11 @@ namespace faf::editor
     return zip;
   }
 
-  PackagePlan PlanPackage(const std::string& folder, const std::string& scenario, const std::vector<std::string>& files)
+  PackagePlan PlanPackage(
+    const std::string& folder,
+    const std::string& scenario,
+    const std::vector<std::string>& files
+  )
   {
     PackagePlan plan;
     plan.folder = folder;
@@ -136,7 +157,9 @@ namespace faf::editor
     if (std::regex_match(folder, match, std::regex(R"(([a-z0-9_]+)\.v(\d{4}))"))) {
       plan.version = std::stoi(match[2].str());
     } else {
-      plan.errors.push_back("the folder's name \"" + folder + "\" isn't name.vNNNN in lower case (letters, digits and _)");
+      plan.errors.push_back(
+        "the folder's name \"" + folder + "\" isn't name.vNNNN in lower case (letters, digits and _)"
+      );
     }
     // The scenario's own fields.
     const auto field = [&scenario](const char* const key) {
@@ -148,7 +171,9 @@ namespace faf::editor
     if (std::regex_search(scenario, versionMatch, std::regex(R"(\bmap_version\s*=\s*(\d+))"))) {
       const int version = std::stoi(versionMatch[1].str());
       if (plan.version != 0 && version != plan.version) {
-        plan.errors.push_back("the scenario's map_version is " + std::to_string(version) + ", the folder's v" + std::to_string(plan.version));
+        plan.errors.push_back(
+          "the scenario's map_version is " + std::to_string(version) + ", the folder's v" + std::to_string(plan.version)
+        );
       }
     } else {
       plan.errors.push_back("the scenario has no map_version");
@@ -185,9 +210,12 @@ namespace faf::editor
       const std::string lower = Lower(file);
       const std::size_t slash = lower.find_last_of('/');
       const std::string name = slash == std::string::npos ? lower : lower.substr(slash + 1);
-      if (lower.rfind(".editor_backup/", 0) == 0 || lower.find("/.editor_backup/") != std::string::npos || name == "thumbs.db" ||
-          name == "desktop.ini" || (name.size() > 4 && name.compare(name.size() - 4, 4, ".bak") == 0) ||
-          (name.size() > 7 && name.compare(name.size() - 7, 7, ".editor") == 0) || (!name.empty() && name[0] == '.')) {
+      if (
+        lower.rfind(".editor_backup/", 0) == 0 || lower.find("/.editor_backup/") != std::string::npos ||
+        name == "thumbs.db" || name == "desktop.ini" ||
+        (name.size() > 4 && name.compare(name.size() - 4, 4, ".bak") == 0) ||
+        (name.size() > 7 && name.compare(name.size() - 7, 7, ".editor") == 0) || (!name.empty() && name[0] == '.')
+      ) {
         continue;
       }
       plan.files.push_back(file);
@@ -202,17 +230,24 @@ namespace faf::editor
     return plan;
   }
 
-  int FolderVersion(const std::string& folder)
+  int FolderVersion(
+    const std::string& folder
+  )
   {
     std::smatch match;
     return std::regex_match(folder, match, std::regex(R"(.*\.v(\d{4}))")) ? std::stoi(match[1].str()) : 0;
   }
 
-  std::string WithMapVersion(const std::string& scenario, const int version)
+  std::string WithMapVersion(
+    const std::string& scenario,
+    const int version
+  )
   {
     const std::regex existing(R"(\bmap_version\s*=\s*\d+)");
     if (std::regex_search(scenario, existing)) {
-      return std::regex_replace(scenario, existing, "map_version = " + std::to_string(version), std::regex_constants::format_first_only);
+      return std::regex_replace(
+        scenario, existing, "map_version = " + std::to_string(version), std::regex_constants::format_first_only
+      );
     }
     std::smatch open;
     if (!std::regex_search(scenario, open, std::regex(R"(ScenarioInfo\s*=\s*\{[^\n]*\n)"))) {
@@ -223,11 +258,14 @@ namespace faf::editor
     return scenario.substr(0, at) + "    map_version = " + std::to_string(version) + "," + nl + scenario.substr(at);
   }
 
-  std::vector<std::string> FilesUnder(const std::filesystem::path& folder)
+  std::vector<std::string> FilesUnder(
+    const std::filesystem::path& folder
+  )
   {
     std::vector<std::string> files;
     std::error_code error;
-    for (auto it = std::filesystem::recursive_directory_iterator(folder, error); !error && it != std::filesystem::recursive_directory_iterator();
+    for (auto it = std::filesystem::recursive_directory_iterator(folder, error);
+         !error && it != std::filesystem::recursive_directory_iterator();
          it.increment(error)) {
       if (it->is_regular_file(error)) {
         files.push_back(std::filesystem::relative(it->path(), folder, error).generic_string());

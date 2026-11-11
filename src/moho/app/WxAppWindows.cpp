@@ -1,6 +1,5 @@
 #include "moho/app/WxPrivate.h"
 
-
 /**
  * The managed-window registries (elements at 0x010A9B94 / 0x010A9BD8).
  *
@@ -130,9 +129,9 @@ void moho::MohoApp::ExitMainLoop()
 namespace
 {
 
-// ---------------------------------------------------------------------------
-// WBitmapPanel
-// ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // WBitmapPanel
+  // ---------------------------------------------------------------------------
 
   /**
    * Address: 0x004FBC20 (FUN_004FBC20)
@@ -141,7 +140,11 @@ namespace
    * Draws `bitmap` over `rect` in tiles, column by column (the wxWidgets
    * sample's TileBitmap). The DC and the rectangle arrive in registers.
    */
-  void TileBitmap(const wxRect& rect, wxDC& dc, wxBitmap& bitmap)
+  void TileBitmap(
+    const wxRect& rect,
+    wxDC& dc,
+    wxBitmap& bitmap
+  )
   {
     const int width = bitmap.GetWidth();
     const int height = bitmap.GetHeight();
@@ -151,8 +154,7 @@ namespace
       }
     }
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x004FBCC0 (FUN_004FBCC0)
@@ -172,8 +174,13 @@ moho::WBitmapPanel::WBitmapPanel(
 
 // Table 0x00DFF48C = {&wxPanel::sm_eventTable (0x00D5A910), rows 0x00F59814};
 // GetEventTable (0x004FBCB0) comes with it.
-BEGIN_EVENT_TABLE(moho::WBitmapPanel, wxPanel)
-  EVT_ERASE_BACKGROUND(moho::WBitmapPanel::OnEraseBackground)
+BEGIN_EVENT_TABLE(
+  moho::WBitmapPanel,
+  wxPanel
+)
+EVT_ERASE_BACKGROUND(
+  moho::WBitmapPanel::OnEraseBackground
+)
 END_EVENT_TABLE()
 
 /**
@@ -184,7 +191,9 @@ END_EVENT_TABLE()
  * Tiles the bitmap over the client area into the erase event's DC; without a
  * usable bitmap the event is skipped so the default erase runs.
  */
-void moho::WBitmapPanel::OnEraseBackground(wxEraseEvent& eraseEvent)
+void moho::WBitmapPanel::OnEraseBackground(
+  wxEraseEvent& eraseEvent
+)
 {
   if (mBitmap == nullptr || !mBitmap->Ok()) {
     eraseEvent.Skip();
@@ -220,8 +229,13 @@ moho::WBitmapCheckBox::WBitmapCheckBox(
 
 // Table 0x00DFF494 = {&wxBitmapButton::sm_eventTable - wxControl's, 0x00D54D70
 // - rows 0x00F5983C}; GetEventTable (0x004FBE20) comes with it.
-BEGIN_EVENT_TABLE(moho::WBitmapCheckBox, wxBitmapButton)
-  EVT_LEFT_UP(moho::WBitmapCheckBox::OnLeftUp)
+BEGIN_EVENT_TABLE(
+  moho::WBitmapCheckBox,
+  wxBitmapButton
+)
+EVT_LEFT_UP(
+  moho::WBitmapCheckBox::OnLeftUp
+)
 END_EVENT_TABLE()
 
 /**
@@ -245,7 +259,9 @@ bool moho::WBitmapCheckBox::IsChecked()
  * the button pick its bitmap again (OnSetBitmap) - repaints, and stores the
  * new state.
  */
-void moho::WBitmapCheckBox::SetChecked(const bool checked)
+void moho::WBitmapCheckBox::SetChecked(
+  const bool checked
+)
 {
   if (static_cast<std::uint8_t>(checked) == mIsChecked) {
     return;
@@ -266,7 +282,9 @@ void moho::WBitmapCheckBox::SetChecked(const bool checked)
  * Toggles the checked state on button-up, then lets the event carry on to
  * the button's own handling.
  */
-void moho::WBitmapCheckBox::OnLeftUp(wxMouseEvent& event)
+void moho::WBitmapCheckBox::OnLeftUp(
+  wxMouseEvent& event
+)
 {
   SetChecked(mIsChecked == 0);
   event.Skip();
@@ -318,9 +336,7 @@ moho::WWxInputBox::WWxInputBox(
   wxBoxSizer* const buttonSizer = new wxBoxSizer(wxHORIZONTAL);
   wxButton* const okButton = new wxButton(this, wxID_OK, wxT("OK"), wxDefaultPosition, wxDefaultSize, 0);
   buttonSizer->Add(okButton, 0, wxALL, 10);
-  buttonSizer->Add(
-    new wxButton(this, wxID_CANCEL, wxT("Cancel"), wxDefaultPosition, wxDefaultSize, 0), 0, wxALL, 10
-  );
+  buttonSizer->Add(new wxButton(this, wxID_CANCEL, wxT("Cancel"), wxDefaultPosition, wxDefaultSize, 0), 0, wxALL, 10);
   topSizer->Add(buttonSizer, 0, wxALIGN_CENTER, 0);
 
   okButton->SetDefault();
@@ -370,7 +386,9 @@ bool moho::WxInputBox(
  * "Type your answer below.", then prints the entered text (or "Canceled"
  * when dismissed) through `Moho::CON_Printf`.
  */
-void moho::CON_WxInputBox(const fa::vector<fa::string>& args)
+void moho::CON_WxInputBox(
+  const fa::vector<fa::string>& args
+)
 {
   (void)args;
 
@@ -394,5 +412,4 @@ namespace moho
    * in this tree yet.
    */
   extern CWldSession* sWldSession;
-}
-
+} // namespace moho

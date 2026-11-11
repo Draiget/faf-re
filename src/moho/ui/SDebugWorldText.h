@@ -16,10 +16,10 @@ namespace moho
    */
   struct SDebugWorldText
   {
-    Wm3::Vec3f position;   // +0x00
-    fa::string text;    // +0x0C
-    std::int32_t style;    // +0x28
-    std::uint32_t depth;   // +0x2C
+    Wm3::Vec3f position; // +0x00
+    fa::string text;     // +0x0C
+    std::int32_t style;  // +0x28
+    std::uint32_t depth; // +0x2C
   };
 
   static_assert(offsetof(SDebugWorldText, position) == 0x00, "SDebugWorldText::position offset must be 0x00");

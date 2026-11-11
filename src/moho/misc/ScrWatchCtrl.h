@@ -56,7 +56,8 @@ namespace moho
     void Clear() override;
 
     /**
-     * Address: 0x004D7220 (FUN_004D7220, ?Update@ScrWatchCtrl@Moho@@QAEXABV?$vector@VScrWatch@Moho@@V?$allocator@VScrWatch@Moho@@@std@@@std@@@Z)
+     * Address: 0x004D7220 (FUN_004D7220,
+     * ?Update@ScrWatchCtrl@Moho@@QAEXABV?$vector@VScrWatch@Moho@@V?$allocator@VScrWatch@Moho@@@std@@@std@@@Z)
      *
      * What it does:
      * Replaces the rows with `watches`, sorted by name.

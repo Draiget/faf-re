@@ -142,7 +142,6 @@ namespace moho
      * Address: 0x00A82547 (_purecall in FA binary)
      */
     virtual void GetResultCell(HPathCell* outCell) const = 0;
-
   };
 
   static_assert(sizeof(IPathTraveler) == 0x0C, "IPathTraveler size must be 0x0C");

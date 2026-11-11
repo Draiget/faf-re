@@ -58,4 +58,3 @@ namespace moho
 
   static_assert(sizeof(CEffectManagerImplTypeInfo) == 0x64, "CEffectManagerImplTypeInfo size must be 0x64");
 } // namespace moho
-

@@ -47,10 +47,7 @@ namespace moho
    * Scales one vector in place by `1/divisor`; when `divisor == 0`, writes
    * `FLT_MAX` into all three lanes.
    */
-  [[nodiscard]] Wm3::Vector3f* VecScaleByReciprocalOrSetMax(
-    Wm3::Vector3f* vector,
-    float divisor
-  ) noexcept;
+  [[nodiscard]] Wm3::Vector3f* VecScaleByReciprocalOrSetMax(Wm3::Vector3f* vector, float divisor) noexcept;
 
   /**
    * Address: 0x0069A360 (FUN_0069A360, func_VecSetLengthTo)

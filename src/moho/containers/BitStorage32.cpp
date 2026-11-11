@@ -14,7 +14,9 @@ namespace moho
       std::uint32_t bit;
     };
 
-    [[nodiscard]] constexpr std::uint32_t WordCountForBits(const std::uint32_t bitCount) noexcept
+    [[nodiscard]] constexpr std::uint32_t WordCountForBits(
+      const std::uint32_t bitCount
+    ) noexcept
     {
       return (bitCount + 31u) >> 5u;
     }
@@ -26,7 +28,9 @@ namespace moho
      * What it does:
      * Clears dynamic word-storage lanes while preserving the base-word metadata lane.
      */
-    void ResetStoragePreserveBase(SBitStorage32& storage) noexcept
+    void ResetStoragePreserveBase(
+      SBitStorage32& storage
+    ) noexcept
     {
       storage.mBitCount = 0;
       storage.mWords = nullptr;
@@ -40,7 +44,10 @@ namespace moho
      * What it does:
      * Builds one `(word,bit)` cursor at storage begin and advances it by `bitOffset`.
      */
-    [[nodiscard]] BitCursor32 MakeCursorAtBitOffset(const SBitStorage32& storage, const std::uint32_t bitOffset) noexcept
+    [[nodiscard]] BitCursor32 MakeCursorAtBitOffset(
+      const SBitStorage32& storage,
+      const std::uint32_t bitOffset
+    ) noexcept
     {
       BitCursor32 out{storage.mWords, bitOffset & 31u};
       if (out.word != nullptr) {
@@ -55,7 +62,9 @@ namespace moho
      * What it does:
      * Returns one single-bit mask for the cursor-local bit index.
      */
-    [[nodiscard]] std::uint32_t CursorBitMask(const BitCursor32& cursor) noexcept
+    [[nodiscard]] std::uint32_t CursorBitMask(
+      const BitCursor32& cursor
+    ) noexcept
     {
       return 1u << cursor.bit;
     }
@@ -66,7 +75,10 @@ namespace moho
      * What it does:
      * Sets or clears one bit through a precomputed `(word,bit)` cursor.
      */
-    void SetCursorBit(BitCursor32& cursor, const bool enabled) noexcept
+    void SetCursorBit(
+      BitCursor32& cursor,
+      const bool enabled
+    ) noexcept
     {
       const std::uint32_t bitMask = CursorBitMask(cursor);
       if (enabled) {
@@ -82,7 +94,9 @@ namespace moho
      * What it does:
      * Returns whether one bit is set through a precomputed `(word,bit)` cursor.
      */
-    [[nodiscard]] bool TestCursorBit(const BitCursor32& cursor) noexcept
+    [[nodiscard]] bool TestCursorBit(
+      const BitCursor32& cursor
+    ) noexcept
     {
       return ((*cursor.word) & CursorBitMask(cursor)) != 0u;
     }
@@ -121,7 +135,7 @@ namespace moho
   } // namespace
 
   /**
-    * Alias of FUN_00440030 (non-canonical helper lane).
+   * Alias of FUN_00440030 (non-canonical helper lane).
    *
    * What it does:
    * Releases word storage and clears all metadata lanes.
@@ -144,7 +158,10 @@ namespace moho
    * What it does:
    * Resizes packed storage for `bitCount` bits and initializes payload words.
    */
-  void SBitStorage32::Resize(const std::uint32_t bitCount, const bool setBits)
+  void SBitStorage32::Resize(
+    const std::uint32_t bitCount,
+    const bool setBits
+  )
   {
     const std::uint32_t requiredWordCount = WordCountForBits(bitCount);
     if (requiredWordCount == 0u) {
@@ -152,9 +169,8 @@ namespace moho
       return;
     }
 
-    const std::uint32_t currentWordCapacity = (mWords != nullptr && mWordsCapacityEnd != nullptr)
-      ? static_cast<std::uint32_t>(mWordsCapacityEnd - mWords)
-      : 0u;
+    const std::uint32_t currentWordCapacity =
+      (mWords != nullptr && mWordsCapacityEnd != nullptr) ? static_cast<std::uint32_t>(mWordsCapacityEnd - mWords) : 0u;
     if (currentWordCapacity < requiredWordCount) {
       if (mWords == nullptr) {
         (void)InitializeWordWindow(mWords, mWordsEnd, mWordsCapacityEnd, requiredWordCount);
@@ -187,7 +203,9 @@ namespace moho
    * What it does:
    * Returns whether one bit is set.
    */
-  bool SBitStorage32::TestBit(const std::uint32_t bitIndex) const
+  bool SBitStorage32::TestBit(
+    const std::uint32_t bitIndex
+  ) const
   {
     if (mWords == nullptr || bitIndex >= mBitCount) {
       return false;
@@ -205,7 +223,10 @@ namespace moho
    * What it does:
    * Sets or clears one bit.
    */
-  void SBitStorage32::SetBit(const std::uint32_t bitIndex, const bool enabled)
+  void SBitStorage32::SetBit(
+    const std::uint32_t bitIndex,
+    const bool enabled
+  )
   {
     if (mWords == nullptr || bitIndex >= mBitCount) {
       return;

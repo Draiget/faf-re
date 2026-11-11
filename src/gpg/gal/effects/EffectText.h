@@ -43,7 +43,8 @@ namespace gpg::gal::effects::text
   [[nodiscard]] bool EvaluateConstant(std::string_view text, double& value);
 
   /** Replaces every whole-identifier occurrence of `name`, skipping member accesses (`x.name`). */
-  [[nodiscard]] std::string ReplaceIdentifier(std::string_view text, std::string_view name, std::string_view replacement);
+  [[nodiscard]] std::string
+  ReplaceIdentifier(std::string_view text, std::string_view name, std::string_view replacement);
 
   /** True when `text` contains the identifier `name` as a whole word. */
   [[nodiscard]] bool ContainsIdentifier(std::string_view text, std::string_view name);

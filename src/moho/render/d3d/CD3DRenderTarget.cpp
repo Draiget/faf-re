@@ -29,7 +29,8 @@ namespace moho
    * incoming render-surface ownership handle.
    */
   CD3DRenderTarget::CD3DRenderTarget(
-    CD3DDevice* const ownerDevice, const SurfaceHandle surface
+    CD3DDevice* const ownerDevice,
+    const SurfaceHandle surface
   )
     : mLink()
     , mOwnerDevice(ownerDevice)
@@ -69,7 +70,9 @@ namespace moho
    * What it does:
    * Copies retained render-surface ownership into caller storage.
    */
-  CD3DRenderTarget::SurfaceHandle& CD3DRenderTarget::GetSurface(SurfaceHandle& outSurface)
+  CD3DRenderTarget::SurfaceHandle& CD3DRenderTarget::GetSurface(
+    SurfaceHandle& outSurface
+  )
   {
     outSurface = mSurface;
     return outSurface;

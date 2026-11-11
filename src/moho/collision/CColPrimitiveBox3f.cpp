@@ -33,7 +33,9 @@ namespace Wm3
    * Address: 0x00475800 (FUN_00475800, Wm3::Box3f::MemberDeserialize)
    */
   template <>
-  void Box3<float>::MemberDeserialize(gpg::ReadArchive* archive)
+  void Box3<float>::MemberDeserialize(
+    gpg::ReadArchive* archive
+  )
   {
     gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
 
@@ -58,7 +60,9 @@ namespace Wm3
    * Address: 0x00475910 (FUN_00475910, Wm3::Box3f::MemberSerialize)
    */
   template <>
-  void Box3<float>::MemberSerialize(gpg::WriteArchive* archive) const
+  void Box3<float>::MemberSerialize(
+    gpg::WriteArchive* archive
+  ) const
   {
     gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
 
@@ -148,7 +152,9 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] gpg::RRef MakeDColPrimBoxRef(moho::CColPrimitive<Wm3::Box3f>* object)
+  [[nodiscard]] gpg::RRef MakeDColPrimBoxRef(
+    moho::CColPrimitive<Wm3::Box3f>* object
+  )
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -183,21 +189,23 @@ namespace moho
   }
 
   /**
- * Address: 0x005004D0 (FUN_005004D0, Moho::DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase)
- *
- * What it does:
- * Registers `CColPrimitiveBase` as this type's reflected base at offset 0 -
- * the primitive derives from it singly.
- */
-void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
-{
-  GPG_ASSERT(typeInfo != nullptr);
-  GPG_ASSERT(!typeInfo->initFinished_);
+   * Address: 0x005004D0 (FUN_005004D0, Moho::DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase)
+   *
+   * What it does:
+   * Registers `CColPrimitiveBase` as this type's reflected base at offset 0 -
+   * the primitive derives from it singly.
+   */
+  void DColPrimBoxTypeInfo::AddBase_CColPrimitiveBase(
+    gpg::RType* const typeInfo
+  )
+  {
+    GPG_ASSERT(typeInfo != nullptr);
+    GPG_ASSERT(!typeInfo->initFinished_);
 
-  gpg::AddReflectedBaseType(typeInfo, gpg::RTypeOf<moho::CColPrimitiveBase>());
-}
+    gpg::AddReflectedBaseType(typeInfo, gpg::RTypeOf<moho::CColPrimitiveBase>());
+  }
 
-/**
+  /**
    * Address: 0x004FF050 (FUN_004FF050, Moho::DColPrimBoxTypeInfo::Init)
    */
   void DColPrimBoxTypeInfo::Init()
@@ -238,12 +246,23 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_Box3fTypeInfo_88284f, moho::register_Box3fTypeInfo)
-GPG_PREREGISTER_INIT(register_DColPrimBoxTypeInfo_88284f, moho::register_DColPrimBoxTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_Box3fTypeInfo_88284f,
+  moho::register_Box3fTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_DColPrimBoxTypeInfo_88284f,
+  moho::register_DColPrimBoxTypeInfo
+)
 
 namespace moho
 {
-  void CColPrimitive<Wm3::Box3f>::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CColPrimitive<Wm3::Box3f>::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     Wm3::Box3f shape{};
     Wm3::Vec3f localCenter{};
@@ -264,7 +283,10 @@ namespace moho
    * Address: 0x004FF620 (FUN_004FF620)
    */
   void CColPrimitive<Wm3::Box3f>::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     Wm3::Vec3f center{};

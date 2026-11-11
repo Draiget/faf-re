@@ -109,4 +109,7 @@ void EEmitterCurveTypeInfo::Init()
 // through gpg::LookupRType (ResolveEEmitterCurveType) to translate curve
 // names, so the descriptor must exist before that consumer runs. See
 // StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_EEmitterCurveTypeInfo_7704e0, moho::preregister_EEmitterCurveTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_EEmitterCurveTypeInfo_7704e0,
+  moho::preregister_EEmitterCurveTypeInfo
+)

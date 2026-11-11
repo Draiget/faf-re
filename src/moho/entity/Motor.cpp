@@ -16,7 +16,10 @@ namespace moho
    * What it does:
    * Base no-op bind hook; derived motors may keep owner-specific state.
    */
-  void Motor::BindEntity(Entity*) {}
+  void Motor::BindEntity(
+    Entity*
+  )
+  {}
 
   /**
    * Address: 0x00694AD0 (FUN_00694AD0, Moho::Motor::dtr)

@@ -135,8 +135,7 @@ namespace
   }
   /** Win32 `WM_KEYDOWN`/`WM_KEYUP` `lParam` bit 30: the key was already down. */
   constexpr std::uint32_t kWxKeyEventRawFlagPreviouslyDown = 0x40000000u;
-}
-
+} // namespace
 
 /**
  * Address: 0x0079D7A0 (FUN_0079D7A0, cfunc_IsKeyDown)
@@ -217,7 +216,12 @@ int moho::cfunc_KeycodeMauiToMSW(
 moho::CScrLuaInitForm* moho::func_KeycodeMauiToMSW_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(), "KeycodeMauiToMSW", &moho::cfunc_KeycodeMauiToMSW, nullptr, "<global>", kKeycodeMauiToMSWHelpText
+    moho::SCR_UserLuaInitSet(),
+    "KeycodeMauiToMSW",
+    &moho::cfunc_KeycodeMauiToMSW,
+    nullptr,
+    "<global>",
+    kKeycodeMauiToMSWHelpText
   );
   return &binder;
 }
@@ -272,7 +276,12 @@ int moho::cfunc_KeycodeMSWToMaui(
 moho::CScrLuaInitForm* moho::func_KeycodeMSWToMaui_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(), "KeycodeMSWToMaui", &moho::cfunc_KeycodeMSWToMaui, nullptr, "<global>", kKeycodeMSWToMauiHelpText
+    moho::SCR_UserLuaInitSet(),
+    "KeycodeMSWToMaui",
+    &moho::cfunc_KeycodeMSWToMaui,
+    nullptr,
+    "<global>",
+    kKeycodeMSWToMauiHelpText
   );
   return &binder;
 }
@@ -427,7 +436,12 @@ int moho::cfunc_IN_ClearKeyMap(
 moho::CScrLuaInitForm* moho::func_IN_ClearKeyMap_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(), "IN_ClearKeyMap", &moho::cfunc_IN_ClearKeyMap, nullptr, "<global>", kINClearKeyMapHelpText
+    moho::SCR_UserLuaInitSet(),
+    "IN_ClearKeyMap",
+    &moho::cfunc_IN_ClearKeyMap,
+    nullptr,
+    "<global>",
+    kINClearKeyMapHelpText
   );
   return &binder;
 }
@@ -486,8 +500,7 @@ namespace
   constexpr UiKeyMask kUiKeyMaskShift = 0x80000000u;
   constexpr UiKeyMask kUiKeyMaskCtrl = 0x40000000u;
   constexpr UiKeyMask kUiKeyMaskAlt = 0x20000000u;
-}
-
+} // namespace
 
 /**
  * Address: 0x00838E70 (FUN_00838E70, Moho::IN_GetKeyName)

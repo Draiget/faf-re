@@ -24,14 +24,18 @@ namespace
     float mDistance;
   };
 
-  [[nodiscard]] const moho::CHeightField&
-  GetTerrainHeightField(const moho::IWldTerrainRes& terrainRes) noexcept
+  [[nodiscard]] const moho::CHeightField& GetTerrainHeightField(
+    const moho::IWldTerrainRes& terrainRes
+  ) noexcept
   {
     const auto* const map = terrainRes.mMap;
     return *map->GetHeightField();
   }
 
-  [[nodiscard]] int ClampHeightSampleIndex(const int coordinate, const int extent) noexcept
+  [[nodiscard]] int ClampHeightSampleIndex(
+    const int coordinate,
+    const int extent
+  ) noexcept
   {
     int clamped = extent - 1;
     if (coordinate < clamped) {
@@ -43,7 +47,11 @@ namespace
     return clamped;
   }
 
-  [[nodiscard]] float SampleTerrainHeightWordScaled(const moho::CHeightField& field, const int x, const int z) noexcept
+  [[nodiscard]] float SampleTerrainHeightWordScaled(
+    const moho::CHeightField& field,
+    const int x,
+    const int z
+  ) noexcept
   {
     const int clampedX = ClampHeightSampleIndex(x, field.width);
     const int clampedZ = ClampHeightSampleIndex(z, field.height);
@@ -83,7 +91,8 @@ namespace
    * destination slot and returns the destination pointer.
    */
   [[nodiscard]] moho::CWldTerrainDecal::Quad* CopyTerrainDecalQuad(
-    moho::CWldTerrainDecal::Quad& destination, const moho::CWldTerrainDecal::Quad& source
+    moho::CWldTerrainDecal::Quad& destination,
+    const moho::CWldTerrainDecal::Quad& source
   ) noexcept
   {
     destination.mCorner0 = source.mCorner0;
@@ -93,7 +102,9 @@ namespace
     return &destination;
   }
 
-  void ReleaseTrackedCountedObjectPtr(moho::CountedPtr<moho::CountedObject>& ptr) noexcept
+  void ReleaseTrackedCountedObjectPtr(
+    moho::CountedPtr<moho::CountedObject>& ptr
+  ) noexcept
   {
     if (ptr.tex != nullptr) {
       (void)ptr.tex->ReleaseReference();
@@ -117,7 +128,9 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::VMatrix4 RotationAxisX(const float angle) noexcept
+  [[nodiscard]] moho::VMatrix4 RotationAxisX(
+    const float angle
+  ) noexcept
   {
     const float c = std::cos(angle);
     const float s = std::sin(angle);
@@ -134,7 +147,9 @@ namespace
   // X/Z below already follow D3DXMatrixRotationX/Z; Y must match, otherwise the decal texture
   // frame is mirrored against the XZ bounds ProjectDecalBoundsXZ (0x00778730) builds with a
   // (cos, +sin) u-axis.
-  [[nodiscard]] moho::VMatrix4 RotationAxisY(const float angle) noexcept
+  [[nodiscard]] moho::VMatrix4 RotationAxisY(
+    const float angle
+  ) noexcept
   {
     const float c = std::cos(angle);
     const float s = std::sin(angle);
@@ -147,7 +162,9 @@ namespace
     return out;
   }
 
-  [[nodiscard]] moho::VMatrix4 RotationAxisZ(const float angle) noexcept
+  [[nodiscard]] moho::VMatrix4 RotationAxisZ(
+    const float angle
+  ) noexcept
   {
     const float c = std::cos(angle);
     const float s = std::sin(angle);
@@ -196,7 +213,10 @@ namespace
    * Multiplies each XYZ axis lane in a 4x4 texture matrix by the provided
    * axis-scale vector.
    */
-  void ApplyAxisScaleToTextureMatrix(moho::VMatrix4& matrix, const Wm3::Vec3f& axisScale) noexcept
+  void ApplyAxisScaleToTextureMatrix(
+    moho::VMatrix4& matrix,
+    const Wm3::Vec3f& axisScale
+  ) noexcept
   {
     matrix.r[0].x *= axisScale.x;
     matrix.r[0].y *= axisScale.y;
@@ -212,7 +232,10 @@ namespace
     matrix.r[3].z *= axisScale.z;
   }
 
-  void ApplyInverseScaleToTextureMatrix(moho::VMatrix4& matrix, const Wm3::Vec3f& scale) noexcept
+  void ApplyInverseScaleToTextureMatrix(
+    moho::VMatrix4& matrix,
+    const Wm3::Vec3f& scale
+  ) noexcept
   {
     Wm3::Vec3f inverseScale{};
     inverseScale.x = 1.0f / scale.x;
@@ -249,7 +272,10 @@ namespace moho
    * Seeds the terrain-decal defaults, registers the decal into the spatial
    * database, and initializes the default scale/position/orientation lanes.
    */
-  CWldTerrainDecal::CWldTerrainDecal(SpatialDB<CWldTerrainDecal>* const spatialDbOwner, IWldTerrainRes* const terrainRes)
+  CWldTerrainDecal::CWldTerrainDecal(
+    SpatialDB<CWldTerrainDecal>* const spatialDbOwner,
+    IWldTerrainRes* const terrainRes
+  )
     : WeakObject{}
     , mTerrainRes(terrainRes)
     , mEntry{}
@@ -316,7 +342,9 @@ namespace moho
    * What it does:
    * Stores one per-decal flat-optimization enable flag at +0x13C.
    */
-  void CWldTerrainDecal::EnableFlatOptimization(const bool enabled)
+  void CWldTerrainDecal::EnableFlatOptimization(
+    const bool enabled
+  )
   {
     mFlatOptimizationEnabled = static_cast<std::uint8_t>(enabled ? 1u : 0u);
   }
@@ -330,7 +358,9 @@ namespace moho
    * index, type, name-slot count + per-slot `(byteLen, bytes)`, then
    * scale/position/orientation, cutoff lanes, and terminal runtime token.
    */
-  void CWldTerrainDecal::DecalSave(gpg::BinaryWriter& writer)
+  void CWldTerrainDecal::DecalSave(
+    gpg::BinaryWriter& writer
+  )
   {
     writer.Write(mIndex);
 
@@ -365,7 +395,9 @@ namespace moho
    * via SetName, then scale/position/orientation vectors, cutoff lanes, and the
    * terminal runtime token; refreshes derived state via Update().
    */
-  void CWldTerrainDecal::DecalLoad(gpg::BinaryReader& reader)
+  void CWldTerrainDecal::DecalLoad(
+    gpg::BinaryReader& reader
+  )
   {
     mFlatOptimizationEnabled = 1;
     mFlatnessCacheValid = 0;
@@ -427,14 +459,18 @@ namespace moho
   }
 
   /**
-   * Address: 0x0089D190 (FUN_0089D190, ?LookupDecalType@CWldTerrainDecal@Moho@@SA?AW4TYPE@12@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
-   * Mangled: ?LookupDecalType@CWldTerrainDecal@Moho@@SA?AW4TYPE@12@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
+   * Address: 0x0089D190 (FUN_0089D190,
+   * ?LookupDecalType@CWldTerrainDecal@Moho@@SA?AW4TYPE@12@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+   * Mangled:
+   * ?LookupDecalType@CWldTerrainDecal@Moho@@SA?AW4TYPE@12@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
    *
    * What it does:
    * Resolves one decal type enum from static descriptor text and warns when
    * caller input does not match any known descriptor lane.
    */
-  EWldTerrainDecalType CWldTerrainDecal::LookupDecalType(const fa::string& typeDescription)
+  EWldTerrainDecalType CWldTerrainDecal::LookupDecalType(
+    const fa::string& typeDescription
+  )
   {
     fa::string* const begin = &sTypeDesc[0];
     fa::string* const end = begin + 10;
@@ -453,7 +489,10 @@ namespace moho
    * What it does:
    * Writes one name lane and refreshes the matching counted texture reference.
    */
-  void CWldTerrainDecal::SetName(const fa::string& name, const int slot)
+  void CWldTerrainDecal::SetName(
+    const fa::string& name,
+    const int slot
+  )
   {
     mNames[slot] = name;
 
@@ -476,7 +515,9 @@ namespace moho
    * What it does:
    * Stores one runtime handle lane used by decal registration systems.
    */
-  void CWldTerrainDecal::SetHandle(const int handle)
+  void CWldTerrainDecal::SetHandle(
+    const int handle
+  )
   {
     mDecalHandle = handle;
   }
@@ -488,7 +529,9 @@ namespace moho
    * What it does:
    * Stores scale lanes and tail-calls `Update` via the vtable slot.
    */
-  void CWldTerrainDecal::SetScale(const Wm3::Vec3f& scale)
+  void CWldTerrainDecal::SetScale(
+    const Wm3::Vec3f& scale
+  )
   {
     mScale = scale;
     Update();
@@ -501,7 +544,9 @@ namespace moho
    * What it does:
    * Stores world-position lanes and tail-calls `Update` via the vtable slot.
    */
-  void CWldTerrainDecal::SetPosition(const Wm3::Vec3f& position)
+  void CWldTerrainDecal::SetPosition(
+    const Wm3::Vec3f& position
+  )
   {
     mPosition = position;
     Update();
@@ -514,7 +559,9 @@ namespace moho
    * What it does:
    * Stores orientation lanes and tail-calls `Update` via the vtable slot.
    */
-  void CWldTerrainDecal::SetOrientation(const Wm3::Vec3f& orientation)
+  void CWldTerrainDecal::SetOrientation(
+    const Wm3::Vec3f& orientation
+  )
   {
     mOrientation = orientation;
     Update();
@@ -546,7 +593,9 @@ namespace moho
    * What it does:
    * Clears near-cutoff fade to zero (argument is ignored by binary behavior).
    */
-  void CWldTerrainDecal::SetNearCutoffLOD(const float nearCutoffLod)
+  void CWldTerrainDecal::SetNearCutoffLOD(
+    const float nearCutoffLod
+  )
   {
     (void)nearCutoffLod;
     mNearCutoff = 0.0f;
@@ -559,7 +608,9 @@ namespace moho
    * What it does:
    * Stores one absolute remove-tick lane for lifetime scheduling.
    */
-  void CWldTerrainDecal::SetRemoveTick(const int removeTick)
+  void CWldTerrainDecal::SetRemoveTick(
+    const int removeTick
+  )
   {
     mRemoveTick = removeTick;
   }
@@ -571,8 +622,11 @@ namespace moho
    * Samples one animated decal texture for `slot` using binary-equivalent frame
    * phase math and returns one retained texture-sheet handle.
    */
-  boost::shared_ptr<ID3DTextureSheet>
-  CWldTerrainDecal::GetTexture(const int slot, const float phaseOffset, const int frameSeed) const
+  boost::shared_ptr<ID3DTextureSheet> CWldTerrainDecal::GetTexture(
+    const int slot,
+    const float phaseOffset,
+    const int frameSeed
+  ) const
   {
     CountedObject* const resource = mResourceRefs[slot].tex;
     if (resource == nullptr) {
@@ -593,19 +647,17 @@ namespace moho
    * What it does:
    * Projects one local corner into XZ world space using current yaw/scale.
    */
-  Wm3::Vec2f CWldTerrainDecal::ComputeCorner(const Wm3::Vec2f& corner) const
+  Wm3::Vec2f CWldTerrainDecal::ComputeCorner(
+    const Wm3::Vec2f& corner
+  ) const
   {
     const float angle = mOrientation.y;
     const float cosAngle = static_cast<float>(std::cos(angle));
     const float sinAngle = static_cast<float>(std::sin(angle));
 
     Wm3::Vec2f out{};
-    out.x =
-      (mPosition.x + (corner.y * (-mScale.z * sinAngle)))
-      + (corner.x * (mScale.x * cosAngle));
-    out.y =
-      (mPosition.z + (corner.y * (mScale.z * cosAngle)))
-      + (corner.x * (mScale.x * sinAngle));
+    out.x = (mPosition.x + (corner.y * (-mScale.z * sinAngle))) + (corner.x * (mScale.x * cosAngle));
+    out.y = (mPosition.z + (corner.y * (mScale.z * cosAngle))) + (corner.x * (mScale.x * sinAngle));
     return out;
   }
 
@@ -617,7 +669,9 @@ namespace moho
    * Applies inverse decal translation + yaw rotation + scale to a world-space
    * XZ point and returns true when the mapped UV lies in `[0, 1)` on both axes.
    */
-  bool CWldTerrainDecal::IsInside(const Wm3::Vec2f& worldXZ) const
+  bool CWldTerrainDecal::IsInside(
+    const Wm3::Vec2f& worldXZ
+  ) const
   {
     const float inverseYaw = -mOrientation.y;
     const float cosine = static_cast<float>(std::cos(inverseYaw));
@@ -639,7 +693,9 @@ namespace moho
    * Reuses or rebuilds one cached terrain-sampled corner quad and tests all
    * covered heightfield samples against the fitted plane tolerance.
    */
-  bool CWldTerrainDecal::ComputeFlatness(Quad& quad)
+  bool CWldTerrainDecal::ComputeFlatness(
+    Quad& quad
+  )
   {
     if (mFlatOptimizationEnabled == 0) {
       return false;
@@ -657,42 +713,28 @@ namespace moho
       const int maxZ = static_cast<int>(std::ceil(mBoundsMaxZ));
 
       mCachedFlatQuad.mCorner0 = {
-        static_cast<float>(minX),
-        SampleTerrainHeightWordScaled(field, minX, maxZ),
-        static_cast<float>(maxZ)
+        static_cast<float>(minX), SampleTerrainHeightWordScaled(field, minX, maxZ), static_cast<float>(maxZ)
       };
       mCachedFlatQuad.mCorner1 = {
-        static_cast<float>(minX),
-        SampleTerrainHeightWordScaled(field, minX, minZ),
-        static_cast<float>(minZ)
+        static_cast<float>(minX), SampleTerrainHeightWordScaled(field, minX, minZ), static_cast<float>(minZ)
       };
       mCachedFlatQuad.mCorner2 = {
-        static_cast<float>(maxX),
-        SampleTerrainHeightWordScaled(field, maxX, maxZ),
-        static_cast<float>(maxZ)
+        static_cast<float>(maxX), SampleTerrainHeightWordScaled(field, maxX, maxZ), static_cast<float>(maxZ)
       };
       mCachedFlatQuad.mCorner3 = {
-        static_cast<float>(maxX),
-        SampleTerrainHeightWordScaled(field, maxX, minZ),
-        static_cast<float>(minZ)
+        static_cast<float>(maxX), SampleTerrainHeightWordScaled(field, maxX, minZ), static_cast<float>(minZ)
       };
 
-      const PlaneEquation plane = BuildPlaneFromAnchor(
-        mCachedFlatQuad.mCorner0,
-        mCachedFlatQuad.mCorner2,
-        mCachedFlatQuad.mCorner1
-      );
+      const PlaneEquation plane =
+        BuildPlaneFromAnchor(mCachedFlatQuad.mCorner0, mCachedFlatQuad.mCorner2, mCachedFlatQuad.mCorner1);
 
       const auto isInsideTolerance = [&](const float x, const float y, const float z) noexcept -> bool {
         const float signedDistance = SignedPlaneDistance(plane, x, y, z);
         return flatToleranceSquared > (signedDistance * signedDistance);
       };
 
-      bool isFlat = isInsideTolerance(
-        mCachedFlatQuad.mCorner3.x,
-        mCachedFlatQuad.mCorner3.y,
-        mCachedFlatQuad.mCorner3.z
-      );
+      bool isFlat =
+        isInsideTolerance(mCachedFlatQuad.mCorner3.x, mCachedFlatQuad.mCorner3.y, mCachedFlatQuad.mCorner3.z);
 
       for (int sampleX = minX; isFlat && sampleX <= maxX; ++sampleX) {
         for (int sampleZ = minZ; isFlat && sampleZ <= maxZ; ++sampleZ) {
@@ -721,7 +763,9 @@ namespace moho
    * What it does:
    * Returns one distance-scaled cutoff metric using decal extents and type lane.
    */
-  float CWldTerrainDecal::ComputeCutoffLOD(const float distance) const
+  float CWldTerrainDecal::ComputeCutoffLOD(
+    const float distance
+  ) const
   {
     const float extentX = mBoundsMaxX - mBoundsMinX;
     const float extentY = mBoundsMaxZ - mBoundsMinZ;
@@ -732,9 +776,8 @@ namespace moho
     }
 
     if (
-      mType == WldTerrainDecalType_Albedo
-      || mType == WldTerrainDecalType_WaterAlbedo
-      || mType == WldTerrainDecalType_GlowMask
+      mType == WldTerrainDecalType_Albedo || mType == WldTerrainDecalType_WaterAlbedo ||
+      mType == WldTerrainDecalType_GlowMask
     ) {
       return diagonal * ren_DecalAlbedoLodCutoff;
     }
@@ -749,7 +792,9 @@ namespace moho
    * Computes one normalized alpha in `[0,1]` from either near-cutoff or
    * far-cutoff fade lanes.
    */
-  float CWldTerrainDecal::GetLODAlpha(const float distance) const
+  float CWldTerrainDecal::GetLODAlpha(
+    const float distance
+  ) const
   {
     if (mNearCutoff > 0.0f) {
       const float fadeBegin = mNearCutoff * ren_DecalFadeFraction;
@@ -769,7 +814,10 @@ namespace moho
    * What it does:
    * Returns the cached texture projection matrix.
    */
-  VMatrix4 CWldTerrainDecal::GetTextureMatrix(const int slot, const float lod) const
+  VMatrix4 CWldTerrainDecal::GetTextureMatrix(
+    const int slot,
+    const float lod
+  ) const
   {
     (void)slot;
     (void)lod;
@@ -783,7 +831,10 @@ namespace moho
    * What it does:
    * Returns the cached tangent matrix.
    */
-  VMatrix4 CWldTerrainDecal::GetTangentMatrix(const int slot, const float lod) const
+  VMatrix4 CWldTerrainDecal::GetTangentMatrix(
+    const int slot,
+    const float lod
+  ) const
   {
     (void)slot;
     (void)lod;
@@ -819,7 +870,10 @@ namespace moho
    * What it does:
    * Returns the current alpha lane.
    */
-  float CWldTerrainDecal::GetCurrentAlpha(const int slot, const float lod) const
+  float CWldTerrainDecal::GetCurrentAlpha(
+    const int slot,
+    const float lod
+  ) const
   {
     (void)slot;
     (void)lod;
@@ -833,7 +887,10 @@ namespace moho
    * What it does:
    * Adds/subtracts one delta from current alpha and clamps to the binary branch outcome.
    */
-  float CWldTerrainDecal::AdjustAlpha(const float delta, const float lod)
+  float CWldTerrainDecal::AdjustAlpha(
+    const float delta,
+    const float lod
+  )
   {
     (void)lod;
 
@@ -858,7 +915,9 @@ namespace moho
    * What it does:
    * Stores one explicit cutoff-lod scalar and updates spatial-db dissolve sort key.
    */
-  void CWldTerrainDecal::SetCutoffLOD(const float cutoffLod)
+  void CWldTerrainDecal::SetCutoffLOD(
+    const float cutoffLod
+  )
   {
     mCutoffLOD = cutoffLod;
     mEntry.UpdateDissolveCutoff(cutoffLod);
@@ -873,15 +932,7 @@ namespace moho
    */
   void CWldTerrainDecal::Update()
   {
-    ProjectDecalBoundsXZ(
-      mPosition,
-      mScale,
-      mOrientation,
-      mBoundsMaxX,
-      mBoundsMaxZ,
-      mBoundsMinX,
-      mBoundsMinZ
-    );
+    ProjectDecalBoundsXZ(mPosition, mScale, mOrientation, mBoundsMaxX, mBoundsMaxZ, mBoundsMinX, mBoundsMinZ);
 
     mTexMatrix = VMatrix4::Identity();
     mTexMatrix.r[3].x = -mPosition.x;
@@ -911,4 +962,3 @@ namespace moho
     mCachedFlatResult = 0;
   }
 } // namespace moho
-

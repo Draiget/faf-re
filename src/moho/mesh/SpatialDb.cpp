@@ -1,6 +1,5 @@
 #include "moho/mesh/MeshPrivate.h"
 
-
 bool moho::ren_ParallelCull = true;
 namespace
 {
@@ -23,13 +22,18 @@ namespace
     1024, // index 3
   };
 
-  [[nodiscard]] std::uint32_t EntityTypeBits(const moho::EEntityType type) noexcept
+  [[nodiscard]] std::uint32_t EntityTypeBits(
+    const moho::EEntityType type
+  ) noexcept
   {
     return static_cast<std::uint32_t>(type);
   }
 
   template <class T>
-  [[nodiscard]] bool SpatialShardHasNoRequestedType(const moho::SpatialShard<T>& shard, const moho::EEntityType type) noexcept
+  [[nodiscard]] bool SpatialShardHasNoRequestedType(
+    const moho::SpatialShard<T>& shard,
+    const moho::EEntityType type
+  ) noexcept
   {
     return shard.CountType(type);
   }
@@ -43,7 +47,10 @@ namespace
     return moho::SpatialShardData<T>::HasType(&data, type);
   }
 
-  [[nodiscard]] bool SolidContainsAabb(const moho::CGeomSolid3& solid, const Wm3::AxisAlignedBox3f& bounds) noexcept
+  [[nodiscard]] bool SolidContainsAabb(
+    const moho::CGeomSolid3& solid,
+    const Wm3::AxisAlignedBox3f& bounds
+  ) noexcept
   {
     for (const Wm3::Plane3f& plane : solid.planes_) {
       const float supportX = std::signbit(plane.Normal.x) ? bounds.Min.x : bounds.Max.x;
@@ -160,7 +167,9 @@ namespace
   // for a while (564d7e57d) -- so they are gone, and the source says
   // `map.insert(entry)` and `mShards.resize(16)`.
 
-  [[nodiscard]] std::int32_t FloorSpatialCellCoordinate(const float value) noexcept
+  [[nodiscard]] std::int32_t FloorSpatialCellCoordinate(
+    const float value
+  ) noexcept
   {
     return static_cast<std::int32_t>(std::floor(value * 0.0625f));
   }
@@ -177,8 +186,8 @@ namespace
     const Wm3::AxisAlignedBox3f& updatedBounds
   ) noexcept
   {
-    return FloorSpatialCellCoordinate(previousBounds.Min.x) != FloorSpatialCellCoordinate(updatedBounds.Min.x)
-      || FloorSpatialCellCoordinate(previousBounds.Min.z) != FloorSpatialCellCoordinate(updatedBounds.Min.z);
+    return FloorSpatialCellCoordinate(previousBounds.Min.x) != FloorSpatialCellCoordinate(updatedBounds.Min.x) ||
+      FloorSpatialCellCoordinate(previousBounds.Min.z) != FloorSpatialCellCoordinate(updatedBounds.Min.z);
   }
 
   /**
@@ -189,7 +198,10 @@ namespace
    * parent shards.
    */
   template <class T>
-  void PropagateBoundsToShardChain(moho::SpatialShard<T>* shard, const Wm3::AxisAlignedBox3f& bounds) noexcept
+  void PropagateBoundsToShardChain(
+    moho::SpatialShard<T>* shard,
+    const Wm3::AxisAlignedBox3f& bounds
+  ) noexcept
   {
     for (moho::SpatialShard<T>* current = shard; current != nullptr; current = current->mParent) {
       current->mBounds.Min.x = std::min(current->mBounds.Min.x, bounds.Min.x);
@@ -208,7 +220,10 @@ namespace
    * Increments one type-lane counter on a shard and all parent shards.
    */
   template <class T>
-  void IncrementShardTypeCountChain(moho::SpatialShard<T>* shard, const std::uint32_t typeBits) noexcept
+  void IncrementShardTypeCountChain(
+    moho::SpatialShard<T>* shard,
+    const std::uint32_t typeBits
+  ) noexcept
   {
     for (moho::SpatialShard<T>* current = shard; current != nullptr; current = current->mParent) {
       if ((typeBits & kSpatialEntityTypeUnit) != 0u) {
@@ -229,7 +244,11 @@ namespace
    * collect body runs over up to four maps.
    */
   template <class T, class Predicate>
-  void CollectEntries(const moho::SpatialMap<T>& map, gpg::fastvector<T*>& destination, const Predicate& accept)
+  void CollectEntries(
+    const moho::SpatialMap<T>& map,
+    gpg::fastvector<T*>& destination,
+    const Predicate& accept
+  )
   {
     for (const moho::SpatialEntry<T>& entry : map) {
       if (accept(entry.mBox)) {
@@ -355,7 +374,9 @@ namespace
     return fadePlane.x * supportX + fadePlane.y * supportY + fadePlane.z * supportZ + fadePlane.w;
   }
 
-  [[nodiscard]] Wm3::Vector3f BuildViewSupportSelector(const moho::GeomCamera3& camera) noexcept
+  [[nodiscard]] Wm3::Vector3f BuildViewSupportSelector(
+    const moho::GeomCamera3& camera
+  ) noexcept
   {
     Wm3::Vector3f supportSelector{};
     supportSelector.x = -camera.inverseView.r[2].x;
@@ -381,12 +402,7 @@ namespace
   {
     const Wm3::Vector3f supportSelector = BuildViewSupportSelector(*camera);
     moho::SpatialShardData<T>::FindInVolumeFromData(
-      camera->viewport.r[1],
-      supportSelector,
-      data,
-      type,
-      &camera->solid2,
-      destination
+      camera->viewport.r[1], supportSelector, data, type, &camera->solid2, destination
     );
   }
 
@@ -406,7 +422,9 @@ namespace
   )
   {
     const Wm3::Vector3f supportSelector = BuildViewSupportSelector(*camera);
-    moho::SpatialShardData<T>::FindInVolume(shard, type, &camera->solid2, supportSelector, camera->viewport.r[1], destination);
+    moho::SpatialShardData<T>::FindInVolume(
+      shard, type, &camera->solid2, supportSelector, camera->viewport.r[1], destination
+    );
   }
 
   /**
@@ -472,7 +490,9 @@ namespace
   /// The leaf-level type and bounds tests of `SpatialShardData<T>::FindInVolumeFromData`.
   template <class T>
   [[nodiscard]] bool VolumeLeafPasses(
-    const moho::SpatialShardData<T>& data, const moho::EEntityType type, const moho::CGeomSolid3& volume
+    const moho::SpatialShardData<T>& data,
+    const moho::EEntityType type,
+    const moho::CGeomSolid3& volume
   )
   {
     return !SpatialShardDataHasNoRequestedType(data, type) && IntersectsShardVolumeBounds(volume, data.mBounds);
@@ -480,7 +500,9 @@ namespace
 
   /// The periodic bounds refresh `SpatialShardData<T>::FindInVolumeFromData` runs on a leaf that passed.
   template <class T>
-  [[nodiscard]] bool VolumeLeafNeedsRefresh(const moho::SpatialShardData<T>& data)
+  [[nodiscard]] bool VolumeLeafNeedsRefresh(
+    const moho::SpatialShardData<T>& data
+  )
   {
     return data.mTimeSinceRecalc > 500;
   }
@@ -491,7 +513,9 @@ namespace
    */
   template <class T>
   [[nodiscard]] bool PrepareVolumeLeaf(
-    moho::SpatialShardData<T>& data, const moho::EEntityType type, const moho::CGeomSolid3& volume
+    moho::SpatialShardData<T>& data,
+    const moho::EEntityType type,
+    const moho::CGeomSolid3& volume
   )
   {
     if (!VolumeLeafPasses(data, type, volume)) {
@@ -610,8 +634,10 @@ namespace
     moho::SpatialShardData<T>* const rootLeaf = &rootData;
     groups.push_back(VolumeLeafGroup<T>{&rootLeaf, 1});
 
-    if (groups.size() < kParallelCullMinGroups ||
-        (ren_ParallelCullMinItems > 0 && items < static_cast<std::size_t>(ren_ParallelCullMinItems))) {
+    if (
+      groups.size() < kParallelCullMinGroups ||
+      (ren_ParallelCullMinItems > 0 && items < static_cast<std::size_t>(ren_ParallelCullMinItems))
+    ) {
       for (const VolumeLeafGroup<T>& group : groups) {
         for (std::int32_t index = 0; index < group.mCount; ++index) {
           moho::SpatialShardData<T>& leaf = *group.mLeaves[index];
@@ -666,7 +692,6 @@ namespace
     return true;
   }
 
-
   /**
    * Address: 0x00503B10 (FUN_00503B10, sub_503B10)
    *
@@ -674,14 +699,19 @@ namespace
    * Walks shard children by x/z cell index until it reaches one leaf-data lane.
    */
   template <class T>
-  [[nodiscard]] moho::SpatialShardData<T>*
-  ResolveSpatialLeafDataForPoint(moho::SpatialShard<T>* shard, const float worldZ, const float worldX)
+  [[nodiscard]] moho::SpatialShardData<T>* ResolveSpatialLeafDataForPoint(
+    moho::SpatialShard<T>* shard,
+    const float worldZ,
+    const float worldX
+  )
   {
     for (;;) {
       const std::int32_t level = shard->mLevel;
       const float cellSize = static_cast<float>(kSpatialShardCellSizeByLevel[level]);
-      const std::int32_t laneX = static_cast<std::int32_t>((worldX - static_cast<float>(shard->mAreaRect.x0)) / cellSize);
-      const std::int32_t laneZ = static_cast<std::int32_t>((worldZ - static_cast<float>(shard->mAreaRect.z0)) / cellSize);
+      const std::int32_t laneX =
+        static_cast<std::int32_t>((worldX - static_cast<float>(shard->mAreaRect.x0)) / cellSize);
+      const std::int32_t laneZ =
+        static_cast<std::int32_t>((worldZ - static_cast<float>(shard->mAreaRect.z0)) / cellSize);
       const std::int32_t laneIndex = laneX + kSpatialShardGridDimension * laneZ;
 
       if (level <= 0) {
@@ -705,8 +735,10 @@ namespace
    * ends there.
    */
   template <class T>
-  [[nodiscard]] moho::SpatialShardData<T>*
-  ResolveSpatialLeafDataFromStoragePoint(const Wm3::Vec3f& point, moho::SpatialDB<T>& storage)
+  [[nodiscard]] moho::SpatialShardData<T>* ResolveSpatialLeafDataFromStoragePoint(
+    const Wm3::Vec3f& point,
+    moho::SpatialDB<T>& storage
+  )
   {
     const std::int32_t coarseX = static_cast<std::int32_t>(std::floor(point.x * 0.0625f));
     const std::int32_t coarseZ = static_cast<std::int32_t>(std::floor(point.z * 0.0625f));
@@ -720,7 +752,7 @@ namespace
     const std::int32_t topIndex = shardX + kSpatialShardGridDimension * shardZ;
     return ResolveSpatialLeafDataForPoint(storage.mShards[topIndex], point.z, point.x);
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -732,7 +764,11 @@ namespace moho
    * shards (non-leaf levels) or 16 leaf-data lanes.
    */
   template <class T>
-  SpatialShard<T>::SpatialShard(const std::int32_t level, SpatialShard<T>* const parent, const gpg::Rect2i& areaRect)
+  SpatialShard<T>::SpatialShard(
+    const std::int32_t level,
+    SpatialShard<T>* const parent,
+    const gpg::Rect2i& areaRect
+  )
     : mParent(parent)
     , mAreaRect(areaRect)
     , mLevel(level)
@@ -810,14 +846,16 @@ namespace moho
    * Returns true when the shard has no entries for requested type lanes.
    */
   template <class T>
-  bool SpatialShard<T>::CountType(const EEntityType type) const
+  bool SpatialShard<T>::CountType(
+    const EEntityType type
+  ) const
   {
     const std::uint32_t typeBits = EntityTypeBits(type);
     if (typeBits != 0u) {
-      return ((typeBits & kSpatialEntityTypeUnit) == 0u || mUnitCount <= 0)
-        && ((typeBits & kSpatialEntityTypeProjectile) == 0u || mProjectileCount <= 0)
-        && ((typeBits & kSpatialEntityTypeProp) == 0u || mPropCount <= 0)
-        && ((typeBits & kSpatialEntityTypeEntity) == 0u || mEntityCount <= 0);
+      return ((typeBits & kSpatialEntityTypeUnit) == 0u || mUnitCount <= 0) &&
+        ((typeBits & kSpatialEntityTypeProjectile) == 0u || mProjectileCount <= 0) &&
+        ((typeBits & kSpatialEntityTypeProp) == 0u || mPropCount <= 0) &&
+        ((typeBits & kSpatialEntityTypeEntity) == 0u || mEntityCount <= 0);
     }
 
     return mUnitCount <= 0 && mProjectileCount <= 0 && mPropCount <= 0 && mEntityCount <= 0;
@@ -830,7 +868,10 @@ namespace moho
    * Decrements the requested entity-lane count on this shard and every parent.
    */
   template <class T>
-  void SpatialShard<T>::DecrementCount(SpatialShard<T>* shard, const EEntityType type)
+  void SpatialShard<T>::DecrementCount(
+    SpatialShard<T>* shard,
+    const EEntityType type
+  )
   {
     for (SpatialShard<T>* current = shard; current != nullptr; current = current->mParent) {
       const std::uint32_t typeBits = EntityTypeBits(type);
@@ -892,14 +933,17 @@ namespace moho
    * Returns true when leaf map lanes have no entries for requested type lanes.
    */
   template <class T>
-  bool SpatialShardData<T>::HasType(const SpatialShardData<T>* const data, const EEntityType type)
+  bool SpatialShardData<T>::HasType(
+    const SpatialShardData<T>* const data,
+    const EEntityType type
+  )
   {
     const std::uint32_t typeBits = EntityTypeBits(type);
     if (typeBits != 0u) {
-      return ((typeBits & kSpatialEntityTypeUnit) == 0u || data->mMapUnits.empty())
-        && ((typeBits & kSpatialEntityTypeProjectile) == 0u || data->mMapProjectiles.empty())
-        && ((typeBits & kSpatialEntityTypeProp) == 0u || data->mMapProps.empty())
-        && ((typeBits & kSpatialEntityTypeEntity) == 0u || data->mMapEntities.empty());
+      return ((typeBits & kSpatialEntityTypeUnit) == 0u || data->mMapUnits.empty()) &&
+        ((typeBits & kSpatialEntityTypeProjectile) == 0u || data->mMapProjectiles.empty()) &&
+        ((typeBits & kSpatialEntityTypeProp) == 0u || data->mMapProps.empty()) &&
+        ((typeBits & kSpatialEntityTypeEntity) == 0u || data->mMapEntities.empty());
     }
 
     return data->mMapUnits.empty() && data->mMapProjectiles.empty() && data->mMapProps.empty() &&
@@ -915,7 +959,9 @@ namespace moho
    * own heads (`_Buynode` 0x00505D20, self-linked, size zero).
    */
   template <class T>
-  SpatialShardData<T>::SpatialShardData(SpatialShard<T>* const ownerShard)
+  SpatialShardData<T>::SpatialShardData(
+    SpatialShard<T>* const ownerShard
+  )
     : mShard(ownerShard)
     , mUnknown_04_13{}
     , mTimeSinceRecalc(0)
@@ -1004,7 +1050,9 @@ namespace moho
    * counts up the owner chain.
    */
   template <class T>
-  void SpatialShardData<T>::RemoveNode(const iterator node)
+  void SpatialShardData<T>::RemoveNode(
+    const iterator node
+  )
   {
     ++mTimeSinceRecalc;
     const EEntityType type = static_cast<EEntityType>(node->mEntityType);
@@ -1035,7 +1083,9 @@ namespace moho
    * shard chain.
    */
   template <class T>
-  typename SpatialShardData<T>::iterator SpatialShardData<T>::Insert(const SpatialEntry<T>& entry)
+  typename SpatialShardData<T>::iterator SpatialShardData<T>::Insert(
+    const SpatialEntry<T>& entry
+  )
   {
     iterator inserted;
     const std::uint32_t typeBits = entry.mEntityType;
@@ -1074,7 +1124,11 @@ namespace moho
    * Appends all entity pointers from selected leaf maps to destination.
    */
   template <class T>
-  void SpatialShardData<T>::CollectFromData(const EEntityType type, gpg::fastvector<T*>& destination, SpatialShardData<T>* const data)
+  void SpatialShardData<T>::CollectFromData(
+    const EEntityType type,
+    gpg::fastvector<T*>& destination,
+    SpatialShardData<T>* const data
+  )
   {
     if (SpatialShardDataHasNoRequestedType(*data, type)) {
       return;
@@ -1082,7 +1136,9 @@ namespace moho
 
     const std::uint32_t typeBits = EntityTypeBits(type);
     const auto collectAll = [&destination](const SpatialMap<T>& map) {
-      CollectEntries(map, destination, [](const Wm3::AxisAlignedBox3f&) { return true; });
+      CollectEntries(map, destination, [](const Wm3::AxisAlignedBox3f&) {
+        return true;
+      });
     };
 
     if ((typeBits & kSpatialEntityTypeUnit) != 0u) {
@@ -1256,9 +1312,7 @@ namespace moho
     const bool dataBoundsContained = SphereContainsAabbDiagonal(probe, mBounds);
     const std::uint32_t typeBits = EntityTypeBits(type);
 
-    const auto includeIfRelevant = [&probe, dataBoundsContained](
-      const Wm3::AxisAlignedBox3f& nodeBox
-    ) {
+    const auto includeIfRelevant = [&probe, dataBoundsContained](const Wm3::AxisAlignedBox3f& nodeBox) {
       return dataBoundsContained || SphereIntersectsAabb(nodeBox, probe);
     };
 
@@ -1405,7 +1459,10 @@ namespace moho
    * would reach past the map.
    */
   template <class T>
-  void SpatialDB<T>::ResizeForMap(const std::int32_t width, const std::int32_t height)
+  void SpatialDB<T>::ResizeForMap(
+    const std::int32_t width,
+    const std::int32_t height
+  )
   {
     if (width == mMapWidth && height == mMapHeight) {
       return;
@@ -1493,7 +1550,11 @@ namespace moho
    * which relinks an overflow entry unconditionally.
    */
   template <class T>
-  void SpatialDBEntry<T>::Register(SpatialDB<T>* const db, T* const owner, const std::int32_t routingMask)
+  void SpatialDBEntry<T>::Register(
+    SpatialDB<T>* const db,
+    T* const owner,
+    const std::int32_t routingMask
+  )
   {
     if (mDb != nullptr) {
       Unregister();
@@ -1519,7 +1580,9 @@ namespace moho
    * does not.
    */
   template <class T>
-  void SpatialDBEntry<T>::UpdateDissolveCutoff(const float cutoff)
+  void SpatialDBEntry<T>::UpdateDissolveCutoff(
+    const float cutoff
+  )
   {
     SpatialEntry<T> entry = *mNode;
     entry.mFadeOut = cutoff;
@@ -1543,7 +1606,9 @@ namespace moho
    * corner; otherwise the lane's bounds just widen to take the new box.
    */
   template <class T>
-  void SpatialDBEntry<T>::UpdateBounds(const Wm3::AxisAlignedBox3f& bounds)
+  void SpatialDBEntry<T>::UpdateBounds(
+    const Wm3::AxisAlignedBox3f& bounds
+  )
   {
     const bool requiresRelink = mNode->mShardData != nullptr ? HasSpatialCellChanged(mNode->mBox, bounds) : true;
     mNode->mBox = bounds;
@@ -1700,7 +1765,6 @@ namespace moho
     return static_cast<std::int32_t>(destination.size());
   }
 
-
   /**
    * Address: 0x00504040 (FUN_00504040, Moho::SpatialDB<T>::CollectInBox)
    * Address: 0x008C5A90 (FUN_008C5A90 -- a register-shape bridge into this
@@ -1777,7 +1841,11 @@ namespace moho
       kSpatialEntityTypeUnit | kSpatialEntityTypeProjectile | kSpatialEntityTypeProp | kSpatialEntityTypeEntity
     );
 
-    if (CollectInVolumeParallel(mShards, mShardData, kAllRenderableTypes, *volume, supportSelector, fadePlane, destination)) {
+    if (
+      CollectInVolumeParallel(
+        mShards, mShardData, kAllRenderableTypes, *volume, supportSelector, fadePlane, destination
+      )
+    ) {
       return static_cast<std::int32_t>(destination.size());
     }
 
@@ -1788,12 +1856,7 @@ namespace moho
     }
 
     SpatialShardData<T>::FindInVolumeFromData(
-      fadePlane,
-      supportSelector,
-      &mShardData,
-      kAllRenderableTypes,
-      volume,
-      destination
+      fadePlane, supportSelector, &mShardData, kAllRenderableTypes, volume, destination
     );
     return static_cast<std::int32_t>(destination.size());
   }
@@ -1814,9 +1877,11 @@ namespace moho
     const EEntityType type
   )
   {
-    if (CollectInVolumeParallel(
-          mShards, mShardData, type, camera->solid2, BuildViewSupportSelector(*camera), camera->viewport.r[1], destination
-        )) {
+    if (
+      CollectInVolumeParallel(
+        mShards, mShardData, type, camera->solid2, BuildViewSupportSelector(*camera), camera->viewport.r[1], destination
+      )
+    ) {
       return static_cast<std::int32_t>(destination.size());
     }
 
@@ -1849,5 +1914,4 @@ namespace moho
   template struct SpatialDBEntry<WaveGenerator>;
   template struct SpatialDBEntry<ShoreCell>;
   template struct SpatialDBEntry<CWldTerrainDecal>;
-}
-
+} // namespace moho

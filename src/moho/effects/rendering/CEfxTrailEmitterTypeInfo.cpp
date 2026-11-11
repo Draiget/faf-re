@@ -79,7 +79,9 @@ namespace moho
   /**
    * Address: 0x00672410 (FUN_00672410, Moho::CEfxTrailEmitterTypeInfo::CtrRef)
    */
-  gpg::RRef CEfxTrailEmitterTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CEfxTrailEmitterTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const object = gpg::ConstructInStorage<CEfxTrailEmitter>(objectStorage);
     gpg::RRef out{};
@@ -90,7 +92,9 @@ namespace moho
   /**
    * Address: 0x006723F0 (FUN_006723F0, Moho::CEfxTrailEmitterTypeInfo::Delete)
    */
-  void CEfxTrailEmitterTypeInfo::Delete(void* const objectStorage)
+  void CEfxTrailEmitterTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CEfxTrailEmitter*>(objectStorage);
   }
@@ -98,7 +102,9 @@ namespace moho
   /**
    * Address: 0x00672480 (FUN_00672480, Moho::CEfxTrailEmitterTypeInfo::Destruct)
    */
-  void CEfxTrailEmitterTypeInfo::Destruct(void* const objectStorage)
+  void CEfxTrailEmitterTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     gpg::DestructInStorage<CEfxTrailEmitter>(objectStorage);
   }
@@ -106,7 +112,9 @@ namespace moho
   /**
    * Address: 0x00672490 (FUN_00672490, Moho::CEfxTrailEmitterTypeInfo::AddBase_CEffectImpl)
    */
-  void CEfxTrailEmitterTypeInfo::AddBase_CEffectImpl(gpg::RType* const typeInfo)
+  void CEfxTrailEmitterTypeInfo::AddBase_CEffectImpl(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* const baseType = CEffectImpl::StaticGetClass();
 
@@ -146,4 +154,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CEfxTrailEmitterTypeInfo_00_a17c2d, moho::register_CEfxTrailEmitterTypeInfo_00)
+GPG_PREREGISTER_INIT(
+  register_CEfxTrailEmitterTypeInfo_00_a17c2d,
+  moho::register_CEfxTrailEmitterTypeInfo_00
+)

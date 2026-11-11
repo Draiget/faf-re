@@ -92,7 +92,8 @@ namespace moho
         }
         return destinationCursor;
       } catch (...) {
-        for (RUnitBlueprintWeapon* destroyCursor = destinationBegin; destroyCursor != destinationCursor; ++destroyCursor) {
+        for (RUnitBlueprintWeapon* destroyCursor = destinationBegin; destroyCursor != destinationCursor;
+             ++destroyCursor) {
           destroyCursor->~RUnitBlueprintWeapon();
         }
         throw;
@@ -180,23 +181,25 @@ namespace moho
     // writes it, so every motion type derives FPFLAG_None.
     constexpr std::int8_t kDefaultFootprintFlags = 0;
 
-    constexpr EOccupancyCaps OccupancyMask(const std::uint8_t value) noexcept
+    constexpr EOccupancyCaps OccupancyMask(
+      const std::uint8_t value
+    ) noexcept
     {
       return static_cast<EOccupancyCaps>(value);
     }
 
     constexpr std::array<EOccupancyCaps, static_cast<std::size_t>(RULEUMT_Special) + 1>
       kFootprintOccupancyCapsByMotion = {
-        OccupancyMask(0x00), // RULEUMT_None
-        EOccupancyCaps::OC_LAND, // RULEUMT_Land
-        EOccupancyCaps::OC_AIR, // RULEUMT_Air
+        OccupancyMask(0x00),      // RULEUMT_None
+        EOccupancyCaps::OC_LAND,  // RULEUMT_Land
+        EOccupancyCaps::OC_AIR,   // RULEUMT_Air
         EOccupancyCaps::OC_WATER, // RULEUMT_Water
-        EOccupancyCaps::OC_LAND, // RULEUMT_Biped
-        OccupancyMask(0x0C), // RULEUMT_SurfacingSub (OC_SUB | OC_WATER)
-        OccupancyMask(0x03), // RULEUMT_Amphibious (OC_LAND | OC_SEABED)
-        OccupancyMask(0x09), // RULEUMT_Hover (OC_LAND | OC_WATER)
-        OccupancyMask(0x09), // RULEUMT_AmphibiousFloating (OC_LAND | OC_WATER)
-        OccupancyMask(0x00), // RULEUMT_Special
+        EOccupancyCaps::OC_LAND,  // RULEUMT_Biped
+        OccupancyMask(0x0C),      // RULEUMT_SurfacingSub (OC_SUB | OC_WATER)
+        OccupancyMask(0x03),      // RULEUMT_Amphibious (OC_LAND | OC_SEABED)
+        OccupancyMask(0x09),      // RULEUMT_Hover (OC_LAND | OC_WATER)
+        OccupancyMask(0x09),      // RULEUMT_AmphibiousFloating (OC_LAND | OC_WATER)
+        OccupancyMask(0x00),      // RULEUMT_Special
     };
 
     constexpr std::array<std::int8_t, 10> kFootprintFlagsByMotion = {
@@ -212,7 +215,9 @@ namespace moho
       kDefaultFootprintFlags,
     };
 
-    [[nodiscard]] std::size_t ToMotionIndex(const ERuleBPUnitMovementType motionType) noexcept
+    [[nodiscard]] std::size_t ToMotionIndex(
+      const ERuleBPUnitMovementType motionType
+    ) noexcept
     {
       const auto rawValue = static_cast<std::int32_t>(motionType);
       if (rawValue < 0 || rawValue >= static_cast<std::int32_t>(kFootprintOccupancyCapsByMotion.size())) {
@@ -221,17 +226,24 @@ namespace moho
       return static_cast<std::size_t>(rawValue);
     }
 
-    [[nodiscard]] EOccupancyCaps LookupFootprintOccupancyCaps(const ERuleBPUnitMovementType motionType) noexcept
+    [[nodiscard]] EOccupancyCaps LookupFootprintOccupancyCaps(
+      const ERuleBPUnitMovementType motionType
+    ) noexcept
     {
       return kFootprintOccupancyCapsByMotion[ToMotionIndex(motionType)];
     }
 
-    [[nodiscard]] EFootprintFlags LookupFootprintFlags(const ERuleBPUnitMovementType motionType) noexcept
+    [[nodiscard]] EFootprintFlags LookupFootprintFlags(
+      const ERuleBPUnitMovementType motionType
+    ) noexcept
     {
       return static_cast<EFootprintFlags>(kFootprintFlagsByMotion[ToMotionIndex(motionType)]);
     }
 
-    void AssignNormalizedFilename(fa::string& destination, const std::string_view filename)
+    void AssignNormalizedFilename(
+      fa::string& destination,
+      const std::string_view filename
+    )
     {
       std::string normalized{filename};
       gpg::STR_NormalizeFilenameLowerSlash(normalized);
@@ -239,7 +251,6 @@ namespace moho
     }
 
   } // namespace
-
 
   /**
    * Address: 0x0051EE10 (FUN_0051EE10)
@@ -250,11 +261,11 @@ namespace moho
    * lanes for general unit-blueprint metadata.
    */
   RUnitBlueprintGeneral::RUnitBlueprintGeneral()
-    : CommandCaps(RULEUCC_None),
-      ToggleCaps(static_cast<ERuleBPUnitToggleCaps>(0)),
-      QuickSelectPriority(0),
-      CapCost(1.0f),
-      SelectionPriority(1)
+    : CommandCaps(RULEUCC_None)
+    , ToggleCaps(static_cast<ERuleBPUnitToggleCaps>(0))
+    , QuickSelectPriority(0)
+    , CapCost(1.0f)
+    , SelectionPriority(1)
   {
     gpg::STR_InitFilename(&UpgradesTo.name, "");
     gpg::STR_InitFilename(&UpgradesFrom.name, "none");
@@ -459,7 +470,9 @@ namespace moho
    * Seeds economy defaults, clears category-string vectors, and initializes
    * runtime category-cache inline storage using one rules-owner lane.
    */
-  RUnitBlueprintEconomy::RUnitBlueprintEconomy(RRuleGameRules* const rules)
+  RUnitBlueprintEconomy::RUnitBlueprintEconomy(
+    RRuleGameRules* const rules
+  )
     : BuildCostEnergy(0.0f)
     , BuildCostMass(0.0f)
     , BuildRate(1.0f)
@@ -503,7 +516,10 @@ namespace moho
    * Constructs unit-blueprint subsection lanes on top of `REntityBlueprint`,
    * seeds gameplay defaults, and enables life-bar rendering.
    */
-  RUnitBlueprint::RUnitBlueprint(RRuleGameRules* const owner, const RResId& resId)
+  RUnitBlueprint::RUnitBlueprint(
+    RRuleGameRules* const owner,
+    const RResId& resId
+  )
     : REntityBlueprint(owner, resId)
     , General()
     , Physics()
@@ -573,7 +589,9 @@ namespace moho
    * footprint pointers using rule-game tables.
    */
   void RUnitBlueprintPhysics::ComputeDerivedQuantities(
-    RRuleGameRules* const gameRules, const char* const blueprintName, REntityBlueprint& ownerEntity
+    RRuleGameRules* const gameRules,
+    const char* const blueprintName,
+    REntityBlueprint& ownerEntity
   )
   {
     if (MaxSpeed == 0.0f) {
@@ -625,8 +643,9 @@ namespace moho
       const std::uint8_t layerCapsLow = static_cast<std::uint8_t>(BuildOnLayerCapsMask);
       ownerEntity.mFootprint.mOccupancyCaps = static_cast<EOccupancyCaps>(layerCapsLow);
 
-      if ((layerCapsLow & static_cast<std::uint8_t>(LAYER_Seabed)) != 0U &&
-          ownerEntity.mFootprint.mMaxWaterDepth == 0.0f) {
+      if (
+        (layerCapsLow & static_cast<std::uint8_t>(LAYER_Seabed)) != 0U && ownerEntity.mFootprint.mMaxWaterDepth == 0.0f
+      ) {
         ownerEntity.mFootprint.mMaxWaterDepth = std::numeric_limits<float>::max();
       }
     }
@@ -717,13 +736,13 @@ namespace moho
    * Parses each buildable-category expression and unions the resulting
    * category bits into the runtime economy category cache.
    */
-  void RUnitBlueprint::AddEconomyRestrictions(RRuleGameRulesImpl* const rules)
+  void RUnitBlueprint::AddEconomyRestrictions(
+    RRuleGameRulesImpl* const rules
+  )
   {
     EntityCategorySet* const economyCategoryCache = &Economy.CategoryCache;
 
-    for (fa::string* it = Economy.BuildableCategories.begin();
-         it != Economy.BuildableCategories.end();
-         ++it) {
+    for (fa::string* it = Economy.BuildableCategories.begin(); it != Economy.BuildableCategories.end(); ++it) {
       // The binary parses through the free function directly (a1 =
       // rules->mEntityCategoryLookup at +0xC4), not the virtual dispatch.
       EntityCategorySet parsedCategory;
@@ -861,7 +880,9 @@ namespace moho
    * Builds the integer occupancy footprint rectangle centered around
    * `position`.
    */
-  gpg::Rect2i RUnitBlueprint::GetFootprintRect(const SCoordsVec2& position) const
+  gpg::Rect2i RUnitBlueprint::GetFootprintRect(
+    const SCoordsVec2& position
+  ) const
   {
     const std::int32_t footprintSizeX = static_cast<std::int32_t>(mFootprint.mSizeX);
     const std::int32_t footprintSizeZ = static_cast<std::int32_t>(mFootprint.mSizeZ);
@@ -892,7 +913,9 @@ namespace moho
    * explicit skirt offsets/sizes when present and falling back to footprint
    * extents otherwise.
    */
-  gpg::Rect2f RUnitBlueprint::GetSkirtRect(const SCoordsVec2& position) const
+  gpg::Rect2f RUnitBlueprint::GetSkirtRect(
+    const SCoordsVec2& position
+  ) const
   {
     const std::int16_t xLower = static_cast<std::int16_t>(
       static_cast<std::int32_t>(std::lrintf(position.x - (static_cast<float>(mFootprint.mSizeX) * 0.5f)))
@@ -931,78 +954,79 @@ namespace moho
    * Restores default weapon-blueprint runtime state, including canonical
    * range, ballistic, and damage-profile defaults.
    */
-  RUnitBlueprintWeapon::RUnitBlueprintWeapon() :
-    OwnerBlueprint(nullptr),
-    WeaponIndex(static_cast<std::uint32_t>(-1)),
-    Label(),
-    DisplayName(),
-    RangeCategory(UWRC_Undefined),
-    DummyWeapon(0),
-    PrefersPrimaryWeaponTarget(0),
-    StopOnPrimaryWeaponBusy(0),
-    SlavedToBody(0),
-    SlavedToBodyArcRange(1.0f),
-    AutoInitiateAttackCommand(0),
-    pad_004D_0050{},
-    TargetCheckInterval(3.0f),
-    AlwaysRecheckTarget(1),
-    pad_0055_0058{},
-    MinRadius(0.0f),
-    MaxRadius(0.0f),
-    MaximumBeamLength(0.0f),
-    EffectiveRadius(-1.0f),
-    MaxHeightDiff(std::numeric_limits<float>::infinity()),
-    TrackingRadius(1.0f),
-    HeadingArcCenter(0.0f),
-    HeadingArcRange(180.0f),
-    FiringTolerance(0.01f),
-    FiringRandomness(0.0f),
-    RequiresEnergy(0.0f),
-    RequiresMass(0.0f),
-    MuzzleVelocity(0.0f),
-    MuzzleVelocityRandom(0.0f),
-    MuzzleVelocityReduceDistance(0.0f),
-    LeadTarget(1),
-    pad_0095_0098{},
-    ProjectileLifetime(0.0f),
-    ProjectileLifetimeUsesMultiplier(0.0f),
-    Damage(0.0f),
-    DamageRadius(0.0f),
-    DamageType("Normal"),
-    RateOfFire(1.0f),
-    ProjectileId(),
-    BallisticArc(RULEUBA_None),
-    TargetRestrictOnlyAllow(),
-    TargetRestrictDisallow(),
-    ManualFire(0),
-    NukeWeapon(0),
-    OverChargeWeapon(0),
-    NeedPrep(0),
-    CountedProjectile(0),
-    pad_0125_0128{},
-    MaxProjectileStorage(0),
-    IgnoresAlly(1),
-    pad_012D_0130{},
+  RUnitBlueprintWeapon::RUnitBlueprintWeapon()
+    : OwnerBlueprint(nullptr)
+    , WeaponIndex(static_cast<std::uint32_t>(-1))
+    , Label()
+    , DisplayName()
+    , RangeCategory(UWRC_Undefined)
+    , DummyWeapon(0)
+    , PrefersPrimaryWeaponTarget(0)
+    , StopOnPrimaryWeaponBusy(0)
+    , SlavedToBody(0)
+    , SlavedToBodyArcRange(1.0f)
+    , AutoInitiateAttackCommand(0)
+    , pad_004D_0050{}
+    , TargetCheckInterval(3.0f)
+    , AlwaysRecheckTarget(1)
+    , pad_0055_0058{}
+    , MinRadius(0.0f)
+    , MaxRadius(0.0f)
+    , MaximumBeamLength(0.0f)
+    , EffectiveRadius(-1.0f)
+    , MaxHeightDiff(std::numeric_limits<float>::infinity())
+    , TrackingRadius(1.0f)
+    , HeadingArcCenter(0.0f)
+    , HeadingArcRange(180.0f)
+    , FiringTolerance(0.01f)
+    , FiringRandomness(0.0f)
+    , RequiresEnergy(0.0f)
+    , RequiresMass(0.0f)
+    , MuzzleVelocity(0.0f)
+    , MuzzleVelocityRandom(0.0f)
+    , MuzzleVelocityReduceDistance(0.0f)
+    , LeadTarget(1)
+    , pad_0095_0098{}
+    , ProjectileLifetime(0.0f)
+    , ProjectileLifetimeUsesMultiplier(0.0f)
+    , Damage(0.0f)
+    , DamageRadius(0.0f)
+    , DamageType("Normal")
+    , RateOfFire(1.0f)
+    , ProjectileId()
+    , BallisticArc(RULEUBA_None)
+    , TargetRestrictOnlyAllow()
+    , TargetRestrictDisallow()
+    , ManualFire(0)
+    , NukeWeapon(0)
+    , OverChargeWeapon(0)
+    , NeedPrep(0)
+    , CountedProjectile(0)
+    , pad_0125_0128{}
+    , MaxProjectileStorage(0)
+    , IgnoresAlly(1)
+    , pad_012D_0130{}
+    ,
     // 0x0051F672 / 0x0051F6C7: TargetType +0x130 = 0 (RULEWTT_Unit), AttackGroundTries +0x134 = 3.
-    TargetType(RULEWTT_Unit),
-    AttackGroundTries(3),
-    AimsStraightOnDisable(0),
-    Turreted(0),
-    YawOnlyOnTarget(0),
-    AboveWaterFireOnly(0),
-    BelowWaterFireOnly(0),
-    AboveWaterTargetsOnly(0),
-    BelowWaterTargetsOnly(0),
-    ReTargetOnMiss(0),
-    NeedToComputeBombDrop(0),
-    pad_0141_0144{},
-    BombDropThreshold(1.5f),
-    UseFiringSolutionInsteadOfAimBone(0),
-    IgnoreIfDisabled(0),
-    CannotAttackGround(0),
-    pad_014B_014C{},
-    UIMinRangeVisualId(),
-    UIMaxRangeVisualId()
+    TargetType(RULEWTT_Unit)
+    , AttackGroundTries(3)
+    , AimsStraightOnDisable(0)
+    , Turreted(0)
+    , YawOnlyOnTarget(0)
+    , AboveWaterFireOnly(0)
+    , BelowWaterFireOnly(0)
+    , AboveWaterTargetsOnly(0)
+    , BelowWaterTargetsOnly(0)
+    , ReTargetOnMiss(0)
+    , NeedToComputeBombDrop(0)
+    , pad_0141_0144{}
+    , BombDropThreshold(1.5f)
+    , UseFiringSolutionInsteadOfAimBone(0)
+    , IgnoreIfDisabled(0)
+    , CannotAttackGround(0)
+    , pad_014B_014C{}
+    , UIMinRangeVisualId()
+    , UIMaxRangeVisualId()
   {}
 
   /**
@@ -1028,7 +1052,10 @@ namespace moho
    * What it does:
    * Stores runtime owner/index metadata after a weapon record is materialized.
    */
-  void RUnitBlueprintWeapon::PostInit(RUnitBlueprint* ownerBlueprint, const std::uint32_t weaponIndex) noexcept
+  void RUnitBlueprintWeapon::PostInit(
+    RUnitBlueprint* ownerBlueprint,
+    const std::uint32_t weaponIndex
+  ) noexcept
   {
     OwnerBlueprint = ownerBlueprint;
     WeaponIndex = weaponIndex;
@@ -1042,8 +1069,10 @@ namespace moho
    * Returns muzzle velocity with optional gaussian jitter and
    * short-range attenuation against `MuzzleVelocityReduceDistance`.
    */
-  float
-  RUnitBlueprintWeapon::GetMuzzleVelocity(const float targetDistance, CRandomStream* const randomStream) const noexcept
+  float RUnitBlueprintWeapon::GetMuzzleVelocity(
+    const float targetDistance,
+    CRandomStream* const randomStream
+  ) const noexcept
   {
     float velocity = MuzzleVelocity;
     if (randomStream != nullptr && MuzzleVelocityRandom != 0.0f) {
@@ -1060,11 +1089,19 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(PreregisterRUnitBlueprintPointerType_5e07bb, moho::PreregisterRUnitBlueprintPointerType)
+GPG_PREREGISTER_INIT(
+  PreregisterRUnitBlueprintPointerType_5e07bb,
+  moho::PreregisterRUnitBlueprintPointerType
+)
 
 namespace moho
 {
-  void RUnitBlueprint::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void RUnitBlueprint::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     RRuleGameRules* rules = nullptr;
     const gpg::RRef owner{};
@@ -1080,7 +1117,10 @@ namespace moho
    * Address: 0x00522BE0 (FUN_00522BE0)
    */
   void RUnitBlueprint::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     archive.WritePointer(mOwner, gpg::TrackedPointerState::Unowned, gpg::RRef{});
@@ -1124,7 +1164,10 @@ namespace
 namespace moho
 {
   void RUnitBlueprintWeapon::MemberConstruct(
-    gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
   )
   {
     RUnitBlueprint* owner = nullptr;
@@ -1139,7 +1182,10 @@ namespace moho
    * Address: 0x00522E60 (FUN_00522E60)
    */
   void RUnitBlueprintWeapon::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     archive.WritePointer(OwnerBlueprint, gpg::TrackedPointerState::Unowned, gpg::RRef{});

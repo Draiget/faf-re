@@ -30,7 +30,10 @@ namespace moho
    * What it does:
    * Base no-op hook for accepted path payload callbacks.
    */
-  void IPathTraveler::OnPathAccepted(const SNavPath&) {}
+  void IPathTraveler::OnPathAccepted(
+    const SNavPath&
+  )
+  {}
 
   /**
    * Address: 0x005A9C70 (FUN_005A9C70, ?Func9@IPathTraveler@Moho@@UAEXXZ)
@@ -54,5 +57,8 @@ namespace moho
    * What it does:
    * Base no-op hook for rejected path payload callbacks.
    */
-  void IPathTraveler::OnPathRejected(const SNavPath&) {}
+  void IPathTraveler::OnPathRejected(
+    const SNavPath&
+  )
+  {}
 } // namespace moho

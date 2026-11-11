@@ -8,7 +8,8 @@
 #include "moho/ai/EAiAttackerEvent.h"
 #include "moho/misc/Listener.h"
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/ECommandEvent.h"
+#include "moho/unit/ECommandEvent.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -83,7 +84,9 @@ namespace moho
    * What it does:
    * Registers `CCommandTask` as the primary reflection base.
    */
-  void CUnitAttackTargetTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void CUnitAttackTargetTaskTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -95,9 +98,13 @@ namespace moho
    * Registers `Listener<EAiAttackerEvent>` as the secondary reflection base at
    * offset `0x34`.
    */
-  void CUnitAttackTargetTaskTypeInfo::AddBase_Listener_EAiAttackerEvent(gpg::RType* const typeInfo)
+  void CUnitAttackTargetTaskTypeInfo::AddBase_Listener_EAiAttackerEvent(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::AddReflectedBase<moho::Listener<moho::EAiAttackerEvent>>(typeInfo, gpg::BaseSubobjectOffset<CUnitAttackTargetTask, Listener<EAiAttackerEvent>>());
+    gpg::AddReflectedBase<moho::Listener<moho::EAiAttackerEvent>>(
+      typeInfo, gpg::BaseSubobjectOffset<CUnitAttackTargetTask, Listener<EAiAttackerEvent>>()
+    );
   }
 
   /**
@@ -107,9 +114,13 @@ namespace moho
    * Registers `Listener<ECommandEvent>` as the secondary reflection base at
    * offset `0x44`.
    */
-  void CUnitAttackTargetTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
+  void CUnitAttackTargetTaskTypeInfo::AddBase_Listener_ECommandEvent(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(typeInfo, gpg::BaseSubobjectOffset<CUnitAttackTargetTask, Listener<ECommandEvent>>());
+    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(
+      typeInfo, gpg::BaseSubobjectOffset<CUnitAttackTargetTask, Listener<ECommandEvent>>()
+    );
   }
 
   /**
@@ -132,7 +143,9 @@ namespace moho
    * Placement-constructs one `CUnitAttackTargetTask` in caller-provided
    * storage and returns typed reflection reference for it.
    */
-  gpg::RRef CUnitAttackTargetTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitAttackTargetTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = gpg::ConstructInStorage<CUnitAttackTargetTask>(objectStorage);
     return gpg::RRef{task, gpg::RTypeOf<moho::CUnitAttackTargetTask>()};
@@ -144,7 +157,9 @@ namespace moho
    * What it does:
    * Deletes one heap-owned `CUnitAttackTargetTask`.
    */
-  void CUnitAttackTargetTaskTypeInfo::Delete(void* const objectStorage)
+  void CUnitAttackTargetTaskTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitAttackTargetTask*>(objectStorage);
   }
@@ -156,7 +171,9 @@ namespace moho
    * Runs in-place destructor for one `CUnitAttackTargetTask` without
    * deallocating storage.
    */
-  void CUnitAttackTargetTaskTypeInfo::Destruct(void* const objectStorage)
+  void CUnitAttackTargetTaskTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CUnitAttackTargetTask*>(objectStorage);
     if (!task) {
@@ -175,7 +192,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitAttackTargetTaskTypeInfo_83cf44, moho::register_CUnitAttackTargetTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitAttackTargetTaskTypeInfo_83cf44,
+  moho::register_CUnitAttackTargetTaskTypeInfo
+)

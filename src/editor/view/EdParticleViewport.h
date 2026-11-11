@@ -22,9 +22,18 @@ namespace faf::editor
      * the last one's particles live out their lives beyond this view's far plane (2000 past the effect).
      */
     static constexpr float kPlaceY = 0.0f;
-    [[nodiscard]] float PlaceX() const noexcept { return -6000.0f - 3000.0f * static_cast<float>(mSpot); }
-    [[nodiscard]] float PlaceZ() const noexcept { return -6000.0f; }
-    void NextSpot() noexcept { mSpot = (mSpot + 1) % 8; }
+    [[nodiscard]] float PlaceX() const noexcept
+    {
+      return -6000.0f - 3000.0f * static_cast<float>(mSpot);
+    }
+    [[nodiscard]] float PlaceZ() const noexcept
+    {
+      return -6000.0f;
+    }
+    void NextSpot() noexcept
+    {
+      mSpot = (mSpot + 1) % 8;
+    }
 
     struct Options
     {
@@ -34,7 +43,10 @@ namespace faf::editor
       float height = 0.0f; // the emitter above the ground
       bool turn = false;   // the camera turns slowly round the effect
     };
-    [[nodiscard]] Options& Opts() noexcept { return mOptions; }
+    [[nodiscard]] Options& Opts() noexcept
+    {
+      return mOptions;
+    }
 
     /** The size the panels show it at; the target follows it. */
     void SetSize(int width, int height);
@@ -48,9 +60,15 @@ namespace faf::editor
     /** Renders it (the engine's frame hook, head 0 only; the caller restores the head's target). */
     void Render(int headWidth, int headHeight, float frameSeconds);
     /** The image for ImGui::Image (0 before the first render). */
-    [[nodiscard]] std::uint64_t Image() const noexcept { return mImage; }
+    [[nodiscard]] std::uint64_t Image() const noexcept
+    {
+      return mImage;
+    }
     /** Shown this frame: rendered only while some panel draws it. */
-    void MarkShown() noexcept { mShown = true; }
+    void MarkShown() noexcept
+    {
+      mShown = true;
+    }
 
   private:
     Options mOptions;

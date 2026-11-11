@@ -100,51 +100,57 @@ namespace moho
      */
     ~SSTICommandIssueData();
 
-    int32_t nextCommandId;                             // +0x00
-    int32_t unk04;                                     // +0x04
-    int32_t mIndex;                                    // +0x08
-    EUnitCommandType mCommandType;                     // +0x0C (serialized as 1 byte in marshaller stream)
-    SSTITarget mTarget;                                // +0x10
-    SSTITarget mTarget2;                               // +0x24
-    int32_t unk38;                                     // +0x38
-    Wm3::Quatf mOri;                                   // +0x3C
-    float unk4C;                                       // +0x4C
-    RUnitBlueprint* mBlueprint;                        // +0x50
-    int32_t unk54;                                     // +0x54
-    gpg::core::FastVectorN<SOCellPos, 2> mCells;       // +0x58..+0x70
-    int32_t unk70;                                     // +0x70
-    int32_t unk74;                                     // +0x74
-    LuaPlus::LuaObject mObject;                        // +0x78
-    lua_State* mLuaState;                              // +0x8C
-    CUnitCommand* mUnitCommand;                        // +0x90
-    CUnitCommandQueue* mCommandQueue;                  // +0x94
+    int32_t nextCommandId;                       // +0x00
+    int32_t unk04;                               // +0x04
+    int32_t mIndex;                              // +0x08
+    EUnitCommandType mCommandType;               // +0x0C (serialized as 1 byte in marshaller stream)
+    SSTITarget mTarget;                          // +0x10
+    SSTITarget mTarget2;                         // +0x24
+    int32_t unk38;                               // +0x38
+    Wm3::Quatf mOri;                             // +0x3C
+    float unk4C;                                 // +0x4C
+    RUnitBlueprint* mBlueprint;                  // +0x50
+    int32_t unk54;                               // +0x54
+    gpg::core::FastVectorN<SOCellPos, 2> mCells; // +0x58..+0x70
+    int32_t unk70;                               // +0x70
+    int32_t unk74;                               // +0x74
+    LuaPlus::LuaObject mObject;                  // +0x78
+    lua_State* mLuaState;                        // +0x8C
+    CUnitCommand* mUnitCommand;                  // +0x90
+    CUnitCommandQueue* mCommandQueue;            // +0x94
   };
 
   static_assert(
-    offsetof(SSTICommandIssueData, nextCommandId) == 0x00, "SSTICommandIssueData::nextCommandId offset must be 0x00"
+    offsetof(SSTICommandIssueData, nextCommandId) == 0x00,
+    "SSTICommandIssueData::nextCommandId offset must be 0x00"
   );
   static_assert(offsetof(SSTICommandIssueData, mIndex) == 0x08, "SSTICommandIssueData::mIndex offset must be 0x08");
   static_assert(
-    offsetof(SSTICommandIssueData, mCommandType) == 0x0C, "SSTICommandIssueData::mCommandType offset must be 0x0C"
+    offsetof(SSTICommandIssueData, mCommandType) == 0x0C,
+    "SSTICommandIssueData::mCommandType offset must be 0x0C"
   );
   static_assert(offsetof(SSTICommandIssueData, mTarget) == 0x10, "SSTICommandIssueData::mTarget offset must be 0x10");
   static_assert(offsetof(SSTICommandIssueData, mTarget2) == 0x24, "SSTICommandIssueData::mTarget2 offset must be 0x24");
   static_assert(offsetof(SSTICommandIssueData, mOri) == 0x3C, "SSTICommandIssueData::mOri offset must be 0x3C");
   static_assert(
-    offsetof(SSTICommandIssueData, mBlueprint) == 0x50, "SSTICommandIssueData::mBlueprint offset must be 0x50"
+    offsetof(SSTICommandIssueData, mBlueprint) == 0x50,
+    "SSTICommandIssueData::mBlueprint offset must be 0x50"
   );
   static_assert(offsetof(SSTICommandIssueData, mCells) == 0x58, "SSTICommandIssueData::mCells offset must be 0x58");
   static_assert(offsetof(SSTICommandIssueData, unk70) == 0x70, "SSTICommandIssueData::unk70 offset must be 0x70");
   static_assert(offsetof(SSTICommandIssueData, unk74) == 0x74, "SSTICommandIssueData::unk74 offset must be 0x74");
   static_assert(offsetof(SSTICommandIssueData, mObject) == 0x78, "SSTICommandIssueData::mObject offset must be 0x78");
   static_assert(
-    offsetof(SSTICommandIssueData, mLuaState) == 0x8C, "SSTICommandIssueData::mLuaState offset must be 0x8C"
+    offsetof(SSTICommandIssueData, mLuaState) == 0x8C,
+    "SSTICommandIssueData::mLuaState offset must be 0x8C"
   );
   static_assert(
-    offsetof(SSTICommandIssueData, mUnitCommand) == 0x90, "SSTICommandIssueData::mUnitCommand offset must be 0x90"
+    offsetof(SSTICommandIssueData, mUnitCommand) == 0x90,
+    "SSTICommandIssueData::mUnitCommand offset must be 0x90"
   );
   static_assert(
-    offsetof(SSTICommandIssueData, mCommandQueue) == 0x94, "SSTICommandIssueData::mCommandQueue offset must be 0x94"
+    offsetof(SSTICommandIssueData, mCommandQueue) == 0x94,
+    "SSTICommandIssueData::mCommandQueue offset must be 0x94"
   );
   static_assert(sizeof(SSTICommandIssueData) == 0x98, "SSTICommandIssueData size must be 0x98");
 } // namespace moho

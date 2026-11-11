@@ -20,13 +20,19 @@ namespace moho
   /**
    * Address: 0x005DE8D0 (FUN_005DE8D0, sub_5DE8D0)
    */
-  void IAiAttacker::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef&)
+  void IAiAttacker::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    const int,
+    const gpg::RRef&
+  )
   {
     if (!archive) {
       return;
     }
 
-    void* const broadcasterLane = (static_cast<const void*>(this) != nullptr) ? static_cast<void*>(static_cast<Broadcaster<EAiAttackerEvent>*>(this)) : nullptr;
+    void* const broadcasterLane = (static_cast<const void*>(this) != nullptr)
+      ? static_cast<void*>(static_cast<Broadcaster<EAiAttackerEvent>*>(this))
+      : nullptr;
     gpg::RType* const broadcasterType = gpg::RTypeOf<Broadcaster<EAiAttackerEvent>>();
     GPG_ASSERT(broadcasterType != nullptr);
     const gpg::RRef ownerRef{};
@@ -36,13 +42,19 @@ namespace moho
   /**
    * Address: 0x005DE920 (FUN_005DE920, sub_5DE920)
    */
-  void IAiAttacker::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef&) const
+  void IAiAttacker::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    const int,
+    const gpg::RRef&
+  ) const
   {
     if (!archive) {
       return;
     }
 
-    const void* const broadcasterLane = (static_cast<const void*>(this) != nullptr) ? static_cast<const void*>(static_cast<const Broadcaster<EAiAttackerEvent>*>(this)) : nullptr;
+    const void* const broadcasterLane = (static_cast<const void*>(this) != nullptr)
+      ? static_cast<const void*>(static_cast<const Broadcaster<EAiAttackerEvent>*>(this))
+      : nullptr;
     gpg::RType* const broadcasterType = gpg::RTypeOf<Broadcaster<EAiAttackerEvent>>();
     GPG_ASSERT(broadcasterType != nullptr);
     const gpg::RRef ownerRef{};

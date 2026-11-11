@@ -14,35 +14,57 @@ namespace faf::editor
 
     // ---- Images and pixels ----
 
-    float Luminance(const float (&c)[4])
+    float Luminance(
+      const float (&c)[4]
+    )
     {
       return c[0] * 0.2126f + c[1] * 0.7152f + c[2] * 0.0722f;
     }
 
-    float Clamp01(const float v)
+    float Clamp01(
+      const float v
+    )
     {
       return std::min(std::max(v, 0.0f), 1.0f);
     }
 
-    float Lerp(const float a, const float b, const float t)
+    float Lerp(
+      const float a,
+      const float b,
+      const float t
+    )
     {
       return a + (b - a) * t;
     }
 
-    float Smoothstep(const float edge0, const float edge1, const float x)
+    float Smoothstep(
+      const float edge0,
+      const float edge1,
+      const float x
+    )
     {
       const float t = Clamp01((x - edge0) / std::max(edge1 - edge0, 1e-6f));
       return t * t * (3.0f - 2.0f * t);
     }
 
-    int Wrap(const int i, const int n)
+    int Wrap(
+      const int i,
+      const int n
+    )
     {
       const int m = i % n;
       return m < 0 ? m + n : m;
     }
 
-    /** The image's RGBA at pixel (x, y) of a `size` image: its own pixel at the same size, else sampled at the centre. */
-    void Fetch(const TexImage& image, const int x, const int y, const int size, float (&out)[4])
+    /** The image's RGBA at pixel (x, y) of a `size` image: its own pixel at the same size, else sampled at the centre.
+     */
+    void Fetch(
+      const TexImage& image,
+      const int x,
+      const int y,
+      const int size,
+      float (&out)[4]
+    )
     {
       if (image.size == size) {
         const float* p = image.Pixel(x, y);
@@ -57,10 +79,19 @@ namespace faf::editor
         }
         return;
       }
-      image.Sample((static_cast<float>(x) + 0.5f) / static_cast<float>(size), (static_cast<float>(y) + 0.5f) / static_cast<float>(size), out);
+      image.Sample(
+        (static_cast<float>(x) + 0.5f) / static_cast<float>(size),
+        (static_cast<float>(y) + 0.5f) / static_cast<float>(size),
+        out
+      );
     }
 
-    float FetchGrey(const TexImage& image, const int x, const int y, const int size)
+    float FetchGrey(
+      const TexImage& image,
+      const int x,
+      const int y,
+      const int size
+    )
     {
       if (image.size == size && image.channels == 1) {
         return image.Pixel(x, y)[0];
@@ -71,7 +102,11 @@ namespace faf::editor
     }
 
     /** Runs fn(y) for every row, on the machine's cores for big images. */
-    template <class Fn> void ForRows(const int size, const Fn& fn)
+    template <class Fn>
+    void ForRows(
+      const int size,
+      const Fn& fn
+    )
     {
       const int threads = size >= 128 ? static_cast<int>(std::clamp(std::thread::hardware_concurrency(), 1U, 16U)) : 1;
       if (threads <= 1) {
@@ -96,7 +131,11 @@ namespace faf::editor
 
     // ---- Tiling noise ----
 
-    std::uint32_t Hash(std::uint32_t x, std::uint32_t y, std::uint32_t seed)
+    std::uint32_t Hash(
+      std::uint32_t x,
+      std::uint32_t y,
+      std::uint32_t seed
+    )
     {
       std::uint32_t h = x * 0x8DA6B343U ^ y * 0xD8163841U ^ seed * 0xCB1AB31FU;
       h ^= h >> 16;
@@ -107,18 +146,30 @@ namespace faf::editor
       return h;
     }
 
-    float HashFloat(const int x, const int y, const std::uint32_t seed)
+    float HashFloat(
+      const int x,
+      const int y,
+      const std::uint32_t seed
+    )
     {
-      return static_cast<float>(Hash(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y), seed) >> 8) / 16777216.0f;
+      return static_cast<float>(Hash(static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y), seed) >> 8) /
+        16777216.0f;
     }
 
-    float Fade(const float t)
+    float Fade(
+      const float t
+    )
     {
       return t * t * t * (t * (t * 6.0f - 15.0f) + 10.0f);
     }
 
     /** Gradient noise with `period` cells across the image, about -1 to 1, wrapping at the period. */
-    float Perlin(const float x, const float y, const int period, const std::uint32_t seed)
+    float Perlin(
+      const float x,
+      const float y,
+      const int period,
+      const std::uint32_t seed
+    )
     {
       const int x0 = static_cast<int>(std::floor(x));
       const int y0 = static_cast<int>(std::floor(y));
@@ -137,8 +188,18 @@ namespace faf::editor
       return Lerp(Lerp(n00, n10, u), Lerp(n01, n11, u), v) * 1.41421356f;
     }
 
-    /** Cells with one jittered point each, `period` across, wrapping: the nearest and second nearest distances and the cell. */
-    void Cells(const float x, const float y, const int period, const float jitter, const std::uint32_t seed, float& f1, float& f2, float& cell)
+    /** Cells with one jittered point each, `period` across, wrapping: the nearest and second nearest distances and the
+     * cell. */
+    void Cells(
+      const float x,
+      const float y,
+      const int period,
+      const float jitter,
+      const std::uint32_t seed,
+      float& f1,
+      float& f2,
+      float& cell
+    )
     {
       const int cx = static_cast<int>(std::floor(x));
       const int cy = static_cast<int>(std::floor(y));
@@ -176,11 +237,34 @@ namespace faf::editor
       const std::function<std::shared_ptr<TexImage>(const std::string&)>& texture;
       const TerrainSource* terrain;
 
-      [[nodiscard]] float F(const std::size_t param) const { return node.params[param].value[0]; }
-      [[nodiscard]] int I(const std::size_t param) const { return static_cast<int>(std::lround(node.params[param].value[0])); }
-      [[nodiscard]] const std::array<float, 4>& C(const std::size_t param) const { return node.params[param].value; }
-      [[nodiscard]] const TexImage& In(const std::size_t pin) const { return *inputs[pin]; }
-      [[nodiscard]] TexImage& Out(const std::size_t pin, const int channels) const
+      [[nodiscard]] float F(
+        const std::size_t param
+      ) const
+      {
+        return node.params[param].value[0];
+      }
+      [[nodiscard]] int I(
+        const std::size_t param
+      ) const
+      {
+        return static_cast<int>(std::lround(node.params[param].value[0]));
+      }
+      [[nodiscard]] const std::array<float, 4>& C(
+        const std::size_t param
+      ) const
+      {
+        return node.params[param].value;
+      }
+      [[nodiscard]] const TexImage& In(
+        const std::size_t pin
+      ) const
+      {
+        return *inputs[pin];
+      }
+      [[nodiscard]] TexImage& Out(
+        const std::size_t pin,
+        const int channels
+      ) const
       {
         outputs[pin]->Reset(size, channels);
         return *outputs[pin];
@@ -194,17 +278,33 @@ namespace faf::editor
       std::map<std::string, EvalFn> eval;
     };
 
-    PinDef In(const char* name, const PinType type, const float a = 0.0f, const float b = 0.0f, const float c = 0.0f, const float d = 1.0f)
+    PinDef In(
+      const char* name,
+      const PinType type,
+      const float a = 0.0f,
+      const float b = 0.0f,
+      const float c = 0.0f,
+      const float d = 1.0f
+    )
     {
       return PinDef{name, type, {a, b, c, d}};
     }
 
-    PinDef Out(const char* name, const PinType type)
+    PinDef Out(
+      const char* name,
+      const PinType type
+    )
     {
       return PinDef{name, type, {}};
     }
 
-    ParamDef Num(const char* name, const float initial, const float min, const float max, const char* help = "")
+    ParamDef Num(
+      const char* name,
+      const float initial,
+      const float min,
+      const float max,
+      const char* help = ""
+    )
     {
       ParamDef def;
       def.name = name;
@@ -216,14 +316,26 @@ namespace faf::editor
       return def;
     }
 
-    ParamDef Int(const char* name, const int initial, const int min, const int max, const char* help = "")
+    ParamDef Int(
+      const char* name,
+      const int initial,
+      const int min,
+      const int max,
+      const char* help = ""
+    )
     {
       ParamDef def = Num(name, static_cast<float>(initial), static_cast<float>(min), static_cast<float>(max), help);
       def.kind = ParamKind::Int;
       return def;
     }
 
-    ParamDef Col(const char* name, const float r, const float g, const float b, const float a = 1.0f)
+    ParamDef Col(
+      const char* name,
+      const float r,
+      const float g,
+      const float b,
+      const float a = 1.0f
+    )
     {
       ParamDef def;
       def.name = name;
@@ -232,7 +344,11 @@ namespace faf::editor
       return def;
     }
 
-    ParamDef Choice(const char* name, std::vector<std::string> choices, const int initial = 0)
+    ParamDef Choice(
+      const char* name,
+      std::vector<std::string> choices,
+      const int initial = 0
+    )
     {
       ParamDef def;
       def.name = name;
@@ -242,7 +358,10 @@ namespace faf::editor
       return def;
     }
 
-    ParamDef Bool(const char* name, const bool initial)
+    ParamDef Bool(
+      const char* name,
+      const bool initial
+    )
     {
       ParamDef def;
       def.name = name;
@@ -251,7 +370,11 @@ namespace faf::editor
       return def;
     }
 
-    ParamDef Text(const char* name, const char* initial, const char* help = "")
+    ParamDef Text(
+      const char* name,
+      const char* initial,
+      const char* help = ""
+    )
     {
       ParamDef def;
       def.name = name;
@@ -262,7 +385,10 @@ namespace faf::editor
     }
 
     /** A colour node of two inputs computed per channel. */
-    template <class Op> EvalFn PerChannel2(Op op)
+    template <class Op>
+    EvalFn PerChannel2(
+      Op op
+    )
     {
       return [op](const EvalArgs& a) {
         TexImage& out = a.Out(0, 4);
@@ -282,7 +408,11 @@ namespace faf::editor
     }
 
     /** A colour node of one input computed per channel (alpha kept unless `alphaToo`). */
-    template <class Op> EvalFn PerChannel1(Op op, const bool alphaToo = false)
+    template <class Op>
+    EvalFn PerChannel1(
+      Op op,
+      const bool alphaToo = false
+    )
     {
       return [op, alphaToo](const EvalArgs& a) {
         TexImage& out = a.Out(0, 4);
@@ -299,23 +429,44 @@ namespace faf::editor
       };
     }
 
-    float BlendChannel(const int mode, const float a, const float b)
+    float BlendChannel(
+      const int mode,
+      const float a,
+      const float b
+    )
     {
       switch (mode) {
-      case 1: return a * b;                                                                         // multiply
-      case 2: return 1.0f - (1.0f - a) * (1.0f - b);                                                // screen
-      case 3: return a < 0.5f ? 2.0f * a * b : 1.0f - 2.0f * (1.0f - a) * (1.0f - b);               // overlay
-      case 4: return (1.0f - 2.0f * b) * a * a + 2.0f * b * a;                                      // soft light
-      case 5: return a + b;                                                                         // add
-      case 6: return a - b;                                                                         // subtract
-      case 7: return std::fabs(a - b);                                                              // difference
-      case 8: return std::min(a, b);                                                                // darken
-      case 9: return std::max(a, b);                                                                // lighten
-      default: return b;                                                                            // normal
+      case 1:
+        return a * b; // multiply
+      case 2:
+        return 1.0f - (1.0f - a) * (1.0f - b); // screen
+      case 3:
+        return a < 0.5f ? 2.0f * a * b : 1.0f - 2.0f * (1.0f - a) * (1.0f - b); // overlay
+      case 4:
+        return (1.0f - 2.0f * b) * a * a + 2.0f * b * a; // soft light
+      case 5:
+        return a + b; // add
+      case 6:
+        return a - b; // subtract
+      case 7:
+        return std::fabs(a - b); // difference
+      case 8:
+        return std::min(a, b); // darken
+      case 9:
+        return std::max(a, b); // lighten
+      default:
+        return b; // normal
       }
     }
 
-    void RgbToHsv(const float r, const float g, const float b, float& h, float& s, float& v)
+    void RgbToHsv(
+      const float r,
+      const float g,
+      const float b,
+      float& h,
+      float& s,
+      float& v
+    )
     {
       const float mx = std::max({r, g, b});
       const float mn = std::min({r, g, b});
@@ -333,7 +484,14 @@ namespace faf::editor
       }
     }
 
-    void HsvToRgb(float h, const float s, const float v, float& r, float& g, float& b)
+    void HsvToRgb(
+      float h,
+      const float s,
+      const float v,
+      float& r,
+      float& g,
+      float& b
+    )
     {
       h = h - std::floor(h);
       const float i = std::floor(h * 6.0f);
@@ -342,672 +500,963 @@ namespace faf::editor
       const float q = v * (1.0f - s * f);
       const float t = v * (1.0f - s * (1.0f - f));
       switch (static_cast<int>(i) % 6) {
-      case 0: r = v, g = t, b = p; break;
-      case 1: r = q, g = v, b = p; break;
-      case 2: r = p, g = v, b = t; break;
-      case 3: r = p, g = q, b = v; break;
-      case 4: r = t, g = p, b = v; break;
-      default: r = v, g = p, b = q; break;
+      case 0:
+        r = v, g = t, b = p;
+        break;
+      case 1:
+        r = q, g = v, b = p;
+        break;
+      case 2:
+        r = p, g = v, b = t;
+        break;
+      case 3:
+        r = p, g = q, b = v;
+        break;
+      case 4:
+        r = t, g = p, b = v;
+        break;
+      default:
+        r = v, g = p, b = q;
+        break;
       }
     }
 
-    void AddNoiseNodes(TextureNodes& nodes)
+    void AddNoiseNodes(
+      TextureNodes& nodes
+    )
     {
       const auto add = [&](NodeType type, EvalFn fn) {
         nodes.eval[type.name] = std::move(fn);
         nodes.registry.Add(std::move(type));
       };
 
-      add({"Noise", "Noise", "Noise", "Gradient (Perlin) noise that tiles: Scale cells across, Octaves layers of finer detail.",
-           {},
-           {Out("Out", PinType::Grey)},
-           {Int("Scale", 4, 1, 64, "Cells across the image (a whole number, so it tiles)"), Int("Octaves", 5, 1, 10),
-            Num("Persistence", 0.5f, 0.0f, 1.0f, "How much each finer octave adds"), Choice("Style", {"Smooth", "Ridged", "Billow", "Turbulence"}),
-            Int("Seed", 0, 0, 9999)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 1);
-            const int scale = std::max(a.I(0), 1);
-            const int octaves = std::clamp(a.I(1), 1, 10);
-            const float persistence = a.F(2);
-            const int style = a.I(3);
-            const auto seed = static_cast<std::uint32_t>(a.I(4));
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size);
-                const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size);
-                float sum = 0.0f;
-                float amplitude = 1.0f;
-                float total = 0.0f;
-                int period = scale;
-                for (int o = 0; o < octaves; ++o) {
-                  float n = Perlin(u * static_cast<float>(period), v * static_cast<float>(period), period, seed + static_cast<std::uint32_t>(o) * 31U);
-                  if (style == 1) {
-                    n = 1.0f - std::fabs(n);
-                    n = n * n * 2.0f - 1.0f;
-                  } else if (style == 2) {
-                    n = std::fabs(n) * 2.0f - 1.0f;
-                  } else if (style == 3) {
-                    n = std::fabs(n);
-                  }
-                  sum += n * amplitude;
-                  total += amplitude;
-                  amplitude *= persistence;
-                  period *= 2;
-                }
-                sum /= std::max(total, 1e-6f);
-                out.Pixel(x, y)[0] = style == 3 ? Clamp01(sum) : Clamp01(sum * 0.5f + 0.5f);
+      add(
+        {"Noise",
+         "Noise",
+         "Noise",
+         "Gradient (Perlin) noise that tiles: Scale cells across, Octaves layers of finer detail.",
+         {},
+         {Out("Out", PinType::Grey)},
+         {Int("Scale", 4, 1, 64, "Cells across the image (a whole number, so it tiles)"),
+          Int("Octaves", 5, 1, 10),
+          Num("Persistence", 0.5f, 0.0f, 1.0f, "How much each finer octave adds"),
+          Choice("Style", {"Smooth", "Ridged", "Billow", "Turbulence"}),
+          Int("Seed", 0, 0, 9999)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 1);
+        const int scale = std::max(a.I(0), 1);
+        const int octaves = std::clamp(a.I(1), 1, 10);
+        const float persistence = a.F(2);
+        const int style = a.I(3);
+        const auto seed = static_cast<std::uint32_t>(a.I(4));
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size);
+            const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size);
+            float sum = 0.0f;
+            float amplitude = 1.0f;
+            float total = 0.0f;
+            int period = scale;
+            for (int o = 0; o < octaves; ++o) {
+              float n = Perlin(
+                u * static_cast<float>(period),
+                v * static_cast<float>(period),
+                period,
+                seed + static_cast<std::uint32_t>(o) * 31U
+              );
+              if (style == 1) {
+                n = 1.0f - std::fabs(n);
+                n = n * n * 2.0f - 1.0f;
+              } else if (style == 2) {
+                n = std::fabs(n) * 2.0f - 1.0f;
+              } else if (style == 3) {
+                n = std::fabs(n);
               }
-            });
-          });
+              sum += n * amplitude;
+              total += amplitude;
+              amplitude *= persistence;
+              period *= 2;
+            }
+            sum /= std::max(total, 1e-6f);
+            out.Pixel(x, y)[0] = style == 3 ? Clamp01(sum) : Clamp01(sum * 0.5f + 0.5f);
+          }
+        });
+      }
+      );
 
-      add({"Cells", "Cells", "Noise", "Cell (Voronoi) noise that tiles: stones, cracks, scales.",
-           {},
-           {Out("Distance", PinType::Grey), Out("Edges", PinType::Grey), Out("Cell", PinType::Grey)},
-           {Int("Scale", 8, 1, 64, "Cells across the image"), Num("Jitter", 1.0f, 0.0f, 1.0f, "0: a grid, 1: random"), Int("Seed", 0, 0, 9999)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& distance = a.Out(0, 1);
-            TexImage& edges = a.Out(1, 1);
-            TexImage& cellOut = a.Out(2, 1);
-            const int scale = std::max(a.I(0), 1);
-            const float jitter = a.F(1);
-            const auto seed = static_cast<std::uint32_t>(a.I(2));
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(scale);
-                const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(scale);
-                float f1 = 0.0f;
-                float f2 = 0.0f;
-                float cell = 0.0f;
-                Cells(u, v, scale, jitter, seed, f1, f2, cell);
-                distance.Pixel(x, y)[0] = Clamp01(f1);
-                edges.Pixel(x, y)[0] = Clamp01((f2 - f1) * 2.0f);
-                cellOut.Pixel(x, y)[0] = cell;
-              }
-            });
-          });
+      add(
+        {"Cells",
+         "Cells",
+         "Noise",
+         "Cell (Voronoi) noise that tiles: stones, cracks, scales.",
+         {},
+         {Out("Distance", PinType::Grey), Out("Edges", PinType::Grey), Out("Cell", PinType::Grey)},
+         {Int("Scale", 8, 1, 64, "Cells across the image"),
+          Num("Jitter", 1.0f, 0.0f, 1.0f, "0: a grid, 1: random"),
+          Int("Seed", 0, 0, 9999)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& distance = a.Out(0, 1);
+        TexImage& edges = a.Out(1, 1);
+        TexImage& cellOut = a.Out(2, 1);
+        const int scale = std::max(a.I(0), 1);
+        const float jitter = a.F(1);
+        const auto seed = static_cast<std::uint32_t>(a.I(2));
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(scale);
+            const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(scale);
+            float f1 = 0.0f;
+            float f2 = 0.0f;
+            float cell = 0.0f;
+            Cells(u, v, scale, jitter, seed, f1, f2, cell);
+            distance.Pixel(x, y)[0] = Clamp01(f1);
+            edges.Pixel(x, y)[0] = Clamp01((f2 - f1) * 2.0f);
+            cellOut.Pixel(x, y)[0] = cell;
+          }
+        });
+      }
+      );
 
-      add({"WhiteNoise", "White Noise", "Noise", "A random value per pixel block (Scale blocks across).",
-           {},
-           {Out("Out", PinType::Grey)},
-           {Int("Scale", 256, 1, 2048), Int("Seed", 0, 0, 9999)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 1);
-            const int scale = std::max(a.I(0), 1);
-            const auto seed = static_cast<std::uint32_t>(a.I(1));
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                out.Pixel(x, y)[0] = HashFloat(x * scale / a.size, y * scale / a.size, seed);
-              }
-            });
-          });
+      add(
+        {"WhiteNoise",
+         "White Noise",
+         "Noise",
+         "A random value per pixel block (Scale blocks across).",
+         {},
+         {Out("Out", PinType::Grey)},
+         {Int("Scale", 256, 1, 2048), Int("Seed", 0, 0, 9999)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 1);
+        const int scale = std::max(a.I(0), 1);
+        const auto seed = static_cast<std::uint32_t>(a.I(1));
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            out.Pixel(x, y)[0] = HashFloat(x * scale / a.size, y * scale / a.size, seed);
+          }
+        });
+      }
+      );
 
-      add({"Gradient", "Gradient", "Noise", "A ramp from 0 to 1: along U, along V, or out from the centre (doesn't tile).",
-           {},
-           {Out("Out", PinType::Grey)},
-           {Choice("Kind", {"Along U", "Along V", "Radial"})},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 1);
-            const int kind = a.I(0);
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size);
-                const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size);
-                out.Pixel(x, y)[0] = kind == 0 ? u : kind == 1 ? v : Clamp01(1.0f - std::hypot(u - 0.5f, v - 0.5f) * 2.0f);
-              }
-            });
-          });
+      add(
+        {"Gradient",
+         "Gradient",
+         "Noise",
+         "A ramp from 0 to 1: along U, along V, or out from the centre (doesn't tile).",
+         {},
+         {Out("Out", PinType::Grey)},
+         {Choice("Kind", {"Along U", "Along V", "Radial"})},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 1);
+        const int kind = a.I(0);
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            const float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size);
+            const float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size);
+            out.Pixel(x, y)[0] = kind == 0 ? u : kind == 1 ? v : Clamp01(1.0f - std::hypot(u - 0.5f, v - 0.5f) * 2.0f);
+          }
+        });
+      }
+      );
     }
 
-    void AddInputNodes(TextureNodes& nodes)
+    void AddInputNodes(
+      TextureNodes& nodes
+    )
     {
       const auto add = [&](NodeType type, EvalFn fn) {
         nodes.eval[type.name] = std::move(fn);
         nodes.registry.Add(std::move(type));
       };
 
-      add({"Constant", "Constant", "Constants", "One grey value.", {}, {Out("Out", PinType::Grey)}, {Num("Value", 0.5f, 0.0f, 1.0f)}, false},
-          [](const EvalArgs& a) {
-            a.outputs[0]->Reset(1, 1, a.F(0));
-          });
-      add({"Color", "Color", "Constants", "One colour.", {}, {Out("Out", PinType::Color)}, {Col("Color", 0.5f, 0.45f, 0.35f)}, false},
-          [](const EvalArgs& a) {
-            a.outputs[0]->Reset(1, 4);
-            for (int c = 0; c < 4; ++c) {
-              a.outputs[0]->data[static_cast<std::size_t>(c)] = a.C(0)[static_cast<std::size_t>(c)];
-            }
-          });
+      add(
+        {"Constant",
+         "Constant",
+         "Constants",
+         "One grey value.",
+         {},
+         {Out("Out", PinType::Grey)},
+         {Num("Value", 0.5f, 0.0f, 1.0f)},
+         false},
+        [](const EvalArgs& a) {
+        a.outputs[0]->Reset(1, 1, a.F(0));
+      }
+      );
+      add(
+        {"Color",
+         "Color",
+         "Constants",
+         "One colour.",
+         {},
+         {Out("Out", PinType::Color)},
+         {Col("Color", 0.5f, 0.45f, 0.35f)},
+         false},
+        [](const EvalArgs& a) {
+        a.outputs[0]->Reset(1, 4);
+        for (int c = 0; c < 4; ++c) {
+          a.outputs[0]->data[static_cast<std::size_t>(c)] = a.C(0)[static_cast<std::size_t>(c)];
+        }
+      }
+      );
 
-      add({"Texture", "Texture Sample", "Textures", "A texture file (any DDS the game data or the map's folder has), repeated Tiling times.",
-           {},
-           {Out("RGBA", PinType::Color), Out("R", PinType::Grey), Out("G", PinType::Grey), Out("B", PinType::Grey), Out("A", PinType::Grey)},
-           {Text("Texture", "/env/evergreen2/layers/eg_grass001_albedo.dds", "The texture's path in the game's files"), Int("Tiling", 1, 1, 32)},
-           false},
-          [](const EvalArgs& a) {
-            const std::shared_ptr<TexImage> source = a.texture(a.node.params[0].text);
-            TexImage& rgba = a.Out(0, 4);
-            TexImage* channel[4] = {&a.Out(1, 1), &a.Out(2, 1), &a.Out(3, 1), &a.Out(4, 1)};
-            if (source == nullptr || source->size == 0) {
-              a.warning = "Can't read " + a.node.params[0].text;
-              return;
+      add(
+        {"Texture",
+         "Texture Sample",
+         "Textures",
+         "A texture file (any DDS the game data or the map's folder has), repeated Tiling times.",
+         {},
+         {Out("RGBA", PinType::Color),
+          Out("R", PinType::Grey),
+          Out("G", PinType::Grey),
+          Out("B", PinType::Grey),
+          Out("A", PinType::Grey)},
+         {Text("Texture", "/env/evergreen2/layers/eg_grass001_albedo.dds", "The texture's path in the game's files"),
+          Int("Tiling", 1, 1, 32)},
+         false},
+        [](const EvalArgs& a) {
+        const std::shared_ptr<TexImage> source = a.texture(a.node.params[0].text);
+        TexImage& rgba = a.Out(0, 4);
+        TexImage* channel[4] = {&a.Out(1, 1), &a.Out(2, 1), &a.Out(3, 1), &a.Out(4, 1)};
+        if (source == nullptr || source->size == 0) {
+          a.warning = "Can't read " + a.node.params[0].text;
+          return;
+        }
+        const float tiling = static_cast<float>(std::max(a.I(1), 1));
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            float c[4];
+            source->Sample(
+              (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) * tiling,
+              (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) * tiling,
+              c
+            );
+            float* p = rgba.Pixel(x, y);
+            for (int i = 0; i < 4; ++i) {
+              p[i] = c[i];
+              channel[i]->Pixel(x, y)[0] = c[i];
             }
-            const float tiling = static_cast<float>(std::max(a.I(1), 1));
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                float c[4];
-                source->Sample((static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) * tiling,
-                               (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) * tiling, c);
-                float* p = rgba.Pixel(x, y);
-                for (int i = 0; i < 4; ++i) {
-                  p[i] = c[i];
-                  channel[i]->Pixel(x, y)[0] = c[i];
-                }
-              }
-            });
-          });
+          }
+        });
+      }
+      );
 
-      add({"TerrainHeight", "Map Height", "Map", "The open map's height, Low to High game units as 0 to 1 (both 0: the map's lowest to highest). "
-                                                  "Covers the whole map, so it doesn't tile: for masks and the upper slot.",
-           {},
-           {Out("Out", PinType::Grey)},
-           {Num("Low", 0.0f, 0.0f, 512.0f), Num("High", 0.0f, 0.0f, 512.0f)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 1);
-            const TerrainSource* t = a.terrain;
-            if (t == nullptr || t->width < 2 || t->height < 2) {
-              a.warning = "No map open";
-              return;
-            }
-            float low = a.F(0);
-            float high = a.F(1);
-            if (low == 0.0f && high == 0.0f) {
-              const auto [mn, mx] = std::minmax_element(t->heights.begin(), t->heights.end());
-              low = *mn;
-              high = *mx;
-            }
-            const float range = std::max(high - low, 1e-3f);
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                const float fx = (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->width - 1);
-                const float fy = (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->height - 1);
-                const int ix = std::min(static_cast<int>(fx), t->width - 2);
-                const int iy = std::min(static_cast<int>(fy), t->height - 2);
-                const float tx = fx - static_cast<float>(ix);
-                const float ty = fy - static_cast<float>(iy);
-                const auto h = [&](const int sx, const int sy) { return t->heights[static_cast<std::size_t>(sy) * t->width + sx]; };
-                const float v = Lerp(Lerp(h(ix, iy), h(ix + 1, iy), tx), Lerp(h(ix, iy + 1), h(ix + 1, iy + 1), tx), ty);
-                out.Pixel(x, y)[0] = Clamp01((v - low) / range);
-              }
-            });
-          });
+      add(
+        {"TerrainHeight",
+         "Map Height",
+         "Map",
+         "The open map's height, Low to High game units as 0 to 1 (both 0: the map's lowest to highest). "
+         "Covers the whole map, so it doesn't tile: for masks and the upper slot.",
+         {},
+         {Out("Out", PinType::Grey)},
+         {Num("Low", 0.0f, 0.0f, 512.0f), Num("High", 0.0f, 0.0f, 512.0f)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 1);
+        const TerrainSource* t = a.terrain;
+        if (t == nullptr || t->width < 2 || t->height < 2) {
+          a.warning = "No map open";
+          return;
+        }
+        float low = a.F(0);
+        float high = a.F(1);
+        if (low == 0.0f && high == 0.0f) {
+          const auto [mn, mx] = std::minmax_element(t->heights.begin(), t->heights.end());
+          low = *mn;
+          high = *mx;
+        }
+        const float range = std::max(high - low, 1e-3f);
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            const float fx =
+              (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->width - 1);
+            const float fy =
+              (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->height - 1);
+            const int ix = std::min(static_cast<int>(fx), t->width - 2);
+            const int iy = std::min(static_cast<int>(fy), t->height - 2);
+            const float tx = fx - static_cast<float>(ix);
+            const float ty = fy - static_cast<float>(iy);
+            const auto h = [&](const int sx, const int sy) {
+              return t->heights[static_cast<std::size_t>(sy) * t->width + sx];
+            };
+            const float v = Lerp(Lerp(h(ix, iy), h(ix + 1, iy), tx), Lerp(h(ix, iy + 1), h(ix + 1, iy + 1), tx), ty);
+            out.Pixel(x, y)[0] = Clamp01((v - low) / range);
+          }
+        });
+      }
+      );
 
-      add({"TerrainMask", "Map Mask", "Map", "A stratum's painted mask on the open map (0 none, 1 full). Covers the whole map: start a new mask "
-                                              "from it, or blend by where the map already has rock or sand.",
-           {},
-           {Out("Out", PinType::Grey)},
-           {Int("Stratum", 1, 1, 8)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 1);
-            const TerrainSource* t = a.terrain;
-            if (t == nullptr || t->maskWidth < 1 || t->maskHeight < 1 || t->masks.size() < static_cast<std::size_t>(t->maskWidth) * t->maskHeight) {
-              a.warning = "No map open";
-              return;
-            }
-            const int shift = 8 * (std::clamp(a.I(0), 1, 8) - 1);
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                // Bilinear between the mask's texels.
-                const float fx = std::clamp((static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->maskWidth) - 0.5f, 0.0f,
-                                            static_cast<float>(t->maskWidth - 1));
-                const float fy = std::clamp((static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->maskHeight) - 0.5f, 0.0f,
-                                            static_cast<float>(t->maskHeight - 1));
-                const int x0 = static_cast<int>(fx);
-                const int y0 = static_cast<int>(fy);
-                const int x1 = std::min(x0 + 1, t->maskWidth - 1);
-                const int y1 = std::min(y0 + 1, t->maskHeight - 1);
-                const auto m = [&](const int sx, const int sy) {
-                  return static_cast<float>((t->masks[static_cast<std::size_t>(sy) * t->maskWidth + sx] >> shift) & 0xFFU) / 255.0f;
-                };
-                const float tx = fx - static_cast<float>(x0);
-                const float ty = fy - static_cast<float>(y0);
-                out.Pixel(x, y)[0] = Lerp(Lerp(m(x0, y0), m(x1, y0), tx), Lerp(m(x0, y1), m(x1, y1), tx), ty);
-              }
-            });
-          });
+      add(
+        {"TerrainMask",
+         "Map Mask",
+         "Map",
+         "A stratum's painted mask on the open map (0 none, 1 full). Covers the whole map: start a new mask "
+         "from it, or blend by where the map already has rock or sand.",
+         {},
+         {Out("Out", PinType::Grey)},
+         {Int("Stratum", 1, 1, 8)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 1);
+        const TerrainSource* t = a.terrain;
+        if (
+          t == nullptr || t->maskWidth < 1 || t->maskHeight < 1 ||
+          t->masks.size() < static_cast<std::size_t>(t->maskWidth) * t->maskHeight
+        ) {
+          a.warning = "No map open";
+          return;
+        }
+        const int shift = 8 * (std::clamp(a.I(0), 1, 8) - 1);
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            // Bilinear between the mask's texels.
+            const float fx = std::clamp(
+              (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->maskWidth) - 0.5f,
+              0.0f,
+              static_cast<float>(t->maskWidth - 1)
+            );
+            const float fy = std::clamp(
+              (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->maskHeight) - 0.5f,
+              0.0f,
+              static_cast<float>(t->maskHeight - 1)
+            );
+            const int x0 = static_cast<int>(fx);
+            const int y0 = static_cast<int>(fy);
+            const int x1 = std::min(x0 + 1, t->maskWidth - 1);
+            const int y1 = std::min(y0 + 1, t->maskHeight - 1);
+            const auto m = [&](const int sx, const int sy) {
+              return static_cast<float>((t->masks[static_cast<std::size_t>(sy) * t->maskWidth + sx] >> shift) & 0xFFU) /
+                255.0f;
+            };
+            const float tx = fx - static_cast<float>(x0);
+            const float ty = fy - static_cast<float>(y0);
+            out.Pixel(x, y)[0] = Lerp(Lerp(m(x0, y0), m(x1, y0), tx), Lerp(m(x0, y1), m(x1, y1), tx), ty);
+          }
+        });
+      }
+      );
 
-      add({"TerrainSlope", "Map Slope", "Map", "The open map's steepness: 0 flat, 1 at Steepest degrees and over. Covers the whole map.",
-           {},
-           {Out("Out", PinType::Grey)},
-           {Num("Steepest", 45.0f, 1.0f, 90.0f, "Degrees that count as 1")},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 1);
-            const TerrainSource* t = a.terrain;
-            if (t == nullptr || t->width < 3 || t->height < 3) {
-              a.warning = "No map open";
-              return;
-            }
-            const float steepest = std::tan(std::clamp(a.F(0), 1.0f, 89.0f) * kPi / 180.0f);
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                const int sx = std::clamp(static_cast<int>((static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->width)), 1, t->width - 2);
-                const int sy = std::clamp(static_cast<int>((static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->height)), 1, t->height - 2);
-                const auto h = [&](const int px, const int py) { return t->heights[static_cast<std::size_t>(py) * t->width + px]; };
-                const float dx = (h(sx + 1, sy) - h(sx - 1, sy)) / (2.0f * t->units);
-                const float dy = (h(sx, sy + 1) - h(sx, sy - 1)) / (2.0f * t->units);
-                out.Pixel(x, y)[0] = Clamp01(std::hypot(dx, dy) / steepest);
-              }
-            });
-          });
+      add(
+        {"TerrainSlope",
+         "Map Slope",
+         "Map",
+         "The open map's steepness: 0 flat, 1 at Steepest degrees and over. Covers the whole map.",
+         {},
+         {Out("Out", PinType::Grey)},
+         {Num("Steepest", 45.0f, 1.0f, 90.0f, "Degrees that count as 1")},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 1);
+        const TerrainSource* t = a.terrain;
+        if (t == nullptr || t->width < 3 || t->height < 3) {
+          a.warning = "No map open";
+          return;
+        }
+        const float steepest = std::tan(std::clamp(a.F(0), 1.0f, 89.0f) * kPi / 180.0f);
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            const int sx = std::clamp(
+              static_cast<int>(
+                (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->width)
+              ),
+              1,
+              t->width - 2
+            );
+            const int sy = std::clamp(
+              static_cast<int>(
+                (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) * static_cast<float>(t->height)
+              ),
+              1,
+              t->height - 2
+            );
+            const auto h = [&](const int px, const int py) {
+              return t->heights[static_cast<std::size_t>(py) * t->width + px];
+            };
+            const float dx = (h(sx + 1, sy) - h(sx - 1, sy)) / (2.0f * t->units);
+            const float dy = (h(sx, sy + 1) - h(sx, sy - 1)) / (2.0f * t->units);
+            out.Pixel(x, y)[0] = Clamp01(std::hypot(dx, dy) / steepest);
+          }
+        });
+      }
+      );
     }
 
-    void AddMathNodes(TextureNodes& nodes)
+    void AddMathNodes(
+      TextureNodes& nodes
+    )
     {
       const auto add = [&](NodeType type, EvalFn fn) {
         nodes.eval[type.name] = std::move(fn);
         nodes.registry.Add(std::move(type));
       };
       const auto two = [&](const char* name, const char* help, const float bInitial, EvalFn fn) {
-        add({name, name, "Math", help,
-             {In("A", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f), In("B", PinType::Color, bInitial, bInitial, bInitial, 1.0f)},
-             {Out("Out", PinType::Color)},
-             {},
-             false},
-            std::move(fn));
-      };
-      two("Add", "A + B, per channel.", 0.0f, PerChannel2([](const float x, const float y) { return x + y; }));
-      two("Subtract", "A - B, per channel.", 0.0f, PerChannel2([](const float x, const float y) { return x - y; }));
-      two("Multiply", "A times B, per channel.", 1.0f, PerChannel2([](const float x, const float y) { return x * y; }));
-      two("Divide", "A / B, per channel (B near 0 gives A).", 1.0f,
-          PerChannel2([](const float x, const float y) { return std::fabs(y) > 1e-5f ? x / y : x; }));
-      two("Min", "The smaller of A and B.", 1.0f, PerChannel2([](const float x, const float y) { return std::min(x, y); }));
-      two("Max", "The larger of A and B.", 0.0f, PerChannel2([](const float x, const float y) { return std::max(x, y); }));
-
-      add({"Lerp", "Lerp", "Math", "A where Alpha is 0, B where it is 1, mixed between.",
-           {In("A", PinType::Color, 0.0f, 0.0f, 0.0f, 1.0f), In("B", PinType::Color, 1.0f, 1.0f, 1.0f, 1.0f), In("Alpha", PinType::Grey, 0.5f)},
+        add(
+          {name,
+           name,
+           "Math",
+           help,
+           {In("A", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f),
+            In("B", PinType::Color, bInitial, bInitial, bInitial, 1.0f)},
            {Out("Out", PinType::Color)},
            {},
            false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 4);
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                float l[4];
-                float r[4];
-                Fetch(a.In(0), x, y, a.size, l);
-                Fetch(a.In(1), x, y, a.size, r);
-                const float t = FetchGrey(a.In(2), x, y, a.size);
-                float* p = out.Pixel(x, y);
-                for (int c = 0; c < 4; ++c) {
-                  p[c] = Lerp(l[c], r[c], t);
-                }
-              }
-            });
-          });
-
-      const auto one = [&](const char* name, const char* title, const char* help, std::vector<ParamDef> params, EvalFn fn) {
-        add({name, title, "Math", help, {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f)}, {Out("Out", PinType::Color)}, std::move(params), false},
-            std::move(fn));
+          std::move(fn)
+        );
       };
-      one("OneMinus", "1 - x", "Inverts: 1 - In (alpha kept).", {}, PerChannel1([](const EvalArgs&, const float v) { return 1.0f - v; }));
-      one("Clamp", "Clamp", "In kept between Min and Max.", {Num("Min", 0.0f, 0.0f, 1.0f), Num("Max", 1.0f, 0.0f, 1.0f)},
-          PerChannel1([](const EvalArgs& a, const float v) { return std::clamp(v, a.F(0), std::max(a.F(0), a.F(1))); }));
-      one("Power", "Power", "In to the power of Exponent.", {Num("Exponent", 2.0f, 0.05f, 8.0f)},
-          PerChannel1([](const EvalArgs& a, const float v) { return std::pow(std::max(v, 0.0f), a.F(0)); }));
-      one("Remap", "Remap", "In Low..In High becomes Out Low..Out High.",
-          {Num("In Low", 0.0f, 0.0f, 1.0f), Num("In High", 1.0f, 0.0f, 1.0f), Num("Out Low", 0.0f, 0.0f, 1.0f), Num("Out High", 1.0f, 0.0f, 1.0f)},
-          PerChannel1([](const EvalArgs& a, const float v) {
-            const float t = (v - a.F(0)) / std::max(a.F(1) - a.F(0), 1e-5f);
-            return Lerp(a.F(2), a.F(3), t);
-          }));
-      one("Threshold", "Threshold", "0 below Level, 1 above, with a soft edge of Softness.", {Num("Level", 0.5f, 0.0f, 1.0f), Num("Softness", 0.05f, 0.0f, 0.5f)},
-          PerChannel1([](const EvalArgs& a, const float v) { return Smoothstep(a.F(0) - a.F(1), a.F(0) + a.F(1) + 1e-5f, v); }));
-    }
+      two("Add", "A + B, per channel.", 0.0f, PerChannel2([](const float x, const float y) {
+        return x + y;
+      }));
+      two("Subtract", "A - B, per channel.", 0.0f, PerChannel2([](const float x, const float y) {
+        return x - y;
+      }));
+      two("Multiply", "A times B, per channel.", 1.0f, PerChannel2([](const float x, const float y) {
+        return x * y;
+      }));
+      two("Divide", "A / B, per channel (B near 0 gives A).", 1.0f, PerChannel2([](const float x, const float y) {
+        return std::fabs(y) > 1e-5f ? x / y : x;
+      }));
+      two("Min", "The smaller of A and B.", 1.0f, PerChannel2([](const float x, const float y) {
+        return std::min(x, y);
+      }));
+      two("Max", "The larger of A and B.", 0.0f, PerChannel2([](const float x, const float y) {
+        return std::max(x, y);
+      }));
 
-    void AddAdjustNodes(TextureNodes& nodes)
-    {
-      const auto add = [&](NodeType type, EvalFn fn) {
-        nodes.eval[type.name] = std::move(fn);
-        nodes.registry.Add(std::move(type));
-      };
-
-      add({"Levels", "Levels", "Adjust", "Photoshop's levels: input black and white points, gamma, output range.",
-           {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f)},
-           {Out("Out", PinType::Color)},
-           {Num("In Black", 0.0f, 0.0f, 1.0f), Num("In White", 1.0f, 0.0f, 1.0f), Num("Gamma", 1.0f, 0.1f, 5.0f), Num("Out Black", 0.0f, 0.0f, 1.0f),
-            Num("Out White", 1.0f, 0.0f, 1.0f)},
-           false},
-          PerChannel1([](const EvalArgs& a, const float v) {
-            const float t = Clamp01((v - a.F(0)) / std::max(a.F(1) - a.F(0), 1e-5f));
-            return Lerp(a.F(3), a.F(4), std::pow(t, 1.0f / std::max(a.F(2), 0.01f)));
-          }));
-
-      add({"HSV", "Hue / Saturation", "Adjust", "Shifts the hue, scales the saturation and brightness.",
-           {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f)},
-           {Out("Out", PinType::Color)},
-           {Num("Hue", 0.0f, -0.5f, 0.5f), Num("Saturation", 1.0f, 0.0f, 2.0f), Num("Value", 1.0f, 0.0f, 2.0f)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 4);
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                float c[4];
-                Fetch(a.In(0), x, y, a.size, c);
-                float h = 0.0f;
-                float s = 0.0f;
-                float v = 0.0f;
-                RgbToHsv(c[0], c[1], c[2], h, s, v);
-                float* p = out.Pixel(x, y);
-                HsvToRgb(h + a.F(0), Clamp01(s * a.F(1)), v * a.F(2), p[0], p[1], p[2]);
-                p[3] = c[3];
-              }
-            });
-          });
-
-      add({"GradientMap", "Gradient Map", "Adjust", "Colours a grey image: Low at 0, Middle at Position, High at 1.",
-           {In("In", PinType::Grey, 0.5f)},
-           {Out("Out", PinType::Color)},
-           {Col("Low", 0.22f, 0.18f, 0.13f), Col("Middle", 0.42f, 0.36f, 0.26f), Col("High", 0.62f, 0.58f, 0.47f), Num("Position", 0.5f, 0.01f, 0.99f)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 4);
-            const float mid = a.F(3);
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                const float g = Clamp01(FetchGrey(a.In(0), x, y, a.size));
-                const std::array<float, 4>& lo = g < mid ? a.C(0) : a.C(1);
-                const std::array<float, 4>& hi = g < mid ? a.C(1) : a.C(2);
-                const float t = g < mid ? g / mid : (g - mid) / (1.0f - mid);
-                float* p = out.Pixel(x, y);
-                for (int c = 0; c < 4; ++c) {
-                  p[c] = Lerp(lo[static_cast<std::size_t>(c)], hi[static_cast<std::size_t>(c)], t);
-                }
-              }
-            });
-          });
-
-      add({"Blur", "Blur", "Adjust", "Softens the image; Radius is a share of the image's width, so the bake looks like the preview.",
-           {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f)},
-           {Out("Out", PinType::Color)},
-           {Num("Radius", 0.01f, 0.0f, 0.1f)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 4);
-            const int n = a.size;
-            const int radius = std::max(static_cast<int>(std::lround(a.F(0) * static_cast<float>(n))), 0);
-            TexImage temp;
-            temp.Reset(n, 4);
-            ForRows(n, [&](const int y) {
-              for (int x = 0; x < n; ++x) {
-                float c[4];
-                Fetch(a.In(0), x, y, n, c);
-                std::copy(c, c + 4, temp.Pixel(x, y));
-              }
-            });
-            // Three box passes each way: close to a Gaussian, wrapping at the edges.
-            TexImage other;
-            other.Reset(n, 4);
-            TexImage* src = &temp;
-            TexImage* dst = &other;
-            const float scale = 1.0f / static_cast<float>(2 * radius + 1);
-            for (int pass = 0; pass < 6 && radius > 0; ++pass) {
-              const bool horizontal = pass % 2 == 0;
-              ForRows(n, [&](const int line) {
-                float sum[4] = {};
-                for (int k = -radius; k <= radius; ++k) {
-                  const float* p = horizontal ? src->Pixel(Wrap(k, n), line) : src->Pixel(line, Wrap(k, n));
-                  for (int c = 0; c < 4; ++c) {
-                    sum[c] += p[c];
-                  }
-                }
-                for (int i = 0; i < n; ++i) {
-                  float* d = horizontal ? dst->Pixel(i, line) : dst->Pixel(line, i);
-                  for (int c = 0; c < 4; ++c) {
-                    d[c] = sum[c] * scale;
-                  }
-                  const float* leave = horizontal ? src->Pixel(Wrap(i - radius, n), line) : src->Pixel(line, Wrap(i - radius, n));
-                  const float* enter = horizontal ? src->Pixel(Wrap(i + radius + 1, n), line) : src->Pixel(line, Wrap(i + radius + 1, n));
-                  for (int c = 0; c < 4; ++c) {
-                    sum[c] += enter[c] - leave[c];
-                  }
-                }
-              });
-              std::swap(src, dst);
+      add(
+        {"Lerp",
+         "Lerp",
+         "Math",
+         "A where Alpha is 0, B where it is 1, mixed between.",
+         {In("A", PinType::Color, 0.0f, 0.0f, 0.0f, 1.0f),
+          In("B", PinType::Color, 1.0f, 1.0f, 1.0f, 1.0f),
+          In("Alpha", PinType::Grey, 0.5f)},
+         {Out("Out", PinType::Color)},
+         {},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 4);
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            float l[4];
+            float r[4];
+            Fetch(a.In(0), x, y, a.size, l);
+            Fetch(a.In(1), x, y, a.size, r);
+            const float t = FetchGrey(a.In(2), x, y, a.size);
+            float* p = out.Pixel(x, y);
+            for (int c = 0; c < 4; ++c) {
+              p[c] = Lerp(l[c], r[c], t);
             }
-            out.data = src->data;
-          });
+          }
+        });
+      }
+      );
+
+      const auto one =
+        [&](const char* name, const char* title, const char* help, std::vector<ParamDef> params, EvalFn fn) {
+        add(
+          {name,
+           title,
+           "Math",
+           help,
+           {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f)},
+           {Out("Out", PinType::Color)},
+           std::move(params),
+           false},
+          std::move(fn)
+        );
+      };
+      one("OneMinus", "1 - x", "Inverts: 1 - In (alpha kept).", {}, PerChannel1([](const EvalArgs&, const float v) {
+        return 1.0f - v;
+      }));
+      one(
+        "Clamp",
+        "Clamp",
+        "In kept between Min and Max.",
+        {Num("Min", 0.0f, 0.0f, 1.0f), Num("Max", 1.0f, 0.0f, 1.0f)},
+        PerChannel1([](const EvalArgs& a, const float v) {
+        return std::clamp(v, a.F(0), std::max(a.F(0), a.F(1)));
+      })
+      );
+      one(
+        "Power",
+        "Power",
+        "In to the power of Exponent.",
+        {Num("Exponent", 2.0f, 0.05f, 8.0f)},
+        PerChannel1([](const EvalArgs& a, const float v) {
+        return std::pow(std::max(v, 0.0f), a.F(0));
+      })
+      );
+      one(
+        "Remap",
+        "Remap",
+        "In Low..In High becomes Out Low..Out High.",
+        {Num("In Low", 0.0f, 0.0f, 1.0f),
+         Num("In High", 1.0f, 0.0f, 1.0f),
+         Num("Out Low", 0.0f, 0.0f, 1.0f),
+         Num("Out High", 1.0f, 0.0f, 1.0f)},
+        PerChannel1([](const EvalArgs& a, const float v) {
+        const float t = (v - a.F(0)) / std::max(a.F(1) - a.F(0), 1e-5f);
+        return Lerp(a.F(2), a.F(3), t);
+      })
+      );
+      one(
+        "Threshold",
+        "Threshold",
+        "0 below Level, 1 above, with a soft edge of Softness.",
+        {Num("Level", 0.5f, 0.0f, 1.0f), Num("Softness", 0.05f, 0.0f, 0.5f)},
+        PerChannel1([](const EvalArgs& a, const float v) {
+        return Smoothstep(a.F(0) - a.F(1), a.F(0) + a.F(1) + 1e-5f, v);
+      })
+      );
     }
 
-    void AddBlendNodes(TextureNodes& nodes)
+    void AddAdjustNodes(
+      TextureNodes& nodes
+    )
     {
       const auto add = [&](NodeType type, EvalFn fn) {
         nodes.eval[type.name] = std::move(fn);
         nodes.registry.Add(std::move(type));
       };
 
-      add({"Blend", "Blend", "Blend", "B over A with a blend mode, by Opacity and the Mask.",
-           {In("A", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f), In("B", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f), In("Mask", PinType::Grey, 1.0f)},
-           {Out("Out", PinType::Color)},
-           {Choice("Mode", {"Normal", "Multiply", "Screen", "Overlay", "Soft Light", "Add", "Subtract", "Difference", "Darken", "Lighten"}),
-            Num("Opacity", 1.0f, 0.0f, 1.0f)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 4);
-            const int mode = a.I(0);
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                float l[4];
-                float r[4];
-                Fetch(a.In(0), x, y, a.size, l);
-                Fetch(a.In(1), x, y, a.size, r);
-                const float t = a.F(1) * FetchGrey(a.In(2), x, y, a.size);
-                float* p = out.Pixel(x, y);
-                for (int c = 0; c < 3; ++c) {
-                  p[c] = Lerp(l[c], BlendChannel(mode, l[c], r[c]), t);
-                }
-                p[3] = l[3];
-              }
-            });
-          });
+      add(
+        {"Levels",
+         "Levels",
+         "Adjust",
+         "Photoshop's levels: input black and white points, gamma, output range.",
+         {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f)},
+         {Out("Out", PinType::Color)},
+         {Num("In Black", 0.0f, 0.0f, 1.0f),
+          Num("In White", 1.0f, 0.0f, 1.0f),
+          Num("Gamma", 1.0f, 0.1f, 5.0f),
+          Num("Out Black", 0.0f, 0.0f, 1.0f),
+          Num("Out White", 1.0f, 0.0f, 1.0f)},
+         false},
+        PerChannel1([](const EvalArgs& a, const float v) {
+        const float t = Clamp01((v - a.F(0)) / std::max(a.F(1) - a.F(0), 1e-5f));
+        return Lerp(a.F(3), a.F(4), std::pow(t, 1.0f / std::max(a.F(2), 0.01f)));
+      })
+      );
 
-      add({"HeightBlend", "Height Blend", "Blend", "B shows where its height rises above A's: stones between grass, not a soft fade.",
-           {In("A", PinType::Color, 0.3f, 0.4f, 0.2f, 1.0f), In("B", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f), In("Height A", PinType::Grey, 0.5f),
-            In("Height B", PinType::Grey, 0.5f)},
-           {Out("Out", PinType::Color), Out("Height", PinType::Grey)},
-           {Num("Bias", 0.0f, -1.0f, 1.0f, "Raises B (above 0) or A"), Num("Contrast", 0.8f, 0.0f, 1.0f, "1: a sharp edge")},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 4);
-            TexImage& height = a.Out(1, 1);
-            const float soft = (1.0f - a.F(1)) * 0.5f + 0.001f;
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                float l[4];
-                float r[4];
-                Fetch(a.In(0), x, y, a.size, l);
-                Fetch(a.In(1), x, y, a.size, r);
-                const float ha = FetchGrey(a.In(2), x, y, a.size);
-                const float hb = FetchGrey(a.In(3), x, y, a.size) + a.F(0);
-                const float t = Smoothstep(-soft, soft, hb - ha);
-                float* p = out.Pixel(x, y);
-                for (int c = 0; c < 4; ++c) {
-                  p[c] = Lerp(l[c], r[c], t);
-                }
-                height.Pixel(x, y)[0] = Clamp01(Lerp(ha, hb, t));
+      add(
+        {"HSV",
+         "Hue / Saturation",
+         "Adjust",
+         "Shifts the hue, scales the saturation and brightness.",
+         {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f)},
+         {Out("Out", PinType::Color)},
+         {Num("Hue", 0.0f, -0.5f, 0.5f), Num("Saturation", 1.0f, 0.0f, 2.0f), Num("Value", 1.0f, 0.0f, 2.0f)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 4);
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            float c[4];
+            Fetch(a.In(0), x, y, a.size, c);
+            float h = 0.0f;
+            float s = 0.0f;
+            float v = 0.0f;
+            RgbToHsv(c[0], c[1], c[2], h, s, v);
+            float* p = out.Pixel(x, y);
+            HsvToRgb(h + a.F(0), Clamp01(s * a.F(1)), v * a.F(2), p[0], p[1], p[2]);
+            p[3] = c[3];
+          }
+        });
+      }
+      );
+
+      add(
+        {"GradientMap",
+         "Gradient Map",
+         "Adjust",
+         "Colours a grey image: Low at 0, Middle at Position, High at 1.",
+         {In("In", PinType::Grey, 0.5f)},
+         {Out("Out", PinType::Color)},
+         {Col("Low", 0.22f, 0.18f, 0.13f),
+          Col("Middle", 0.42f, 0.36f, 0.26f),
+          Col("High", 0.62f, 0.58f, 0.47f),
+          Num("Position", 0.5f, 0.01f, 0.99f)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 4);
+        const float mid = a.F(3);
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            const float g = Clamp01(FetchGrey(a.In(0), x, y, a.size));
+            const std::array<float, 4>& lo = g < mid ? a.C(0) : a.C(1);
+            const std::array<float, 4>& hi = g < mid ? a.C(1) : a.C(2);
+            const float t = g < mid ? g / mid : (g - mid) / (1.0f - mid);
+            float* p = out.Pixel(x, y);
+            for (int c = 0; c < 4; ++c) {
+              p[c] = Lerp(lo[static_cast<std::size_t>(c)], hi[static_cast<std::size_t>(c)], t);
+            }
+          }
+        });
+      }
+      );
+
+      add(
+        {"Blur",
+         "Blur",
+         "Adjust",
+         "Softens the image; Radius is a share of the image's width, so the bake looks like the preview.",
+         {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f)},
+         {Out("Out", PinType::Color)},
+         {Num("Radius", 0.01f, 0.0f, 0.1f)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 4);
+        const int n = a.size;
+        const int radius = std::max(static_cast<int>(std::lround(a.F(0) * static_cast<float>(n))), 0);
+        TexImage temp;
+        temp.Reset(n, 4);
+        ForRows(n, [&](const int y) {
+          for (int x = 0; x < n; ++x) {
+            float c[4];
+            Fetch(a.In(0), x, y, n, c);
+            std::copy(c, c + 4, temp.Pixel(x, y));
+          }
+        });
+        // Three box passes each way: close to a Gaussian, wrapping at the edges.
+        TexImage other;
+        other.Reset(n, 4);
+        TexImage* src = &temp;
+        TexImage* dst = &other;
+        const float scale = 1.0f / static_cast<float>(2 * radius + 1);
+        for (int pass = 0; pass < 6 && radius > 0; ++pass) {
+          const bool horizontal = pass % 2 == 0;
+          ForRows(n, [&](const int line) {
+            float sum[4] = {};
+            for (int k = -radius; k <= radius; ++k) {
+              const float* p = horizontal ? src->Pixel(Wrap(k, n), line) : src->Pixel(line, Wrap(k, n));
+              for (int c = 0; c < 4; ++c) {
+                sum[c] += p[c];
               }
-            });
+            }
+            for (int i = 0; i < n; ++i) {
+              float* d = horizontal ? dst->Pixel(i, line) : dst->Pixel(line, i);
+              for (int c = 0; c < 4; ++c) {
+                d[c] = sum[c] * scale;
+              }
+              const float* leave =
+                horizontal ? src->Pixel(Wrap(i - radius, n), line) : src->Pixel(line, Wrap(i - radius, n));
+              const float* enter =
+                horizontal ? src->Pixel(Wrap(i + radius + 1, n), line) : src->Pixel(line, Wrap(i + radius + 1, n));
+              for (int c = 0; c < 4; ++c) {
+                sum[c] += enter[c] - leave[c];
+              }
+            }
           });
+          std::swap(src, dst);
+        }
+        out.data = src->data;
+      }
+      );
     }
 
-    void AddShapeNodes(TextureNodes& nodes)
+    void AddBlendNodes(
+      TextureNodes& nodes
+    )
     {
       const auto add = [&](NodeType type, EvalFn fn) {
         nodes.eval[type.name] = std::move(fn);
         nodes.registry.Add(std::move(type));
       };
 
-      add({"Transform", "Transform", "UV", "Repeats the image Tiling times, turns it by quarter turns and shifts it (it still tiles).",
-           {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f)},
-           {Out("Out", PinType::Color)},
-           {Int("Tiling", 2, 1, 32), Choice("Turn", {"0", "90", "180", "270"}), Num("Offset U", 0.0f, 0.0f, 1.0f), Num("Offset V", 0.0f, 0.0f, 1.0f)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 4);
-            const float tiling = static_cast<float>(std::max(a.I(0), 1));
-            const int turn = a.I(1) & 3;
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size);
-                float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size);
-                for (int t = 0; t < turn; ++t) {
-                  const float nu = v;
-                  v = 1.0f - u;
-                  u = nu;
-                }
-                float c[4];
-                a.In(0).Sample(u * tiling + a.F(2), v * tiling + a.F(3), c);
-                std::copy(c, c + 4, out.Pixel(x, y));
-              }
-            });
-          });
+      add(
+        {"Blend",
+         "Blend",
+         "Blend",
+         "B over A with a blend mode, by Opacity and the Mask.",
+         {In("A", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f),
+          In("B", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f),
+          In("Mask", PinType::Grey, 1.0f)},
+         {Out("Out", PinType::Color)},
+         {Choice(
+            "Mode",
+            {"Normal",
+             "Multiply",
+             "Screen",
+             "Overlay",
+             "Soft Light",
+             "Add",
+             "Subtract",
+             "Difference",
+             "Darken",
+             "Lighten"}
+          ),
+          Num("Opacity", 1.0f, 0.0f, 1.0f)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 4);
+        const int mode = a.I(0);
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            float l[4];
+            float r[4];
+            Fetch(a.In(0), x, y, a.size, l);
+            Fetch(a.In(1), x, y, a.size, r);
+            const float t = a.F(1) * FetchGrey(a.In(2), x, y, a.size);
+            float* p = out.Pixel(x, y);
+            for (int c = 0; c < 3; ++c) {
+              p[c] = Lerp(l[c], BlendChannel(mode, l[c], r[c]), t);
+            }
+            p[3] = l[3];
+          }
+        });
+      }
+      );
 
-      add({"Warp", "Warp", "UV", "Pushes the image along Angle by the Warp image's value: wavy rock strata, smeared dirt.",
-           {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f), In("Warp", PinType::Grey, 0.0f)},
-           {Out("Out", PinType::Color)},
-           {Num("Intensity", 0.05f, 0.0f, 0.5f), Num("Angle", 0.0f, 0.0f, 360.0f)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 4);
-            const float du = std::cos(a.F(1) * kPi / 180.0f) * a.F(0);
-            const float dv = std::sin(a.F(1) * kPi / 180.0f) * a.F(0);
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                const float w = FetchGrey(a.In(1), x, y, a.size);
-                float c[4];
-                a.In(0).Sample((static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) + du * w,
-                               (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) + dv * w, c);
-                std::copy(c, c + 4, out.Pixel(x, y));
-              }
-            });
-          });
+      add(
+        {"HeightBlend",
+         "Height Blend",
+         "Blend",
+         "B shows where its height rises above A's: stones between grass, not a soft fade.",
+         {In("A", PinType::Color, 0.3f, 0.4f, 0.2f, 1.0f),
+          In("B", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f),
+          In("Height A", PinType::Grey, 0.5f),
+          In("Height B", PinType::Grey, 0.5f)},
+         {Out("Out", PinType::Color), Out("Height", PinType::Grey)},
+         {Num("Bias", 0.0f, -1.0f, 1.0f, "Raises B (above 0) or A"),
+          Num("Contrast", 0.8f, 0.0f, 1.0f, "1: a sharp edge")},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 4);
+        TexImage& height = a.Out(1, 1);
+        const float soft = (1.0f - a.F(1)) * 0.5f + 0.001f;
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            float l[4];
+            float r[4];
+            Fetch(a.In(0), x, y, a.size, l);
+            Fetch(a.In(1), x, y, a.size, r);
+            const float ha = FetchGrey(a.In(2), x, y, a.size);
+            const float hb = FetchGrey(a.In(3), x, y, a.size) + a.F(0);
+            const float t = Smoothstep(-soft, soft, hb - ha);
+            float* p = out.Pixel(x, y);
+            for (int c = 0; c < 4; ++c) {
+              p[c] = Lerp(l[c], r[c], t);
+            }
+            height.Pixel(x, y)[0] = Clamp01(Lerp(ha, hb, t));
+          }
+        });
+      }
+      );
+    }
 
-      add({"HeightToNormal", "Height to Normal", "Normal", "A normal map from a height image (tangent space, 0.5 0.5 1 flat).",
-           {In("Height", PinType::Grey, 0.5f)},
-           {Out("Normal", PinType::Color)},
-           {Num("Strength", 1.0f, 0.0f, 10.0f), Bool("Flip Green", false)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 4);
-            const int n = a.size;
-            TexImage h;
-            h.Reset(n, 1);
-            ForRows(n, [&](const int y) {
-              for (int x = 0; x < n; ++x) {
-                h.Pixel(x, y)[0] = FetchGrey(a.In(0), x, y, n);
-              }
-            });
-            // Slopes in the image's own units, so the strength reads the same at every size.
-            const float k = a.F(0) * 0.05f * static_cast<float>(n) * 0.5f;
-            const float flip = a.F(1) > 0.5f ? -1.0f : 1.0f;
-            ForRows(n, [&](const int y) {
-              for (int x = 0; x < n; ++x) {
-                const float dx = (h.Pixel(Wrap(x + 1, n), y)[0] - h.Pixel(Wrap(x - 1, n), y)[0]) * k;
-                const float dy = (h.Pixel(x, Wrap(y + 1, n))[0] - h.Pixel(x, Wrap(y - 1, n))[0]) * k * flip;
-                const float len = std::sqrt(dx * dx + dy * dy + 1.0f);
-                float* p = out.Pixel(x, y);
-                p[0] = -dx / len * 0.5f + 0.5f;
-                p[1] = dy / len * 0.5f + 0.5f;
-                p[2] = 1.0f / len * 0.5f + 0.5f;
-                p[3] = 1.0f;
-              }
-            });
-          });
+    void AddShapeNodes(
+      TextureNodes& nodes
+    )
+    {
+      const auto add = [&](NodeType type, EvalFn fn) {
+        nodes.eval[type.name] = std::move(fn);
+        nodes.registry.Add(std::move(type));
+      };
 
-      add({"NormalBlend", "Normal Blend", "Normal", "Detail normal over a base normal (whiteout blend), by Amount.",
-           {In("Base", PinType::Color, 0.5f, 0.5f, 1.0f, 1.0f), In("Detail", PinType::Color, 0.5f, 0.5f, 1.0f, 1.0f)},
-           {Out("Normal", PinType::Color)},
-           {Num("Amount", 1.0f, 0.0f, 1.0f)},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 4);
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                float b[4];
-                float d[4];
-                Fetch(a.In(0), x, y, a.size, b);
-                Fetch(a.In(1), x, y, a.size, d);
-                const float bx = b[0] * 2.0f - 1.0f;
-                const float by = b[1] * 2.0f - 1.0f;
-                const float bz = b[2] * 2.0f - 1.0f;
-                const float dx = (d[0] * 2.0f - 1.0f) * a.F(0);
-                const float dy = (d[1] * 2.0f - 1.0f) * a.F(0);
-                const float dz = Lerp(1.0f, d[2] * 2.0f - 1.0f, a.F(0));
-                const float nx = bx + dx;
-                const float ny = by + dy;
-                const float nz = bz * dz;
-                const float len = std::max(std::sqrt(nx * nx + ny * ny + nz * nz), 1e-5f);
-                float* p = out.Pixel(x, y);
-                p[0] = nx / len * 0.5f + 0.5f;
-                p[1] = ny / len * 0.5f + 0.5f;
-                p[2] = nz / len * 0.5f + 0.5f;
-                p[3] = 1.0f;
-              }
-            });
-          });
+      add(
+        {"Transform",
+         "Transform",
+         "UV",
+         "Repeats the image Tiling times, turns it by quarter turns and shifts it (it still tiles).",
+         {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f)},
+         {Out("Out", PinType::Color)},
+         {Int("Tiling", 2, 1, 32),
+          Choice("Turn", {"0", "90", "180", "270"}),
+          Num("Offset U", 0.0f, 0.0f, 1.0f),
+          Num("Offset V", 0.0f, 0.0f, 1.0f)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 4);
+        const float tiling = static_cast<float>(std::max(a.I(0), 1));
+        const int turn = a.I(1) & 3;
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size);
+            float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size);
+            for (int t = 0; t < turn; ++t) {
+              const float nu = v;
+              v = 1.0f - u;
+              u = nu;
+            }
+            float c[4];
+            a.In(0).Sample(u * tiling + a.F(2), v * tiling + a.F(3), c);
+            std::copy(c, c + 4, out.Pixel(x, y));
+          }
+        });
+      }
+      );
 
-      add({"Split", "Split Channels", "Channels", "A colour image's R, G, B and A as grey images.",
-           {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f)},
-           {Out("R", PinType::Grey), Out("G", PinType::Grey), Out("B", PinType::Grey), Out("A", PinType::Grey)},
-           {},
-           false},
-          [](const EvalArgs& a) {
-            TexImage* channel[4] = {&a.Out(0, 1), &a.Out(1, 1), &a.Out(2, 1), &a.Out(3, 1)};
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                float c[4];
-                Fetch(a.In(0), x, y, a.size, c);
-                for (int i = 0; i < 4; ++i) {
-                  channel[i]->Pixel(x, y)[0] = c[i];
-                }
-              }
-            });
-          });
+      add(
+        {"Warp",
+         "Warp",
+         "UV",
+         "Pushes the image along Angle by the Warp image's value: wavy rock strata, smeared dirt.",
+         {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f), In("Warp", PinType::Grey, 0.0f)},
+         {Out("Out", PinType::Color)},
+         {Num("Intensity", 0.05f, 0.0f, 0.5f), Num("Angle", 0.0f, 0.0f, 360.0f)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 4);
+        const float du = std::cos(a.F(1) * kPi / 180.0f) * a.F(0);
+        const float dv = std::sin(a.F(1) * kPi / 180.0f) * a.F(0);
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            const float w = FetchGrey(a.In(1), x, y, a.size);
+            float c[4];
+            a.In(0).Sample(
+              (static_cast<float>(x) + 0.5f) / static_cast<float>(a.size) + du * w,
+              (static_cast<float>(y) + 0.5f) / static_cast<float>(a.size) + dv * w,
+              c
+            );
+            std::copy(c, c + 4, out.Pixel(x, y));
+          }
+        });
+      }
+      );
 
-      add({"Merge", "Merge Channels", "Channels", "Four grey images as one colour image's R, G, B and A.",
-           {In("R", PinType::Grey, 0.0f), In("G", PinType::Grey, 0.0f), In("B", PinType::Grey, 0.0f), In("A", PinType::Grey, 1.0f)},
-           {Out("Out", PinType::Color)},
-           {},
-           false},
-          [](const EvalArgs& a) {
-            TexImage& out = a.Out(0, 4);
-            ForRows(a.size, [&](const int y) {
-              for (int x = 0; x < a.size; ++x) {
-                float* p = out.Pixel(x, y);
-                for (int i = 0; i < 4; ++i) {
-                  p[i] = FetchGrey(a.In(static_cast<std::size_t>(i)), x, y, a.size);
-                }
-              }
-            });
-          });
+      add(
+        {"HeightToNormal",
+         "Height to Normal",
+         "Normal",
+         "A normal map from a height image (tangent space, 0.5 0.5 1 flat).",
+         {In("Height", PinType::Grey, 0.5f)},
+         {Out("Normal", PinType::Color)},
+         {Num("Strength", 1.0f, 0.0f, 10.0f), Bool("Flip Green", false)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 4);
+        const int n = a.size;
+        TexImage h;
+        h.Reset(n, 1);
+        ForRows(n, [&](const int y) {
+          for (int x = 0; x < n; ++x) {
+            h.Pixel(x, y)[0] = FetchGrey(a.In(0), x, y, n);
+          }
+        });
+        // Slopes in the image's own units, so the strength reads the same at every size.
+        const float k = a.F(0) * 0.05f * static_cast<float>(n) * 0.5f;
+        const float flip = a.F(1) > 0.5f ? -1.0f : 1.0f;
+        ForRows(n, [&](const int y) {
+          for (int x = 0; x < n; ++x) {
+            const float dx = (h.Pixel(Wrap(x + 1, n), y)[0] - h.Pixel(Wrap(x - 1, n), y)[0]) * k;
+            const float dy = (h.Pixel(x, Wrap(y + 1, n))[0] - h.Pixel(x, Wrap(y - 1, n))[0]) * k * flip;
+            const float len = std::sqrt(dx * dx + dy * dy + 1.0f);
+            float* p = out.Pixel(x, y);
+            p[0] = -dx / len * 0.5f + 0.5f;
+            p[1] = dy / len * 0.5f + 0.5f;
+            p[2] = 1.0f / len * 0.5f + 0.5f;
+            p[3] = 1.0f;
+          }
+        });
+      }
+      );
+
+      add(
+        {"NormalBlend",
+         "Normal Blend",
+         "Normal",
+         "Detail normal over a base normal (whiteout blend), by Amount.",
+         {In("Base", PinType::Color, 0.5f, 0.5f, 1.0f, 1.0f), In("Detail", PinType::Color, 0.5f, 0.5f, 1.0f, 1.0f)},
+         {Out("Normal", PinType::Color)},
+         {Num("Amount", 1.0f, 0.0f, 1.0f)},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 4);
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            float b[4];
+            float d[4];
+            Fetch(a.In(0), x, y, a.size, b);
+            Fetch(a.In(1), x, y, a.size, d);
+            const float bx = b[0] * 2.0f - 1.0f;
+            const float by = b[1] * 2.0f - 1.0f;
+            const float bz = b[2] * 2.0f - 1.0f;
+            const float dx = (d[0] * 2.0f - 1.0f) * a.F(0);
+            const float dy = (d[1] * 2.0f - 1.0f) * a.F(0);
+            const float dz = Lerp(1.0f, d[2] * 2.0f - 1.0f, a.F(0));
+            const float nx = bx + dx;
+            const float ny = by + dy;
+            const float nz = bz * dz;
+            const float len = std::max(std::sqrt(nx * nx + ny * ny + nz * nz), 1e-5f);
+            float* p = out.Pixel(x, y);
+            p[0] = nx / len * 0.5f + 0.5f;
+            p[1] = ny / len * 0.5f + 0.5f;
+            p[2] = nz / len * 0.5f + 0.5f;
+            p[3] = 1.0f;
+          }
+        });
+      }
+      );
+
+      add(
+        {"Split",
+         "Split Channels",
+         "Channels",
+         "A colour image's R, G, B and A as grey images.",
+         {In("In", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f)},
+         {Out("R", PinType::Grey), Out("G", PinType::Grey), Out("B", PinType::Grey), Out("A", PinType::Grey)},
+         {},
+         false},
+        [](const EvalArgs& a) {
+        TexImage* channel[4] = {&a.Out(0, 1), &a.Out(1, 1), &a.Out(2, 1), &a.Out(3, 1)};
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            float c[4];
+            Fetch(a.In(0), x, y, a.size, c);
+            for (int i = 0; i < 4; ++i) {
+              channel[i]->Pixel(x, y)[0] = c[i];
+            }
+          }
+        });
+      }
+      );
+
+      add(
+        {"Merge",
+         "Merge Channels",
+         "Channels",
+         "Four grey images as one colour image's R, G, B and A.",
+         {In("R", PinType::Grey, 0.0f),
+          In("G", PinType::Grey, 0.0f),
+          In("B", PinType::Grey, 0.0f),
+          In("A", PinType::Grey, 1.0f)},
+         {Out("Out", PinType::Color)},
+         {},
+         false},
+        [](const EvalArgs& a) {
+        TexImage& out = a.Out(0, 4);
+        ForRows(a.size, [&](const int y) {
+          for (int x = 0; x < a.size; ++x) {
+            float* p = out.Pixel(x, y);
+            for (int i = 0; i < 4; ++i) {
+              p[i] = FetchGrey(a.In(static_cast<std::size_t>(i)), x, y, a.size);
+            }
+          }
+        });
+      }
+      );
     }
 
     TextureNodes& Nodes()
     {
       static TextureNodes nodes = [] {
         TextureNodes made;
-        made.registry.Add({"Output", "Output", "Output",
-                           "What the graph makes: the stratum's albedo (alpha: its transparency or specular, by the shader), its normal map, "
-                           "and a mask for painting the stratum over the map.",
-                           {In("Albedo", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f), In("Normal", PinType::Color, 0.5f, 0.5f, 1.0f, 1.0f),
-                            In("Mask", PinType::Grey, 1.0f)},
-                           {},
-                           {},
-                           true});
+        made.registry.Add(
+          {"Output",
+           "Output",
+           "Output",
+           "What the graph makes: the stratum's albedo (alpha: its transparency or specular, by the shader), its "
+           "normal map, "
+           "and a mask for painting the stratum over the map.",
+           {In("Albedo", PinType::Color, 0.5f, 0.5f, 0.5f, 1.0f),
+            In("Normal", PinType::Color, 0.5f, 0.5f, 1.0f, 1.0f),
+            In("Mask", PinType::Grey, 1.0f)},
+           {},
+           {},
+           true}
+        );
         made.eval["Output"] = [](const EvalArgs&) {};
         AddInputNodes(made);
         AddNoiseNodes(made);
@@ -1021,14 +1470,22 @@ namespace faf::editor
     }
   } // namespace
 
-  void TexImage::Reset(const int newSize, const int newChannels, const float fill)
+  void TexImage::Reset(
+    const int newSize,
+    const int newChannels,
+    const float fill
+  )
   {
     size = newSize;
     channels = newChannels;
     data.assign(static_cast<std::size_t>(newSize) * newSize * newChannels, fill);
   }
 
-  void TexImage::Sample(const float u, const float v, float (&out)[4]) const
+  void TexImage::Sample(
+    const float u,
+    const float v,
+    float (&out)[4]
+  ) const
   {
     if (size <= 0) {
       out[0] = out[1] = out[2] = 0.0f;
@@ -1061,7 +1518,9 @@ namespace faf::editor
     return Nodes().registry;
   }
 
-  void StartTextureGraph(NodeGraph& graph)
+  void StartTextureGraph(
+    NodeGraph& graph
+  )
   {
     graph.Clear();
     const int output = graph.AddNode("Output", 520.0f, 0.0f);
@@ -1074,7 +1533,9 @@ namespace faf::editor
     (void)graph.Link(normal, 0, output, 1);
   }
 
-  void TextureGraphEvaluator::SetSize(const int size)
+  void TextureGraphEvaluator::SetSize(
+    const int size
+  )
   {
     if (size != mSize) {
       mSize = std::clamp(size, 8, 4096);
@@ -1082,14 +1543,18 @@ namespace faf::editor
     }
   }
 
-  void TextureGraphEvaluator::SetTextureLoader(TextureLoader loader)
+  void TextureGraphEvaluator::SetTextureLoader(
+    TextureLoader loader
+  )
   {
     mLoader = std::move(loader);
     mTextures.clear();
     Invalidate();
   }
 
-  void TextureGraphEvaluator::SetTerrain(std::shared_ptr<const TerrainSource> terrain)
+  void TextureGraphEvaluator::SetTerrain(
+    std::shared_ptr<const TerrainSource> terrain
+  )
   {
     mTerrain = std::move(terrain);
     Invalidate();
@@ -1100,7 +1565,9 @@ namespace faf::editor
     mCache.clear();
   }
 
-  int TextureGraphEvaluator::Evaluate(const int id)
+  int TextureGraphEvaluator::Evaluate(
+    const int id
+  )
   {
     int computed = 0;
     for (const int at : mGraph->OrderFor(id)) {
@@ -1129,7 +1596,9 @@ namespace faf::editor
     return computed;
   }
 
-  bool TextureGraphEvaluator::Compute(const GraphNode& node)
+  bool TextureGraphEvaluator::Compute(
+    const GraphNode& node
+  )
   {
     const auto fn = Nodes().eval.find(node.type->name);
     if (fn == Nodes().eval.end()) {
@@ -1147,7 +1616,8 @@ namespace faf::editor
       outputs.push_back(std::move(image));
     }
     Cached cached;
-    const std::function<std::shared_ptr<TexImage>(const std::string&)> texture = [this](const std::string& path) -> std::shared_ptr<TexImage> {
+    const std::function<std::shared_ptr<TexImage>(const std::string&)> texture =
+      [this](const std::string& path) -> std::shared_ptr<TexImage> {
       if (const auto found = mTextures.find(path); found != mTextures.end()) {
         return found->second;
       }
@@ -1168,7 +1638,10 @@ namespace faf::editor
     return true;
   }
 
-  TexImagePtr TextureGraphEvaluator::Output(const int id, const int pin) const
+  TexImagePtr TextureGraphEvaluator::Output(
+    const int id,
+    const int pin
+  ) const
   {
     const auto found = mCache.find(id);
     if (found == mCache.end() || pin < 0 || static_cast<std::size_t>(pin) >= found->second.outputs.size()) {
@@ -1177,7 +1650,10 @@ namespace faf::editor
     return found->second.outputs[static_cast<std::size_t>(pin)];
   }
 
-  TexImagePtr TextureGraphEvaluator::Input(const int id, const int pin) const
+  TexImagePtr TextureGraphEvaluator::Input(
+    const int id,
+    const int pin
+  ) const
   {
     if (const GraphLink* link = mGraph->InputLink(id, pin)) {
       if (TexImagePtr image = Output(link->fromNode, link->fromPin)) {
@@ -1200,19 +1676,25 @@ namespace faf::editor
     return constant;
   }
 
-  std::string TextureGraphEvaluator::Warning(const int id) const
+  std::string TextureGraphEvaluator::Warning(
+    const int id
+  ) const
   {
     const auto found = mCache.find(id);
     return found == mCache.end() ? std::string() : found->second.warning;
   }
 
-  double TextureGraphEvaluator::Millis(const int id) const
+  double TextureGraphEvaluator::Millis(
+    const int id
+  ) const
   {
     const auto found = mCache.find(id);
     return found == mCache.end() ? 0.0 : found->second.millis;
   }
 
-  TexImagePtr TextureGraphEvaluator::Result(const std::string& outputPin)
+  TexImagePtr TextureGraphEvaluator::Result(
+    const std::string& outputPin
+  )
   {
     const int output = mGraph->OutputNode();
     const GraphNode* node = mGraph->Find(output);

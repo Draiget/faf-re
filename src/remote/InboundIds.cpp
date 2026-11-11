@@ -14,7 +14,11 @@
 
 namespace faf::remote
 {
-  void CCommandIdRewriter::Drop(const char* const message, const char* const kind, const std::uint32_t id)
+  void CCommandIdRewriter::Drop(
+    const char* const message,
+    const char* const kind,
+    const std::uint32_t id
+  )
   {
     ++mDropped;
     char text[160];
@@ -26,7 +30,10 @@ namespace faf::remote
     }
   }
 
-  bool CCommandIdRewriter::Entity(const char* const message, std::uint32_t& id)
+  bool CCommandIdRewriter::Entity(
+    const char* const message,
+    std::uint32_t& id
+  )
   {
     const std::uint32_t before = id;
     if (!RewriteEntity(id)) {
@@ -37,7 +44,10 @@ namespace faf::remote
     return true;
   }
 
-  bool CCommandIdRewriter::Command(const char* const message, std::uint32_t& id)
+  bool CCommandIdRewriter::Command(
+    const char* const message,
+    std::uint32_t& id
+  )
   {
     const std::uint32_t before = id;
     if (!RewriteCommand(id)) {
@@ -48,7 +58,10 @@ namespace faf::remote
     return true;
   }
 
-  bool CCommandIdRewriter::Target(const char* const message, moho::SSTITarget& target)
+  bool CCommandIdRewriter::Target(
+    const char* const message,
+    moho::SSTITarget& target
+  )
   {
     if (target.mType != moho::EAiTargetType::AITARGET_Entity) {
       return true;
@@ -65,7 +78,11 @@ namespace faf::remote
     return true;
   }
 
-  bool CCommandIdRewriter::Entities(const char* const message, const EntitySet& in, EntitySet& out)
+  bool CCommandIdRewriter::Entities(
+    const char* const message,
+    const EntitySet& in,
+    EntitySet& out
+  )
   {
     bool known = true;
     in.ForEachValue([&](const unsigned int value) {
@@ -79,7 +96,10 @@ namespace faf::remote
     return known;
   }
 
-  bool CCommandIdRewriter::IssueData(const char* const message, moho::SSTICommandIssueData& data)
+  bool CCommandIdRewriter::IssueData(
+    const char* const message,
+    moho::SSTICommandIssueData& data
+  )
   {
     if (data.unk04 != -1) {
       auto partner = static_cast<std::uint32_t>(data.unk04);
@@ -98,17 +118,23 @@ namespace faf::remote
     return Target(message, data.mTarget) && Target(message, data.mTarget2);
   }
 
-  void CCommandIdRewriter::CountBlipTarget(const moho::SSTICommandIssueData& data) noexcept
+  void CCommandIdRewriter::CountBlipTarget(
+    const moho::SSTICommandIssueData& data
+  ) noexcept
   {
     const auto index = static_cast<std::size_t>(data.mCommandType);
-    if (data.mTarget.mType == moho::EAiTargetType::AITARGET_Entity && (data.mTarget.mEntityId >> 28u) == 3u
-        && index < mBlipTargets.size()) {
+    if (
+      data.mTarget.mType == moho::EAiTargetType::AITARGET_Entity && (data.mTarget.mEntityId >> 28u) == 3u &&
+      index < mBlipTargets.size()
+    ) {
       ++mBlipTargets[index];
     }
   }
 
   std::uint32_t TranslateSelectionMask(
-    const CViewIdMap& map, const moho::SSyncFilterMaskBlock& in, moho::SSyncFilterMaskBlock& out,
+    const CViewIdMap& map,
+    const moho::SSyncFilterMaskBlock& in,
+    moho::SSyncFilterMaskBlock& out,
     const std::function<bool(std::uint32_t simId)>& known
   )
   {
@@ -125,7 +151,9 @@ namespace faf::remote
     return leftOut;
   }
 
-  void CCommandIdRewriter::SetCommandSource(const moho::CommandSourceId sourceId)
+  void CCommandIdRewriter::SetCommandSource(
+    const moho::CommandSourceId sourceId
+  )
   {
     mNext.SetCommandSource(sourceId);
   }
@@ -135,7 +163,10 @@ namespace faf::remote
     mNext.OnCommandSourceTerminated();
   }
 
-  void CCommandIdRewriter::VerifyChecksum(const gpg::MD5Digest& digest, const moho::CSeqNo seqNo)
+  void CCommandIdRewriter::VerifyChecksum(
+    const gpg::MD5Digest& digest,
+    const moho::CSeqNo seqNo
+  )
   {
     mNext.VerifyChecksum(digest, seqNo);
   }
@@ -156,20 +187,28 @@ namespace faf::remote
   }
 
   void CCommandIdRewriter::CreateUnit(
-    const uint32_t armyIndex, const moho::RResId& id, const moho::SCoordsVec2& pos, const float heading
+    const uint32_t armyIndex,
+    const moho::RResId& id,
+    const moho::SCoordsVec2& pos,
+    const float heading
   )
   {
     ++mCommands;
     mNext.CreateUnit(armyIndex, id, pos, heading);
   }
 
-  void CCommandIdRewriter::CreateProp(const char* const id, const Wm3::Vec3f& loc)
+  void CCommandIdRewriter::CreateProp(
+    const char* const id,
+    const Wm3::Vec3f& loc
+  )
   {
     ++mCommands;
     mNext.CreateProp(id, loc);
   }
 
-  void CCommandIdRewriter::DestroyEntity(const moho::EntId entityId)
+  void CCommandIdRewriter::DestroyEntity(
+    const moho::EntId entityId
+  )
   {
     ++mCommands;
     auto id = static_cast<std::uint32_t>(entityId);
@@ -178,7 +217,10 @@ namespace faf::remote
     }
   }
 
-  void CCommandIdRewriter::WarpEntity(const moho::EntId entityId, const moho::VTransform& transform)
+  void CCommandIdRewriter::WarpEntity(
+    const moho::EntId entityId,
+    const moho::VTransform& transform
+  )
   {
     ++mCommands;
     auto id = static_cast<std::uint32_t>(entityId);
@@ -187,7 +229,11 @@ namespace faf::remote
     }
   }
 
-  void CCommandIdRewriter::ProcessInfoPair(const moho::EntId entityId, const gpg::StrArg key, const gpg::StrArg value)
+  void CCommandIdRewriter::ProcessInfoPair(
+    const moho::EntId entityId,
+    const gpg::StrArg key,
+    const gpg::StrArg value
+  )
   {
     ++mCommands;
     auto id = static_cast<std::uint32_t>(entityId);
@@ -197,7 +243,9 @@ namespace faf::remote
   }
 
   void CCommandIdRewriter::IssueCommand(
-    const EntitySet& entities, const moho::SSTICommandIssueData& data, const bool clear
+    const EntitySet& entities,
+    const moho::SSTICommandIssueData& data,
+    const bool clear
   )
   {
     ++mCommands;
@@ -210,7 +258,9 @@ namespace faf::remote
   }
 
   void CCommandIdRewriter::IssueFactoryCommand(
-    const EntitySet& entities, const moho::SSTICommandIssueData& data, const bool clear
+    const EntitySet& entities,
+    const moho::SSTICommandIssueData& data,
+    const bool clear
   )
   {
     ++mCommands;
@@ -222,7 +272,10 @@ namespace faf::remote
     }
   }
 
-  void CCommandIdRewriter::IncreaseCommandCount(const moho::CmdId id, const int count)
+  void CCommandIdRewriter::IncreaseCommandCount(
+    const moho::CmdId id,
+    const int count
+  )
   {
     ++mCommands;
     auto command = static_cast<std::uint32_t>(id);
@@ -231,7 +284,10 @@ namespace faf::remote
     }
   }
 
-  void CCommandIdRewriter::DecreaseCommandCount(const moho::CmdId id, const int count)
+  void CCommandIdRewriter::DecreaseCommandCount(
+    const moho::CmdId id,
+    const int count
+  )
   {
     ++mCommands;
     auto command = static_cast<std::uint32_t>(id);
@@ -240,7 +296,10 @@ namespace faf::remote
     }
   }
 
-  void CCommandIdRewriter::SetCommandTarget(const moho::CmdId id, const moho::SSTITarget& target)
+  void CCommandIdRewriter::SetCommandTarget(
+    const moho::CmdId id,
+    const moho::SSTITarget& target
+  )
   {
     ++mCommands;
     auto command = static_cast<std::uint32_t>(id);
@@ -250,7 +309,10 @@ namespace faf::remote
     }
   }
 
-  void CCommandIdRewriter::SetCommandType(const moho::CmdId id, const moho::EUnitCommandType type)
+  void CCommandIdRewriter::SetCommandType(
+    const moho::CmdId id,
+    const moho::EUnitCommandType type
+  )
   {
     ++mCommands;
     auto command = static_cast<std::uint32_t>(id);
@@ -260,7 +322,9 @@ namespace faf::remote
   }
 
   void CCommandIdRewriter::SetCommandCells(
-    const moho::CmdId id, const gpg::core::FastVector<moho::SOCellPos>& cells, const Wm3::Vector3<float>& target
+    const moho::CmdId id,
+    const gpg::core::FastVector<moho::SOCellPos>& cells,
+    const Wm3::Vector3<float>& target
   )
   {
     ++mCommands;
@@ -270,7 +334,10 @@ namespace faf::remote
     }
   }
 
-  void CCommandIdRewriter::RemoveCommandFromUnitQueue(const moho::CmdId id, const moho::EntId unitId)
+  void CCommandIdRewriter::RemoveCommandFromUnitQueue(
+    const moho::CmdId id,
+    const moho::EntId unitId
+  )
   {
     ++mCommands;
     auto command = static_cast<std::uint32_t>(id);
@@ -280,14 +347,19 @@ namespace faf::remote
     }
   }
 
-  void CCommandIdRewriter::ExecuteLuaInSim(const char* const lua, const LuaPlus::LuaObject& args)
+  void CCommandIdRewriter::ExecuteLuaInSim(
+    const char* const lua,
+    const LuaPlus::LuaObject& args
+  )
   {
     ++mCommands;
     mNext.ExecuteLuaInSim(lua, args);
   }
 
   void CCommandIdRewriter::LuaSimCallback(
-    const char* const name, const LuaPlus::LuaObject& args, const EntitySet& entities
+    const char* const name,
+    const LuaPlus::LuaObject& args,
+    const EntitySet& entities
   )
   {
     ++mCommands;
@@ -297,7 +369,10 @@ namespace faf::remote
     }
   }
 
-  bool CCommandIdRewriter::CallbackIds(const char* const name, const LuaPlus::LuaObject& args)
+  bool CCommandIdRewriter::CallbackIds(
+    const char* const name,
+    const LuaPlus::LuaObject& args
+  )
   {
     if (name == nullptr || !args.IsTable()) {
       return true;
@@ -362,7 +437,10 @@ namespace faf::remote
   }
 
   void CCommandIdRewriter::LogUnmarked(
-    const char* const name, const LuaPlus::LuaObject& value, const std::string& path, const int depth
+    const char* const name,
+    const LuaPlus::LuaObject& value,
+    const std::string& path,
+    const int depth
   )
   {
     if (depth > 6) {
@@ -374,10 +452,10 @@ namespace faf::remote
         const std::string child = key.IsString() ? path + "." + key.GetString() : path + "[]";
         bool marked = false;
         for (const SCallbackIdField& field : kCallbackIdFields) {
-          marked = marked
-                || (std::strcmp(field.callback, name) == 0
-                    && (field.key == nullptr ? depth == 0 : depth == 0 && key.IsString()
-                                                               && std::strcmp(field.key, key.GetString()) == 0));
+          marked = marked ||
+            (std::strcmp(field.callback, name) == 0 &&
+             (field.key == nullptr ? depth == 0
+                                   : depth == 0 && key.IsString() && std::strcmp(field.key, key.GetString()) == 0));
         }
         if (!marked) {
           LogUnmarked(name, it.GetValue(), child, depth + 1);
@@ -407,14 +485,19 @@ namespace faf::remote
     // Plan WP5.11: an id the policy does not mark goes to the sim untranslated; logged for the policy.
     if (mUnmarkedIds++ < 8u) {
       gpg::Warnf(
-        "command ids: %s args%s holds 0x%08x, an id this view was given, in a field the policy does not mark", name,
-        path.c_str(), static_cast<std::uint32_t>(number)
+        "command ids: %s args%s holds 0x%08x, an id this view was given, in a field the policy does not mark",
+        name,
+        path.c_str(),
+        static_cast<std::uint32_t>(number)
       );
     }
   }
 
   void CCommandIdRewriter::ExecuteDebugCommand(
-    const char* const command, const Wm3::Vector3<float>& position, const uint32_t army, const EntitySet& entities
+    const char* const command,
+    const Wm3::Vector3<float>& position,
+    const uint32_t army,
+    const EntitySet& entities
   )
   {
     ++mCommands;
@@ -424,7 +507,9 @@ namespace faf::remote
     }
   }
 
-  void CCommandIdRewriter::AdvanceBeat(const int beats)
+  void CCommandIdRewriter::AdvanceBeat(
+    const int beats
+  )
   {
     mNext.AdvanceBeat(beats);
   }

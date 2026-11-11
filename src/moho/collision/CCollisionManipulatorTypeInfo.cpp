@@ -3,4 +3,3 @@
 // Compatibility translation unit:
 // `moho::CCollisionManipulatorTypeInfo` method bodies are implemented in
 // `moho/collision/CCollisionManipulator.cpp`.
-

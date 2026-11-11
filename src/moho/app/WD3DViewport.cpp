@@ -1,14 +1,20 @@
 #include "moho/app/WxPrivate.h"
 #include "moho/app/NetworkPanel.h"
 
-
 // ---------------------------------------------------------------------------
 // WD3DViewport
 // ---------------------------------------------------------------------------
 
-BEGIN_EVENT_TABLE(moho::WD3DViewport, wxWindow)
-  EVT_PAINT(moho::WD3DViewport::OnPaint)
-  EVT_ERASE_BACKGROUND(moho::WD3DViewport::OnEraseBackground)
+BEGIN_EVENT_TABLE(
+  moho::WD3DViewport,
+  wxWindow
+)
+EVT_PAINT(
+  moho::WD3DViewport::OnPaint
+)
+EVT_ERASE_BACKGROUND(
+  moho::WD3DViewport::OnEraseBackground
+)
 END_EVENT_TABLE()
 
 /**
@@ -47,7 +53,9 @@ moho::WD3DViewport::~WD3DViewport()
 /**
  * Address: 0x0042BAF0 (FUN_0042BAF0)
  */
-void moho::WD3DViewport::D3DWindowOnDeviceInit(const bool createBatchers)
+void moho::WD3DViewport::D3DWindowOnDeviceInit(
+  const bool createBatchers
+)
 {
   (void)createBatchers;
 }
@@ -60,7 +68,9 @@ void moho::WD3DViewport::D3DWindowOnDeviceRender() {}
 /**
  * Address: 0x0042BB10 (FUN_0042BB10)
  */
-void moho::WD3DViewport::D3DWindowOnDeviceExit(const bool fullShutdown)
+void moho::WD3DViewport::D3DWindowOnDeviceExit(
+  const bool fullShutdown
+)
 {
   (void)fullShutdown;
 }
@@ -68,7 +78,9 @@ void moho::WD3DViewport::D3DWindowOnDeviceExit(const bool fullShutdown)
 /**
  * Address: 0x0042BB20 (FUN_0042BB20)
  */
-void moho::WD3DViewport::RenderPreviewImage(const bool forceRegenerate)
+void moho::WD3DViewport::RenderPreviewImage(
+  const bool forceRegenerate
+)
 {
   (void)forceRegenerate;
 }
@@ -96,7 +108,9 @@ moho::CD3DPrimBatcher* moho::WD3DViewport::GetPrimBatcher() const
  * What it does:
  * SetBrush(wxBLACK_BRUSH), fill the DC's extent, SetBrush(wxNullBrush).
  */
-void moho::WD3DViewport::DrawBackgroundImage(wxDC& dc)
+void moho::WD3DViewport::DrawBackgroundImage(
+  wxDC& dc
+)
 {
   int width = 0;
   int height = 0;
@@ -113,7 +127,9 @@ void moho::WD3DViewport::DrawBackgroundImage(wxDC& dc)
  * Paints the background on WM_ERASEBKGND while there is no device, or while
  * the device asks for it; once it presents, erasing would only flicker.
  */
-void moho::WD3DViewport::OnEraseBackground(wxEraseEvent& event)
+void moho::WD3DViewport::OnEraseBackground(
+  wxEraseEvent& event
+)
 {
   CD3DDevice* const device = D3D_GetDevice();
   if (device != nullptr && !device->ShouldDrawViewportBackground()) {
@@ -132,7 +148,9 @@ void moho::WD3DViewport::OnEraseBackground(wxEraseEvent& event)
  * device presents - the background image is no longer needed - or, without
  * one, the background is painted by hand.
  */
-void moho::WD3DViewport::OnPaint(wxPaintEvent& event)
+void moho::WD3DViewport::OnPaint(
+  wxPaintEvent& event
+)
 {
   (void)event;
   wxPaintDC dc(this);
@@ -162,7 +180,6 @@ namespace
 {
   constexpr std::uint16_t kClientHitTestCode = HTCLIENT;
 }
-
 
 /**
  * Address: 0x00430B90 (FUN_00430B90)
@@ -202,8 +219,10 @@ long moho::WD3DViewport::MSWWindowProc(
   // Engine addition (issue #322): Ctrl+Shift+F11 flips the network panel, here so it works
   // in the lobby, in a game and in fullscreen without the Lua key map. F11 alone is FAF's
   // connectivity screen. Only the first press of a held key counts (lParam bit 30).
-  if (message == WM_KEYDOWN && wParam == VK_F11 && (lParam & 0x40000000) == 0 &&
-      (::GetKeyState(VK_CONTROL) & 0x8000) != 0 && (::GetKeyState(VK_SHIFT) & 0x8000) != 0) {
+  if (
+    message == WM_KEYDOWN && wParam == VK_F11 && (lParam & 0x40000000) == 0 &&
+    (::GetKeyState(VK_CONTROL) & 0x8000) != 0 && (::GetKeyState(VK_SHIFT) & 0x8000) != 0
+  ) {
     NETPANEL_Toggle();
     return 0;
   }

@@ -20,14 +20,23 @@ namespace faf::editor
 {
   namespace
   {
-    std::string LowerText(std::string text)
+    std::string LowerText(
+      std::string text
+    )
     {
-      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return text;
     }
 
     const char* const kTypes[] = {"All types", "Emitters", "Beams", "Trails"};
-    const ImU32 kTypeColors[] = {IM_COL32(120, 120, 120, 255), IM_COL32(240, 170, 80, 255), IM_COL32(110, 160, 255, 255), IM_COL32(120, 220, 140, 255)};
+    const ImU32 kTypeColors[] = {
+      IM_COL32(120, 120, 120, 255),
+      IM_COL32(240, 170, 80, 255),
+      IM_COL32(110, 160, 255, 255),
+      IM_COL32(120, 220, 140, 255)
+    };
   } // namespace
 
   void EdParticleEditor::ListEffects()
@@ -53,10 +62,14 @@ namespace faf::editor
       info.kind = EffectKind(info.path);
       mEffects.push_back(std::move(info));
     }
-    std::sort(mEffects.begin(), mEffects.end(), [](const EffectInfo& a, const EffectInfo& b) { return LowerText(a.name) < LowerText(b.name); });
+    std::sort(mEffects.begin(), mEffects.end(), [](const EffectInfo& a, const EffectInfo& b) {
+      return LowerText(a.name) < LowerText(b.name);
+    });
   }
 
-  void EdParticleEditor::TestBrowse(const std::string& search)
+  void EdParticleEditor::TestBrowse(
+    const std::string& search
+  )
   {
     ListEffects();
     (void)std::snprintf(mGridFilter, sizeof(mGridFilter), "%s", search.c_str());
@@ -69,7 +82,9 @@ namespace faf::editor
     }
   }
 
-  void EdParticleEditor::ReadEffect(EffectInfo& info)
+  void EdParticleEditor::ReadEffect(
+    EffectInfo& info
+  )
   {
     // Its type and textures, from its file, once (only for the tiles that show).
     info.read = true;
@@ -95,20 +110,31 @@ namespace faf::editor
     }
   }
 
-  void EdParticleEditor::DrawBrowserWindow(bool& open)
+  void EdParticleEditor::DrawBrowserWindow(
+    bool& open
+  )
   {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.8f, viewport->WorkSize.y * 0.75f), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
-                            ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowPos(
+      ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
+      ImGuiCond_FirstUseEver,
+      ImVec2(0.5f, 0.5f)
+    );
     ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
     if (!ImGui::Begin("Particle Browser", &open, ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
       return;
     }
     ListEffects();
-    if (ImGui::BeginTable("##browser", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail())) {
-      ImGui::TableSetupColumn("preview", ImGuiTableColumnFlags_WidthFixed, std::max(ImGui::GetContentRegionAvail().x * 0.35f, 300.0f));
+    if (
+      ImGui::BeginTable(
+        "##browser", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail()
+      )
+    ) {
+      ImGui::TableSetupColumn(
+        "preview", ImGuiTableColumnFlags_WidthFixed, std::max(ImGui::GetContentRegionAvail().x * 0.35f, 300.0f)
+      );
       ImGui::TableSetupColumn("grid", ImGuiTableColumnFlags_WidthStretch);
       ImGui::TableNextRow();
 
@@ -122,20 +148,31 @@ namespace faf::editor
         if (!mFlatMode) {
           char life[32];
           (void)std::snprintf(life, sizeof(life), "%.1f ticks", static_cast<double>(mEmitter.lifetime));
-          ImGui::Text("Lifetime %s, blend %s", mEmitter.lifetime < 0.0f ? "endless" : life, kEmitterBlendModes[std::clamp(static_cast<int>(mEmitter.blendMode), 0, 5)]);
+          ImGui::Text(
+            "Lifetime %s, blend %s",
+            mEmitter.lifetime < 0.0f ? "endless" : life,
+            kEmitterBlendModes[std::clamp(static_cast<int>(mEmitter.blendMode), 0, 5)]
+          );
         }
         ImGui::Spacing();
         if (ImGui::Button("Edit in the Particle Editor", ImVec2(-1.0f, 0.0f))) {
           mOpenEditorAsk = true; // the editor opens and this browser closes (EdShell)
         }
-        ImGui::SetItemTooltip("Opens it in the Particle Editor to change (this browser closes); Save there writes a copy into the map's folder");
+        ImGui::SetItemTooltip(
+          "Opens it in the Particle Editor to change (this browser closes); Save there writes a copy into the map's "
+          "folder"
+        );
         if (ImGui::Button("Place on the map", ImVec2(-1.0f, 0.0f))) {
           mPlaceAsk = mBrowserPick;
         }
-        ImGui::SetItemTooltip("An effect decoration at the middle of the map's view (an Effect marker: move it with the Markers tool; "
-                              "the map's script plays it in the game)");
+        ImGui::SetItemTooltip(
+          "An effect decoration at the middle of the map's view (an Effect marker: move it with the Markers tool; "
+          "the map's script plays it in the game)"
+        );
       } else {
-        ImGui::TextWrapped("Click an effect to play it here (and at the middle of the map's view). The wheel over the preview zooms.");
+        ImGui::TextWrapped(
+          "Click an effect to play it here (and at the middle of the map's view). The wheel over the preview zooms."
+        );
       }
 
       // The grid: filters, then a tile per effect.
@@ -155,8 +192,11 @@ namespace faf::editor
       const std::string filter = LowerText(mGridFilter);
       std::vector<EffectInfo*> shown;
       for (EffectInfo& info : mEffects) {
-        if ((mBrowseFaction != 0 && info.faction != mBrowseFaction) || (mBrowseKind != 0 && info.kind != mBrowseKind) ||
-            (mBrowseType != 0 && info.read && info.type != mBrowseType) || (!filter.empty() && LowerText(info.name).find(filter) == std::string::npos)) {
+        if (
+          (mBrowseFaction != 0 && info.faction != mBrowseFaction) || (mBrowseKind != 0 && info.kind != mBrowseKind) ||
+          (mBrowseType != 0 && info.read && info.type != mBrowseType) ||
+          (!filter.empty() && LowerText(info.name).find(filter) == std::string::npos)
+        ) {
           continue;
         }
         shown.push_back(&info);
@@ -197,23 +237,48 @@ namespace faf::editor
               dl->AddRectFilled(at, ImVec2(at.x + kTile, at.y + kTile), IM_COL32(12, 12, 16, 255), 4.0f);
               // The particle texture over a dark ground (additive ones show as they would at night), the ramp under it.
               if (const std::uint64_t image = mLibrary.Thumbnail(info.texture, true); image != 0) {
-                dl->AddImage(ImTextureRef(static_cast<ImTextureID>(image)), ImVec2(at.x + 8.0f, at.y + 8.0f), ImVec2(at.x + kTile - 8.0f, at.y + kTile - 8.0f));
+                dl->AddImage(
+                  ImTextureRef(static_cast<ImTextureID>(image)),
+                  ImVec2(at.x + 8.0f, at.y + 8.0f),
+                  ImVec2(at.x + kTile - 8.0f, at.y + kTile - 8.0f)
+                );
               }
               if (const std::uint64_t ramp = mLibrary.Thumbnail(info.ramp, true); ramp != 0) {
-                dl->AddImage(ImTextureRef(static_cast<ImTextureID>(ramp)), ImVec2(at.x, at.y + kTile + 2.0f), ImVec2(at.x + kTile, at.y + kTile + 9.0f));
+                dl->AddImage(
+                  ImTextureRef(static_cast<ImTextureID>(ramp)),
+                  ImVec2(at.x, at.y + kTile + 2.0f),
+                  ImVec2(at.x + kTile, at.y + kTile + 9.0f)
+                );
               }
-              dl->AddRect(at, ImVec2(at.x + kTile, at.y + kTile), selected ? IM_COL32(250, 200, 80, 255) : hovered ? IM_COL32(200, 200, 200, 255) : IM_COL32(50, 50, 56, 255),
-                          4.0f, 0, selected ? 2.0f : 1.0f);
+              dl->AddRect(
+                at,
+                ImVec2(at.x + kTile, at.y + kTile),
+                selected    ? IM_COL32(250, 200, 80, 255)
+                  : hovered ? IM_COL32(200, 200, 200, 255)
+                            : IM_COL32(50, 50, 56, 255),
+                4.0f,
+                0,
+                selected ? 2.0f : 1.0f
+              );
               // The type as a corner mark.
-              dl->AddRectFilled(ImVec2(at.x + kTile - 14.0f, at.y + 4.0f), ImVec2(at.x + kTile - 4.0f, at.y + 14.0f),
-                                kTypeColors[std::clamp(info.type, 0, 3)], 2.0f);
+              dl->AddRectFilled(
+                ImVec2(at.x + kTile - 14.0f, at.y + 4.0f),
+                ImVec2(at.x + kTile - 4.0f, at.y + 14.0f),
+                kTypeColors[std::clamp(info.type, 0, 3)],
+                2.0f
+              );
               ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + kTile);
               ImGui::TextUnformatted(info.name.c_str());
               ImGui::PopTextWrapPos();
               ImGui::EndGroup();
               if (hovered) {
-                ImGui::SetTooltip("%s\n%s, %s, %s\nClick to play it in the preview", info.path.c_str(), kEffectFactions[info.faction], kEffectKinds[info.kind],
-                                  info.read ? kTypes[std::clamp(info.type, 0, 3)] + 0 : "...");
+                ImGui::SetTooltip(
+                  "%s\n%s, %s, %s\nClick to play it in the preview",
+                  info.path.c_str(),
+                  kEffectFactions[info.faction],
+                  kEffectKinds[info.kind],
+                  info.read ? kTypes[std::clamp(info.type, 0, 3)] + 0 : "..."
+                );
               }
               if (picked && info.path == mBrowserPick) {
                 RestartPreview(); // the one open again: played from its start, its edits kept

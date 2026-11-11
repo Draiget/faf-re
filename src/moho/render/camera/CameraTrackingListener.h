@@ -30,14 +30,11 @@ namespace moho
    */
   struct SCameraTracking
   {
-    fa::string mCameraName{};        // +0x00, 28 bytes
-    std::uint8_t  mTransitionFlag = 0;  // +0x1C, 1 byte (padded to 4 on the stack)
+    fa::string mCameraName{};         // +0x00, 28 bytes
+    std::uint8_t mTransitionFlag = 0; // +0x1C, 1 byte (padded to 4 on the stack)
   };
 
-  static_assert(
-    offsetof(SCameraTracking, mCameraName) == 0x00,
-    "SCameraTracking::mCameraName offset must be 0x00"
-  );
+  static_assert(offsetof(SCameraTracking, mCameraName) == 0x00, "SCameraTracking::mCameraName offset must be 0x00");
   static_assert(
     offsetof(SCameraTracking, mTransitionFlag) == 0x1C,
     "SCameraTracking::mTransitionFlag offset must be 0x1C"
@@ -93,7 +90,8 @@ namespace moho
 
     /**
      * Address: 0x008714B0 (FUN_008714B0)
-     * Mangled: ?Receive@CameraTrackingListener@Moho@@UAEXV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z
+     * Mangled:
+     * ?Receive@CameraTrackingListener@Moho@@UAEXV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z
      * Slot: 0 (Listener<SCameraTracking> vtable, single virtual method)
      *
      * IDA signature:

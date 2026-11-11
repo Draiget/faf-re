@@ -22,12 +22,19 @@ namespace faf::editor
    * lowest corner is deeper than MaxWaterDepth, or when an edge of the cell rises more than MaxSlope. Without a sea
    * the level is -10000. The terrain types' own blocking is not counted.
    */
-  std::vector<std::uint8_t> PassableCells(const std::uint16_t* heights, int width, int height, bool water, float waterLevel,
-                                          const PathFootprint& footprint);
+  std::vector<std::uint8_t> PassableCells(
+    const std::uint16_t* heights,
+    int width,
+    int height,
+    bool water,
+    float waterLevel,
+    const PathFootprint& footprint
+  );
 
   /** Joins passable cells edge to edge: an area number per cell (0 where blocked); returns how many areas. */
   int ConnectAreas(const std::vector<std::uint8_t>& cells, int cellsX, int cellsZ, std::vector<int>& areas);
 
-  /** The area of the passable cell nearest (x, z) within `reach` cells (a resource on a slope is reached beside it), or 0. */
+  /** The area of the passable cell nearest (x, z) within `reach` cells (a resource on a slope is reached beside it), or
+   * 0. */
   int AreaNear(const std::vector<int>& areas, int cellsX, int cellsZ, float x, float z, int reach);
 } // namespace faf::editor

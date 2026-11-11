@@ -50,7 +50,10 @@ namespace
     return registry;
   }
 
-  TEST(NodeGraph, LinksReplaceTheInputsLinkAndRefuseLoops)
+  TEST(
+    NodeGraph,
+    LinksReplaceTheInputsLinkAndRefuseLoops
+  )
   {
     const NodeTypeRegistry registry = MakeRegistry();
     NodeGraph graph(registry);
@@ -75,7 +78,9 @@ namespace
     // Order: c before b before out; a stands alone, the output's evaluation leaves it out.
     std::vector<int> order;
     ASSERT_TRUE(graph.Order(order));
-    const auto at = [&](const int id) { return std::find(order.begin(), order.end(), id) - order.begin(); };
+    const auto at = [&](const int id) {
+      return std::find(order.begin(), order.end(), id) - order.begin();
+    };
     EXPECT_LT(at(c), at(b));
     EXPECT_LT(at(b), at(out));
     EXPECT_EQ(graph.OrderFor(out), (std::vector<int>{c, b, out}));
@@ -86,7 +91,10 @@ namespace
     EXPECT_EQ(graph.InputLink(b, 0), nullptr);
   }
 
-  TEST(NodeGraph, AChangeBumpsTheNodeAndWhatItFeeds)
+  TEST(
+    NodeGraph,
+    AChangeBumpsTheNodeAndWhatItFeeds
+  )
   {
     const NodeTypeRegistry registry = MakeRegistry();
     NodeGraph graph(registry);
@@ -96,7 +104,9 @@ namespace
     const int lone = graph.AddNode("Constant", 0.0f, 0.0f);
     ASSERT_EQ(graph.Link(c, 0, m, 0), LinkResult::Ok);
     ASSERT_EQ(graph.Link(m, 0, out, 0), LinkResult::Ok);
-    const auto revision = [&](const int id) { return graph.Find(id)->revision; };
+    const auto revision = [&](const int id) {
+      return graph.Find(id)->revision;
+    };
     const auto outBefore = revision(out);
     const auto loneBefore = revision(lone);
     ParamValue value;
@@ -110,7 +120,10 @@ namespace
     EXPECT_EQ(revision(out), again);
   }
 
-  TEST(NodeGraph, TheFileReadsBackTheSameGraph)
+  TEST(
+    NodeGraph,
+    TheFileReadsBackTheSameGraph
+  )
   {
     const NodeTypeRegistry registry = MakeRegistry();
     NodeGraph graph(registry);
@@ -140,7 +153,10 @@ namespace
     EXPECT_GT(read.AddNode("Constant", 0.0f, 0.0f), std::max({out, s, m}));
   }
 
-  TEST(NodeGraph, AFileWithUnknownNodesAndMissingParametersStillReads)
+  TEST(
+    NodeGraph,
+    AFileWithUnknownNodesAndMissingParametersStillReads
+  )
   {
     const NodeTypeRegistry registry = MakeRegistry();
     const std::string text = R"({

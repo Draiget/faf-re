@@ -29,7 +29,10 @@ namespace gpg::core
      * it holds on x86.
      */
     template <class T>
-    inline void StoreInlineCapacitySentinel(T* const inlineOrigin, T* const capacityEnd) noexcept
+    inline void StoreInlineCapacitySentinel(
+      T* const inlineOrigin,
+      T* const capacityEnd
+    ) noexcept
     {
 #if defined(_M_IX86)
       *reinterpret_cast<T**>(inlineOrigin) = capacityEnd;
@@ -40,7 +43,9 @@ namespace gpg::core
     }
 
     template <class T>
-    [[nodiscard]] inline T* LoadInlineCapacitySentinel(T* const inlineOrigin) noexcept
+    [[nodiscard]] inline T* LoadInlineCapacitySentinel(
+      T* const inlineOrigin
+    ) noexcept
     {
 #if defined(_M_IX86)
       return *reinterpret_cast<T* const*>(inlineOrigin);
@@ -91,11 +96,17 @@ namespace gpg::core
      * objects. The 0x00562A80 emission is for `T = Moho::UnitWeaponInfo` and
      * calls its operator= (0x0055F210) per element, which is why a byte-wise
      * move is wrong for that T - it owns two fa::string members.
-     * Address: 0x0061CE90 (FUN_0061CE90 -- the `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion` emission: `WeakPtr::operator=` per slot, walking backward; formerly `AssignIntrusiveWeakRefRangeBackwardRelink` over a look-alike node struct, removed 2026-09-30.)
-     * Address: 0x0061CF00 (FUN_0061CF00 -- an ICF twin of 0x0061CE90.)
+     * Address: 0x0061CE90 (FUN_0061CE90 -- the `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>`
+     * (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion` emission:
+     * `WeakPtr::operator=` per slot, walking backward; formerly `AssignIntrusiveWeakRefRangeBackwardRelink` over a
+     * look-alike node struct, removed 2026-09-30.) Address: 0x0061CF00 (FUN_0061CF00 -- an ICF twin of 0x0061CE90.)
      */
     template <class T>
-    T* CopyBackwardAssign(const T* last, T* resultLast, const T* first)
+    T* CopyBackwardAssign(
+      const T* last,
+      T* resultLast,
+      const T* first
+    )
     {
       while (last != first) {
         --last;
@@ -125,13 +136,16 @@ namespace gpg::core
      * destructible `T` hides an element-count cookie in front of the block.
      */
 #if defined(_M_X64) || defined(__x86_64__)
-    /// `moho::SimBlockLane`'s account of `unsigned int` storage, whose bytes are the same in the binary. Null where no sim is linked.
+    /// `moho::SimBlockLane`'s account of `unsigned int` storage, whose bytes are the same in the binary. Null where no
+    /// sim is linked.
     inline void (*gUIntStorageAllocated)(const void*, std::size_t) = nullptr;
     inline void (*gUIntStorageFreed)(const void*) = nullptr;
 #endif
 
     template <class T>
-    [[nodiscard]] inline T* AllocateElements(const std::size_t count)
+    [[nodiscard]] inline T* AllocateElements(
+      const std::size_t count
+    )
     {
       T* const block = static_cast<T*>(::operator new(count * sizeof(T)));
 #if defined(_M_X64) || defined(__x86_64__)
@@ -145,7 +159,9 @@ namespace gpg::core
     }
 
     template <class T>
-    inline void FreeElements(T* const block) noexcept
+    inline void FreeElements(
+      T* const block
+    ) noexcept
     {
 #if defined(_M_X64) || defined(__x86_64__)
       if constexpr (std::is_same_v<T, unsigned int>) {
@@ -175,23 +191,42 @@ namespace gpg::core
      * destructible element, which is the shape every POD lane compiles to.
      */
     /**
-     * Address: 0x00711B80 (FUN_00711B80 -- `_Destroy_range` for `gpg::fastvector_n<moho::SCondition, 2>` (`STrigger::mConditions`, element 0x38): each `~SCondition` releases the category set's word storage; reached from `~STrigger` (0x00711A90) through `ResetStorageToInline`.)
-     * Address: 0x0065F750 (FUN_0065F750 -- `_Destroy_range` for
-     * `gpg::fastvector_n<moho::SEfxCurve, 21>` (`CEfxEmitter::mCurves`, element
-     * 0x38): per element the inlined `~SEfxCurve`, which is `mKeys`'
-     * `ResetInline_` at `+0x10` -- free when `start_ != originalVec_`, restore
-     * `capacity_` from the saved sentinel, then `end_ = start_`. Reached from
+     * Address: 0x00711B80 (FUN_00711B80 -- `_Destroy_range` for `gpg::fastvector_n<moho::SCondition, 2>`
+     * (`STrigger::mConditions`, element 0x38): each `~SCondition` releases the category set's word storage; reached
+     * from `~STrigger` (0x00711A90) through `ResetStorageToInline`.) Address: 0x0065F750 (FUN_0065F750 --
+     * `_Destroy_range` for `gpg::fastvector_n<moho::SEfxCurve, 21>` (`CEfxEmitter::mCurves`, element 0x38): per element
+     * the inlined `~SEfxCurve`, which is `mKeys`' `ResetInline_` at `+0x10` -- free when `start_ != originalVec_`,
+     * restore `capacity_` from the saved sentinel, then `end_ = start_`. Reached from
      * `~CEfxEmitter` (0x0065DE4B) and from both emitter constructors'
      * `resize(21, value)`.)
-     * Address: 0x0055D940 (FUN_0055D940 -- `DestroyRange` for `gpg::fastvector_n<moho::UnitWeaponInfo, 1>` (`SSTIUnitVariableData::mWeaponInfo`, element 0x98): `first` in EAX, `last` in EBX, `~UnitWeaponInfo` (0x0055D170) per slot; callers 0x00561D90 (`AssignFrom`'s shrink tail, `DestroyRange(newEnd, end_)`), 0x0055D260 (`resize`), 0x0055D840, and unboxed code at 0x0055D7FA; formerly `DestroyUnitWeaponInfoRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0056E7E0 (FUN_0056E7E0 -- `DestroyRange` for `gpg::fastvector_n<SFormationRunScriptCandidate, 16>` (CAiFormationInstance.cpp, element 0x48): `first` in EAX, `last` in EBX; each inlined `~SFormationRunScriptCandidate` is the reset of `category.mBits.mWords` at `+0x30`; callers 0x00567300 (`CFormationInstance::RunScript`'s three scope exits of the candidate vector), 0x0056C8A0 / 0x0056C900 / 0x0056E7A0 (out-of-line `~FastVectorN` emissions), 0x0056FAB0 (`GrowInsertDeepCopy`'s old-range teardown and catch rollback); formerly `NormalizeFormationLaneRangeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0061CA70 (FUN_0061CA70 -- `DestroyRange` for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`: `~WeakPtr` per slot, the splice-out walk with no write to the node; reached from those vectors' destructors and `ResetStorageToInline` (`Unit::UpdateBlipsInRange` 0x006ACC60, `CUnitMotion::ProcessSurfaceCollisionFromLastMove`), and from the reallocating insert's old-range teardown. Formerly an intrusive-slot range unlink beside this template, removed 2026-09-30.)
-     * Address: 0x007AF240 (FUN_007AF240 -- the same body for the camera's `fastvector_n<WeakPtr<UserEntity>, N>` frustum lists.)
-     * Address: 0x008B79A0 (FUN_008B79A0 -- the same body for `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>` (`UserCommandQueue::primaryLinks`/`resolvedLinks`), 11 callers: the queue's destructor 0x008B6BE0, its three edits, `ResetStorageToInline` 0x008B74A0 and 0x008B7350; formerly `UnlinkResolvedQueueOwnerLinks` in moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
-     * (Inlined at 0x007EEB21..0x007EEB40 in `RangeRenderer::Render`, 0x007EEA00, as the teardown of a stack `WeakPtr` fastvector.)
+     * Address: 0x0055D940 (FUN_0055D940 -- `DestroyRange` for `gpg::fastvector_n<moho::UnitWeaponInfo, 1>`
+     * (`SSTIUnitVariableData::mWeaponInfo`, element 0x98): `first` in EAX, `last` in EBX, `~UnitWeaponInfo`
+     * (0x0055D170) per slot; callers 0x00561D90 (`AssignFrom`'s shrink tail, `DestroyRange(newEnd, end_)`), 0x0055D260
+     * (`resize`), 0x0055D840, and unboxed code at 0x0055D7FA; formerly `DestroyUnitWeaponInfoRangeRuntime` in
+     * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address: 0x0056E7E0 (FUN_0056E7E0 --
+     * `DestroyRange` for `gpg::fastvector_n<SFormationRunScriptCandidate, 16>` (CAiFormationInstance.cpp, element
+     * 0x48): `first` in EAX, `last` in EBX; each inlined `~SFormationRunScriptCandidate` is the reset of
+     * `category.mBits.mWords` at `+0x30`; callers 0x00567300 (`CFormationInstance::RunScript`'s three scope exits of
+     * the candidate vector), 0x0056C8A0 / 0x0056C900 / 0x0056E7A0 (out-of-line `~FastVectorN` emissions), 0x0056FAB0
+     * (`GrowInsertDeepCopy`'s old-range teardown and catch rollback); formerly `NormalizeFormationLaneRangeRuntime` in
+     * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address: 0x0061CA70 (FUN_0061CA70 --
+     * `DestroyRange` for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>`
+     * raised-platform candidates of `CUnitMotion`: `~WeakPtr` per slot, the splice-out walk with no write to the node;
+     * reached from those vectors' destructors and `ResetStorageToInline` (`Unit::UpdateBlipsInRange` 0x006ACC60,
+     * `CUnitMotion::ProcessSurfaceCollisionFromLastMove`), and from the reallocating insert's old-range teardown.
+     * Formerly an intrusive-slot range unlink beside this template, removed 2026-09-30.) Address: 0x007AF240
+     * (FUN_007AF240 -- the same body for the camera's `fastvector_n<WeakPtr<UserEntity>, N>` frustum lists.) Address:
+     * 0x008B79A0 (FUN_008B79A0 -- the same body for `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>`
+     * (`UserCommandQueue::primaryLinks`/`resolvedLinks`), 11 callers: the queue's destructor 0x008B6BE0, its three
+     * edits, `ResetStorageToInline` 0x008B74A0 and 0x008B7350; formerly `UnlinkResolvedQueueOwnerLinks` in
+     * moho/unit/core/UserUnit.cpp, removed 2026-09-30.) (Inlined at 0x007EEB21..0x007EEB40 in `RangeRenderer::Render`,
+     * 0x007EEA00, as the teardown of a stack `WeakPtr` fastvector.)
      */
     template <class T>
-    inline void DestroyRange(T* first, T* const last) noexcept
+    inline void DestroyRange(
+      T* first,
+      T* const last
+    ) noexcept
     {
       if constexpr (!std::is_trivially_destructible_v<T>) {
         for (; first != last; ++first) {
@@ -230,17 +265,38 @@ namespace gpg::core
      *
      * For trivially-copyable `T` this collapses to the same plain element store
      * the generic 4-byte emission (FUN_00402C20) performs.
-     * Address: 0x0092BE50 (FUN_0092BE50 -- `ConstructRangeForward` (`_Ucopy`, null-guarded byte copy) for the 1-byte `gpg::HaStar::Cluster::Edge` of `gpg::fastvector_n<Cluster::Edge, 50>` (`ClusterBuild`'s triangular edge table), emitted as a `this`-taking member (`ret 0xC`, `(first, last, dest)` order); callers 0x0092CCF0 (the reallocating insert: prefix / inserted run / suffix); formerly `CopyByteRangeAndAdvanceRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00954250 (FUN_00954250 -- `ConstructRangeForward` for the `char` reachability flags of `gpg::fastvector_n<char, 12>` (`EraseUnconnectedNodes` 0x00954650, grown by `resize(n, 0)` 0x009545D0); the same null-guarded byte copy as 0x0092BE50 for a second instantiation, also a `this`-taking member (`ret 0xC`); callers 0x009543F0 (the reallocating insert: prefix / inserted run / suffix); formerly `CopyByteRangeAndAdvanceRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0061CA20 (FUN_0061CA20 -- `ConstructRangeForward` for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`: each non-null slot `WeakPtr`'s copy constructor, pushed onto its target's chain; the `_Ucopy` of the reallocating insert 0x0061C940. Formerly `CopyIntrusiveWeakRefRangeRelink`, removed 2026-09-30.)
-     * Address: 0x008AFB90 (FUN_008AFB90 -- `ConstructRangeForward` for `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28): `if (dest) new (dest) SoundHandleRecord(*src)` per slot, the copy constructor 0x008AECF0 that pushes the new slot onto its loop handle's chain and copies the tracked-entity set; the three slices of the reallocating insert 0x008AF760. It was cited on the assignment lane, with the chain relink and the set copy modelled as passes after the grow (`RebuildSoundHandleOwnerChains`, `RefreshTrackedEntitySetAfterRelocation`, removed 2026-09-30); the second one emptied every relocated slot's set instead of copying it.)
-     * Address: 0x004ADDB0 (FUN_004ADDB0 -- `ConstructRangeForward` for `gpg::fastvector_n<moho::ResourceWatch*, N>` (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8), the
-     * null-guarded pointer copy of the inserting and reallocating paths
-     * (0x004ACD80, 0x004ADCE0); formerly `CopyDwordRangeForward_004ADDB0` in
+     * Address: 0x0092BE50 (FUN_0092BE50 -- `ConstructRangeForward` (`_Ucopy`, null-guarded byte copy) for the 1-byte
+     * `gpg::HaStar::Cluster::Edge` of `gpg::fastvector_n<Cluster::Edge, 50>` (`ClusterBuild`'s triangular edge table),
+     * emitted as a `this`-taking member (`ret 0xC`, `(first, last, dest)` order); callers 0x0092CCF0 (the reallocating
+     * insert: prefix / inserted run / suffix); formerly `CopyByteRangeAndAdvanceRuntimeA` in
+     * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address: 0x00954250 (FUN_00954250 --
+     * `ConstructRangeForward` for the `char` reachability flags of `gpg::fastvector_n<char, 12>`
+     * (`EraseUnconnectedNodes` 0x00954650, grown by `resize(n, 0)` 0x009545D0); the same null-guarded byte copy as
+     * 0x0092BE50 for a second instantiation, also a `this`-taking member (`ret 0xC`); callers 0x009543F0 (the
+     * reallocating insert: prefix / inserted run / suffix); formerly `CopyByteRangeAndAdvanceRuntimeB` in
+     * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address: 0x0061CA20 (FUN_0061CA20 --
+     * `ConstructRangeForward` for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the
+     * `, 10>` raised-platform candidates of `CUnitMotion`: each non-null slot `WeakPtr`'s copy constructor, pushed onto
+     * its target's chain; the `_Ucopy` of the reallocating insert 0x0061C940. Formerly
+     * `CopyIntrusiveWeakRefRangeRelink`, removed 2026-09-30.) Address: 0x008AFB90 (FUN_008AFB90 --
+     * `ConstructRangeForward` for `gpg::fastvector_n<moho::SoundHandleRecord, 256>`
+     * (`CUserSoundManager::mSoundHandles`, element 0x28): `if (dest) new (dest) SoundHandleRecord(*src)` per slot, the
+     * copy constructor 0x008AECF0 that pushes the new slot onto its loop handle's chain and copies the tracked-entity
+     * set; the three slices of the reallocating insert 0x008AF760. It was cited on the assignment lane, with the chain
+     * relink and the set copy modelled as passes after the grow (`RebuildSoundHandleOwnerChains`,
+     * `RefreshTrackedEntitySetAfterRelocation`, removed 2026-09-30); the second one emptied every relocated slot's set
+     * instead of copying it.) Address: 0x004ADDB0 (FUN_004ADDB0 -- `ConstructRangeForward` for
+     * `gpg::fastvector_n<moho::ResourceWatch*, N>` (`CResourceWatcher::mWatches`, N = 2, and
+     * `ResourceManager::OnDiskWatchEvent`'s local, N = 8), the null-guarded pointer copy of the inserting and
+     * reallocating paths (0x004ACD80, 0x004ADCE0); formerly `CopyDwordRangeForward_004ADDB0` in
      * moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
      */
     template <class T>
-    inline T* ConstructRangeForward(T* dest, const T* first, const T* const last)
+    inline T* ConstructRangeForward(
+      T* dest,
+      const T* first,
+      const T* const last
+    )
     {
       for (; first != last; ++first) {
         if (dest != nullptr) {
@@ -263,13 +319,19 @@ namespace gpg::core
     // Element size in bytes; for void treat as 1 to allow math in bytes.
     static constexpr size_t elem_ = std::is_void_v<T> ? 1 : sizeof(T);
 
-    static size_t index_of(const T* base, const T* p) noexcept
+    static size_t index_of(
+      const T* base,
+      const T* p
+    ) noexcept
     {
       const auto b = reinterpret_cast<const std::byte*>(base);
       const auto q = reinterpret_cast<const std::byte*>(p);
       return static_cast<size_t>(q - b) / elem_;
     }
-    static T* ptr_at(T* base, const size_t idx) noexcept
+    static T* ptr_at(
+      T* base,
+      const size_t idx
+    ) noexcept
     {
       auto b = reinterpret_cast<std::byte*>(base);
       return reinterpret_cast<T*>(b + idx * elem_);
@@ -332,9 +394,10 @@ namespace gpg::core
     [[nodiscard]]
     /**
      * Address: 0x00402290 (FUN_00402290, the generic 4-byte emission)
-     * Address: 0x006D1A00 (FUN_006D1A00 -- out-of-line `Size()` for an 8-byte element (`(end - begin) / 8`); zero callers, unreachable.)
-     * Address: 0x006D1D00 (FUN_006D1D00 -- checked-iterator distance for an 8-byte element; zero callers, unreachable.)
-     * Address: 0x006D1DF0 (FUN_006D1DF0 -- a second emission of the 8-byte checked-iterator distance; zero callers, unreachable.)
+     * Address: 0x006D1A00 (FUN_006D1A00 -- out-of-line `Size()` for an 8-byte element (`(end - begin) / 8`); zero
+     * callers, unreachable.) Address: 0x006D1D00 (FUN_006D1D00 -- checked-iterator distance for an 8-byte element; zero
+     * callers, unreachable.) Address: 0x006D1DF0 (FUN_006D1DF0 -- a second emission of the 8-byte checked-iterator
+     * distance; zero callers, unreachable.)
      */
     size_t Size() const noexcept
     {
@@ -349,7 +412,8 @@ namespace gpg::core
     [[nodiscard]]
     /**
      * Address: 0x00402280 (FUN_00402280, the generic `Empty()` emission is the same shape)
-     * Address: 0x006D19D0 (FUN_006D19D0 -- out-of-line `Capacity()` for an 8-byte element (`(capacity - begin) / 8`); zero callers, unreachable.)
+     * Address: 0x006D19D0 (FUN_006D19D0 -- out-of-line `Capacity()` for an 8-byte element (`(capacity - begin) / 8`);
+     * zero callers, unreachable.)
      */
     size_t Capacity() const noexcept
     {
@@ -387,11 +451,15 @@ namespace gpg::core
     }
 
     /** Random access operators (no bounds checks). */
-    T& operator[](const size_t idx) noexcept
+    T& operator[](
+      const size_t idx
+    ) noexcept
     {
       return *ptr_at(start_, idx);
     }
-    const T& operator[](const size_t idx) const noexcept
+    const T& operator[](
+      const size_t idx
+    ) const noexcept
     {
       return *ptr_at(const_cast<T*>(start_), idx);
     }
@@ -521,7 +589,9 @@ namespace gpg::core
      *
      * Reserve at least n elements; does not shrink.
      */
-    void Reserve(size_t n)
+    void Reserve(
+      size_t n
+    )
     {
       if (Capacity() >= n)
         return;
@@ -545,7 +615,9 @@ namespace gpg::core
     /**
      * Append by copy; grows capacity exponentially.
      */
-    void PushBack(const T& v)
+    void PushBack(
+      const T& v
+    )
     {
       if (end_ == capacity_) {
         const size_t newCap = Capacity() ? Capacity() * 2 : 4;
@@ -555,7 +627,9 @@ namespace gpg::core
       ++end_;
     }
 
-    void reserve(const size_t n)
+    void reserve(
+      const size_t n
+    )
     {
       Reserve(n);
     }
@@ -569,7 +643,9 @@ namespace gpg::core
      * grow lane of `nodes.push_back(point)` in Moho::CAiPathSpline::Generate,
      * element width 0x1C.)
      */
-    void push_back(const value_type& v)
+    void push_back(
+      const value_type& v
+    )
     {
       PushBack(v);
     }
@@ -578,7 +654,9 @@ namespace gpg::core
       Clear();
     }
 
-    void resize(const size_t n)
+    void resize(
+      const size_t n
+    )
     {
       const size_t current = Size();
       if (n <= current) {
@@ -600,10 +678,21 @@ namespace gpg::core
     }
 
     /**
-     * Address: 0x00657900 (FUN_00657900 -- `resize(n, fill)` for `moho::CountedPtr<CParticleTexture>` (4-byte refcounted element): shrinking erases the tail through 0x00657DB0 (each slot's destructor releases its texture), growing reserves and copy-constructs `fill` into the new slots (each retaining the texture). Callers: the `RFastVectorType<CountedPtr<CParticleTexture>>` SerLoad 0x0065A4C0 and `SetCount`. Formerly `ResizeFastVectorCountedPtrCParticleTexture` in moho/particles/CParticleTextureCountedPtr.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0067C430 (FUN_0067C430 -- `resize(n, value)` itself -- trim by moving `end_` when shrinking, grow through 0x0067E190 otherwise. Reached from `Entity::GetTerrainCollisionGeom`'s `outSpheres.resize(n, Sphere3f{})` for `gpg::core::FastVector<Wm3::Sphere3f>` (the terrain-collision proxy sphere buffer `Entity::GetTerrainCollisionGeom` fills; the 16-byte element is trivially copyable); callers 0x0067AA50; formerly `ResizeTerrainCollisionSphereBuffer` in moho/entity/Entity.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x00657900 (FUN_00657900 -- `resize(n, fill)` for `moho::CountedPtr<CParticleTexture>` (4-byte
+     * refcounted element): shrinking erases the tail through 0x00657DB0 (each slot's destructor releases its texture),
+     * growing reserves and copy-constructs `fill` into the new slots (each retaining the texture). Callers: the
+     * `RFastVectorType<CountedPtr<CParticleTexture>>` SerLoad 0x0065A4C0 and `SetCount`. Formerly
+     * `ResizeFastVectorCountedPtrCParticleTexture` in moho/particles/CParticleTextureCountedPtr.cpp (RULE ONE), removed
+     * 2026-09-10.) Address: 0x0067C430 (FUN_0067C430 -- `resize(n, value)` itself -- trim by moving `end_` when
+     * shrinking, grow through 0x0067E190 otherwise. Reached from `Entity::GetTerrainCollisionGeom`'s
+     * `outSpheres.resize(n, Sphere3f{})` for `gpg::core::FastVector<Wm3::Sphere3f>` (the terrain-collision proxy sphere
+     * buffer `Entity::GetTerrainCollisionGeom` fills; the 16-byte element is trivially copyable); callers 0x0067AA50;
+     * formerly `ResizeTerrainCollisionSphereBuffer` in moho/entity/Entity.cpp (RULE ONE), removed 2026-09-11.)
      */
-    void resize(const size_t n, const value_type& value)
+    void resize(
+      const size_t n,
+      const value_type& value
+    )
     {
       const size_t current = Size();
       if (n <= current) {
@@ -621,32 +710,69 @@ namespace gpg::core
     }
 
     /**
-     * Address: 0x005E8900 (FUN_005E8900 -- `erase(pos)` -- shift the tail down one slot and rewind `end_`, handing back a cursor on the same index. Reached from `EntitySetTemplate<Unit>::RemoveUnit`'s `mVec.erase(it)` for `gpg::core::FastVectorN<moho::Entity*, 4>` (`EntitySetTemplate<Unit>::mVec` at +0x08; the 0x10 head sits in front of its own four-slot inline block); callers 0x00608EF0; formerly `EraseEntityVectorSlotAndReturnCursor` in moho/sim/ArmyUnitSet.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x008B7540 (FUN_008B7540 -- `erase(pos)` for `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>` (`UserCommandQueue::primaryLinks`/`resolvedLinks`): the Remove edit's `resolvedLinks.erase(found)` in the rebuild 0x008B6F60, shifting through 0x008B8140; formerly `EraseQueueLinkEntryAndShrinkRange` in moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
+     * Address: 0x005E8900 (FUN_005E8900 -- `erase(pos)` -- shift the tail down one slot and rewind `end_`, handing back
+     * a cursor on the same index. Reached from `EntitySetTemplate<Unit>::RemoveUnit`'s `mVec.erase(it)` for
+     * `gpg::core::FastVectorN<moho::Entity*, 4>` (`EntitySetTemplate<Unit>::mVec` at +0x08; the 0x10 head sits in front
+     * of its own four-slot inline block); callers 0x00608EF0; formerly `EraseEntityVectorSlotAndReturnCursor` in
+     * moho/sim/ArmyUnitSet.cpp (RULE ONE), removed 2026-09-11.) Address: 0x008B7540 (FUN_008B7540 -- `erase(pos)` for
+     * `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>`
+     * (`UserCommandQueue::primaryLinks`/`resolvedLinks`): the Remove edit's `resolvedLinks.erase(found)` in the rebuild
+     * 0x008B6F60, shifting through 0x008B8140; formerly `EraseQueueLinkEntryAndShrinkRange` in
+     * moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
      */
-    iterator erase(iterator pos)
+    iterator erase(
+      iterator pos
+    )
     {
       return erase(pos, pos + 1);
     }
 
     /**
-     * Address: 0x0056F0A0 (FUN_0056F0A0 -- `erase(first, last)` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C): the assign-forward shift followed by the tail destroy, reached from that vector's shrinking `Resize`.)
-     * Address: 0x005716D0 (FUN_005716D0 -- the `std::copy` emission over `SOffsetInfo::operator=` that the shift loop below compiles to for that instantiation.)
-     * Address: 0x0072AE40 (FUN_0072AE40 -- tail relocation of `erase` for a 4-byte element; Moves one dword range `[sourceBegin, sourceEnd)` into a destination tail ending at `destinationEnd` and returns the destination begin pointer.)
-     * Address: 0x0071D450 (FUN_0071D450 -- tail relocation of `erase` for a 56-byte element (calling-convention bridge); Copies `rangeCount` trailing 56-byte lanes ending at `destinationEnd` into uninitialized storage starting at `destinationEnd`.)
-     * Address: 0x00751AF0 (FUN_00751AF0 -- tail relocation of `erase` for a 40-byte element (calling-convention bridge); Copies one 40-byte lane range `[sourceBegin, sourceEnd)` into destination storage starting at `sourceEnd`.)
-     * Address: 0x007535B0 (FUN_007535B0 -- tail relocation of `erase` for a 12-byte element; Copies one 12-byte tail range `[sourceCursor, owner.finish)` into `destinationBegin`, updates `owner.finish`, and stores `destinationBegin` through `outBegin`.)
-     * Address: 0x00753680 (FUN_00753680 -- tail relocation of `erase` for a 40-byte element; Copies one 40-byte tail range `[sourceCursor, owner.finish)` into `destinationBegin`, updates `owner.finish`, and stores `destinationBegin` through `outBegin`.)
-     * Address: 0x007654F0 (FUN_007654F0 -- tail relocation of `erase` for a 4-byte element (calling-convention bridge); Copies one dword lane range `[sourceBegin, sourceEnd)` into destination storage starting at `sourceEnd`.)
-     * Address: 0x00658800 (FUN_00658800 -- the shift step of `erase(pos, end())` for `moho::CountedPtr<CParticleTexture>`: per slot a refcounted assignment (release the old texture, retain the new one) rather than a raw copy; its one caller 0x00657DB0 always passes an empty source range. Formerly `RelinkCountedTextureSlotsForward` in moho/particles/CParticleTextureCountedPtr.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x00657DB0 (FUN_00657DB0 -- `erase(pos, end())` for `moho::CountedPtr<CParticleTexture>`: shift through 0x00658800 (always empty here), release the vacated tail, drop `end_`; the shrink arm of `resize` 0x00657900.)
-     * Address: 0x00954510 (FUN_00954510 -- `FastVector<T>::erase(first, last)` for a 12-char inline-backed lane; zero callers, unreachable; formerly `FastVectorN12CharEraseRange` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0092DAD0 (FUN_0092DAD0 -- `erase(first, last)` for `gpg::fastvector_n<gpg::HaStar::Cluster::Edge, 50>` (1-byte element): byte-copy the tail `[last, end_)` down to `first`, rebase `end_` (+0x04), return `first`, nothing when `first == last` -- the `erase(begin() + n, end())` shrink arm of `resize(n, value)` 0x0092E410; callers 0x0092E410; formerly `ShiftByteRangeLeftAndCommitEndRuntime` over a `ByteRangeStorageRuntime` overlay in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
-     * Address: 0x007F2DA0 (FUN_007F2DA0 -- `erase(first, last)` for `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`): `WeakPtr::operator=` down over the gap, `~WeakPtr` over the vacated tail (0x007AF240); its one caller is `AssignFrom` 0x007F20E0's shrink arm; formerly `CameraFrustumUserEntityList::Erase`, removed 2026-09-30.)
-     * Address: 0x008AF2C0 (FUN_008AF2C0 -- `erase(first, last)` for `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28), the shrink arm of `resize(n, value)` 0x008AEA40: assignment down over the gap, `~SoundHandleRecord` over the vacated tail.)
-     * Address: 0x008B8140 (FUN_008B8140 -- the shift loop for `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>` (`UserCommandQueue::primaryLinks`/`resolvedLinks`): `WeakPtr::operator=` forward, ICF-identical to the `WeakPtr<UserUnit>` copy 0x008B3870; callers `erase(pos)` 0x008B7540 and the shrinking `resize` 0x008B7900.)
+     * Address: 0x0056F0A0 (FUN_0056F0A0 -- `erase(first, last)` for `gpg::fastvector_n<moho::SOffsetInfo, 2>`
+     * (`CFormationInstance::mOffsetInfo`, element 0x4C): the assign-forward shift followed by the tail destroy, reached
+     * from that vector's shrinking `Resize`.) Address: 0x005716D0 (FUN_005716D0 -- the `std::copy` emission over
+     * `SOffsetInfo::operator=` that the shift loop below compiles to for that instantiation.) Address: 0x0072AE40
+     * (FUN_0072AE40 -- tail relocation of `erase` for a 4-byte element; Moves one dword range `[sourceBegin,
+     * sourceEnd)` into a destination tail ending at `destinationEnd` and returns the destination begin pointer.)
+     * Address: 0x0071D450 (FUN_0071D450 -- tail relocation of `erase` for a 56-byte element (calling-convention
+     * bridge); Copies `rangeCount` trailing 56-byte lanes ending at `destinationEnd` into uninitialized storage
+     * starting at `destinationEnd`.) Address: 0x00751AF0 (FUN_00751AF0 -- tail relocation of `erase` for a 40-byte
+     * element (calling-convention bridge); Copies one 40-byte lane range `[sourceBegin, sourceEnd)` into destination
+     * storage starting at `sourceEnd`.) Address: 0x007535B0 (FUN_007535B0 -- tail relocation of `erase` for a 12-byte
+     * element; Copies one 12-byte tail range `[sourceCursor, owner.finish)` into `destinationBegin`, updates
+     * `owner.finish`, and stores `destinationBegin` through `outBegin`.) Address: 0x00753680 (FUN_00753680 -- tail
+     * relocation of `erase` for a 40-byte element; Copies one 40-byte tail range `[sourceCursor, owner.finish)` into
+     * `destinationBegin`, updates `owner.finish`, and stores `destinationBegin` through `outBegin`.) Address:
+     * 0x007654F0 (FUN_007654F0 -- tail relocation of `erase` for a 4-byte element (calling-convention bridge); Copies
+     * one dword lane range `[sourceBegin, sourceEnd)` into destination storage starting at `sourceEnd`.) Address:
+     * 0x00658800 (FUN_00658800 -- the shift step of `erase(pos, end())` for `moho::CountedPtr<CParticleTexture>`: per
+     * slot a refcounted assignment (release the old texture, retain the new one) rather than a raw copy; its one caller
+     * 0x00657DB0 always passes an empty source range. Formerly `RelinkCountedTextureSlotsForward` in
+     * moho/particles/CParticleTextureCountedPtr.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00657DB0 (FUN_00657DB0
+     * -- `erase(pos, end())` for `moho::CountedPtr<CParticleTexture>`: shift through 0x00658800 (always empty here),
+     * release the vacated tail, drop `end_`; the shrink arm of `resize` 0x00657900.) Address: 0x00954510 (FUN_00954510
+     * -- `FastVector<T>::erase(first, last)` for a 12-char inline-backed lane; zero callers, unreachable; formerly
+     * `FastVectorN12CharEraseRange` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.) Address:
+     * 0x0092DAD0 (FUN_0092DAD0 -- `erase(first, last)` for `gpg::fastvector_n<gpg::HaStar::Cluster::Edge, 50>` (1-byte
+     * element): byte-copy the tail `[last, end_)` down to `first`, rebase `end_` (+0x04), return `first`, nothing when
+     * `first == last` -- the `erase(begin() + n, end())` shrink arm of `resize(n, value)` 0x0092E410; callers
+     * 0x0092E410; formerly `ShiftByteRangeLeftAndCommitEndRuntime` over a `ByteRangeStorageRuntime` overlay in
+     * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address: 0x007F2DA0 (FUN_007F2DA0 --
+     * `erase(first, last)` for `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes
+     * `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`): `WeakPtr::operator=` down over the gap, `~WeakPtr` over
+     * the vacated tail (0x007AF240); its one caller is `AssignFrom` 0x007F20E0's shrink arm; formerly
+     * `CameraFrustumUserEntityList::Erase`, removed 2026-09-30.) Address: 0x008AF2C0 (FUN_008AF2C0 -- `erase(first,
+     * last)` for `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28),
+     * the shrink arm of `resize(n, value)` 0x008AEA40: assignment down over the gap, `~SoundHandleRecord` over the
+     * vacated tail.) Address: 0x008B8140 (FUN_008B8140 -- the shift loop for
+     * `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>`
+     * (`UserCommandQueue::primaryLinks`/`resolvedLinks`): `WeakPtr::operator=` forward, ICF-identical to the
+     * `WeakPtr<UserUnit>` copy 0x008B3870; callers `erase(pos)` 0x008B7540 and the shrinking `resize` 0x008B7900.)
      */
-    iterator erase(iterator first, iterator last)
+    iterator erase(
+      iterator first,
+      iterator last
+    )
     {
       if (!first || !last || first < start_ || first > end_ || last < first || last > end_) {
         return end_;
@@ -698,7 +824,10 @@ namespace gpg::core
      * container through a runtime-view overlay -- see RULE ONE in
      * CLAUDE.md.
      */
-    void Resize(const size_t newSize, const T& fill = T{})
+    void Resize(
+      const size_t newSize,
+      const T& fill = T{}
+    )
     {
       resize(newSize, fill);
     }
@@ -719,7 +848,9 @@ namespace gpg::core
      * engine to reach around the container through
      * a runtime-view overlay -- see RULE ONE in CLAUDE.md.
      */
-    FastVector& operator=(const FastVector& other)
+    FastVector& operator=(
+      const FastVector& other
+    )
     {
       if (this == &other) {
         return *this;
@@ -748,14 +879,18 @@ namespace gpg::core
       return *this;
     }
 
-    FastVector(FastVector&& other) noexcept
+    FastVector(
+      FastVector&& other
+    ) noexcept
       : start_(other.start_)
       , end_(other.end_)
       , capacity_(other.capacity_)
     {
       other.start_ = other.end_ = other.capacity_ = nullptr;
     }
-    FastVector& operator=(FastVector&& other) noexcept
+    FastVector& operator=(
+      FastVector&& other
+    ) noexcept
     {
       if (this != &other) {
         detail::DestroyRange(start_, end_);
@@ -804,11 +939,27 @@ namespace gpg::core
      * Destroys the live range, releases the heap block when one is active (the
      * inline buffer is never freed) and nulls the lanes so the base destructor
      * has nothing left to do.
-     * Address: 0x0056B4D0 (FUN_0056B4D0 -- the destructor of `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the element destructor the `eh vector destructor iterator` runs for `mOffsetInfo[2]` in `~CFormationInstance`.)
-     * Address: 0x0057E9D0 (FUN_0057E9D0 -- the destructor of `gpg::fastvector_n<Moho::CollisionResult, 10>`, the stack buffer every COGrid collision query fills; its 12 callers are the scope exits of those locals (`Sim::LocationIsFree`, `Projectile::CheckCollision`, `CUnitMotion::ProcessSurfaceCollisionFromLastMove`, ...). The FUN_00401DE0 body with `this` in ESI instead of ECX and the vector at +0x00; no element loop, `CollisionResult` being trivially destructible.)
-     * Address: 0x00545280 (FUN_00545280 -- the FUN_00401DE0 body with `this` in ESI: the destructor of the `gpg::fastvector_n<unsigned int, 2>` at `+0x08` of `moho::BVIntSet` (`mWords`), i.e. the implicit `~ArmyLaunchInfo` / `~BVIntSet` of the 0x20-byte element of `fa::vector<moho::ArmyLaunchInfo>`; callers 0x00545130 (`uninit_fill_n`), 0x005454A0 / 0x005457A0 / 0x00545880 (the `uninit_copy_n` bodies' catch rollback loops, stride 0x20); formerly `ResetSwapBackedArrayRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
-     * Address: 0x006DF040 (FUN_006DF040 -- the same destructor body for the `gpg::fastvector_n<unsigned int, 2>` at `+0x10` of `moho::EntityCategorySet` (`mBits.mWords`), i.e. the implicit `~BVSet` of the 0x28-byte element of `fa::vector<moho::EntityCategorySet>`, `this` in ESI; callers 0x006DEA30 (`uninit_fill_n`), 0x006DFFF0 / 0x006E0400 (`uninit_copy_n`), 0x006E00A0 -- each a catch rollback loop, stride 0x28; formerly `ResetSwapBackedArrayRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
-     * Address: 0x008AF710 (FUN_008AF710 -- the destructor of `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28): `~SoundHandleRecord` (0x008AB160) per slot, then the heap block freed and the lanes rebound to the inline window; callers `~CUserSoundManager` (0x008AABC7) and the constructor's unwind (0x008AA800). Formerly `ClearSoundHandleVector`, removed 2026-09-30.)
+     * Address: 0x0056B4D0 (FUN_0056B4D0 -- the destructor of `gpg::fastvector_n<moho::SOffsetInfo, 2>`
+     * (`CFormationInstance::mOffsetInfo`, element 0x4C), the element destructor the `eh vector destructor iterator`
+     * runs for `mOffsetInfo[2]` in `~CFormationInstance`.) Address: 0x0057E9D0 (FUN_0057E9D0 -- the destructor of
+     * `gpg::fastvector_n<Moho::CollisionResult, 10>`, the stack buffer every COGrid collision query fills; its 12
+     * callers are the scope exits of those locals (`Sim::LocationIsFree`, `Projectile::CheckCollision`,
+     * `CUnitMotion::ProcessSurfaceCollisionFromLastMove`, ...). The FUN_00401DE0 body with `this` in ESI instead of ECX
+     * and the vector at +0x00; no element loop, `CollisionResult` being trivially destructible.) Address: 0x00545280
+     * (FUN_00545280 -- the FUN_00401DE0 body with `this` in ESI: the destructor of the `gpg::fastvector_n<unsigned int,
+     * 2>` at `+0x08` of `moho::BVIntSet` (`mWords`), i.e. the implicit `~ArmyLaunchInfo` / `~BVIntSet` of the 0x20-byte
+     * element of `fa::vector<moho::ArmyLaunchInfo>`; callers 0x00545130 (`uninit_fill_n`), 0x005454A0 / 0x005457A0 /
+     * 0x00545880 (the `uninit_copy_n` bodies' catch rollback loops, stride 0x20); formerly
+     * `ResetSwapBackedArrayRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address:
+     * 0x006DF040 (FUN_006DF040 -- the same destructor body for the `gpg::fastvector_n<unsigned int, 2>` at `+0x10` of
+     * `moho::EntityCategorySet` (`mBits.mWords`), i.e. the implicit `~BVSet` of the 0x28-byte element of
+     * `fa::vector<moho::EntityCategorySet>`, `this` in ESI; callers 0x006DEA30 (`uninit_fill_n`), 0x006DFFF0 /
+     * 0x006E0400 (`uninit_copy_n`), 0x006E00A0 -- each a catch rollback loop, stride 0x28; formerly
+     * `ResetSwapBackedArrayRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address:
+     * 0x008AF710 (FUN_008AF710 -- the destructor of `gpg::fastvector_n<moho::SoundHandleRecord, 256>`
+     * (`CUserSoundManager::mSoundHandles`, element 0x28): `~SoundHandleRecord` (0x008AB160) per slot, then the heap
+     * block freed and the lanes rebound to the inline window; callers `~CUserSoundManager` (0x008AABC7) and the
+     * constructor's unwind (0x008AA800). Formerly `ClearSoundHandleVector`, removed 2026-09-30.)
      */
     ~FastVectorInline()
     {
@@ -832,15 +983,31 @@ namespace gpg::core
      * Address: 0x004026F0 (FUN_004026F0, the generic emission: binds all four lanes to a
      * caller-owned buffer)
      * Address: 0x0047F500 (FUN_0047F500, the n64<char> fixed-span alias lane)
-     * Address: 0x00553430 (FUN_00553430 -- `BindInlineStorage` for `unsigned int`: `lea edx,[ecx+edx*4]` -- base in ECX and the slot count in EDX, the by-count form. Zero callers, unreachable; formerly a deleted overlay in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
-     * Address: 0x00553500 (FUN_00553500 -- `BindInlineStorage` for `unsigned int`: an ICF-identical second emission of that by-count form. Zero callers, unreachable; formerly a deleted overlay in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
-     * Address: 0x0065A340 (FUN_0065A340 -- `BindInlineStorage` for `unsigned int`: the same body with the count folded to 26 (`lea edx,[ecx+0x68]`). Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity26` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
-     * Address: 0x0065F380 (FUN_0065F380 -- `BindInlineStorage` for `unsigned int` with the count folded to 294. Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity294` in moho/render/EmitterTypeTypeInfo.cpp (RULE THREE), removed 2026-09-23.)
-     * Address: 0x0065A350 (FUN_0065A350 -- `BindInlineStorage` for `unsigned int`: the same body with the count folded to 2 (`lea edx,[ecx+8]`). Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity2` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
-     * Address: 0x004ACE90 (FUN_004ACE90 -- the by-count `BindInlineStorage` for `gpg::fastvector_n<moho::ResourceWatch*, N>` (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8). Zero callers, unreachable; formerly `InitializeDwordPointerWindow4` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
-     * Address: 0x004ACC70 (FUN_004ACC70 -- the N = 8 form with the count folded (`lea ecx,[eax+0x10]; lea edx,[ecx+0x20]`), `OnDiskWatchEvent`'s local. Zero callers, unreachable; formerly `InitializeLegacyPointerHeader4` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00553430 (FUN_00553430 -- `BindInlineStorage` for `unsigned int`: `lea edx,[ecx+edx*4]` -- base in ECX
+     * and the slot count in EDX, the by-count form. Zero callers, unreachable; formerly a deleted overlay in
+     * gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.) Address: 0x00553500
+     * (FUN_00553500 -- `BindInlineStorage` for `unsigned int`: an ICF-identical second emission of that by-count form.
+     * Zero callers, unreachable; formerly a deleted overlay in gpg/core/containers/FastVectorUIntReflection.cpp (RULE
+     * ONE), removed 2026-09-18.) Address: 0x0065A340 (FUN_0065A340 -- `BindInlineStorage` for `unsigned int`: the same
+     * body with the count folded to 26 (`lea edx,[ecx+0x68]`). Zero callers, unreachable; formerly
+     * `BindDwordVectorHeaderCapacity26` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed
+     * 2026-09-18.) Address: 0x0065F380 (FUN_0065F380 -- `BindInlineStorage` for `unsigned int` with the count folded to
+     * 294. Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity294` in
+     * moho/render/EmitterTypeTypeInfo.cpp (RULE THREE), removed 2026-09-23.) Address: 0x0065A350 (FUN_0065A350 --
+     * `BindInlineStorage` for `unsigned int`: the same body with the count folded to 2 (`lea edx,[ecx+8]`). Zero
+     * callers, unreachable; formerly `BindDwordVectorHeaderCapacity2` in
+     * gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.) Address: 0x004ACE90
+     * (FUN_004ACE90 -- the by-count `BindInlineStorage` for `gpg::fastvector_n<moho::ResourceWatch*, N>`
+     * (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8). Zero callers,
+     * unreachable; formerly `InitializeDwordPointerWindow4` in moho/resource/ResourceManager.cpp (RULE ONE), removed
+     * 2026-09-30.) Address: 0x004ACC70 (FUN_004ACC70 -- the N = 8 form with the count folded (`lea ecx,[eax+0x10]; lea
+     * edx,[ecx+0x20]`), `OnDiskWatchEvent`'s local. Zero callers, unreachable; formerly
+     * `InitializeLegacyPointerHeader4` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
      */
-    void BindInlineStorage(T* const storage, const size_type count) noexcept
+    void BindInlineStorage(
+      T* const storage,
+      const size_type count
+    ) noexcept
     {
       this->start_ = storage;
       this->end_ = storage;
@@ -873,18 +1040,32 @@ namespace gpg::core
      * otherwise only reset end to start.
      * Address: 0x004021F0 (FUN_004021F0, the same body reached from the clear lane)
      * Address: 0x004022A0 (FUN_004022A0, an alias emission of the same)
-     * Address: 0x004E7280 (FUN_004E7280 -- reset to inline storage for a 24-byte element; Resets one 24-byte fastvector lane to its inline origin storage, releasing heap storage when the active lane is not already inline.)
-     * Address: 0x0054CCF0 (FUN_0054CCF0 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to inline storage and releases heap storage when the active lane is not already inline.)
-     * Address: 0x0054D760 (FUN_0054D760 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
-     * Address: 0x006FD160 (FUN_006FD160 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to inline storage and releases heap storage when the active lane is not already inline.)
-     * Address: 0x006FD190 (FUN_006FD190 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
-     * Address: 0x0072A440 (FUN_0072A440 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to inline storage and frees heap storage when the active lane is not already inline.)
-     * Address: 0x0072A970 (FUN_0072A970 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
-     * Address: 0x007AE790 (FUN_007AE790 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
-     * Address: 0x008B74A0 (FUN_008B74A0 -- `ResetStorageToInline` for `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>` (`UserCommandQueue::primaryLinks`/`resolvedLinks`): the resolved run discarded whenever an edit is queued, and at the start of its rebuild 0x008B6F60; formerly `ResetQueueLinkVectorToInlineStorage` in moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
-     * Address: 0x004C7C70 (FUN_004C7C70 -- `fastvector_n<LuaPlus::LuaObject, N>::clear`: destroy every live `LuaObject`, free the heap block when the active buffer is not the inline one, rebind to the inline buffer using the saved inline capacity. Formerly `ClearAndResetLuaObjectFastVector` in lua/LuaObject.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0056B4B0 (FUN_0056B4B0 -- `FastVectorN<T, N>::ResetStorageToInline` for a 0x98-byte inline block; callers ; formerly `ResetInlineOffsetVectorStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x00954550 (FUN_00954550 -- `FastVectorInline<T>::ResetStorageToInline` for a 12-char inline-backed lane; zero callers, unreachable; formerly `FastVectorN12CharReleaseHeapStorage` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004E7280 (FUN_004E7280 -- reset to inline storage for a 24-byte element; Resets one 24-byte fastvector
+     * lane to its inline origin storage, releasing heap storage when the active lane is not already inline.) Address:
+     * 0x0054CCF0 (FUN_0054CCF0 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to
+     * inline storage and releases heap storage when the active lane is not already inline.) Address: 0x0054D760
+     * (FUN_0054D760 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector
+     * storage contract.) Address: 0x006FD160 (FUN_006FD160 -- reset to inline storage for a ? element; Resets one
+     * inline-backed fastvector lane to inline storage and releases heap storage when the active lane is not already
+     * inline.) Address: 0x006FD190 (FUN_006FD190 -- reset to inline storage for a ? element; Alias reset lane for the
+     * same inline-backed fastvector storage contract.) Address: 0x0072A440 (FUN_0072A440 -- reset to inline storage for
+     * a ? element; Resets one inline-backed fastvector lane to inline storage and frees heap storage when the active
+     * lane is not already inline.) Address: 0x0072A970 (FUN_0072A970 -- reset to inline storage for a ? element; Alias
+     * reset lane for the same inline-backed fastvector storage contract.) Address: 0x007AE790 (FUN_007AE790 -- reset to
+     * inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
+     * Address: 0x008B74A0 (FUN_008B74A0 -- `ResetStorageToInline` for
+     * `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>`
+     * (`UserCommandQueue::primaryLinks`/`resolvedLinks`): the resolved run discarded whenever an edit is queued, and at
+     * the start of its rebuild 0x008B6F60; formerly `ResetQueueLinkVectorToInlineStorage` in
+     * moho/unit/core/UserUnit.cpp, removed 2026-09-30.) Address: 0x004C7C70 (FUN_004C7C70 --
+     * `fastvector_n<LuaPlus::LuaObject, N>::clear`: destroy every live `LuaObject`, free the heap block when the active
+     * buffer is not the inline one, rebind to the inline buffer using the saved inline capacity. Formerly
+     * `ClearAndResetLuaObjectFastVector` in lua/LuaObject.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0056B4B0
+     * (FUN_0056B4B0 -- `FastVectorN<T, N>::ResetStorageToInline` for a 0x98-byte inline block; callers ; formerly
+     * `ResetInlineOffsetVectorStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x00954550 (FUN_00954550 -- `FastVectorInline<T>::ResetStorageToInline` for a 12-char inline-backed
+     * lane; zero callers, unreachable; formerly `FastVectorN12CharReleaseHeapStorage` in
+     * gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
      */
     void ResetStorageToInline() noexcept
     {
@@ -918,7 +1099,9 @@ namespace gpg::core
     }
 
     /// Destroys the elements of a block `ReleaseHeapStorage` handed over and frees it.
-    static void FreeReleasedBlock(const ReleasedBlock& released) noexcept
+    static void FreeReleasedBlock(
+      const ReleasedBlock& released
+    ) noexcept
     {
       detail::DestroyRange(released.begin, released.end);
       detail::FreeElements(released.begin);
@@ -929,56 +1112,83 @@ namespace gpg::core
      * insert_range` -- the ordered insert `Unit::GuardedByList` and the
      * formation weak-ref sets perform; its reallocating branch is
      * 0x00710E90, cited on `ReallocateInsert_`.)
-     * Address: 0x004ACD80 (FUN_004ACD80 -- `InsertRange` for `gpg::fastvector_n<moho::ResourceWatch*, N>` (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8): the
-     * `push_back`s of `ResourceManager::GetResource` (0x004AA220) and
-     * `OnDiskWatchEvent` (0x004AB780) and 0x004AC050; growth doubles. It was
-     * cited on `fa::vector::insert`; formerly `InsertDwordRangeIntoVectorRuntime`
-     * in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004ACD80 (FUN_004ACD80 -- `InsertRange` for `gpg::fastvector_n<moho::ResourceWatch*, N>`
+     * (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8): the `push_back`s
+     * of `ResourceManager::GetResource` (0x004AA220) and `OnDiskWatchEvent` (0x004AB780) and 0x004AC050; growth
+     * doubles. It was cited on `fa::vector::insert`; formerly `InsertDwordRangeIntoVectorRuntime` in
+     * moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
      *
      * What it does:
      * Inserts `[first, last)` at `pos`, growing storage when the run no longer
      * fits and never freeing the inline window. Returns the new end, exactly
      * as the binary body does.
      */
-    T* InsertRange(T* const pos, const T* const first, const T* const last)
+    T* InsertRange(
+      T* const pos,
+      const T* const first,
+      const T* const last
+    )
     {
       return InsertRangeImpl_(pos, first, last);
     }
 
-    void PushBack(const T& v)
+    void PushBack(
+      const T& v
+    )
     {
       (void)InsertRange(this->end_, &v, &v + 1);
     }
 
-    void push_back(const T& v)
+    void push_back(
+      const T& v
+    )
     {
       (void)InsertRange(this->end_, &v, &v + 1);
     }
 
     /**
-     * Address: 0x0092CCF0 (FUN_0092CCF0 -- the reallocate-and-split-copy an insert runs when the inline block is full for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x0092DAC5, 0x0092E410; formerly `ReallocateInlineBackedByteVectorWithSplitInsert` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0092CCF0 (FUN_0092CCF0 -- the reallocate-and-split-copy an insert runs when the inline block is full
+     * for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x0092DAC5,
+     * 0x0092E410; formerly `ReallocateInlineBackedByteVectorWithSplitInsert` in gpg/core/algorithms/Cluster.cpp (RULE
+     * ONE), removed 2026-09-10.)
      */
-    void Reserve(const size_type n)
+    void Reserve(
+      const size_type n
+    )
     {
       (void)EnsureCapacity_(n);
     }
 
-    void reserve(const size_type n)
+    void reserve(
+      const size_type n
+    )
     {
       Reserve(n);
     }
 
-    void resize(const size_type n)
+    void resize(
+      const size_type n
+    )
     {
       const T zeroFill{};
       ResizeFill_(zeroFill, n);
     }
 
     /**
-     * Address: 0x009545D0 (FUN_009545D0 -- a second emission of `resize(n, value)`, for the reachability flags for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x00954650; formerly `FastVectorN12CharResize` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0092E410 (FUN_0092E410 -- `resize(n, value)` for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x009310E0, 0x00954A40; formerly `ResizeInlineBackedByteVectorWithFill` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0056D1D0 (FUN_0056D1D0 -- `resize(n, value)` for `gpg::fastvector<moho::WeakPtr<moho::IUnit>>` (the 0x10 header of `CFormationInstance::mUnits`, element 0x08): shrink through 0x0056EF40, grow through `ReallocateInsert_` 0x0056D2B0, then copy-construct `value` (link at the owner head) into each new slot; callers `RFastVectorType<WeakPtr<IUnit>>::SetCount` 0x0056BF9D and its loader 0x0056DDC7; formerly `ResizeWeakPtrVector` over `WeakPtrVectorStorage` in moho/unit/core/IUnitWeakPtrReflection.cpp (RULE THREE), removed 2026-09-30.)
-     * Address: 0x006AF0A0 (FUN_006AF0A0 -- `resize(n, value)` for `gpg::fastvector<moho::WeakPtr<moho::Entity>>` (the 0x10 header of `Unit::mBlipsInRange`): callers `RFastVectorType<WeakPtr<Entity>>::SetCount` 0x006AE570 and its load callback 0x006AF3F0, each with a default `WeakPtr` temporary as the fill, and the vector's copy constructor 0x006ADE50.)
+     * Address: 0x009545D0 (FUN_009545D0 -- a second emission of `resize(n, value)`, for the reachability flags for
+     * `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity, inline}` head); callers 0x00954650; formerly
+     * `FastVectorN12CharResize` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0092E410
+     * (FUN_0092E410 -- `resize(n, value)` for `gpg::core::FastVectorInline<T>` (the 0x10 `{start, end, capacity,
+     * inline}` head); callers 0x009310E0, 0x00954A40; formerly `ResizeInlineBackedByteVectorWithFill` in
+     * gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0056D1D0 (FUN_0056D1D0 -- `resize(n,
+     * value)` for `gpg::fastvector<moho::WeakPtr<moho::IUnit>>` (the 0x10 header of `CFormationInstance::mUnits`,
+     * element 0x08): shrink through 0x0056EF40, grow through `ReallocateInsert_` 0x0056D2B0, then copy-construct
+     * `value` (link at the owner head) into each new slot; callers `RFastVectorType<WeakPtr<IUnit>>::SetCount`
+     * 0x0056BF9D and its loader 0x0056DDC7; formerly `ResizeWeakPtrVector` over `WeakPtrVectorStorage` in
+     * moho/unit/core/IUnitWeakPtrReflection.cpp (RULE THREE), removed 2026-09-30.) Address: 0x006AF0A0 (FUN_006AF0A0 --
+     * `resize(n, value)` for `gpg::fastvector<moho::WeakPtr<moho::Entity>>` (the 0x10 header of `Unit::mBlipsInRange`):
+     * callers `RFastVectorType<WeakPtr<Entity>>::SetCount` 0x006AE570 and its load callback 0x006AF3F0, each with a
+     * default `WeakPtr` temporary as the fill, and the vector's copy constructor 0x006ADE50.)
      */
     /**
      * Address: 0x00558EC0 (FUN_00558EC0, SSTIEntityAttachInfo resize emission)
@@ -987,7 +1197,10 @@ namespace gpg::core
      * Resizes the inline-backed attachment vector, preserving its origin and
      * filling appended records with the supplied entity-id sentinel.
      */
-    void resize(const size_type n, const T& value)
+    void resize(
+      const size_type n,
+      const T& value
+    )
     {
       ResizeFill_(value, n);
     }
@@ -1043,7 +1256,9 @@ namespace gpg::core
      * 32-bit element count in the same first 4 bytes, so the window's other
      * bytes keep exactly what they hold on x86.
      */
-    void StoreInlineCapacitySentinel_(T* const capacityEnd) noexcept
+    void StoreInlineCapacitySentinel_(
+      T* const capacityEnd
+    ) noexcept
     {
       detail::StoreInlineCapacitySentinel(originalVec_, capacityEnd);
     }
@@ -1058,7 +1273,10 @@ namespace gpg::core
      * Address: 0x00562350 (FUN_00562350, fastvector<WeakPtr<CUnitCommand>> instantiation)
      * Address: 0x0056D2B0 (FUN_0056D2B0, fastvector<IUnitWeakPtr pair> instantiation)
      * Address: 0x0067E190 (FUN_0067E190, fastvector<Wm3::Sphere3f> instantiation)
-     * Address: 0x0063C950 (FUN_0063C950 -- the reallocating insert (buy, copy prefix / inserted run / suffix, stamp the inline capacity sentinel or free the old block, rebase) for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); callers 0x0063C5F0, 0x0063C700, 0x0063C903; formerly `ReallocateWatchBoneStorageForInsert` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0063C950 (FUN_0063C950 -- the reallocating insert (buy, copy prefix / inserted run / suffix, stamp the
+     * inline capacity sentinel or free the old block, rebase) for `moho::SAniManipBinding`
+     * (`IAniManipulator::mWatchBones`, two bindings inline); callers 0x0063C5F0, 0x0063C700, 0x0063C903; formerly
+     * `ReallocateWatchBoneStorageForInsert` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x00710E90 (FUN_00710E90, the reallocating branch of the
      * `moho::SCondition` instantiation -- sizes the new block with
      * `count * 8 - count` doubled three times, which is `count * 56`, the
@@ -1068,9 +1286,10 @@ namespace gpg::core
      * range to the new block and rebases `end_`)
      * Address: 0x00553A80 (FUN_00553A80, the `Moho::SOCellPos` instantiation
      * reached from the reflected `SetCount`/`SerLoad` resize at 0x005532F0.)
-     * Address: 0x004ADCE0 (FUN_004ADCE0 -- the same step for `gpg::fastvector_n<moho::ResourceWatch*, N>` (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8);
-     * callers 0x004ACD80. It was cited on `fa::vector::insert`; formerly
-     * `ReallocateAndSpliceDwordRange_004ADCE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004ADCE0 (FUN_004ADCE0 -- the same step for `gpg::fastvector_n<moho::ResourceWatch*, N>`
+     * (`CResourceWatcher::mWatches`, N = 2, and `ResourceManager::OnDiskWatchEvent`'s local, N = 8); callers
+     * 0x004ACD80. It was cited on `fa::vector::insert`; formerly `ReallocateAndSpliceDwordRange_004ADCE0` in
+     * moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
      *
      * Buy a `newCapacity` block, uninitialized-copy the prefix, the inserted
      * run and the suffix into it, then retire the old storage: when it was the
@@ -1081,7 +1300,10 @@ namespace gpg::core
      * here and not on the base.
      */
     std::size_t ReallocateInsert_(
-      T* const insertPos, const std::size_t newCapacity, const T* const sourceBegin, const T* const sourceEnd
+      T* const insertPos,
+      const std::size_t newCapacity,
+      const T* const sourceBegin,
+      const T* const sourceEnd
     )
     {
       static_assert(!std::is_void_v<T>, "ReallocateInsert_ requires a concrete element type");
@@ -1128,7 +1350,9 @@ namespace gpg::core
      *
      * Grow so at least `requiredCount` values fit, preserving the live range.
      */
-    std::size_t EnsureCapacity_(const std::size_t requiredCount)
+    std::size_t EnsureCapacity_(
+      const std::size_t requiredCount
+    )
     {
       if (requiredCount > this->Capacity()) {
         (void)ReallocateInsert_(this->start_, requiredCount, this->start_, this->start_);
@@ -1147,9 +1371,14 @@ namespace gpg::core
      *
      * Shrink by destroying the surplus tail, or grow by appending copies of
      * `fill` one slot at a time, advancing `end_` as each is constructed.
-     * Address: 0x0056EF40 (FUN_0056EF40 -- the shrink arm for `gpg::fastvector<moho::WeakPtr<moho::IUnit>>`, emitted out of line: unlink `[begin + n, end)` (0x0056D3C0) and pull `end` back; callers `resize` 0x0056D1EA and `AssignFrom` 0x0056EFA0.)
+     * Address: 0x0056EF40 (FUN_0056EF40 -- the shrink arm for `gpg::fastvector<moho::WeakPtr<moho::IUnit>>`, emitted
+     * out of line: unlink `[begin + n, end)` (0x0056D3C0) and pull `end` back; callers `resize` 0x0056D1EA and
+     * `AssignFrom` 0x0056EFA0.)
      */
-    void ResizeFill_(const T& fill, const std::size_t newSize)
+    void ResizeFill_(
+      const T& fill,
+      const std::size_t newSize
+    )
     {
       const std::size_t currentSize = this->Size();
       if (newSize <= currentSize) {
@@ -1184,17 +1413,25 @@ namespace gpg::core
      * Copy `other`'s payload over this one. Public copy assignment stays deleted
      * because an inline-backed vector must not be assigned through a base
      * reference; the rebind helpers call this explicitly instead.
-     * Address: 0x0056EFA0 (FUN_0056EFA0 -- the `gpg::fastvector<moho::WeakPtr<moho::IUnit>>` emission: assign over the live prefix (relink), grow through `ReallocateInsert_` 0x0056D2B0, copy-construct the rest, unlink a longer destination's tail (0x0056EF40). The binary's `fastvector_n<WeakPtr<IUnit>, 4>` copy constructor 0x0056B200 seats its inline block and calls this at 0x0056B236, as `FastVectorN`'s copy constructor does. Formerly `AssignWeakPtrIUnitVectorStorage` in moho/unit/core/IUnitWeakPtrReflection.cpp (orphan), removed 2026-09-30.)
+     * Address: 0x0056EFA0 (FUN_0056EFA0 -- the `gpg::fastvector<moho::WeakPtr<moho::IUnit>>` emission: assign over the
+     * live prefix (relink), grow through `ReallocateInsert_` 0x0056D2B0, copy-construct the rest, unlink a longer
+     * destination's tail (0x0056EF40). The binary's `fastvector_n<WeakPtr<IUnit>, 4>` copy constructor 0x0056B200 seats
+     * its inline block and calls this at 0x0056B236, as `FastVectorN`'s copy constructor does. Formerly
+     * `AssignWeakPtrIUnitVectorStorage` in moho/unit/core/IUnitWeakPtrReflection.cpp (orphan), removed 2026-09-30.)
      * Address: 0x00576F10 (FUN_00576F10 -- the `Moho::SFormationScriptSlot`
      * (0x38) emission: the size compare at 0x00576F5A, growth through
      * 0x00576D60 when the source outruns the twenty inline slots, then
      * element-wise copies, each slot's `EntityCategorySet` rebinding its word
      * lane to its own inline run. Reached only from that type's copy
      * constructor 0x00576C20. It was cited on `ResetFrom`.)
-     * Address: 0x007F20E0 (FUN_007F20E0 -- the `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`) emission, reached from the converting copy 0x007F03D0; formerly `CameraFrustumUserEntityList::AssignRange`, removed 2026-09-30.)
+     * Address: 0x007F20E0 (FUN_007F20E0 -- the `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's
+     * frustum lanes `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`) emission, reached from the converting copy
+     * 0x007F03D0; formerly `CameraFrustumUserEntityList::AssignRange`, removed 2026-09-30.)
      */
   public:
-    void AssignFrom(const FastVectorInline& other)
+    void AssignFrom(
+      const FastVectorInline& other
+    )
     {
       if (this == &other) {
         return;
@@ -1230,7 +1467,11 @@ namespace gpg::core
      * write into already-live slots by assignment rather than a byte copy -- a
      * raw move there would duplicate owning members and then double-free them.
      */
-    T* InsertRangeImpl_(T* const insertPos, const T* const sourceBegin, const T* const sourceEnd)
+    T* InsertRangeImpl_(
+      T* const insertPos,
+      const T* const sourceBegin,
+      const T* const sourceEnd
+    )
     {
       static_assert(!std::is_void_v<T>, "InsertRangeImpl_ requires a concrete element type");
 
@@ -1292,9 +1533,7 @@ namespace gpg::core
         } else {
           // The binary uses a backward element-assign loop here for non-trivial
           // T (0x00562A80 for UnitWeaponInfo, calling its operator=).
-          (void)detail::CopyBackwardAssign<T>(
-            insertPos + moveCount, insertPos + insertCount + moveCount, insertPos
-          );
+          (void)detail::CopyBackwardAssign<T>(insertPos + moveCount, insertPos + insertCount + moveCount, insertPos);
         }
       }
 
@@ -1335,7 +1574,10 @@ namespace gpg::core
     static constexpr size_t ElemSize = std::is_void_v<T> ? 1 : sizeof(T);
 
     // Compute index of pointer p relative to base in elements
-    static size_t index_of(const T* base, const T* p) noexcept
+    static size_t index_of(
+      const T* base,
+      const T* p
+    ) noexcept
     {
       auto b = reinterpret_cast<const std::byte*>(base);
       auto q = reinterpret_cast<const std::byte*>(p);
@@ -1343,7 +1585,10 @@ namespace gpg::core
     }
 
     // Get pointer at element index from base
-    static T* ptr_at(T* base, size_t idx) noexcept
+    static T* ptr_at(
+      T* base,
+      size_t idx
+    ) noexcept
     {
       auto b = reinterpret_cast<std::byte*>(base);
       return reinterpret_cast<T*>(b + idx * ElemSize);
@@ -1378,44 +1623,92 @@ namespace gpg::core
      * What it does:
      * Initializes vector pointer lanes to the inline storage window and
      * records inline-origin metadata.
-     * Address: 0x005FBC10 (FUN_005FBC10 -- `fastvector_n<uint32, 5>` default constructor (inline storage armed); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-     * Address: 0x00605390 (FUN_00605390 -- `fastvector_n<uint32, 15>` default constructor; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-     * Address: 0x00578750 (FUN_00578750 -- `FastVectorN` constructor for a 20-byte element rebinding to a caller-provided block of `count` slots; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-     * Address: 0x005B4680 (FUN_005B4680 -- `FastVectorN` default constructor for a 0x230-byte inline block (at `this + 0x10`, or a caller-provided base); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-     * Address: 0x005B4E30 (FUN_005B4E30 -- `FastVectorN` default constructor for a 0x230-byte inline block (at `this + 0x10`, or a caller-provided base); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
-     * Address: 0x0080A290 (FUN_0080A290 -- inline-storage constructor for a ? element; Initializes one inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans 0x445C0 bytes.)
-     * Address: 0x0080EBD0 (FUN_0080EBD0 -- inline-storage constructor for a ? element; Initializes one inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans 0x7EF40 bytes.)
-     * Address: 0x0080ED20 (FUN_0080ED20 -- inline-storage constructor for a ? element; Initializes one inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans 0x4E200 bytes.)
-     * Address: 0x0056B610 (FUN_0056B610 -- inline-storage constructor for a ? element; Initializes one inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans 0x100 bytes.)
-     * Address: 0x0056C5A0 (FUN_0056C5A0 -- inline-storage constructor for a ? element; Initializes one inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans 0x80 bytes.)
-     * Address: 0x0056C740 (FUN_0056C740 -- inline-storage constructor for a ? element; Initializes one inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans 0x200 bytes.)
-     * Address: 0x0056C880 (FUN_0056C880 -- inline-storage constructor for a ? element; Initializes one inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans 0x480 bytes.)
-     * Address: 0x00576C00 (FUN_00576C00 -- inline-storage constructor for a ? element; Initializes one inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans 0x460 bytes.)
-     * Address: 0x00558960 (FUN_00558960 -- inline-storage constructor for a ? element; Initializes one inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans 0x4 bytes.)
-     * Address: 0x00558F40 (FUN_00558F40 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x4`.)
-     * Address: 0x005613C0 (FUN_005613C0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x20`.)
-     * Address: 0x0056D260 (FUN_0056D260 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x20`.)
-     * Address: 0x00561410 (FUN_00561410 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x98`.)
-     * Address: 0x0056D5F0 (FUN_0056D5F0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x98`.)
-     * Address: 0x0056D6E0 (FUN_0056D6E0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x100`.)
-     * Address: 0x0056E3E0 (FUN_0056E3E0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x80`.)
-     * Address: 0x0056E5C0 (FUN_0056E5C0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x200`.)
-     * Address: 0x0056E780 (FUN_0056E780 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x480`.)
-     * Address: 0x00576ED0 (FUN_00576ED0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x460`.)
-     * Address: 0x0080F030 (FUN_0080F030 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x7EF40`.)
-     * Address: 0x0080F1B0 (FUN_0080F1B0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x4E200`.)
-     * Address: 0x0059C890 (FUN_0059C890 -- `fastvector_n<CAiFormationInstance*, 10>` default constructor. Zero callers, no xrefs, unreachable: the live instantiation is inlined into `CAiFormationDBImpl`'s constructor (visible in `CAiFormationDBImplTypeInfo::NewRef` 0x0059D390). Formerly `InitializeFormationInstanceInlineStorage` in moho/ai/CAiFormationDBImplTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0059CEB0 (FUN_0059CEB0 -- the inline-arming step of that constructor (`start_ = end_ = originalVec_ = inline; capacity_ = inline + 10`). Zero callers, no xrefs, unreachable. Formerly a deleted overlay, removed 2026-09-10.)
-     * Address: 0x00552C40 (FUN_00552C40 -- `FastVectorN<unsigned int, 2>()`: `lea ecx,[eax+0x10]; lea edx,[ecx+8]` -- inline block at this+0x10, capacity 2 words, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineUIntScratchViewLaneA` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
-     * Address: 0x00552CE0 (FUN_00552CE0 -- `FastVectorN<unsigned int, 2>()`: an ICF-identical second emission of the same 2-word constructor, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineUIntScratchViewLaneB` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
-     * Address: 0x00659980 (FUN_00659980 -- `FastVectorN<unsigned int, 26>()`: `lea ecx,[eax+0x10]; lea edx,[ecx+0x68]` -- 0x68 is 26 words, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity26` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
-     * Address: 0x006599A0 (FUN_006599A0 -- `FastVectorN<unsigned int, 2>()`: the 2-word emission in that same run, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity2` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
-     * Address: 0x0065EC00 (FUN_0065EC00 -- `FastVectorN<unsigned int, 6>()`: the 6-word emission, `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity6` in moho/render/EmitterTypeTypeInfo.cpp (RULE THREE), removed 2026-09-23.)
-     * Address: 0x0065EC60 (FUN_0065EC60 -- `FastVectorN<unsigned int, 294>()`: the 294-word emission of the same body. Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity294` in moho/render/EmitterTypeTypeInfo.cpp (RULE THREE), removed 2026-09-23.)
-     * Address: 0x006599C0 (FUN_006599C0 -- `FastVectorN<unsigned int, 14>()`: `lea edx,[ecx+0x38]` -- 0x38 is 14 words, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity14` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
-     * Address: 0x0063C070 (FUN_0063C070 -- `FastVectorN<T, N>()` -- arm the lane on its inline window for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); zero callers, unreachable; formerly `InitializeWatchBoneStorageInline` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0065DD90 (FUN_0065DD90 -- `moho::SEfxCurve::SEfxCurve()`, whose
-     * only non-trivial member is `fastvector_n<Wm3::Vector3f, 2> mKeys` at
+     * Address: 0x005FBC10 (FUN_005FBC10 -- `fastvector_n<uint32, 5>` default constructor (inline storage armed); zero
+     * callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.) Address: 0x00605390
+     * (FUN_00605390 -- `fastvector_n<uint32, 15>` default constructor; zero callers, no xrefs, unreachable from every
+     * seeded root: a linker-retained copy nothing runs.) Address: 0x00578750 (FUN_00578750 -- `FastVectorN` constructor
+     * for a 20-byte element rebinding to a caller-provided block of `count` slots; zero callers, no xrefs, unreachable
+     * from every seeded root: a linker-retained copy nothing runs.) Address: 0x005B4680 (FUN_005B4680 -- `FastVectorN`
+     * default constructor for a 0x230-byte inline block (at `this + 0x10`, or a caller-provided base); zero callers, no
+     * xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.) Address: 0x005B4E30
+     * (FUN_005B4E30 -- `FastVectorN` default constructor for a 0x230-byte inline block (at `this + 0x10`, or a
+     * caller-provided base); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing
+     * runs.) Address: 0x0080A290 (FUN_0080A290 -- inline-storage constructor for a ? element; Initializes one
+     * inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans
+     * 0x445C0 bytes.) Address: 0x0080EBD0 (FUN_0080EBD0 -- inline-storage constructor for a ? element; Initializes one
+     * inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans
+     * 0x7EF40 bytes.) Address: 0x0080ED20 (FUN_0080ED20 -- inline-storage constructor for a ? element; Initializes one
+     * inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans
+     * 0x4E200 bytes.) Address: 0x0056B610 (FUN_0056B610 -- inline-storage constructor for a ? element; Initializes one
+     * inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans
+     * 0x100 bytes.) Address: 0x0056C5A0 (FUN_0056C5A0 -- inline-storage constructor for a ? element; Initializes one
+     * inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans
+     * 0x80 bytes.) Address: 0x0056C740 (FUN_0056C740 -- inline-storage constructor for a ? element; Initializes one
+     * inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans
+     * 0x200 bytes.) Address: 0x0056C880 (FUN_0056C880 -- inline-storage constructor for a ? element; Initializes one
+     * inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans
+     * 0x480 bytes.) Address: 0x00576C00 (FUN_00576C00 -- inline-storage constructor for a ? element; Initializes one
+     * inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans
+     * 0x460 bytes.) Address: 0x00558960 (FUN_00558960 -- inline-storage constructor for a ? element; Initializes one
+     * inline-backed fastvector runtime view where the inline origin is embedded at `result+0x10` and capacity spans 0x4
+     * bytes.) Address: 0x00558F40 (FUN_00558F40 -- inline-storage constructor for a ? element; Initializes one
+     * fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x4`.)
+     * Address: 0x005613C0 (FUN_005613C0 -- inline-storage constructor for a ? element; Initializes one fastvector
+     * runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x20`.) Address:
+     * 0x0056D260 (FUN_0056D260 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view
+     * from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x20`.) Address: 0x00561410
+     * (FUN_00561410 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from
+     * caller-provided inline origin storage and sets capacity to `inlineOrigin+0x98`.) Address: 0x0056D5F0
+     * (FUN_0056D5F0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from
+     * caller-provided inline origin storage and sets capacity to `inlineOrigin+0x98`.) Address: 0x0056D6E0
+     * (FUN_0056D6E0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from
+     * caller-provided inline origin storage and sets capacity to `inlineOrigin+0x100`.) Address: 0x0056E3E0
+     * (FUN_0056E3E0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from
+     * caller-provided inline origin storage and sets capacity to `inlineOrigin+0x80`.) Address: 0x0056E5C0
+     * (FUN_0056E5C0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from
+     * caller-provided inline origin storage and sets capacity to `inlineOrigin+0x200`.) Address: 0x0056E780
+     * (FUN_0056E780 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from
+     * caller-provided inline origin storage and sets capacity to `inlineOrigin+0x480`.) Address: 0x00576ED0
+     * (FUN_00576ED0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from
+     * caller-provided inline origin storage and sets capacity to `inlineOrigin+0x460`.) Address: 0x0080F030
+     * (FUN_0080F030 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from
+     * caller-provided inline origin storage and sets capacity to `inlineOrigin+0x7EF40`.) Address: 0x0080F1B0
+     * (FUN_0080F1B0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from
+     * caller-provided inline origin storage and sets capacity to `inlineOrigin+0x4E200`.) Address: 0x0059C890
+     * (FUN_0059C890 -- `fastvector_n<CAiFormationInstance*, 10>` default constructor. Zero callers, no xrefs,
+     * unreachable: the live instantiation is inlined into `CAiFormationDBImpl`'s constructor (visible in
+     * `CAiFormationDBImplTypeInfo::NewRef` 0x0059D390). Formerly `InitializeFormationInstanceInlineStorage` in
+     * moho/ai/CAiFormationDBImplTypeInfo.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0059CEB0 (FUN_0059CEB0 -- the
+     * inline-arming step of that constructor (`start_ = end_ = originalVec_ = inline; capacity_ = inline + 10`). Zero
+     * callers, no xrefs, unreachable. Formerly a deleted overlay, removed 2026-09-10.) Address: 0x00552C40
+     * (FUN_00552C40 -- `FastVectorN<unsigned int, 2>()`: `lea ecx,[eax+0x10]; lea edx,[ecx+8]` -- inline block at
+     * this+0x10, capacity 2 words, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero
+     * callers, unreachable; formerly `InitializeInlineUIntScratchViewLaneA` in
+     * gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.) Address: 0x00552CE0
+     * (FUN_00552CE0 -- `FastVectorN<unsigned int, 2>()`: an ICF-identical second emission of the same 2-word
+     * constructor, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable;
+     * formerly `InitializeInlineUIntScratchViewLaneB` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE),
+     * removed 2026-09-18.) Address: 0x00659980 (FUN_00659980 -- `FastVectorN<unsigned int, 26>()`: `lea ecx,[eax+0x10];
+     * lea edx,[ecx+0x68]` -- 0x68 is 26 words, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`.
+     * Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity26` in
+     * gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.) Address: 0x006599A0
+     * (FUN_006599A0 -- `FastVectorN<unsigned int, 2>()`: the 2-word emission in that same run, so `start_ = end_ =
+     * originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly
+     * `InitializeInlineDwordVectorHeaderCapacity2` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE),
+     * removed 2026-09-18.) Address: 0x0065EC00 (FUN_0065EC00 -- `FastVectorN<unsigned int, 6>()`: the 6-word emission,
+     * `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly
+     * `InitializeInlineDwordVectorHeaderCapacity6` in moho/render/EmitterTypeTypeInfo.cpp (RULE THREE), removed
+     * 2026-09-23.) Address: 0x0065EC60 (FUN_0065EC60 -- `FastVectorN<unsigned int, 294>()`: the 294-word emission of
+     * the same body. Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity294` in
+     * moho/render/EmitterTypeTypeInfo.cpp (RULE THREE), removed 2026-09-23.) Address: 0x006599C0 (FUN_006599C0 --
+     * `FastVectorN<unsigned int, 14>()`: `lea edx,[ecx+0x38]` -- 0x38 is 14 words, so `start_ = end_ = originalVec_ =
+     * inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly
+     * `InitializeInlineDwordVectorHeaderCapacity14` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE),
+     * removed 2026-09-18.) Address: 0x0063C070 (FUN_0063C070 -- `FastVectorN<T, N>()` -- arm the lane on its inline
+     * window for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); zero callers,
+     * unreachable; formerly `InitializeWatchBoneStorageInline` in moho/animation/IAniManipulator.cpp (RULE ONE),
+     * removed 2026-09-10.) Address: 0x0065DD90 (FUN_0065DD90 -- `moho::SEfxCurve::SEfxCurve()`, whose only non-trivial
+     * member is `fastvector_n<Wm3::Vector3f, 2> mKeys` at
      * `+0x10`: `lea ecx,[eax+0x20]; lea edx,[ecx+0x18]` then the four stores at
      * `+0x10/+0x14/+0x18/+0x1C`. Zero callers, no xrefs: every use site inlined
      * it -- `CEfxEmitter`'s two constructors inline it for the stack-built fill
@@ -1469,7 +1762,9 @@ namespace gpg::core
      *   `InitializeSSTIUnitWeaponInfoVector` in moho/unit/core/Unit.cpp,
      *   removed 2026-09-24.)
      */
-    explicit FastVectorN(std::size_t count)
+    explicit FastVectorN(
+      std::size_t count
+    )
     {
       RebindInlineNoFree();
       const T zeroFill{};
@@ -1511,9 +1806,17 @@ namespace gpg::core
      * mBuildTemplates;`, CWldSession.cpp) rather than placement-constructs,
      * reaching this same `ResetFrom` machinery through `operator=` instead
      * -- identical end state, without constructing over a live object.)
-     * Address: 0x0056B200 (FUN_0056B200, sub_56B200 -- the copy constructor of `gpg::fastvector_n<moho::WeakPtr<moho::IUnit>, 4>` (`CFormationInstance::mUnits` and the formation scratch sets, element 0x08): `mUnits(units)` in `CFormationInstance::CFormationInstance` (0x005694B0); each copied `WeakPtr<IUnit>` relinks into its unit's weak chain.)
-     * Address: 0x0082E5E0 (FUN_0082E5E0 -- copy constructor for a 4-byte element; Initializes one stack-style inline dword-vector scratch lane and assigns source content into that lane via `AssignDwordVectorRange`.)
-     * Address: 0x0057D3F0 (FUN_0057D3F0 -- the copy constructor -- seat the three lanes plus `originalVec_` on the inline block at `this+0x10`, then `AddAll` the source; ten callers, `EntitySetTemplate<Unit>`'s own copy constructor 0x00579500 among them for `gpg::core::FastVectorN<moho::Entity*, 4>` (`EntitySetTemplate<Unit>::mVec` at +0x08; the 0x10 head sits in front of its own four-slot inline block); callers 0x00579500, 0x005ADC70, 0x005FA790; formerly `CopyEntityInlineVector` in moho/sim/ArmyUnitSet.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x0056B200 (FUN_0056B200, sub_56B200 -- the copy constructor of
+     * `gpg::fastvector_n<moho::WeakPtr<moho::IUnit>, 4>` (`CFormationInstance::mUnits` and the formation scratch sets,
+     * element 0x08): `mUnits(units)` in `CFormationInstance::CFormationInstance` (0x005694B0); each copied
+     * `WeakPtr<IUnit>` relinks into its unit's weak chain.) Address: 0x0082E5E0 (FUN_0082E5E0 -- copy constructor for a
+     * 4-byte element; Initializes one stack-style inline dword-vector scratch lane and assigns source content into that
+     * lane via `AssignDwordVectorRange`.) Address: 0x0057D3F0 (FUN_0057D3F0 -- the copy constructor -- seat the three
+     * lanes plus `originalVec_` on the inline block at `this+0x10`, then `AddAll` the source; ten callers,
+     * `EntitySetTemplate<Unit>`'s own copy constructor 0x00579500 among them for `gpg::core::FastVectorN<moho::Entity*,
+     * 4>` (`EntitySetTemplate<Unit>::mVec` at +0x08; the 0x10 head sits in front of its own four-slot inline block);
+     * callers 0x00579500, 0x005ADC70, 0x005FA790; formerly `CopyEntityInlineVector` in moho/sim/ArmyUnitSet.cpp (RULE
+     * ONE), removed 2026-09-11.)
      */
     /**
      * Address: 0x00560B90 (FUN_00560B90, SSTIEntityAttachInfo N=1 copy emission)
@@ -1522,7 +1825,9 @@ namespace gpg::core
      * Binds the copy to its own one-slot inline window, then copies the source
      * through AssignFrom, allocating only when the source outgrows it.
      */
-    FastVectorN(const FastVectorN& other)
+    FastVectorN(
+      const FastVectorN& other
+    )
       : FastVectorN()
     {
       this->AssignFrom(other);
@@ -1541,7 +1846,9 @@ namespace gpg::core
      * Copies any vector of the same element type into this one's own storage,
      * the way the copy constructor above does.
      */
-    explicit FastVectorN(const FastVectorInline<T>& other)
+    explicit FastVectorN(
+      const FastVectorInline<T>& other
+    )
       : FastVectorN()
     {
       this->AssignFrom(other);
@@ -1557,12 +1864,18 @@ namespace gpg::core
      *
      * Copy assignment: self-assignment guard, then reset to inline storage
      * and copy the source range (`ResetFrom`).
-     * Address: 0x00752830 (FUN_00752830 -- copy assignment for a 12-byte element; Replaces destination 12-byte fastvector content with source content, reusing storage when possible and reacquiring storage when capacity is insufficient.)
-     * Address: 0x00752A70 (FUN_00752A70 -- copy assignment for a 8-byte element; Replaces destination 8-byte fastvector content with source content, reusing storage when possible and reacquiring storage when capacity is insufficient.)
-     * Address: 0x0065F240 (FUN_0065F240 -- copy assignment for a 12-byte element; Replaces destination 12-byte fastvector content with source content, reusing capacity when possible and growing when required.)
-     * Address: 0x0082D030 (FUN_0082D030 -- copy assignment for a 4-byte element; Replaces destination 4-byte fastvector content with source content, reusing capacity when possible and growing when required.)
+     * Address: 0x00752830 (FUN_00752830 -- copy assignment for a 12-byte element; Replaces destination 12-byte
+     * fastvector content with source content, reusing storage when possible and reacquiring storage when capacity is
+     * insufficient.) Address: 0x00752A70 (FUN_00752A70 -- copy assignment for a 8-byte element; Replaces destination
+     * 8-byte fastvector content with source content, reusing storage when possible and reacquiring storage when
+     * capacity is insufficient.) Address: 0x0065F240 (FUN_0065F240 -- copy assignment for a 12-byte element; Replaces
+     * destination 12-byte fastvector content with source content, reusing capacity when possible and growing when
+     * required.) Address: 0x0082D030 (FUN_0082D030 -- copy assignment for a 4-byte element; Replaces destination 4-byte
+     * fastvector content with source content, reusing capacity when possible and growing when required.)
      */
-    FastVectorN& operator=(const FastVectorN& other)
+    FastVectorN& operator=(
+      const FastVectorN& other
+    )
     {
       if (this != &other) {
         this->ResetFrom(other);
@@ -1585,7 +1898,9 @@ namespace gpg::core
      * buffer -- there is no cheaper way to "move" data embedded inside
      * another object.
      */
-    FastVectorN(FastVectorN&& other) noexcept
+    FastVectorN(
+      FastVectorN&& other
+    ) noexcept
       : FastVectorN()
     {
       if (other.start_ != other.originalVec_) {
@@ -1609,7 +1924,9 @@ namespace gpg::core
      * (SBO-aware) before copying, so the inline-source branch needs no
      * separate release step.
      */
-    FastVectorN& operator=(FastVectorN&& other) noexcept
+    FastVectorN& operator=(
+      FastVectorN&& other
+    ) noexcept
     {
       if (this != &other) {
         if (other.start_ != other.originalVec_) {
@@ -1637,7 +1954,9 @@ namespace gpg::core
      * push_back (0x00576C80) and the copy constructor's rebind (0x00576F10).)
      */
     /** Ensure capacity is at least newSize elements. */
-    void Grow(size_t newSize)
+    void Grow(
+      size_t newSize
+    )
     {
       if (this->Capacity() >= newSize)
         return;
@@ -1649,7 +1968,9 @@ namespace gpg::core
      *
      * Reserve is overridden for FastVectorN to avoid Base::Reserve deleting inline storage.
      */
-    void Reserve(size_t n)
+    void Reserve(
+      size_t n
+    )
     {
       if (this->Capacity() >= n)
         return;
@@ -1694,27 +2015,40 @@ namespace gpg::core
      * genuinely heap-backed, fall back to a real copy when it is still on
      * its own inline storage.
      */
-    void reserve(const size_t n)
+    void reserve(
+      const size_t n
+    )
     {
       Reserve(n);
     }
 
-    void resize(const size_t n)
+    void resize(
+      const size_t n
+    )
     {
       Resize(n);
     }
 
-    void resize(const size_t n, const T& value)
+    void resize(
+      const size_t n,
+      const T& value
+    )
     {
       Resize(n, value);
     }
 
     /**
      * Append by copy; grows capacity exponentially.
-     * Address: 0x0063C5F0 (FUN_0063C5F0 -- `PushBack` for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); callers 0x0063B6D0, 0x0063C090; formerly `AppendWatchBoneBinding` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0063C090 (FUN_0063C090 -- `PushBack` through a pointer to the value for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); zero callers, unreachable; formerly `AppendWatchBoneBindingFromPointer` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0063C5F0 (FUN_0063C5F0 -- `PushBack` for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two
+     * bindings inline); callers 0x0063B6D0, 0x0063C090; formerly `AppendWatchBoneBinding` in
+     * moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0063C090 (FUN_0063C090 --
+     * `PushBack` through a pointer to the value for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two
+     * bindings inline); zero callers, unreachable; formerly `AppendWatchBoneBindingFromPointer` in
+     * moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
      */
-    void PushBack(const T& v)
+    void PushBack(
+      const T& v
+    )
     {
       push_back(v);
     }
@@ -1758,21 +2092,36 @@ namespace gpg::core
      * grow-full arm forwards to `InsertAt` (0x006AEAD0). Reached from
      * `Moho::Unit::GetExtraData`'s `out->pairs.PushBack(pair)` calls,
      * Unit.cpp.)
-     * Address: 0x0056B590 (FUN_0056B590 -- `push_back` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C): `mOffsetInfo[layerIndex].push_back(group)` at the end of `CFormationInstance::RunScript`.)
-     * Address: 0x0070E8F0 (FUN_0070E8F0 -- `push_back` for `gpg::fastvector_n<moho::SCondition, 2>` (`STrigger::mConditions`, element 0x38): `CArmyStats::AddTriggerCondition`'s `trigger->mConditions.push_back(condition)` (CArmyStats.cpp); the full arm calls the `InsertAt` at 0x0070FAD0.)
-     * Address: 0x0080A1A0 (FUN_0080A1A0 -- `push_back` for a 24-byte element; Appends one 24-byte element lane, delegating to range-insert growth when the destination fastvector has no spare capacity.)
-     * Address: 0x0080A710 (FUN_0080A710 -- `push_back` for a 24-byte element; Appends one 24-byte element lane, delegating to range-insert growth when the destination fastvector has no spare capacity.)
-     * Address: 0x0080A810 (FUN_0080A810 -- `push_back` for a 24-byte element; Appends one 24-byte element lane, delegating to range-insert growth when the destination fastvector has no spare capacity.)
-     * Address: 0x00722EC0 (FUN_00722EC0 -- `push_back` for a 24-byte element; Appends one 24-byte element into a collision-result style fastvector lane and grows storage through `AppendRange24ByteLane` when full.)
-     * Address: 0x004E72B0 (FUN_004E72B0 -- `push_back` for a 24-byte element; Appends one 24-byte element into the destination fastvector lane and delegates to range-grow insertion when capacity is exhausted.)
-     * Address: 0x005477E0 (FUN_005477E0 -- `push_back` for a 20-byte element; Appends one 20-byte element lane and delegates to range-insert growth when the destination fastvector has no spare capacity.)
-     * Address: 0x00722F10 (FUN_00722F10 -- `push_back` for a 32-byte element; Appends one 32-byte element lane and delegates to range growth insertion when the destination fastvector has no spare capacity.)
-     * Address: 0x0081B6E0 (FUN_0081B6E0 -- `push_back` for a 12-byte element; Appends one 12-byte element lane and delegates to range growth insertion when the destination fastvector has no spare capacity.)
-     * Address: 0x008224E0 (FUN_008224E0 -- `push_back` for a ? element; Inserts one `UserUnit*` pointer range into the destination dword lane, preserving the legacy overlap-safe copy/move path and grow semantics.)
-     * Address: 0x0072A470 (FUN_0072A470 -- `push_back` for a 4-byte element; Appends one 4-byte element lane and delegates to range growth insertion when the destination fastvector has no spare capacity.)
-     * Address: 0x0092E380 (FUN_0092E380 -- `push_back` for a 2-byte element read through a pointer, the `fastvector<Node>` append of `gpg::HaStar::ClusterBuild`'s edge-contact scan (Cluster.cpp).)
+     * Address: 0x0056B590 (FUN_0056B590 -- `push_back` for `gpg::fastvector_n<moho::SOffsetInfo, 2>`
+     * (`CFormationInstance::mOffsetInfo`, element 0x4C): `mOffsetInfo[layerIndex].push_back(group)` at the end of
+     * `CFormationInstance::RunScript`.) Address: 0x0070E8F0 (FUN_0070E8F0 -- `push_back` for
+     * `gpg::fastvector_n<moho::SCondition, 2>` (`STrigger::mConditions`, element 0x38):
+     * `CArmyStats::AddTriggerCondition`'s `trigger->mConditions.push_back(condition)` (CArmyStats.cpp); the full arm
+     * calls the `InsertAt` at 0x0070FAD0.) Address: 0x0080A1A0 (FUN_0080A1A0 -- `push_back` for a 24-byte element;
+     * Appends one 24-byte element lane, delegating to range-insert growth when the destination fastvector has no spare
+     * capacity.) Address: 0x0080A710 (FUN_0080A710 -- `push_back` for a 24-byte element; Appends one 24-byte element
+     * lane, delegating to range-insert growth when the destination fastvector has no spare capacity.) Address:
+     * 0x0080A810 (FUN_0080A810 -- `push_back` for a 24-byte element; Appends one 24-byte element lane, delegating to
+     * range-insert growth when the destination fastvector has no spare capacity.) Address: 0x00722EC0 (FUN_00722EC0 --
+     * `push_back` for a 24-byte element; Appends one 24-byte element into a collision-result style fastvector lane and
+     * grows storage through `AppendRange24ByteLane` when full.) Address: 0x004E72B0 (FUN_004E72B0 -- `push_back` for a
+     * 24-byte element; Appends one 24-byte element into the destination fastvector lane and delegates to range-grow
+     * insertion when capacity is exhausted.) Address: 0x005477E0 (FUN_005477E0 -- `push_back` for a 20-byte element;
+     * Appends one 20-byte element lane and delegates to range-insert growth when the destination fastvector has no
+     * spare capacity.) Address: 0x00722F10 (FUN_00722F10 -- `push_back` for a 32-byte element; Appends one 32-byte
+     * element lane and delegates to range growth insertion when the destination fastvector has no spare capacity.)
+     * Address: 0x0081B6E0 (FUN_0081B6E0 -- `push_back` for a 12-byte element; Appends one 12-byte element lane and
+     * delegates to range growth insertion when the destination fastvector has no spare capacity.) Address: 0x008224E0
+     * (FUN_008224E0 -- `push_back` for a ? element; Inserts one `UserUnit*` pointer range into the destination dword
+     * lane, preserving the legacy overlap-safe copy/move path and grow semantics.) Address: 0x0072A470 (FUN_0072A470 --
+     * `push_back` for a 4-byte element; Appends one 4-byte element lane and delegates to range growth insertion when
+     * the destination fastvector has no spare capacity.) Address: 0x0092E380 (FUN_0092E380 -- `push_back` for a 2-byte
+     * element read through a pointer, the `fastvector<Node>` append of `gpg::HaStar::ClusterBuild`'s edge-contact scan
+     * (Cluster.cpp).)
      */
-    void push_back(const T& value)
+    void push_back(
+      const T& value
+    )
     {
       if (this->end_ == this->capacity_) {
         InsertAt(this->end_, &value, &value + 1);
@@ -1792,26 +2141,53 @@ namespace gpg::core
      * What it does:
      * Resizes logical element count, growing storage when needed and filling
      * appended slots with `fill`.
-     * Address: 0x0056D500 (FUN_0056D500 -- `Resize` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C): `groups.Resize(count, SOffsetInfo())` in `SetFastVectorSOffsetInfoCount`/`LoadFastVectorSOffsetInfo` (CAiFormationInstance.cpp).)
-     * Address: 0x0056D650 (FUN_0056D650 -- `Resize` for `gpg::fastvector_n<moho::SAssignedLocInfo, 16>` (`CFormationInstance::mSlots`, element 0x10): `slots.Resize(count, SAssignedLocInfo{})` in `SetFastVectorSAssignedLocInfoCount`/`LoadFastVectorSAssignedLocInfo`; the trivially-copyable 0x10 element is filled as four raw dwords (0x0056D67F-0x0056D691).)
-     * Address: 0x005836D0 (FUN_005836D0 -- resize/fill for a 24-byte element; Writes one repeated 24-byte source lane into destination slots in `[destinationBegin, destinationEnd)`.)
-     * Address: 0x005821B0 (FUN_005821B0 -- resize/fill for a 24-byte element (calling-convention bridge); Register-shape adapter that forwards one repeated 24-byte fill lane into the canonical range-fill helper.)
-     * Address: 0x00548B20 (FUN_00548B20 -- resize/fill for a 20-byte element; Writes one repeated 20-byte source lane into destination slots in `[destinationBegin, destinationEnd)`.)
-     * Address: 0x00540C00 (FUN_00540C00 -- resize/fill for a 8-byte element; Writes one repeated 8-byte source lane into destination slots in `[destinationBegin, destinationEnd)` and returns `destinationEnd`.)
-     * Address: 0x0054E170 (FUN_0054E170 -- resize/fill for a 8-byte element; Writes one repeated 8-byte source lane into destination slots in `[destinationBegin, destinationEnd)` and returns `destinationEnd`.)
-     * Address: 0x0075FD20 (FUN_0075FD20 -- resize/fill for a 8-byte element; Writes one repeated 8-byte source lane into destination slots in `[destinationBegin, destinationEnd)` and returns `destinationEnd`.)
-     * Address: 0x00760020 (FUN_00760020 -- resize/fill for a 8-byte element; Writes one repeated 8-byte source lane into destination slots in `[destinationBegin, destinationEnd)` and returns `destinationEnd`.)
-     * Address: 0x006D2770 (FUN_006D2770 -- resize/fill for a 8-byte element (calling-convention bridge); Fills one 8-byte destination range with a repeated single 8-byte source lane and returns the destination end pointer.)
-     * Address: 0x008F63C0 (FUN_008F63C0 -- resize/fill for a 28-byte element; Writes one repeated 28-byte source lane into destination slots in `[destinationBegin, destinationEnd)`.)
-     * Address: 0x00693260 (FUN_00693260 -- resize/fill for a 28-byte element; Writes one repeated 28-byte source lane into destination slots in `[destinationBegin, destinationEnd)`.)
-     * Address: 0x00693140 (FUN_00693140 -- resize/fill for a 28-byte element (calling-convention bridge); Tail-thunk alias that forwards 28-byte repeated-fill lanes into the shared fill body.)
-     * Address: 0x0064F7C0 (FUN_0064F7C0 -- resize/fill for a 52-byte element (calling-convention bridge); Tail-thunk alias that forwards 52-byte repeated-fill lanes into the shared fill body.)
-     * Address: 0x0064FB10 (FUN_0064FB10 -- resize/fill for a 52-byte element; Writes one repeated 52-byte source lane into destination slots in `[destinationBegin, destinationEnd)`.)
-     * Address: 0x008AEA40 (FUN_008AEA40 -- `resize(n, value)` for `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28): shrinking through `erase(begin() + n, end())` (0x008AF2C0), growing through the reallocating insert 0x008AF760 when full, then the copy constructor 0x008AECF0 per new slot. Callers `CUserSoundManager::CUserSoundManager` (0x008AA800, 256 slots), `StartRPCEntityLoop` (0x008ABCD0) and `StartEntityLoop` (0x008ABE90), each passing a default-constructed record. Formerly `EnsureSoundHandleStorage`, removed 2026-09-30.)
-     * Address: 0x008B7590 (FUN_008B7590 -- `resize(n, value)` for `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>` (`UserCommandQueue::primaryLinks`/`resolvedLinks`): `ResyncUserCommandQueueLinks` 0x008B6C50's `primaryLinks.resize(n, WeakPtr())`; growing through the reallocating insert 0x008B7CC0 to exactly `n`, then a `WeakPtr` copy per new slot. Formerly `ResizeQueueLinkVector` in moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
-     * Address: 0x008B7900 (FUN_008B7900 -- its shrink arm, `erase(begin() + n, end())`: the forward shift 0x008B8140 over an empty range, then the tail destroyed. Formerly `ShrinkQueueLinkVectorTo`, removed 2026-09-30.)
+     * Address: 0x0056D500 (FUN_0056D500 -- `Resize` for `gpg::fastvector_n<moho::SOffsetInfo, 2>`
+     * (`CFormationInstance::mOffsetInfo`, element 0x4C): `groups.Resize(count, SOffsetInfo())` in
+     * `SetFastVectorSOffsetInfoCount`/`LoadFastVectorSOffsetInfo` (CAiFormationInstance.cpp).) Address: 0x0056D650
+     * (FUN_0056D650 -- `Resize` for `gpg::fastvector_n<moho::SAssignedLocInfo, 16>` (`CFormationInstance::mSlots`,
+     * element 0x10): `slots.Resize(count, SAssignedLocInfo{})` in
+     * `SetFastVectorSAssignedLocInfoCount`/`LoadFastVectorSAssignedLocInfo`; the trivially-copyable 0x10 element is
+     * filled as four raw dwords (0x0056D67F-0x0056D691).) Address: 0x005836D0 (FUN_005836D0 -- resize/fill for a
+     * 24-byte element; Writes one repeated 24-byte source lane into destination slots in `[destinationBegin,
+     * destinationEnd)`.) Address: 0x005821B0 (FUN_005821B0 -- resize/fill for a 24-byte element (calling-convention
+     * bridge); Register-shape adapter that forwards one repeated 24-byte fill lane into the canonical range-fill
+     * helper.) Address: 0x00548B20 (FUN_00548B20 -- resize/fill for a 20-byte element; Writes one repeated 20-byte
+     * source lane into destination slots in `[destinationBegin, destinationEnd)`.) Address: 0x00540C00 (FUN_00540C00 --
+     * resize/fill for a 8-byte element; Writes one repeated 8-byte source lane into destination slots in
+     * `[destinationBegin, destinationEnd)` and returns `destinationEnd`.) Address: 0x0054E170 (FUN_0054E170 --
+     * resize/fill for a 8-byte element; Writes one repeated 8-byte source lane into destination slots in
+     * `[destinationBegin, destinationEnd)` and returns `destinationEnd`.) Address: 0x0075FD20 (FUN_0075FD20 --
+     * resize/fill for a 8-byte element; Writes one repeated 8-byte source lane into destination slots in
+     * `[destinationBegin, destinationEnd)` and returns `destinationEnd`.) Address: 0x00760020 (FUN_00760020 --
+     * resize/fill for a 8-byte element; Writes one repeated 8-byte source lane into destination slots in
+     * `[destinationBegin, destinationEnd)` and returns `destinationEnd`.) Address: 0x006D2770 (FUN_006D2770 --
+     * resize/fill for a 8-byte element (calling-convention bridge); Fills one 8-byte destination range with a repeated
+     * single 8-byte source lane and returns the destination end pointer.) Address: 0x008F63C0 (FUN_008F63C0 --
+     * resize/fill for a 28-byte element; Writes one repeated 28-byte source lane into destination slots in
+     * `[destinationBegin, destinationEnd)`.) Address: 0x00693260 (FUN_00693260 -- resize/fill for a 28-byte element;
+     * Writes one repeated 28-byte source lane into destination slots in `[destinationBegin, destinationEnd)`.) Address:
+     * 0x00693140 (FUN_00693140 -- resize/fill for a 28-byte element (calling-convention bridge); Tail-thunk alias that
+     * forwards 28-byte repeated-fill lanes into the shared fill body.) Address: 0x0064F7C0 (FUN_0064F7C0 -- resize/fill
+     * for a 52-byte element (calling-convention bridge); Tail-thunk alias that forwards 52-byte repeated-fill lanes
+     * into the shared fill body.) Address: 0x0064FB10 (FUN_0064FB10 -- resize/fill for a 52-byte element; Writes one
+     * repeated 52-byte source lane into destination slots in `[destinationBegin, destinationEnd)`.) Address: 0x008AEA40
+     * (FUN_008AEA40 -- `resize(n, value)` for `gpg::fastvector_n<moho::SoundHandleRecord, 256>`
+     * (`CUserSoundManager::mSoundHandles`, element 0x28): shrinking through `erase(begin() + n, end())` (0x008AF2C0),
+     * growing through the reallocating insert 0x008AF760 when full, then the copy constructor 0x008AECF0 per new slot.
+     * Callers `CUserSoundManager::CUserSoundManager` (0x008AA800, 256 slots), `StartRPCEntityLoop` (0x008ABCD0) and
+     * `StartEntityLoop` (0x008ABE90), each passing a default-constructed record. Formerly `EnsureSoundHandleStorage`,
+     * removed 2026-09-30.) Address: 0x008B7590 (FUN_008B7590 -- `resize(n, value)` for
+     * `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>`
+     * (`UserCommandQueue::primaryLinks`/`resolvedLinks`): `ResyncUserCommandQueueLinks` 0x008B6C50's
+     * `primaryLinks.resize(n, WeakPtr())`; growing through the reallocating insert 0x008B7CC0 to exactly `n`, then a
+     * `WeakPtr` copy per new slot. Formerly `ResizeQueueLinkVector` in moho/unit/core/UserUnit.cpp, removed
+     * 2026-09-30.) Address: 0x008B7900 (FUN_008B7900 -- its shrink arm, `erase(begin() + n, end())`: the forward shift
+     * 0x008B8140 over an empty range, then the tail destroyed. Formerly `ShrinkQueueLinkVectorTo`, removed 2026-09-30.)
      */
-    void Resize(size_t newSize, const T& fill = T{})
+    void Resize(
+      size_t newSize,
+      const T& fill = T{}
+    )
     {
       const size_t sz = this->Size();
       if (newSize < sz) {
@@ -1864,8 +2240,12 @@ namespace gpg::core
      * constructor, so it takes the deep-copy path below)
      * Address: 0x0084E570 (FUN_0084E570, gpg::fastvector_n<boost::shared_ptr<Moho::CMauiFrame>, 2>::InsertAt)
      * Address: 0x0083B6F0 (FUN_0083B6F0, gpg::fastvector_n<fa::string, 4>::InsertAt)
-     * Address: 0x00767370 (FUN_00767370, gpg::fastvector_n<gpg::AStarNeighbour<Moho::SOCellPos>, 200>::InsertAt -- `AStarSearch::WorkOnce`'s candidate buffer (gpg/core/algorithms/AStarSearch.h), a 0x10 head at [esp+650h] and 200 8-byte entries at [esp+660h]..[esp+CA0h]; reached from the two `push_back` full-storage arms at 0x00766490 (EnumerateAdjacentCells) and 0x0076674D (EnumerateClusterEdges), whose `mov eax,[edi+4]; cmp eax,[edi+8]` guards at 0x0076646A / 0x0076671A are the template's `end_ == capacity_` test. Doubles the capacity when short and tail-calls GrowInsert at 0x007673B4.)
-     * Address: 0x008489D0 (FUN_008489D0,
+     * Address: 0x00767370 (FUN_00767370, gpg::fastvector_n<gpg::AStarNeighbour<Moho::SOCellPos>, 200>::InsertAt --
+     * `AStarSearch::WorkOnce`'s candidate buffer (gpg/core/algorithms/AStarSearch.h), a 0x10 head at [esp+650h] and 200
+     * 8-byte entries at [esp+660h]..[esp+CA0h]; reached from the two `push_back` full-storage arms at 0x00766490
+     * (EnumerateAdjacentCells) and 0x0076674D (EnumerateClusterEdges), whose `mov eax,[edi+4]; cmp eax,[edi+8]` guards
+     * at 0x0076646A / 0x0076671A are the template's `end_ == capacity_` test. Doubles the capacity when short and
+     * tail-calls GrowInsert at 0x007673B4.) Address: 0x008489D0 (FUN_008489D0,
      * gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::InsertAt -- the
      * deep-copy lane (44-byte element owning an `fa::string`). Confirmed
      * via `sub_899790`'s IDA-typed call `sub_8489D0(result, result->finish, v7,
@@ -1914,42 +2294,81 @@ namespace gpg::core
      *    live slots, mirroring std::vector::insert on a non-trivial value type.
      *    The branch structure (fits-in-tail vs. spills-past-end vs. grow) is
      *    identical across both emissions; only the per-element operation differs.
-     * Address: 0x0056D3F0 (FUN_0056D3F0 -- `InsertAt` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the grow arm of its `push_back`/`Resize`; deep-copy path.)
-     * Address: 0x0070FAD0 (FUN_0070FAD0 -- `insert_range` for `gpg::fastvector_n<moho::SCondition, 2>` (`STrigger::mConditions`, element 0x38), the grow arm of `push_back` 0x0070E8F0; its tail shift is the `_Copy_backward` at 0x00714850.)
-     * Address: 0x0080A340 (FUN_0080A340 -- `insert_range`/`InsertAt` for a 28-byte element; Inserts one 28-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0080A8C0 (FUN_0080A8C0 -- `insert_range`/`InsertAt` for a 24-byte element; Inserts one 24-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0080ACB0 (FUN_0080ACB0 -- `insert_range`/`InsertAt` for a 24-byte element; Inserts one 24-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0080AE70 (FUN_0080AE70 -- `insert_range`/`InsertAt` for a 24-byte element; Inserts one 24-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x004E7460 (FUN_004E7460 -- `insert_range`/`InsertAt` for a 24-byte element; Inserts one 24-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x00547C70 (FUN_00547C70 -- `insert_range`/`InsertAt` for a 20-byte element; Inserts one 20-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0080EF20 (FUN_0080EF20 -- `insert_range`/`InsertAt` for a 8-byte element; Inserts one 8-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x007A24B0 (FUN_007A24B0 -- `insert_range`/`InsertAt` for a 8-byte element; Inserts one 8-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0080F0A0 (FUN_0080F0A0 -- `insert_range`/`InsertAt` for a 32-byte element; Inserts one 32-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0056E4A0 (FUN_0056E4A0 -- `insert_range`/`InsertAt` for a 32-byte element; Inserts one 32-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x00723200 (FUN_00723200 -- `insert_range`/`InsertAt` for a 32-byte element; Inserts one 32-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0081B830 (FUN_0081B830 -- `insert_range`/`InsertAt` for a 12-byte element; Inserts one 12-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x00515E30 (FUN_00515E30 -- `insert_range`/`InsertAt` for a 12-byte element; Inserts one 12-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x006C0DE0 (FUN_006C0DE0 -- `insert_range`/`InsertAt` for a 16-byte element; Inserts one 16-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0092D9B0 (FUN_0092D9B0 -- `insert_range`/`InsertAt` for a 2-byte element; Inserts one 2-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0080F210 (FUN_0080F210 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0082CF20 (FUN_0082CF20 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0084E740 (FUN_0084E740 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x00867D40 (FUN_00867D40 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x00540130 (FUN_00540130 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0059CD10 (FUN_0059CD10 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x005C5270 (FUN_005C5270 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x005D4020 (FUN_005D4020 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x006FBC40 (FUN_006FBC40 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x00702330 (FUN_00702330 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x0072A850 (FUN_0072A850 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x00774000 (FUN_00774000 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
-     * Address: 0x006AEAD0 (FUN_006AEAD0 -- `insert_range`/`InsertAt` for a 8-byte element; Inserts one 8-byte source range before `insertPosition`, growing storage when required and preserving overlap-safe lane movement semantics.)
-     * Address: 0x00723090 (FUN_00723090 -- `InsertAt` for `gpg::fastvector_n<moho::CollisionResult, 10>` (element 0x18), the full arm of the inlined `push_back` in the COGrid gathers 0x00721C00/0x00721DC0/0x00721FB0/0x00722350/0x007227B0 and CDamage's 0x00722560; its tail shifts are the `_Copy_backward` pair 0x007237E0/0x00723770 and its `_Ucopy` is 0x00723410. Formerly `InsertCollisionResultRange` in moho/entity/EntityCollisionUpdater.cpp (RULE ONE), file removed 2026-09-24.)
-     * Address: 0x007AF0B0 (FUN_007AF0B0 -- `InsertAt` for `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`), the full arm of their `push_back`; formerly `CameraFrustumUserEntityList::InsertRange` in moho/render/camera/CameraImpl.cpp (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0061C750 (FUN_0061C750 -- `InsertAt` for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`, the deep-copy arm: `WeakPtr` copy constructors past the end and `operator=` over live slots; the full arm of `push_back` 0x0061C5E0, growing through 0x0061C940.)
-     * Address: 0x008B77D0 (FUN_008B77D0 -- `InsertAt` for `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>` (`UserCommandQueue::primaryLinks`/`resolvedLinks`): the full arm of the rebuild's `push_back`s and its ordered insert (0x008B6F60, three calls); `_Ucopy` 0x008B7DA0, the backward assigns 0x008B81B0 / 0x008B8200, growing through 0x008B7CC0. Formerly `InsertQueueLinkRangeWithGrowth` in moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
+     * Address: 0x0056D3F0 (FUN_0056D3F0 -- `InsertAt` for `gpg::fastvector_n<moho::SOffsetInfo, 2>`
+     * (`CFormationInstance::mOffsetInfo`, element 0x4C), the grow arm of its `push_back`/`Resize`; deep-copy path.)
+     * Address: 0x0070FAD0 (FUN_0070FAD0 -- `insert_range` for `gpg::fastvector_n<moho::SCondition, 2>`
+     * (`STrigger::mConditions`, element 0x38), the grow arm of `push_back` 0x0070E8F0; its tail shift is the
+     * `_Copy_backward` at 0x00714850.) Address: 0x0080A340 (FUN_0080A340 -- `insert_range`/`InsertAt` for a 28-byte
+     * element; Inserts one 28-byte range before `insertPosition`, growing storage when capacity is insufficient.)
+     * Address: 0x0080A8C0 (FUN_0080A8C0 -- `insert_range`/`InsertAt` for a 24-byte element; Inserts one 24-byte range
+     * before `insertPosition`, growing storage when capacity is insufficient.) Address: 0x0080ACB0 (FUN_0080ACB0 --
+     * `insert_range`/`InsertAt` for a 24-byte element; Inserts one 24-byte range before `insertPosition`, growing
+     * storage when capacity is insufficient.) Address: 0x0080AE70 (FUN_0080AE70 -- `insert_range`/`InsertAt` for a
+     * 24-byte element; Inserts one 24-byte range before `insertPosition`, growing storage when capacity is
+     * insufficient.) Address: 0x004E7460 (FUN_004E7460 -- `insert_range`/`InsertAt` for a 24-byte element; Inserts one
+     * 24-byte range before `insertPosition`, growing storage when capacity is insufficient.) Address: 0x00547C70
+     * (FUN_00547C70 -- `insert_range`/`InsertAt` for a 20-byte element; Inserts one 20-byte range before
+     * `insertPosition`, growing storage when capacity is insufficient.) Address: 0x0080EF20 (FUN_0080EF20 --
+     * `insert_range`/`InsertAt` for a 8-byte element; Inserts one 8-byte range before `insertPosition`, growing storage
+     * when capacity is insufficient.) Address: 0x007A24B0 (FUN_007A24B0 -- `insert_range`/`InsertAt` for a 8-byte
+     * element; Inserts one 8-byte range before `insertPosition`, growing storage when capacity is insufficient.)
+     * Address: 0x0080F0A0 (FUN_0080F0A0 -- `insert_range`/`InsertAt` for a 32-byte element; Inserts one 32-byte range
+     * before `insertPosition`, growing storage when capacity is insufficient.) Address: 0x0056E4A0 (FUN_0056E4A0 --
+     * `insert_range`/`InsertAt` for a 32-byte element; Inserts one 32-byte range before `insertPosition`, growing
+     * storage when capacity is insufficient.) Address: 0x00723200 (FUN_00723200 -- `insert_range`/`InsertAt` for a
+     * 32-byte element; Inserts one 32-byte range before `insertPosition`, growing storage when capacity is
+     * insufficient.) Address: 0x0081B830 (FUN_0081B830 -- `insert_range`/`InsertAt` for a 12-byte element; Inserts one
+     * 12-byte range before `insertPosition`, growing storage when capacity is insufficient.) Address: 0x00515E30
+     * (FUN_00515E30 -- `insert_range`/`InsertAt` for a 12-byte element; Inserts one 12-byte range before
+     * `insertPosition`, growing storage when capacity is insufficient.) Address: 0x006C0DE0 (FUN_006C0DE0 --
+     * `insert_range`/`InsertAt` for a 16-byte element; Inserts one 16-byte range before `insertPosition`, growing
+     * storage when capacity is insufficient.) Address: 0x0092D9B0 (FUN_0092D9B0 -- `insert_range`/`InsertAt` for a
+     * 2-byte element; Inserts one 2-byte range before `insertPosition`, growing storage when capacity is insufficient.)
+     * Address: 0x0080F210 (FUN_0080F210 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range
+     * before `insertPosition`, growing storage when capacity is insufficient.) Address: 0x0082CF20 (FUN_0082CF20 --
+     * `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage
+     * when capacity is insufficient.) Address: 0x0084E740 (FUN_0084E740 -- `insert_range`/`InsertAt` for a 4-byte
+     * element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
+     * Address: 0x00867D40 (FUN_00867D40 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range
+     * before `insertPosition`, growing storage when capacity is insufficient.) Address: 0x00540130 (FUN_00540130 --
+     * `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage
+     * when capacity is insufficient.) Address: 0x0059CD10 (FUN_0059CD10 -- `insert_range`/`InsertAt` for a 4-byte
+     * element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
+     * Address: 0x005C5270 (FUN_005C5270 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range
+     * before `insertPosition`, growing storage when capacity is insufficient.) Address: 0x005D4020 (FUN_005D4020 --
+     * `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage
+     * when capacity is insufficient.) Address: 0x006FBC40 (FUN_006FBC40 -- `insert_range`/`InsertAt` for a 4-byte
+     * element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
+     * Address: 0x00702330 (FUN_00702330 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range
+     * before `insertPosition`, growing storage when capacity is insufficient.) Address: 0x0072A850 (FUN_0072A850 --
+     * `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage
+     * when capacity is insufficient.) Address: 0x00774000 (FUN_00774000 -- `insert_range`/`InsertAt` for a 4-byte
+     * element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
+     * Address: 0x006AEAD0 (FUN_006AEAD0 -- `insert_range`/`InsertAt` for a 8-byte element; Inserts one 8-byte source
+     * range before `insertPosition`, growing storage when required and preserving overlap-safe lane movement
+     * semantics.) Address: 0x00723090 (FUN_00723090 -- `InsertAt` for `gpg::fastvector_n<moho::CollisionResult, 10>`
+     * (element 0x18), the full arm of the inlined `push_back` in the COGrid gathers
+     * 0x00721C00/0x00721DC0/0x00721FB0/0x00722350/0x007227B0 and CDamage's 0x00722560; its tail shifts are the
+     * `_Copy_backward` pair 0x007237E0/0x00723770 and its `_Ucopy` is 0x00723410. Formerly `InsertCollisionResultRange`
+     * in moho/entity/EntityCollisionUpdater.cpp (RULE ONE), file removed 2026-09-24.) Address: 0x007AF0B0 (FUN_007AF0B0
+     * -- `InsertAt` for `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes
+     * `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`), the full arm of their `push_back`; formerly
+     * `CameraFrustumUserEntityList::InsertRange` in moho/render/camera/CameraImpl.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0061C750 (FUN_0061C750 -- `InsertAt` for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>`
+     * (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`, the deep-copy arm: `WeakPtr`
+     * copy constructors past the end and `operator=` over live slots; the full arm of `push_back` 0x0061C5E0, growing
+     * through 0x0061C940.) Address: 0x008B77D0 (FUN_008B77D0 -- `InsertAt` for
+     * `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>`
+     * (`UserCommandQueue::primaryLinks`/`resolvedLinks`): the full arm of the rebuild's `push_back`s and its ordered
+     * insert (0x008B6F60, three calls); `_Ucopy` 0x008B7DA0, the backward assigns 0x008B81B0 / 0x008B8200, growing
+     * through 0x008B7CC0. Formerly `InsertQueueLinkRangeWithGrowth` in moho/unit/core/UserUnit.cpp, removed
+     * 2026-09-30.)
      */
-    void InsertAt(T* pos, const T* insStart, const T* insEnd)
+    void InsertAt(
+      T* pos,
+      const T* insStart,
+      const T* insEnd
+    )
     {
       const size_t insertCount = static_cast<size_t>(insEnd - insStart);
       if (!insertCount)
@@ -2044,7 +2463,9 @@ namespace gpg::core
       }
     }
 
-    void Append(T& o)
+    void Append(
+      T& o
+    )
     {
       if (this->end_ == this->capacity_) {
         this->InsertAt(this->end_, &o, &o + 1);
@@ -2063,7 +2484,9 @@ namespace gpg::core
      * Replaces this payload with `source` while preserving inline/heap storage
      * rules and minimizing reallocations when capacity is already sufficient.
      */
-    FastVectorN<T, N>* AddAll(const FastVectorN<T, N>* const source)
+    FastVectorN<T, N>* AddAll(
+      const FastVectorN<T, N>* const source
+    )
     {
       if (this == source) {
         return this;
@@ -2109,16 +2532,24 @@ namespace gpg::core
 
     // Reset to inline storage and copy from a plain FastVector view
     /**
-     * Address: 0x0065FED0 (FUN_0065FED0 -- the per-element assignment a range copy runs for `gpg::core::FastVector<moho::SEfxCurve>` (the reflected curve vector; the 0x38 element's assignment copies both bound vectors then hands its key vector to `ResetFrom`, which is the emission at 0x0065F240); callers 0x0065F330, 0x0065FA80; formerly `CopyAssignSEfxCurveRangeRuntime` in moho/effects/rendering/SEfxCurve.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x0065FED0 (FUN_0065FED0 -- the per-element assignment a range copy runs for
+     * `gpg::core::FastVector<moho::SEfxCurve>` (the reflected curve vector; the 0x38 element's assignment copies both
+     * bound vectors then hands its key vector to `ResetFrom`, which is the emission at 0x0065F240); callers 0x0065F330,
+     * 0x0065FA80; formerly `CopyAssignSEfxCurveRangeRuntime` in moho/effects/rendering/SEfxCurve.cpp (RULE ONE),
+     * removed 2026-09-11.)
      */
-    void ResetFrom(const FastVector<T>& src)
+    void ResetFrom(
+      const FastVector<T>& src
+    )
     {
       this->ResetInline_();
       CopyFromRaw_(src.start_, static_cast<size_t>(src.end_ - src.start_));
     }
 
     // Reset to inline storage and copy from another FastVectorN
-    void ResetFrom(const FastVectorN<T, N>& src)
+    void ResetFrom(
+      const FastVectorN<T, N>& src
+    )
     {
       this->ResetInline_();
       CopyFromRaw_(src.start_, static_cast<size_t>(src.end_ - src.start_));
@@ -2148,7 +2579,9 @@ namespace gpg::core
      * What it does:
      * Initializes this fastvector_n lane to inline storage and copies source elements.
      */
-    void InitInlineAndCopyFrom(const FastVector<T>& src)
+    void InitInlineAndCopyFrom(
+      const FastVector<T>& src
+    )
     {
       RebindInlineNoFree();
       ResetFrom(src);
@@ -2175,7 +2608,11 @@ namespace gpg::core
      * Adopt raw storage pointers without allocating/freeing.
      * Intended for recovered ABI helpers that manage storage externally.
      */
-    void AdoptRawBufferNoFree(T* begin, size_t size, size_t capacity) noexcept
+    void AdoptRawBufferNoFree(
+      T* begin,
+      size_t size,
+      size_t capacity
+    ) noexcept
     {
       this->start_ = begin;
       this->end_ = begin + size;
@@ -2185,7 +2622,9 @@ namespace gpg::core
     /**
      * Set logical size without constructing/destroying elements.
      */
-    void SetSizeUnchecked(size_t size) noexcept
+    void SetSizeUnchecked(
+      size_t size
+    ) noexcept
     {
       this->end_ = this->start_ + size;
     }
@@ -2208,126 +2647,251 @@ namespace gpg::core
      * Address: 0x005774B0 (FUN_005774B0, the same body emitted a second time --
      * 36 instructions and 92 bytes each, identical mnemonics and the same call
      * target. This build did not fold identical COMDATs, so both survive.)
-     * Address: 0x00762530 (FUN_00762530 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0080ABE0 (FUN_0080ABE0 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00693430 (FUN_00693430 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00693110 (FUN_00693110 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00762850 (FUN_00762850 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00561E60 (FUN_00561E60 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x005B5250 (FUN_005B5250 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00754740 (FUN_00754740 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00693240 (FUN_00693240 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Register-shape adapter that forwards one forward 28-byte range copy lane.)
-     * Address: 0x00693370 (FUN_00693370 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Secondary register-shape adapter that forwards one forward 28-byte range copy lane.)
-     * Address: 0x00693410 (FUN_00693410 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Third register-shape adapter that forwards one forward 28-byte range copy lane.)
-     * Address: 0x006D2880 (FUN_006D2880 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Third register-shape adapter that forwards one forward 28-byte range copy lane.)
-     * Address: 0x0080B150 (FUN_0080B150 -- copy-forward (`_Ucopy`/`_Copy`) for a 24-byte element; Copies 24-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0080B2B0 (FUN_0080B2B0 -- copy-forward (`_Ucopy`/`_Copy`) for a 24-byte element; Copies 24-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0080B3E0 (FUN_0080B3E0 -- copy-forward (`_Ucopy`/`_Copy`) for a 24-byte element; Copies 24-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x004E7740 (FUN_004E7740 -- copy-forward (`_Ucopy`/`_Copy`) for a 24-byte element; Copies 24-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00548460 (FUN_00548460 -- copy-forward (`_Ucopy`/`_Copy`) for a 20-byte element; Copies 20-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0080F460 (FUN_0080F460 -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x006D28A0 (FUN_006D28A0 -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x006D2530 (FUN_006D2530 -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x006D2560 (FUN_006D2560 -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x007A26D0 (FUN_007A26D0 -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x006AF7B0 (FUN_006AF7B0 -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x007678A0 (FUN_007678A0 -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x006D2750 (FUN_006D2750 -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element (calling-convention bridge); Register-shape adapter that forwards one 8-byte forward range copy lane into the canonical null-tolerant copy helper.)
-     * Address: 0x006D2820 (FUN_006D2820 -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element (calling-convention bridge); Register-shape adapter that forwards one 8-byte forward range copy lane into the canonical null-tolerant copy helper.)
-     * Address: 0x00754850 (FUN_00754850 -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element (calling-convention bridge); Bridges one 8-byte source-first copy lane where the source-end bound was supplied through a hidden register lane in the original call shape.)
-     * Address: 0x0080F550 (FUN_0080F550 -- copy-forward (`_Ucopy`/`_Copy`) for a 32-byte element; Copies 32-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0056FA10 (FUN_0056FA10 -- copy-forward (`_Ucopy`/`_Copy`) for a 32-byte element; Copies 32-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00723530 (FUN_00723530 -- copy-forward (`_Ucopy`/`_Copy`) for a 32-byte element; Copies 32-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0081BC90 (FUN_0081BC90 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0065FA50 (FUN_0065FA50 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x006A0F70 (FUN_006A0F70 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x006828B0 (FUN_006828B0 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0069FA60 (FUN_0069FA60 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0069FA90 (FUN_0069FA90 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0067F950 (FUN_0067F950 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00516670 (FUN_00516670 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0067F920 (FUN_0067F920 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Register-shape adapter that forwards one 12-byte forward range copy lane into the canonical null-tolerant copy helper.)
-     * Address: 0x00680B10 (FUN_00680B10 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Register-shape adapter that forwards one 12-byte forward range copy lane into the canonical null-tolerant copy helper.)
-     * Address: 0x00681C20 (FUN_00681C20 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Register-shape adapter that forwards one 12-byte forward range copy lane into the canonical null-tolerant copy helper.)
-     * Address: 0x00682340 (FUN_00682340 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Register-shape adapter that forwards one 12-byte forward range copy lane into the canonical null-tolerant copy helper.)
-     * Address: 0x006A02A0 (FUN_006A02A0 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Register-shape adapter that forwards one 12-byte forward range copy lane into the canonical null-tolerant copy helper.)
-     * Address: 0x006A0CF0 (FUN_006A0CF0 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Register-shape adapter that forwards one 12-byte forward range copy lane into the canonical null-tolerant copy helper.)
-     * Address: 0x006A0E70 (FUN_006A0E70 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Register-shape adapter that forwards one 12-byte forward range copy lane into the canonical null-tolerant copy helper.)
-     * Address: 0x006C1030 (FUN_006C1030 -- copy-forward (`_Ucopy`/`_Copy`) for a 16-byte element; Copies 16-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x007F0C50 (FUN_007F0C50 -- copy-forward (`_Ucopy`/`_Copy`) for a 16-byte element; Copies 16-byte elements from `[sourceBegin, rangeEnd)` into `destination`, stores the copied begin in `outBegin`, and advances `rangeEnd` to the copied tail.)
-     * Address: 0x0067F8F0 (FUN_0067F8F0 -- copy-forward (`_Ucopy`/`_Copy`) for a 16-byte element; Copies 16-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00517200 (FUN_00517200 -- copy-forward (`_Ucopy`/`_Copy`) for a 16-byte element; Copies 16-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x007E96A0 (FUN_007E96A0 -- copy-forward (`_Ucopy`/`_Copy`) for a 16-byte element; Copies 16-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0056F2A0 (FUN_0056F2A0 -- copy-forward (`_Ucopy`/`_Copy`) for a 16-byte element; Copies 16-byte lanes from `[sourceBegin, vectorView.finish)` into `destinationBegin`, advances `vectorView.finish`, and returns `destinationBegin`.)
-     * Address: 0x0092BD70 (FUN_0092BD70 -- copy-forward (`_Ucopy`/`_Copy`) for a 2-byte element; Copies 2-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0080F660 (FUN_0080F660 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0082E7A0 (FUN_0082E7A0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0084ED40 (FUN_0084ED40 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00868500 (FUN_00868500 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x005407F0 (FUN_005407F0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0059D370 (FUN_0059D370 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x005C6CF0 (FUN_005C6CF0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x005D44A0 (FUN_005D44A0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x006FBE40 (FUN_006FBE40 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00702E40 (FUN_00702E40 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x0072AB30 (FUN_0072AB30 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00774260 (FUN_00774260 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x006E3ED0 (FUN_006E3ED0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00706080 (FUN_00706080 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x006E2D10 (FUN_006E2D10 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x006E35A0 (FUN_006E35A0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00704270 (FUN_00704270 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00658470 (FUN_00658470 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00559270 (FUN_00559270 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x00553C70 (FUN_00553C70 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
-     * Address: 0x007052D0 (FUN_007052D0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Register-order adapter that forwards one 4-byte range copy lane to `CopyForwardDwordLane`.)
-     * Address: 0x007655C0 (FUN_007655C0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Register-order adapter that forwards one 4-byte range copy lane to `CopyForwardDwordLane`.)
-     * Address: 0x007656E0 (FUN_007656E0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Register-order adapter that forwards one 4-byte range copy lane to `CopyForwardDwordLane`.)
-     * Address: 0x006E34C0 (FUN_006E34C0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Register-shape forwarding lane for one dword copy range into `CopyForwardDwordLane`.)
-     * Address: 0x006E3D10 (FUN_006E3D10 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Mirrored register-shape forwarding lane for one dword copy range into `CopyForwardDwordLane`.)
-     * Address: 0x008D8190 (FUN_008D8190 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x008D81C0 (FUN_008D81C0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x008D7DF0 (FUN_008D7DF0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Forwards one source-first 4-byte lane copy through the shared `FUN_008D8190` dword source-first copy lane.)
-     * Address: 0x008D7E50 (FUN_008D7E50 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Forwards one source-first 4-byte lane copy through the shared `FUN_008D81C0` dword source-first copy lane.)
-     * Address: 0x008EA850 (FUN_008EA850 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Forwards one source-first 4-byte lane copy through the shared `FUN_008D8190` dword source-first copy lane.)
-     * Address: 0x008EA880 (FUN_008EA880 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Forwards one source-first 4-byte lane copy through the shared `FUN_008D81C0` dword source-first copy lane.)
-     * Address: 0x008EA450 (FUN_008EA450 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Adapter lane forwarding one source-first 4-byte copy range through `CopyForwardDwordLaneSourceFirst`.)
-     * Address: 0x008EA470 (FUN_008EA470 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Secondary adapter lane forwarding one source-first 4-byte copy range through `CopyForwardDwordLaneSourceFirst`.)
-     * Address: 0x008EA660 (FUN_008EA660 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Third adapter lane forwarding one source-first 4-byte copy range through `CopyForwardDwordLaneSourceFirst`.)
-     * Address: 0x008EA690 (FUN_008EA690 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Fourth adapter lane forwarding one source-first 4-byte copy range through `CopyForwardDwordLaneSourceFirst`.)
-     * Address: 0x008D7F90 (FUN_008D7F90 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Forwards one source-first 12-byte lane copy through the shared `FUN_008D8150` 12-byte source-first copy lane.)
-     * Address: 0x008D8000 (FUN_008D8000 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Forwards one source-first 4-byte lane copy through the shared `FUN_008D8190` dword source-first copy lane.)
-     * Address: 0x008D8070 (FUN_008D8070 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Forwards one source-first 4-byte lane copy through the shared `FUN_008D81C0` dword source-first copy lane.)
-     * Address: 0x008D8150 (FUN_008D8150 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x007547D0 (FUN_007547D0 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Bridges one 12-byte source-first copy lane where the source-end bound was supplied through a hidden register lane in the original call shape.)
-     * Address: 0x008EA820 (FUN_008EA820 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Forwards one source-first 12-byte lane copy through the shared `FUN_008D8150` 12-byte source-first copy lane.)
-     * Address: 0x008EA430 (FUN_008EA430 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Adapter lane forwarding one source-first 12-byte copy range through `CopyForward12ByteLaneSourceFirst`.)
-     * Address: 0x008EA630 (FUN_008EA630 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Secondary adapter lane forwarding one source-first 12-byte copy range through `CopyForward12ByteLaneSourceFirst`.)
-     * Address: 0x008F64A0 (FUN_008F64A0 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x008F64D0 (FUN_008F64D0 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x008F6810 (FUN_008F6810 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x008F6620 (FUN_008F6620 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Forwarding lane that routes one source-first 28-byte range copy into `FUN_008F64D0`.)
-     * Address: 0x008F66C0 (FUN_008F66C0 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Secondary forwarding lane that routes one source-first 28-byte range copy into `FUN_008F64D0`.)
-     * Address: 0x008F6760 (FUN_008F6760 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Tertiary forwarding lane that routes one source-first 28-byte range copy into `FUN_008F64D0`.)
-     * Address: 0x008F66E0 (FUN_008F66E0 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Forwards one source-first 28-byte lane copy through the shared `FUN_008F64D0` 28-byte source-first copy lane.)
-     * Address: 0x00756990 (FUN_00756990 -- copy-forward (`_Ucopy`/`_Copy`) for a 40-byte element; Copies 40-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x00753D60 (FUN_00753D60 -- copy-forward (`_Ucopy`/`_Copy`) for a 40-byte element; Copies 40-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x00751B20 (FUN_00751B20 -- copy-forward (`_Ucopy`/`_Copy`) for a 40-byte element (calling-convention bridge); Tail-jump adapter lane that forwards one 40-byte source-first copy range into `FUN_00753D60`.)
-     * Address: 0x00753D40 (FUN_00753D40 -- copy-forward (`_Ucopy`/`_Copy`) for a 40-byte element (calling-convention bridge); Source-first forwarding adapter lane that routes one 40-byte range copy into `FUN_00756990` while discarding one zero scratch lane.)
-     * Address: 0x00755950 (FUN_00755950 -- copy-forward (`_Ucopy`/`_Copy`) for a 40-byte element (calling-convention bridge); Duplicate source-first forwarding adapter lane for one 40-byte range copy into `FUN_00756990`.)
-     * Address: 0x00755D90 (FUN_00755D90 -- copy-forward (`_Ucopy`/`_Copy`) for a 40-byte element (calling-convention bridge); Third source-first forwarding adapter lane for one 40-byte range copy into `FUN_00756990`.)
-     * Address: 0x0071D700 (FUN_0071D700 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x0071FC60 (FUN_0071FC60 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x0071E950 (FUN_0071E950 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x0071F510 (FUN_0071F510 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x0071F6D0 (FUN_0071F6D0 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x0071EC30 (FUN_0071EC30 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.)
-     * Address: 0x0071EC90 (FUN_0071EC90 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element (calling-convention bridge); Register-shape adapter lane that forwards one 56-byte source-first copy into `CopyForward56ByteLaneSourceFirst`.)
-     * Address: 0x00754830 (FUN_00754830 -- forward copy for an 8-byte element (eax=dest, edx=end, ecx=begin register convention), the copy step of `fastvector::operator=` 0x00752A70; formerly `CopyDwordPairRangeLaneA` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x007547A0 (FUN_007547A0 -- forward copy for a 12-byte element, the copy step of `fastvector::operator=` 0x00752830; formerly `CopyDwordTripleRangeLaneA`, removed.)
-     * Address: 0x0063CA20 (FUN_0063CA20 -- `CopyRangeForward` for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); callers 0x0063C5F0, 0x0063C950; formerly `CopyBindingRange` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x00762530 (FUN_00762530 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte
+     * elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address:
+     * 0x0080ABE0 (FUN_0080ABE0 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x00693430
+     * (FUN_00693430 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x00693110
+     * (FUN_00693110 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x00762850
+     * (FUN_00762850 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x00561E60
+     * (FUN_00561E60 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x005B5250
+     * (FUN_005B5250 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x00754740
+     * (FUN_00754740 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x00693240
+     * (FUN_00693240 -- copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge);
+     * Register-shape adapter that forwards one forward 28-byte range copy lane.) Address: 0x00693370 (FUN_00693370 --
+     * copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Secondary register-shape
+     * adapter that forwards one forward 28-byte range copy lane.) Address: 0x00693410 (FUN_00693410 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Third register-shape adapter that forwards
+     * one forward 28-byte range copy lane.) Address: 0x006D2880 (FUN_006D2880 -- copy-forward (`_Ucopy`/`_Copy`) for a
+     * 28-byte element (calling-convention bridge); Third register-shape adapter that forwards one forward 28-byte range
+     * copy lane.) Address: 0x0080B150 (FUN_0080B150 -- copy-forward (`_Ucopy`/`_Copy`) for a 24-byte element; Copies
+     * 24-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.)
+     * Address: 0x0080B2B0 (FUN_0080B2B0 -- copy-forward (`_Ucopy`/`_Copy`) for a 24-byte element; Copies 24-byte
+     * elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address:
+     * 0x0080B3E0 (FUN_0080B3E0 -- copy-forward (`_Ucopy`/`_Copy`) for a 24-byte element; Copies 24-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x004E7740
+     * (FUN_004E7740 -- copy-forward (`_Ucopy`/`_Copy`) for a 24-byte element; Copies 24-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x00548460
+     * (FUN_00548460 -- copy-forward (`_Ucopy`/`_Copy`) for a 20-byte element; Copies 20-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x0080F460
+     * (FUN_0080F460 -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin,
+     * sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x006D28A0 (FUN_006D28A0 --
+     * copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x006D2530 (FUN_006D2530 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x006D2560 (FUN_006D2560 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x007A26D0 (FUN_007A26D0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x006AF7B0 (FUN_006AF7B0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x007678A0 (FUN_007678A0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 8-byte element; Copies 8-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x006D2750 (FUN_006D2750 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 8-byte element (calling-convention bridge); Register-shape adapter that forwards one
+     * 8-byte forward range copy lane into the canonical null-tolerant copy helper.) Address: 0x006D2820 (FUN_006D2820
+     * -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element (calling-convention bridge); Register-shape adapter that
+     * forwards one 8-byte forward range copy lane into the canonical null-tolerant copy helper.) Address: 0x00754850
+     * (FUN_00754850 -- copy-forward (`_Ucopy`/`_Copy`) for a 8-byte element (calling-convention bridge); Bridges one
+     * 8-byte source-first copy lane where the source-end bound was supplied through a hidden register lane in the
+     * original call shape.) Address: 0x0080F550 (FUN_0080F550 -- copy-forward (`_Ucopy`/`_Copy`) for a 32-byte element;
+     * Copies 32-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination
+     * lane.) Address: 0x0056FA10 (FUN_0056FA10 -- copy-forward (`_Ucopy`/`_Copy`) for a 32-byte element; Copies 32-byte
+     * elements from `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address:
+     * 0x00723530 (FUN_00723530 -- copy-forward (`_Ucopy`/`_Copy`) for a 32-byte element; Copies 32-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x0081BC90
+     * (FUN_0081BC90 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x0065FA50
+     * (FUN_0065FA50 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x006A0F70
+     * (FUN_006A0F70 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x006828B0
+     * (FUN_006828B0 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x0069FA60
+     * (FUN_0069FA60 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x0069FA90
+     * (FUN_0069FA90 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x0067F950
+     * (FUN_0067F950 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x00516670
+     * (FUN_00516670 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x0067F920
+     * (FUN_0067F920 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge);
+     * Register-shape adapter that forwards one 12-byte forward range copy lane into the canonical null-tolerant copy
+     * helper.) Address: 0x00680B10 (FUN_00680B10 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element
+     * (calling-convention bridge); Register-shape adapter that forwards one 12-byte forward range copy lane into the
+     * canonical null-tolerant copy helper.) Address: 0x00681C20 (FUN_00681C20 -- copy-forward (`_Ucopy`/`_Copy`) for a
+     * 12-byte element (calling-convention bridge); Register-shape adapter that forwards one 12-byte forward range copy
+     * lane into the canonical null-tolerant copy helper.) Address: 0x00682340 (FUN_00682340 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Register-shape adapter that forwards one
+     * 12-byte forward range copy lane into the canonical null-tolerant copy helper.) Address: 0x006A02A0 (FUN_006A02A0
+     * -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Register-shape adapter that
+     * forwards one 12-byte forward range copy lane into the canonical null-tolerant copy helper.) Address: 0x006A0CF0
+     * (FUN_006A0CF0 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge);
+     * Register-shape adapter that forwards one 12-byte forward range copy lane into the canonical null-tolerant copy
+     * helper.) Address: 0x006A0E70 (FUN_006A0E70 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element
+     * (calling-convention bridge); Register-shape adapter that forwards one 12-byte forward range copy lane into the
+     * canonical null-tolerant copy helper.) Address: 0x006C1030 (FUN_006C1030 -- copy-forward (`_Ucopy`/`_Copy`) for a
+     * 16-byte element; Copies 16-byte elements from `[sourceBegin, sourceEnd)` into `destination` and returns the
+     * advanced destination lane.) Address: 0x007F0C50 (FUN_007F0C50 -- copy-forward (`_Ucopy`/`_Copy`) for a 16-byte
+     * element; Copies 16-byte elements from `[sourceBegin, rangeEnd)` into `destination`, stores the copied begin in
+     * `outBegin`, and advances `rangeEnd` to the copied tail.) Address: 0x0067F8F0 (FUN_0067F8F0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 16-byte element; Copies 16-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x00517200 (FUN_00517200 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 16-byte element; Copies 16-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x007E96A0 (FUN_007E96A0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 16-byte element; Copies 16-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x0056F2A0 (FUN_0056F2A0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 16-byte element; Copies 16-byte lanes from `[sourceBegin, vectorView.finish)` into
+     * `destinationBegin`, advances `vectorView.finish`, and returns `destinationBegin`.) Address: 0x0092BD70
+     * (FUN_0092BD70 -- copy-forward (`_Ucopy`/`_Copy`) for a 2-byte element; Copies 2-byte elements from `[sourceBegin,
+     * sourceEnd)` into `destination` and returns the advanced destination lane.) Address: 0x0080F660 (FUN_0080F660 --
+     * copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x0082E7A0 (FUN_0082E7A0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x0084ED40 (FUN_0084ED40 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x00868500 (FUN_00868500 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x005407F0 (FUN_005407F0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x0059D370 (FUN_0059D370 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x005C6CF0 (FUN_005C6CF0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x005D44A0 (FUN_005D44A0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x006FBE40 (FUN_006FBE40 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x00702E40 (FUN_00702E40 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x0072AB30 (FUN_0072AB30 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x00774260 (FUN_00774260 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x006E3ED0 (FUN_006E3ED0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x00706080 (FUN_00706080 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x006E2D10 (FUN_006E2D10 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x006E35A0 (FUN_006E35A0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x00704270 (FUN_00704270 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x00658470 (FUN_00658470 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x00559270 (FUN_00559270 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x00553C70 (FUN_00553C70 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` and returns the advanced destination lane.) Address: 0x007052D0 (FUN_007052D0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Register-order adapter that forwards one
+     * 4-byte range copy lane to `CopyForwardDwordLane`.) Address: 0x007655C0 (FUN_007655C0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Register-order adapter that forwards one
+     * 4-byte range copy lane to `CopyForwardDwordLane`.) Address: 0x007656E0 (FUN_007656E0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Register-order adapter that forwards one
+     * 4-byte range copy lane to `CopyForwardDwordLane`.) Address: 0x006E34C0 (FUN_006E34C0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Register-shape forwarding lane for one dword
+     * copy range into `CopyForwardDwordLane`.) Address: 0x006E3D10 (FUN_006E3D10 -- copy-forward (`_Ucopy`/`_Copy`) for
+     * a 4-byte element (calling-convention bridge); Mirrored register-shape forwarding lane for one dword copy range
+     * into `CopyForwardDwordLane`.) Address: 0x008D8190 (FUN_008D8190 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte
+     * element; Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is
+     * provided first.) Address: 0x008D81C0 (FUN_008D81C0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element;
+     * Copies 4-byte elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided
+     * first.) Address: 0x008D7DF0 (FUN_008D7DF0 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element
+     * (calling-convention bridge); Forwards one source-first 4-byte lane copy through the shared `FUN_008D8190` dword
+     * source-first copy lane.) Address: 0x008D7E50 (FUN_008D7E50 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte
+     * element (calling-convention bridge); Forwards one source-first 4-byte lane copy through the shared `FUN_008D81C0`
+     * dword source-first copy lane.) Address: 0x008EA850 (FUN_008EA850 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte
+     * element (calling-convention bridge); Forwards one source-first 4-byte lane copy through the shared `FUN_008D8190`
+     * dword source-first copy lane.) Address: 0x008EA880 (FUN_008EA880 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte
+     * element (calling-convention bridge); Forwards one source-first 4-byte lane copy through the shared `FUN_008D81C0`
+     * dword source-first copy lane.) Address: 0x008EA450 (FUN_008EA450 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte
+     * element (calling-convention bridge); Adapter lane forwarding one source-first 4-byte copy range through
+     * `CopyForwardDwordLaneSourceFirst`.) Address: 0x008EA470 (FUN_008EA470 -- copy-forward (`_Ucopy`/`_Copy`) for a
+     * 4-byte element (calling-convention bridge); Secondary adapter lane forwarding one source-first 4-byte copy range
+     * through `CopyForwardDwordLaneSourceFirst`.) Address: 0x008EA660 (FUN_008EA660 -- copy-forward (`_Ucopy`/`_Copy`)
+     * for a 4-byte element (calling-convention bridge); Third adapter lane forwarding one source-first 4-byte copy
+     * range through `CopyForwardDwordLaneSourceFirst`.) Address: 0x008EA690 (FUN_008EA690 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Fourth adapter lane forwarding one
+     * source-first 4-byte copy range through `CopyForwardDwordLaneSourceFirst`.) Address: 0x008D7F90 (FUN_008D7F90 --
+     * copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Forwards one source-first
+     * 12-byte lane copy through the shared `FUN_008D8150` 12-byte source-first copy lane.) Address: 0x008D8000
+     * (FUN_008D8000 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge); Forwards one
+     * source-first 4-byte lane copy through the shared `FUN_008D8190` dword source-first copy lane.) Address:
+     * 0x008D8070 (FUN_008D8070 -- copy-forward (`_Ucopy`/`_Copy`) for a 4-byte element (calling-convention bridge);
+     * Forwards one source-first 4-byte lane copy through the shared `FUN_008D81C0` dword source-first copy lane.)
+     * Address: 0x008D8150 (FUN_008D8150 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element; Copies 12-byte
+     * elements from `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.) Address:
+     * 0x007547D0 (FUN_007547D0 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge);
+     * Bridges one 12-byte source-first copy lane where the source-end bound was supplied through a hidden register lane
+     * in the original call shape.) Address: 0x008EA820 (FUN_008EA820 -- copy-forward (`_Ucopy`/`_Copy`) for a 12-byte
+     * element (calling-convention bridge); Forwards one source-first 12-byte lane copy through the shared
+     * `FUN_008D8150` 12-byte source-first copy lane.) Address: 0x008EA430 (FUN_008EA430 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Adapter lane forwarding one source-first
+     * 12-byte copy range through `CopyForward12ByteLaneSourceFirst`.) Address: 0x008EA630 (FUN_008EA630 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 12-byte element (calling-convention bridge); Secondary adapter lane forwarding one
+     * source-first 12-byte copy range through `CopyForward12ByteLaneSourceFirst`.) Address: 0x008F64A0 (FUN_008F64A0 --
+     * copy-forward (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)`
+     * into `destination` when the source range is provided first.) Address: 0x008F64D0 (FUN_008F64D0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` when the source range is provided first.) Address: 0x008F6810 (FUN_008F6810 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 28-byte element; Copies 28-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` when the source range is provided first.) Address: 0x008F6620 (FUN_008F6620 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Forwarding lane that routes one
+     * source-first 28-byte range copy into `FUN_008F64D0`.) Address: 0x008F66C0 (FUN_008F66C0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Secondary forwarding lane that routes one
+     * source-first 28-byte range copy into `FUN_008F64D0`.) Address: 0x008F6760 (FUN_008F6760 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Tertiary forwarding lane that routes one
+     * source-first 28-byte range copy into `FUN_008F64D0`.) Address: 0x008F66E0 (FUN_008F66E0 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 28-byte element (calling-convention bridge); Forwards one source-first 28-byte lane copy
+     * through the shared `FUN_008F64D0` 28-byte source-first copy lane.) Address: 0x00756990 (FUN_00756990 --
+     * copy-forward (`_Ucopy`/`_Copy`) for a 40-byte element; Copies 40-byte elements from `[sourceBegin, sourceEnd)`
+     * into `destination` when the source range is provided first.) Address: 0x00753D60 (FUN_00753D60 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 40-byte element; Copies 40-byte elements from `[sourceBegin, sourceEnd)` into
+     * `destination` when the source range is provided first.) Address: 0x00751B20 (FUN_00751B20 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 40-byte element (calling-convention bridge); Tail-jump adapter lane that forwards one
+     * 40-byte source-first copy range into `FUN_00753D60`.) Address: 0x00753D40 (FUN_00753D40 -- copy-forward
+     * (`_Ucopy`/`_Copy`) for a 40-byte element (calling-convention bridge); Source-first forwarding adapter lane that
+     * routes one 40-byte range copy into `FUN_00756990` while discarding one zero scratch lane.) Address: 0x00755950
+     * (FUN_00755950 -- copy-forward (`_Ucopy`/`_Copy`) for a 40-byte element (calling-convention bridge); Duplicate
+     * source-first forwarding adapter lane for one 40-byte range copy into `FUN_00756990`.) Address: 0x00755D90
+     * (FUN_00755D90 -- copy-forward (`_Ucopy`/`_Copy`) for a 40-byte element (calling-convention bridge); Third
+     * source-first forwarding adapter lane for one 40-byte range copy into `FUN_00756990`.) Address: 0x0071D700
+     * (FUN_0071D700 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.) Address: 0x0071FC60
+     * (FUN_0071FC60 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.) Address: 0x0071E950
+     * (FUN_0071E950 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.) Address: 0x0071F510
+     * (FUN_0071F510 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.) Address: 0x0071F6D0
+     * (FUN_0071F6D0 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.) Address: 0x0071EC30
+     * (FUN_0071EC30 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element; Copies 56-byte elements from
+     * `[sourceBegin, sourceEnd)` into `destination` when the source range is provided first.) Address: 0x0071EC90
+     * (FUN_0071EC90 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element (calling-convention bridge);
+     * Register-shape adapter lane that forwards one 56-byte source-first copy into `CopyForward56ByteLaneSourceFirst`.)
+     * Address: 0x00754830 (FUN_00754830 -- forward copy for an 8-byte element (eax=dest, edx=end, ecx=begin register
+     * convention), the copy step of `fastvector::operator=` 0x00752A70; formerly `CopyDwordPairRangeLaneA` in
+     * moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.) Address: 0x007547A0 (FUN_007547A0
+     * -- forward copy for a 12-byte element, the copy step of `fastvector::operator=` 0x00752830; formerly
+     * `CopyDwordTripleRangeLaneA`, removed.) Address: 0x0063CA20 (FUN_0063CA20 -- `CopyRangeForward` for
+     * `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); callers 0x0063C5F0, 0x0063C950;
+     * formerly `CopyBindingRange` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
      */
-    static T* CopyRangeForward(T* dest, const T* copyBegin, const T* copyEnd)
+    static T* CopyRangeForward(
+      T* dest,
+      const T* copyBegin,
+      const T* copyEnd
+    )
     {
       if constexpr (std::is_trivially_copyable_v<T> && ElemSize == sizeof(std::uint32_t)) {
         auto* const destWords = reinterpret_cast<std::uint32_t*>(dest);
@@ -2392,11 +2956,19 @@ namespace gpg::core
      * `assign`s the source string; expressed here as placement-new copy so
      * owned heap buffers are deep-copied, never aliased. Advances without
      * writing when `dest == nullptr`, matching the binary's null-guarded lane.
-     * Address: 0x0056F1F0 (FUN_0056F1F0 -- `_Ucopy` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the copy-construct step of its `GrowInsertDeepCopy`/`InsertAt`.)
-     * Address: 0x0056D390 (FUN_0056D390 -- `_Ucopy` for `gpg::fastvector_n<moho::WeakPtr<moho::IUnit>, 4>` (`CFormationInstance::mUnits` and the formation scratch sets, element 0x08), the relinking copy-construct step of its `InsertAt` (0x0056B2F0).)
-     * Address: 0x00723410 (FUN_00723410 -- `_Ucopy` for `gpg::fastvector_n<moho::CollisionResult, 10>` (element 0x18), null-guarded; called from `InsertAt` 0x00723090 and the grow lane 0x00723340. Formerly `CopyCollisionResultsForward`, RULE ONE.)
+     * Address: 0x0056F1F0 (FUN_0056F1F0 -- `_Ucopy` for `gpg::fastvector_n<moho::SOffsetInfo, 2>`
+     * (`CFormationInstance::mOffsetInfo`, element 0x4C), the copy-construct step of its
+     * `GrowInsertDeepCopy`/`InsertAt`.) Address: 0x0056D390 (FUN_0056D390 -- `_Ucopy` for
+     * `gpg::fastvector_n<moho::WeakPtr<moho::IUnit>, 4>` (`CFormationInstance::mUnits` and the formation scratch sets,
+     * element 0x08), the relinking copy-construct step of its `InsertAt` (0x0056B2F0).) Address: 0x00723410
+     * (FUN_00723410 -- `_Ucopy` for `gpg::fastvector_n<moho::CollisionResult, 10>` (element 0x18), null-guarded; called
+     * from `InsertAt` 0x00723090 and the grow lane 0x00723340. Formerly `CopyCollisionResultsForward`, RULE ONE.)
      */
-    static T* UninitializedCopyForward(T* dest, const T* copyBegin, const T* copyEnd)
+    static T* UninitializedCopyForward(
+      T* dest,
+      const T* copyBegin,
+      const T* copyEnd
+    )
     {
       std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(dest);
       for (const T* cur = copyBegin; cur != copyEnd; ++cur) {
@@ -2437,86 +3009,144 @@ namespace gpg::core
      * takes the grow branch to `GrowInsertDeepCopy` instead) but is still
      * part of `InsertAt`'s one compiled body for this element type, which
      * this template reproduces branch-for-branch.)
-     * Address: 0x00571150 (FUN_00571150 -- `_Copy_backward` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the in-place tail shift of its `InsertAt`.)
-     * Address: 0x00571180 (FUN_00571180 -- a second, byte-identical emission of the same `_Copy_backward` the linker kept distinct.)
-     * Address: 0x00714850 (FUN_00714850 -- `_Copy_backward` for `gpg::fastvector_n<moho::SCondition, 2>` (`STrigger::mConditions`, element 0x38), the in-place tail shift of `InsertAt` 0x0070FAD0; element `operator=` copies `mItem`, `mOp`, `mCat` and `mVal`.)
-     * Address: 0x00713950 (FUN_00713950 -- a second emission of the same `SCondition` `_Copy_backward`.)
-     * Address: 0x00712840 (FUN_00712840 -- jump thunk into the `SCondition` `_Copy_backward`; zero callers.)
-     * Address: 0x00712870 (FUN_00712870 -- jump thunk into the `SCondition` `_Copy_backward`; zero callers.)
-     * Address: 0x007237E0 (FUN_007237E0 -- `_Copy_backward` for `gpg::fastvector_n<moho::CollisionResult, 10>` (element 0x18), the in-place tail shift of `InsertAt` 0x00723090. Formerly `CopyCollisionResultsBackward`, RULE ONE.)
-     * Address: 0x00723770 (FUN_00723770 -- a second, byte-identical emission of the same `CollisionResult` `_Copy_backward`, also called from 0x00723090.)
-     * Address: 0x00723610 (FUN_00723610 -- calling-convention bridge into the `CollisionResult` `_Copy_backward` 0x00723770 (source-first argument order); zero callers.)
-     * Address: 0x00723640 (FUN_00723640 -- calling-convention bridge into the `CollisionResult` `_Copy_backward` 0x007237E0; zero callers.)
-     * Address: 0x00762590 (FUN_00762590 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x007625C0 (FUN_007625C0 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x0080B670 (FUN_0080B670 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x0080B6E0 (FUN_0080B6E0 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x005B5C50 (FUN_005B5C50 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x005B5CC0 (FUN_005B5CC0 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x00693390 (FUN_00693390 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x00762A30 (FUN_00762A30 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x00762A90 (FUN_00762A90 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x006932C0 (FUN_006932C0 -- `_Copy_backward` for a 28-byte element (calling-convention bridge); Register-shape adapter that forwards one backward 28-byte range copy lane.)
-     * Address: 0x005B5740 (FUN_005B5740 -- `_Copy_backward` for a 28-byte element (calling-convention bridge); Register-shape adapter that forwards one source-first backward 28-byte lane copy through `FUN_005B5C50`.)
-     * Address: 0x005B5770 (FUN_005B5770 -- `_Copy_backward` for a 28-byte element (calling-convention bridge); Secondary register-shape adapter for source-first backward 28-byte lane copy, forwarding to `FUN_005B5CC0`.)
-     * Address: 0x0080B4A0 (FUN_0080B4A0 -- `_Copy_backward` for a 28-byte element (calling-convention bridge); Tertiary source-first delegate for one backward 28-byte range-copy lane.)
-     * Address: 0x0080B4D0 (FUN_0080B4D0 -- `_Copy_backward` for a 28-byte element (calling-convention bridge); Quaternary source-first delegate for one backward 28-byte range-copy lane.)
-     * Address: 0x0080B750 (FUN_0080B750 -- `_Copy_backward` for a 24-byte element; Copies 24-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x0080B7B0 (FUN_0080B7B0 -- `_Copy_backward` for a 24-byte element; Copies 24-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x0080B810 (FUN_0080B810 -- `_Copy_backward` for a 24-byte element; Copies 24-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x0080B870 (FUN_0080B870 -- `_Copy_backward` for a 24-byte element; Copies 24-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x0080B8D0 (FUN_0080B8D0 -- `_Copy_backward` for a 24-byte element; Copies 24-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x0080B930 (FUN_0080B930 -- `_Copy_backward` for a 24-byte element; Copies 24-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x004E7AA0 (FUN_004E7AA0 -- `_Copy_backward` for a 24-byte element; Copies 24-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x00584220 (FUN_00584220 -- `_Copy_backward` for a 24-byte element; Copies 24-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x004E7B00 (FUN_004E7B00 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Alias lane of `CopyBackward24ByteLane` used by one adjacent VC8 vector helper instantiation.)
-     * Address: 0x004E7890 (FUN_004E7890 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Adapts one register-lane caller shape into the canonical backward 24-byte range-copy helper.)
-     * Address: 0x004E78C0 (FUN_004E78C0 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Second register-lane adapter for backward 24-byte range-copy dispatch.)
-     * Address: 0x005821C0 (FUN_005821C0 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Third register-shape adapter for backward 24-byte range-copy dispatch.)
-     * Address: 0x00583720 (FUN_00583720 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Third register-shape adapter for backward 24-byte range-copy dispatch.)
-     * Address: 0x0080B500 (FUN_0080B500 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Forwards one source-first backward 24-byte range-copy lane through the shared canonical helper.)
-     * Address: 0x0080B530 (FUN_0080B530 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Secondary source-first delegate for one backward 24-byte range-copy lane.)
-     * Address: 0x0080B560 (FUN_0080B560 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Tertiary source-first delegate for one backward 24-byte range-copy lane.)
-     * Address: 0x0080B590 (FUN_0080B590 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Quaternary source-first delegate for one backward 24-byte range-copy lane.)
-     * Address: 0x0080B5C0 (FUN_0080B5C0 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Quinary source-first delegate for one backward 24-byte range-copy lane.)
-     * Address: 0x0080B5F0 (FUN_0080B5F0 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Senary source-first delegate for one backward 24-byte range-copy lane.)
-     * Address: 0x005EF7D0 (FUN_005EF7D0 -- `_Copy_backward` for a 20-byte element; Copies 20-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x00548A50 (FUN_00548A50 -- `_Copy_backward` for a 20-byte element; Copies 20-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x00548A80 (FUN_00548A80 -- `_Copy_backward` for a 20-byte element; Copies 20-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x00548B50 (FUN_00548B50 -- `_Copy_backward` for a 20-byte element; Copies 20-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x00760065 (FUN_00760065 -- `_Copy_backward` for a 8-byte element; Copies 8-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the destination begin.)
-     * Address: 0x007A2830 (FUN_007A2830 -- `_Copy_backward` for a 8-byte element; Copies 8-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the destination begin.)
-     * Address: 0x00540C20 (FUN_00540C20 -- `_Copy_backward` for a 8-byte element; Copies 8-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the destination begin.)
-     * Address: 0x0054E190 (FUN_0054E190 -- `_Copy_backward` for a 8-byte element; Copies 8-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the destination begin.)
-     * Address: 0x006D2580 (FUN_006D2580 -- `_Copy_backward` for a 8-byte element; Copies 8-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the destination begin.)
-     * Address: 0x0075FD40 (FUN_0075FD40 -- `_Copy_backward` for a 8-byte element; Copies 8-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the destination begin.)
-     * Address: 0x007A2860 (FUN_007A2860 -- `_Copy_backward` for a 8-byte element; Copies 8-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the destination begin.)
-     * Address: 0x006D27B0 (FUN_006D27B0 -- `_Copy_backward` for a 8-byte element (calling-convention bridge); Alias lane for backward 8-byte range copy.)
-     * Address: 0x006D2840 (FUN_006D2840 -- `_Copy_backward` for a 8-byte element (calling-convention bridge); Alias lane for backward 8-byte range copy.)
-     * Address: 0x00572F80 (FUN_00572F80 -- `_Copy_backward` for a 32-byte element; Copies 32-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x00572F20 (FUN_00572F20 -- `_Copy_backward` for a 32-byte element; Copies 32-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x00723850 (FUN_00723850 -- `_Copy_backward` for a 32-byte element; Copies 32-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x007238D0 (FUN_007238D0 -- `_Copy_backward` for a 32-byte element; Copies 32-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x005715D0 (FUN_005715D0 -- `_Copy_backward` for a 32-byte element (calling-convention bridge); Adapts one source-first 32-byte backward copy lane through `FUN_00572F20`.)
-     * Address: 0x00571600 (FUN_00571600 -- `_Copy_backward` for a 32-byte element (calling-convention bridge); Secondary source-first adapter lane for the 32-byte backward copy dispatcher via `FUN_00572F80`.)
-     * Address: 0x00723670 (FUN_00723670 -- `_Copy_backward` for a 32-byte element (calling-convention bridge); Tiny adapter lane that forwards destination-only dispatch to the canonical backward 32-byte copy helper with an empty source range.)
-     * Address: 0x007236A0 (FUN_007236A0 -- `_Copy_backward` for a 32-byte element (calling-convention bridge); Secondary destination-only adapter that forwards an empty source range to the canonical backward 32-byte copy helper.)
-     * Address: 0x007BEBE0 (FUN_007BEBE0 -- `_Copy_backward` for a 32-byte element (calling-convention bridge); Secondary destination-only adapter that forwards an empty source range to the canonical backward 32-byte copy helper.)
-     * Address: 0x00517090 (FUN_00517090 -- `_Copy_backward` for a 12-byte element; Copies 12-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x005170C0 (FUN_005170C0 -- `_Copy_backward` for a 12-byte element; Copies 12-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x0069FAB0 (FUN_0069FAB0 -- `_Copy_backward` for a 12-byte element; Copies 12-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x0067F970 (FUN_0067F970 -- `_Copy_backward` for a 12-byte element; Copies 12-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x0059DC60 (FUN_0059DC60 -- `_Copy_backward` for a 16-byte element; Copies 16-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the destination begin.)
-     * Address: 0x006C1170 (FUN_006C1170 -- `_Copy_backward` for a 16-byte element; Copies 16-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the destination begin.)
-     * Address: 0x006C11B0 (FUN_006C11B0 -- `_Copy_backward` for a 16-byte element; Copies 16-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the destination begin.)
-     * Address: 0x0065004D (FUN_0065004D -- `_Copy_backward` for a 52-byte element (calling-convention bridge); Debug-trap adapter lane that breaks into debugger and then forwards to the shared 52-byte backward-copy helper.)
-     * Address: 0x00650050 (FUN_00650050 -- `_Copy_backward` for a 52-byte element; Copies 52-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
-     * Address: 0x0064FB90 (FUN_0064FB90 -- `_Copy_backward` for a 52-byte element (calling-convention bridge); Adapts one legacy register/stack caller shape into the canonical backward 52-byte range-copy helper.)
-     * Address: 0x00755970 (FUN_00755970 -- `_Copy_backward` for a 40-byte element; Copies 40-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane when caller lanes are provided as source-first.)
-     * Address: 0x00753DD0 (FUN_00753DD0 -- `_Copy_backward` for a 40-byte element (calling-convention bridge); Source-first forwarding adapter lane that routes one 40-byte backward copy into `FUN_00755970` while discarding one zero scratch lane.)
-     * Address: 0x00751B30 (FUN_00751B30 -- `_Copy_backward` for a 40-byte element (calling-convention bridge); Duplicate source-first forwarding adapter lane that routes one 40-byte backward copy into `FUN_00755970` while discarding one zero scratch lane.)
+     * Address: 0x00571150 (FUN_00571150 -- `_Copy_backward` for `gpg::fastvector_n<moho::SOffsetInfo, 2>`
+     * (`CFormationInstance::mOffsetInfo`, element 0x4C), the in-place tail shift of its `InsertAt`.) Address:
+     * 0x00571180 (FUN_00571180 -- a second, byte-identical emission of the same `_Copy_backward` the linker kept
+     * distinct.) Address: 0x00714850 (FUN_00714850 -- `_Copy_backward` for `gpg::fastvector_n<moho::SCondition, 2>`
+     * (`STrigger::mConditions`, element 0x38), the in-place tail shift of `InsertAt` 0x0070FAD0; element `operator=`
+     * copies `mItem`, `mOp`, `mCat` and `mVal`.) Address: 0x00713950 (FUN_00713950 -- a second emission of the same
+     * `SCondition` `_Copy_backward`.) Address: 0x00712840 (FUN_00712840 -- jump thunk into the `SCondition`
+     * `_Copy_backward`; zero callers.) Address: 0x00712870 (FUN_00712870 -- jump thunk into the `SCondition`
+     * `_Copy_backward`; zero callers.) Address: 0x007237E0 (FUN_007237E0 -- `_Copy_backward` for
+     * `gpg::fastvector_n<moho::CollisionResult, 10>` (element 0x18), the in-place tail shift of `InsertAt` 0x00723090.
+     * Formerly `CopyCollisionResultsBackward`, RULE ONE.) Address: 0x00723770 (FUN_00723770 -- a second, byte-identical
+     * emission of the same `CollisionResult` `_Copy_backward`, also called from 0x00723090.) Address: 0x00723610
+     * (FUN_00723610 -- calling-convention bridge into the `CollisionResult` `_Copy_backward` 0x00723770 (source-first
+     * argument order); zero callers.) Address: 0x00723640 (FUN_00723640 -- calling-convention bridge into the
+     * `CollisionResult` `_Copy_backward` 0x007237E0; zero callers.) Address: 0x00762590 (FUN_00762590 --
+     * `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the
+     * destination tail lane.) Address: 0x007625C0 (FUN_007625C0 -- `_Copy_backward` for a 28-byte element; Copies
+     * 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x0080B670
+     * (FUN_0080B670 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin,
+     * sourceEnd)` into the destination tail lane.) Address: 0x0080B6E0 (FUN_0080B6E0 -- `_Copy_backward` for a 28-byte
+     * element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
+     * Address: 0x005B5C50 (FUN_005B5C50 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward
+     * from `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x005B5CC0 (FUN_005B5CC0 --
+     * `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the
+     * destination tail lane.) Address: 0x00693390 (FUN_00693390 -- `_Copy_backward` for a 28-byte element; Copies
+     * 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x00762A30
+     * (FUN_00762A30 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin,
+     * sourceEnd)` into the destination tail lane.) Address: 0x00762A90 (FUN_00762A90 -- `_Copy_backward` for a 28-byte
+     * element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
+     * Address: 0x006932C0 (FUN_006932C0 -- `_Copy_backward` for a 28-byte element (calling-convention bridge);
+     * Register-shape adapter that forwards one backward 28-byte range copy lane.) Address: 0x005B5740 (FUN_005B5740 --
+     * `_Copy_backward` for a 28-byte element (calling-convention bridge); Register-shape adapter that forwards one
+     * source-first backward 28-byte lane copy through `FUN_005B5C50`.) Address: 0x005B5770 (FUN_005B5770 --
+     * `_Copy_backward` for a 28-byte element (calling-convention bridge); Secondary register-shape adapter for
+     * source-first backward 28-byte lane copy, forwarding to `FUN_005B5CC0`.) Address: 0x0080B4A0 (FUN_0080B4A0 --
+     * `_Copy_backward` for a 28-byte element (calling-convention bridge); Tertiary source-first delegate for one
+     * backward 28-byte range-copy lane.) Address: 0x0080B4D0 (FUN_0080B4D0 -- `_Copy_backward` for a 28-byte element
+     * (calling-convention bridge); Quaternary source-first delegate for one backward 28-byte range-copy lane.) Address:
+     * 0x0080B750 (FUN_0080B750 -- `_Copy_backward` for a 24-byte element; Copies 24-byte elements backward from
+     * `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x0080B7B0 (FUN_0080B7B0 -- `_Copy_backward`
+     * for a 24-byte element; Copies 24-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail
+     * lane.) Address: 0x0080B810 (FUN_0080B810 -- `_Copy_backward` for a 24-byte element; Copies 24-byte elements
+     * backward from `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x0080B870 (FUN_0080B870 --
+     * `_Copy_backward` for a 24-byte element; Copies 24-byte elements backward from `[sourceBegin, sourceEnd)` into the
+     * destination tail lane.) Address: 0x0080B8D0 (FUN_0080B8D0 -- `_Copy_backward` for a 24-byte element; Copies
+     * 24-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x0080B930
+     * (FUN_0080B930 -- `_Copy_backward` for a 24-byte element; Copies 24-byte elements backward from `[sourceBegin,
+     * sourceEnd)` into the destination tail lane.) Address: 0x004E7AA0 (FUN_004E7AA0 -- `_Copy_backward` for a 24-byte
+     * element; Copies 24-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
+     * Address: 0x00584220 (FUN_00584220 -- `_Copy_backward` for a 24-byte element; Copies 24-byte elements backward
+     * from `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x004E7B00 (FUN_004E7B00 --
+     * `_Copy_backward` for a 24-byte element (calling-convention bridge); Alias lane of `CopyBackward24ByteLane` used
+     * by one adjacent VC8 vector helper instantiation.) Address: 0x004E7890 (FUN_004E7890 -- `_Copy_backward` for a
+     * 24-byte element (calling-convention bridge); Adapts one register-lane caller shape into the canonical backward
+     * 24-byte range-copy helper.) Address: 0x004E78C0 (FUN_004E78C0 -- `_Copy_backward` for a 24-byte element
+     * (calling-convention bridge); Second register-lane adapter for backward 24-byte range-copy dispatch.) Address:
+     * 0x005821C0 (FUN_005821C0 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Third
+     * register-shape adapter for backward 24-byte range-copy dispatch.) Address: 0x00583720 (FUN_00583720 --
+     * `_Copy_backward` for a 24-byte element (calling-convention bridge); Third register-shape adapter for backward
+     * 24-byte range-copy dispatch.) Address: 0x0080B500 (FUN_0080B500 -- `_Copy_backward` for a 24-byte element
+     * (calling-convention bridge); Forwards one source-first backward 24-byte range-copy lane through the shared
+     * canonical helper.) Address: 0x0080B530 (FUN_0080B530 -- `_Copy_backward` for a 24-byte element
+     * (calling-convention bridge); Secondary source-first delegate for one backward 24-byte range-copy lane.) Address:
+     * 0x0080B560 (FUN_0080B560 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Tertiary
+     * source-first delegate for one backward 24-byte range-copy lane.) Address: 0x0080B590 (FUN_0080B590 --
+     * `_Copy_backward` for a 24-byte element (calling-convention bridge); Quaternary source-first delegate for one
+     * backward 24-byte range-copy lane.) Address: 0x0080B5C0 (FUN_0080B5C0 -- `_Copy_backward` for a 24-byte element
+     * (calling-convention bridge); Quinary source-first delegate for one backward 24-byte range-copy lane.) Address:
+     * 0x0080B5F0 (FUN_0080B5F0 -- `_Copy_backward` for a 24-byte element (calling-convention bridge); Senary
+     * source-first delegate for one backward 24-byte range-copy lane.) Address: 0x005EF7D0 (FUN_005EF7D0 --
+     * `_Copy_backward` for a 20-byte element; Copies 20-byte elements backward from `[sourceBegin, sourceEnd)` into the
+     * destination tail lane.) Address: 0x00548A50 (FUN_00548A50 -- `_Copy_backward` for a 20-byte element; Copies
+     * 20-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x00548A80
+     * (FUN_00548A80 -- `_Copy_backward` for a 20-byte element; Copies 20-byte elements backward from `[sourceBegin,
+     * sourceEnd)` into the destination tail lane.) Address: 0x00548B50 (FUN_00548B50 -- `_Copy_backward` for a 20-byte
+     * element; Copies 20-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
+     * Address: 0x00760065 (FUN_00760065 -- `_Copy_backward` for a 8-byte element; Copies 8-byte elements backward from
+     * `[sourceBegin, sourceEnd)` into the destination tail lane and returns the destination begin.) Address: 0x007A2830
+     * (FUN_007A2830 -- `_Copy_backward` for a 8-byte element; Copies 8-byte elements backward from `[sourceBegin,
+     * sourceEnd)` into the destination tail lane and returns the destination begin.) Address: 0x00540C20 (FUN_00540C20
+     * -- `_Copy_backward` for a 8-byte element; Copies 8-byte elements backward from `[sourceBegin, sourceEnd)` into
+     * the destination tail lane and returns the destination begin.) Address: 0x0054E190 (FUN_0054E190 --
+     * `_Copy_backward` for a 8-byte element; Copies 8-byte elements backward from `[sourceBegin, sourceEnd)` into the
+     * destination tail lane and returns the destination begin.) Address: 0x006D2580 (FUN_006D2580 -- `_Copy_backward`
+     * for a 8-byte element; Copies 8-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail
+     * lane and returns the destination begin.) Address: 0x0075FD40 (FUN_0075FD40 -- `_Copy_backward` for a 8-byte
+     * element; Copies 8-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and
+     * returns the destination begin.) Address: 0x007A2860 (FUN_007A2860 -- `_Copy_backward` for a 8-byte element;
+     * Copies 8-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the
+     * destination begin.) Address: 0x006D27B0 (FUN_006D27B0 -- `_Copy_backward` for a 8-byte element
+     * (calling-convention bridge); Alias lane for backward 8-byte range copy.) Address: 0x006D2840 (FUN_006D2840 --
+     * `_Copy_backward` for a 8-byte element (calling-convention bridge); Alias lane for backward 8-byte range copy.)
+     * Address: 0x00572F80 (FUN_00572F80 -- `_Copy_backward` for a 32-byte element; Copies 32-byte elements backward
+     * from `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x00572F20 (FUN_00572F20 --
+     * `_Copy_backward` for a 32-byte element; Copies 32-byte elements backward from `[sourceBegin, sourceEnd)` into the
+     * destination tail lane.) Address: 0x00723850 (FUN_00723850 -- `_Copy_backward` for a 32-byte element; Copies
+     * 32-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x007238D0
+     * (FUN_007238D0 -- `_Copy_backward` for a 32-byte element; Copies 32-byte elements backward from `[sourceBegin,
+     * sourceEnd)` into the destination tail lane.) Address: 0x005715D0 (FUN_005715D0 -- `_Copy_backward` for a 32-byte
+     * element (calling-convention bridge); Adapts one source-first 32-byte backward copy lane through `FUN_00572F20`.)
+     * Address: 0x00571600 (FUN_00571600 -- `_Copy_backward` for a 32-byte element (calling-convention bridge);
+     * Secondary source-first adapter lane for the 32-byte backward copy dispatcher via `FUN_00572F80`.) Address:
+     * 0x00723670 (FUN_00723670 -- `_Copy_backward` for a 32-byte element (calling-convention bridge); Tiny adapter lane
+     * that forwards destination-only dispatch to the canonical backward 32-byte copy helper with an empty source
+     * range.) Address: 0x007236A0 (FUN_007236A0 -- `_Copy_backward` for a 32-byte element (calling-convention bridge);
+     * Secondary destination-only adapter that forwards an empty source range to the canonical backward 32-byte copy
+     * helper.) Address: 0x007BEBE0 (FUN_007BEBE0 -- `_Copy_backward` for a 32-byte element (calling-convention bridge);
+     * Secondary destination-only adapter that forwards an empty source range to the canonical backward 32-byte copy
+     * helper.) Address: 0x00517090 (FUN_00517090 -- `_Copy_backward` for a 12-byte element; Copies 12-byte elements
+     * backward from `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x005170C0 (FUN_005170C0 --
+     * `_Copy_backward` for a 12-byte element; Copies 12-byte elements backward from `[sourceBegin, sourceEnd)` into the
+     * destination tail lane.) Address: 0x0069FAB0 (FUN_0069FAB0 -- `_Copy_backward` for a 12-byte element; Copies
+     * 12-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x0067F970
+     * (FUN_0067F970 -- `_Copy_backward` for a 12-byte element; Copies 12-byte elements backward from `[sourceBegin,
+     * sourceEnd)` into the destination tail lane.) Address: 0x0059DC60 (FUN_0059DC60 -- `_Copy_backward` for a 16-byte
+     * element; Copies 16-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and
+     * returns the destination begin.) Address: 0x006C1170 (FUN_006C1170 -- `_Copy_backward` for a 16-byte element;
+     * Copies 16-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the
+     * destination begin.) Address: 0x006C11B0 (FUN_006C11B0 -- `_Copy_backward` for a 16-byte element; Copies 16-byte
+     * elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane and returns the destination
+     * begin.) Address: 0x0065004D (FUN_0065004D -- `_Copy_backward` for a 52-byte element (calling-convention bridge);
+     * Debug-trap adapter lane that breaks into debugger and then forwards to the shared 52-byte backward-copy helper.)
+     * Address: 0x00650050 (FUN_00650050 -- `_Copy_backward` for a 52-byte element; Copies 52-byte elements backward
+     * from `[sourceBegin, sourceEnd)` into the destination tail lane.) Address: 0x0064FB90 (FUN_0064FB90 --
+     * `_Copy_backward` for a 52-byte element (calling-convention bridge); Adapts one legacy register/stack caller shape
+     * into the canonical backward 52-byte range-copy helper.) Address: 0x00755970 (FUN_00755970 -- `_Copy_backward` for
+     * a 40-byte element; Copies 40-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail
+     * lane when caller lanes are provided as source-first.) Address: 0x00753DD0 (FUN_00753DD0 -- `_Copy_backward` for a
+     * 40-byte element (calling-convention bridge); Source-first forwarding adapter lane that routes one 40-byte
+     * backward copy into `FUN_00755970` while discarding one zero scratch lane.) Address: 0x00751B30 (FUN_00751B30 --
+     * `_Copy_backward` for a 40-byte element (calling-convention bridge); Duplicate source-first forwarding adapter
+     * lane that routes one 40-byte backward copy into `FUN_00755970` while discarding one zero scratch lane.)
      */
-    static T* CopyBackwardAssign(const T* last, T* resultLast, const T* first)
+    static T* CopyBackwardAssign(
+      const T* last,
+      T* resultLast,
+      const T* first
+    )
     {
       return detail::CopyBackwardAssign<T>(last, resultLast, first);
     }
@@ -2565,13 +3195,32 @@ namespace gpg::core
      * capacity sentinel restamped. Should a copy throw, the elements already
      * built in the new block are torn down, the block is freed and the vector
      * is left untouched.
-     * Address: 0x0056F100 (FUN_0056F100 -- the reallocating insert for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C): three `_Ucopy` passes (0x0056F1F0) into the new block, destroy of the old range (0x0056D620) and the inline-capacity save.)
-     * Address: 0x007AFBB0 (FUN_007AFBB0 -- the reallocating insert for `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`), doubling (0x007AF0E0 `add edx, edx`); formerly `CameraFrustumUserEntityList::GrowAndInsertRange`, removed 2026-09-30.)
-     * Address: 0x0061C940 (FUN_0061C940 -- the reallocating insert for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `, 10>` raised-platform candidates of `CUnitMotion`: the three slices copy-constructed into the new block (0x0061CA20), the old range destroyed (0x0061CA70), then the old block freed or the inline capacity restamped. Formerly `GrowInsertIntrusiveWeakRef`, removed 2026-09-30.)
-     * Address: 0x008AF760 (FUN_008AF760 -- the reallocating insert for `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28): `operator new(0x28 * capacity)`, the three slices copy-constructed through 0x008AFB90, `~SoundHandleRecord` (0x008AB160) over the old range (0x008AF7E2, stride 0x28), then the old block freed or the inline capacity restamped. Reached from `resize(n, value)` 0x008AEA40 with an empty insert at `start`.)
-     * Address: 0x008B7CC0 (FUN_008B7CC0 -- the reallocating insert for `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>` (`UserCommandQueue::primaryLinks`/`resolvedLinks`): copy the prefix, the inserted range and the suffix into the new block (0x008B7DA0), destroy the old range (0x008B79A0), stash the inline capacity or free the old block. Callers `InsertAt` 0x008B77D0 and `resize` 0x008B7590; formerly `GrowQueueLinkVectorAndInsertRange` in moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
+     * Address: 0x0056F100 (FUN_0056F100 -- the reallocating insert for `gpg::fastvector_n<moho::SOffsetInfo, 2>`
+     * (`CFormationInstance::mOffsetInfo`, element 0x4C): three `_Ucopy` passes (0x0056F1F0) into the new block, destroy
+     * of the old range (0x0056D620) and the inline-capacity save.) Address: 0x007AFBB0 (FUN_007AFBB0 -- the
+     * reallocating insert for `gpg::fastvector_n<moho::WeakPtr<moho::UserEntity>, 40>` (the camera's frustum lanes
+     * `CameraImpl::mFrustumLaneA/B` and `mArmyUnitsInFrustum`), doubling (0x007AF0E0 `add edx, edx`); formerly
+     * `CameraFrustumUserEntityList::GrowAndInsertRange`, removed 2026-09-30.) Address: 0x0061C940 (FUN_0061C940 -- the
+     * reallocating insert for `gpg::fastvector_n<moho::WeakPtr<moho::Entity>, 20>` (`Unit::mBlipsInRange`) and the `,
+     * 10>` raised-platform candidates of `CUnitMotion`: the three slices copy-constructed into the new block
+     * (0x0061CA20), the old range destroyed (0x0061CA70), then the old block freed or the inline capacity restamped.
+     * Formerly `GrowInsertIntrusiveWeakRef`, removed 2026-09-30.) Address: 0x008AF760 (FUN_008AF760 -- the reallocating
+     * insert for `gpg::fastvector_n<moho::SoundHandleRecord, 256>` (`CUserSoundManager::mSoundHandles`, element 0x28):
+     * `operator new(0x28 * capacity)`, the three slices copy-constructed through 0x008AFB90, `~SoundHandleRecord`
+     * (0x008AB160) over the old range (0x008AF7E2, stride 0x28), then the old block freed or the inline capacity
+     * restamped. Reached from `resize(n, value)` 0x008AEA40 with an empty insert at `start`.) Address: 0x008B7CC0
+     * (FUN_008B7CC0 -- the reallocating insert for `gpg::fastvector_n<moho::WeakPtr<moho::UserCommandIssueHelper>, 2>`
+     * (`UserCommandQueue::primaryLinks`/`resolvedLinks`): copy the prefix, the inserted range and the suffix into the
+     * new block (0x008B7DA0), destroy the old range (0x008B79A0), stash the inline capacity or free the old block.
+     * Callers `InsertAt` 0x008B77D0 and `resize` 0x008B7590; formerly `GrowQueueLinkVectorAndInsertRange` in
+     * moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
      */
-    void GrowInsertDeepCopy(T* pos, const std::size_t newCapacity, const T* insStart, const T* insEnd)
+    void GrowInsertDeepCopy(
+      T* pos,
+      const std::size_t newCapacity,
+      const T* insStart,
+      const T* insEnd
+    )
     {
       T* const oldStart = this->start_;
       T* const oldEnd = this->end_;
@@ -2606,7 +3255,9 @@ namespace gpg::core
      * Address: 0x005811A0 (FUN_005811A0, gpg::fastvector_Entity::GrowInsert)
      * Address: 0x00505BA0 (FUN_00505BA0, gpg::fastvector_UserEntity::GrowInsert)
      * Address: 0x00723340 (FUN_00723340, gpg::fastvector_n<moho::CollisionResult, 10>::GrowInsert lane)
-     * Address: 0x007677D0 (FUN_007677D0, gpg::fastvector_n<gpg::AStarNeighbour<Moho::SOCellPos>, 200>::GrowInsert lane -- `operator new[](8 * capacity)`, prefix / inserted range / suffix through the copy lane 0x007678A0, then hands the inline window back or frees the old block; the funclet at 0x00767882 frees the new block on a throwing copy.)
+     * Address: 0x007677D0 (FUN_007677D0, gpg::fastvector_n<gpg::AStarNeighbour<Moho::SOCellPos>, 200>::GrowInsert lane
+     * -- `operator new[](8 * capacity)`, prefix / inserted range / suffix through the copy lane 0x007678A0, then hands
+     * the inline window back or frees the old block; the funclet at 0x00767882 frees the new block on a throwing copy.)
      * Address: 0x004FDC60 (FUN_004FDC60, gpg::fastvector_EntityOccupation::insert_new_range
      * -- the real binary's per-type "allocate new buffer, copy prefix +
      * inserted range + suffix" growth helper for the trivially-copyable
@@ -2620,40 +3271,77 @@ namespace gpg::core
      * `[start, pos) + [insStart, insEnd) + [pos, end)` in the new storage.
      * A non-trivially-copyable element takes the construct-and-destroy lane
      * (`GrowInsertDeepCopy`); the bitwise relocation below is the POD emission.
-     * Address: 0x0080AB00 (FUN_0080AB00 -- reallocating grow-insert for a 28-byte element; Allocates replacement storage for one 28-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x00561460 (FUN_00561460 -- reallocating grow-insert for a 28-byte element; Allocates replacement storage for one 28-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x005B5170 (FUN_005B5170 -- reallocating grow-insert for a 28-byte element; Allocates replacement storage for one 28-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x0080B080 (FUN_0080B080 -- reallocating grow-insert for a 24-byte element; Allocates replacement storage for one 24-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x0080B1E0 (FUN_0080B1E0 -- reallocating grow-insert for a 24-byte element; Allocates replacement storage for one 24-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x0080B310 (FUN_0080B310 -- reallocating grow-insert for a 24-byte element; Allocates replacement storage for one 24-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x004E7670 (FUN_004E7670 -- reallocating grow-insert for a 24-byte element; Allocates replacement storage for one 24-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x00548390 (FUN_00548390 -- reallocating grow-insert for a 20-byte element; Allocates replacement storage for one 20-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x0080F390 (FUN_0080F390 -- reallocating grow-insert for a 8-byte element; Allocates replacement storage for one 8-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x007A2600 (FUN_007A2600 -- reallocating grow-insert for a 8-byte element; Allocates replacement storage for one 8-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x0080F490 (FUN_0080F490 -- reallocating grow-insert for a 32-byte element; Allocates replacement storage for one 32-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x0081BBC0 (FUN_0081BBC0 -- reallocating grow-insert for a 12-byte element; Allocates replacement storage for one 12-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x005165A0 (FUN_005165A0 -- reallocating grow-insert for a 12-byte element; Allocates replacement storage for one 12-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x006C0F70 (FUN_006C0F70 -- reallocating grow-insert for a 16-byte element; 16-byte-stride specialization of the fastvector `_Insert_n_grow` reallocation path.)
-     * Address: 0x0092CBF0 (FUN_0092CBF0 -- reallocating grow-insert for a 2-byte element; Allocates replacement storage for one 2-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x0080F590 (FUN_0080F590 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x0082E6D0 (FUN_0082E6D0 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x0084EC70 (FUN_0084EC70 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x00868430 (FUN_00868430 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x00540720 (FUN_00540720 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x0059D2A0 (FUN_0059D2A0 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x005C6C20 (FUN_005C6C20 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x005D43D0 (FUN_005D43D0 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x006FBD70 (FUN_006FBD70 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x00702D70 (FUN_00702D70 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x0072AA60 (FUN_0072AA60 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x00774190 (FUN_00774190 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x00553B90 (FUN_00553B90 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x00559190 (FUN_00559190 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x00657F60 (FUN_00657F60 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x008228C0 (FUN_008228C0 -- reallocating grow-insert for a 4-byte element; Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
-     * Address: 0x006AF6E0 (FUN_006AF6E0 -- reallocating grow-insert for a 8-byte element; Grows one 8-byte fastvector lane to `requestedCapacity` and materializes prefix/insert/suffix slices into the replacement storage, returning the requested element count lane.)
+     * Address: 0x0080AB00 (FUN_0080AB00 -- reallocating grow-insert for a 28-byte element; Allocates replacement
+     * storage for one 28-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
+     * Address: 0x00561460 (FUN_00561460 -- reallocating grow-insert for a 28-byte element; Allocates replacement
+     * storage for one 28-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
+     * Address: 0x005B5170 (FUN_005B5170 -- reallocating grow-insert for a 28-byte element; Allocates replacement
+     * storage for one 28-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
+     * Address: 0x0080B080 (FUN_0080B080 -- reallocating grow-insert for a 24-byte element; Allocates replacement
+     * storage for one 24-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
+     * Address: 0x0080B1E0 (FUN_0080B1E0 -- reallocating grow-insert for a 24-byte element; Allocates replacement
+     * storage for one 24-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
+     * Address: 0x0080B310 (FUN_0080B310 -- reallocating grow-insert for a 24-byte element; Allocates replacement
+     * storage for one 24-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
+     * Address: 0x004E7670 (FUN_004E7670 -- reallocating grow-insert for a 24-byte element; Allocates replacement
+     * storage for one 24-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
+     * Address: 0x00548390 (FUN_00548390 -- reallocating grow-insert for a 20-byte element; Allocates replacement
+     * storage for one 20-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.)
+     * Address: 0x0080F390 (FUN_0080F390 -- reallocating grow-insert for a 8-byte element; Allocates replacement storage
+     * for one 8-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.) Address:
+     * 0x007A2600 (FUN_007A2600 -- reallocating grow-insert for a 8-byte element; Allocates replacement storage for one
+     * 8-byte fastvector lane and materializes prefix/insert/suffix slices into the new storage.) Address: 0x0080F490
+     * (FUN_0080F490 -- reallocating grow-insert for a 32-byte element; Allocates replacement storage for one 32-byte
+     * fastvector lane and materializes prefix/insert/suffix slices into the new storage.) Address: 0x0081BBC0
+     * (FUN_0081BBC0 -- reallocating grow-insert for a 12-byte element; Allocates replacement storage for one 12-byte
+     * fastvector lane and materializes prefix/insert/suffix slices into the new storage.) Address: 0x005165A0
+     * (FUN_005165A0 -- reallocating grow-insert for a 12-byte element; Allocates replacement storage for one 12-byte
+     * fastvector lane and materializes prefix/insert/suffix slices into the new storage.) Address: 0x006C0F70
+     * (FUN_006C0F70 -- reallocating grow-insert for a 16-byte element; 16-byte-stride specialization of the fastvector
+     * `_Insert_n_grow` reallocation path.) Address: 0x0092CBF0 (FUN_0092CBF0 -- reallocating grow-insert for a 2-byte
+     * element; Allocates replacement storage for one 2-byte fastvector lane and materializes prefix/insert/suffix
+     * slices into the new storage.) Address: 0x0080F590 (FUN_0080F590 -- reallocating grow-insert for a 4-byte element;
+     * Allocates replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into
+     * the new storage.) Address: 0x0082E6D0 (FUN_0082E6D0 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x0084EC70 (FUN_0084EC70 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x00868430 (FUN_00868430 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x00540720 (FUN_00540720 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x0059D2A0 (FUN_0059D2A0 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x005C6C20 (FUN_005C6C20 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x005D43D0 (FUN_005D43D0 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x006FBD70 (FUN_006FBD70 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x00702D70 (FUN_00702D70 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x0072AA60 (FUN_0072AA60 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x00774190 (FUN_00774190 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x00553B90 (FUN_00553B90 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x00559190 (FUN_00559190 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x00657F60 (FUN_00657F60 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x008228C0 (FUN_008228C0 -- reallocating grow-insert for a 4-byte element; Allocates
+     * replacement storage for one 4-byte fastvector lane and materializes prefix/insert/suffix slices into the new
+     * storage.) Address: 0x006AF6E0 (FUN_006AF6E0 -- reallocating grow-insert for a 8-byte element; Grows one 8-byte
+     * fastvector lane to `requestedCapacity` and materializes prefix/insert/suffix slices into the replacement storage,
+     * returning the requested element count lane.)
      */
-    void GrowInsert(T* pos, const std::size_t newCapacity, const T* insStart, const T* insEnd)
+    void GrowInsert(
+      T* pos,
+      const std::size_t newCapacity,
+      const T* insStart,
+      const T* insEnd
+    )
     {
       if constexpr (!std::is_trivially_copyable_v<T>) {
         GrowInsertDeepCopy(pos, newCapacity, insStart, insEnd);
@@ -2692,18 +3380,18 @@ namespace gpg::core
      * until their contents have been read out.
      *
      * Address: 0x00577010 (FUN_00577010, the same member's heap branch for that
- * element -- taken when the incoming count exceeds the inline capacity. It
- * sizes the block as `count * 8 - count` doubled three times, i.e.
- * `count * 0x38`, calls `operator new`, fills it through 0x005770F0 and then
- * releases the old range.)
- * Address: 0x005770F0 (FUN_005770F0, the uninitialised copy that fills it.
- * Per slot it copies the offset, universe handle and first-word index, then
- * *constructs* the embedded `fastvector_n` in place -- seating all four of
- * its lanes on the fresh inline buffer at `+0x18` -- before copying the words
- * and `mWeight`. That in-place construction is what distinguishes it from the
- * assigning copy at 0x00577450.)
- *
- * Reached only from `ResetFrom` (0x00576F10).
+     * element -- taken when the incoming count exceeds the inline capacity. It
+     * sizes the block as `count * 8 - count` doubled three times, i.e.
+     * `count * 0x38`, calls `operator new`, fills it through 0x005770F0 and then
+     * releases the old range.)
+     * Address: 0x005770F0 (FUN_005770F0, the uninitialised copy that fills it.
+     * Per slot it copies the offset, universe handle and first-word index, then
+     * *constructs* the embedded `fastvector_n` in place -- seating all four of
+     * its lanes on the fresh inline buffer at `+0x18` -- before copying the words
+     * and `mWeight`. That in-place construction is what distinguishes it from the
+     * assigning copy at 0x00577450.)
+     *
+     * Reached only from `ResetFrom` (0x00576F10).
      *
      * Address: 0x00750A80 (FUN_00750A80, `gpg::core::FastVectorN<
      * moho::SExtraUnitDataPair, 1>::CopyFromRaw_` -- `pairs` sub-vector of
@@ -2727,7 +3415,10 @@ namespace gpg::core
      * hand-rolled duplicate under a generic-looking name; see `Vector.h`'s
      * `push_back` citation for the full evidence chain.)
      */
-    void CopyFromRaw_(const T* src, size_t count)
+    void CopyFromRaw_(
+      const T* src,
+      size_t count
+    )
     {
       if (count == 0 || src == nullptr) {
         return;
@@ -2771,7 +3462,9 @@ namespace gpg::core
     }
 
     /** Reallocate to exactly newCap elements; preserve contents. */
-    void GrowToCapacity(size_t newCap)
+    void GrowToCapacity(
+      size_t newCap
+    )
     {
       const size_t sz = this->Size();
       T* newBuf = detail::AllocateElements<T>(newCap);
@@ -2800,7 +3493,8 @@ namespace gpg::core
   namespace legacy
   {
     template <class T>
-    [[nodiscard]] inline FastVector<T>& CopyFrom(FastVector<T>& dst, const FastVector<T>& src, T* inlineOrigin = nullptr);
+    [[nodiscard]] inline FastVector<T>&
+    CopyFrom(FastVector<T>& dst, const FastVector<T>& src, T* inlineOrigin = nullptr);
 
     /**
      * Address: 0x00402C20 (FUN_00402C20, fastvector_uint copy-range helper)
@@ -2810,7 +3504,11 @@ namespace gpg::core
      * Matches the legacy helper shape that also advances when `out == nullptr`.
      */
     template <class T>
-    [[nodiscard]] inline T* CopyRangeForward(T* out, const T* srcBegin, const T* srcEnd) noexcept
+    [[nodiscard]] inline T* CopyRangeForward(
+      T* out,
+      const T* srcBegin,
+      const T* srcEnd
+    ) noexcept
     {
       if constexpr (std::is_trivially_copyable_v<T> && sizeof(T) == sizeof(std::uint32_t)) {
         auto* const outWords = reinterpret_cast<std::uint32_t*>(out);
@@ -2836,7 +3534,9 @@ namespace gpg::core
      * Rebinds `fastvector_n` state to its inline buffer and marks that buffer as origin.
      */
     template <class T, std::size_t N>
-    [[nodiscard]] inline FastVectorN<T, N>& InitializeInlineStorage(FastVectorN<T, N>& vec) noexcept
+    [[nodiscard]] inline FastVectorN<T, N>& InitializeInlineStorage(
+      FastVectorN<T, N>& vec
+    ) noexcept
     {
       vec.originalVec_ = vec.InlineStorage();
       vec.start_ = vec.InlineStorage();
@@ -2890,7 +3590,9 @@ namespace gpg::core
      * Releases heap-backed storage (if any) and restores inline storage pointers.
      */
     template <class T, std::size_t N>
-    inline void ResetStorageToInline(FastVectorN<T, N>& vec) noexcept
+    inline void ResetStorageToInline(
+      FastVectorN<T, N>& vec
+    ) noexcept
     {
       vec.ResetStorageToInline();
     }
@@ -2903,7 +3605,10 @@ namespace gpg::core
      * source vector content into it.
      */
     template <class T, std::size_t N>
-    [[nodiscard]] inline FastVectorN<T, N>& RebindInlineAndCopy(FastVectorN<T, N>& dst, const FastVector<T>& src)
+    [[nodiscard]] inline FastVectorN<T, N>& RebindInlineAndCopy(
+      FastVectorN<T, N>& dst,
+      const FastVector<T>& src
+    )
     {
       InitializeInlineStorage(dst);
       CopyFrom(static_cast<FastVector<T>&>(dst), src, dst.originalVec_);
@@ -2917,7 +3622,9 @@ namespace gpg::core
      * Returns raw begin pointer for legacy fastvector storage.
      */
     template <class T>
-    [[nodiscard]] inline T* BeginPtr(FastVector<T>& vec) noexcept
+    [[nodiscard]] inline T* BeginPtr(
+      FastVector<T>& vec
+    ) noexcept
     {
       return vec.start_;
     }
@@ -2929,7 +3636,9 @@ namespace gpg::core
      * Returns true when begin == end.
      */
     template <class T>
-    [[nodiscard]] inline bool IsEmpty(const FastVector<T>& vec) noexcept
+    [[nodiscard]] inline bool IsEmpty(
+      const FastVector<T>& vec
+    ) noexcept
     {
       return vec.start_ == vec.end_;
     }
@@ -2941,7 +3650,9 @@ namespace gpg::core
      * Returns element count from pointer distance.
      */
     template <class T>
-    [[nodiscard]] inline std::size_t Count(const FastVector<T>& vec) noexcept
+    [[nodiscard]] inline std::size_t Count(
+      const FastVector<T>& vec
+    ) noexcept
     {
       return static_cast<std::size_t>(vec.end_ - vec.start_);
     }
@@ -2953,7 +3664,9 @@ namespace gpg::core
      * Returns total addressable element slots (`capacity - begin`).
      */
     template <class T>
-    [[nodiscard]] inline std::size_t CapacityCount(const FastVector<T>& vec) noexcept
+    [[nodiscard]] inline std::size_t CapacityCount(
+      const FastVector<T>& vec
+    ) noexcept
     {
       return static_cast<std::size_t>(vec.capacity_ - vec.start_);
     }
@@ -2966,7 +3679,10 @@ namespace gpg::core
      * Returns pointer to indexed element slot from begin pointer.
      */
     template <class T>
-    [[nodiscard]] inline T* IndexPtr(FastVector<T>& vec, const std::size_t index) noexcept
+    [[nodiscard]] inline T* IndexPtr(
+      FastVector<T>& vec,
+      const std::size_t index
+    ) noexcept
     {
       return vec.start_ + index;
     }
@@ -2978,8 +3694,12 @@ namespace gpg::core
      * Binds vector pointers to an external buffer window.
      */
     template <class T>
-    [[nodiscard]] inline FastVector<T>&
-    BindExternalWindow(FastVector<T>& vec, const std::size_t capacity, T* buffer, T*& metadataPtr) noexcept
+    [[nodiscard]] inline FastVector<T>& BindExternalWindow(
+      FastVector<T>& vec,
+      const std::size_t capacity,
+      T* buffer,
+      T*& metadataPtr
+    ) noexcept
     {
       vec.start_ = buffer;
       vec.end_ = buffer;
@@ -3034,8 +3754,13 @@ namespace gpg::core
      * Inserts `[sourceBegin, sourceEnd)` before `insertPos`, growing storage when needed.
      */
     template <class T>
-    [[nodiscard]] inline T*
-    InsertRange(FastVector<T>& vec, T* insertPos, const T* sourceBegin, const T* sourceEnd, T* inlineOrigin = nullptr)
+    [[nodiscard]] inline T* InsertRange(
+      FastVector<T>& vec,
+      T* insertPos,
+      const T* sourceBegin,
+      const T* sourceEnd,
+      T* inlineOrigin = nullptr
+    )
     {
       static_assert(
         std::is_trivially_copyable_v<T>, "Legacy fastvector ABI helpers require trivially copyable element types."
@@ -3090,8 +3815,11 @@ namespace gpg::core
      * append-path behavior.
      */
     template <class T>
-    [[nodiscard]] inline FastVector<T>&
-    CopyFrom(FastVector<T>& dst, const FastVector<T>& src, T* inlineOrigin)
+    [[nodiscard]] inline FastVector<T>& CopyFrom(
+      FastVector<T>& dst,
+      const FastVector<T>& src,
+      T* inlineOrigin
+    )
     {
       static_assert(
         std::is_trivially_copyable_v<T>, "Legacy fastvector ABI helpers require trivially copyable element types."
@@ -3130,8 +3858,11 @@ namespace gpg::core
      * Thin wrapper for legacy vector copy path.
      */
     template <class T>
-    [[nodiscard]] inline FastVector<T>&
-    CopyFromWrapper(FastVector<T>& dst, const FastVector<T>& src, T* inlineOrigin = nullptr)
+    [[nodiscard]] inline FastVector<T>& CopyFromWrapper(
+      FastVector<T>& dst,
+      const FastVector<T>& src,
+      T* inlineOrigin = nullptr
+    )
     {
       return CopyFrom(dst, src, inlineOrigin);
     }
@@ -3143,8 +3874,11 @@ namespace gpg::core
      * Ensures vector capacity for `minCapacity` elements via legacy reallocation path.
      */
     template <class T>
-    [[nodiscard]] inline std::size_t
-    EnsureCapacity(FastVector<T>& vec, const std::size_t minCapacity, T* inlineOrigin = nullptr)
+    [[nodiscard]] inline std::size_t EnsureCapacity(
+      FastVector<T>& vec,
+      const std::size_t minCapacity,
+      T* inlineOrigin = nullptr
+    )
     {
       const std::size_t currentCapacity = static_cast<std::size_t>(vec.capacity_ - vec.start_);
       if (minCapacity > currentCapacity) {
@@ -3160,7 +3894,11 @@ namespace gpg::core
      * Moves prefix data from `sourceBegin` to `destBegin` and updates finish pointer.
      */
     template <class T>
-    [[nodiscard]] inline T* MovePrefixAndSetEnd(FastVector<T>& vec, T* sourceBegin, T* destBegin)
+    [[nodiscard]] inline T* MovePrefixAndSetEnd(
+      FastVector<T>& vec,
+      T* sourceBegin,
+      T* destBegin
+    )
     {
       static_assert(
         std::is_trivially_copyable_v<T>, "Legacy fastvector ABI helpers require trivially copyable element types."
@@ -3205,7 +3943,9 @@ namespace gpg
    * mutating inline-capacity sentinel words.
    */
   template <class T>
-  [[nodiscard]] inline fastvector_n<T, 2>& FastVectorN2InitInlineNoHeader(fastvector_n<T, 2>& storage) noexcept
+  [[nodiscard]] inline fastvector_n<T, 2>& FastVectorN2InitInlineNoHeader(
+    fastvector_n<T, 2>& storage
+  ) noexcept
   {
     storage.start_ = storage.InlineStorage();
     storage.end_ = storage.InlineStorage();
@@ -3222,8 +3962,10 @@ namespace gpg
    * runtime content into it.
    */
   template <class T>
-  [[nodiscard]] inline fastvector_n<T, 2>*
-  FastVectorN2RebindAndCopy(fastvector_n<T, 2>* destination, const fastvector_n<T, 2>* source)
+  [[nodiscard]] inline fastvector_n<T, 2>* FastVectorN2RebindAndCopy(
+    fastvector_n<T, 2>* destination,
+    const fastvector_n<T, 2>* source
+  )
   {
     if (!destination || !source) {
       return destination;

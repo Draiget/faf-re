@@ -14,8 +14,8 @@ namespace
 {
   using faf::editor::SaveEntry;
 
-  // As FAFME's ExportSelectedMarkers writes it (JsonUtility, pretty): a mass point, two linked land path nodes, a weather
-  // generator (a type the editor doesn't place) and a camera.
+  // As FAFME's ExportSelectedMarkers writes it (JsonUtility, pretty): a mass point, two linked land path nodes, a
+  // weather generator (a type the editor doesn't place) and a camera.
   const char* const kFafme = R"({
     "Markers": [
         {
@@ -102,9 +102,14 @@ namespace
     "MapHeight": 1024
 })";
 
-  TEST(MarkerPreset, ReadsFafmesFile)
+  TEST(
+    MarkerPreset,
+    ReadsFafmesFile
+  )
   {
-    std::vector<SaveEntry> markers = {faf::editor::NewMarker(*faf::editor::FindMarkerType("Mass"), "Mass 00", 1.0f, 2.0f, 3.0f)};
+    std::vector<SaveEntry> markers = {
+      faf::editor::NewMarker(*faf::editor::FindMarkerType("Mass"), "Mass 00", 1.0f, 2.0f, 3.0f)
+    };
     faf::editor::MarkerImport result;
     std::string error;
     ASSERT_TRUE(faf::editor::MarkersFromFafmapmarkers(kFafme, markers, result, error)) << error;
@@ -124,14 +129,19 @@ namespace
     EXPECT_EQ(faf::editor::MarkerTypeOf(markers[4]), "Camera Info");
   }
 
-  TEST(MarkerPreset, WritesWhatItReads)
+  TEST(
+    MarkerPreset,
+    WritesWhatItReads
+  )
   {
     std::vector<SaveEntry> markers;
     faf::editor::MarkerImport result;
     std::string error;
     ASSERT_TRUE(faf::editor::MarkersFromFafmapmarkers(kFafme, markers, result, error)) << error;
     // A path node outside the export keeps its link out of the file.
-    markers.push_back(faf::editor::NewMarker(*faf::editor::FindMarkerType("Land Path Node"), "Outside", 0.0f, 0.0f, 0.0f));
+    markers.push_back(
+      faf::editor::NewMarker(*faf::editor::FindMarkerType("Land Path Node"), "Outside", 0.0f, 0.0f, 0.0f)
+    );
     ASSERT_TRUE(faf::editor::SetMarkerLink(markers, result.names[1], "Outside", true));
     const std::string text = faf::editor::MarkersToFafmapmarkers(markers, result.names, 1024, 1024);
     std::vector<SaveEntry> again;
@@ -154,18 +164,28 @@ namespace
     EXPECT_FALSE(faf::editor::MarkersFromFafmapmarkers("{ \"LightingMultiplier\": 1 }", again, second, error));
   }
 
-  TEST(MarkerPreset, AStartPositionSkipsTheArmiesNames)
+  TEST(
+    MarkerPreset,
+    AStartPositionSkipsTheArmiesNames
+  )
   {
-    const char* const start = R"({ "Markers": [ { "MarkerType": 3, "Pos": { "x": 1.0, "y": 1.0, "z": -1.0 }, "Rot": { "x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0 }, "Connected": [] } ] })";
-    std::vector<SaveEntry> markers = {faf::editor::NewMarker(*faf::editor::FindMarkerType("Blank Marker"), "ARMY_1", 0.0f, 0.0f, 0.0f)};
+    const char* const start =
+      R"({ "Markers": [ { "MarkerType": 3, "Pos": { "x": 1.0, "y": 1.0, "z": -1.0 }, "Rot": { "x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0 }, "Connected": [] } ] })";
+    std::vector<SaveEntry> markers = {
+      faf::editor::NewMarker(*faf::editor::FindMarkerType("Blank Marker"), "ARMY_1", 0.0f, 0.0f, 0.0f)
+    };
     faf::editor::MarkerImport result;
     std::string error;
-    ASSERT_TRUE(faf::editor::MarkersFromFafmapmarkers(start, markers, result, error, {"ARMY_1", "ARMY_2", "ARMY_9"})) << error;
+    ASSERT_TRUE(faf::editor::MarkersFromFafmapmarkers(start, markers, result, error, {"ARMY_1", "ARMY_2", "ARMY_9"}))
+      << error;
     ASSERT_EQ(result.names.size(), 1u);
     EXPECT_EQ(result.names[0], "ARMY_3");
   }
 
-  TEST(MarkerPreset, UnityEulerAnglesRoundTrip)
+  TEST(
+    MarkerPreset,
+    UnityEulerAnglesRoundTrip
+  )
   {
     float q[4];
     faf::editor::UnityEulerToQuaternion({0.0f, 90.0f, 0.0f}, q);
@@ -185,9 +205,14 @@ namespace
     EXPECT_NEAR(e[0], 340.0f, 1e-3f);
   }
 
-  TEST(MarkerPreset, ACamerasHeadingAndPitchComeBack)
+  TEST(
+    MarkerPreset,
+    ACamerasHeadingAndPitchComeBack
+  )
   {
-    std::vector<SaveEntry> markers = {faf::editor::NewMarker(*faf::editor::FindMarkerType("Camera Info"), "Camera Info 00", 100.0f, 10.0f, 200.0f)};
+    std::vector<SaveEntry> markers = {
+      faf::editor::NewMarker(*faf::editor::FindMarkerType("Camera Info"), "Camera Info 00", 100.0f, 10.0f, 200.0f)
+    };
     markers[0].Set("orientation", faf::editor::Vector3Value(0.5, 1.2, 0.0));
     const std::string text = faf::editor::MarkersToFafmapmarkers(markers, {}, 512, 512);
     std::vector<SaveEntry> again;

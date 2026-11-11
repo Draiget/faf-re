@@ -18,10 +18,10 @@ namespace faf::server
   namespace
   {
     constexpr std::size_t kMaxObservers = 64;
-    constexpr std::size_t kMaxRequestBytes = 1024;      // 'G', the path, its NUL
-    constexpr std::uint64_t kRequestUs = 5'000'000u;     // to send the request
+    constexpr std::size_t kMaxRequestBytes = 1024;   // 'G', the path, its NUL
+    constexpr std::uint64_t kRequestUs = 5'000'000u; // to send the request
     constexpr std::size_t kChunkBytes = 64u * 1024u;
-    constexpr std::uint64_t kHeldUs = 300'000'000u;     // a request the organiser hasn't answered (plan WP17.9)
+    constexpr std::uint64_t kHeldUs = 300'000'000u; // a request the organiser hasn't answered (plan WP17.9)
 
     [[nodiscard]] bool WouldBlock() noexcept
     {
@@ -34,17 +34,21 @@ namespace faf::server
     int socket = -1;
     std::string peer;
     std::uint64_t acceptedUs = 0;
-    std::string request;            // until its NUL
-    std::string token;              // once the request is whole
-    bool held = false;              // waiting for the organiser's answer
+    std::string request; // until its NUL
+    std::string token;   // once the request is whole
+    bool held = false;   // waiting for the organiser's answer
     std::uint64_t heldUs = 0;
     bool watching = false;
-    std::size_t offset = 0;         // the log's bytes sent so far
-    std::uint64_t delayUs = 0;      // the observers' delay, or 0 for a referee (plan WP13.2)
+    std::size_t offset = 0;    // the log's bytes sent so far
+    std::uint64_t delayUs = 0; // the observers' delay, or 0 for a referee (plan WP13.2)
     std::vector<std::uint8_t> pending;
   };
 
-  CObserverListener::CObserverListener(std::shared_ptr<const CReplayLog> log, Clock clock, const double delaySeconds)
+  CObserverListener::CObserverListener(
+    std::shared_ptr<const CReplayLog> log,
+    Clock clock,
+    const double delaySeconds
+  )
     : mLog(std::move(log))
     , mClock(std::move(clock))
     , mDelayUs(static_cast<std::uint64_t>(std::max(0.0, delaySeconds) * 1e6))
@@ -55,7 +59,10 @@ namespace faf::server
     Stop();
   }
 
-  bool CObserverListener::Start(const remote::net::SEndpoint& at, std::string& error)
+  bool CObserverListener::Start(
+    const remote::net::SEndpoint& at,
+    std::string& error
+  )
   {
     mListenSocket = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
     if (mListenSocket < 0) {
@@ -68,13 +75,18 @@ namespace faf::server
     address.sin_family = AF_INET;
     address.sin_port = htons(at.port);
     address.sin_addr.s_addr = htonl(at.ip);
-    if (::bind(mListenSocket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 || ::listen(mListenSocket, 16) != 0) {
+    if (
+      ::bind(mListenSocket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 ||
+      ::listen(mListenSocket, 16) != 0
+    ) {
       error = "observe: can't listen on " + at.Text();
       ::close(mListenSocket);
       mListenSocket = -1;
       return false;
     }
-    mThread = std::thread([this] { Run(); });
+    mThread = std::thread([this] {
+      Run();
+    });
     return true;
   }
 
@@ -90,14 +102,18 @@ namespace faf::server
     }
   }
 
-  void CObserverListener::AllowToken(std::string token)
+  void CObserverListener::AllowToken(
+    std::string token
+  )
   {
     const std::scoped_lock lock(mLock);
     mRefused.erase(token);
     mTokens.insert(std::move(token));
   }
 
-  void CObserverListener::AllowReferee(std::string token)
+  void CObserverListener::AllowReferee(
+    std::string token
+  )
   {
     const std::scoped_lock lock(mLock);
     mRefused.erase(token);
@@ -105,7 +121,9 @@ namespace faf::server
     mReferees.insert(std::move(token));
   }
 
-  void CObserverListener::RefuseToken(std::string token)
+  void CObserverListener::RefuseToken(
+    std::string token
+  )
   {
     const std::scoped_lock lock(mLock);
     mTokens.erase(token);
@@ -124,7 +142,9 @@ namespace faf::server
     return std::exchange(mNews, {});
   }
 
-  void CObserverListener::Say(std::string line)
+  void CObserverListener::Say(
+    std::string line
+  )
   {
     const std::scoped_lock lock(mLock);
     mNews.push_back(std::move(line));
@@ -141,7 +161,8 @@ namespace faf::server
       for (;;) {
         sockaddr_in from{};
         socklen_t size = sizeof(from);
-        const int socket = ::accept4(mListenSocket, reinterpret_cast<sockaddr*>(&from), &size, SOCK_NONBLOCK | SOCK_CLOEXEC);
+        const int socket =
+          ::accept4(mListenSocket, reinterpret_cast<sockaddr*>(&from), &size, SOCK_NONBLOCK | SOCK_CLOEXEC);
         if (socket < 0) {
           break;
         }
@@ -200,7 +221,10 @@ namespace faf::server
           connection.held = false;
           connection.watching = true;
           connection.delayUs = mDelayUs; // an approved observer is no referee
-          Say("observe: " + connection.peer + " approved, watches " + std::to_string(mDelayUs / 1000000u) + " s behind the game");
+          Say(
+            "observe: " + connection.peer + " approved, watches " + std::to_string(mDelayUs / 1000000u) +
+            " s behind the game"
+          );
         }
         if (!connection.watching) {
           char buffer[256];
@@ -258,8 +282,11 @@ namespace faf::server
             referee = mReferees.contains(token);
           }
           connection.delayUs = referee ? 0u : mDelayUs;
-          Say("observe: " + connection.peer + (referee ? std::string(" referees, with no delay") :
-                                               " watches, " + std::to_string(mDelayUs / 1000000u) + " s behind the game"));
+          Say(
+            "observe: " + connection.peer +
+            (referee ? std::string(" referees, with no delay")
+                     : " watches, " + std::to_string(mDelayUs / 1000000u) + " s behind the game")
+          );
         }
         // What's old enough and not sent yet.
         if (connection.pending.empty()) {
@@ -271,7 +298,8 @@ namespace faf::server
           }
         }
         while (!connection.pending.empty()) {
-          const ssize_t sent = ::send(connection.socket, connection.pending.data(), connection.pending.size(), MSG_NOSIGNAL);
+          const ssize_t sent =
+            ::send(connection.socket, connection.pending.data(), connection.pending.size(), MSG_NOSIGNAL);
           if (sent < 0) {
             if (!WouldBlock()) {
               close("disconnected");
@@ -284,9 +312,13 @@ namespace faf::server
           close("has seen the whole game (" + std::to_string(connection.offset) + " bytes)");
         }
       }
-      std::erase_if(connections, [](const SConnection& connection) { return connection.socket < 0; });
+      std::erase_if(connections, [](const SConnection& connection) {
+        return connection.socket < 0;
+      });
       const std::size_t watching =
-        static_cast<std::size_t>(std::count_if(connections.begin(), connections.end(), [](const SConnection& c) { return c.watching; }));
+        static_cast<std::size_t>(std::count_if(connections.begin(), connections.end(), [](const SConnection& c) {
+        return c.watching;
+      }));
       mObservers.store(watching, std::memory_order_relaxed);
       mAllSent.store(finished && watching == 0u, std::memory_order_relaxed);
 
@@ -294,8 +326,15 @@ namespace faf::server
       polls.clear();
       polls.push_back(pollfd{mListenSocket, POLLIN, 0});
       for (const SConnection& connection : connections) {
-        polls.push_back(pollfd{connection.socket,
-                               static_cast<short>(connection.watching ? (connection.pending.empty() ? 0 : POLLOUT) : (connection.held ? 0 : POLLIN)), 0});
+        polls.push_back(
+          pollfd{
+            connection.socket,
+            static_cast<short>(
+              connection.watching ? (connection.pending.empty() ? 0 : POLLOUT) : (connection.held ? 0 : POLLIN)
+            ),
+            0
+          }
+        );
       }
       (void)::poll(polls.data(), polls.size(), 50);
     }

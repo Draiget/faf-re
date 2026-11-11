@@ -118,12 +118,17 @@ function AddFactionReclaimBack(optional_adaptive_faction_wreckage)
 end
 )lua";
 
-  GroupLobbyRule Rule(const char* const group)
+  GroupLobbyRule Rule(
+    const char* const group
+  )
   {
     return faf::editor::LobbyRuleOfGroup(kScript, faf::editor::ParseLobbyOptions(kOptions), group);
   }
 
-  TEST(GroupOptions, OptionsFileWithoutCommentedOnes)
+  TEST(
+    GroupOptions,
+    OptionsFileWithoutCommentedOnes
+  )
   {
     const auto options = faf::editor::ParseLobbyOptions(kOptions);
     ASSERT_EQ(options.size(), 4u);
@@ -141,7 +146,10 @@ end
     EXPECT_FALSE(options[3].values[1].number);
   }
 
-  TEST(GroupOptions, ALoopOverTheOptionsValue)
+  TEST(
+    GroupOptions,
+    ALoopOverTheOptionsValue
+  )
   {
     const GroupLobbyRule rule = Rule("Optional_Wreckage_2");
     ASSERT_TRUE(rule.scriptNames);
@@ -160,7 +168,10 @@ end
     EXPECT_TRUE(Rule("Optional_Wreckage_3").Never());
   }
 
-  TEST(GroupOptions, AnOptionTheLobbyDoesntOffer)
+  TEST(
+    GroupOptions,
+    AnOptionTheLobbyDoesntOffer
+  )
   {
     // optional_naval_wreckage is commented out in _options.lua: always the script's default 1, so never made.
     const GroupLobbyRule rule = Rule("Optional_Wreckage_Naval_2");
@@ -174,7 +185,10 @@ end
     EXPECT_EQ(lines[1], "No lobby setting creates it: never in a game.");
   }
 
-  TEST(GroupOptions, IfElseifElse)
+  TEST(
+    GroupOptions,
+    IfElseifElse
+  )
   {
     const GroupLobbyRule base = Rule("Optional_Civilian_Base_2");
     ASSERT_EQ(base.cases.size(), 3u);
@@ -193,7 +207,10 @@ end
     EXPECT_EQ(ruins.cases[2].made, GroupLobbyRule::Made::No);
   }
 
-  TEST(GroupOptions, ThroughAFunctionAndTheGame)
+  TEST(
+    GroupOptions,
+    ThroughAFunctionAndTheGame
+  )
   {
     // Called only when the option is above 1; inside, who plays ARMY_7 decides: "maybe".
     const GroupLobbyRule top = Rule("Optional_Wreckage_Back_Top_UEF_2");
@@ -207,7 +224,10 @@ end
     EXPECT_EQ(three.cases[2].made, GroupLobbyRule::Made::Maybe);
   }
 
-  TEST(GroupOptions, DirectReadsAndNoOption)
+  TEST(
+    GroupOptions,
+    DirectReadsAndNoOption
+  )
   {
     const GroupLobbyRule jamming = Rule("Jamming");
     ASSERT_EQ(jamming.keys, std::vector<std::string>{"jamming"});
@@ -222,7 +242,10 @@ end
     EXPECT_FALSE(Rule("Spare").scriptNames);
   }
 
-  const faf::editor::SpawnTarget* Find(const std::vector<faf::editor::SpawnTarget>& targets, const std::string& name)
+  const faf::editor::SpawnTarget* Find(
+    const std::vector<faf::editor::SpawnTarget>& targets,
+    const std::string& name
+  )
   {
     for (const auto& target : targets) {
       if (target.path.back() == name) {
@@ -232,9 +255,13 @@ end
     return nullptr;
   }
 
-  TEST(GroupOptions, SpawnTargets)
+  TEST(
+    GroupOptions,
+    SpawnTargets
+  )
   {
-    const auto targets = faf::editor::SpawnTargets(kScript, kOptions, "ARMY_17", {{"Optional_Wreckage_2"}, {"Base", "Civilian_Ruins"}});
+    const auto targets =
+      faf::editor::SpawnTargets(kScript, kOptions, "ARMY_17", {{"Optional_Wreckage_2"}, {"Base", "Civilian_Ruins"}});
     // An existing level: where it is, and the value that makes it.
     const auto* level2 = Find(targets, "Optional_Wreckage_2");
     ASSERT_NE(level2, nullptr);
@@ -266,14 +293,20 @@ end
     EXPECT_EQ(Find(targets, "Optional_Civilian_Base_2")->when, "Civilian Base = \"wrecks\"");
     EXPECT_EQ(Find(targets, "Jamming")->when, "Jamming = \"on\"");
     EXPECT_EQ(Find(targets, "Outpost")->when, "every game");
-    EXPECT_EQ(Find(targets, "Optional_Wreckage_Back_Top_UEF_2")->when, "Faction reclaim = \"one\" (and the game: slots, factions)");
+    EXPECT_EQ(
+      Find(targets, "Optional_Wreckage_Back_Top_UEF_2")->when,
+      "Faction reclaim = \"one\" (and the game: slots, factions)"
+    );
     // Commented-out code offers nothing; another army gets none of ARMY_17's groups.
     EXPECT_EQ(Find(targets, "Optional_Civilian_Commented"), nullptr);
     EXPECT_TRUE(faf::editor::SpawnTargets(kScript, kOptions, "ARMY_1", {}).empty());
   }
 
   // The real map, when its folder is given (FAF_DUALGAP_DIR: dualgap_adaptive.v0014).
-  TEST(GroupOptions, DualGapAdaptive)
+  TEST(
+    GroupOptions,
+    DualGapAdaptive
+  )
   {
     const std::string dir = faf::editor::test::EnvText("FAF_DUALGAP_DIR");
     if (dir.empty()) {
@@ -305,9 +338,17 @@ end
       std::printf("%s\n", line.c_str());
     }
     // What the Properties panel offers ARMY_17's units.
-    for (const auto& target : faf::editor::SpawnTargets(script, read("DualGap_Adaptive_options.lua"), "ARMY_17", {{"Optional_Wreckage_2"}})) {
-      std::printf("%s%s: %s%s%s\n", target.path.back().c_str(), target.exists ? "" : " (new)", target.when.c_str(),
-                  target.optionsChange.empty() ? "" : "; ", target.optionsChange.c_str());
+    for (const auto& target : faf::editor::SpawnTargets(
+           script, read("DualGap_Adaptive_options.lua"), "ARMY_17", {{"Optional_Wreckage_2"}}
+         )) {
+      std::printf(
+        "%s%s: %s%s%s\n",
+        target.path.back().c_str(),
+        target.exists ? "" : " (new)",
+        target.when.c_str(),
+        target.optionsChange.empty() ? "" : "; ",
+        target.optionsChange.c_str()
+      );
     }
   }
 } // namespace

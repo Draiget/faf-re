@@ -17,8 +17,6 @@ namespace moho
   gpg::RType* REmitterBlueprintCurve::sType = nullptr;
   gpg::RType* REmitterBlueprint::sType = nullptr;
 
-
-
   /**
    * Address: 0x00514B30 (FUN_00514B30)
    * Mangled: ?GetClass@REmitterCurveKey@Moho@@UBEPAVRType@gpg@@XZ
@@ -184,7 +182,12 @@ namespace moho
 
 namespace moho
 {
-  void REmitterBlueprint::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void REmitterBlueprint::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     RRuleGameRules* rules = nullptr;
     const gpg::RRef owner{};
@@ -200,7 +203,10 @@ namespace moho
    * Address: 0x0050FD60 (FUN_0050FD60)
    */
   void REmitterBlueprint::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     archive.WritePointer(mOwnerRules, gpg::TrackedPointerState::Unowned, gpg::RRef{});

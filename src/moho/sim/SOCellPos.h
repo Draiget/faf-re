@@ -48,10 +48,12 @@ namespace moho
    * (`mov edx, [ebp+8]` at 0x00769386 feeding `ldiv`, and the unsigned `cmp`
    * that orders a bucket window), so the packing is observable and must match.
    */
-  [[nodiscard]] inline std::uint32_t PackCellKey(const SOCellPos& cell) noexcept
+  [[nodiscard]] inline std::uint32_t PackCellKey(
+    const SOCellPos& cell
+  ) noexcept
   {
-    return static_cast<std::uint32_t>(static_cast<std::uint16_t>(cell.x))
-         | (static_cast<std::uint32_t>(static_cast<std::uint16_t>(cell.z)) << 16);
+    return static_cast<std::uint32_t>(static_cast<std::uint16_t>(cell.x)) |
+      (static_cast<std::uint32_t>(static_cast<std::uint16_t>(cell.z)) << 16);
   }
 
   /**
@@ -61,7 +63,9 @@ namespace moho
    * Hashes one cell for `fa::hash_map`. Found by argument-dependent lookup,
    * which is how the container picks this up in place of the integral default.
    */
-  [[nodiscard]] inline std::size_t hash_value(const SOCellPos& cell) noexcept
+  [[nodiscard]] inline std::size_t hash_value(
+    const SOCellPos& cell
+  ) noexcept
   {
     return fa::hash_value(static_cast<long>(static_cast<std::int32_t>(PackCellKey(cell))));
   }

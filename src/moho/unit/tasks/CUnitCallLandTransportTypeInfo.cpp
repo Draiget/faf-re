@@ -5,7 +5,8 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitCallLandTransport.h"
+#include "moho/unit/tasks/CUnitCallLandTransport.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -67,7 +68,9 @@ namespace moho
   /**
    * Address: 0x00602E20 (FUN_00602E20, AddBase_CCommandTask)
    */
-  void __stdcall CUnitCallLandTransportTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitCallLandTransportTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<CCommandTask>(typeInfo);
   }
@@ -84,7 +87,9 @@ namespace moho
   /**
    * Address: 0x00602920 (FUN_00602920)
    */
-  gpg::RRef CUnitCallLandTransportTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitCallLandTransportTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = gpg::ConstructInStorage<CUnitCallLandTransport>(objectStorage);
     return gpg::RRef{task, gpg::LookupRType(typeid(CUnitCallLandTransport))};
@@ -93,7 +98,9 @@ namespace moho
   /**
    * Address: 0x00602900 (FUN_00602900)
    */
-  void CUnitCallLandTransportTypeInfo::Delete(void* const objectStorage)
+  void CUnitCallLandTransportTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitCallLandTransport*>(objectStorage);
   }
@@ -101,7 +108,9 @@ namespace moho
   /**
    * Address: 0x00602990 (FUN_00602990)
    */
-  void CUnitCallLandTransportTypeInfo::Destruct(void* const objectStorage)
+  void CUnitCallLandTransportTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CUnitCallLandTransport*>(objectStorage);
     if (!task) {
@@ -120,8 +129,9 @@ namespace moho
   }
 } // namespace moho
 
-
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitCallLandTransportTypeInfo_1db318, moho::register_CUnitCallLandTransportTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitCallLandTransportTypeInfo_1db318,
+  moho::register_CUnitCallLandTransportTypeInfo
+)

@@ -11,7 +11,10 @@ namespace
 {
   using faf::editor::SaveEntry;
 
-  TEST(Markers, NamesSkipTheOnesTaken)
+  TEST(
+    Markers,
+    NamesSkipTheOnesTaken
+  )
   {
     const faf::editor::MarkerType* const mass = faf::editor::FindMarkerType("Mass");
     const faf::editor::MarkerType* const start = faf::editor::FindMarkerType("Blank Marker");
@@ -22,7 +25,10 @@ namespace
     EXPECT_EQ(faf::editor::NextMarkerName(markers, *start), "ARMY_2");
   }
 
-  TEST(Markers, ANewMarkerReadsBack)
+  TEST(
+    Markers,
+    ANewMarkerReadsBack
+  )
   {
     const faf::editor::MarkerType* const node = faf::editor::FindMarkerType("Land Path Node");
     ASSERT_NE(node, nullptr);
@@ -43,7 +49,10 @@ namespace
     EXPECT_EQ(links[1], "LandPN02");
   }
 
-  TEST(Markers, PathNodesLinkBothWaysAndUnlink)
+  TEST(
+    Markers,
+    PathNodesLinkBothWaysAndUnlink
+  )
   {
     const faf::editor::MarkerType* const land = faf::editor::FindMarkerType("Land Path Node");
     const faf::editor::MarkerType* const water = faf::editor::FindMarkerType("Water Path Node");
@@ -78,11 +87,16 @@ namespace
     EXPECT_TRUE(faf::editor::MarkerLinks(markers[2]).empty());
   }
 
-  TEST(Markers, GroupsForTheTree)
+  TEST(
+    Markers,
+    GroupsForTheTree
+  )
   {
     using faf::editor::MarkerGroup;
     const auto of = [](const char* const type) {
-      return faf::editor::MarkerGroupOf(faf::editor::NewMarker(*faf::editor::FindMarkerType(type), "m", 0.0f, 0.0f, 0.0f));
+      return faf::editor::MarkerGroupOf(
+        faf::editor::NewMarker(*faf::editor::FindMarkerType(type), "m", 0.0f, 0.0f, 0.0f)
+      );
     };
     EXPECT_EQ(of("Blank Marker"), MarkerGroup::Starts);
     EXPECT_EQ(of("Mass"), MarkerGroup::Resources);
@@ -96,7 +110,10 @@ namespace
     EXPECT_EQ(faf::editor::MarkerGroupOf(odd), MarkerGroup::Other);
   }
 
-  TEST(Markers, NearestOfATypeWithinReach)
+  TEST(
+    Markers,
+    NearestOfATypeWithinReach
+  )
   {
     const faf::editor::MarkerType* const land = faf::editor::FindMarkerType("Land Path Node");
     const faf::editor::MarkerType* const mass = faf::editor::FindMarkerType("Mass");
@@ -108,11 +125,17 @@ namespace
     EXPECT_EQ(faf::editor::MarkerNear(markers, "Mass", 11.5f, 10.5f, 1.5f), 0);
     EXPECT_EQ(faf::editor::MarkerNear(markers, "Land Path Node", 20.5f, 10.5f, 1.5f), -1);
   }
-  TEST(Markers, AirNodeGridAsFafmeLaysIt)
+  TEST(
+    Markers,
+    AirNodeGridAsFafmeLaysIt
+  )
   {
     // FAForeverMapEditor's 10 km preset: 16 x 16 nodes over a 512 map, 32 apart from 16.5, 3 to 8 links each.
     const std::vector<SaveEntry> existing = {{"AirPN00", {}}, {"Mass 01", {}}};
-    const std::vector<SaveEntry> grid = faf::editor::AirNodeGrid(existing, 16, 0.0f, 0.0f, 512.0f, 512.0f, [](float, float) { return 20.0f; });
+    const std::vector<SaveEntry> grid =
+      faf::editor::AirNodeGrid(existing, 16, 0.0f, 0.0f, 512.0f, 512.0f, [](float, float) {
+      return 20.0f;
+    });
     ASSERT_EQ(grid.size(), 256U);
     float x = 0.0f, y = 0.0f, z = 0.0f;
     ASSERT_TRUE(faf::editor::MarkerPosition(grid[0], x, y, z));
@@ -136,7 +159,10 @@ namespace
     EXPECT_NE(std::find(back.begin(), back.end(), grid[17].name), back.end());
   }
 
-  TEST(Markers, TypedValuesReadAndWriteBack)
+  TEST(
+    Markers,
+    TypedValuesReadAndWriteBack
+  )
   {
     using faf::editor::MarkerValue;
     const MarkerValue colour = faf::editor::ParseMarkerValue("STRING( 'ff800080' )");
@@ -144,7 +170,7 @@ namespace
     EXPECT_EQ(colour.text, "ff800080");
     float rgba[4] = {};
     ASSERT_TRUE(faf::editor::MarkerColourText(colour.text, rgba));
-    EXPECT_NEAR(rgba[3], 1.0f, 1e-6f);           // alpha first
+    EXPECT_NEAR(rgba[3], 1.0f, 1e-6f);            // alpha first
     EXPECT_NEAR(rgba[0], 128.0f / 255.0f, 1e-6f); // then red
     EXPECT_NEAR(rgba[1], 0.0f, 1e-6f);
     EXPECT_NEAR(rgba[2], 128.0f / 255.0f, 1e-6f);

@@ -64,9 +64,8 @@ namespace moho
      * its members are loaded over it afterwards.
      * Inlined into `SerConstructHelper<CEffectManagerImpl>::Construct` 0x0066BB40.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x0066BA60 (FUN_0066BA60)
@@ -75,7 +74,10 @@ namespace moho
      * Saves `GetSim()` unowned for `MemberConstruct` to read back.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     /**
@@ -244,14 +246,15 @@ namespace moho
     ) override;
 
   public:
-    Sim* mSim;                              // +0x04
-    TDatList<IEffect, void> mActiveEffects;   // +0x08
+    Sim* mSim;                                 // +0x04
+    TDatList<IEffect, void> mActiveEffects;    // +0x08
     TDatList<IEffect, void> mDestroyedEffects; // +0x10
   };
 
   static_assert(offsetof(CEffectManagerImpl, mSim) == 0x04, "CEffectManagerImpl::mSim offset must be 0x04");
   static_assert(
-    offsetof(CEffectManagerImpl, mActiveEffects) == 0x08, "CEffectManagerImpl::mActiveEffects offset must be 0x08"
+    offsetof(CEffectManagerImpl, mActiveEffects) == 0x08,
+    "CEffectManagerImpl::mActiveEffects offset must be 0x08"
   );
   static_assert(
     offsetof(CEffectManagerImpl, mDestroyedEffects) == 0x10,

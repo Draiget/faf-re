@@ -36,36 +36,118 @@ namespace fa
     constexpr X87Float() noexcept = default;
 
     /// `fld dword`: exact.
-    constexpr X87Float(const float value) noexcept // NOLINT(google-explicit-constructor)
+    constexpr X87Float(
+      const float value
+    ) noexcept // NOLINT(google-explicit-constructor)
       : mValue(value)
     {}
 
     /// `fstp dword`: rounds into the float range (overflow to inf, denormals).
-    [[nodiscard]] explicit operator float() const noexcept { return static_cast<float>(mValue); }
+    [[nodiscard]] explicit operator float() const noexcept
+    {
+      return static_cast<float>(mValue);
+    }
 
-    friend X87Float operator+(const X87Float lhs, const X87Float rhs) noexcept { return Round(lhs.mValue + rhs.mValue); }
-    friend X87Float operator-(const X87Float lhs, const X87Float rhs) noexcept { return Round(lhs.mValue - rhs.mValue); }
-    friend X87Float operator*(const X87Float lhs, const X87Float rhs) noexcept { return Round(lhs.mValue * rhs.mValue); }
-    friend X87Float operator/(const X87Float lhs, const X87Float rhs) noexcept { return Round(lhs.mValue / rhs.mValue); }
+    friend X87Float operator+(
+      const X87Float lhs,
+      const X87Float rhs
+    ) noexcept
+    {
+      return Round(lhs.mValue + rhs.mValue);
+    }
+    friend X87Float operator-(
+      const X87Float lhs,
+      const X87Float rhs
+    ) noexcept
+    {
+      return Round(lhs.mValue - rhs.mValue);
+    }
+    friend X87Float operator*(
+      const X87Float lhs,
+      const X87Float rhs
+    ) noexcept
+    {
+      return Round(lhs.mValue * rhs.mValue);
+    }
+    friend X87Float operator/(
+      const X87Float lhs,
+      const X87Float rhs
+    ) noexcept
+    {
+      return Round(lhs.mValue / rhs.mValue);
+    }
     /// `fchs`: exact.
-    friend X87Float operator-(const X87Float value) noexcept { return Raw(-value.mValue); }
+    friend X87Float operator-(
+      const X87Float value
+    ) noexcept
+    {
+      return Raw(-value.mValue);
+    }
 
-    friend bool operator<(const X87Float lhs, const X87Float rhs) noexcept { return lhs.mValue < rhs.mValue; }
-    friend bool operator>(const X87Float lhs, const X87Float rhs) noexcept { return lhs.mValue > rhs.mValue; }
-    friend bool operator<=(const X87Float lhs, const X87Float rhs) noexcept { return lhs.mValue <= rhs.mValue; }
-    friend bool operator>=(const X87Float lhs, const X87Float rhs) noexcept { return lhs.mValue >= rhs.mValue; }
-    friend bool operator==(const X87Float lhs, const X87Float rhs) noexcept { return lhs.mValue == rhs.mValue; }
-    friend bool operator!=(const X87Float lhs, const X87Float rhs) noexcept { return lhs.mValue != rhs.mValue; }
+    friend bool operator<(
+      const X87Float lhs,
+      const X87Float rhs
+    ) noexcept
+    {
+      return lhs.mValue < rhs.mValue;
+    }
+    friend bool operator>(
+      const X87Float lhs,
+      const X87Float rhs
+    ) noexcept
+    {
+      return lhs.mValue > rhs.mValue;
+    }
+    friend bool operator<=(
+      const X87Float lhs,
+      const X87Float rhs
+    ) noexcept
+    {
+      return lhs.mValue <= rhs.mValue;
+    }
+    friend bool operator>=(
+      const X87Float lhs,
+      const X87Float rhs
+    ) noexcept
+    {
+      return lhs.mValue >= rhs.mValue;
+    }
+    friend bool operator==(
+      const X87Float lhs,
+      const X87Float rhs
+    ) noexcept
+    {
+      return lhs.mValue == rhs.mValue;
+    }
+    friend bool operator!=(
+      const X87Float lhs,
+      const X87Float rhs
+    ) noexcept
+    {
+      return lhs.mValue != rhs.mValue;
+    }
 
     /// `fabs`: exact, and clears the sign of a NaN too.
-    [[nodiscard]] friend X87Float Abs(const X87Float value) noexcept { return Raw(std::fabs(value.mValue)); }
+    [[nodiscard]] friend X87Float Abs(
+      const X87Float value
+    ) noexcept
+    {
+      return Raw(std::fabs(value.mValue));
+    }
 
     /// `fild dword`: exact (an int has at most 31 significant bits, and the
     /// load does not round).
-    [[nodiscard]] static X87Float FromInt(const std::int32_t value) noexcept { return Raw(static_cast<double>(value)); }
+    [[nodiscard]] static X87Float FromInt(
+      const std::int32_t value
+    ) noexcept
+    {
+      return Raw(static_cast<double>(value));
+    }
 
   private:
-    [[nodiscard]] static X87Float Raw(const double value) noexcept
+    [[nodiscard]] static X87Float Raw(
+      const double value
+    ) noexcept
     {
       X87Float result;
       result.mValue = value;
@@ -73,7 +155,9 @@ namespace fa
     }
 
     /// Round to a 24-bit significand, ties to even, keeping the exponent.
-    [[nodiscard]] static X87Float Round(double value) noexcept
+    [[nodiscard]] static X87Float Round(
+      double value
+    ) noexcept
     {
       std::uint64_t bits;
       std::memcpy(&bits, &value, sizeof(bits));
@@ -106,7 +190,9 @@ namespace fa
 
   /// `Math<float>::FAbs` as the binary inlines it: the argument is stored to a
   /// float, `fabs`, and the result stored again.
-  [[nodiscard]] inline float FAbsX87(const X87Float value) noexcept
+  [[nodiscard]] inline float FAbsX87(
+    const X87Float value
+  ) noexcept
   {
     return static_cast<float>(Abs(X87Float(static_cast<float>(value))));
   }

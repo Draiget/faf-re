@@ -31,21 +31,22 @@
  */
 
 #if defined(_DEBUG) && !defined(NDEBUG)
-  #define MOHO_WX_HELD_NDEBUG
-  #define NDEBUG
+#define MOHO_WX_HELD_NDEBUG
+#define NDEBUG
 #endif
 
 #include <wx/defs.h>
 
 #ifdef MOHO_WX_HELD_NDEBUG
-  #undef NDEBUG
-  #undef MOHO_WX_HELD_NDEBUG
-  // wx/debug.h included <assert.h> while NDEBUG was held; this re-evaluates it.
-  #include <assert.h>
+#undef NDEBUG
+#undef MOHO_WX_HELD_NDEBUG
+// wx/debug.h included <assert.h> while NDEBUG was held; this re-evaluates it.
+#include <assert.h>
 #endif
 
 #ifdef __WXDEBUG__
-  #error "a wx header was read in __WXDEBUG__ mode before platform/WxWidgets.h - include it first; wxmswu.lib is a FINAL build"
+#error                                                                                                                 \
+  "a wx header was read in __WXDEBUG__ mode before platform/WxWidgets.h - include it first; wxmswu.lib is a FINAL build"
 #endif
 
 // <windows.h> defines CreateDialog, LoadMenu, GetCharWidth, FindWindow and a

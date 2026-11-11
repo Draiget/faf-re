@@ -67,7 +67,6 @@ namespace moho
     static void AddEnums(gpg::REnumType* enumType);
   };
 
-
   static_assert(sizeof(ESTITargetTypeTypeInfo) == 0x78, "ESTITargetTypeTypeInfo size must be 0x78");
 
   /**

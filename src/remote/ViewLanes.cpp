@@ -10,7 +10,10 @@
 
 namespace faf::remote
 {
-  wire::SFrameCodec MakeViewCodec(const float mapSizeX, const float mapSizeZ)
+  wire::SFrameCodec MakeViewCodec(
+    const float mapSizeX,
+    const float mapSizeZ
+  )
   {
     wire::SFrameCodec codec{};
     codec.position = wire::SPositionQuantizer::ForMap(mapSizeX, mapSizeZ);
@@ -18,7 +21,11 @@ namespace faf::remote
     return codec;
   }
 
-  CViewLanes::CViewLanes(const wire::SContentTables& tables, const float mapSizeX, const float mapSizeZ)
+  CViewLanes::CViewLanes(
+    const wire::SContentTables& tables,
+    const float mapSizeX,
+    const float mapSizeZ
+  )
     : CViewFrames(tables, MakeViewCodec(mapSizeX, mapSizeZ))
   {}
 
@@ -27,7 +34,9 @@ namespace faf::remote
     moho::Sim::SetSyncRouting(nullptr);
   }
 
-  void CViewLanes::OnViewFrames(moho::Sim& sim)
+  void CViewLanes::OnViewFrames(
+    moho::Sim& sim
+  )
   {
     const auto armyCount = static_cast<std::size_t>(ArmyCount());
     if (mClients.size() < ViewSlots()) {
@@ -55,7 +64,10 @@ namespace faf::remote
       for (std::size_t army = 0; army < armyCount && army < mRouter->ViewCount(); ++army) {
         SClient& client = mClients[army];
         client.lua.Clear();
-        if (HasView(static_cast<std::int32_t>(army)) && !wire::EncodeLuaSyncLane(mRouter->Payload(army), mRouter->Prints(army), client.lua)) {
+        if (
+          HasView(static_cast<std::int32_t>(army)) &&
+          !wire::EncodeLuaSyncLane(mRouter->Payload(army), mRouter->Prints(army), client.lua)
+        ) {
           ++client.failures;
         }
       }
@@ -77,7 +89,9 @@ namespace faf::remote
     }
   }
 
-  std::size_t CViewLanes::PrepareSideJobs(moho::Sim& sim)
+  std::size_t CViewLanes::PrepareSideJobs(
+    moho::Sim& sim
+  )
   {
     // Every army's grids, encoded once for all the views that receive them, on the workers with the
     // frames: the grids mostly wait on memory (a vision cell is 2 map units), the frames mostly compute.
@@ -88,7 +102,9 @@ namespace faf::remote
       if (army == nullptr) {
         continue;
       }
-      moho::CIntelGrid* const kinds[2] = {army->mConstDat.mVisionReconGrid.get(), army->mConstDat.mWaterReconGrid.get()};
+      moho::CIntelGrid* const kinds[2] = {
+        army->mConstDat.mVisionReconGrid.get(), army->mConstDat.mWaterReconGrid.get()
+      };
       for (std::uint8_t kind = 0; kind < 2u; ++kind) {
         moho::CIntelGrid* const grid = kinds[kind];
         if (grid == nullptr) {
@@ -126,7 +142,9 @@ namespace faf::remote
     return slots;
   }
 
-  void CViewLanes::RunSideJob(const std::size_t index)
+  void CViewLanes::RunSideJob(
+    const std::size_t index
+  )
   {
     SBeatGrid& beatGrid = mBeatGrids[index];
     moho::CIntelGrid* const grid = beatGrid.source;
@@ -140,12 +158,21 @@ namespace faf::remote
     // Only the chunks the sim may have rastered since last beat (a vision cell is 2 map units, so a
     // grid is up to a megabyte); a grid the clients get whole is read whole.
     wire::EncodeGridDeltaInPlace(
-      grid->mWidth, grid->mHeight, grid->mGrid.get(), beatGrid.seen.data(), beatGrid.delta, grid->ChangedChunks(),
-      moho::CIntelGrid::kChangeChunkCells, beatGrid.fresh
+      grid->mWidth,
+      grid->mHeight,
+      grid->mGrid.get(),
+      beatGrid.seen.data(),
+      beatGrid.delta,
+      grid->ChangedChunks(),
+      moho::CIntelGrid::kChangeChunkCells,
+      beatGrid.fresh
     );
   }
 
-  void CViewLanes::SetCameras(const std::size_t army, std::vector<SCameraReport> cameras)
+  void CViewLanes::SetCameras(
+    const std::size_t army,
+    std::vector<SCameraReport> cameras
+  )
   {
     const std::scoped_lock lock(mCamerasLock);
     if (army >= mCameras.size()) {
@@ -154,7 +181,10 @@ namespace faf::remote
     mCameras[army] = std::move(cameras);
   }
 
-  void CViewLanes::CheckPoses(SClient& client, const wire::BitWriter& lane)
+  void CViewLanes::CheckPoses(
+    SClient& client,
+    const wire::BitWriter& lane
+  )
   {
     // Plan WP8.2's check. As a client applies the lane: a whole unit's bones replace what it held (none: it drops
     // the unit), a change adds each bone's difference and takes its flags.
@@ -211,8 +241,9 @@ namespace faf::remote
       }
       const std::span<const wire::SPoseBone> sent = Poses().SentPose(id);
       const auto held = client.poseCopy.find(id);
-      const bool same = held == client.poseCopy.end() ? sent.empty()
-                                                       : std::equal(sent.begin(), sent.end(), held->second.begin(), held->second.end());
+      const bool same = held == client.poseCopy.end()
+        ? sent.empty()
+        : std::equal(sent.begin(), sent.end(), held->second.begin(), held->second.end());
       ++compared;
       differ += same ? 0u : 1u;
     }
@@ -222,8 +253,9 @@ namespace faf::remote
 
   std::string CViewLanes::PoseCheckReport() const
   {
-    return std::to_string(mPoseCheckUnits.load()) + " unit-beats compared, " + std::to_string(mPoseCheckDiffers.load()) + " differ, "
-         + std::to_string(mPoseCheckOrphanChanges.load()) + " changes to a unit the client held no pose of";
+    return std::to_string(mPoseCheckUnits.load()) + " unit-beats compared, " +
+      std::to_string(mPoseCheckDiffers.load()) + " differ, " + std::to_string(mPoseCheckOrphanChanges.load()) +
+      " changes to a unit the client held no pose of";
   }
 
   std::size_t CViewLanes::OwedPoses() const
@@ -235,7 +267,9 @@ namespace faf::remote
     return owed;
   }
 
-  void CViewLanes::Send(const std::size_t army)
+  void CViewLanes::Send(
+    const std::size_t army
+  )
   {
     SClient& client = mClients[army];
     client.bytes = static_cast<std::uint32_t>(client.lua.Bytes().size());
@@ -337,7 +371,14 @@ namespace faf::remote
         }
         HeldUnitKeys(army, client.poseUnitsNext, cameras, client.poseKeys);
         posesOk = Poses().EncodeViewBudgeted(
-          client.poseUnitsNext, client.poseUnits, fresh, mPoseBudgetBytes, client.poseKeys, client.poseBeat++, client.owedPoses, poseWriter
+          client.poseUnitsNext,
+          client.poseUnits,
+          fresh,
+          mPoseBudgetBytes,
+          client.poseKeys,
+          client.poseBeat++,
+          client.owedPoses,
+          poseWriter
         );
       } else {
         posesOk = Poses().EncodeView(client.poseUnitsNext, client.poseUnits, fresh, poseWriter);
@@ -373,7 +414,8 @@ namespace faf::remote
       }
       lanes.teamEntities = HeldCount(static_cast<std::int32_t>(teamSlot));
       // The team's view hashed itself only on a check's beat; between them a whole view hashes it here.
-      lanes.teamHash = check ? mClients[teamSlot].teamHash : (fresh ? HeldFrameHash(static_cast<std::int32_t>(teamSlot)) : 0u);
+      lanes.teamHash =
+        check ? mClients[teamSlot].teamHash : (fresh ? HeldFrameHash(static_cast<std::int32_t>(teamSlot)) : 0u);
       client.bytes += static_cast<std::uint32_t>(lanes.team->Bytes().size());
     }
     OnLanesEncoded(army, lanes);

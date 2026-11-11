@@ -21,7 +21,9 @@ namespace Wm3
    * Address: 0x00474260 (FUN_00474260, Wm3::Sphere3f::MemberDeserialize)
    */
   template <>
-  void Sphere3<float>::MemberDeserialize(gpg::ReadArchive* archive)
+  void Sphere3<float>::MemberDeserialize(
+    gpg::ReadArchive* archive
+  )
   {
     gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
@@ -33,7 +35,9 @@ namespace Wm3
    * Address: 0x004742B0 (FUN_004742B0, Wm3::Sphere3f::MemberSerialize)
    */
   template <>
-  void Sphere3<float>::MemberSerialize(gpg::WriteArchive* archive) const
+  void Sphere3<float>::MemberSerialize(
+    gpg::WriteArchive* archive
+  ) const
   {
     gpg::RType* const vector3Type = gpg::RTypeOf<Wm3::Vector3<float>>();
     gpg::RRef ownerRef{};
@@ -66,7 +70,9 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] gpg::RRef MakeDColPrimSphereRef(moho::CColPrimitive<Wm3::Sphere3f>* object)
+  [[nodiscard]] gpg::RRef MakeDColPrimSphereRef(
+    moho::CColPrimitive<Wm3::Sphere3f>* object
+  )
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -98,7 +104,9 @@ namespace moho
    * Registers `CColPrimitiveBase` as this type's reflected base at offset 0 -
    * the primitive derives from it singly.
    */
-  void DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase(gpg::RType* const typeInfo)
+  void DColPrimSphereTypeInfo::AddBase_CColPrimitiveBase(
+    gpg::RType* const typeInfo
+  )
   {
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(!typeInfo->initFinished_);
@@ -160,12 +168,23 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_DColPrimSphereTypeInfo_2459d0, moho::register_DColPrimSphereTypeInfo)
-GPG_PREREGISTER_INIT(preregister_DColPrimSphereTypeInfo_2459d0, moho::preregister_DColPrimSphereTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_DColPrimSphereTypeInfo_2459d0,
+  moho::register_DColPrimSphereTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_DColPrimSphereTypeInfo_2459d0,
+  moho::preregister_DColPrimSphereTypeInfo
+)
 
 namespace moho
 {
-  void CColPrimitive<Wm3::Sphere3f>::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CColPrimitive<Wm3::Sphere3f>::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     Wm3::Sphere3f shape{};
     Wm3::Vec3f localCenter{};
@@ -188,7 +207,10 @@ namespace moho
    * Address: 0x004FECF0 (FUN_004FECF0)
    */
   void CColPrimitive<Wm3::Sphere3f>::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     Wm3::Vec3f center{};

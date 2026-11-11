@@ -32,25 +32,32 @@ namespace
 {
   // --- Harness (as tests/remote/WireTests.cpp) -------------------------------------------
 
-
   using Bytes = std::vector<std::uint8_t>;
 
   // The standard distributions and std::shuffle differ between standard libraries; these
   // take the engine's raw output, which does not, so every platform runs the same cases.
-  double Unit(std::mt19937_64& rng)
+  double Unit(
+    std::mt19937_64& rng
+  )
   {
     return static_cast<double>(rng() >> 11) * (1.0 / 9007199254740992.0);
   }
 
   template <class T>
-  void Shuffle(std::vector<T>& items, std::mt19937_64& rng)
+  void Shuffle(
+    std::vector<T>& items,
+    std::mt19937_64& rng
+  )
   {
     for (std::size_t i = items.size(); i > 1; --i) {
       std::swap(items[i - 1], items[rng() % i]);
     }
   }
 
-  Bytes RandomBytes(std::mt19937_64& rng, const std::size_t size)
+  Bytes RandomBytes(
+    std::mt19937_64& rng,
+    const std::size_t size
+  )
   {
     Bytes bytes(size);
     for (std::uint8_t& b : bytes) {
@@ -63,8 +70,8 @@ namespace
 
   struct LinkConfig
   {
-    std::uint64_t latencyUs = 25'000;  // one way
-    std::uint64_t jitterUs = 0;        // extra delay, uniform in [0, jitter]: reorders
+    std::uint64_t latencyUs = 25'000; // one way
+    std::uint64_t jitterUs = 0;       // extra delay, uniform in [0, jitter]: reorders
     double loss = 0.0;
     double duplicate = 0.0;
     /** [begin, end) times when everything is dropped both ways. */
@@ -79,25 +86,34 @@ namespace
     LinkConfig link;
     std::mt19937_64 rng;
     std::uint64_t now = 0;
-    std::multimap<std::uint64_t, std::pair<bool, Bytes>> inFlight;  // time -> (to B?, datagram)
+    std::multimap<std::uint64_t, std::pair<bool, Bytes>> inFlight; // time -> (to B?, datagram)
     std::uint64_t carried = 0;
     std::vector<ReceiveResult> resultsAtB;
 
-    Pair(const ChannelConfig& config, const LinkConfig& linkConfig, const std::uint64_t seed)
+    Pair(
+      const ChannelConfig& config,
+      const LinkConfig& linkConfig,
+      const std::uint64_t seed
+    )
       : a(config)
       , b(config)
       , link(linkConfig)
       , rng(seed)
     {}
 
-    [[nodiscard]] bool Partitioned(const std::uint64_t t) const
+    [[nodiscard]] bool Partitioned(
+      const std::uint64_t t
+    ) const
     {
       return std::any_of(link.partitions.begin(), link.partitions.end(), [&](const auto& p) {
         return t >= p.first && t < p.second;
       });
     }
 
-    void Carry(const bool toB, std::vector<Bytes>& datagrams)
+    void Carry(
+      const bool toB,
+      std::vector<Bytes>& datagrams
+    )
     {
       for (Bytes& d : datagrams) {
         carried += d.size();
@@ -133,7 +149,10 @@ namespace
     }
   };
 
-  ChannelKeys KeysFor(const std::uint8_t seed, const bool swapped)
+  ChannelKeys KeysFor(
+    const std::uint8_t seed,
+    const bool swapped
+  )
   {
     ChannelKeys keys;
     for (std::size_t i = 0; i < kKeySize; ++i) {
@@ -162,8 +181,10 @@ namespace
       WriteHeader(in, bytes);
       DatagramHeader out;
       EXPECT_TRUE(ReadHeader(bytes, sizeof bytes, out));
-      EXPECT_TRUE(out.flags == in.flags && out.sequence == in.sequence && out.ack == in.ack &&
-            out.ackBits == in.ackBits && out.ackDelay == in.ackDelay);
+      EXPECT_TRUE(
+        out.flags == in.flags && out.sequence == in.sequence && out.ack == in.ack && out.ackBits == in.ackBits &&
+        out.ackDelay == in.ackDelay
+      );
     }
 
     DatagramHeader header;
@@ -171,16 +192,16 @@ namespace
     std::uint8_t bytes[kHeaderSize];
     WriteHeader(header, bytes);
     DatagramHeader out;
-    EXPECT_TRUE(!ReadHeader(bytes, kHeaderSize - 1, out));  // short
+    EXPECT_TRUE(!ReadHeader(bytes, kHeaderSize - 1, out)); // short
     bytes[0] = 0x00;
-    EXPECT_FALSE(ReadHeader(bytes, kHeaderSize, out));  // not our tag
+    EXPECT_FALSE(ReadHeader(bytes, kHeaderSize, out)); // not our tag
     bytes[0] = kDatagramTag;
     bytes[1] = 0x80;
-    EXPECT_FALSE(ReadHeader(bytes, kHeaderSize, out));  // unknown flag
+    EXPECT_FALSE(ReadHeader(bytes, kHeaderSize, out)); // unknown flag
     bytes[1] = 0;
     header.sequence = 0;
     WriteHeader(header, bytes);
-    EXPECT_FALSE(ReadHeader(bytes, kHeaderSize, out));  // sequence 0 is never sent
+    EXPECT_FALSE(ReadHeader(bytes, kHeaderSize, out)); // sequence 0 is never sent
   }
 
   void TestVarints()
@@ -331,7 +352,7 @@ namespace
         fragments.push_back({at, at + size});
         at += size;
       }
-      for (int extra = 0; extra < 30; ++extra) {  // overlapping repeats
+      for (int extra = 0; extra < 30; ++extra) { // overlapping repeats
         const std::uint64_t begin = rng() % stream.size();
         fragments.push_back({begin, std::min<std::uint64_t>(stream.size(), begin + 1 + rng() % 900)});
       }
@@ -371,7 +392,10 @@ namespace
     bool inOrder = true;
   };
 
-  void Pump(NetChannel& channel, Traffic& traffic)
+  void Pump(
+    NetChannel& channel,
+    Traffic& traffic
+  )
   {
     Bytes message;
     while (channel.TakeReliable(message)) {
@@ -383,7 +407,12 @@ namespace
   }
 
   /** Sends `count` messages each way and runs until both arrive or `limitMs` passes. */
-  bool RunReliable(Pair& pair, const int count, const std::uint64_t limitMs, std::uint64_t* doneMs = nullptr)
+  bool RunReliable(
+    Pair& pair,
+    const int count,
+    const std::uint64_t limitMs,
+    std::uint64_t* doneMs = nullptr
+  )
   {
     Traffic toB;
     Traffic toA;
@@ -407,7 +436,9 @@ namespace
         return toB.inOrder && toA.inOrder;
       }
     }
-    std::printf("    stalled: %zu/%zu to B, %zu/%zu to A\n", toB.received, toB.sent.size(), toA.received, toA.sent.size());
+    std::printf(
+      "    stalled: %zu/%zu to B, %zu/%zu to A\n", toB.received, toB.sent.size(), toA.received, toA.sent.size()
+    );
     return false;
   }
 
@@ -421,8 +452,13 @@ namespace
       double duplicate;
     };
     const Case cases[] = {
-      {0, 0, 0.0, 0.0},    {25, 0, 0.0, 0.0},    {25, 10, 0.05, 0.02}, {50, 25, 0.10, 0.05},
-      {150, 50, 0.05, 0.0}, {75, 50, 0.20, 0.10}, {25, 5, 0.50, 0.0},
+      {0, 0, 0.0, 0.0},
+      {25, 0, 0.0, 0.0},
+      {25, 10, 0.05, 0.02},
+      {50, 25, 0.10, 0.05},
+      {150, 50, 0.05, 0.0},
+      {75, 50, 0.20, 0.10},
+      {25, 5, 0.50, 0.0},
     };
     std::uint64_t seed = 10;
     for (const Case& c : cases) {
@@ -476,8 +512,13 @@ namespace
     ChannelConfig congested;
     congested.congestionControl = true;
     const Case cases[] = {
-      {0, 0, 0.0, 0.0},    {25, 0, 0.0, 0.0},    {25, 10, 0.05, 0.02}, {50, 25, 0.10, 0.05},
-      {150, 50, 0.05, 0.0}, {75, 50, 0.20, 0.10}, {25, 5, 0.50, 0.0},
+      {0, 0, 0.0, 0.0},
+      {25, 0, 0.0, 0.0},
+      {25, 10, 0.05, 0.02},
+      {50, 25, 0.10, 0.05},
+      {150, 50, 0.05, 0.0},
+      {75, 50, 0.20, 0.10},
+      {25, 5, 0.50, 0.0},
     };
     std::uint64_t seed = 40;
     for (const Case& c : cases) {
@@ -571,7 +612,7 @@ namespace
     const Bytes over(channel.MaxUnreliableSize() + 1, 2);
     EXPECT_TRUE(channel.SendUnreliable(fits.data(), fits.size()));
     EXPECT_FALSE(channel.SendUnreliable(over.data(), over.size()));
-    EXPECT_TRUE(channel.SendReliable(nullptr, 0));  // an empty message is a message
+    EXPECT_TRUE(channel.SendReliable(nullptr, 0)); // an empty message is a message
   }
 
   // Unreliable messages arrive at most once, intact, in send order where they arrive.
@@ -604,18 +645,23 @@ namespace
     for (const Bytes& m : got) {
       const std::size_t index = m[0] | (m[1] << 8);
       intact = intact && index < sent.size() && sent[index] == m;
-      EXPECT_TRUE(indices.insert(index).second);  // never twice
+      EXPECT_TRUE(indices.insert(index).second); // never twice
     }
     EXPECT_TRUE(intact);
     const double share = static_cast<double>(got.size()) / static_cast<double>(sent.size());
-    std::printf("    %zu of %zu unreliable messages arrived (%.1f%%) at 20%% loss\n", got.size(), sent.size(), share * 100);
+    std::printf(
+      "    %zu of %zu unreliable messages arrived (%.1f%%) at 20%% loss\n", got.size(), sent.size(), share * 100
+    );
     EXPECT_TRUE(share > 0.7 && share < 0.9);
   }
 
   // Issue #240: the redundant lane. Messages every 33 ms (the game's datagram
   // rate) over 20 % loss each way: with redundancy 2 nearly all arrive, each
   // once and intact; with redundancy 0 only the lucky 80 %.
-  double LaneDelivery(const std::uint32_t redundancy, std::uint64_t* repeats)
+  double LaneDelivery(
+    const std::uint32_t redundancy,
+    std::uint64_t* repeats
+  )
   {
     ChannelConfig config;
     config.redundancy = redundancy;
@@ -692,7 +738,7 @@ namespace
       Bytes plain(payloadSize);
       EXPECT_TRUE(OpenDatagram(key, 42, datagram.data(), datagram.size(), plain.data()));
       EXPECT_EQ(plain, payload);
-      EXPECT_FALSE(OpenDatagram(key, 43, datagram.data(), datagram.size(), plain.data()));  // other nonce
+      EXPECT_FALSE(OpenDatagram(key, 43, datagram.data(), datagram.size(), plain.data())); // other nonce
       ChannelKey other = key;
       other[5] ^= 1;
       EXPECT_FALSE(OpenDatagram(other, 42, datagram.data(), datagram.size(), plain.data()));
@@ -708,11 +754,15 @@ namespace
     }
   }
 
-  Bytes Hex(const char* text)
+  Bytes Hex(
+    const char* text
+  )
   {
     Bytes bytes;
     for (; text[0] != 0 && text[1] != 0; text += 2) {
-      const auto nibble = [](const char c) { return c <= '9' ? c - '0' : c - 'a' + 10; };
+      const auto nibble = [](const char c) {
+        return c <= '9' ? c - '0' : c - 'a' + 10;
+      };
       bytes.push_back(static_cast<std::uint8_t>(nibble(text[0]) * 16 + nibble(text[1])));
     }
     return bytes;
@@ -739,10 +789,17 @@ namespace
       nonce[i] = static_cast<std::uint8_t>(0x40 + i);
     }
     Bytes cipher(plain.size() + 16);
-    crypto_aead_lock(cipher.data(), cipher.data() + plain.size(), key, nonce, aad.data(), aad.size(), plain.data(), plain.size());
-    EXPECT_EQ(cipher, Hex("bd6d179d3e83d43b9576579493c0e939572a1700252bfaccbed2902c21396cbb731c7f1b0b4aa6440bf3a82f4eda7e39ae64c670"
-              "8c54c216cb96b72e1213b4522f8c9ba40db5d945b11b69b982c1bb9e3f3fac2bc369488f76b2383565d3fff921f9664c97637da97"
-              "68812f615c68b13b52ec0875924c1c7987947deafd8780acf49"));
+    crypto_aead_lock(
+      cipher.data(), cipher.data() + plain.size(), key, nonce, aad.data(), aad.size(), plain.data(), plain.size()
+    );
+    EXPECT_EQ(
+      cipher,
+      Hex(
+        "bd6d179d3e83d43b9576579493c0e939572a1700252bfaccbed2902c21396cbb731c7f1b0b4aa6440bf3a82f4eda7e39ae64c670"
+        "8c54c216cb96b72e1213b4522f8c9ba40db5d945b11b69b982c1bb9e3f3fac2bc369488f76b2383565d3fff921f9664c97637da97"
+        "68812f615c68b13b52ec0875924c1c7987947deafd8780acf49"
+      )
+    );
 
     ChannelKey channelKey{};
     for (std::size_t i = 0; i < kKeySize; ++i) {
@@ -761,8 +818,13 @@ namespace
       datagram[kHeaderSize + i] = static_cast<std::uint8_t>(i);
     }
     SealDatagram(channelKey, header.sequence, datagram.data(), 40);
-    EXPECT_EQ(Bytes(datagram.begin() + kHeaderSize, datagram.end()), Hex("ad41c4abaa2469294f4ecff48110bdfc026fcfee7c57328f0010f4dbe246c7ca3ce94d47f292bcb0794ed6590f957a8b06ef0cd7ab"
-              "6b7be7"));
+    EXPECT_EQ(
+      Bytes(datagram.begin() + kHeaderSize, datagram.end()),
+      Hex(
+        "ad41c4abaa2469294f4ecff48110bdfc026fcfee7c57328f0010f4dbe246c7ca3ce94d47f292bcb0794ed6590f957a8b06ef0cd7ab"
+        "6b7be7"
+      )
+    );
   }
 
   // The handshake runs in plaintext, then each end calls SetKeys when it has the keys; the
@@ -789,7 +851,7 @@ namespace
       }
       if (ms == 2'000) {
         EXPECT_TRUE(pair.a.SetKeys(KeysFor(5, false)));
-        EXPECT_FALSE(pair.a.SetKeys(KeysFor(6, false)));  // once only
+        EXPECT_FALSE(pair.a.SetKeys(KeysFor(6, false))); // once only
       }
       if (ms == 2'080) {
         EXPECT_TRUE(pair.b.SetKeys(KeysFor(5, true)));
@@ -798,8 +860,7 @@ namespace
       Pump(pair.b, toB);
       Pump(pair.a, toA);
       Bytes drop;
-      while (pair.b.TakeUnreliable(drop)) {
-      }
+      while (pair.b.TakeUnreliable(drop)) {}
     }
     std::printf(
       "    keys set at 2.000 s (A) and 2.080 s (B): %zu/%zu and %zu/%zu messages in order, B refused %llu "
@@ -814,7 +875,7 @@ namespace
     EXPECT_TRUE(toB.inOrder && toA.inOrder);
     EXPECT_TRUE(toB.received == toB.sent.size() && toA.received == toA.sent.size());
     EXPECT_TRUE(pair.b.Stats().unauthenticatedDropped > 0);
-    EXPECT_TRUE(pair.a.Stats().unreliableDropped > 0);  // queued before the keys, too big after
+    EXPECT_TRUE(pair.a.Stats().unreliableDropped > 0); // queued before the keys, too big after
     EXPECT_TRUE(pair.a.State() == ChannelState::Connected && pair.b.State() == ChannelState::Connected);
   }
 
@@ -852,7 +913,7 @@ namespace
     }
     EXPECT_EQ(pair.b.Stats().datagramsReceived, before.datagramsReceived);
     EXPECT_EQ(pair.b.Receive(datagram.data(), datagram.size(), pair.now), ReceiveResult::Accepted);
-    EXPECT_EQ(pair.b.Receive(datagram.data(), datagram.size(), pair.now), ReceiveResult::Duplicate);  // replay
+    EXPECT_EQ(pair.b.Receive(datagram.data(), datagram.size(), pair.now), ReceiveResult::Duplicate); // replay
     Bytes got;
     EXPECT_TRUE(pair.b.TakeReliable(got) && got == message);
 
@@ -882,7 +943,7 @@ namespace
     config.firstSequence = UINT32_MAX - 3;
     NetChannel channel(config);
     channel.SetKeys(KeysFor(4, false));
-    const Bytes message(5000, 9);  // several datagrams' worth
+    const Bytes message(5000, 9); // several datagrams' worth
     EXPECT_TRUE(channel.SendReliable(message.data(), message.size()));
     std::vector<Bytes> out;
     channel.Poll(1000, out);
@@ -905,7 +966,7 @@ namespace
   void TestKeepaliveAndRtt()
   {
     LinkConfig link;
-    link.latencyUs = 40'000;  // 80 ms round trip
+    link.latencyUs = 40'000; // 80 ms round trip
     link.jitterUs = 4'000;
     Pair pair({}, link, 11);
     for (int ms = 0; ms < 20'000; ++ms) {
@@ -913,7 +974,8 @@ namespace
     }
     const ChannelStats& s = pair.a.Stats();
     std::printf(
-      "    idle 20 s at 80-88 ms RTT: %llu keepalives, %llu ack-only, %llu RTT samples, srtt %.1f ms, var %.1f, min %.1f\n",
+      "    idle 20 s at 80-88 ms RTT: %llu keepalives, %llu ack-only, %llu RTT samples, srtt %.1f ms, var %.1f, min "
+      "%.1f\n",
       static_cast<unsigned long long>(s.keepalivesSent),
       static_cast<unsigned long long>(s.ackOnlySent),
       static_cast<unsigned long long>(s.rttSamples),
@@ -937,22 +999,20 @@ namespace
     Pair pair({}, link, 12);
     std::mt19937_64 rng(13);
     for (int ms = 0; ms < 60'000; ++ms) {
-      if (ms % 20 == 0) {  // a steady 50 messages a second each way
+      if (ms % 20 == 0) { // a steady 50 messages a second each way
         const Bytes m = RandomBytes(rng, 100);
         pair.a.SendReliable(m.data(), m.size());
         pair.b.SendReliable(m.data(), m.size());
       }
       pair.Step();
       Bytes drop;
-      while (pair.a.TakeReliable(drop)) {
-      }
-      while (pair.b.TakeReliable(drop)) {
-      }
+      while (pair.a.TakeReliable(drop)) {}
+      while (pair.b.TakeReliable(drop)) {}
     }
     const ChannelStats& s = pair.a.Stats();
     const double lost = static_cast<double>(s.datagramsLost) / static_cast<double>(s.datagramsLost + s.datagramsAcked);
     const double inbound = static_cast<double>(pair.b.Stats().inboundMissing) /
-                           static_cast<double>(pair.b.Stats().inboundMissing + pair.b.Stats().datagramsReceived);
+      static_cast<double>(pair.b.Stats().inboundMissing + pair.b.Stats().datagramsReceived);
     std::printf(
       "    10%% loss each way, 60 s: A counted %.1f%% of its datagrams lost (recent %.1f%%), B saw %.1f%% of A's "
       "sequences missing, srtt %.1f ms\n",
@@ -993,11 +1053,15 @@ namespace
       b.Step();
       if (!timedOutAtA && b.a.State() == ChannelState::TimedOut) {
         timedOutAtA = b.now;
-        EXPECT_TRUE(b.a.SinceLastReceivedUs(b.now) >= config.timeoutUs && b.a.SinceLastReceivedUs(b.now) < config.timeoutUs + 1000);
+        EXPECT_TRUE(
+          b.a.SinceLastReceivedUs(b.now) >= config.timeoutUs && b.a.SinceLastReceivedUs(b.now) < config.timeoutUs + 1000
+        );
       }
       if (!timedOutAtB && b.b.State() == ChannelState::TimedOut) {
         timedOutAtB = b.now;
-        EXPECT_TRUE(b.b.SinceLastReceivedUs(b.now) >= config.timeoutUs && b.b.SinceLastReceivedUs(b.now) < config.timeoutUs + 1000);
+        EXPECT_TRUE(
+          b.b.SinceLastReceivedUs(b.now) >= config.timeoutUs && b.b.SinceLastReceivedUs(b.now) < config.timeoutUs + 1000
+        );
       }
     }
     std::printf(
@@ -1079,7 +1143,7 @@ namespace
         } else {
           const Bytes& original = corpus[rng() % corpus.size()];
           d = original;
-          while (d == original) {  // two flips of one bit would give the original back
+          while (d == original) { // two flips of one bit would give the original back
             const int flips = 1 + static_cast<int>(rng() % 4);
             for (int f = 0; f < flips; ++f) {
               d[rng() % d.size()] ^= static_cast<std::uint8_t>(1u << (rng() % 8));
@@ -1095,17 +1159,18 @@ namespace
         target.Poll(1000 + i, out);
         out.clear();
         Bytes drop;
-        while (target.TakeReliable(drop)) {
-        }
-        while (target.TakeUnreliable(drop)) {
-        }
+        while (target.TakeReliable(drop)) {}
+        while (target.TakeUnreliable(drop)) {}
         EXPECT_TRUE(target.ReliableHeld() <= ChannelConfig{}.receiveWindow);
       }
-      std::printf("    fuzz (%s): 200000 datagrams, %llu accepted, state %d\n",
-                  keyed ? "keys set" : "no keys", static_cast<unsigned long long>(accepted),
-                  static_cast<int>(target.State()));
+      std::printf(
+        "    fuzz (%s): 200000 datagrams, %llu accepted, state %d\n",
+        keyed ? "keys set" : "no keys",
+        static_cast<unsigned long long>(accepted),
+        static_cast<int>(target.State())
+      );
       if (keyed) {
-        EXPECT_EQ(accepted, 0);  // nothing forged or mutated gets past the tag
+        EXPECT_EQ(accepted, 0); // nothing forged or mutated gets past the tag
       }
     }
   }
@@ -1156,25 +1221,157 @@ namespace
 
 } // namespace
 
-TEST(Existing_NetChannel, StyleProof) { TestStyleProof(); }
-TEST(NetChannel, CongestionWindow) { TestCongestionWindow(); }
-TEST(Existing_NetChannel, HeaderRoundTrip) { TestHeaderRoundTrip(); }
-TEST(Existing_NetChannel, Varints) { TestVarints(); }
-TEST(Existing_NetChannel, ReceiveWindowModel) { TestReceiveWindowModel(); }
-TEST(Existing_NetChannel, RangeSetModel) { TestRangeSetModel(); }
-TEST(Existing_NetChannel, ReceiverReassembly) { TestReceiverReassembly(); }
-TEST(Existing_NetChannel, ReliableMatrix) { TestReliableMatrix(); }
-TEST(Existing_NetChannel, InFlightLimit) { TestInFlightLimit(); }
-TEST(Existing_NetChannel, MessageLimits) { TestMessageLimits(); }
-TEST(Existing_NetChannel, Unreliable) { TestUnreliable(); }
-TEST(Existing_NetChannel, RedundantLane) { TestRedundantLane(); }
-TEST(Existing_NetChannel, SealOpen) { TestSealOpen(); }
-TEST(Existing_NetChannel, CipherKnownAnswers) { TestCipherKnownAnswers(); }
-TEST(Existing_NetChannel, EncryptedChannel) { TestEncryptedChannel(); }
-TEST(Existing_NetChannel, KeysMidSession) { TestKeysMidSession(); }
-TEST(Existing_NetChannel, SequenceEnd) { TestSequenceEnd(); }
-TEST(Existing_NetChannel, KeepaliveAndRtt) { TestKeepaliveAndRtt(); }
-TEST(Existing_NetChannel, LossStatistics) { TestLossStatistics(); }
-TEST(Existing_NetChannel, TimeoutAndPartition) { TestTimeoutAndPartition(); }
-TEST(Existing_NetChannel, Backoff) { TestBackoff(); }
-TEST(Existing_NetChannel, Fuzz) { TestFuzz(); }
+TEST(
+  Existing_NetChannel,
+  StyleProof
+)
+{
+  TestStyleProof();
+}
+TEST(
+  NetChannel,
+  CongestionWindow
+)
+{
+  TestCongestionWindow();
+}
+TEST(
+  Existing_NetChannel,
+  HeaderRoundTrip
+)
+{
+  TestHeaderRoundTrip();
+}
+TEST(
+  Existing_NetChannel,
+  Varints
+)
+{
+  TestVarints();
+}
+TEST(
+  Existing_NetChannel,
+  ReceiveWindowModel
+)
+{
+  TestReceiveWindowModel();
+}
+TEST(
+  Existing_NetChannel,
+  RangeSetModel
+)
+{
+  TestRangeSetModel();
+}
+TEST(
+  Existing_NetChannel,
+  ReceiverReassembly
+)
+{
+  TestReceiverReassembly();
+}
+TEST(
+  Existing_NetChannel,
+  ReliableMatrix
+)
+{
+  TestReliableMatrix();
+}
+TEST(
+  Existing_NetChannel,
+  InFlightLimit
+)
+{
+  TestInFlightLimit();
+}
+TEST(
+  Existing_NetChannel,
+  MessageLimits
+)
+{
+  TestMessageLimits();
+}
+TEST(
+  Existing_NetChannel,
+  Unreliable
+)
+{
+  TestUnreliable();
+}
+TEST(
+  Existing_NetChannel,
+  RedundantLane
+)
+{
+  TestRedundantLane();
+}
+TEST(
+  Existing_NetChannel,
+  SealOpen
+)
+{
+  TestSealOpen();
+}
+TEST(
+  Existing_NetChannel,
+  CipherKnownAnswers
+)
+{
+  TestCipherKnownAnswers();
+}
+TEST(
+  Existing_NetChannel,
+  EncryptedChannel
+)
+{
+  TestEncryptedChannel();
+}
+TEST(
+  Existing_NetChannel,
+  KeysMidSession
+)
+{
+  TestKeysMidSession();
+}
+TEST(
+  Existing_NetChannel,
+  SequenceEnd
+)
+{
+  TestSequenceEnd();
+}
+TEST(
+  Existing_NetChannel,
+  KeepaliveAndRtt
+)
+{
+  TestKeepaliveAndRtt();
+}
+TEST(
+  Existing_NetChannel,
+  LossStatistics
+)
+{
+  TestLossStatistics();
+}
+TEST(
+  Existing_NetChannel,
+  TimeoutAndPartition
+)
+{
+  TestTimeoutAndPartition();
+}
+TEST(
+  Existing_NetChannel,
+  Backoff
+)
+{
+  TestBackoff();
+}
+TEST(
+  Existing_NetChannel,
+  Fuzz
+)
+{
+  TestFuzz();
+}

@@ -97,7 +97,9 @@ inline constexpr lu_mem kLuaX86LClosureHeader = 0x1Cu;
 /// 32-bit unsigned words (`jb`, 0x00913F06..0x00913F12). They hold x86 byte
 /// counts on every build, and comparing their low 32 bits keeps the binary's
 /// wraparound and its 0xFFFFFFFF "never" threshold (lua_setgcthreshold) exactly.
-[[nodiscard]] inline bool LuaGcThresholdReached(const global_State* const globalState) noexcept
+[[nodiscard]] inline bool LuaGcThresholdReached(
+  const global_State* const globalState
+) noexcept
 {
   return static_cast<std::uint32_t>(globalState->nblocks) >= static_cast<std::uint32_t>(globalState->GCthreshold);
 }
@@ -110,24 +112,35 @@ struct LuaBlockSize
 };
 
 /// lstring.h `sizestring(l)`.
-[[nodiscard]] constexpr LuaBlockSize sizestring(const std::size_t length) noexcept
+[[nodiscard]] constexpr LuaBlockSize sizestring(
+  const std::size_t length
+) noexcept
 {
-  return {static_cast<lu_mem>(offsetof(TString, str) + length + 1u),
-          static_cast<lu_mem>(kLuaX86TStringHeader + length + 1u)};
+  return {
+    static_cast<lu_mem>(offsetof(TString, str) + length + 1u), static_cast<lu_mem>(kLuaX86TStringHeader + length + 1u)
+  };
 }
 
 /// lfunc.h `sizeCclosure(n)`: the header plus n upvalue TObjects.
-[[nodiscard]] constexpr LuaBlockSize sizeCclosure(const int upvalueCount) noexcept
+[[nodiscard]] constexpr LuaBlockSize sizeCclosure(
+  const int upvalueCount
+) noexcept
 {
-  return {static_cast<lu_mem>(offsetof(CClosure, upvalue) + sizeof(LuaPlus::TObject) * upvalueCount),
-          static_cast<lu_mem>(kLuaX86CClosureHeader + kLuaX86Size<LuaPlus::TObject> * upvalueCount)};
+  return {
+    static_cast<lu_mem>(offsetof(CClosure, upvalue) + sizeof(LuaPlus::TObject) * upvalueCount),
+    static_cast<lu_mem>(kLuaX86CClosureHeader + kLuaX86Size<LuaPlus::TObject> * upvalueCount)
+  };
 }
 
 /// lfunc.h `sizeLclosure(n)`: the header plus n UpVal pointers.
-[[nodiscard]] constexpr LuaBlockSize sizeLclosure(const int upvalueCount) noexcept
+[[nodiscard]] constexpr LuaBlockSize sizeLclosure(
+  const int upvalueCount
+) noexcept
 {
-  return {static_cast<lu_mem>(offsetof(LClosure, upvals) + sizeof(UpVal*) * upvalueCount),
-          static_cast<lu_mem>(kLuaX86LClosureHeader + kLuaX86Size<UpVal*> * upvalueCount)};
+  return {
+    static_cast<lu_mem>(offsetof(LClosure, upvals) + sizeof(UpVal*) * upvalueCount),
+    static_cast<lu_mem>(kLuaX86LClosureHeader + kLuaX86Size<UpVal*> * upvalueCount)
+  };
 }
 
 /// lstring.h `sizeudata(l)` for this fork, whose userdata carries a reflected
@@ -138,37 +151,50 @@ struct LuaBlockSize
 /// The x86 byte size of a reflected userdata payload.
 [[nodiscard]] lu_mem LuaX86PayloadSize(const gpg::RType* type) noexcept;
 
-extern "C"
-{
-  /**
-   * Address: 0x0091A240 (FUN_0091A240, luaM_realloc)
-   *
-   * IDA signature:
-   * void *__cdecl luaM_realloc(lua_State *L, void *block, lu_mem oldsize, lu_mem size);
-   *
-   * `accountedOldSize`/`accountedSize` (not in the binary) are what `nblocks`
-   * moves by; see the top of this header.
-   */
-  void* luaM_realloc(
-    lua_State* L, void* block, lu_mem oldsize, lu_mem size, lu_mem accountedOldSize, lu_mem accountedSize
-  );
+extern "C" {
+/**
+ * Address: 0x0091A240 (FUN_0091A240, luaM_realloc)
+ *
+ * IDA signature:
+ * void *__cdecl luaM_realloc(lua_State *L, void *block, lu_mem oldsize, lu_mem size);
+ *
+ * `accountedOldSize`/`accountedSize` (not in the binary) are what `nblocks`
+ * moves by; see the top of this header.
+ */
+void* luaM_realloc(
+  lua_State* L,
+  void* block,
+  lu_mem oldsize,
+  lu_mem size,
+  lu_mem accountedOldSize,
+  lu_mem accountedSize
+);
 
-  /**
-   * Address: 0x0091A310 (FUN_0091A310, luaM_growaux)
-   *
-   * IDA signature:
-   * void *__cdecl luaM_growaux(lua_State *L, void *block, int *size, int size_elems, int limit, char *what);
-   *
-   * `accountedSizeElems` (not in the binary) is the element's x86 size.
-   */
-  void* luaM_growaux(
-    lua_State* L, void* block, int* size, int sizeElems, int accountedSizeElems, int limit, const char* what
-  );
+/**
+ * Address: 0x0091A310 (FUN_0091A310, luaM_growaux)
+ *
+ * IDA signature:
+ * void *__cdecl luaM_growaux(lua_State *L, void *block, int *size, int size_elems, int limit, char *what);
+ *
+ * `accountedSizeElems` (not in the binary) is the element's x86 size.
+ */
+void* luaM_growaux(
+  lua_State* L,
+  void* block,
+  int* size,
+  int sizeElems,
+  int accountedSizeElems,
+  int limit,
+  const char* what
+);
 }
 
 /// One block resized from `oldSize` to `newSize`.
 inline void* luaM_reallocblock(
-  lua_State* const L, void* const block, const LuaBlockSize oldSize, const LuaBlockSize newSize
+  lua_State* const L,
+  void* const block,
+  const LuaBlockSize oldSize,
+  const LuaBlockSize newSize
 )
 {
   return luaM_realloc(L, block, oldSize.real, newSize.real, oldSize.accounted, newSize.accounted);
@@ -176,21 +202,31 @@ inline void* luaM_reallocblock(
 
 /// lmem.h `luaM_new(L, t)`.
 template <class T>
-[[nodiscard]] T* luaM_new(lua_State* const L)
+[[nodiscard]] T* luaM_new(
+  lua_State* const L
+)
 {
   return static_cast<T*>(luaM_realloc(L, nullptr, 0u, sizeof(T), 0u, kLuaX86Size<T>));
 }
 
 /// lmem.h `luaM_freelem(L, b)`.
 template <class T>
-void luaM_freelem(lua_State* const L, T* const block)
+void luaM_freelem(
+  lua_State* const L,
+  T* const block
+)
 {
   (void)luaM_realloc(L, block, sizeof(T), 0u, kLuaX86Size<T>, 0u);
 }
 
 /// lmem.h `luaM_reallocvector(L, v, oldn, n, t)`.
 template <class T>
-[[nodiscard]] T* luaM_reallocvector(lua_State* const L, T* const block, const lu_mem oldCount, const lu_mem newCount)
+[[nodiscard]] T* luaM_reallocvector(
+  lua_State* const L,
+  T* const block,
+  const lu_mem oldCount,
+  const lu_mem newCount
+)
 {
   return static_cast<T*>(luaM_realloc(
     L, block, sizeof(T) * oldCount, sizeof(T) * newCount, kLuaX86Size<T> * oldCount, kLuaX86Size<T> * newCount
@@ -199,14 +235,21 @@ template <class T>
 
 /// lmem.h `luaM_newvector(L, n, t)`.
 template <class T>
-[[nodiscard]] T* luaM_newvector(lua_State* const L, const lu_mem count)
+[[nodiscard]] T* luaM_newvector(
+  lua_State* const L,
+  const lu_mem count
+)
 {
   return luaM_reallocvector<T>(L, nullptr, 0u, count);
 }
 
 /// lmem.h `luaM_freearray(L, b, n, t)`.
 template <class T>
-void luaM_freearray(lua_State* const L, T* const block, const lu_mem count)
+void luaM_freearray(
+  lua_State* const L,
+  T* const block,
+  const lu_mem count
+)
 {
   (void)luaM_reallocvector<T>(L, block, count, 0u);
 }
@@ -215,13 +258,18 @@ void luaM_freearray(lua_State* const L, T* const block, const lu_mem count)
 /// through luaM_growaux when `count + 1` no longer fits in `capacity`.
 template <class T>
 void luaM_growvector(
-  lua_State* const L, T*& block, const int count, int& capacity, const int limit, const char* const what
+  lua_State* const L,
+  T*& block,
+  const int count,
+  int& capacity,
+  const int limit,
+  const char* const what
 )
 {
   if (count + 1 > capacity) {
-    block = static_cast<T*>(luaM_growaux(
-      L, block, &capacity, static_cast<int>(sizeof(T)), static_cast<int>(kLuaX86Size<T>), limit, what
-    ));
+    block = static_cast<T*>(
+      luaM_growaux(L, block, &capacity, static_cast<int>(sizeof(T)), static_cast<int>(kLuaX86Size<T>), limit, what)
+    );
   }
 }
 

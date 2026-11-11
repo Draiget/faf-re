@@ -9,13 +9,18 @@ namespace faf::editor
 {
   namespace
   {
-    bool IsNameChar(const char c)
+    bool IsNameChar(
+      const char c
+    )
     {
       return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
     }
 
     /** Past the quoted string that starts at `at`; npos when it doesn't end. */
-    std::size_t StringEnd(const std::string& text, const std::size_t at)
+    std::size_t StringEnd(
+      const std::string& text,
+      const std::size_t at
+    )
     {
       const char quote = text[at];
       std::size_t end = at + 1;
@@ -26,7 +31,10 @@ namespace faf::editor
     }
 
     /** Past the long string `[[ ... ]]` or `[==[ ... ]==]` that starts at `at`; npos when it doesn't end. */
-    std::size_t LongStringEnd(const std::string& text, const std::size_t at)
+    std::size_t LongStringEnd(
+      const std::string& text,
+      const std::size_t at
+    )
     {
       std::size_t level = 0;
       std::size_t open = at + 1;
@@ -43,7 +51,10 @@ namespace faf::editor
     }
 
     /** Past spaces, `-- line` and `--[[ block ]]` comments. */
-    std::size_t SkipSpace(const std::string& text, std::size_t at)
+    std::size_t SkipSpace(
+      const std::string& text,
+      std::size_t at
+    )
     {
       while (at < text.size()) {
         if (std::isspace(static_cast<unsigned char>(text[at])) != 0) {
@@ -61,7 +72,13 @@ namespace faf::editor
       return at;
     }
 
-    bool ReadValue(const std::string& text, std::size_t& at, LuaText& value, std::string& error, const int depth)
+    bool ReadValue(
+      const std::string& text,
+      std::size_t& at,
+      LuaText& value,
+      std::string& error,
+      const int depth
+    )
     {
       if (depth > 64) {
         error = "tables nested too deep";
@@ -161,7 +178,9 @@ namespace faf::editor
         return false;
       }
       // A call, as the map files write their typed values: STRING( 'ARMY_9' ), VECTOR3( 1, 2, 3 ). Kept as its text.
-      if (const std::size_t open = SkipSpace(text, at); open < text.size() && text[open] == '(' && IsNameChar(text[start])) {
+      if (
+        const std::size_t open = SkipSpace(text, at); open < text.size() && text[open] == '(' && IsNameChar(text[start])
+      ) {
         int depth = 0;
         std::size_t end = open;
         while (end < text.size()) {
@@ -193,7 +212,9 @@ namespace faf::editor
     }
   } // namespace
 
-  const LuaText* LuaText::Field(const std::string& name) const
+  const LuaText* LuaText::Field(
+    const std::string& name
+  ) const
   {
     for (const auto& [key, field] : fields) {
       if (key == name) {
@@ -213,17 +234,29 @@ namespace faf::editor
     return end != nullptr && *end == '\0';
   }
 
-  double LuaText::Number(const double fallback) const
+  double LuaText::Number(
+    const double fallback
+  ) const
   {
     return IsNumber() ? std::strtod(atom.c_str(), nullptr) : fallback;
   }
 
-  bool ReadLuaValue(const std::string& text, std::size_t at, LuaText& value, std::string& error)
+  bool ReadLuaValue(
+    const std::string& text,
+    std::size_t at,
+    LuaText& value,
+    std::string& error
+  )
   {
     return ReadValue(text, at, value, error, 0);
   }
 
-  bool ReadLuaAssignment(const std::string& text, const std::string& name, LuaText& value, std::string& error)
+  bool ReadLuaAssignment(
+    const std::string& text,
+    const std::string& name,
+    LuaText& value,
+    std::string& error
+  )
   {
     // The assignment at the top level: braces and strings outside it are skipped.
     std::size_t at = 0;
@@ -256,7 +289,10 @@ namespace faf::editor
           ++end;
         }
         const std::size_t equals = SkipSpace(text, end);
-        if (text.compare(at, end - at, name) == 0 && end - at == name.size() && equals < text.size() && text[equals] == '=') {
+        if (
+          text.compare(at, end - at, name) == 0 && end - at == name.size() && equals < text.size() &&
+          text[equals] == '='
+        ) {
           at = equals + 1;
           return ReadValue(text, at, value, error, 0);
         }
@@ -269,7 +305,9 @@ namespace faf::editor
     return false;
   }
 
-  std::string LuaNumber(const double value)
+  std::string LuaNumber(
+    const double value
+  )
   {
     char text[64];
     (void)std::snprintf(text, sizeof(text), "%.3f", value);

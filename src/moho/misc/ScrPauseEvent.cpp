@@ -3,17 +3,21 @@
 /**
  * Address: 0x00BC5F40 (FUN_00BC5F40, dynamic initializer)
  */
-DEFINE_EVENT_TYPE(moho::EVT_SCR_PAUSE)
+DEFINE_EVENT_TYPE(
+  moho::EVT_SCR_PAUSE
+)
 
 /**
  * Address: 0x004B4330 (FUN_004B4330)
  */
-moho::ScrPauseEvent::ScrPauseEvent(const fa::string& sourceName, const int sourceLine)
+moho::ScrPauseEvent::ScrPauseEvent(
+  const fa::string& sourceName,
+  const int sourceLine
+)
   : wxEvent(0, EVT_SCR_PAUSE)
   , mSourceName(sourceName)
   , mSourceLine(sourceLine)
-{
-}
+{}
 
 /**
  * Address: 0x004B43F0 (FUN_004B43F0)

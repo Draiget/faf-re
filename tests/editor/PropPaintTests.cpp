@@ -31,7 +31,10 @@ namespace
     ]
 })";
 
-  TEST(PropPaint, ReadsFafmesSet)
+  TEST(
+    PropPaint,
+    ReadsFafmesSet
+  )
   {
     std::vector<PropPaintEntry> entries;
     std::string error;
@@ -45,13 +48,17 @@ namespace
     EXPECT_EQ(entries[1].rotationMax, 180);
   }
 
-  TEST(PropPaint, WritesEachEntrysOwnValues)
+  TEST(
+    PropPaint,
+    WritesEachEntrysOwnValues
+  )
   {
     std::vector<PropPaintEntry> entries;
     std::string error;
     ASSERT_TRUE(faf::editor::PaintSetFromProppaintset(kFafme, entries, error)) << error;
     std::vector<PropPaintEntry> again;
-    ASSERT_TRUE(faf::editor::PaintSetFromProppaintset(faf::editor::PaintSetToProppaintset(entries), again, error)) << error;
+    ASSERT_TRUE(faf::editor::PaintSetFromProppaintset(faf::editor::PaintSetToProppaintset(entries), again, error))
+      << error;
     ASSERT_EQ(again.size(), entries.size());
     for (std::size_t i = 0; i < entries.size(); ++i) {
       EXPECT_TRUE(again[i] == entries[i]) << "entry " << i;
@@ -62,7 +69,10 @@ namespace
     EXPECT_FALSE(faf::editor::PaintSetFromProppaintset("{ \"Units\": [] }", again, error));
   }
 
-  TEST(PropPaint, PicksByChance)
+  TEST(
+    PropPaint,
+    PicksByChance
+  )
   {
     std::vector<PropPaintEntry> entries(3);
     entries[0].chance = 70;

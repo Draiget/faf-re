@@ -57,7 +57,10 @@ u_short CNetNullConnector::GetLocalPort()
  * What it does:
  * No-op connect path; always returns null.
  */
-INetConnection* CNetNullConnector::Connect(const u_long address, const u_short port)
+INetConnection* CNetNullConnector::Connect(
+  const u_long address,
+  const u_short port
+)
 {
   (void)address;
   (void)port;
@@ -70,7 +73,10 @@ INetConnection* CNetNullConnector::Connect(const u_long address, const u_short p
  * What it does:
  * Null connector has no pending peers; always returns false.
  */
-bool CNetNullConnector::FindNextAddress(u_long& outAddress, u_short& outPort)
+bool CNetNullConnector::FindNextAddress(
+  u_long& outAddress,
+  u_short& outPort
+)
 {
   (void)outAddress;
   (void)outPort;
@@ -83,7 +89,10 @@ bool CNetNullConnector::FindNextAddress(u_long& outAddress, u_short& outPort)
  * What it does:
  * No-op accept path; always returns null.
  */
-INetConnection* CNetNullConnector::Accept(const u_long address, const u_short port)
+INetConnection* CNetNullConnector::Accept(
+  const u_long address,
+  const u_short port
+)
 {
   (void)address;
   (void)port;
@@ -96,7 +105,10 @@ INetConnection* CNetNullConnector::Accept(const u_long address, const u_short po
  * What it does:
  * No-op reject path.
  */
-void CNetNullConnector::Reject(const u_long address, const u_short port)
+void CNetNullConnector::Reject(
+  const u_long address,
+  const u_short port
+)
 {
   (void)address;
   (void)port;
@@ -115,7 +127,9 @@ void CNetNullConnector::Push() {}
 /**
  * Address: 0x0047EBB0 (FUN_0047EBB0)
  */
-void CNetNullConnector::SelectEvent(HANDLE ev)
+void CNetNullConnector::SelectEvent(
+  HANDLE ev
+)
 {
   (void)ev;
 }
@@ -126,7 +140,9 @@ void CNetNullConnector::SelectEvent(HANDLE ev)
  * What it does:
  * Returns an empty send-stamp snapshot (`items` empty, duration/end = 0).
  */
-SSendStampWindow CNetNullConnector::SnapshotSendStamps(const int32_t since)
+SSendStampWindow CNetNullConnector::SnapshotSendStamps(
+  const int32_t since
+)
 {
   (void)since;
   return {0u, 0u};

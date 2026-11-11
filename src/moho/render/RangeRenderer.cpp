@@ -177,7 +177,8 @@ namespace
     const std::uint32_t used = rangeRenderer.mDynamicRingVertexCount;
     if (used + requestedVertexCount < kDynamicVertexLimit) {
       void* const writeBase = vertexBuffer->Lock(
-        used * kDynamicVertexStrideBytes, requestedVertexCount * kDynamicVertexStrideBytes,
+        used * kDynamicVertexStrideBytes,
+        requestedVertexCount * kDynamicVertexStrideBytes,
         gpg::gal::MohoD3DLockFlags::NoOverwrite
       );
       *outVertexWriteBase = writeBase;
@@ -325,8 +326,11 @@ namespace
     for (int pass = 0; pass < passCount; ++pass) {
       castTechnique->BeginPass(pass);
       gpg::gal::DrawIndexedContext drawContext(
-        gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST, static_cast<std::uint32_t>(rangeRenderer.mVertexCount),
-        static_cast<std::uint32_t>(rangeRenderer.mIndexCount), 0, 0
+        gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST,
+        static_cast<std::uint32_t>(rangeRenderer.mVertexCount),
+        static_cast<std::uint32_t>(rangeRenderer.mIndexCount),
+        0,
+        0
       );
       device->DrawIndexedPrimitive(&drawContext);
       castTechnique->EndPass();
@@ -359,14 +363,21 @@ namespace
   /** cos(pi/45): the 45-gon's apothem, the radius of the circle it contains, per unit radius. */
   constexpr float kRingTemplateApothem = 0.99756405f;
 
-  [[nodiscard]] float Cross2(const Wm3::Vector2f& o, const Wm3::Vector2f& a, const Wm3::Vector2f& b) noexcept
+  [[nodiscard]] float Cross2(
+    const Wm3::Vector2f& o,
+    const Wm3::Vector2f& a,
+    const Wm3::Vector2f& b
+  ) noexcept
   {
     return ((a.x - o.x) * (b.y - o.y)) - ((a.y - o.y) * (b.x - o.x));
   }
 
   /** False when the camera's inverse matrix gives no usable frustum (then nothing is culled). */
   [[nodiscard]] bool BuildRangeViewFootprint(
-    const moho::GeomCamera3& camera, const float lowerHeight, const float upperHeight, RangeViewFootprint& out
+    const moho::GeomCamera3& camera,
+    const float lowerHeight,
+    const float upperHeight,
+    RangeViewFootprint& out
   )
   {
     // The frustum's corners: NDC x, y in {-1, 1}, z in {0, 1} (Direct3D depth), through the
@@ -454,7 +465,10 @@ namespace
   }
 
   /** Distance from `center` to the footprint (0 inside it); infinite for an empty footprint. */
-  [[nodiscard]] float DistanceToFootprint(const RangeViewFootprint& footprint, const Wm3::Vector2f& center) noexcept
+  [[nodiscard]] float DistanceToFootprint(
+    const RangeViewFootprint& footprint,
+    const Wm3::Vector2f& center
+  ) noexcept
   {
     if (footprint.count == 0u) {
       return std::numeric_limits<float>::infinity();
@@ -485,11 +499,18 @@ namespace
    * the result). False when the rectangle leaves the map.
    */
   [[nodiscard]] bool LowestTerrainIn(
-    const moho::CHeightField& field, const float minX, const float maxX, const float minZ, const float maxZ, float& out
+    const moho::CHeightField& field,
+    const float minX,
+    const float maxX,
+    const float minZ,
+    const float maxZ,
+    float& out
   )
   {
-    if (field.data == nullptr || !(minX >= 0.0f) || !(minZ >= 0.0f) ||
-        !(maxX <= static_cast<float>(field.width - 1)) || !(maxZ <= static_cast<float>(field.height - 1))) {
+    if (
+      field.data == nullptr || !(minX >= 0.0f) || !(minZ >= 0.0f) || !(maxX <= static_cast<float>(field.width - 1)) ||
+      !(maxZ <= static_cast<float>(field.height - 1))
+    ) {
       return false;
     }
     const auto x0 = static_cast<std::int32_t>(std::floor(minX));
@@ -512,7 +533,9 @@ namespace
   }
 
   /** Slack for the footprint's float error: the tests below only ever keep more than they need. */
-  [[nodiscard]] float CullMargin(const float radius) noexcept
+  [[nodiscard]] float CullMargin(
+    const float radius
+  ) noexcept
   {
     return 0.1f + (0.001f * std::fabs(radius));
   }
@@ -531,14 +554,22 @@ namespace
     float maxZ;
   };
 
-  [[nodiscard]] float DistanceToCell(const CoverageCell& cell, const float x, const float z) noexcept
+  [[nodiscard]] float DistanceToCell(
+    const CoverageCell& cell,
+    const float x,
+    const float z
+  ) noexcept
   {
     const float dx = std::max({cell.minX - x, 0.0f, x - cell.maxX});
     const float dz = std::max({cell.minZ - z, 0.0f, z - cell.maxZ});
     return std::sqrt((dx * dx) + (dz * dz));
   }
 
-  [[nodiscard]] float FarthestCellCorner(const CoverageCell& cell, const float x, const float z) noexcept
+  [[nodiscard]] float FarthestCellCorner(
+    const CoverageCell& cell,
+    const float x,
+    const float z
+  ) noexcept
   {
     const float dx = std::max(std::fabs(cell.minX - x), std::fabs(cell.maxX - x));
     const float dz = std::max(std::fabs(cell.minZ - z), std::fabs(cell.maxZ - z));
@@ -546,7 +577,10 @@ namespace
   }
 
   /** The cell lies entirely outside the (counter-clockwise, convex) footprint. */
-  [[nodiscard]] bool CellOutsideFootprint(const CoverageCell& cell, const RangeViewFootprint& footprint) noexcept
+  [[nodiscard]] bool CellOutsideFootprint(
+    const CoverageCell& cell,
+    const RangeViewFootprint& footprint
+  ) noexcept
   {
     const Wm3::Vector2f corners[4] = {
       {cell.minX, cell.minZ}, {cell.maxX, cell.minZ}, {cell.maxX, cell.maxZ}, {cell.minX, cell.maxZ}
@@ -566,35 +600,45 @@ namespace
   }
 
   /** The payload's volume holds the whole cell's column: its 45-gon annulus contains the cell. */
-  [[nodiscard]] bool PayloadHoldsCell(const moho::SRangeExtractionPayload& payload, const CoverageCell& cell) noexcept
+  [[nodiscard]] bool PayloadHoldsCell(
+    const moho::SRangeExtractionPayload& payload,
+    const CoverageCell& cell
+  ) noexcept
   {
     if (payload.innerRadius < 0.0f || payload.outerRadius <= payload.innerRadius) {
       return false;
     }
     const float margin = CullMargin(payload.outerRadius);
-    if (FarthestCellCorner(cell, payload.centerX, payload.centerZ) > (payload.outerRadius * kRingTemplateApothem) - margin) {
+    if (
+      FarthestCellCorner(cell, payload.centerX, payload.centerZ) > (payload.outerRadius * kRingTemplateApothem) - margin
+    ) {
       return false;
     }
     // The hole's 45-gon lies inside the circle of the inner radius.
     return payload.innerRadius == 0.0f ||
-           DistanceToCell(cell, payload.centerX, payload.centerZ) >= payload.innerRadius + margin;
+      DistanceToCell(cell, payload.centerX, payload.centerZ) >= payload.innerRadius + margin;
   }
 
   /** The payload's volume may reach into the cell's column. */
-  [[nodiscard]] bool PayloadMayTouchCell(const moho::SRangeExtractionPayload& payload, const CoverageCell& cell) noexcept
+  [[nodiscard]] bool PayloadMayTouchCell(
+    const moho::SRangeExtractionPayload& payload,
+    const CoverageCell& cell
+  ) noexcept
   {
     if (payload.innerRadius < 0.0f || payload.outerRadius < payload.innerRadius) {
       // Not a plain annulus: the whole disc its vertices span.
       const float reach = std::max(std::fabs(payload.innerRadius), std::fabs(payload.outerRadius));
       return DistanceToCell(cell, payload.centerX, payload.centerZ) <= reach + CullMargin(reach);
     }
-    if (DistanceToCell(cell, payload.centerX, payload.centerZ) > payload.outerRadius + CullMargin(payload.outerRadius)) {
+    if (
+      DistanceToCell(cell, payload.centerX, payload.centerZ) > payload.outerRadius + CullMargin(payload.outerRadius)
+    ) {
       return false;
     }
     // Inside the circle the hole's 45-gon contains, the cell is in the hole.
     return payload.innerRadius == 0.0f ||
-           FarthestCellCorner(cell, payload.centerX, payload.centerZ) >=
-             (payload.innerRadius * kRingTemplateApothem) - CullMargin(payload.innerRadius);
+      FarthestCellCorner(cell, payload.centerX, payload.centerZ) >=
+      (payload.innerRadius * kRingTemplateApothem) - CullMargin(payload.innerRadius);
   }
 
   /**
@@ -611,7 +655,9 @@ namespace
    * fills and nothing else.
    */
   void CullRingPayloadsToCoverage(
-    const RangeViewFootprint& footprint, RangeExtractionPayloadVector& fillPayloads, RangeExtractionPayloadVector& edgePayloads
+    const RangeViewFootprint& footprint,
+    RangeExtractionPayloadVector& fillPayloads,
+    RangeExtractionPayloadVector& edgePayloads
   )
   {
     float minX = footprint.points[0].x;
@@ -635,14 +681,17 @@ namespace
       }
     }
     const float cellTarget = std::max(smallestFill * 0.6f, 0.5f);
-    const auto columns = std::clamp(static_cast<std::int32_t>(std::ceil((maxX - minX) / cellTarget)), 1, kCoverageGridMax);
+    const auto columns =
+      std::clamp(static_cast<std::int32_t>(std::ceil((maxX - minX) / cellTarget)), 1, kCoverageGridMax);
     const auto rows = std::clamp(static_cast<std::int32_t>(std::ceil((maxZ - minZ) / cellTarget)), 1, kCoverageGridMax);
     const float cellW = (maxX - minX) / static_cast<float>(columns);
     const float cellH = (maxZ - minZ) / static_cast<float>(rows);
     const auto cellAt = [&](const std::int32_t column, const std::int32_t row) {
       return CoverageCell{
-        minX + (cellW * static_cast<float>(column)), minZ + (cellH * static_cast<float>(row)),
-        minX + (cellW * static_cast<float>(column + 1)), minZ + (cellH * static_cast<float>(row + 1))
+        minX + (cellW * static_cast<float>(column)),
+        minZ + (cellH * static_cast<float>(row)),
+        minX + (cellW * static_cast<float>(column + 1)),
+        minZ + (cellH * static_cast<float>(row + 1))
       };
     };
 
@@ -657,8 +706,15 @@ namespace
       }
     }
     // The cells under each fill's bounding box that it holds.
-    const auto cellRange = [&](const float center, const float reach, const float origin, const float size,
-                               const std::int32_t count, std::int32_t& first, std::int32_t& last) {
+    const auto cellRange = [&](
+                             const float center,
+                             const float reach,
+                             const float origin,
+                             const float size,
+                             const std::int32_t count,
+                             std::int32_t& first,
+                             std::int32_t& last
+                           ) {
       first = std::clamp(static_cast<std::int32_t>(std::floor((center - reach - origin) / size)), 0, count - 1);
       last = std::clamp(static_cast<std::int32_t>(std::floor((center + reach - origin) / size)), 0, count - 1);
     };
@@ -708,8 +764,10 @@ namespace
       if (static_cast<std::size_t>((c1 - c0 + 1) * (r1 - r0 + 1)) < sOpenCells.size()) {
         for (std::int32_t row = r0; row <= r1; ++row) {
           for (std::int32_t column = c0; column <= c1; ++column) {
-            if (sHolder[static_cast<std::size_t>((row * columns) + column)] == -1 &&
-                PayloadMayTouchCell(payload, cellAt(column, row))) {
+            if (
+              sHolder[static_cast<std::size_t>((row * columns) + column)] == -1 &&
+              PayloadMayTouchCell(payload, cellAt(column, row))
+            ) {
               return true;
             }
           }
@@ -732,9 +790,13 @@ namespace
     }
     fillPayloads.erase(fillPayloads.begin() + kept, fillPayloads.end());
     edgePayloads.erase(
-      std::remove_if(edgePayloads.begin(), edgePayloads.end(), [&](const moho::SRangeExtractionPayload& edge) {
-        return !touchesOpenCell(edge);
-      }),
+      std::remove_if(
+        edgePayloads.begin(),
+        edgePayloads.end(),
+        [&](const moho::SRangeExtractionPayload& edge) {
+      return !touchesOpenCell(edge);
+    }
+      ),
       edgePayloads.end()
     );
   }
@@ -755,8 +817,10 @@ namespace
    *   0 there, and the dropped volumes might not.
    */
   void CullRingPayloadsToView(
-    const moho::GeomCamera3& camera, const moho::CHeightField* const heightField,
-    RangeExtractionPayloadVector& fillPayloads, RangeExtractionPayloadVector& edgePayloads
+    const moho::GeomCamera3& camera,
+    const moho::CHeightField* const heightField,
+    RangeExtractionPayloadVector& fillPayloads,
+    RangeExtractionPayloadVector& edgePayloads
   )
   {
     if (!sRingTemplateHeightsKnown) {
@@ -807,13 +871,16 @@ namespace
 
     const auto outOfView = [&](const moho::SRangeExtractionPayload& payload) {
       const float reach = std::max(std::fabs(payload.innerRadius), std::fabs(payload.outerRadius));
-      return DistanceToFootprint(footprint, Wm3::Vector2f{payload.centerX, payload.centerZ}) > reach + CullMargin(reach);
+      return DistanceToFootprint(footprint, Wm3::Vector2f{payload.centerX, payload.centerZ}) >
+        reach + CullMargin(reach);
     };
     fillPayloads.erase(std::remove_if(fillPayloads.begin(), fillPayloads.end(), outOfView), fillPayloads.end());
     edgePayloads.erase(std::remove_if(edgePayloads.begin(), edgePayloads.end(), outOfView), edgePayloads.end());
 
-    if (!moho::range_StencilFlush || footprint.count < 3u || !footprint.farPlaneBelowSlab ||
-        fillPayloads.size() < kCoverageMinFills) {
+    if (
+      !moho::range_StencilFlush || footprint.count < 3u || !footprint.farPlaneBelowSlab ||
+      fillPayloads.size() < kCoverageMinFills
+    ) {
       return;
     }
     CullRingPayloadsToCoverage(footprint, fillPayloads, edgePayloads);
@@ -951,8 +1018,12 @@ namespace
     // reserve failed: FAF #149 hooks the loop tail (0x007EF7EA), which a failed
     // reserve also reaches.
     // `gpuFirstPayload`: where `payloads` starts in the `ren_GpuRanges` buffer.
-    const auto drawBatched = [&](const RangeExtractionPayloadVector& payloads, const std::uint32_t gpuFirstPayload,
-                                 const std::uint32_t batchLimit, auto&& afterBatch) {
+    const auto drawBatched = [&](
+                               const RangeExtractionPayloadVector& payloads,
+                               const std::uint32_t gpuFirstPayload,
+                               const std::uint32_t batchLimit,
+                               auto&& afterBatch
+                             ) {
       const std::uint32_t totalCount = static_cast<std::uint32_t>(payloads.size());
       std::uint32_t drawn = 0u;
       while (drawn < totalCount) {
@@ -965,7 +1036,9 @@ namespace
           moho::RangeGpuRenderer::Get().Cast(rangeRenderer, cameraView, gpuFirstPayload + drawn, batchCount);
         } else if (ReserveDynamicRingVertexSlice(batchCount, &lockedWritePtr, rangeRenderer, &previousVertexCount)) {
           // Raw GPU upload: range payload blob into the dynamic ring buffer.
-          std::copy_n(payloads.begin() + drawn, batchCount, static_cast<moho::SRangeExtractionPayload*>(lockedWritePtr));
+          std::copy_n(
+            payloads.begin() + drawn, batchCount, static_cast<moho::SRangeExtractionPayload*>(lockedWritePtr)
+          );
           rangeRenderer.mDynamicVertexBuffer->Unlock();
           DrawRangeRingBatch(cameraView, rangeRenderer, batchCount, static_cast<int>(previousVertexCount));
         }
@@ -982,7 +1055,9 @@ namespace
       // Fill, as FAF FA-Binary-Patches #149: the last batch's "RangeMask" is
       // the final one, and no fill payloads means no "RangeMask" at all (its
       // `jle` at 0x007EF76E goes straight to the edge loop).
-      drawBatched(fillPayloads, 0u, kStencilSafeBatchLimit, [&](bool) { runRangeMaskPass(); });
+      drawBatched(fillPayloads, 0u, kStencilSafeBatchLimit, [&](bool) {
+        runRangeMaskPass();
+      });
 
       if (moho::range_Fill) {
         runFramePass("RangeFill");
@@ -1093,7 +1168,9 @@ namespace
     return writeIndex;
   }
 
-  [[nodiscard]] moho::RangeRingColor DecodePackedRgbaColor(const std::uint32_t packedColor) noexcept
+  [[nodiscard]] moho::RangeRingColor DecodePackedRgbaColor(
+    const std::uint32_t packedColor
+  ) noexcept
   {
     constexpr float kByteToFloat = 0.0039209998f;
     return {
@@ -1121,7 +1198,9 @@ namespace
    * + `EntityCategory::HasBlueprint` pair, which matches the surrounding
    * category-membership semantics exactly.
    */
-  [[nodiscard]] bool ProfileParticipatesInPerUnitPasses(const moho::SRangeRenderProfile& profile) noexcept
+  [[nodiscard]] bool ProfileParticipatesInPerUnitPasses(
+    const moho::SRangeRenderProfile& profile
+  ) noexcept
   {
     // The two combination profiles ("Combine Military" / "Combine Intel") are
     // aggregates of the other profiles' categories: they exist for the
@@ -1203,7 +1282,12 @@ namespace
       scratchPayload.clear();
       scratchPayload.push_back(payload);
       RenderRingBatch(
-        profile.mOuterRingParams, camera, rangeRenderer, headIndex, profile.mBuildRingColor, profile.mInnerRingParams,
+        profile.mOuterRingParams,
+        camera,
+        rangeRenderer,
+        headIndex,
+        profile.mBuildRingColor,
+        profile.mInnerRingParams,
         scratchPayload
       );
     }
@@ -1219,12 +1303,12 @@ namespace
    * position that has no unit on it. Its *colours* are still the red the
    * range-overlay menu gives military ranges - see `FindMilitaryStyleProfile`.
    */
-  [[nodiscard]] bool IsAttackRangeProfile(const moho::SRangeRenderProfile& profile)
+  [[nodiscard]] bool IsAttackRangeProfile(
+    const moho::SRangeRenderProfile& profile
+  )
   {
-    return profile.mExtractorName == "DirectFire"
-      || profile.mExtractorName == "IndirectFire"
-      || profile.mExtractorName == "AntiAir"
-      || profile.mExtractorName == "AntiNavy";
+    return profile.mExtractorName == "DirectFire" || profile.mExtractorName == "IndirectFire" ||
+      profile.mExtractorName == "AntiAir" || profile.mExtractorName == "AntiNavy";
   }
 
   /**
@@ -1263,11 +1347,12 @@ namespace
    * its half-extent, exactly as `MaxFootprintExtent` in
    * `CUnitReclaimTask.cpp:82` computes it.
    */
-  [[nodiscard]] float MaxFootprintExtent(const moho::SFootprint& footprint) noexcept
+  [[nodiscard]] float MaxFootprintExtent(
+    const moho::SFootprint& footprint
+  ) noexcept
   {
     return static_cast<float>(
-      (footprint.mSizeX >= footprint.mSizeZ) ? static_cast<int>(footprint.mSizeX)
-                                             : static_cast<int>(footprint.mSizeZ)
+      (footprint.mSizeX >= footprint.mSizeZ) ? static_cast<int>(footprint.mSizeX) : static_cast<int>(footprint.mSizeZ)
     );
   }
 
@@ -1292,7 +1377,9 @@ namespace
    * carry a second footprint at all, and it is the default footprint that is
    * wrong to omit.
    */
-  [[nodiscard]] float ReclaimFootprintExtentOf(const moho::UserEntity& entity) noexcept
+  [[nodiscard]] float ReclaimFootprintExtentOf(
+    const moho::UserEntity& entity
+  ) noexcept
   {
     const moho::REntityBlueprint* const entityBlueprint = entity.mParams.mBlueprint;
     return (entityBlueprint != nullptr) ? MaxFootprintExtent(entityBlueprint->mFootprint) : 0.0f;
@@ -1325,9 +1412,10 @@ namespace
     const bool candidateIsDirect = candidateProfile.mExtractorName == "DirectFire";
     const bool bestIsDirect = bestProfile != nullptr && bestProfile->mExtractorName == "DirectFire";
 
-    if (bestProfile == nullptr
-        || (candidateIsDirect && !bestIsDirect)
-        || (candidateIsDirect == bestIsDirect && candidatePayload.outerRadius > bestPayload.outerRadius)) {
+    if (
+      bestProfile == nullptr || (candidateIsDirect && !bestIsDirect) ||
+      (candidateIsDirect == bestIsDirect && candidatePayload.outerRadius > bestPayload.outerRadius)
+    ) {
       bestProfile = &candidateProfile;
       bestPayload = candidatePayload;
     }
@@ -1465,8 +1553,13 @@ namespace
       scratchPayload.clear();
       scratchPayload.push_back(assistPayload);
       RenderRingBatch(
-        assistProfile->mOuterRingParams, camera, rangeRenderer, headIndex, assistProfile->mBuildRingColor,
-        assistProfile->mInnerRingParams, scratchPayload
+        assistProfile->mOuterRingParams,
+        camera,
+        rangeRenderer,
+        headIndex,
+        assistProfile->mBuildRingColor,
+        assistProfile->mInnerRingParams,
+        scratchPayload
       );
     }
 
@@ -1482,8 +1575,13 @@ namespace
       scratchPayload.clear();
       scratchPayload.push_back(attackPayload);
       RenderRingBatch(
-        attackProfile->mOuterRingParams, camera, rangeRenderer, headIndex, style.mBuildRingColor,
-        attackProfile->mInnerRingParams, scratchPayload
+        attackProfile->mOuterRingParams,
+        camera,
+        rangeRenderer,
+        headIndex,
+        style.mBuildRingColor,
+        attackProfile->mInnerRingParams,
+        scratchPayload
       );
     }
   }
@@ -1628,14 +1726,18 @@ namespace
     // carries no weapons, so the hovered-attack pass has nothing to draw
     // alongside it.
     const moho::SRangeRenderProfile* const militaryStyle = FindMilitaryStyleProfile(rangeRenderer);
-    const moho::SRangeRenderProfile& style =
-      (militaryStyle != nullptr) ? *militaryStyle : *buildRangeProfile;
+    const moho::SRangeRenderProfile& style = (militaryStyle != nullptr) ? *militaryStyle : *buildRangeProfile;
 
     scratchPayload.clear();
     scratchPayload.push_back(payload);
     RenderRingBatch(
-      buildRangeProfile->mOuterRingParams, camera, rangeRenderer, headIndex, style.mBuildRingColor,
-      buildRangeProfile->mInnerRingParams, scratchPayload
+      buildRangeProfile->mOuterRingParams,
+      camera,
+      rangeRenderer,
+      headIndex,
+      style.mBuildRingColor,
+      buildRangeProfile->mInnerRingParams,
+      scratchPayload
     );
   }
 
@@ -1755,8 +1857,13 @@ namespace
     scratchPayload.clear();
     scratchPayload.push_back(attackPayload);
     RenderRingBatch(
-      attackProfile->mOuterRingParams, camera, rangeRenderer, headIndex, style.mBuildRingColor,
-      attackProfile->mInnerRingParams, scratchPayload
+      attackProfile->mOuterRingParams,
+      camera,
+      rangeRenderer,
+      headIndex,
+      style.mBuildRingColor,
+      attackProfile->mInnerRingParams,
+      scratchPayload
     );
   }
 
@@ -1787,8 +1894,11 @@ namespace
    * when given, receives every unit that got a ring (see `RangeRenderer::Render`).
    */
   void RenderSelectedUnitsRange(
-    const moho::CWldSession& session, const fa::vector<moho::UserUnit*>& selectedUnits,
-    RangeExtractionPayloadVector& outPayloads, const moho::SRangeRenderProfile& profile, const float alpha,
+    const moho::CWldSession& session,
+    const fa::vector<moho::UserUnit*>& selectedUnits,
+    RangeExtractionPayloadVector& outPayloads,
+    const moho::SRangeRenderProfile& profile,
+    const float alpha,
     std::vector<const moho::UserEntity*>* const outRingUnits = nullptr
   )
   {
@@ -1862,8 +1972,12 @@ namespace
    * `profile.mHighlightedRingColor`.
    */
   void RenderHighlightedUnitRange(
-    moho::CWldSession& session, RangeExtractionPayloadVector& scratchPayload, moho::RangeRenderer& rangeRenderer,
-    const moho::CameraImpl& camera, const float alpha, const unsigned int headIndex
+    moho::CWldSession& session,
+    RangeExtractionPayloadVector& scratchPayload,
+    moho::RangeRenderer& rangeRenderer,
+    const moho::CameraImpl& camera,
+    const float alpha,
+    const unsigned int headIndex
   )
   {
     if (!moho::range_RenderHighlighted) {
@@ -1911,8 +2025,13 @@ namespace
       scratchPayload.clear();
       scratchPayload.push_back(payload);
       RenderRingBatch(
-        profile.mOuterRingParams, camera, rangeRenderer, headIndex, profile.mHighlightedRingColor,
-        profile.mInnerRingParams, scratchPayload
+        profile.mOuterRingParams,
+        camera,
+        rangeRenderer,
+        headIndex,
+        profile.mHighlightedRingColor,
+        profile.mInnerRingParams,
+        scratchPayload
       );
     }
   }
@@ -1932,7 +2051,8 @@ namespace
    * `RangeRenderer::Render` (0x007EEBD7), which draws it as a fixed thin ring.
    */
   void ExtractFocusArmyNoRushRange(
-    const moho::CWldSession& session, RangeExtractionPayloadVector& outPayloads
+    const moho::CWldSession& session,
+    RangeExtractionPayloadVector& outPayloads
   )
   {
     outPayloads.clear();
@@ -1971,8 +2091,7 @@ namespace moho
     , mDynamicRingVertexCount(0u)
     , mDynamicVertexBuffer{}
     , mFrame{}
-  {
-  }
+  {}
 
   /**
    * Address: 0x007EDE00 (FUN_007EDE00, Moho::RangeRenderer::dtr)
@@ -2116,7 +2235,9 @@ namespace moho
    *   of the `RenderRingBatch` call at 0x007EEC43)
    */
   void RangeRenderer::Render(
-    CWldSession* const worldSession, CameraImpl* const camera, const unsigned int viewportHeadIndex,
+    CWldSession* const worldSession,
+    CameraImpl* const camera,
+    const unsigned int viewportHeadIndex,
     const float alpha
   )
   {
@@ -2215,8 +2336,14 @@ namespace moho
               selected = &rings;
               const SRangeRenderProfile& registered = match->second;
               RenderRingBatch(
-                registered.mOuterRingParams, *camera, *this, viewportHeadIndex, registered.mSelectedRingColor,
-                registered.mInnerRingParams, rings.payloads, true
+                registered.mOuterRingParams,
+                *camera,
+                *this,
+                viewportHeadIndex,
+                registered.mSelectedRingColor,
+                registered.mInnerRingParams,
+                rings.payloads,
+                true
               );
               rings.drawn = true;
             }
@@ -2232,8 +2359,13 @@ namespace moho
             continue;
           }
           RenderRingBatch(
-            profile.mOuterRingParams, *camera, *this, viewportHeadIndex, profile.mBuildRingColor,
-            profile.mInnerRingParams, scratchPayload
+            profile.mOuterRingParams,
+            *camera,
+            *this,
+            viewportHeadIndex,
+            profile.mBuildRingColor,
+            profile.mInnerRingParams,
+            scratchPayload
           );
         }
       }
@@ -2244,8 +2376,13 @@ namespace moho
       for (const auto& [extractorName, profile] : mRangeProfiles) {
         if (!rings->drawn) {
           RenderRingBatch(
-            profile.mOuterRingParams, *camera, *this, viewportHeadIndex, profile.mSelectedRingColor,
-            profile.mInnerRingParams, rings->payloads
+            profile.mOuterRingParams,
+            *camera,
+            *this,
+            viewportHeadIndex,
+            profile.mSelectedRingColor,
+            profile.mInnerRingParams,
+            rings->payloads
           );
         }
         ++rings;
@@ -2270,7 +2407,9 @@ namespace moho
    * Rebuilds visible range profiles by resolving each category key through the
    * range-profile tree and appending matching profile values in caller order.
    */
-  void RangeRenderer::MoveCategories(const fa::vector<fa::string>& categories)
+  void RangeRenderer::MoveCategories(
+    const fa::vector<fa::string>& categories
+  )
   {
     mVisibleProfiles.clear();
 

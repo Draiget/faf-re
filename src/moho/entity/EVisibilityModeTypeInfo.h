@@ -42,7 +42,6 @@ namespace moho
 
   static_assert(sizeof(EVisibilityModeTypeInfo) == 0x78, "EVisibilityModeTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x0050A100 (FUN_0050A100, preregister_EVisibilityModeTypeInfo)
    *
@@ -60,4 +59,3 @@ namespace moho
    */
   void register_EVisibilityModeTypeInfo();
 } // namespace moho
-

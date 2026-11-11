@@ -55,4 +55,3 @@ namespace moho
 
   static_assert(sizeof(IEffectTypeInfo) == 0x64, "IEffectTypeInfo size must be 0x64");
 } // namespace moho
-

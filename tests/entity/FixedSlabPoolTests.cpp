@@ -16,12 +16,12 @@
 #include "moho/entity/Shield.h"
 #include "moho/entity/Entity.h"
 
-#define TEST_ASSERT(cond) \
-  do { \
-    if (!(cond)) { \
-      fprintf(stderr, "TEST ASSERTION FAILED: %s at %s:%d\n", #cond, __FILE__, __LINE__); \
-      std::abort(); \
-    } \
+#define TEST_ASSERT(cond)                                                                                              \
+  do {                                                                                                                 \
+    if (!(cond)) {                                                                                                     \
+      fprintf(stderr, "TEST ASSERTION FAILED: %s at %s:%d\n", #cond, __FILE__, __LINE__);                              \
+      std::abort();                                                                                                    \
+    }                                                                                                                  \
   } while (false)
 
 static void TestBasicAllocation()
@@ -222,10 +222,52 @@ static void TestSwitchAndHybridSafety()
 }
 
 // The checks abort on failure (TEST_ASSERT), worker threads included, which fails the run.
-TEST(FixedSlabPool, BasicAllocation) { TestBasicAllocation(); }
-TEST(FixedSlabPool, SlabReclamation) { TestSlabReclamation(); }
-TEST(FixedSlabPool, ConcurrentAllocation) { TestConcurrentAllocation(); }
-TEST(FixedSlabPool, EntityMemoryManagerRouting) { TestEntityMemoryManagerRouting(); }
-TEST(FixedSlabPool, HeapPointerRangeCheckSafety) { TestHeapPointerRangeCheckSafety(); }
-TEST(FixedSlabPool, ClearWithLiveBlocksSafety) { TestClearWithLiveBlocksSafety(); }
-TEST(FixedSlabPool, SwitchAndHybridSafety) { TestSwitchAndHybridSafety(); }
+TEST(
+  FixedSlabPool,
+  BasicAllocation
+)
+{
+  TestBasicAllocation();
+}
+TEST(
+  FixedSlabPool,
+  SlabReclamation
+)
+{
+  TestSlabReclamation();
+}
+TEST(
+  FixedSlabPool,
+  ConcurrentAllocation
+)
+{
+  TestConcurrentAllocation();
+}
+TEST(
+  FixedSlabPool,
+  EntityMemoryManagerRouting
+)
+{
+  TestEntityMemoryManagerRouting();
+}
+TEST(
+  FixedSlabPool,
+  HeapPointerRangeCheckSafety
+)
+{
+  TestHeapPointerRangeCheckSafety();
+}
+TEST(
+  FixedSlabPool,
+  ClearWithLiveBlocksSafety
+)
+{
+  TestClearWithLiveBlocksSafety();
+}
+TEST(
+  FixedSlabPool,
+  SwitchAndHybridSafety
+)
+{
+  TestSwitchAndHybridSafety();
+}

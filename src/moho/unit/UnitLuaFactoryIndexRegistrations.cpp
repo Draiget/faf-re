@@ -8,7 +8,7 @@ namespace moho
 {
   class CUnitScriptTask;
   class UnitWeapon;
-}
+} // namespace moho
 
 namespace
 {

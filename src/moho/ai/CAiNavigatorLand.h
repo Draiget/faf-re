@@ -48,9 +48,8 @@ namespace moho
      * Builds a new `CAiNavigatorLand` for an archive load and hands it back unowned; its
      * members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x005A8F40 (FUN_005A8F40, Moho::CAiNavigatorLand::MemberDeserialize)
@@ -198,11 +197,14 @@ namespace moho
      * rather than a `Unit`.
      */
     WeakPtr<Entity> mDestinationEntity; // +0x6C
-    SAiNavigatorGoal mGoal;           // +0x74
+    SAiNavigatorGoal mGoal;             // +0x74
   };
 
   static_assert(sizeof(CAiNavigatorLand) == 0x98, "CAiNavigatorLand size must be 0x98");
-  static_assert(offsetof(CAiNavigatorLand, mPathNavigator) == 0x68, "CAiNavigatorLand::mPathNavigator offset must be 0x68");
+  static_assert(
+    offsetof(CAiNavigatorLand, mPathNavigator) == 0x68,
+    "CAiNavigatorLand::mPathNavigator offset must be 0x68"
+  );
   static_assert(
     offsetof(CAiNavigatorLand, mDestinationEntity) == 0x6C,
     "CAiNavigatorLand::mDestinationEntity offset must be 0x6C"

@@ -18,12 +18,12 @@ namespace faf::netlink
   // ice4j's CandidateType, written by Jackson as the enum name.
   enum class CandidateType
   {
-    Host,           // HOST_CANDIDATE
+    Host,            // HOST_CANDIDATE
     ServerReflexive, // SERVER_REFLEXIVE_CANDIDATE
-    PeerReflexive,  // PEER_REFLEXIVE_CANDIDATE
-    Relayed,        // RELAYED_CANDIDATE
-    Local,          // LOCAL_CANDIDATE (old name of host, never sent)
-    Stun            // STUN_CANDIDATE (old name of srflx, never sent)
+    PeerReflexive,   // PEER_REFLEXIVE_CANDIDATE
+    Relayed,         // RELAYED_CANDIDATE
+    Local,           // LOCAL_CANDIDATE (old name of host, never sent)
+    Stun             // STUN_CANDIDATE (old name of srflx, never sent)
   };
 
   const char* CandidateTypeName(CandidateType type);
@@ -83,7 +83,9 @@ namespace faf::netlink
   };
 
   // "host:port", as the network panel names a server (#322).
-  [[nodiscard]] inline std::string IceServerName(const IceServer& s)
+  [[nodiscard]] inline std::string IceServerName(
+    const IceServer& s
+  )
   {
     return s.host + ":" + std::to_string(s.port);
   }

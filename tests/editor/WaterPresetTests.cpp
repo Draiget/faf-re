@@ -79,7 +79,10 @@ namespace
     ]
 })";
 
-  TEST(WaterPreset, ReadsFafmesFile)
+  TEST(
+    WaterPreset,
+    ReadsFafmesFile
+  )
   {
     faf::editor::WaterState water;
     std::string error;
@@ -96,7 +99,10 @@ namespace
     EXPECT_EQ(water.textures[5], "/textures/engine/waves.dds");
   }
 
-  TEST(WaterPreset, WritesWhatItReads)
+  TEST(
+    WaterPreset,
+    WritesWhatItReads
+  )
   {
     faf::editor::WaterState water;
     std::string error;

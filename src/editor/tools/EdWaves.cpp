@@ -18,25 +18,65 @@ namespace faf::editor
     constexpr float kPi = 3.14159265358979323846f;
 
     // The 17 floats in the file's order.
-    void Floats(const WaveRecord& wave, float (&out)[17])
+    void Floats(
+      const WaveRecord& wave,
+      float (&out)[17]
+    )
     {
-      const float values[17] = {wave.position[0], wave.position[1], wave.position[2], wave.angle,       wave.velocity[0], wave.velocity[1],
-                                wave.velocity[2], wave.lifetime[0], wave.lifetime[1], wave.period[0],   wave.period[1],   wave.scale[0],
-                                wave.scale[1],    wave.frameCount,  wave.frameRate[0], wave.frameRate[1], wave.stripCount};
+      const float values[17] = {
+        wave.position[0],
+        wave.position[1],
+        wave.position[2],
+        wave.angle,
+        wave.velocity[0],
+        wave.velocity[1],
+        wave.velocity[2],
+        wave.lifetime[0],
+        wave.lifetime[1],
+        wave.period[0],
+        wave.period[1],
+        wave.scale[0],
+        wave.scale[1],
+        wave.frameCount,
+        wave.frameRate[0],
+        wave.frameRate[1],
+        wave.stripCount
+      };
       std::memcpy(out, values, sizeof(values));
     }
 
-    void FromFloats(const float (&in)[17], WaveRecord& wave)
+    void FromFloats(
+      const float (&in)[17],
+      WaveRecord& wave
+    )
     {
-      float* const fields[17] = {&wave.position[0], &wave.position[1], &wave.position[2], &wave.angle,       &wave.velocity[0], &wave.velocity[1],
-                                 &wave.velocity[2], &wave.lifetime[0], &wave.lifetime[1], &wave.period[0],   &wave.period[1],   &wave.scale[0],
-                                 &wave.scale[1],    &wave.frameCount,  &wave.frameRate[0], &wave.frameRate[1], &wave.stripCount};
+      float* const fields[17] = {
+        &wave.position[0],
+        &wave.position[1],
+        &wave.position[2],
+        &wave.angle,
+        &wave.velocity[0],
+        &wave.velocity[1],
+        &wave.velocity[2],
+        &wave.lifetime[0],
+        &wave.lifetime[1],
+        &wave.period[0],
+        &wave.period[1],
+        &wave.scale[0],
+        &wave.scale[1],
+        &wave.frameCount,
+        &wave.frameRate[0],
+        &wave.frameRate[1],
+        &wave.stripCount
+      };
       for (int i = 0; i < 17; ++i) {
         *fields[i] = in[i];
       }
     }
 
-    float Roll(std::uint32_t& seed)
+    float Roll(
+      std::uint32_t& seed
+    )
     {
       seed = seed * 1664525U + 1013904223U;
       return static_cast<float>(seed >> 8) / 16777216.0f;
@@ -52,7 +92,9 @@ namespace faf::editor
       std::vector<std::pair<std::string, std::shared_ptr<LuaValue>>> fields;
       std::vector<std::shared_ptr<LuaValue>> items;
 
-      [[nodiscard]] const LuaValue* Get(const std::string& key) const
+      [[nodiscard]] const LuaValue* Get(
+        const std::string& key
+      ) const
       {
         for (const auto& [name, value] : fields) {
           if (name == key) {
@@ -61,12 +103,17 @@ namespace faf::editor
         }
         return nullptr;
       }
-      [[nodiscard]] float Number(const std::string& key, const float fallback) const
+      [[nodiscard]] float Number(
+        const std::string& key,
+        const float fallback
+      ) const
       {
         const LuaValue* const value = Get(key);
         return value != nullptr && value->isNumber ? static_cast<float>(value->number) : fallback;
       }
-      [[nodiscard]] std::string Text(const std::string& key) const
+      [[nodiscard]] std::string Text(
+        const std::string& key
+      ) const
       {
         const LuaValue* const value = Get(key);
         return value != nullptr && !value->isNumber && !value->isTable ? value->text : std::string();
@@ -76,9 +123,15 @@ namespace faf::editor
     class LuaReader
     {
     public:
-      explicit LuaReader(const std::string& text) : mText(text) {}
+      explicit LuaReader(
+        const std::string& text
+      )
+        : mText(text)
+      {}
 
-      bool Value(LuaValue& out)
+      bool Value(
+        LuaValue& out
+      )
       {
         Skip();
         if (mAt >= mText.size()) {
@@ -102,7 +155,8 @@ namespace faf::editor
             const std::size_t save = mAt;
             if (std::isalpha(static_cast<unsigned char>(mText[mAt])) || mText[mAt] == '_') {
               std::size_t end = mAt;
-              while (end < mText.size() && (std::isalnum(static_cast<unsigned char>(mText[end])) || mText[end] == '_')) {
+              while (end < mText.size() &&
+                     (std::isalnum(static_cast<unsigned char>(mText[end])) || mText[end] == '_')) {
                 ++end;
               }
               key = mText.substr(mAt, end - mAt);
@@ -182,7 +236,10 @@ namespace faf::editor
       }
 
       /** `name = value` at the top of the file. */
-      bool Assignment(const std::string& name, LuaValue& out)
+      bool Assignment(
+        const std::string& name,
+        LuaValue& out
+      )
       {
         for (;;) {
           Skip();
@@ -224,7 +281,9 @@ namespace faf::editor
     };
   } // namespace
 
-  bool WaveRecord::operator==(const WaveRecord& other) const
+  bool WaveRecord::operator==(
+    const WaveRecord& other
+  ) const
   {
     float a[17], b[17];
     Floats(*this, a);
@@ -232,7 +291,9 @@ namespace faf::editor
     return texture == other.texture && ramp == other.ramp && std::memcmp(a, b, sizeof(a)) == 0;
   }
 
-  std::string WaveRecordsToBytes(const std::vector<WaveRecord>& waves)
+  std::string WaveRecordsToBytes(
+    const std::vector<WaveRecord>& waves
+  )
   {
     std::string out;
     const std::int32_t count = static_cast<std::int32_t>(waves.size());
@@ -249,7 +310,10 @@ namespace faf::editor
     return out;
   }
 
-  bool WaveRecordsFromBytes(const std::string& bytes, std::vector<WaveRecord>& waves)
+  bool WaveRecordsFromBytes(
+    const std::string& bytes,
+    std::vector<WaveRecord>& waves
+  )
   {
     std::int32_t count = 0;
     if (bytes.size() < sizeof(count)) {
@@ -281,7 +345,9 @@ namespace faf::editor
     return true;
   }
 
-  std::string WavesToScmwaves(const std::vector<WaveRecord>& waves)
+  std::string WavesToScmwaves(
+    const std::vector<WaveRecord>& waves
+  )
   {
     std::string out = "{\n    \"AllWaves\": [";
     const std::string in = "            ";
@@ -310,7 +376,11 @@ namespace faf::editor
     return out + (waves.empty() ? "]\n}" : "\n    ]\n}");
   }
 
-  bool WavesFromScmwaves(const std::string& text, std::vector<WaveRecord>& waves, std::string& error)
+  bool WavesFromScmwaves(
+    const std::string& text,
+    std::vector<WaveRecord>& waves,
+    std::string& error
+  )
   {
     std::string array;
     if (!JsonValue(text, "AllWaves", array) || array.empty() || array.front() != '[') {
@@ -399,7 +469,11 @@ namespace faf::editor
     return patterns;
   }
 
-  bool ParseWavePatterns(const std::string& lua, std::vector<WavePattern>& patterns, std::string& error)
+  bool ParseWavePatterns(
+    const std::string& lua,
+    std::vector<WavePattern>& patterns,
+    std::string& error
+  )
   {
     LuaReader reader(lua);
     LuaValue root;
@@ -410,7 +484,10 @@ namespace faf::editor
     std::vector<WavePattern> read;
     for (const auto& item : root.items) {
       const LuaValue* const parameters = item->isTable ? item->Get("parameters") : nullptr;
-      if (parameters == nullptr || !parameters->isTable || parameters->items.empty() || !parameters->items.front()->isTable) {
+      if (
+        parameters == nullptr || !parameters->isTable || parameters->items.empty() ||
+        !parameters->items.front()->isTable
+      ) {
         continue;
       }
       const LuaValue& first = *parameters->items.front();
@@ -428,7 +505,9 @@ namespace faf::editor
       pattern.lifetime[1] = lifetime + lifetimeVariance;
       pattern.speed = first.Number("speed", 0.01f);
       pattern.speedVariance = first.Number("speedVariance", 0.0f);
-      if (const LuaValue* const scale = first.Get("scale"); scale != nullptr && scale->isTable && scale->items.size() >= 2) {
+      if (
+        const LuaValue* const scale = first.Get("scale"); scale != nullptr && scale->isTable && scale->items.size() >= 2
+      ) {
         pattern.scale[0] = static_cast<float>(scale->items[0]->number);
         pattern.scale[1] = static_cast<float>(scale->items[1]->number);
       }
@@ -451,15 +530,27 @@ namespace faf::editor
     return true;
   }
 
-  std::vector<ShorePoint> FindShorePoints(const std::vector<float>& heights, const int width, const int height, const float waterLevel,
-                                          const float depth, const float centreDegrees, const float rangeDegrees)
+  std::vector<ShorePoint> FindShorePoints(
+    const std::vector<float>& heights,
+    const int width,
+    const int height,
+    const float waterLevel,
+    const float depth,
+    const float centreDegrees,
+    const float rangeDegrees
+  )
   {
     std::vector<ShorePoint> points;
-    if (width <= 0 || height <= 0 || heights.size() < static_cast<std::size_t>(width + 1) * static_cast<std::size_t>(height + 1)) {
+    if (
+      width <= 0 || height <= 0 ||
+      heights.size() < static_cast<std::size_t>(width + 1) * static_cast<std::size_t>(height + 1)
+    ) {
       return points;
     }
     const float level = waterLevel - depth;
-    const auto at = [&](const int x, const int z) { return heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(width + 1) + x]; };
+    const auto at = [&](const int x, const int z) {
+      return heights[static_cast<std::size_t>(z) * static_cast<std::size_t>(width + 1) + x];
+    };
     for (int z = 0; z < height; ++z) {
       for (int x = 0; x < width; ++x) {
         const float h00 = at(x, z), h10 = at(x + 1, z), h01 = at(x, z + 1), h11 = at(x + 1, z + 1);
@@ -483,18 +574,26 @@ namespace faf::editor
     return points;
   }
 
-  std::vector<ShorePoint> PickShorePoints(std::vector<ShorePoint> points, const float density, const float spacing, std::uint32_t seed)
+  std::vector<ShorePoint> PickShorePoints(
+    std::vector<ShorePoint> points,
+    const float density,
+    const float spacing,
+    std::uint32_t seed
+  )
   {
     // Shuffled by the seed, then each taken unless one already taken is within the spacing (a grid of spacing-sized
     // cells finds the neighbours), until the density's share is reached.
     for (std::size_t i = points.size(); i > 1; --i) {
       std::swap(points[i - 1], points[static_cast<std::size_t>(Roll(seed) * static_cast<float>(i)) % i]);
     }
-    const std::size_t target = static_cast<std::size_t>(std::lround(std::clamp(density, 0.0f, 1.0f) * static_cast<float>(points.size())));
+    const std::size_t target =
+      static_cast<std::size_t>(std::lround(std::clamp(density, 0.0f, 1.0f) * static_cast<float>(points.size())));
     std::vector<ShorePoint> picked;
     const float cell = std::max(spacing, 0.001f);
     std::unordered_map<std::int64_t, std::vector<std::size_t>> grid;
-    const auto key = [](const int cx, const int cz) { return (static_cast<std::int64_t>(cx) << 32) ^ static_cast<std::uint32_t>(cz); };
+    const auto key = [](const int cx, const int cz) {
+      return (static_cast<std::int64_t>(cx) << 32) ^ static_cast<std::uint32_t>(cz);
+    };
     for (const ShorePoint& point : points) {
       if (picked.size() >= target) {
         break;
@@ -523,7 +622,12 @@ namespace faf::editor
     return picked;
   }
 
-  WaveRecord MakeShoreWave(const WavePattern& pattern, const ShorePoint& point, const float waterLevel, std::uint32_t& seed)
+  WaveRecord MakeShoreWave(
+    const WavePattern& pattern,
+    const ShorePoint& point,
+    const float waterLevel,
+    std::uint32_t& seed
+  )
   {
     WaveRecord wave;
     wave.texture = pattern.texture;

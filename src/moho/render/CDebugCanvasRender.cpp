@@ -204,7 +204,9 @@ void CDebugCanvas::Render(
     boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(text.pointSize, "Ariel");
     CD3DFont* const font = rawFont.px;
     if (font != nullptr) {
-      (void)font->Render(text.text.raw_data_unsafe(), primBatcher, text.origin, text.xAxis, text.yAxis, text.color, 0.0f, kNoMaxAdvance);
+      (void)font->Render(
+        text.text.raw_data_unsafe(), primBatcher, text.origin, text.xAxis, text.yAxis, text.color, 0.0f, kNoMaxAdvance
+      );
     }
     rawFont.release();
   }
@@ -268,15 +270,15 @@ void CDebugCanvas::Render(
   constexpr Wm3::Vector3f kScreenTextXAxis{1.0f, 0.0f, 0.0f};
   constexpr Wm3::Vector3f kScreenTextYAxis{0.0f, -1.0f, 0.0f};
   for (const SDebugWorldText& worldEntry : worldText) {
-    const float clipX =
-      (worldEntry.position.x * camera.viewProjection.r[0].x) + (worldEntry.position.y * camera.viewProjection.r[1].x) +
-      (worldEntry.position.z * camera.viewProjection.r[2].x) + camera.viewProjection.r[3].x;
-    const float clipY =
-      (worldEntry.position.x * camera.viewProjection.r[0].y) + (worldEntry.position.y * camera.viewProjection.r[1].y) +
-      (worldEntry.position.z * camera.viewProjection.r[2].y) + camera.viewProjection.r[3].y;
-    const float clipW =
-      (worldEntry.position.x * camera.viewProjection.r[0].w) + (worldEntry.position.y * camera.viewProjection.r[1].w) +
-      (worldEntry.position.z * camera.viewProjection.r[2].w) + camera.viewProjection.r[3].w;
+    const float clipX = (worldEntry.position.x * camera.viewProjection.r[0].x) +
+      (worldEntry.position.y * camera.viewProjection.r[1].x) + (worldEntry.position.z * camera.viewProjection.r[2].x) +
+      camera.viewProjection.r[3].x;
+    const float clipY = (worldEntry.position.x * camera.viewProjection.r[0].y) +
+      (worldEntry.position.y * camera.viewProjection.r[1].y) + (worldEntry.position.z * camera.viewProjection.r[2].y) +
+      camera.viewProjection.r[3].y;
+    const float clipW = (worldEntry.position.x * camera.viewProjection.r[0].w) +
+      (worldEntry.position.y * camera.viewProjection.r[1].w) + (worldEntry.position.z * camera.viewProjection.r[2].w) +
+      camera.viewProjection.r[3].w;
     const float inverseW = 1.0f / clipW;
 
     const float ndcX = clipX * inverseW;

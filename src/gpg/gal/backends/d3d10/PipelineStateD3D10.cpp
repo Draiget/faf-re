@@ -2,15 +2,17 @@
 
 namespace gpg::gal
 {
-namespace
-{
+  namespace
+  {
 
-    [[noreturn]] void ThrowPipelineStateD3D10Hresult(const int line, const HRESULT code)
+    [[noreturn]] void ThrowPipelineStateD3D10Hresult(
+      const int line,
+      const HRESULT code
+    )
     {
       throw Error(MakeShortString("PipelineStateD3D10.cpp"), line, MakeD3DErrorString(code));
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x00902CA0 (FUN_00902CA0)
@@ -21,7 +23,9 @@ namespace
    * Initializes one pipeline-state bundle from a native D3D10 device and
    * builds both recovered startup state packs.
    */
-  PipelineStateD3D10::PipelineStateD3D10(ID3D10Device* const device)
+  PipelineStateD3D10::PipelineStateD3D10(
+    ID3D10Device* const device
+  )
     : device_(device)
     , samplerFilterToken_(15U)
     , rasterizerState1_(nullptr)
@@ -38,14 +42,16 @@ namespace
     CreateState1();
     CreateState2();
   }
-namespace
-{
+  namespace
+  {
 
     /**
      * The depth-stencil state both packs create, differing only in
      * `depthFunc`: depth test and writes on, stencil off with zero masks.
      */
-    [[nodiscard]] D3D10_DEPTH_STENCIL_DESC DepthWriteDesc(const D3D10_COMPARISON_FUNC depthFunc)
+    [[nodiscard]] D3D10_DEPTH_STENCIL_DESC DepthWriteDesc(
+      const D3D10_COMPARISON_FUNC depthFunc
+    )
     {
       D3D10_DEPTH_STENCIL_DESC depthStencilDesc{};
       depthStencilDesc.DepthEnable = TRUE;
@@ -61,8 +67,7 @@ namespace
       depthStencilDesc.BackFace = depthStencilDesc.FrontFace;
       return depthStencilDesc;
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x009024F0 (FUN_009024F0)
@@ -238,5 +243,4 @@ namespace
     SafeRelease(depthStencilState2_);
     SafeRelease(blendState2_);
   }
-}
-
+} // namespace gpg::gal

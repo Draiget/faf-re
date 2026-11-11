@@ -82,6 +82,8 @@ void CNetTCPServerImpl::CloseSocket()
  * What it does:
  * Initializes CNetTCPServerImpl around already-open listening socket.
  */
-CNetTCPServerImpl::CNetTCPServerImpl(const platform::net::Socket socket) noexcept
+CNetTCPServerImpl::CNetTCPServerImpl(
+  const platform::net::Socket socket
+) noexcept
   : mSocket(socket)
 {}

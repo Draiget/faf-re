@@ -40,7 +40,6 @@ namespace
   // have silently misread `layerMask`/`minRange`/`maxRange` here instead of
   // failing to compile.
 
-
   // The factory build-queue row type and the published queue itself are owned by
   // `moho/ui/UiRuntimeTypes.{h,cpp}` (`moho::FactoryQueueDisplayItem`,
   // `moho::sCurrentBuildQueue`). The queue-rebuild and Lua-table workers below
@@ -48,25 +47,28 @@ namespace
   // `ebx` at 0x00835DF0 and in `esi` at 0x00836080 - so this translation unit
   // keeps no build-queue global of its own.
 
-
   // UserCommandQueue and its two sub-runs are real types now, declared in
   // moho/command/UserCommandQueue.h so the layout is stated once instead of
   // living as a reinterpret view over an opaque forward declaration.
 
-}
+} // namespace
 
 namespace moho
 {
-  const IUnit* GetIUnitBridge(const UserUnit* const self) noexcept
+  const IUnit* GetIUnitBridge(
+    const UserUnit* const self
+  ) noexcept
   {
     return self;
   }
 
-  IUnit* GetIUnitBridge(UserUnit* const self) noexcept
+  IUnit* GetIUnitBridge(
+    UserUnit* const self
+  ) noexcept
   {
     return self;
   }
-}
+} // namespace moho
 
 namespace
 {
@@ -77,7 +79,9 @@ namespace
    * What it does:
    * Returns the fixed transport-load factor used by the UserUnit IUnit bridge.
    */
-  [[maybe_unused]] [[nodiscard]] float IUnitBridgeCalcTransportLoadFactor(const IUnit* const bridge) noexcept
+  [[maybe_unused]] [[nodiscard]] float IUnitBridgeCalcTransportLoadFactor(
+    const IUnit* const bridge
+  ) noexcept
   {
     (void)bridge;
     return 1.0f;
@@ -89,7 +93,9 @@ namespace
    * What it does:
    * Returns false for the UserUnit IUnit bridge destroy-queued lane.
    */
-  [[maybe_unused]] [[nodiscard]] bool IUnitBridgeDestroyQueued(const IUnit* const bridge) noexcept
+  [[maybe_unused]] [[nodiscard]] bool IUnitBridgeDestroyQueued(
+    const IUnit* const bridge
+  ) noexcept
   {
     (void)bridge;
     return false;
@@ -101,7 +107,9 @@ namespace
    * What it does:
    * Returns false for the UserUnit IUnit bridge navigator-idle lane.
    */
-  [[maybe_unused]] [[nodiscard]] bool IUnitBridgeIsNavigatorIdle(const IUnit* const bridge) noexcept
+  [[maybe_unused]] [[nodiscard]] bool IUnitBridgeIsNavigatorIdle(
+    const IUnit* const bridge
+  ) noexcept
   {
     (void)bridge;
     return false;
@@ -113,7 +121,10 @@ namespace
    * What it does:
    * Tests one unit-state bit in the `UserUnit` IUnit-bridge state mask.
    */
-  [[nodiscard]] bool IUnitBridgeIsUnitState(const IUnit* const bridge, const EUnitState state) noexcept
+  [[nodiscard]] bool IUnitBridgeIsUnitState(
+    const IUnit* const bridge,
+    const EUnitState state
+  ) noexcept
   {
     if (bridge == nullptr) {
       return false;
@@ -134,12 +145,16 @@ namespace
   // `UserEntity::mVisionHandle` already sits at +0x18; the pad-struct that used
   // to be cast over `UserUnit*` here declared the same pointer at the same
   // offset.
-  [[nodiscard]] VisionDB::Handle*& GetUserUnitVisionHandle(UserUnit* const self) noexcept
+  [[nodiscard]] VisionDB::Handle*& GetUserUnitVisionHandle(
+    UserUnit* const self
+  ) noexcept
   {
     return self->mVisionHandle;
   }
 
-  [[maybe_unused]] [[nodiscard]] const VisionDB::Handle* GetUserUnitVisionHandle(const UserUnit* const self) noexcept
+  [[maybe_unused]] [[nodiscard]] const VisionDB::Handle* GetUserUnitVisionHandle(
+    const UserUnit* const self
+  ) noexcept
   {
     return self->mVisionHandle;
   }
@@ -155,7 +170,9 @@ namespace
    * the session selection and only republishes when the entity really was
    * selected, so a unit going busy off-screen never disturbs the selection.
    */
-  void DeselectFromSessionSelection(UserEntity* const entity) noexcept
+  void DeselectFromSessionSelection(
+    UserEntity* const entity
+  ) noexcept
   {
     if (entity == nullptr || entity->mSession == nullptr) {
       return;
@@ -189,7 +206,10 @@ namespace
    * the hit is `insert(it, WeakPtr(unit))` (0x008B23D2), the fall-through
    * `push_back(WeakPtr(unit))` (0x008B2429).
    */
-  void AddArmyAvatar(UserArmy* const army, UserUnit* const unit)
+  void AddArmyAvatar(
+    UserArmy* const army,
+    UserUnit* const unit
+  )
   {
     if (unit == nullptr) {
       return;
@@ -220,7 +240,10 @@ namespace
    * What it does:
    * Inserts one `UserUnit` into the owning army idle-engineer weak set.
    */
-  [[nodiscard]] bool InsertIdleEngineerWeakSetEntry(UserUnit* const unit, UserArmy* const army) noexcept
+  [[nodiscard]] bool InsertIdleEngineerWeakSetEntry(
+    UserUnit* const unit,
+    UserArmy* const army
+  ) noexcept
   {
     if (unit == nullptr || army == nullptr) {
       return false;
@@ -235,7 +258,10 @@ namespace
    * What it does:
    * Inserts one `UserUnit` into the owning army idle-factory weak set.
    */
-  [[nodiscard]] bool InsertIdleFactoryWeakSetEntry(UserUnit* const unit, UserArmy* const army) noexcept
+  [[nodiscard]] bool InsertIdleFactoryWeakSetEntry(
+    UserUnit* const unit,
+    UserArmy* const army
+  ) noexcept
   {
     if (unit == nullptr || army == nullptr) {
       return false;
@@ -272,7 +298,10 @@ namespace
    * blueprint `QuickSelectPriority` is positive, and from `UserUnit::Tick`
    * (FUN_008C0A30) during the dead-unit cleanup sweep.
    */
-  void UnregisterUserArmyPrioritySelectionSlot(UserUnit* const unit, UserArmy* const army) noexcept
+  void UnregisterUserArmyPrioritySelectionSlot(
+    UserUnit* const unit,
+    UserArmy* const army
+  ) noexcept
   {
     if (army == nullptr || unit == nullptr) {
       return;
@@ -293,7 +322,9 @@ namespace
    * What it does:
    * Resolves one command-manager active range and returns whether it is empty.
    */
-  [[nodiscard]] bool IsUserCommandManagerQueueEmpty(const UserCommandQueue* const manager) noexcept
+  [[nodiscard]] bool IsUserCommandManagerQueueEmpty(
+    const UserCommandQueue* const manager
+  ) noexcept
   {
     const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueRange =
       ResolveUserCommandQueueRange(manager);
@@ -307,13 +338,16 @@ namespace
    * Returns whether one `UserUnit` is currently idle enough for dock-target
    * candidate selection (not busy and no pending command queue entries).
    */
-  [[nodiscard]] bool IsDockTargetQueueIdle(const UserUnit* const unit) noexcept
+  [[nodiscard]] bool IsDockTargetQueueIdle(
+    const UserUnit* const unit
+  ) noexcept
   {
     if (unit == nullptr || unit->mUnitVarDat.mIsBusy != 0u) {
       return false;
     }
 
-    const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueRange = ResolveUserCommandQueueRange(unit->GetCommandQueue());
+    const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueRange =
+      ResolveUserCommandQueueRange(unit->GetCommandQueue());
     return queueRange != nullptr && queueRange->empty();
   }
 
@@ -325,7 +359,10 @@ namespace
    * marks resolved links dirty, then rebuilds resolved-link storage back to
    * inline mode when any slot was consumed.
    */
-  void AdvanceUserCommandManagerBySeq(UserCommandQueue* const managerPtr, const std::int32_t seqNo) noexcept
+  void AdvanceUserCommandManagerBySeq(
+    UserCommandQueue* const managerPtr,
+    const std::int32_t seqNo
+  ) noexcept
   {
     while (!managerPtr->issueQueue.empty() && (managerPtr->issueQueue.front().mCommandId - seqNo) <= 0) {
       managerPtr->issueQueue.pop_front();
@@ -338,7 +375,7 @@ namespace
 
     managerPtr->resolvedLinks.ResetStorageToInline();
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -368,7 +405,9 @@ namespace moho
    * Exposed (declared in UserUnit.h) so `Moho::ISSUE_SetCommandTarget`
    * (Sim.cpp) can resolve the drag-target world position it publishes.
    */
-  [[nodiscard]] Wm3::Vector3<float> ResolvePositionFromTarget(const UserTarget& target) noexcept
+  [[nodiscard]] Wm3::Vector3<float> ResolvePositionFromTarget(
+    const UserTarget& target
+  ) noexcept
   {
     if (target.targetType == UserTargetType::Position) {
       return target.position;
@@ -382,7 +421,7 @@ namespace moho
 
     return InvalidCommandQueuePosition();
   }
-}
+} // namespace moho
 
 namespace
 {
@@ -394,12 +433,17 @@ namespace
    * `SSTIEntityVariableData::mIntelAttributes` (+0xB0) - the same eight fields
    * in the same order, already declared as `SSTIIntelAttributes`.
    */
-  [[nodiscard]] const SSTIIntelAttributes& GetIntelRanges(const UserUnit* const self) noexcept
+  [[nodiscard]] const SSTIIntelAttributes& GetIntelRanges(
+    const UserUnit* const self
+  ) noexcept
   {
     return self->mVariableData.mIntelAttributes;
   }
 
-  [[nodiscard]] std::uint32_t GetIntelRangeMagnitude(const UserUnit* const self, const UserUnitIntelLane intel) noexcept
+  [[nodiscard]] std::uint32_t GetIntelRangeMagnitude(
+    const UserUnit* const self,
+    const UserUnitIntelLane intel
+  ) noexcept
   {
     const SSTIIntelAttributes& ranges = GetIntelRanges(self);
 
@@ -433,17 +477,24 @@ namespace
     return 0u;
   }
 
-  [[nodiscard]] float GetIntelRangeAsFloat(const UserUnit* const self, const UserUnitIntelLane intel) noexcept
+  [[nodiscard]] float GetIntelRangeAsFloat(
+    const UserUnit* const self,
+    const UserUnitIntelLane intel
+  ) noexcept
   {
     return static_cast<float>(GetIntelRangeMagnitude(self, intel));
   }
 
-  [[nodiscard]] const UnitWeaponInfo* GetWeaponInfoBegin(const UserUnit* const self) noexcept
+  [[nodiscard]] const UnitWeaponInfo* GetWeaponInfoBegin(
+    const UserUnit* const self
+  ) noexcept
   {
     return self->mUnitVarDat.mWeaponInfo.data();
   }
 
-  [[nodiscard]] const UnitWeaponInfo* GetWeaponInfoEnd(const UserUnit* const self) noexcept
+  [[nodiscard]] const UnitWeaponInfo* GetWeaponInfoEnd(
+    const UserUnit* const self
+  ) noexcept
   {
     return self->mUnitVarDat.mWeaponInfo.data() + self->mUnitVarDat.mWeaponInfo.size();
   }
@@ -461,18 +512,19 @@ namespace
     const REntityBlueprint* const blueprint
   ) noexcept
   {
-    if (!weaponInfo.mCat1.Bits().mWords.empty()
-        && ContainsBlueprintCategory(weaponInfo.mCat1, blueprint)) {
+    if (!weaponInfo.mCat1.Bits().mWords.empty() && ContainsBlueprintCategory(weaponInfo.mCat1, blueprint)) {
       return false;
     }
-    if (!weaponInfo.mCat2.Bits().mWords.empty()
-        && !ContainsBlueprintCategory(weaponInfo.mCat2, blueprint)) {
+    if (!weaponInfo.mCat2.Bits().mWords.empty() && !ContainsBlueprintCategory(weaponInfo.mCat2, blueprint)) {
       return false;
     }
     return true;
   }
 
-  [[nodiscard]] bool IsUnitInOverlayCategory(const UserUnit* const unit, const char* const categoryName)
+  [[nodiscard]] bool IsUnitInOverlayCategory(
+    const UserUnit* const unit,
+    const char* const categoryName
+  )
   {
     fa::string category{};
     category.assign_owned(categoryName != nullptr ? categoryName : "");
@@ -492,7 +544,10 @@ namespace
     return sharedPose->GetSkeleton().get() == skeleton.get();
   }
 
-  [[nodiscard]] float PlanarDistanceXZ(const Wm3::Vector3<float>& from, const Wm3::Vector3<float>& to) noexcept
+  [[nodiscard]] float PlanarDistanceXZ(
+    const Wm3::Vector3<float>& from,
+    const Wm3::Vector3<float>& to
+  ) noexcept
   {
     const float dx = to.x - from.x;
     const float dz = to.z - from.z;
@@ -525,7 +580,7 @@ namespace
 
     return reinterpret_cast<Wm3::Vector3<float>*>(destinationAddress);
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -536,7 +591,9 @@ namespace moho
    * reinterprets that same object as the UserUnit-local event-ring view the
    * count resolver was recovered against (identical binary layout).
    */
-  std::int32_t QueuedBuildCommandCount(const UserCommandIssueHelper& helper) noexcept
+  std::int32_t QueuedBuildCommandCount(
+    const UserCommandIssueHelper& helper
+  ) noexcept
   {
     return ResolveHelperBuildCount(helper);
   }
@@ -547,7 +604,9 @@ namespace moho
    * Returns whether one candidate platform unit is idle enough (not busy, no
    * pending command queue entries) to be considered a dock target.
    */
-  bool USERUNIT_IsDockTargetIdle(const UserUnit* const unit) noexcept
+  bool USERUNIT_IsDockTargetIdle(
+    const UserUnit* const unit
+  ) noexcept
   {
     return IsDockTargetQueueIdle(unit);
   }
@@ -560,7 +619,9 @@ namespace moho
    * dock worker reinterprets this handle as the command-graph anchor history the
    * binary walks to seed its centroid (identical binary object).
    */
-  const QueuedUserCommandRecord* GetLastQueuedUserCommandAnchor(const UserUnit* const unit) noexcept
+  const QueuedUserCommandRecord* GetLastQueuedUserCommandAnchor(
+    const UserUnit* const unit
+  ) noexcept
   {
     if (unit == nullptr) {
       return nullptr;
@@ -600,9 +661,13 @@ namespace moho
    * "last" target by heap-address order instead, an observable behavior
    * bug independent of the citation.
    */
-  void CollectUpgradeCommandTargetBlueprints(UserUnit* const unit, fa::list<const RUnitBlueprint*>& out)
+  void CollectUpgradeCommandTargetBlueprints(
+    UserUnit* const unit,
+    fa::list<const RUnitBlueprint*>& out
+  )
   {
-    gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queue = RebuildAndGetUserUnitManagerQueue(unit->mManager);
+    gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queue =
+      RebuildAndGetUserUnitManagerQueue(unit->mManager);
     if (queue == nullptr) {
       return;
     }
@@ -630,7 +695,7 @@ namespace moho
       }
     }
   }
-}
+} // namespace moho
 
 namespace
 {
@@ -641,25 +706,29 @@ namespace
    * What it does:
    * Emits one fixed warning when the focus-army-damaged Lua callback throws.
    */
-  void WarnFocusArmyUnitDamagedCallbackError(const std::exception& exception) noexcept
+  void WarnFocusArmyUnitDamagedCallbackError(
+    const std::exception& exception
+  ) noexcept
   {
     const char* const message = exception.what() != nullptr ? exception.what() : "";
     gpg::Warnf("Error running '/lua/ui/game/gamemain.lua:OnFocusArmyUnitDamaged': %s", message);
   }
-}
-
+} // namespace
 
 CScrLuaMetatableFactory<UserUnit> CScrLuaMetatableFactory<UserUnit>::sInstance{};
 namespace moho
 {
 
-  UserCommandIssueHelper* ResolveUserUnitFrontCommandIssueHelper(UserCommandQueue* const manager) noexcept
+  UserCommandIssueHelper* ResolveUserUnitFrontCommandIssueHelper(
+    UserCommandQueue* const manager
+  ) noexcept
   {
     if (manager == nullptr) {
       return nullptr;
     }
 
-    const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector =
+      RebuildAndGetUserUnitManagerQueue(manager);
     if (queueVector == nullptr) {
       return nullptr;
     }
@@ -689,20 +758,21 @@ namespace moho
   {
     return SCR_WriteMetatable<UserUnit>(object, state);
   }
-}
+} // namespace moho
 
 namespace
 {
   /// The metatable the `CScriptObject` sub-object is built against, fetched
   /// through the recovered factory accessor at 0x008C60F0.
-  [[nodiscard]] LuaPlus::LuaObject MakeUserUnitScriptMetatable(moho::CWldSession* const session)
+  [[nodiscard]] LuaPlus::LuaObject MakeUserUnitScriptMetatable(
+    moho::CWldSession* const session
+  )
   {
     LuaPlus::LuaObject metatable;
     (void)moho::func_GetUserUnitFactory(&metatable, session != nullptr ? session->mState : nullptr);
     return metatable;
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x008BF420 (FUN_008BF420, ??0UserUnit@Moho@@QAE@@Z)
@@ -718,7 +788,10 @@ namespace
  * either into its army's quick-select avatar run or into the engineer
  * classification.
  */
-UserUnit::UserUnit(CWldSession* const session, const SCreateUnitParams& params)
+UserUnit::UserUnit(
+  CWldSession* const session,
+  const SCreateUnitParams& params
+)
   : UserEntity(*session, params)
   , IUnit()
   , CScriptObject(
@@ -760,10 +833,8 @@ UserUnit::UserUnit(CWldSession* const session, const SCreateUnitParams& params)
     return;
   }
 
-  mIsEngineer = IsInCategory(fa::string("ENGINEER", 8u))
-    && !IsInCategory(fa::string("COMMAND", 7u))
-    && !IsInCategory(fa::string("SCOUT", 5u))
-    && !IsInCategory(fa::string("UNTARGETABLE", 12u));
+  mIsEngineer = IsInCategory(fa::string("ENGINEER", 8u)) && !IsInCategory(fa::string("COMMAND", 7u)) &&
+    !IsInCategory(fa::string("SCOUT", 5u)) && !IsInCategory(fa::string("UNTARGETABLE", 12u));
 }
 
 /**
@@ -841,12 +912,13 @@ UserUnit::~UserUnit()
  * Samples this unit's current world XZ position and writes the resolved
  * blueprint skirt rectangle into `outSkirtRect`.
  */
-gpg::Rect2f* UserUnit::GetSkirt(gpg::Rect2f* const outSkirtRect) const
+gpg::Rect2f* UserUnit::GetSkirt(
+  gpg::Rect2f* const outSkirtRect
+) const
 {
   const UserEntity* const entityView = this;
   const SCoordsVec2 currentPosition{
-    entityView->mVariableData.mCurTransform.pos_.x,
-    entityView->mVariableData.mCurTransform.pos_.z
+    entityView->mVariableData.mCurTransform.pos_.x, entityView->mVariableData.mCurTransform.pos_.z
   };
   const RUnitBlueprint* const blueprint = GetIUnitBridge(this)->GetBlueprint();
   *outSkirtRect = blueprint->GetSkirtRect(currentPosition);
@@ -916,7 +988,10 @@ void UserUnit::UpdateVisibility()
  * the payload says the sim refreshed them. A unit that has just gone busy
  * drops out of the current selection.
  */
-void UserUnit::UpdateUnitData(const SSTIUnitVariableData& payload, const std::uint32_t intelStateFlags)
+void UserUnit::UpdateUnitData(
+  const SSTIUnitVariableData& payload,
+  const std::uint32_t intelStateFlags
+)
 {
   const bool wasBusy = ApplyUnitPayload(payload, intelStateFlags);
 
@@ -928,7 +1003,10 @@ void UserUnit::UpdateUnitData(const SSTIUnitVariableData& payload, const std::ui
   FinishUnitDataLinks();
 }
 
-bool UserUnit::ApplyUnitPayload(const SSTIUnitVariableData& payload, const std::uint32_t intelStateFlags)
+bool UserUnit::ApplyUnitPayload(
+  const SSTIUnitVariableData& payload,
+  const std::uint32_t intelStateFlags
+)
 {
   const bool wasBusy = mUnitVarDat.mIsBusy;
   mUnitVarDat.AssignFrom(payload);
@@ -942,7 +1020,9 @@ void UserUnit::ApplyUnitPoses()
   mPoseSecondary = mUnitVarDat.mSharedPose;
 }
 
-bool UserUnit::UnitDataUpdateRunsLua(const SSTIUnitVariableData& payload) const
+bool UserUnit::UnitDataUpdateRunsLua(
+  const SSTIUnitVariableData& payload
+) const
 {
   if (!mUnitVarDat.mIsBusy && payload.mIsBusy) {
     return true;
@@ -1101,7 +1181,9 @@ bool UserUnit::IsNavigatorIdle() const
  * `__allshl`, which yields zero once the count reaches 64; the explicit bound
  * keeps that same answer without the shift being undefined.
  */
-bool UserUnit::IsUnitState(const EUnitState state) const
+bool UserUnit::IsUnitState(
+  const EUnitState state
+) const
 {
   const auto stateIndex = static_cast<std::uint32_t>(state);
   if (stateIndex >= 64u) {
@@ -1134,11 +1216,12 @@ const UnitAttributes& UserUnit::GetAttributes() const
  * What it does:
  * Tests the sign-extended script flags with the original 64-bit shift semantics.
  */
-bool UserUnit::HasScriptBit(const std::uint8_t bitIndex) const
+bool UserUnit::HasScriptBit(
+  const std::uint8_t bitIndex
+) const
 {
-  const auto scriptBits = static_cast<std::uint64_t>(
-    static_cast<std::int64_t>(static_cast<std::int32_t>(mUnitVarDat.mScriptbits))
-  );
+  const auto scriptBits =
+    static_cast<std::uint64_t>(static_cast<std::int64_t>(static_cast<std::int32_t>(mUnitVarDat.mScriptbits)));
   return bitIndex < 64u && (scriptBits & (std::uint64_t{1} << bitIndex)) != 0u;
 }
 
@@ -1150,7 +1233,10 @@ bool UserUnit::HasScriptBit(const std::uint8_t bitIndex) const
  * The default value only picks the lane: a string default routes to the
  * string-typed stat under this unit's stats root.
  */
-StatItem* UserUnit::GetStat(const gpg::StrArg statPath, const std::string& defaultValue)
+StatItem* UserUnit::GetStat(
+  const gpg::StrArg statPath,
+  const std::string& defaultValue
+)
 {
   (void)defaultValue;
   return mUnitConstDat.mStatsRoot->GetStringItem(statPath);
@@ -1160,7 +1246,10 @@ StatItem* UserUnit::GetStat(const gpg::StrArg statPath, const std::string& defau
  * Address: 0x008BF0B0 (FUN_008BF0B0, Moho::IUnit_UserUnit::GetStat)
  * IUnit slot 19.
  */
-StatItem* UserUnit::GetStat(const gpg::StrArg statPath, const float& defaultValue)
+StatItem* UserUnit::GetStat(
+  const gpg::StrArg statPath,
+  const float& defaultValue
+)
 {
   (void)defaultValue;
   return mUnitConstDat.mStatsRoot->GetFloatItem(statPath);
@@ -1175,7 +1264,10 @@ StatItem* UserUnit::GetStat(const gpg::StrArg statPath, const float& defaultValu
  * missing - the binary rewrites the second argument to `true` and tail-calls
  * the same lookup slot 21 uses.
  */
-StatItem* UserUnit::GetStat(const gpg::StrArg statPath, const int& defaultValue)
+StatItem* UserUnit::GetStat(
+  const gpg::StrArg statPath,
+  const int& defaultValue
+)
 {
   (void)defaultValue;
   return mUnitConstDat.mStatsRoot->GetItem(statPath, true);
@@ -1185,7 +1277,9 @@ StatItem* UserUnit::GetStat(const gpg::StrArg statPath, const int& defaultValue)
  * Address: 0x008BF080 (FUN_008BF080, Moho::IUnit_UserUnit::GetStat)
  * IUnit slot 21.
  */
-StatItem* UserUnit::GetStat(const gpg::StrArg statPath)
+StatItem* UserUnit::GetStat(
+  const gpg::StrArg statPath
+)
 {
   return mUnitConstDat.mStatsRoot->GetItem(statPath, false);
 }
@@ -1219,7 +1313,9 @@ gpg::RRef UserUnit::GetDerivedObjectRef()
  * Advances command-manager queue state, updates idle engineer/factory weak-set
  * membership, and maintains the vision-handle lane for fog/recon tracking.
  */
-void UserUnit::Tick(const std::int32_t seqNo)
+void UserUnit::Tick(
+  const std::int32_t seqNo
+)
 {
   AdvanceUserCommandManagerBySeq(mManager, seqNo);
   if (mFactoryManager != nullptr) {
@@ -1241,7 +1337,7 @@ void UserUnit::Tick(const std::int32_t seqNo)
         // high-priority selection registry instead of the idle weak-sets.
         UnregisterUserArmyPrioritySelectionSlot(this, army);
       } else if (mQueueEmptyCached) {
-          if (mIsFactory) {
+        if (mIsFactory) {
           (void)army->mFactories.Remove(this);
         }
         if (mIsEngineer) {
@@ -1312,7 +1408,9 @@ void UserUnit::Tick(const std::int32_t seqNo)
     isAlly = focusArmy->IsAlly(army->mArmyIndex);
   }
 
-  const Wm3::Vector2f currentPos(entityView->mVariableData.mCurTransform.pos_.x, entityView->mVariableData.mCurTransform.pos_.z);
+  const Wm3::Vector2f currentPos(
+    entityView->mVariableData.mCurTransform.pos_.x, entityView->mVariableData.mCurTransform.pos_.z
+  );
   const Wm3::Vector2f previousPos(
     entityView->mVariableData.mLastTransform.pos_.x, entityView->mVariableData.mLastTransform.pos_.z
   );
@@ -1320,13 +1418,15 @@ void UserUnit::Tick(const std::int32_t seqNo)
 }
 
 /**
-  * Alias of FUN_008B8EB0 (non-canonical helper lane).
+ * Alias of FUN_008B8EB0 (non-canonical helper lane).
  *
  * What it does:
  * For UserUnit instances, forwards replicated variable-data updates to the
  * shared UserEntity implementation for mesh/visibility/vision refresh.
  */
-void UserUnit::UpdateEntityData(const SSTIEntityVariableData& variableData)
+void UserUnit::UpdateEntityData(
+  const SSTIEntityVariableData& variableData
+)
 {
   UserEntity::UpdateEntityData(variableData);
 }
@@ -1412,7 +1512,7 @@ UserCommandQueue* UserUnit::GetFactoryCommandQueue()
 }
 
 /**
-  * Alias of FUN_008B8530 (non-canonical helper lane).
+ * Alias of FUN_008B8530 (non-canonical helper lane).
  *
  * What it does:
  * Returns replicated UI-dirty state from UserEntity variable-data bytes.
@@ -1470,8 +1570,7 @@ bool UserUnit::IsSelectable() const
     return false;
   }
 
-  const UserEntity* const entityView = this;  // base conversion, not a reinterpretation
-
+  const UserEntity* const entityView = this; // base conversion, not a reinterpretation
 
   const fa::string podCategory("POD", 3u);
   if (mUnitVarDat.mIsBusy && iunitBridge->IsMobile() && !entityView->IsInCategory(podCategory)) {
@@ -1540,7 +1639,9 @@ void UserUnit::NotifyFocusArmyUnitDamaged()
  * Invokes `/lua/ui/game/gamemain.lua:OnDetectAdjacencyBonus(unitObject, blueprintObject)`
  * and returns the callback boolean result.
  */
-bool UserUnit::DoOnDetectAdjacencyBonusFor(const RUnitBlueprint* const blueprint)
+bool UserUnit::DoOnDetectAdjacencyBonusFor(
+  const RUnitBlueprint* const blueprint
+)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr || blueprint == nullptr) {
@@ -1577,7 +1678,9 @@ bool UserUnit::DoOnDetectAdjacencyBonusFor(const RUnitBlueprint* const blueprint
  * Creates the unit mesh instance, applies team-color lookup parameter, and
  * wires animation poses from shared unit pose lanes when skeletons match.
  */
-void UserUnit::CreateMeshInstance(const bool forUnitPose)
+void UserUnit::CreateMeshInstance(
+  const bool forUnitPose
+)
 {
   UserEntity* const entityView = this;
   if (entityView == nullptr || entityView->mSession == nullptr) {
@@ -1628,7 +1731,8 @@ void UserUnit::CreateMeshInstance(const bool forUnitPose)
 
   const boost::shared_ptr<Mesh> mesh = entityView->mMeshInstance->GetMesh();
   const boost::shared_ptr<RScmResource> resource = mesh ? mesh->GetResource(0) : boost::shared_ptr<RScmResource>{};
-  const boost::shared_ptr<const CAniSkel> skeleton = resource ? resource->GetSkeleton() : boost::shared_ptr<const CAniSkel>{};
+  const boost::shared_ptr<const CAniSkel> skeleton =
+    resource ? resource->GetSkeleton() : boost::shared_ptr<const CAniSkel>{};
 
   const boost::shared_ptr<CAniPose> priorSharedPose =
     unitVarDat ? unitVarDat->mPriorSharedPose : boost::shared_ptr<CAniPose>{};
@@ -1672,7 +1776,9 @@ void UserUnit::DestroyMeshInstance()
  * range category (`6` means match all categories).
  */
 bool UserUnit::FindWeaponBy(
-  const std::int32_t rangeCategoryFilter, float* const outMinRange, float* const outMaxRange
+  const std::int32_t rangeCategoryFilter,
+  float* const outMinRange,
+  float* const outMaxRange
 ) const
 {
   constexpr float kInitialMinRangeSentinel = std::numeric_limits<float>::max();
@@ -1688,8 +1794,10 @@ bool UserUnit::FindWeaponBy(
 
   for (std::size_t i = 0; i < weaponBlueprints.size(); ++i) {
     const auto& weaponBlueprint = weaponBlueprints[i];
-    if (rangeCategoryFilter != kRangeCategoryAll &&
-        rangeCategoryFilter != static_cast<std::int32_t>(weaponBlueprint.RangeCategory)) {
+    if (
+      rangeCategoryFilter != kRangeCategoryAll &&
+      rangeCategoryFilter != static_cast<std::int32_t>(weaponBlueprint.RangeCategory)
+    ) {
       continue;
     }
 
@@ -1719,7 +1827,11 @@ bool UserUnit::FindWeaponBy(
  * Returns active intel ranges (`omni`, `radar`, `sonar`) unless Intel toggle
  * state currently disables this intel block.
  */
-bool UserUnit::GetIntelRanges(float* const outOmniRange, float* const outRadarRange, float* const outSonarRange) const
+bool UserUnit::GetIntelRanges(
+  float* const outOmniRange,
+  float* const outRadarRange,
+  float* const outSonarRange
+) const
 {
   const IUnit* const iunitBridge = GetIUnitBridge(this);
   const std::uint32_t toggleCaps = iunitBridge->GetAttributes().toggleCapsMask;
@@ -1741,12 +1853,16 @@ bool UserUnit::GetIntelRanges(float* const outOmniRange, float* const outRadarRa
  * Computes the largest active counter-intel radius from replicated intel
  * ranges plus blueprint jam/spoof maxima.
  */
-bool UserUnit::GetMaxCounterIntel(float* const outMaxCounterIntelRange) const
+bool UserUnit::GetMaxCounterIntel(
+  float* const outMaxCounterIntelRange
+) const
 {
   const IUnit* const iunitBridge = GetIUnitBridge(this);
   const std::uint32_t toggleCaps = iunitBridge->GetAttributes().toggleCapsMask;
-  if (((toggleCaps & kToggleCapJamming) != 0u && (mUnitVarDat.mScriptbits & kToggleCapJamming) != 0u) ||
-      ((toggleCaps & kToggleCapStealth) != 0u && (mUnitVarDat.mScriptbits & kToggleCapStealth) != 0u)) {
+  if (
+    ((toggleCaps & kToggleCapJamming) != 0u && (mUnitVarDat.mScriptbits & kToggleCapJamming) != 0u) ||
+    ((toggleCaps & kToggleCapStealth) != 0u && (mUnitVarDat.mScriptbits & kToggleCapStealth) != 0u)
+  ) {
     return false;
   }
 
@@ -1859,7 +1975,9 @@ float UserUnit::GetShield() const
  * Inserts one selection-set name into this unit's persisted selection-set
  * container.
  */
-void UserUnit::AddSelectionSet(const char* const selectionSetName)
+void UserUnit::AddSelectionSet(
+  const char* const selectionSetName
+)
 {
   fa::string selectionSet{};
   selectionSet.assign_owned(selectionSetName != nullptr ? selectionSetName : "");
@@ -1879,7 +1997,10 @@ void UserUnit::AddSelectionSet(const char* const selectionSetName)
  * (0x008BFAEE), and when a freshly replicated unit inherits them from the
  * factory that built it (0x008C0956).
  */
-void UserUnit::AddToSelectionSet(UserUnit* const target, UserUnit* const source)
+void UserUnit::AddToSelectionSet(
+  UserUnit* const target,
+  UserUnit* const source
+)
 {
   if (source == nullptr) {
     return;
@@ -1889,8 +2010,7 @@ void UserUnit::AddToSelectionSet(UserUnit* const target, UserUnit* const source)
   // the target, so the walk is stable even when `target == source`.
   const fa::set<fa::string> inheritedNames = source->mSelectionSets;
 
-  LuaPlus::LuaObject selectionModule =
-    SCR_Import(WLD_GetActiveSession()->mState, "/lua/ui/game/selection.lua");
+  LuaPlus::LuaObject selectionModule = SCR_Import(WLD_GetActiveSession()->mState, "/lua/ui/game/selection.lua");
   LuaPlus::LuaObject addUnitToSelectionSet = selectionModule["AddUnitToSelectionSet"];
   LuaPlus::LuaFunction callback(addUnitToSelectionSet);
 
@@ -1911,7 +2031,9 @@ void UserUnit::AddToSelectionSet(UserUnit* const target, UserUnit* const source)
  * Removes one selection-set name from this unit's persisted selection-set
  * container.
  */
-void UserUnit::RemoveSelectionSet(const char* const selectionSetName)
+void UserUnit::RemoveSelectionSet(
+  const char* const selectionSetName
+)
 {
   fa::string selectionSet{};
   selectionSet.assign_owned(selectionSetName != nullptr ? selectionSetName : "");
@@ -1934,7 +2056,8 @@ void UserUnit::RemoveSelectionSet(const char* const selectionSetName)
  */
 fa::set<fa::string>::iterator FindStringSetEntry(
   const fa::set<fa::string>& storage,
-  const fa::string& key)
+  const fa::string& key
+)
 {
   return storage.find(key);
 }
@@ -1947,7 +2070,9 @@ fa::set<fa::string>::iterator FindStringSetEntry(
  * Routes the per-T `fa::set<fa::string>::find` through the named
  * helper (FUN_008C5B90) to preserve the MSVC8 template emission symbol.
  */
-bool UserUnit::HasSelectionSet(const char* const selectionSetName) const
+bool UserUnit::HasSelectionSet(
+  const char* const selectionSetName
+) const
 {
   fa::string selectionSet{};
   selectionSet.assign_owned(selectionSetName != nullptr ? selectionSetName : "");
@@ -1967,23 +2092,31 @@ bool UserUnit::IsRepeatQueueEnabled() const
  * movement-layer overlays, weapon layer/category filters, and optional
  * range-gating checks.
  */
-bool UserUnit::CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) const
+bool UserUnit::CanAttackTarget(
+  const UserEntity* targetEntity,
+  bool rangeCheck
+) const
 {
   const IUnit* const iunitBridge = GetIUnitBridge(this);
   const UserEntity* const selfEntity = this;
-  const REntityBlueprint* const targetBlueprint = (targetEntity != nullptr) ? targetEntity->mParams.mBlueprint : nullptr;
+  const REntityBlueprint* const targetBlueprint =
+    (targetEntity != nullptr) ? targetEntity->mParams.mBlueprint : nullptr;
 
   if (targetBlueprint != nullptr) {
     if (iunitBridge->IsMobile() && targetEntity != nullptr) {
       const std::uint32_t targetLayerMask = targetEntity->mVariableData.mLayerMask;
 
       if (mUnitVarDat.mAutoSurfaceMode) {
-        if ((targetLayerMask & static_cast<std::uint32_t>(LAYER_Air)) != 0u
-            && IsUnitInOverlayCategory(this, kOverlayCategoryAntiAir)) {
+        if (
+          (targetLayerMask & static_cast<std::uint32_t>(LAYER_Air)) != 0u &&
+          IsUnitInOverlayCategory(this, kOverlayCategoryAntiAir)
+        ) {
           return true;
         }
-        if ((targetLayerMask & static_cast<std::uint32_t>(LAYER_Land)) != 0u
-            && IsUnitInOverlayCategory(this, kOverlayCategoryDirectFire)) {
+        if (
+          (targetLayerMask & static_cast<std::uint32_t>(LAYER_Land)) != 0u &&
+          IsUnitInOverlayCategory(this, kOverlayCategoryDirectFire)
+        ) {
           return true;
         }
       }
@@ -1992,20 +2125,22 @@ bool UserUnit::CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) 
       const RUnitBlueprint* const selfBlueprint = iunitBridge->GetBlueprint();
       const bool selfOnLand = (selfLayerMask & static_cast<std::uint32_t>(LAYER_Land)) != 0u;
       const bool selfOnSeabed = (selfLayerMask & static_cast<std::uint32_t>(LAYER_Seabed)) != 0u;
-      const bool targetUnderwater = (targetLayerMask
-                                     & (static_cast<std::uint32_t>(LAYER_Sub) | static_cast<std::uint32_t>(LAYER_Seabed)))
-                                    != 0u;
+      const bool targetUnderwater =
+        (targetLayerMask & (static_cast<std::uint32_t>(LAYER_Sub) | static_cast<std::uint32_t>(LAYER_Seabed))) != 0u;
       const bool targetOnLand = (targetLayerMask & static_cast<std::uint32_t>(LAYER_Land)) != 0u;
 
       if (selfOnLand && targetUnderwater) {
         const ERuleBPUnitMovementType motionType = selfBlueprint->Physics.MotionType;
-        if ((motionType == RULEUMT_Amphibious || motionType == RULEUMT_AmphibiousFloating)
-            && IsUnitInOverlayCategory(this, kOverlayCategoryAntiNavy)) {
+        if (
+          (motionType == RULEUMT_Amphibious || motionType == RULEUMT_AmphibiousFloating) &&
+          IsUnitInOverlayCategory(this, kOverlayCategoryAntiNavy)
+        ) {
           return true;
         }
-      } else if (selfOnSeabed && targetOnLand
-                 && selfBlueprint->Physics.MotionType == RULEUMT_Amphibious
-                 && IsUnitInOverlayCategory(this, kOverlayCategoryDirectFire)) {
+      } else if (
+        selfOnSeabed && targetOnLand && selfBlueprint->Physics.MotionType == RULEUMT_Amphibious &&
+        IsUnitInOverlayCategory(this, kOverlayCategoryDirectFire)
+      ) {
         return true;
       }
     }
@@ -2018,10 +2153,14 @@ bool UserUnit::CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) 
     const UnitWeaponInfo* weaponInfo = GetWeaponInfoBegin(this);
     const UnitWeaponInfo* const weaponInfoEnd = GetWeaponInfoEnd(this);
     while (weaponInfo != weaponInfoEnd) {
-      if ((static_cast<std::uint32_t>(weaponInfo->mLayer) & targetLayerMask) != 0u
-          && WeaponAllowsBlueprint(*weaponInfo, targetBlueprint)) {
-        if (iunitBridge->IsMobile() || !rangeCheck
-            || (weaponInfo->mMinRadius <= targetDistance && targetDistance <= weaponInfo->mMaxRadius)) {
+      if (
+        (static_cast<std::uint32_t>(weaponInfo->mLayer) & targetLayerMask) != 0u &&
+        WeaponAllowsBlueprint(*weaponInfo, targetBlueprint)
+      ) {
+        if (
+          iunitBridge->IsMobile() || !rangeCheck ||
+          (weaponInfo->mMinRadius <= targetDistance && targetDistance <= weaponInfo->mMaxRadius)
+        ) {
           return true;
         }
       }
@@ -2043,7 +2182,8 @@ bool UserUnit::CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) 
     return false;
   }
 
-  const float cursorDistance = PlanarDistanceXZ(selfEntity->mVariableData.mCurTransform.pos_, activeSession->CursorWorldPos);
+  const float cursorDistance =
+    PlanarDistanceXZ(selfEntity->mVariableData.mCurTransform.pos_, activeSession->CursorWorldPos);
   const UnitWeaponInfo* weaponInfo = GetWeaponInfoBegin(this);
   const UnitWeaponInfo* const weaponInfoEnd = GetWeaponInfoEnd(this);
   while (weaponInfo != weaponInfoEnd) {
@@ -2057,7 +2197,8 @@ bool UserUnit::CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) 
 }
 
 /**
- * Address: 0x008C1880 (FUN_008C1880, ?USERUNIT_CanBeBuiltAt@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSCoordsVec2@1@_NPAUSBuildInfo@1@PBVUserCommand@1@@Z)
+ * Address: 0x008C1880 (FUN_008C1880,
+ * ?USERUNIT_CanBeBuiltAt@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSCoordsVec2@1@_NPAUSBuildInfo@1@PBVUserCommand@1@@Z)
  *
  * What it does:
  * Runs world-space placement validation, then rejects placements that overlap
@@ -2084,10 +2225,12 @@ bool moho::USERUNIT_CanBeBuiltAt(
   const SCoordsVec2 candidatePosition{buildInfo->pos.x, buildInfo->pos.z};
   const gpg::Rect2f candidateSkirt = buildBlueprint->GetSkirtRect(candidatePosition);
   const gpg::Rect2i& playableRect = map->mPlayableRect;
-  if (static_cast<float>(playableRect.x0 + 2) >= candidateSkirt.x0
-      || static_cast<float>(playableRect.z0 + 2) >= candidateSkirt.z0
-      || candidateSkirt.x1 >= static_cast<float>(playableRect.x1 - 2)
-      || candidateSkirt.z1 >= static_cast<float>(playableRect.z1 - 2)) {
+  if (
+    static_cast<float>(playableRect.x0 + 2) >= candidateSkirt.x0 ||
+    static_cast<float>(playableRect.z0 + 2) >= candidateSkirt.z0 ||
+    candidateSkirt.x1 >= static_cast<float>(playableRect.x1 - 2) ||
+    candidateSkirt.z1 >= static_cast<float>(playableRect.z1 - 2)
+  ) {
     return false;
   }
 
@@ -2170,7 +2313,8 @@ bool moho::USERUNIT_CanBeBuiltAt(
 }
 
 /**
- * Address: 0x008C1BC0 (FUN_008C1BC0, ?USERUNIT_CanBeBuiltAt@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSOCellPos@1@_NPAUSBuildInfo@1@@Z)
+ * Address: 0x008C1BC0 (FUN_008C1BC0,
+ * ?USERUNIT_CanBeBuiltAt@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSOCellPos@1@_NPAUSBuildInfo@1@@Z)
  *
  * What it does:
  * Converts one cell-origin placement probe into world-space center
@@ -2192,14 +2336,7 @@ bool moho::USERUNIT_CanBeBuiltAt(
     static_cast<float>(cellPosition.z) + halfSizeZ,
   };
 
-  return USERUNIT_CanBeBuiltAt(
-    session,
-    buildBlueprint,
-    buildPosition,
-    allowCommandOverlap,
-    buildInfo,
-    nullptr
-  );
+  return USERUNIT_CanBeBuiltAt(session, buildBlueprint, buildPosition, allowCommandOverlap, buildInfo, nullptr);
 }
 
 /**
@@ -2210,7 +2347,11 @@ bool moho::USERUNIT_CanBeBuiltAt(
  * placement if it overlaps a visible non-mobile unit footprint in the spatial
  * database.
  */
-bool moho::USERUNIT_CanOccupy(CWldSession& session, const SFootprint& footprint, SOCellPos& position)
+bool moho::USERUNIT_CanOccupy(
+  CWldSession& session,
+  const SFootprint& footprint,
+  SOCellPos& position
+)
 {
   const std::int16_t cellX = position.x;
   if (cellX < 0 || position.z < 0) {
@@ -2273,7 +2414,8 @@ bool moho::USERUNIT_CanOccupy(CWldSession& session, const SFootprint& footprint,
 }
 
 /**
- * Address: 0x008C1610 (FUN_008C1610, ?USERUNIT_WithinBuildDistance@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSCoordsVec2@1@@Z)
+ * Address: 0x008C1610 (FUN_008C1610,
+ * ?USERUNIT_WithinBuildDistance@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSCoordsVec2@1@@Z)
  *
  * What it does:
  * Checks whether all selected user units are within each unit's own
@@ -2281,7 +2423,9 @@ bool moho::USERUNIT_CanOccupy(CWldSession& session, const SFootprint& footprint,
  * candidate blueprint footprint.
  */
 bool moho::USERUNIT_WithinBuildDistance(
-  CWldSession& session, const RUnitBlueprint* const buildBlueprint, const SCoordsVec2& buildPosition
+  CWldSession& session,
+  const RUnitBlueprint* const buildBlueprint,
+  const SCoordsVec2& buildPosition
 )
 {
   fa::vector<UserUnit*> selectedUnits{};
@@ -2324,7 +2468,8 @@ bool moho::USERUNIT_WithinBuildDistance(
 }
 
 /**
- * Address: 0x008C1C30 (FUN_008C1C30, ?USERUNIT_GetBounds@Moho@@YA?AV?$AxisAlignedBox3@M@Wm3@@PBVRUnitBlueprint@1@ABV?$Vector3@M@3@@Z)
+ * Address: 0x008C1C30 (FUN_008C1C30,
+ * ?USERUNIT_GetBounds@Moho@@YA?AV?$AxisAlignedBox3@M@Wm3@@PBVRUnitBlueprint@1@ABV?$Vector3@M@3@@Z)
  *
  * What it does:
  * Builds one world-space unit bounds AABB from collision offsets/sizes for
@@ -2339,11 +2484,9 @@ Wm3::AxisAlignedBox3f moho::USERUNIT_GetBounds(
   Wm3::AxisAlignedBox3f bounds{};
 
   if (unitBlueprint->IsMobile()) {
-    const float minX =
-      (worldPosition.x + unitBlueprint->mCollisionOffsetX) - (unitBlueprint->mSizeX * 0.5f);
+    const float minX = (worldPosition.x + unitBlueprint->mCollisionOffsetX) - (unitBlueprint->mSizeX * 0.5f);
     const float minY = worldPosition.y + unitBlueprint->mCollisionOffsetY;
-    const float minZ =
-      (worldPosition.z + unitBlueprint->mCollisionOffsetZ) - (unitBlueprint->mSizeZ * 0.5f);
+    const float minZ = (worldPosition.z + unitBlueprint->mCollisionOffsetZ) - (unitBlueprint->mSizeZ * 0.5f);
 
     bounds.Min.x = minX;
     bounds.Min.y = minY;

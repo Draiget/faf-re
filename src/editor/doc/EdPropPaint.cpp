@@ -8,7 +8,9 @@
 
 namespace faf::editor
 {
-  std::string PaintSetToProppaintset(const std::vector<PropPaintEntry>& entries)
+  std::string PaintSetToProppaintset(
+    const std::vector<PropPaintEntry>& entries
+  )
   {
     std::string out = "{\n    \"PaintProps\": [";
     for (std::size_t i = 0; i < entries.size(); ++i) {
@@ -26,7 +28,11 @@ namespace faf::editor
     return out + (entries.empty() ? "]\n}" : "\n    ]\n}");
   }
 
-  bool PaintSetFromProppaintset(const std::string& text, std::vector<PropPaintEntry>& entries, std::string& error)
+  bool PaintSetFromProppaintset(
+    const std::string& text,
+    std::vector<PropPaintEntry>& entries,
+    std::string& error
+  )
   {
     std::string array;
     if (!JsonValue(text, "PaintProps", array) || array.empty() || array.front() != '[') {
@@ -57,7 +63,10 @@ namespace faf::editor
     return true;
   }
 
-  int PickPaintEntry(const std::vector<PropPaintEntry>& entries, const float roll)
+  int PickPaintEntry(
+    const std::vector<PropPaintEntry>& entries,
+    const float roll
+  )
   {
     int total = 0;
     for (const PropPaintEntry& entry : entries) {

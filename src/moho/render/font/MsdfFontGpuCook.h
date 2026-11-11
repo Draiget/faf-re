@@ -18,7 +18,8 @@ namespace moho
    * batches below keep every dispatch short.
    */
 
-  /** `ren_GpuFontCook`: -1 where the backend has verified it (NVIDIA adapters for now), 1 wherever it has compute, 0 never. */
+  /** `ren_GpuFontCook`: -1 where the backend has verified it (NVIDIA adapters for now), 1 wherever it has compute, 0
+   * never. */
   extern int ren_GpuFontCook;
   /** `ren_GpuFontCookCompare`: also cook each font on the CPU, ignore the cache, and log how far apart they are. */
   extern bool ren_GpuFontCookCompare;
@@ -39,5 +40,11 @@ namespace moho
   void MSDF_CancelGpuCook();
 
   /** Logs how two atlases of one font differ, per channel and in the shape they draw. */
-  void MSDF_LogAtlasComparison(const char* name, const SMsdfFontAtlas& gpu, const SMsdfFontAtlas& cpu, double gpuMs, double cpuMs);
+  void MSDF_LogAtlasComparison(
+    const char* name,
+    const SMsdfFontAtlas& gpu,
+    const SMsdfFontAtlas& cpu,
+    double gpuMs,
+    double cpuMs
+  );
 } // namespace moho

@@ -21,9 +21,13 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<HPathCell>::Deserialize` 0x00762F80.
    */
-  void HPathCell::MemberDeserialize(gpg::ReadArchive* const archive)
+  void HPathCell::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
-    static_assert(sizeof(moho::HPathCell) == sizeof(unsigned int), "HPathCell must pack to one unsigned int for archive I/O");
+    static_assert(
+      sizeof(moho::HPathCell) == sizeof(unsigned int), "HPathCell must pack to one unsigned int for archive I/O"
+    );
 
     unsigned int packed = 0;
     archive->ReadUInt(&packed);
@@ -33,7 +37,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<HPathCell>::Serialize` 0x00762FA0.
    */
-  void HPathCell::MemberSerialize(gpg::WriteArchive* const archive) const
+  void HPathCell::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     archive->WriteUInt(std::bit_cast<unsigned int>(*this));
   }

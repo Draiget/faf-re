@@ -87,25 +87,23 @@ namespace
   constexpr const char* kHeadAliases[] = {"head", "monitor", "mon", "display"};
   constexpr const char* kFullscreenAliases[] = {"fullscreen"};
   constexpr const char* kWindowedAliases[] = {"windowed", "window", "size"};
-  constexpr std::array<std::uint32_t, 4> kDefaultGameIdParts{
-    0xFA42B43Au,
-    0x68BC5B02u,
-    0x4F701F15u,
-    0x7C3E8FB0u
-  };
+  constexpr std::array<std::uint32_t, 4> kDefaultGameIdParts{0xFA42B43Au, 0x68BC5B02u, 0x4F701F15u, 0x7C3E8FB0u};
 
   constexpr moho::CfgAliasSet kOptionPrefixesSet{kOptionPrefixes, sizeof(kOptionPrefixes) / sizeof(kOptionPrefixes[0])};
   constexpr moho::CfgAliasSet kAdapterAliasesSet{kAdapterAliases, sizeof(kAdapterAliases) / sizeof(kAdapterAliases[0])};
   constexpr moho::CfgAliasSet kMaximizeAliasesSet{
-    kMaximizeAliases, sizeof(kMaximizeAliases) / sizeof(kMaximizeAliases[0])
+    kMaximizeAliases,
+    sizeof(kMaximizeAliases) / sizeof(kMaximizeAliases[0])
   };
   constexpr moho::CfgAliasSet kDualAliasesSet{kDualAliases, sizeof(kDualAliases) / sizeof(kDualAliases[0])};
   constexpr moho::CfgAliasSet kHeadAliasesSet{kHeadAliases, sizeof(kHeadAliases) / sizeof(kHeadAliases[0])};
   constexpr moho::CfgAliasSet kFullscreenAliasesSet{
-    kFullscreenAliases, sizeof(kFullscreenAliases) / sizeof(kFullscreenAliases[0])
+    kFullscreenAliases,
+    sizeof(kFullscreenAliases) / sizeof(kFullscreenAliases[0])
   };
   constexpr moho::CfgAliasSet kWindowedAliasesSet{
-    kWindowedAliases, sizeof(kWindowedAliases) / sizeof(kWindowedAliases[0])
+    kWindowedAliases,
+    sizeof(kWindowedAliases) / sizeof(kWindowedAliases[0])
   };
   constexpr char kSHGetFolderPathHelpText[] = "(name, create?) -- Interface to Win32 SHGetFolderPath api";
   constexpr char kGetMovieDurationHelpText[] = "GetMovieDuration(localFileName)";
@@ -123,7 +121,10 @@ namespace
    * Replaces destination with source when destination already exists; otherwise
    * moves source to destination, logging Win32 error codes on failure.
    */
-  void CopyOrReplacePreferenceFile(const wchar_t* const sourcePath, const wchar_t* const destinationPath)
+  void CopyOrReplacePreferenceFile(
+    const wchar_t* const sourcePath,
+    const wchar_t* const destinationPath
+  )
   {
     if (sourcePath == nullptr || destinationPath == nullptr) {
       return;
@@ -157,7 +158,8 @@ namespace
    * Address: 0x008C8230 (FUN_008C8230)
    *
    * IDA signature:
-   * void __stdcall sub_8C8230(std::ostream *lpOutputString, std::string *a2, LuaPlus::LuaObject a3, LuaPlus::LuaObject tableObj);
+   * void __stdcall sub_8C8230(std::ostream *lpOutputString, std::string *a2, LuaPlus::LuaObject a3, LuaPlus::LuaObject
+   * tableObj);
    *
    * What it does:
    * Serializes one Lua key/value lane to preferences text, recursively formatting
@@ -182,56 +184,56 @@ namespace
     }
 
     switch (valueObject.Type()) {
-      case LUA_TBOOLEAN:
-        output << (valueObject.GetBoolean() ? "true" : "false");
-        break;
+    case LUA_TBOOLEAN:
+      output << (valueObject.GetBoolean() ? "true" : "false");
+      break;
 
-      case LUA_TNUMBER: {
-        const char* const valueText = valueObject.ToString();
-        output << (valueText != nullptr ? valueText : "0");
-        break;
-      }
+    case LUA_TNUMBER: {
+      const char* const valueText = valueObject.ToString();
+      output << (valueText != nullptr ? valueText : "0");
+      break;
+    }
 
-      case LUA_TSTRING: {
-        const char* const valueText = valueObject.GetString();
-        const fa::string quotedValue = moho::SCR_QuoteLuaString(valueText != nullptr ? valueText : "");
-        output << quotedValue.c_str();
-        break;
-      }
+    case LUA_TSTRING: {
+      const char* const valueText = valueObject.GetString();
+      const fa::string quotedValue = moho::SCR_QuoteLuaString(valueText != nullptr ? valueText : "");
+      output << quotedValue.c_str();
+      break;
+    }
 
-      case LUA_TTABLE: {
-        output << "{";
-        fa::string nestedIndent = indent;
-        nestedIndent.append("    ");
+    case LUA_TTABLE: {
+      output << "{";
+      fa::string nestedIndent = indent;
+      nestedIndent.append("    ");
 
-        int entryIndex = 0;
-        for (LuaPlus::LuaTableIterator iter(&valueObject, 1); !iter.m_isDone; iter.Next()) {
-          if (entryIndex > 0) {
-            output << ',';
-          }
-
-          output << '\n' << nestedIndent.c_str();
-          LuaPlus::LuaObject nestedValue(iter.GetValue());
-          LuaPlus::LuaObject nestedKey(iter.GetKey());
-          SerializePreferenceLuaEntry(output, nestedIndent, nestedKey, nestedValue);
-          ++entryIndex;
+      int entryIndex = 0;
+      for (LuaPlus::LuaTableIterator iter(&valueObject, 1); !iter.m_isDone; iter.Next()) {
+        if (entryIndex > 0) {
+          output << ',';
         }
 
-        if (entryIndex == 0) {
-          output << " }";
-        } else {
-          output << '\n' << indent.c_str() << '}';
-        }
-        break;
+        output << '\n' << nestedIndent.c_str();
+        LuaPlus::LuaObject nestedValue(iter.GetValue());
+        LuaPlus::LuaObject nestedKey(iter.GetKey());
+        SerializePreferenceLuaEntry(output, nestedIndent, nestedKey, nestedValue);
+        ++entryIndex;
       }
 
-      default: {
-        LuaPlus::LuaState* const activeState = valueObject.GetActiveState();
-        lua_State* const rawState = activeState != nullptr ? activeState->m_state : nullptr;
-        const char* const typeName = rawState != nullptr ? lua_typename(rawState, valueObject.Type()) : "<unknown>";
-        gpg::Warnf("Attempting to write unsupported type in prefs: %s", typeName != nullptr ? typeName : "<unknown>");
-        break;
+      if (entryIndex == 0) {
+        output << " }";
+      } else {
+        output << '\n' << indent.c_str() << '}';
       }
+      break;
+    }
+
+    default: {
+      LuaPlus::LuaState* const activeState = valueObject.GetActiveState();
+      lua_State* const rawState = activeState != nullptr ? activeState->m_state : nullptr;
+      const char* const typeName = rawState != nullptr ? lua_typename(rawState, valueObject.Type()) : "<unknown>";
+      gpg::Warnf("Attempting to write unsupported type in prefs: %s", typeName != nullptr ? typeName : "<unknown>");
+      break;
+    }
     }
   }
 
@@ -245,7 +247,10 @@ namespace
    * Iterates root preferences table entries and emits one serialized Lua line
    * per entry to the target output stream.
    */
-  void SerializePreferenceRootTable(std::ostream& output, LuaPlus::LuaObject preferenceTable)
+  void SerializePreferenceRootTable(
+    std::ostream& output,
+    LuaPlus::LuaObject preferenceTable
+  )
   {
     LuaPlus::LuaTableIterator iter(&preferenceTable, 1);
     while (!iter.m_isDone) {
@@ -304,7 +309,9 @@ namespace
 
   wchar_t gShGetFolderPathBuffer[MAX_PATH]{};
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingLuaState(lua_State* const luaContext) noexcept
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingLuaState(
+    lua_State* const luaContext
+  ) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
   }
@@ -323,7 +330,9 @@ namespace
     return sSet;
   }
 
-  [[nodiscard]] const UnsafePathEntry* FindUnsafePathByKey(const char* const key) noexcept
+  [[nodiscard]] const UnsafePathEntry* FindUnsafePathByKey(
+    const char* const key
+  ) noexcept
   {
     if (key == nullptr) {
       return nullptr;
@@ -343,7 +352,10 @@ namespace
   }
 
   template <lua_CFunction TFunction>
-  void RegisterProcessControlLuaFunction(lua_State* const state, const char* const globalName) noexcept
+  void RegisterProcessControlLuaFunction(
+    lua_State* const state,
+    const char* const globalName
+  ) noexcept
   {
     if (state == nullptr || globalName == nullptr || globalName[0] == '\0') {
       return;
@@ -354,7 +366,9 @@ namespace
     lua_settable(state, LUA_GLOBALSINDEX);
   }
 
-  [[nodiscard]] float MaskWordToFloat(const std::uint32_t value) noexcept
+  [[nodiscard]] float MaskWordToFloat(
+    const std::uint32_t value
+  ) noexcept
   {
     const std::uint32_t low = value & 0xFFFFu;
     const std::uint32_t high = value >> 16u;
@@ -368,7 +382,9 @@ namespace
    * Reads one numeric priority-class argument from Lua and calls
    * `SetPriorityClass` on the current process.
    */
-  int __cdecl lua_SetProcessPriority(lua_State* const state)
+  int __cdecl lua_SetProcessPriority(
+    lua_State* const state
+  )
   {
     if (state == nullptr) {
       return 0;
@@ -398,7 +414,9 @@ namespace
    * Reads one numeric affinity mask argument from Lua and applies it to
    * the current process.
    */
-  int __cdecl lua_SetProcessAffinity(lua_State* const state)
+  int __cdecl lua_SetProcessAffinity(
+    lua_State* const state
+  )
   {
     if (state == nullptr) {
       return 0;
@@ -406,7 +424,8 @@ namespace
 
     const DWORD_PTR affinityMask = static_cast<DWORD_PTR>(static_cast<std::uint32_t>(luaL_checknumber(state, 1)));
     // Engine change: a server given its CPUs keeps them (ThreadPlacement.h).
-    const BOOL result = moho::ProcessCpusAreLocked() ? TRUE : ::SetProcessAffinityMask(::GetCurrentProcess(), affinityMask);
+    const BOOL result =
+      moho::ProcessCpusAreLocked() ? TRUE : ::SetProcessAffinityMask(::GetCurrentProcess(), affinityMask);
     lua_pushboolean(state, result != FALSE ? 1 : 0);
     return 1;
   }
@@ -418,7 +437,9 @@ namespace
    * Pushes `GetProcessAffinityMask` success flag plus current process/system
    * affinity masks as Lua numbers.
    */
-  int __cdecl lua_GetProcessAffinity(lua_State* const state)
+  int __cdecl lua_GetProcessAffinity(
+    lua_State* const state
+  )
   {
     if (state == nullptr) {
       return 0;
@@ -439,7 +460,10 @@ namespace
    * What it does:
    * Injects process-control Lua globals into an initialized Lua state.
    */
-  void patch_InitLuaState(LuaPlus::LuaState* const state, const std::int32_t standardLibraries)
+  void patch_InitLuaState(
+    LuaPlus::LuaState* const state,
+    const std::int32_t standardLibraries
+  )
   {
     (void)standardLibraries;
     if (state == nullptr || state->m_state == nullptr) {
@@ -451,13 +475,11 @@ namespace
     RegisterProcessControlLuaFunction<lua_SetProcessPriority>(state->m_state, "SetProcessPriority");
   }
 
-
   [[nodiscard]] const fa::string& SaveGameExtName()
   {
     static const fa::string kSaveGameExt("SaveGame");
     return kSaveGameExt;
   }
-
 
   [[nodiscard]] const fa::string& ReplayExtName()
   {
@@ -471,9 +493,10 @@ namespace
     return kCampaignSaveExt;
   }
 
-
   [[nodiscard]]
-  std::filesystem::path MakeAbsolutePath(const std::filesystem::path& path)
+  std::filesystem::path MakeAbsolutePath(
+    const std::filesystem::path& path
+  )
   {
     std::error_code ec;
     std::filesystem::path absolutePath = std::filesystem::absolute(path, ec);
@@ -489,18 +512,25 @@ namespace
     return canonicalPath;
   }
 
-  void SetIdentityString(fa::string& out, const char* const value)
+  void SetIdentityString(
+    fa::string& out,
+    const char* const value
+  )
   {
     out.assign_owned(value != nullptr ? value : "");
   }
 
-  [[nodiscard]] bool IsValidAliasSet(const moho::CfgAliasSet& aliases)
+  [[nodiscard]] bool IsValidAliasSet(
+    const moho::CfgAliasSet& aliases
+  )
   {
     return aliases.values != nullptr && aliases.count != 0;
   }
 
   [[nodiscard]] bool TryGetAliasedArgOption(
-    const std::string& option, const std::uint32_t requiredArgCount, fa::vector<fa::string>* const outArgs
+    const std::string& option,
+    const std::uint32_t requiredArgCount,
+    fa::vector<fa::string>* const outArgs
   )
   {
     if (option.empty()) {
@@ -509,7 +539,10 @@ namespace
     return moho::CFG_GetArgOption(option.c_str(), requiredArgCount, outArgs);
   }
 
-  [[noreturn]] void ThrowStartupFileError(const char* const functionName, const char* const message)
+  [[noreturn]] void ThrowStartupFileError(
+    const char* const functionName,
+    const char* const message
+  )
   {
     std::uintptr_t callstack[32]{};
     const std::uint32_t frameCount = moho::PLAT_GetCallStack(nullptr, 32u, callstack);
@@ -519,11 +552,14 @@ namespace
     throw moho::XFileError(errorText.to_std(), callstack, frameCount);
   }
 
-  [[noreturn]] void ThrowFileDirCrtError(const char* const crtFunctionName)
+  [[noreturn]] void ThrowFileDirCrtError(
+    const char* const crtFunctionName
+  )
   {
     const fa::string errnoDescription = moho::FILE_GetErrorFromErrno(errno);
-    const fa::string detail =
-      gpg::STR_Printf("%s error: %s", crtFunctionName != nullptr ? crtFunctionName : "_getcwd", errnoDescription.c_str());
+    const fa::string detail = gpg::STR_Printf(
+      "%s error: %s", crtFunctionName != nullptr ? crtFunctionName : "_getcwd", errnoDescription.c_str()
+    );
     ThrowStartupFileError("Moho::FILE_Dir", detail.c_str());
   }
 
@@ -570,7 +606,9 @@ namespace
    * What it does:
    * Copies the process-global allowed protocol list into one output vector.
    */
-  void CopyAllowedProtocols(std::vector<std::wstring>& outProtocols)
+  void CopyAllowedProtocols(
+    std::vector<std::wstring>& outProtocols
+  )
   {
     std::lock_guard<std::mutex> lock(gDiskPathStateLock);
     outProtocols.clear();
@@ -589,7 +627,9 @@ namespace
   }
 
   [[nodiscard]]
-  std::vector<std::wstring> CollectAllowedProtocolsFromLua(LuaPlus::LuaState* const state)
+  std::vector<std::wstring> CollectAllowedProtocolsFromLua(
+    LuaPlus::LuaState* const state
+  )
   {
     std::vector<std::wstring> protocols;
     if (state == nullptr) {
@@ -620,7 +660,9 @@ namespace
    * exactly those two keys at 0x0045A211 and 0x0045A1FE and builds one
    * SVFSMountPoint per entry, in table order, which is mount order.
    */
-  [[nodiscard]] fa::vector<moho::SVFSMountPoint> CollectMountPointsFromLua(LuaPlus::LuaState* const state)
+  [[nodiscard]] fa::vector<moho::SVFSMountPoint> CollectMountPointsFromLua(
+    LuaPlus::LuaState* const state
+  )
   {
     fa::vector<moho::SVFSMountPoint> mountPoints;
     if (state == nullptr) {
@@ -639,9 +681,7 @@ namespace
         const char* const dir = entry["dir"].GetString();
         const char* const mountpoint = entry["mountpoint"].GetString();
         if (dir != nullptr && dir[0] != '\0') {
-          mountPoints.push_back(
-            moho::SVFSMountPoint(dir, mountpoint != nullptr ? mountpoint : "/")
-          );
+          mountPoints.push_back(moho::SVFSMountPoint(dir, mountpoint != nullptr ? mountpoint : "/"));
         }
       }
       iter.Next();
@@ -653,7 +693,9 @@ namespace
   /**
    * Registers every directory the script lists in the global `hook`.
    */
-  void ApplyHookDirectoriesFromLua(LuaPlus::LuaState* const state)
+  void ApplyHookDirectoriesFromLua(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr) {
       return;
@@ -684,7 +726,9 @@ namespace
    * does this itself rather than through the init file because the init
    * files belong to the FAF client. Nothing happens when the folder is absent.
    */
-  void AppendEngineHookFolder(fa::vector<moho::SVFSMountPoint>& mountPoints)
+  void AppendEngineHookFolder(
+    fa::vector<moho::SVFSMountPoint>& mountPoints
+  )
   {
     std::array<wchar_t, MAX_PATH> modulePath{};
     const DWORD length = ::GetModuleFileNameW(nullptr, modulePath.data(), static_cast<DWORD>(modulePath.size()));
@@ -709,7 +753,8 @@ namespace
    * Builds one Lua string object using the preferences Lua state.
    */
   [[nodiscard]] LuaPlus::LuaObject BuildPreferenceStringObject(
-    LuaPlus::LuaState* const state, const fa::string& value
+    LuaPlus::LuaState* const state,
+    const fa::string& value
   )
   {
     LuaPlus::LuaObject out;
@@ -725,7 +770,8 @@ namespace
    * `StringObject` element per index starting at 1.
    */
   [[nodiscard]] LuaPlus::LuaObject BuildPreferenceStringArrayObject(
-    LuaPlus::LuaState* const state, const fa::list<fa::string>& values
+    LuaPlus::LuaState* const state,
+    const fa::list<fa::string>& values
   )
   {
     LuaPlus::LuaObject out;
@@ -746,7 +792,10 @@ namespace
    * What it does:
    * Builds one Lua boolean object using the preferences Lua state.
    */
-  [[nodiscard]] LuaPlus::LuaObject BuildPreferenceBooleanObject(LuaPlus::LuaState* const state, const bool value)
+  [[nodiscard]] LuaPlus::LuaObject BuildPreferenceBooleanObject(
+    LuaPlus::LuaState* const state,
+    const bool value
+  )
   {
     LuaPlus::LuaObject out;
     out.AssignBoolean(state, value);
@@ -760,7 +809,8 @@ namespace
    * Builds one Lua integer object using the preferences Lua state.
    */
   [[nodiscard]] LuaPlus::LuaObject BuildPreferenceIntegerObject(
-    LuaPlus::LuaState* const state, const std::int32_t value
+    LuaPlus::LuaState* const state,
+    const std::int32_t value
   )
   {
     LuaPlus::LuaObject out;
@@ -775,7 +825,8 @@ namespace
    * Builds one Lua number object using the preferences Lua state.
    */
   [[nodiscard]] LuaPlus::LuaObject BuildPreferenceNumberObject(
-    LuaPlus::LuaState* const state, const float value
+    LuaPlus::LuaState* const state,
+    const float value
   )
   {
     LuaPlus::LuaObject out;
@@ -789,7 +840,9 @@ namespace
    * What it does:
    * Copy-constructs one Lua object lane from an existing source object.
    */
-  [[nodiscard]] LuaPlus::LuaObject BuildPreferenceCopiedObject(const LuaPlus::LuaObject& source)
+  [[nodiscard]] LuaPlus::LuaObject BuildPreferenceCopiedObject(
+    const LuaPlus::LuaObject& source
+  )
   {
     return LuaPlus::LuaObject(source);
   }
@@ -1179,7 +1232,10 @@ namespace moho
      * Looks up one key from the root preferences table and returns fallback when
      * the key is nil; otherwise returns Lua boolean conversion of that value.
      */
-    bool GetBoolean(const fa::string& key, const bool fallback) override
+    bool GetBoolean(
+      const fa::string& key,
+      const bool fallback
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
@@ -1197,7 +1253,10 @@ namespace moho
      * Looks up one key from the root preferences table and returns fallback when
      * the key is nil; otherwise returns Lua integer conversion of that value.
      */
-    std::int32_t GetInteger(const fa::string& key, const std::int32_t fallback) override
+    std::int32_t GetInteger(
+      const fa::string& key,
+      const std::int32_t fallback
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
@@ -1215,7 +1274,10 @@ namespace moho
      * Looks up one key from the root preferences table and returns fallback when
      * the key is nil; otherwise returns Lua number conversion of that value.
      */
-    float GetNumber(const fa::string& key, const float fallback) override
+    float GetNumber(
+      const fa::string& key,
+      const float fallback
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
@@ -1233,7 +1295,10 @@ namespace moho
      * Reads one preference value as Lua string-convertible text and parses it
      * as hexadecimal (optional `0x` prefix), returning fallback on conversion failure.
      */
-    std::uint32_t GetHex(const fa::string& key, const std::uint32_t fallback) override
+    std::uint32_t GetHex(
+      const fa::string& key,
+      const std::uint32_t fallback
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
@@ -1260,7 +1325,10 @@ namespace moho
      * Reads one preference value from the local root table and returns either
      * the resolved string value or the provided fallback when key lookup is nil.
      */
-    fa::string GetString(const fa::string& key, const fa::string& fallback) override
+    fa::string GetString(
+      const fa::string& key,
+      const fa::string& fallback
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const LuaPlus::LuaObject value = LookupKey(key);
@@ -1280,8 +1348,10 @@ namespace moho
      * Starts from one fallback string-array copy, then appends each string from
      * the local root table value when the resolved key is a Lua array-table.
      */
-    fa::list<fa::string>
-    GetStringArr(const fa::string& key, const fa::list<fa::string>& fallback) override
+    fa::list<fa::string> GetStringArr(
+      const fa::string& key,
+      const fa::list<fa::string>& fallback
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       fa::list<fa::string> outValues = fallback;
@@ -1309,7 +1379,10 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceBooleanRecursive` (0x008CBFB0) over `mState`/`mRoot`.
      */
-    void SetBoolean(const fa::string& key, const bool value) override
+    void SetBoolean(
+      const fa::string& key,
+      const bool value
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceBooleanRecursive(&mState, &mRoot, key, value);
@@ -1323,7 +1396,10 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceIntegerRecursive` (0x008CC210) over `mState`/`mRoot`.
      */
-    void SetInteger(const fa::string& key, const std::int32_t value) override
+    void SetInteger(
+      const fa::string& key,
+      const std::int32_t value
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceIntegerRecursive(&mState, &mRoot, key, value);
@@ -1337,7 +1413,10 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceNumberRecursive` (0x008CC470) over `mState`/`mRoot`.
      */
-    void SetNumber(const fa::string& key, const float value) override
+    void SetNumber(
+      const fa::string& key,
+      const float value
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceNumberRecursive(&mState, &mRoot, key, value);
@@ -1350,7 +1429,10 @@ namespace moho
      * Formats one unsigned integer as `0x%08x` and writes it through the
      * recursive string preference setter.
      */
-    void SetHex(const fa::string& key, const std::uint32_t value) override
+    void SetHex(
+      const fa::string& key,
+      const std::uint32_t value
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       const fa::string valueText = gpg::STR_Printf("0x%08x", static_cast<unsigned int>(value));
@@ -1365,7 +1447,10 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceStringRecursive` (0x008CC6D0) over `mState`/`mRoot`.
      */
-    void SetString(const fa::string& key, const fa::string& value) override
+    void SetString(
+      const fa::string& key,
+      const fa::string& value
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceStringRecursive(&mState, &mRoot, key, value);
@@ -1379,7 +1464,10 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceStringArrayRecursive` (0x008CC930) over `mState`/`mRoot`.
      */
-    void SetStringArr(const fa::string& key, const fa::list<fa::string>& values) override
+    void SetStringArr(
+      const fa::string& key,
+      const fa::list<fa::string>& values
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceStringArrayRecursive(&mState, &mRoot, key, values);
@@ -1396,7 +1484,9 @@ namespace moho
      * to the preferences state; it is returned as-is (number, string, table)
      * rather than flattened to text.
      */
-    LuaPlus::LuaObject LookupCurrentOption(const fa::string& key) override
+    LuaPlus::LuaObject LookupCurrentOption(
+      const fa::string& key
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       LuaPlus::LuaObject currentProfile = mRoot.Lookup("profile.current");
@@ -1427,7 +1517,9 @@ namespace moho
      * What it does:
      * Resolves one root preference table entry by key from `mRoot`.
      */
-    LuaPlus::LuaObject LookupKey(const fa::string& key) override
+    LuaPlus::LuaObject LookupKey(
+      const fa::string& key
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       if (mRoot.IsNil()) {
@@ -1460,7 +1552,10 @@ namespace moho
      * What it does:
      * Forwards to `SetPreferenceObjectRecursive` (0x008CCBA0) over `mState`/`mRoot`.
      */
-    void SetObject(const fa::string& key, void* const valueObject) override
+    void SetObject(
+      const fa::string& key,
+      void* const valueObject
+    ) override
     {
       const std::lock_guard<std::recursive_mutex> lock(USER_PreferencesLock());
       SetPreferenceObjectRecursive(&mState, &mRoot, key, *static_cast<LuaPlus::LuaObject*>(valueObject));
@@ -1490,8 +1585,8 @@ namespace moho
     }
 
   private:
-    fa::string mFileName;  // +0x04 `USER_LoadPreferences`' file name
-    fa::string mFilePath;  // +0x20 the full UTF-8 path it resolved to
+    fa::string mFileName;     // +0x04 `USER_LoadPreferences`' file name
+    fa::string mFilePath;     // +0x20 the full UTF-8 path it resolved to
     LuaPlus::LuaState mState; // +0x3C
     LuaPlus::LuaObject mRoot; // +0x70
   };
@@ -1569,7 +1664,9 @@ std::int32_t moho::graphics_Fidelity = 2;
  * vision renderers. This is the runtime dispatch root that reaches
  * `Sim::Create`.
  */
-moho::Sim* moho::Sim_Create_exxt(const boost::SharedPtrRaw<moho::LaunchInfoBase>& launchInfo)
+moho::Sim* moho::Sim_Create_exxt(
+  const boost::SharedPtrRaw<moho::LaunchInfoBase>& launchInfo
+)
 {
   moho::Sim* const sim = moho::Sim::Create(launchInfo);
 
@@ -1592,7 +1689,6 @@ moho::Sim* moho::Sim_Create_exxt(const boost::SharedPtrRaw<moho::LaunchInfoBase>
  * Initializes one user-preferences base interface object.
  */
 moho::IUserPrefs::IUserPrefs() = default;
-
 
 const moho::CfgAliasSet& moho::CFG_GetOptionPrefixes()
 {
@@ -1692,7 +1788,9 @@ bool moho::CFG_GetArgOptionComposedAliases(
  * first command-line option that resolves through `CFG_GetArgOption`.
  */
 bool moho::CFG_GetArgOptionAliases(
-  const CfgAliasSet& aliases, const std::uint32_t requiredArgCount, fa::vector<fa::string>* const outArgs
+  const CfgAliasSet& aliases,
+  const std::uint32_t requiredArgCount,
+  fa::vector<fa::string>* const outArgs
 )
 {
   if (!IsValidAliasSet(aliases)) {
@@ -1746,7 +1844,11 @@ moho::Resolution::Resolution() = default;
  * Initializes one adapter-mode entry from explicit width/height/refresh
  * integer lanes.
  */
-moho::Resolution::Resolution(const std::int32_t requestedWidth, const std::int32_t requestedHeight, const std::int32_t requestedFramesPerSecond)
+moho::Resolution::Resolution(
+  const std::int32_t requestedWidth,
+  const std::int32_t requestedHeight,
+  const std::int32_t requestedFramesPerSecond
+)
   : width(requestedWidth)
   , height(requestedHeight)
   , framesPerSecond(requestedFramesPerSecond)
@@ -1758,7 +1860,9 @@ moho::Resolution::Resolution(const std::int32_t requestedWidth, const std::int32
  * What it does:
  * Copy-constructs one adapter-mode entry from another `Resolution`.
  */
-moho::Resolution::Resolution(const Resolution& other)
+moho::Resolution::Resolution(
+  const Resolution& other
+)
   : width(other.width)
   , height(other.height)
   , framesPerSecond(other.framesPerSecond)
@@ -1779,12 +1883,10 @@ namespace
     const moho::Resolution* const candidate
   ) noexcept
   {
-    return candidate->width < reference->width
-      || (candidate->width == reference->width && candidate->height < reference->height)
-      || (
-        candidate->width == reference->width && candidate->height == reference->height
-        && candidate->framesPerSecond < reference->framesPerSecond
-      );
+    return candidate->width < reference->width ||
+      (candidate->width == reference->width && candidate->height < reference->height) ||
+      (candidate->width == reference->width && candidate->height == reference->height &&
+       candidate->framesPerSecond < reference->framesPerSecond);
   }
 } // namespace
 
@@ -1794,7 +1896,10 @@ namespace
  * What it does:
  * Parses `width,height,fps` CSV text into three integer lanes.
  */
-bool moho::CFG_ParseResolutionTriple(const gpg::StrArg value, ResolutionTriple* const outResolution)
+bool moho::CFG_ParseResolutionTriple(
+  const gpg::StrArg value,
+  ResolutionTriple* const outResolution
+)
 {
   if (outResolution == nullptr) {
     return false;
@@ -1832,7 +1937,9 @@ bool moho::CFG_ParseResolutionTriple(const gpg::StrArg value, ResolutionTriple* 
  * What it does:
  * Replaces the startup company-name lane.
  */
-void moho::USER_SetCompanyName(const gpg::StrArg companyName)
+void moho::USER_SetCompanyName(
+  const gpg::StrArg companyName
+)
 {
   SetIdentityString(gAppIdentity.mCompanyName, companyName);
 }
@@ -1844,7 +1951,9 @@ void moho::USER_SetCompanyName(const gpg::StrArg companyName)
  * What it does:
  * Replaces the startup app/product-name lane.
  */
-void moho::USER_SetAppName(const gpg::StrArg appName)
+void moho::USER_SetAppName(
+  const gpg::StrArg appName
+)
 {
   SetIdentityString(gAppIdentity.mProductName, appName);
 }
@@ -1856,7 +1965,9 @@ void moho::USER_SetAppName(const gpg::StrArg appName)
  * What it does:
  * Replaces the startup app-extension/prefs-prefix lane.
  */
-void moho::USER_SetAppExtensionPrefix(const gpg::StrArg extensionPrefix)
+void moho::USER_SetAppExtensionPrefix(
+  const gpg::StrArg extensionPrefix
+)
 {
   SetIdentityString(gAppIdentity.mPreferencePrefix, extensionPrefix);
 }
@@ -1874,7 +1985,6 @@ void moho::USER_SetGameId()
   gAppIdentity.mGameIdParts[2] = kDefaultGameIdParts[2];
   gAppIdentity.mGameIdParts[3] = kDefaultGameIdParts[3];
 }
-
 
 /**
  * Address: 0x008CAE10 (FUN_008CAE10, USER_GetGameId)
@@ -1925,7 +2035,9 @@ const fa::string& moho::APP_GetPreferencePrefix()
   return gAppIdentity.mPreferencePrefix;
 }
 
-std::uint32_t moho::APP_GetGameIdPart(const std::size_t index)
+std::uint32_t moho::APP_GetGameIdPart(
+  const std::size_t index
+)
 {
   APP_InitializeIdentity();
   if (index >= 4) {
@@ -1940,7 +2052,9 @@ std::uint32_t moho::APP_GetGameIdPart(const std::size_t index)
  * What it does:
  * Stores the AQtime instrumentation mode byte used by startup gates.
  */
-void moho::APP_SetAqtimeInstrumentationMode(const std::uint8_t mode)
+void moho::APP_SetAqtimeInstrumentationMode(
+  const std::uint8_t mode
+)
 {
   gAqtimeInstrumentationMode = mode;
 }
@@ -1971,7 +2085,9 @@ void moho::USER_LuaFrame()
  * its following positional arguments.
  */
 bool moho::CFG_GetArgOption(
-  const gpg::StrArg option, const std::uint32_t requiredArgCount, fa::vector<fa::string>* const outArgs
+  const gpg::StrArg option,
+  const std::uint32_t requiredArgCount,
+  fa::vector<fa::string>* const outArgs
 )
 {
   if (option == nullptr || option[0] == '\0') {
@@ -2011,9 +2127,7 @@ bool moho::CFG_GetArgOption(
  * What it does:
  * Preserves one legacy Perforce info hook as a no-op.
  */
-void moho::P4_Info()
-{
-}
+void moho::P4_Info() {}
 
 /**
  * Address: 0x00500AA0 (FUN_00500AA0, Moho::P4_Edit)
@@ -2022,7 +2136,9 @@ void moho::P4_Info()
  * What it does:
  * Preserves one legacy Perforce edit hook as a no-op.
  */
-void moho::P4_Edit(const char* const filePath)
+void moho::P4_Edit(
+  const char* const filePath
+)
 {
   (void)filePath;
 }
@@ -2069,7 +2185,6 @@ fa::string moho::CFG_GetArgs()
   return result;
 }
 
-
 /**
  * Address: 0x004D6940 (FUN_004D6940, cfunc_SHGetFolderPathL)
  *
@@ -2077,7 +2192,9 @@ fa::string moho::CFG_GetArgs()
  * Resolves one unsafe-path id (`DESKTOP`, `APPDATA`, etc.) into a CSIDL and
  * pushes the resolved path string with a trailing backslash.
  */
-int moho::cfunc_SHGetFolderPathL(LuaPlus::LuaState* const state)
+int moho::cfunc_SHGetFolderPathL(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return 0;
@@ -2122,7 +2239,9 @@ int moho::cfunc_SHGetFolderPathL(LuaPlus::LuaState* const state)
  * Lua C callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_SHGetFolderPathL`.
  */
-int moho::cfunc_SHGetFolderPath(lua_State* const luaContext)
+int moho::cfunc_SHGetFolderPath(
+  lua_State* const luaContext
+)
 {
   return cfunc_SHGetFolderPathL(ResolveBindingLuaState(luaContext));
 }
@@ -2136,16 +2255,10 @@ int moho::cfunc_SHGetFolderPath(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SHGetFolderPath_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UnsafeLuaInitSet(),
-    "SHGetFolderPath",
-    &moho::cfunc_SHGetFolderPath,
-    nullptr,
-    "<global>",
-    kSHGetFolderPathHelpText
+    UnsafeLuaInitSet(), "SHGetFolderPath", &moho::cfunc_SHGetFolderPath, nullptr, "<global>", kSHGetFolderPathHelpText
   );
   return &binder;
 }
-
 
 /**
  * Address: 0x00BC63D0 (FUN_00BC63D0, register_coreInitFormSet)
@@ -2241,7 +2354,6 @@ namespace
   const StartupHelpersLuaFunctionBootstrap gStartupHelpersLuaFunctionBootstrap{};
 } // namespace
 
-
 /**
  * Address: 0x008753A0 (FUN_008753A0, cfunc_GetMovieDuration)
  *
@@ -2249,7 +2361,9 @@ namespace
  * Lua C callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_GetMovieDurationL`.
  */
-int moho::cfunc_GetMovieDuration(lua_State* const luaContext)
+int moho::cfunc_GetMovieDuration(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetMovieDurationL(ResolveBindingLuaState(luaContext));
 }
@@ -2281,7 +2395,9 @@ moho::CScrLuaInitForm* moho::func_GetMovieDuration_LuaFuncDef()
  * Reads one movie path argument, validates string type, and returns
  * duration in seconds through `MOV_GetDuration`.
  */
-int moho::cfunc_GetMovieDurationL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetMovieDurationL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kGetMovieDurationHelpText);
@@ -2299,7 +2415,6 @@ int moho::cfunc_GetMovieDurationL(LuaPlus::LuaState* const state)
   return 1;
 }
 
-
 namespace
 {
   constexpr std::uint32_t kInvalidPathBoundary = std::numeric_limits<std::uint32_t>::max();
@@ -2308,7 +2423,7 @@ namespace
   {
     fa::string mToken;                 // +0x00
     const fa::string* mPath = nullptr; // +0x1C
-    std::uint32_t mOffset = 0;            // +0x20
+    std::uint32_t mOffset = 0;         // +0x20
   };
 
   static_assert(offsetof(PathComponentCursor, mToken) == 0x00, "PathComponentCursor::mToken offset must be 0x00");
@@ -2316,12 +2431,17 @@ namespace
   static_assert(offsetof(PathComponentCursor, mOffset) == 0x20, "PathComponentCursor::mOffset offset must be 0x20");
   static_assert(sizeof(PathComponentCursor) == 0x24, "PathComponentCursor size must be 0x24");
 
-  [[nodiscard]] bool IsSlashToken(const char ch) noexcept
+  [[nodiscard]] bool IsSlashToken(
+    const char ch
+  ) noexcept
   {
     return ch == '/' || ch == '\\';
   }
 
-  [[nodiscard]] std::uint32_t ClampPathIndex(const fa::string& path, std::uint32_t index) noexcept
+  [[nodiscard]] std::uint32_t ClampPathIndex(
+    const fa::string& path,
+    std::uint32_t index
+  ) noexcept
   {
     const std::uint32_t size = static_cast<std::uint32_t>(path.size());
     return index > size ? size : index;
@@ -2333,7 +2453,9 @@ namespace
    * What it does:
    * Appends one trailing `/` separator unless path already ends in `:` or `/`.
    */
-  void func_StringFilenameAppendSlash(fa::string* const path)
+  void func_StringFilenameAppendSlash(
+    fa::string* const path
+  )
   {
     if (path == nullptr || path->empty()) {
       return;
@@ -2351,7 +2473,10 @@ namespace
    * What it does:
    * Appends one filename segment, normalizing `\\` separators into `/`.
    */
-  fa::string* func_StringAppendFilename(const char* source, fa::string* const path)
+  fa::string* func_StringAppendFilename(
+    const char* source,
+    fa::string* const path
+  )
   {
     if (path == nullptr) {
       return nullptr;
@@ -2404,8 +2529,10 @@ namespace
    * Initializes one raw `fa::string` lane to empty SSO state, then appends
    * one filename segment using startup filename normalization rules.
    */
-  [[maybe_unused]] fa::string*
-  InitializeFilenameBufferWithSegment(fa::string* const outPath, const char* const filenameSegment)
+  [[maybe_unused]] fa::string* InitializeFilenameBufferWithSegment(
+    fa::string* const outPath,
+    const char* const filenameSegment
+  )
   {
     if (outPath == nullptr) {
       return nullptr;
@@ -2455,7 +2582,10 @@ namespace
    * Returns root-boundary index for one path prefix window, or `-1` when
    * no root boundary exists.
    */
-  [[nodiscard]] std::uint32_t PathRootBoundaryIndex(const fa::string& path, const std::uint32_t upto)
+  [[nodiscard]] std::uint32_t PathRootBoundaryIndex(
+    const fa::string& path,
+    const std::uint32_t upto
+  )
   {
     const std::uint32_t clamped = ClampPathIndex(path, upto);
     const std::size_t size = path.size();
@@ -2503,7 +2633,10 @@ namespace
    */
   [[nodiscard]]
   std::uint32_t func_StringSearchFromEnd(
-    const std::uint32_t max, const fa::string& path, const char* const search, const std::uint32_t searchLen
+    const std::uint32_t max,
+    const fa::string& path,
+    const char* const search,
+    const std::uint32_t searchLen
   )
   {
     const std::uint32_t size = static_cast<std::uint32_t>(path.size());
@@ -2544,7 +2677,10 @@ namespace
    * What it does:
    * Returns start index of the final filename segment in one path.
    */
-  [[nodiscard]] std::uint32_t func_PathFilenamePos(const fa::string& path, const std::uint32_t upto)
+  [[nodiscard]] std::uint32_t func_PathFilenamePos(
+    const fa::string& path,
+    const std::uint32_t upto
+  )
   {
     const std::uint32_t clamped = ClampPathIndex(path, upto);
     if (clamped == 2u && path.size() > 1u && path[0] == '/' && path[1] == '/') {
@@ -2594,7 +2730,9 @@ namespace
    * Returns one-character root token at current root boundary, or empty
    * token when boundary is absent.
    */
-  [[nodiscard]] fa::string PathRootBoundaryToken(const fa::string& path)
+  [[nodiscard]] fa::string PathRootBoundaryToken(
+    const fa::string& path
+  )
   {
     const std::uint32_t rootBoundary = PathRootBoundaryIndex(path, static_cast<std::uint32_t>(path.size()));
     if (rootBoundary == kInvalidPathBoundary || rootBoundary >= path.size()) {
@@ -2609,7 +2747,9 @@ namespace
    * What it does:
    * Returns true when a path has one root-boundary token.
    */
-  [[nodiscard]] bool PathHasRootBoundaryToken(const fa::string& path)
+  [[nodiscard]] bool PathHasRootBoundaryToken(
+    const fa::string& path
+  )
   {
     return !PathRootBoundaryToken(path).empty();
   }
@@ -2620,7 +2760,11 @@ namespace
    * What it does:
    * Parses one leading root token span and reports token start/length.
    */
-  void ParsePathRootTokenSpan(const fa::string& path, std::uint32_t* const outStart, std::uint32_t* const outLength)
+  void ParsePathRootTokenSpan(
+    const fa::string& path,
+    std::uint32_t* const outStart,
+    std::uint32_t* const outLength
+  )
   {
     if (outStart != nullptr) {
       *outStart = 0u;
@@ -2698,7 +2842,9 @@ namespace
    * What it does:
    * Extracts one leading root/prefix token and initializes path cursor state.
    */
-  [[nodiscard]] PathComponentCursor InitPathPrefixCursor(const fa::string& path)
+  [[nodiscard]] PathComponentCursor InitPathPrefixCursor(
+    const fa::string& path
+  )
   {
     PathComponentCursor cursor{};
     cursor.mPath = &path;
@@ -2718,7 +2864,9 @@ namespace
    * What it does:
    * Returns true when path has one non-empty leading root/prefix token.
    */
-  [[nodiscard]] bool PathHasLeadingPrefixToken(const fa::string& path)
+  [[nodiscard]] bool PathHasLeadingPrefixToken(
+    const fa::string& path
+  )
   {
     return !InitPathPrefixCursor(path).mToken.empty();
   }
@@ -2730,7 +2878,9 @@ namespace
    * Returns one leading root token only when token is UNC-like (`//...`) or
    * drive-like (`...:`); otherwise returns empty token.
    */
-  [[nodiscard]] fa::string GetDriveOrUncPathPrefixToken(const fa::string& path)
+  [[nodiscard]] fa::string GetDriveOrUncPathPrefixToken(
+    const fa::string& path
+  )
   {
     const PathComponentCursor prefixCursor = InitPathPrefixCursor(path);
     if (prefixCursor.mOffset == path.size()) {
@@ -2754,7 +2904,9 @@ namespace
    * Returns true when path has both a root/prefix token and root-boundary
    * marker token.
    */
-  [[nodiscard]] bool PathHasDriveOrUncRootAndBoundary(const fa::string& path)
+  [[nodiscard]] bool PathHasDriveOrUncRootAndBoundary(
+    const fa::string& path
+  )
   {
     return !GetDriveOrUncPathPrefixToken(path).empty() && !PathRootBoundaryToken(path).empty();
   }
@@ -2765,7 +2917,9 @@ namespace
    * What it does:
    * Truncates one path string to directory portion.
    */
-  fa::string* TrimPathToDirectory(fa::string* const path)
+  fa::string* TrimPathToDirectory(
+    fa::string* const path
+  )
   {
     if (path == nullptr) {
       return nullptr;
@@ -2784,7 +2938,10 @@ namespace
    * Returns true when a slash boundary at `index` can be treated as a
    * collapsible path separator (non-root edge case).
    */
-  [[nodiscard]] bool IsCollapsiblePathSlashBoundary(const fa::string& path, const std::uint32_t index)
+  [[nodiscard]] bool IsCollapsiblePathSlashBoundary(
+    const fa::string& path,
+    const std::uint32_t index
+  )
   {
     if (path.empty()) {
       return false;
@@ -2818,12 +2975,17 @@ namespace
    * What it does:
    * Returns basename token for one path; emits `.` for root-edge paths.
    */
-  [[nodiscard]] fa::string GetPathBasenameOrDot(const fa::string& path)
+  [[nodiscard]] fa::string GetPathBasenameOrDot(
+    const fa::string& path
+  )
   {
     const std::uint32_t size = static_cast<std::uint32_t>(path.size());
     std::uint32_t split = func_PathFilenamePos(path, size);
 
-    if (size != 0u && split != 0u && split < path.size() && path[split] == '/' && IsCollapsiblePathSlashBoundary(path, split)) {
+    if (
+      size != 0u && split != 0u && split < path.size() && path[split] == '/' &&
+      IsCollapsiblePathSlashBoundary(path, split)
+    ) {
       return fa::string(".");
     }
 
@@ -2836,7 +2998,9 @@ namespace
    * What it does:
    * Initializes reverse path-component cursor for one source path.
    */
-  [[nodiscard]] PathComponentCursor InitReversePathComponentCursor(const fa::string& path)
+  [[nodiscard]] PathComponentCursor InitReversePathComponentCursor(
+    const fa::string& path
+  )
   {
     PathComponentCursor cursor{};
     cursor.mPath = &path;
@@ -2850,7 +3014,9 @@ namespace
    * What it does:
    * Copies one path-component cursor state.
    */
-  [[nodiscard]] PathComponentCursor CopyPathComponentCursor(const PathComponentCursor& other)
+  [[nodiscard]] PathComponentCursor CopyPathComponentCursor(
+    const PathComponentCursor& other
+  )
   {
     PathComponentCursor cursor{};
     cursor.mToken = other.mToken;
@@ -2865,7 +3031,10 @@ namespace
    * What it does:
    * Replaces one cursor token with a single-character marker (`/` or `.`).
    */
-  fa::string* SetPathTokenMarker(fa::string* const outToken, const char marker)
+  fa::string* SetPathTokenMarker(
+    fa::string* const outToken,
+    const char marker
+  )
   {
     if (outToken == nullptr) {
       return nullptr;
@@ -2883,7 +3052,9 @@ namespace
    * Advances one forward path-component cursor from its current token to the
    * next token/separator marker in the same source path.
    */
-  [[nodiscard]] PathComponentCursor& AdvancePathComponentCursor(PathComponentCursor& cursor)
+  [[nodiscard]] PathComponentCursor& AdvancePathComponentCursor(
+    PathComponentCursor& cursor
+  )
   {
     if (cursor.mPath == nullptr) {
       cursor.mToken.clear();
@@ -2934,7 +3105,9 @@ namespace
    * What it does:
    * Advances one reverse path-component cursor and updates the current token.
    */
-  [[nodiscard]] PathComponentCursor& AdvanceReversePathComponentCursor(PathComponentCursor& cursor)
+  [[nodiscard]] PathComponentCursor& AdvanceReversePathComponentCursor(
+    PathComponentCursor& cursor
+  )
   {
     if (cursor.mPath == nullptr) {
       cursor.mToken.clear();
@@ -2947,7 +3120,9 @@ namespace
     const std::uint32_t rootBoundary = PathRootBoundaryIndex(path, pathIndex);
     const std::uint32_t size = static_cast<std::uint32_t>(path.size());
 
-    if (pathIndex == size && size > 1u && path[pathIndex - 1u] == '/' && IsCollapsiblePathSlashBoundary(path, pathIndex)) {
+    if (
+      pathIndex == size && size > 1u && path[pathIndex - 1u] == '/' && IsCollapsiblePathSlashBoundary(path, pathIndex)
+    ) {
       --pathIndex;
       cursor.mOffset = pathIndex;
       (void)SetPathTokenMarker(&cursor.mToken, '.');
@@ -2990,7 +3165,9 @@ namespace
    * What it does:
    * Copies one path-component cursor and advances source cursor backwards.
    */
-  [[nodiscard]] PathComponentCursor PostIncrementReversePathComponentCursor(PathComponentCursor& source)
+  [[nodiscard]] PathComponentCursor PostIncrementReversePathComponentCursor(
+    PathComponentCursor& source
+  )
   {
     PathComponentCursor copied = CopyPathComponentCursor(source);
     (void)AdvanceReversePathComponentCursor(source);
@@ -3003,7 +3180,9 @@ namespace
    * What it does:
    * Builds one normalized path from cursor token using filename-append rules.
    */
-  [[nodiscard]] fa::string BuildNormalizedCursorPathToken(const PathComponentCursor& cursor)
+  [[nodiscard]] fa::string BuildNormalizedCursorPathToken(
+    const PathComponentCursor& cursor
+  )
   {
     fa::string output{};
     (void)func_StringAppendFilename(cursor.mToken.c_str(), &output);
@@ -3016,7 +3195,10 @@ namespace
    * What it does:
    * Returns true when two path-component cursors are positioned differently.
    */
-  [[nodiscard]] bool PathComponentCursorNotEqual(const PathComponentCursor& lhs, const PathComponentCursor& rhs)
+  [[nodiscard]] bool PathComponentCursorNotEqual(
+    const PathComponentCursor& lhs,
+    const PathComponentCursor& rhs
+  )
   {
     return lhs.mPath != rhs.mPath || lhs.mOffset != rhs.mOffset;
   }
@@ -3027,7 +3209,10 @@ namespace
    * What it does:
    * Returns true when two path-component cursors are at identical position.
    */
-  [[nodiscard]] bool PathComponentCursorEqual(const PathComponentCursor& lhs, const PathComponentCursor& rhs)
+  [[nodiscard]] bool PathComponentCursorEqual(
+    const PathComponentCursor& lhs,
+    const PathComponentCursor& rhs
+  )
   {
     return lhs.mPath == rhs.mPath && lhs.mOffset == rhs.mOffset;
   }
@@ -3039,7 +3224,10 @@ namespace
    * Appends one relative token onto a base path using filename-append
    * normalization rules.
    */
-  [[nodiscard]] fa::string AppendRelativePathToken(const fa::string& basePath, const fa::string& relativePath)
+  [[nodiscard]] fa::string AppendRelativePathToken(
+    const fa::string& basePath,
+    const fa::string& relativePath
+  )
   {
     fa::string appended = basePath;
     (void)func_StringAppendFilename(relativePath.c_str(), &appended);
@@ -3068,8 +3256,10 @@ namespace
     bool allowRootCollapse = (rootBoundary != kInvalidPathBoundary);
 
     for (std::uint32_t index = 0u; index < size; ++index) {
-      if (index == 0u && size > 1u && source[0] == '/' && source[1] == '/' &&
-          (size == 2u || (source[2] != '/' && source[2] != '\\'))) {
+      if (
+        index == 0u && size > 1u && source[0] == '/' && source[1] == '/' &&
+        (size == 2u || (source[2] != '/' && source[2] != '\\'))
+      ) {
         (void)out->append(1u, '\\');
         (void)out->append(1u, '\\');
         index = 1u;
@@ -3077,7 +3267,8 @@ namespace
       }
 
       const char token = source[index];
-      const bool skipCollapsedSlash = allowRootCollapse && !out->empty() && (*out)[out->size() - 1u] == '\\' && token == '/';
+      const bool skipCollapsedSlash =
+        allowRootCollapse && !out->empty() && (*out)[out->size() - 1u] == '\\' && token == '/';
       if (!skipCollapsedSlash) {
         (void)out->append(1u, token == '/' ? '\\' : token);
         if (index > rootBoundary && token == '/') {
@@ -3144,7 +3335,9 @@ namespace
    * Collapses one path in place by resolving `.`/`..` component lanes while
    * preserving root/prefix boundary behavior from the startup filename lane.
    */
-  [[maybe_unused]] fa::string* CollapsePathComponentsInPlace(fa::string* const path)
+  [[maybe_unused]] fa::string* CollapsePathComponentsInPlace(
+    fa::string* const path
+  )
   {
     if (path == nullptr || path->empty()) {
       return path;
@@ -3158,7 +3351,10 @@ namespace
     PathComponentCursor current = CopyPathComponentCursor(prefixCursor);
     while (PathComponentCursorNotEqual(current, endCursor)) {
       const bool isDotToken = current.mToken == ".";
-      if (!isDotToken || PathComponentCursorEqual(current, prefixCursor) || PathComponentCursorEqual(current, reverseCursor)) {
+      if (
+        !isDotToken || PathComponentCursorEqual(current, prefixCursor) ||
+        PathComponentCursorEqual(current, reverseCursor)
+      ) {
         bool collapsedParent = false;
         const bool isParentToken = current.mToken == "..";
         if (!collapsedPath.empty() && isParentToken) {
@@ -3189,8 +3385,10 @@ namespace
             if (collapsedPath.empty()) {
               PathComponentCursor lookahead = CopyPathComponentCursor(current);
               (void)AdvancePathComponentCursor(lookahead);
-              if (PathComponentCursorNotEqual(lookahead, endCursor) && PathComponentCursorEqual(lookahead, reverseCursor) &&
-                  reverseCursor.mToken == ".") {
+              if (
+                PathComponentCursorNotEqual(lookahead, endCursor) &&
+                PathComponentCursorEqual(lookahead, reverseCursor) && reverseCursor.mToken == "."
+              ) {
                 (void)func_StringAppendFilename(".", &collapsedPath);
               }
             }
@@ -3259,7 +3457,10 @@ namespace
    * What it does:
    * Stores one path pointer lane in a single-word helper wrapper.
    */
-  [[maybe_unused]] void SetPathPointerLane(const fa::string*& outPath, const fa::string* const path) noexcept
+  [[maybe_unused]] void SetPathPointerLane(
+    const fa::string*& outPath,
+    const fa::string* const path
+  ) noexcept
   {
     outPath = path;
   }
@@ -3271,7 +3472,9 @@ namespace
    * Identity helper (compiler artifact).
    */
   template <typename T>
-  [[nodiscard]] T* IdentityPointerLaneA(T* const value) noexcept
+  [[nodiscard]] T* IdentityPointerLaneA(
+    T* const value
+  ) noexcept
   {
     return value;
   }
@@ -3283,7 +3486,9 @@ namespace
    * Identity helper (compiler artifact).
    */
   template <typename T>
-  [[nodiscard]] T* IdentityPointerLaneB(T* const value) noexcept
+  [[nodiscard]] T* IdentityPointerLaneB(
+    T* const value
+  ) noexcept
   {
     return value;
   }
@@ -3314,7 +3519,10 @@ fa::string* moho::PATH_ResolveAgainstBase(
  * Compares two canonicalized paths by reverse component order. The comparison
  * starts from the leaf token and walks toward each path root.
  */
-bool moho::PATH_ReverseComponentLess(const fa::string& lhs, const fa::string& rhs)
+bool moho::PATH_ReverseComponentLess(
+  const fa::string& lhs,
+  const fa::string& rhs
+)
 {
   PathComponentCursor lhsCursor = InitReversePathComponentCursor(lhs);
   PathComponentCursor lhsEnd = InitPathPrefixCursor(lhs);
@@ -3347,7 +3555,10 @@ bool moho::PATH_ReverseComponentLess(const fa::string& lhs, const fa::string& rh
  * Returns `inputPath` unchanged when it already has an extension, otherwise
  * appends `suggestedExt` (with leading `.` normalization).
  */
-fa::string moho::FILE_SuggestedExt(const gpg::StrArg inputPath, const gpg::StrArg suggestedExt)
+fa::string moho::FILE_SuggestedExt(
+  const gpg::StrArg inputPath,
+  const gpg::StrArg suggestedExt
+)
 {
   fa::string output;
   output.assign_owned(inputPath != nullptr ? inputPath : "");
@@ -3383,7 +3594,9 @@ fa::string moho::FILE_SuggestedExt(const gpg::StrArg inputPath, const gpg::StrAr
  * Returns true when path begins with a single local-root slash (`/`) and is
  * not UNC-like (`//`) and not slash-drive (`/:` form).
  */
-bool moho::FILE_IsLocal(const gpg::StrArg filename)
+bool moho::FILE_IsLocal(
+  const gpg::StrArg filename
+)
 {
   if (filename == nullptr) {
     return false;
@@ -3405,7 +3618,10 @@ bool moho::FILE_IsLocal(const gpg::StrArg filename)
  * Resolves one resource path against one base directory path, preserving
  * drive/UNC prefixes and validating incompatible base/target combinations.
  */
-fa::string moho::FILE_MakeAbsolute(const gpg::StrArg dir, const gpg::StrArg filename)
+fa::string moho::FILE_MakeAbsolute(
+  const gpg::StrArg dir,
+  const gpg::StrArg filename
+)
 {
   if (dir == nullptr || dir[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_MakeAbsolute", "Null argument.");
@@ -3487,7 +3703,9 @@ fa::string moho::FILE_MakeAbsolute(const gpg::StrArg dir, const gpg::StrArg file
  * What it does:
  * Returns true when `filename` starts with `<alpha>:` drive prefix.
  */
-bool moho::FILE_HasDrive(const gpg::StrArg filename)
+bool moho::FILE_HasDrive(
+  const gpg::StrArg filename
+)
 {
   if (filename == nullptr || filename[0] == '\0') {
     return false;
@@ -3504,7 +3722,9 @@ bool moho::FILE_HasDrive(const gpg::StrArg filename)
  * What it does:
  * Returns true when `filename` starts with UNC prefix (`//` or `\\`).
  */
-bool moho::FILE_HasUNC(const gpg::StrArg filename)
+bool moho::FILE_HasUNC(
+  const gpg::StrArg filename
+)
 {
   if (filename == nullptr || filename[0] == '\0' || filename[1] == '\0') {
     return false;
@@ -3521,7 +3741,9 @@ bool moho::FILE_HasUNC(const gpg::StrArg filename)
  * What it does:
  * Returns true when `filename` is an absolute path.
  */
-bool moho::FILE_IsAbsolute(const gpg::StrArg filename)
+bool moho::FILE_IsAbsolute(
+  const gpg::StrArg filename
+)
 {
   if (filename == nullptr || filename[0] == '\0') {
     return false;
@@ -3543,7 +3765,9 @@ bool moho::FILE_IsAbsolute(const gpg::StrArg filename)
  * Parses alphabetical drive prefix and returns 1..26 (`A/a` -> 1). Throws
  * `XFileError` for null argument, missing drive prefix, or invalid drive char.
  */
-int moho::GetDrive(const gpg::StrArg filename)
+int moho::GetDrive(
+  const gpg::StrArg filename
+)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::GetDrive", "Null argument.");
@@ -3571,7 +3795,9 @@ int moho::GetDrive(const gpg::StrArg filename)
  * Returns extension pointer (characters after final `.` in the last path
  * segment) or null when no extension exists.
  */
-const char* moho::FILE_Ext(const gpg::StrArg filename)
+const char* moho::FILE_Ext(
+  const gpg::StrArg filename
+)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_Ext", "Null argument.");
@@ -3599,7 +3825,10 @@ const char* moho::FILE_Ext(const gpg::StrArg filename)
  * Rebuilds `filename` with forced extension: removes existing extension from
  * last path segment, then appends `.` + `ext` when `ext` is non-empty.
  */
-fa::string moho::FILE_ForcedExt(const gpg::StrArg filename, const gpg::StrArg ext)
+fa::string moho::FILE_ForcedExt(
+  const gpg::StrArg filename,
+  const gpg::StrArg ext
+)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_ForcedExt", "Null argument.");
@@ -3626,7 +3855,10 @@ fa::string moho::FILE_ForcedExt(const gpg::StrArg filename, const gpg::StrArg ex
  * What it does:
  * Normalizes slash separators and returns path-directory prefix text.
  */
-fa::string moho::FILE_DirPrefix(const gpg::StrArg filename, const bool /*unusedFlag*/)
+fa::string moho::FILE_DirPrefix(
+  const gpg::StrArg filename,
+  const bool /*unusedFlag*/
+)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_DirPrefix", "Null argument.");
@@ -3668,7 +3900,9 @@ fa::string moho::FILE_DirPrefix(const gpg::StrArg filename, const bool /*unusedF
  * What it does:
  * Resolves a system-directory path prefix from a potentially relative filename.
  */
-fa::string moho::FILE_Dir(const gpg::StrArg filename)
+fa::string moho::FILE_Dir(
+  const gpg::StrArg filename
+)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_Dir", "Null argument.");
@@ -3729,7 +3963,10 @@ fa::string moho::FILE_Dir(const gpg::StrArg filename)
  * What it does:
  * Returns the final path segment and optionally strips extension text.
  */
-fa::string moho::FILE_Base(const gpg::StrArg filename, const bool stripExtension)
+fa::string moho::FILE_Base(
+  const gpg::StrArg filename,
+  const bool stripExtension
+)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_Base", "Null argument.");
@@ -3768,7 +4005,10 @@ fa::string moho::FILE_Base(const gpg::StrArg filename, const bool stripExtension
  * What it does:
  * Canonicalizes separators and collapses `.` / `..` path components.
  */
-fa::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const success)
+fa::string moho::FILE_CollapsePath(
+  const gpg::StrArg filename,
+  bool* const success
+)
 {
   if (filename == nullptr || filename[0] == '\0') {
     ThrowStartupFileError("Moho::FILE_CollapsePath", "Null argument.");
@@ -3862,7 +4102,9 @@ fa::string moho::FILE_CollapsePath(const gpg::StrArg filename, bool* const succe
  * What it does:
  * Maps platform errno values from disk helpers to human-readable text.
  */
-fa::string moho::FILE_GetErrorFromErrno(const int err)
+fa::string moho::FILE_GetErrorFromErrno(
+  const int err
+)
 {
   fa::string description;
   switch (err) {
@@ -3986,7 +4228,6 @@ void moho::USER_PurgeAppCacheDir()
   DISK_InvalidateFileLookups(); // engine addition (res_CacheFileLookups)
 }
 
-
 /**
  * Address: 0x008CA380 (FUN_008CA380)
  *
@@ -3997,7 +4238,6 @@ fa::string moho::USER_GetSaveGameExt()
 {
   return APP_GetPreferencePrefix() + SaveGameExtName();
 }
-
 
 /**
  * Address: 0x008CA450 (FUN_008CA450)
@@ -4021,11 +4261,9 @@ fa::string moho::USER_GetCampaignSaveExt()
   return APP_GetPreferencePrefix() + CampaignSaveExtName();
 }
 
-
 namespace
 {
 } // namespace
-
 
 /**
  * Address: 0x008CAE20 (FUN_008CAE20)
@@ -4049,7 +4287,9 @@ bool moho::USER_DebugFacilitiesEnabled()
  * Returns `/maps/<map>/<map>_scenario.lua` for plain map tokens, or the
  * input unchanged when it is already a path-like scenario reference.
  */
-fa::string moho::FindMapScenario(const gpg::StrArg mapName)
+fa::string moho::FindMapScenario(
+  const gpg::StrArg mapName
+)
 {
   fa::string scenarioPath;
   scenarioPath.assign_owned(mapName != nullptr ? mapName : "");
@@ -4066,7 +4306,6 @@ fa::string moho::FindMapScenario(const gpg::StrArg mapName)
   return gpg::STR_Printf("/maps/%s/%s_scenario.lua", rawMapName, rawMapName);
 }
 
-
 namespace
 {
   /**
@@ -4076,7 +4315,9 @@ namespace
    * Maps one `errno` value to disk-error text and publishes it to the
    * thread-local file wait-handle error slot.
    */
-  void func_FWaitSetError(const int err)
+  void func_FWaitSetError(
+    const int err
+  )
   {
     const fa::string errorDescription = moho::FILE_GetErrorFromErrno(err);
     if (fa::string* const errorSlot = moho::FWaitHandleSet::GetErrorString(); errorSlot != nullptr) {
@@ -4091,7 +4332,10 @@ namespace
    * Initializes destination string storage and canonicalizes one filesystem
    * path token.
    */
-  fa::string* func_StringSetFilename2(fa::string* const out, const gpg::StrArg sourcePath)
+  fa::string* func_StringSetFilename2(
+    fa::string* const out,
+    const gpg::StrArg sourcePath
+  )
   {
     return gpg::STR_InitFilename(out, sourcePath != nullptr ? sourcePath : "");
   }
@@ -4103,7 +4347,10 @@ namespace
    * Initializes destination string storage from one source string and
    * canonicalizes it as a filesystem token.
    */
-  [[maybe_unused]] fa::string* SetCanonicalFilenameFromString(fa::string* const out, const fa::string& sourcePath)
+  [[maybe_unused]] fa::string* SetCanonicalFilenameFromString(
+    fa::string* const out,
+    const fa::string& sourcePath
+  )
   {
     return func_StringSetFilename2(out, sourcePath.c_str());
   }
@@ -4144,7 +4391,9 @@ std::filesystem::path moho::DISK_GetLaunchDir()
  * What it does:
  * Attempts to create one folder and stores wait-handle error text on failure.
  */
-bool moho::DISK_CreateFolder(const gpg::StrArg sourcePath)
+bool moho::DISK_CreateFolder(
+  const gpg::StrArg sourcePath
+)
 {
   const char* const folderPath = sourcePath != nullptr ? sourcePath : "";
   if (_mkdir(folderPath) == 0) {
@@ -4162,7 +4411,9 @@ bool moho::DISK_CreateFolder(const gpg::StrArg sourcePath)
  * What it does:
  * Moves one file/folder path into shell recycle bin without UI prompts.
  */
-void moho::DISK_Recycle(const gpg::StrArg sourcePath)
+void moho::DISK_Recycle(
+  const gpg::StrArg sourcePath
+)
 {
   SHFILEOPSTRUCTW fileOperation{};
   fileOperation.wFunc = FO_DELETE;
@@ -4192,7 +4443,10 @@ void moho::DISK_Recycle(const gpg::StrArg sourcePath)
  * script name (SupComDataPath.lua); the FAF client launches with
  * `/init init_faf.lua`, `/init init_coop.lua` and so on.
  */
-bool moho::DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std::filesystem::path& launchDir)
+bool moho::DISK_SetupDataAndSearchPaths(
+  fa::string dataPathScriptName,
+  const std::filesystem::path& launchDir
+)
 {
   // 0x00459E14..0x00459E4E: the script name is taken by value and overwritten
   // with the `/init` argument when one is given.
@@ -4212,7 +4466,8 @@ bool moho::DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std
     return false;
   }
   std::filesystem::path absoluteScriptPath = MakeAbsolutePath(
-    requestedScriptPath.is_absolute() ? requestedScriptPath : absoluteLaunchDirectory / requestedScriptPath);
+    requestedScriptPath.is_absolute() ? requestedScriptPath : absoluteLaunchDirectory / requestedScriptPath
+  );
   if (absoluteScriptPath.empty()) {
     return false;
   }
@@ -4237,13 +4492,15 @@ bool moho::DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std
         absoluteScriptPath.string().c_str(),
         fallbackScriptPath.empty() ? "" : " or \"",
         fallbackScriptPath.empty() ? "" : fallbackScriptPath.string().c_str(),
-        fallbackScriptPath.empty() ? "" : "\"");
+        fallbackScriptPath.empty() ? "" : "\""
+      );
       return false;
     }
     gpg::Logf(
       "init script \"%s\" is not next to the exe; using \"%s\"",
       dataPathScriptName.c_str(),
-      fallbackScriptPath.string().c_str());
+      fallbackScriptPath.string().c_str()
+    );
     absoluteScriptPath = fallbackScriptPath;
   }
 
@@ -4326,21 +4583,28 @@ bool moho::DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std
   // Mount it. The binary does this at 0x0045A336-0x0045A376: ensure the
   // wait-handle set exists, build the file system over the mount table, store
   // it, and destroy whatever was mounted before.
-  if (moho::CVirtualFileSystem* const previous =
-        moho::DISK_ExchangeVFS(moho::VFS_Create(mountPoints, absoluteLaunchDirectory));
-      previous != nullptr) {
+  if (
+    moho::CVirtualFileSystem* const previous =
+      moho::DISK_ExchangeVFS(moho::VFS_Create(mountPoints, absoluteLaunchDirectory));
+    previous != nullptr
+  ) {
     delete previous;
   }
 
   return true;
 }
 
-bool moho::DISK_MountDirectoryNow(const std::filesystem::path& directory, const char* const mountpoint)
+bool moho::DISK_MountDirectoryNow(
+  const std::filesystem::path& directory,
+  const char* const mountpoint
+)
 {
   return DISK_MountDirectoriesNow({{directory, std::string(mountpoint)}});
 }
 
-bool moho::DISK_MountDirectoriesNow(const std::vector<std::pair<std::filesystem::path, std::string>>& folders)
+bool moho::DISK_MountDirectoriesNow(
+  const std::vector<std::pair<std::filesystem::path, std::string>>& folders
+)
 {
   fa::vector<moho::SVFSMountPoint> mountPoints;
   std::filesystem::path launchDirectory;
@@ -4401,7 +4665,6 @@ namespace
 #endif
 } // namespace
 
-
 /**
  * Address: 0x008C89D0 (FUN_008C89D0, USER_LoadPreferences)
  * Mangled: ?USER_LoadPreferences@Moho@@YAXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
@@ -4412,7 +4675,9 @@ namespace
  * requested preference file with version validation, and falls back to
  * `../Installed.Prefs` defaults when primary loading fails.
  */
-void moho::USER_LoadPreferences(const fa::string& preferenceFileName)
+void moho::USER_LoadPreferences(
+  const fa::string& preferenceFileName
+)
 {
   fa::auto_ptr<CUserPrefs> preferences(new CUserPrefs());
   bool loadedPrimaryPreferences = false;
@@ -4478,7 +4743,8 @@ void moho::USER_LoadPreferences(const fa::string& preferenceFileName)
   }
 
   if (!loadedPrimaryPreferences) {
-    const std::filesystem::path installedPrefsPath = (DISK_GetLaunchDir() / ".." / "Installed.Prefs").lexically_normal();
+    const std::filesystem::path installedPrefsPath =
+      (DISK_GetLaunchDir() / ".." / "Installed.Prefs").lexically_normal();
     const std::string installedPrefsText = installedPrefsPath.string();
 
     LuaPlus::LuaObject* const preferenceRoot = preferences->GetPreferenceTableMutable();
@@ -4528,7 +4794,8 @@ void moho::USER_SavePreferences()
 
   const fa::string* const preferencesPathUtf8 = preferences->GetStr2();
   const char* const preferencesPathText = preferencesPathUtf8 != nullptr ? preferencesPathUtf8->c_str() : "";
-  const std::wstring preferencesPathWide = gpg::STR_Utf8ToWide(preferencesPathText != nullptr ? preferencesPathText : "");
+  const std::wstring preferencesPathWide =
+    gpg::STR_Utf8ToWide(preferencesPathText != nullptr ? preferencesPathText : "");
   const std::wstring temporaryPathWide = preferencesPathWide + L".new";
 
   std::ofstream outputStream(temporaryPathWide.c_str());
@@ -4553,7 +4820,6 @@ void moho::USER_SavePreferences()
   CopyOrReplacePreferenceFile(temporaryPathWide.c_str(), preferencesPathWide.c_str());
 }
 
-
 /**
  * Address: 0x00874D30 (FUN_00874D30, `Moho::MOV_GetDuration`)
  *
@@ -4561,7 +4827,9 @@ void moho::USER_SavePreferences()
  * Resolves one movie path through mounted VFS state, parses Sofdec header
  * metadata, and returns duration in seconds for valid SFD payloads.
  */
-float moho::MOV_GetDuration(const gpg::StrArg sourcePath)
+float moho::MOV_GetDuration(
+  const gpg::StrArg sourcePath
+)
 {
   // Engine addition (dedicated-server plan WPL.4): `sMovieManager.get() ==
   // nullptr`, asked through the client's hook; without a client there is no
@@ -4597,4 +4865,3 @@ float moho::MOV_GetDuration(const gpg::StrArg sourcePath)
   gpg::Warnf("%s is not a valid SFD file.", sourcePath);
   return 0.0f;
 }
-

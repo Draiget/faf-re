@@ -37,7 +37,10 @@ end
 }
 )lua";
 
-  TEST(AdaptiveModel, OptionsByKindInTheLobbysOrder)
+  TEST(
+    AdaptiveModel,
+    OptionsByKindInTheLobbysOrder
+  )
   {
     faf::editor::AdaptiveTables tables;
     tables.options = {{"middleMexes", {{"Mass 07"}}}, {"sideMexes", {{"Mass 09"}, {}}}};
@@ -66,7 +69,10 @@ end
     EXPECT_EQ(options[5].title, "Optional naval wreckage");
   }
 
-  TEST(AdaptiveModel, WhatAChoiceAdds)
+  TEST(
+    AdaptiveModel,
+    WhatAChoiceAdds
+  )
   {
     const auto lobby = faf::editor::ParseLobbyOptions(kOptions);
     EXPECT_EQ(faf::editor::TableGroupOfChoice(lobby[0].values[0]), -1);
@@ -85,7 +91,10 @@ end
     EXPECT_TRUE(faf::editor::GroupsMadeByChoice(kScript, lobby, "jamming", 0).empty());
   }
 
-  TEST(AdaptiveModel, AnOptionWrittenBackKeepsItsKeys)
+  TEST(
+    AdaptiveModel,
+    AnOptionWrittenBackKeepsItsKeys
+  )
   {
     auto lobby = faf::editor::ParseLobbyOptions(kOptions);
     // Renamed choice, new default, a level added: the rest as it was.
@@ -113,7 +122,10 @@ end
     EXPECT_EQ(back[0].values.size(), 2u);
   }
 
-  TEST(AdaptiveModel, ReadableKeys)
+  TEST(
+    AdaptiveModel,
+    ReadableKeys
+  )
   {
     EXPECT_EQ(faf::editor::ReadableKey("optional_naval_wreckage"), "Optional naval wreckage");
     EXPECT_EQ(faf::editor::ReadableKey("middleMexes"), "Middle mexes");

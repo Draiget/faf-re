@@ -27,7 +27,9 @@ namespace
    * Executes one non-deleting `gpg::RType` base-teardown lane for
    * `CSimResourcesTypeInfo`.
    */
-  [[maybe_unused]] void cleanup_CSimResourcesTypeInfoRTypeBase(moho::CSimResourcesTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void cleanup_CSimResourcesTypeInfoRTypeBase(
+    moho::CSimResourcesTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -39,7 +41,9 @@ namespace
    * Register-shape adapter that forwards one reflected type lane into
    * `CSimResourcesTypeInfo` base-registration semantics.
    */
-  [[maybe_unused]] void AddBaseISimResourcesRegistrationThunk(gpg::RType* const typeInfo)
+  [[maybe_unused]] void AddBaseISimResourcesRegistrationThunk(
+    gpg::RType* const typeInfo
+  )
   {
     moho::resource_reflection::AddBase(typeInfo, moho::resource_reflection::ResolveISimResourcesType());
   }
@@ -67,7 +71,9 @@ namespace
     return typeInfo;
   }
 
-  [[nodiscard]] gpg::RRef MakeCSimResourcesRef(moho::CSimResources* const object)
+  [[nodiscard]] gpg::RRef MakeCSimResourcesRef(
+    moho::CSimResources* const object
+  )
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -195,7 +201,9 @@ namespace moho
   /**
    * Address: 0x005487E0 (FUN_005487E0, Moho::CSimResourcesTypeInfo::AddBase_ISimResources)
    */
-  void CSimResourcesTypeInfo::AddBase_ISimResources(gpg::RType* const typeInfo)
+  void CSimResourcesTypeInfo::AddBase_ISimResources(
+    gpg::RType* const typeInfo
+  )
   {
     resource_reflection::AddBase(typeInfo, resource_reflection::ResolveISimResourcesType());
   }
@@ -212,7 +220,9 @@ namespace moho
   /**
    * Address: 0x00548530 (FUN_00548530, Moho::CSimResourcesTypeInfo::CtrRef)
    */
-  gpg::RRef CSimResourcesTypeInfo::CtrRef(void* const objectPtr)
+  gpg::RRef CSimResourcesTypeInfo::CtrRef(
+    void* const objectPtr
+  )
   {
     auto* const object = reinterpret_cast<CSimResources*>(objectPtr);
     if (object != nullptr) {
@@ -224,7 +234,9 @@ namespace moho
   /**
    * Address: 0x00548510 (FUN_00548510, Moho::CSimResourcesTypeInfo::Delete)
    */
-  void CSimResourcesTypeInfo::Delete(void* const objectPtr)
+  void CSimResourcesTypeInfo::Delete(
+    void* const objectPtr
+  )
   {
     auto* const object = reinterpret_cast<CSimResources*>(objectPtr);
     if (object != nullptr) {
@@ -235,7 +247,9 @@ namespace moho
   /**
    * Address: 0x005485A0 (FUN_005485A0, Moho::CSimResourcesTypeInfo::Destruct)
    */
-  void CSimResourcesTypeInfo::Destruct(void* const objectPtr)
+  void CSimResourcesTypeInfo::Destruct(
+    void* const objectPtr
+  )
   {
     auto* const object = reinterpret_cast<CSimResources*>(objectPtr);
     object->~CSimResources();
@@ -252,4 +266,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CSimResourcesTypeInfo_f091f7, moho::register_CSimResourcesTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CSimResourcesTypeInfo_f091f7,
+  moho::register_CSimResourcesTypeInfo
+)

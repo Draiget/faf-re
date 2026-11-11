@@ -62,9 +62,8 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
 
-
 namespace moho
 {
   extern float ren_MeshDissolve;
   extern float ren_MeshDissolveCutoff;
-}
+} // namespace moho

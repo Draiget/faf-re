@@ -185,7 +185,6 @@
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "gpg/core/reflection/Reflection.h"
 
-
 // The MSVC runtime's polymorphic typeid entry point (vcruntime). cl declares
 // it implicitly; clang-cl needs the declaration.
 extern "C" void* __cdecl __RTtypeid(void* object);
@@ -193,7 +192,8 @@ using namespace gpg;
 namespace
 {
 
-  constexpr const char* kReflectionHeaderPath = "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\reflection.h";
+  constexpr const char* kReflectionHeaderPath =
+    "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\reflection.h";
 
   struct TypeInfoRTypePair
   {
@@ -303,7 +303,9 @@ namespace
    *   CDecalHandle 0x0077F600
    */
   template <class T>
-  [[nodiscard]] void* TryUpcastRefObjectVariantB(gpg::RRef* const sourceRef)
+  [[nodiscard]] void* TryUpcastRefObjectVariantB(
+    gpg::RRef* const sourceRef
+  )
   {
     const RRef upcast = gpg::REF_UpcastPtr(*sourceRef, T::GetPointerType());
     return upcast.mObj;
@@ -340,91 +342,98 @@ namespace
   // Address: 0x0077F600 (FUN_0077F600, TryUpcastRefObjectVariantB<moho::CDecalHandle> explicit instantiation)
   template void* TryUpcastRefObjectVariantB<moho::CDecalHandle>(gpg::RRef* const);
 
-/**
- * Address: 0x004C8F30 (FUN_004C8F30, gpg::RRef::TryUpcast_CScriptObject_P)
- *
- * What it does:
- * Upcasts one reflected reference lane to `CScriptObject*` slot and throws
- * `BadRefCast` on mismatch.
- */
-moho::CScriptObject** TryUpcastCScriptObjectPointerSlotOrThrow(const RRef& source)
-{
+  /**
+   * Address: 0x004C8F30 (FUN_004C8F30, gpg::RRef::TryUpcast_CScriptObject_P)
+   *
+   * What it does:
+   * Upcasts one reflected reference lane to `CScriptObject*` slot and throws
+   * `BadRefCast` on mismatch.
+   */
+  moho::CScriptObject** TryUpcastCScriptObjectPointerSlotOrThrow(
+    const RRef& source
+  )
+  {
     const RRef upcast = gpg::REF_UpcastPtr(source, moho::CScriptObject::GetPointerType());
     auto* const slot = static_cast<moho::CScriptObject**>(upcast.mObj);
     if (!slot) {
-        throw gpg::BadRefCast("type error");
+      throw gpg::BadRefCast("type error");
     }
     return slot;
-}
+  }
 
-/**
- * Address: 0x004C8AC0 (FUN_004C8AC0, sub_4C8AC0)
- *
- * What it does:
- * Allocates one `CScriptObject*` slot and returns it as typed `RRef`.
- */
-[[maybe_unused]] RRef NewCScriptObjectPointerSlotRef()
-{
+  /**
+   * Address: 0x004C8AC0 (FUN_004C8AC0, sub_4C8AC0)
+   *
+   * What it does:
+   * Allocates one `CScriptObject*` slot and returns it as typed `RRef`.
+   */
+  [[maybe_unused]] RRef NewCScriptObjectPointerSlotRef()
+  {
     auto* const slot = static_cast<moho::CScriptObject**>(::operator new(sizeof(moho::CScriptObject*)));
     RRef out{};
     out = gpg::MakeRRef<moho::CScriptObject*>(slot);
     return out;
-}
+  }
 
-/**
- * Address: 0x004C8AF0 (FUN_004C8AF0, sub_4C8AF0)
- *
- * What it does:
- * Allocates one `CScriptObject*` slot and copies pointer lane value from source.
- */
-[[maybe_unused]] RRef CopyCScriptObjectPointerSlotRef(RRef* const sourceRef)
-{
+  /**
+   * Address: 0x004C8AF0 (FUN_004C8AF0, sub_4C8AF0)
+   *
+   * What it does:
+   * Allocates one `CScriptObject*` slot and copies pointer lane value from source.
+   */
+  [[maybe_unused]] RRef CopyCScriptObjectPointerSlotRef(
+    RRef* const sourceRef
+  )
+  {
     auto* slot = static_cast<moho::CScriptObject**>(::operator new(sizeof(moho::CScriptObject*)));
     if (slot) {
-        *slot = *TryUpcastCScriptObjectPointerSlotOrThrow(*sourceRef);
-    }
-    else {
-        slot = nullptr;
+      *slot = *TryUpcastCScriptObjectPointerSlotOrThrow(*sourceRef);
+    } else {
+      slot = nullptr;
     }
 
     RRef out{};
     out = gpg::MakeRRef<moho::CScriptObject*>(slot);
     return out;
-}
+  }
 
-/**
- * Address: 0x004C8B80 (FUN_004C8B80, sub_4C8B80)
- *
- * What it does:
- * Wraps existing `CScriptObject*` slot storage as typed `RRef`.
- */
-[[maybe_unused]] RRef ConstructCScriptObjectPointerSlotRef(void* const slotObject)
-{
+  /**
+   * Address: 0x004C8B80 (FUN_004C8B80, sub_4C8B80)
+   *
+   * What it does:
+   * Wraps existing `CScriptObject*` slot storage as typed `RRef`.
+   */
+  [[maybe_unused]] RRef ConstructCScriptObjectPointerSlotRef(
+    void* const slotObject
+  )
+  {
     RRef out{};
     out = gpg::MakeRRef<moho::CScriptObject*>(static_cast<moho::CScriptObject**>(slotObject));
     return out;
-}
+  }
 
-/**
- * Address: 0x004C8BB0 (FUN_004C8BB0, sub_4C8BB0)
- *
- * What it does:
- * Moves/copies pointer lane value into destination `CScriptObject*` slot.
- */
-[[maybe_unused]] RRef MoveCScriptObjectPointerSlotRef(void* const slotObject, RRef* const sourceRef)
-{
+  /**
+   * Address: 0x004C8BB0 (FUN_004C8BB0, sub_4C8BB0)
+   *
+   * What it does:
+   * Moves/copies pointer lane value into destination `CScriptObject*` slot.
+   */
+  [[maybe_unused]] RRef MoveCScriptObjectPointerSlotRef(
+    void* const slotObject,
+    RRef* const sourceRef
+  )
+  {
     auto* slot = static_cast<moho::CScriptObject**>(slotObject);
     if (slot) {
-        *slot = *TryUpcastCScriptObjectPointerSlotOrThrow(*sourceRef);
-    }
-    else {
-        slot = nullptr;
+      *slot = *TryUpcastCScriptObjectPointerSlotOrThrow(*sourceRef);
+    } else {
+      slot = nullptr;
     }
 
     RRef out{};
     out = gpg::MakeRRef<moho::CScriptObject*>(slot);
     return out;
-}
+  }
 
   /**
    * Address: 0x00C09760 (FUN_00C09760, atexit destructor of the gpg::Rect2iTypeInfo object)
@@ -467,26 +476,22 @@ moho::CScriptObject** TryUpcastCScriptObjectPointerSlotOrThrow(const RRef& sourc
   {
     (void)GetRect2fTypeInfo();
   }
-}
+} // namespace
 
 namespace gpg
 {
 
-// ---------------------------------------------------------------------------
-// gpg::RVectorType<moho::SimArmy*> — reflection of std::vector<moho::SimArmy*>.
-// First exemplar of the RVectorType<T> family (22 element types). Vtable
-// @ 0x00E34778 (primary) / 0x00E347A8 (RIndexed subobject @ +0x64).
-// ---------------------------------------------------------------------------
-
-
+  // ---------------------------------------------------------------------------
+  // gpg::RVectorType<moho::SimArmy*> — reflection of std::vector<moho::SimArmy*>.
+  // First exemplar of the RVectorType<T> family (22 element types). Vtable
+  // @ 0x00E34778 (primary) / 0x00E347A8 (RIndexed subobject @ +0x64).
+  // ---------------------------------------------------------------------------
 }
 
 namespace gpg
 {
-  [[nodiscard]] REnumType::ROptionValue* AppendEnumOptionValue(
-    fa::vector<REnumType::ROptionValue>& options,
-    const REnumType::ROptionValue& value
-  );
+  [[nodiscard]] REnumType::ROptionValue*
+  AppendEnumOptionValue(fa::vector<REnumType::ROptionValue>& options, const REnumType::ROptionValue& value);
 }
 
 // windows.h, pulled in above, renames GetObject; RRef declares it under its own name.

@@ -18,12 +18,22 @@ namespace
   struct ScopedBackoff
   {
     moho::splat_detail::AllocationBackoff previous = moho::splat_detail::Backoff();
-    ScopedBackoff() { moho::splat_detail::Backoff() = {}; }
-    ~ScopedBackoff() { moho::splat_detail::Backoff() = previous; }
+    ScopedBackoff()
+    {
+      moho::splat_detail::Backoff() = {};
+    }
+    ~ScopedBackoff()
+    {
+      moho::splat_detail::Backoff() = previous;
+    }
   };
 
   template <std::size_t N>
-  void AppendQuad(gpg::core::FastVectorN<Vertex, N>& vertices, std::size_t id, float uv = 0.25f)
+  void AppendQuad(
+    gpg::core::FastVectorN<Vertex, N>& vertices,
+    std::size_t id,
+    float uv = 0.25f
+  )
   {
     // WildMagic default constructors need not initialize their floats.
     Vertex vertex{};
@@ -38,7 +48,10 @@ namespace
   }
 
   template <std::size_t N>
-  void CheckPrefix(const gpg::core::FastVectorN<Vertex, N>& vertices, float uv = 0.25f)
+  void CheckPrefix(
+    const gpg::core::FastVectorN<Vertex, N>& vertices,
+    float uv = 0.25f
+  )
   {
     ASSERT_EQ(vertices.Size() % 4, 0u);
     for (std::size_t i = 0; i < vertices.Size(); ++i) {
@@ -114,9 +127,15 @@ namespace
     constexpr std::size_t inlineQuads = N / 4;
     for (const int tier : {0, 1, 2, 3}) {
       const auto limit = tier == 0 ? inlineQuads - 1 : inlineQuads * (tier == 1 ? 4 : tier == 2 ? 10 : 20);
-      for (const std::size_t beforeRestart : {std::size_t(1), inlineQuads - 1, inlineQuads, inlineQuads + 1,
-                                             inlineQuads * 2 + 1, inlineQuads * 4 + 1,
-                                             inlineQuads * 8 + 1, inlineQuads * 16 + 1}) {
+      for (const std::size_t beforeRestart :
+           {std::size_t(1),
+            inlineQuads - 1,
+            inlineQuads,
+            inlineQuads + 1,
+            inlineQuads * 2 + 1,
+            inlineQuads * 4 + 1,
+            inlineQuads * 8 + 1,
+            inlineQuads * 16 + 1}) {
         if (beforeRestart > limit) {
           continue;
         }
@@ -207,18 +226,69 @@ namespace
     EXPECT_EQ(budget.available, N / 2);
     EXPECT_EQ(vertices.Capacity(), N * 2);
   }
+} // namespace
+
+TEST(
+  SplatBudget,
+  HighAndMediumFidelityStorage
+)
+{
+  CheckBudgets<10000>();
+}
+TEST(
+  SplatBudget,
+  LowFidelityStorage
+)
+{
+  CheckBudgets<1000>();
+}
+TEST(
+  SplatBudget,
+  HighAndMediumAtlasRestartStorage
+)
+{
+  CheckAtlasRestartStorage<10000>();
+}
+TEST(
+  SplatBudget,
+  LowAtlasRestartStorage
+)
+{
+  CheckAtlasRestartStorage<1000>();
+}
+TEST(
+  SplatBudget,
+  HighAndMediumBackoffAfterRestart
+)
+{
+  CheckBackoffAfterRestart<10000>();
+}
+TEST(
+  SplatBudget,
+  LowBackoffAfterRestart
+)
+{
+  CheckBackoffAfterRestart<1000>();
+}
+TEST(
+  SplatBudget,
+  HighAndMediumSparseOutputGrowth
+)
+{
+  CheckSparseOutputGrowth<10000>();
+}
+TEST(
+  SplatBudget,
+  LowSparseOutputGrowth
+)
+{
+  CheckSparseOutputGrowth<1000>();
 }
 
-TEST(SplatBudget, HighAndMediumFidelityStorage) { CheckBudgets<10000>(); }
-TEST(SplatBudget, LowFidelityStorage) { CheckBudgets<1000>(); }
-TEST(SplatBudget, HighAndMediumAtlasRestartStorage) { CheckAtlasRestartStorage<10000>(); }
-TEST(SplatBudget, LowAtlasRestartStorage) { CheckAtlasRestartStorage<1000>(); }
-TEST(SplatBudget, HighAndMediumBackoffAfterRestart) { CheckBackoffAfterRestart<10000>(); }
-TEST(SplatBudget, LowBackoffAfterRestart) { CheckBackoffAfterRestart<1000>(); }
-TEST(SplatBudget, HighAndMediumSparseOutputGrowth) { CheckSparseOutputGrowth<10000>(); }
-TEST(SplatBudget, LowSparseOutputGrowth) { CheckSparseOutputGrowth<1000>(); }
-
-TEST(SplatBudget, AllocationBackoff)
+TEST(
+  SplatBudget,
+  AllocationBackoff
+)
 {
   moho::splat_detail::AllocationBackoff state;
   EXPECT_TRUE(state.Allow(100));
@@ -241,7 +311,10 @@ TEST(SplatBudget, AllocationBackoff)
   EXPECT_FALSE(state.Allow(100));
 }
 
-TEST(SplatBudget, DefaultAndInvalidViewsLeaveBackoffUntouched)
+TEST(
+  SplatBudget,
+  DefaultAndInvalidViewsLeaveBackoffUntouched
+)
 {
   const ScopedBackoff isolate;
   auto& state = moho::splat_detail::Backoff();
@@ -257,7 +330,10 @@ TEST(SplatBudget, DefaultAndInvalidViewsLeaveBackoffUntouched)
   }
 }
 
-TEST(SplatBudget, BudgetSnapshotSurvivesPreferenceChange)
+TEST(
+  SplatBudget,
+  BudgetSnapshotSurvivesPreferenceChange
+)
 {
   const ScopedBackoff isolate;
   gpg::core::FastVectorN<Vertex, 1000> vertices;
@@ -273,7 +349,10 @@ TEST(SplatBudget, BudgetSnapshotSurvivesPreferenceChange)
   EXPECT_EQ(vertices.Capacity(), 1000u);
 }
 
-TEST(SplatBudget, SmallerFidelitySuccessPreservesLargerFailure)
+TEST(
+  SplatBudget,
+  SmallerFidelitySuccessPreservesLargerFailure
+)
 {
   const ScopedBackoff isolate;
   gpg::core::FastVectorN<Vertex, 10000> high;
@@ -291,7 +370,10 @@ TEST(SplatBudget, SmallerFidelitySuccessPreservesLargerFailure)
   EXPECT_EQ(high.Capacity(), 10000u);
 }
 
-TEST(SplatBudget, BackoffIsRenderThreadLocal)
+TEST(
+  SplatBudget,
+  BackoffIsRenderThreadLocal
+)
 {
   const ScopedBackoff isolate;
   auto& state = moho::splat_detail::Backoff();

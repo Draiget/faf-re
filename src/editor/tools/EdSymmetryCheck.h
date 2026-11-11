@@ -10,7 +10,8 @@ namespace faf::editor
   /** What the symmetry check found on a height field. */
   struct SymmetryReport
   {
-    /** Samples compared with their copies (for N-way turns, those outside the first sector that have a turned point on the map). */
+    /** Samples compared with their copies (for N-way turns, those outside the first sector that have a turned point on
+     * the map). */
     int checked = 0;
     /** Samples that differ from a copy by more than the tolerance. */
     int differing = 0;
@@ -28,7 +29,14 @@ namespace faf::editor
    * turns compare a sample outside the first sector with the height at its point turned back into the
    * first sector, read between samples, and count differences above `turnTolerance` words.
    */
-  SymmetryReport CheckSymmetry(const std::uint16_t* heights, int width, int height, Symmetry symmetry, int turns, int turnTolerance = 32);
+  SymmetryReport CheckSymmetry(
+    const std::uint16_t* heights,
+    int width,
+    int height,
+    Symmetry symmetry,
+    int turns,
+    int turnTolerance = 32
+  );
 
   /**
    * Makes the field symmetric from its source part: every group of copies takes its first member's height

@@ -24,18 +24,23 @@ namespace
     unsigned char tag;
   };
 
-  std::size_t FirstSpan(const void* const pointer)
+  std::size_t FirstSpan(
+    const void* const pointer
+  )
   {
     return (reinterpret_cast<std::uintptr_t>(pointer) - gBase) / kSpanBytes;
   }
 
-  void CheckFreeRuns(const bool (&used)[kTestSpans])
+  void CheckFreeRuns(
+    const bool (&used)[kTestSpans]
+  )
   {
     bool free[kTestSpans]{};
     ASSERT_TRUE(gFreeRunCount <= kTestSpans) << "Free-run count exceeds capacity";
     for (std::size_t index = 0; index < gFreeRunCount; ++index) {
       const LargeRun run = gFreeRuns[index];
-      ASSERT_TRUE(run.spans > 0 && run.firstSpan < kTestSpans && run.spans <= kTestSpans - run.firstSpan) << "Free run is empty or out of bounds";
+      ASSERT_TRUE(run.spans > 0 && run.firstSpan < kTestSpans && run.spans <= kTestSpans - run.firstSpan)
+        << "Free run is empty or out of bounds";
       for (std::size_t offset = 0; offset < run.spans; ++offset) {
         const std::size_t span = run.firstSpan + offset;
         ASSERT_TRUE(!used[span] && !free[span]) << "Free runs overlap each other or a live allocation";
@@ -46,9 +51,12 @@ namespace
       ASSERT_TRUE(free[span] != used[span]) << "Free-list coverage differs from the occupancy map";
     }
   }
-}
+} // namespace
 
-TEST(LuaArenaPressure, RandomizedOccupancyOracle)
+TEST(
+  LuaArenaPressure,
+  RandomizedOccupancyOracle
+)
 {
   static bool ran = false;
   ASSERT_FALSE(ran) << "Run through CTest: repeated cases require a fresh process.";
@@ -79,7 +87,8 @@ TEST(LuaArenaPressure, RandomizedOccupancyOracle)
       const std::size_t first = FirstSpan(allocation.pointer);
       for (std::size_t offset = 0; offset < allocation.spans; ++offset) {
         ASSERT_TRUE(used[first + offset]) << "Live allocation missing from occupancy map";
-        ASSERT_TRUE(static_cast<unsigned char*>(allocation.pointer)[offset * kSpanBytes] == allocation.tag) << "Live payload was overwritten";
+        ASSERT_TRUE(static_cast<unsigned char*>(allocation.pointer)[offset * kSpanBytes] == allocation.tag)
+          << "Live payload was overwritten";
         used[first + offset] = false;
       }
       lua::ArenaFree(allocation.pointer);
@@ -115,7 +124,8 @@ TEST(LuaArenaPressure, RandomizedOccupancyOracle)
   // Validate allocations still live at the end as well as those freed during the run.
   for (const LiveAllocation allocation : live) {
     for (std::size_t offset = 0; offset < allocation.spans; ++offset) {
-      ASSERT_TRUE(static_cast<unsigned char*>(allocation.pointer)[offset * kSpanBytes] == allocation.tag) << "Final live payload was overwritten";
+      ASSERT_TRUE(static_cast<unsigned char*>(allocation.pointer)[offset * kSpanBytes] == allocation.tag)
+        << "Final live payload was overwritten";
     }
     lua::ArenaFree(allocation.pointer);
   }

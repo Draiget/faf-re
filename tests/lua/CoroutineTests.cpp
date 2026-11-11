@@ -17,12 +17,18 @@ namespace moho
 
 namespace
 {
-  void Assert(const bool condition, const char* const message, const std::string& detail = "")
+  void Assert(
+    const bool condition,
+    const char* const message,
+    const std::string& detail = ""
+  )
   {
     EXPECT_TRUE(condition) << message << (detail.empty() ? "" : " (detail: ") << detail << (detail.empty() ? "" : ")");
   }
 
-  int CountCoroutineThreads(lua_State* const L)
+  int CountCoroutineThreads(
+    lua_State* const L
+  )
   {
     int count = 0;
     if (L != nullptr && L->l_G != nullptr) {
@@ -33,7 +39,10 @@ namespace
     return count;
   }
 
-  std::string RunLua(LuaPlus::LuaState& state, const std::string& source)
+  std::string RunLua(
+    LuaPlus::LuaState& state,
+    const std::string& source
+  )
   {
     lua_State* const L = state.GetCState();
     const int top = lua_gettop(L);
@@ -67,7 +76,10 @@ namespace
     }
   };
 
-  TEST_F(Existing_Coroutine, ArgumentValidation)
+  TEST_F(
+    Existing_Coroutine,
+    ArgumentValidation
+  )
   {
     const std::string res = RunLua(state, R"(
       local ok1, err1 = pcall(coroutine.create, 123)
@@ -88,10 +100,15 @@ namespace
       end
       return "ok"
     )");
-    Assert(res == "ok", "coroutine.create argument validation (rejects non-functions and cfunctions, accepts lua functions)");
+    Assert(
+      res == "ok", "coroutine.create argument validation (rejects non-functions and cfunctions, accepts lua functions)"
+    );
   }
 
-  TEST_F(Existing_Coroutine, StatusLifecycle)
+  TEST_F(
+    Existing_Coroutine,
+    StatusLifecycle
+  )
   {
     const std::string res = RunLua(state, R"(
       local insideStatus = nil
@@ -124,7 +141,10 @@ namespace
     Assert(res == "ok", "coroutine.status reports suspended -> running -> suspended -> dead");
   }
 
-  TEST_F(Existing_Coroutine, ResumeYieldValues)
+  TEST_F(
+    Existing_Coroutine,
+    ResumeYieldValues
+  )
   {
     const std::string res = RunLua(state, R"(
       local co = coroutine.create(function(a, b)
@@ -152,7 +172,10 @@ namespace
     Assert(res == "ok", "coroutine.resume / coroutine.yield argument and return value passing");
   }
 
-  TEST_F(Existing_Coroutine, MultiStepGenerator)
+  TEST_F(
+    Existing_Coroutine,
+    MultiStepGenerator
+  )
   {
     const std::string res = RunLua(state, R"(
       local function range(n)
@@ -175,7 +198,10 @@ namespace
     Assert(res == "ok", "coroutine.wrap works as an iterator generator");
   }
 
-  TEST_F(Existing_Coroutine, ErrorHandling)
+  TEST_F(
+    Existing_Coroutine,
+    ErrorHandling
+  )
   {
     const std::string res = RunLua(state, R"(
       local co = coroutine.create(function()
@@ -198,7 +224,10 @@ namespace
     Assert(res == "ok", "coroutine runtime errors propagate through resume as (false, msg) and leave thread dead");
   }
 
-  TEST_F(Existing_Coroutine, EngineFunctions)
+  TEST_F(
+    Existing_Coroutine,
+    EngineFunctions
+  )
   {
     std::string res = RunLua(state, R"(
       local co
@@ -224,14 +253,19 @@ namespace
       if not ok then return "resume failed: " .. tostring(ret) end
       return ret
     )");
-    Assert(res == "ok", "engine functions work inside a coroutine (CurrentThread, KillThread, ResumeThread, ForkThread)", res);
+    Assert(
+      res == "ok", "engine functions work inside a coroutine (CurrentThread, KillThread, ResumeThread, ForkThread)", res
+    );
 
     stage.UserFrame();
     res = RunLua(state, "return tostring(_G.test_fork_ran)");
     Assert(res == "true", "a thread forked from inside a coroutine runs", res);
   }
 
-  TEST_F(Existing_Coroutine, SelfKill)
+  TEST_F(
+    Existing_Coroutine,
+    SelfKill
+  )
   {
     RunLua(state, R"(
       _G.test_killed = "thread did not run"
@@ -248,7 +282,10 @@ namespace
     Assert(res == "reached the end", "a thread killing itself twice runs on, as in the binary", res);
   }
 
-  TEST_F(Existing_Coroutine, InheritGlobals)
+  TEST_F(
+    Existing_Coroutine,
+    InheritGlobals
+  )
   {
     const std::string res = RunLua(state, R"(
       local env = setmetatable({marker = "parent"}, {__index = _G})
@@ -264,7 +301,10 @@ namespace
     Assert(res == "parent", "a coroutine created inside a coroutine inherits its parent's globals", res);
   }
 
-  TEST_F(Existing_Coroutine, RestoredWithoutWrapper)
+  TEST_F(
+    Existing_Coroutine,
+    RestoredWithoutWrapper
+  )
   {
     lua_State* const L = state.GetCState();
     const char* const body = "return CurrentThread() == test_restored";
@@ -284,7 +324,10 @@ namespace
     Assert(res == "true true", "a coroutine without a wrapper can call engine functions after a resume", res);
   }
 
-  TEST_F(Existing_Coroutine, GarbageCollectionWeakTables)
+  TEST_F(
+    Existing_Coroutine,
+    GarbageCollectionWeakTables
+  )
   {
     const std::string res = RunLua(state, R"(
       -- Verify with weak-value and weak-key tables that unreferenced coroutines
@@ -381,7 +424,10 @@ namespace
     Assert(res == "ok", "coroutine collection in weak tables (values and keys) and stack object cleanup", res);
   }
 
-  TEST_F(Existing_Coroutine, ThreadGcList)
+  TEST_F(
+    Existing_Coroutine,
+    ThreadGcList
+  )
   {
     lua_State* const L = state.GetCState();
     const int baselineThreads = CountCoroutineThreads(L);
@@ -411,7 +457,10 @@ namespace
       collectgarbage()
       collectgarbage()
     )");
-    Assert(CountCoroutineThreads(L) == baselineThreads + 3, "rootgc1 frees exactly the 3 unreferenced coroutines and retains the 3 referenced ones");
+    Assert(
+      CountCoroutineThreads(L) == baselineThreads + 3,
+      "rootgc1 frees exactly the 3 unreferenced coroutines and retains the 3 referenced ones"
+    );
 
     // Drop all remaining references and collect garbage
     RunLua(state, R"(
@@ -424,7 +473,10 @@ namespace
     Assert(clearedThreads == baselineThreads, "rootgc1 unlinks and frees all coroutine threads when unreferenced");
   }
 
-  TEST_F(Existing_Coroutine, StressAllocation)
+  TEST_F(
+    Existing_Coroutine,
+    StressAllocation
+  )
   {
     lua_State* const L = state.GetCState();
     const int baselineThreads = CountCoroutineThreads(L);

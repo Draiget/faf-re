@@ -5,7 +5,10 @@
 
 namespace faf::editor
 {
-  std::vector<ImageChunk> FindImageChunks(const std::string& bytes, std::size_t from)
+  std::vector<ImageChunk> FindImageChunks(
+    const std::string& bytes,
+    std::size_t from
+  )
   {
     std::vector<ImageChunk> chunks;
     std::size_t at = from;
@@ -32,8 +35,12 @@ namespace faf::editor
     return chunks;
   }
 
-  std::string WithOriginalImages(const std::string& bytes, const std::vector<ImageChunk>& chunks, const std::vector<std::string>& originals,
-                                 const std::vector<bool>& keep)
+  std::string WithOriginalImages(
+    const std::string& bytes,
+    const std::vector<ImageChunk>& chunks,
+    const std::vector<std::string>& originals,
+    const std::vector<bool>& keep
+  )
   {
     if (chunks.size() != originals.size() || keep.size() != chunks.size()) {
       return bytes;

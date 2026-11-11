@@ -123,8 +123,7 @@ namespace
     ::ClipCursor(clipRectPtr);
   }
 #endif // FAFRE_PLATFORM_WINDOWS
-}
-
+} // namespace
 
 /**
  * Address: 0x008CD8C0 (FUN_008CD8C0)
@@ -154,9 +153,16 @@ WSupComFrame::WSupComFrame(
 // Table 0x00DFE4EC = {&wxFrame::sm_eventTable (0x00D56F70), rows 0x00F5BB4C};
 // GetEventTable (0x008CE090) comes with it. The deleting destructor
 // (0x008CE060) is the compiler's.
-BEGIN_EVENT_TABLE(WSupComFrame, wxFrame)
-  EVT_CLOSE(WSupComFrame::OnCloseWindow)
-  EVT_MOVE(WSupComFrame::OnMove)
+BEGIN_EVENT_TABLE(
+  WSupComFrame,
+  wxFrame
+)
+EVT_CLOSE(
+  WSupComFrame::OnCloseWindow
+)
+EVT_MOVE(
+  WSupComFrame::OnMove
+)
 END_EVENT_TABLE()
 
 /**

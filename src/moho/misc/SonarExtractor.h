@@ -21,8 +21,11 @@ namespace moho
      * Address: 0x007ED150 (FUN_007ED150, Moho::SonarExtractor::Range)
      * Slot: 1
      */
-    [[nodiscard]] bool
-    Range(SRangeExtractionPayload* outRange, const RUnitBlueprint* unitBlueprint, const Wm3::Vec3f& center) const override;
+    [[nodiscard]] bool Range(
+      SRangeExtractionPayload* outRange,
+      const RUnitBlueprint* unitBlueprint,
+      const Wm3::Vec3f& center
+    ) const override;
 
     /**
      * Address: 0x007ED090 (FUN_007ED090, Moho::SonarExtractor::Extract)

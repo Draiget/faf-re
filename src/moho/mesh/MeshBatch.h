@@ -104,10 +104,10 @@ namespace moho
     std::int32_t mAttachCount;                        // +0x20
     std::int32_t mMaxInstancesPerDraw;                // +0x24
     std::int32_t mActiveInstanceBudget;               // +0x28
-    fa::vector<std::int32_t> mBoneRemapIndices;    // +0x2C
+    fa::vector<std::int32_t> mBoneRemapIndices;       // +0x2C
     std::uint8_t mUseSecondaryData;                   // +0x3C
     std::uint8_t pad_3D_3F[0x03]{};
-    std::int32_t mParameterAnnotation;                  // +0x40
+    std::int32_t mParameterAnnotation;                       // +0x40
     boost::shared_ptr<gpg::gal::VertexFormat> mVertexFormat; // +0x44 the batch's vertex declaration
     boost::shared_ptr<gpg::gal::IndexBuffer> mIndexBuffer;   // +0x4C the batch's static index buffer
   };
@@ -119,7 +119,8 @@ namespace moho
   static_assert(offsetof(MeshBatch, mAttachCount) == 0x20, "MeshBatch::mAttachCount offset must be 0x20");
   static_assert(offsetof(MeshBatch, mBoneRemapIndices) == 0x2C, "MeshBatch::mBoneRemapIndices offset must be 0x2C");
   static_assert(
-    offsetof(MeshBatch, mParameterAnnotation) == 0x40, "MeshBatch::mParameterAnnotation offset must be 0x40"
+    offsetof(MeshBatch, mParameterAnnotation) == 0x40,
+    "MeshBatch::mParameterAnnotation offset must be 0x40"
   );
   static_assert(offsetof(MeshBatch, mVertexFormat) == 0x44, "MeshBatch::mVertexFormat offset must be 0x44");
   static_assert(offsetof(MeshBatch, mIndexBuffer) == 0x4C, "MeshBatch::mIndexBuffer offset must be 0x4C");
@@ -293,12 +294,25 @@ namespace moho
     void* mScratchVertexData = nullptr;
   };
 
-  static_assert(offsetof(HardwareMeshBatch, mStaticVertexBuffer) == 0x54, "HardwareMeshBatch::mStaticVertexBuffer offset must be 0x54");
-  static_assert(offsetof(HardwareMeshBatch, mDynamicVertexBuffer) == 0x5C, "HardwareMeshBatch::mDynamicVertexBuffer offset must be 0x5C");
-  static_assert(offsetof(HardwareMeshBatch, mScratchVertexData) == 0x64, "HardwareMeshBatch::mScratchVertexData offset must be 0x64");
+  static_assert(
+    offsetof(HardwareMeshBatch, mStaticVertexBuffer) == 0x54,
+    "HardwareMeshBatch::mStaticVertexBuffer offset must be 0x54"
+  );
+  static_assert(
+    offsetof(HardwareMeshBatch, mDynamicVertexBuffer) == 0x5C,
+    "HardwareMeshBatch::mDynamicVertexBuffer offset must be 0x5C"
+  );
+  static_assert(
+    offsetof(HardwareMeshBatch, mScratchVertexData) == 0x64,
+    "HardwareMeshBatch::mScratchVertexData offset must be 0x64"
+  );
   static_assert(sizeof(HardwareMeshBatch) == 0x68, "HardwareMeshBatch size must be 0x68");
 
   class MeshInstance;
   /** ren_RayTracedShadows: `meshInstance`'s world transform per bone under `batch` (HardwareMeshBatch.cpp). */
-  bool MeshInstanceRayTransforms(const MeshBatch& batch, MeshInstance& meshInstance, std::vector<std::array<float, 12>>& out);
+  bool MeshInstanceRayTransforms(
+    const MeshBatch& batch,
+    MeshInstance& meshInstance,
+    std::vector<std::array<float, 12>>& out
+  );
 } // namespace moho

@@ -63,7 +63,9 @@ namespace
    * A toolbar bitmap: the mounted path resolved through the VFS, loaded as a
    * BMP. Inlined at each of the eight tools.
    */
-  wxBitmap LoadToolBitmap(const char* const mountedPath)
+  wxBitmap LoadToolBitmap(
+    const char* const mountedPath
+  )
   {
     fa::string diskPath;
     (void)moho::DISK_GetVFS()->FindFile(&diskPath, mountedPath, nullptr);
@@ -73,29 +75,96 @@ namespace
 
 // Table 0x00DFF660 = {&wxFrame::sm_eventTable (0x00D56F70), rows 0x00F59488};
 // GetEventTable (0x004BC100) comes with it.
-BEGIN_EVENT_TABLE(moho::ScrDebugWindow, wxFrame)
-  EVT_CUSTOM(moho::EVT_SCR_PAUSE, -1, moho::ScrDebugWindow::OnScriptPause)
-  EVT_MENU(ID_CloseFile, moho::ScrDebugWindow::OnCloseFile)
-  EVT_MENU(ID_CloseAllFiles, moho::ScrDebugWindow::OnCloseAllFiles)
-  EVT_MENU(ID_ReloadAll, moho::ScrDebugWindow::OnReloadAll)
-  EVT_MENU(ID_GotoLine, moho::ScrDebugWindow::OnGotoLine)
-  EVT_MENU(ID_Find, moho::ScrDebugWindow::OnFind)
-  EVT_MENU(ID_FindNext, moho::ScrDebugWindow::OnFindNext)
-  EVT_MENU(ID_FindPrevious, moho::ScrDebugWindow::OnFindPrevious)
-  EVT_MENU(ID_Step, moho::ScrDebugWindow::OnStep)
-  EVT_MENU(ID_Resume, moho::ScrDebugWindow::OnResume)
-  EVT_MENU(ID_EnableBreakpoints, moho::ScrDebugWindow::OnEnableBreakpoints)
-  EVT_MENU(ID_DisableBreakpoints, moho::ScrDebugWindow::OnDisableBreakpoints)
-  EVT_MENU(ID_ClearBreakpoints, moho::ScrDebugWindow::OnClearBreakpoints)
-  EVT_LIST_ITEM_SELECTED(ID_CallStack, moho::ScrDebugWindow::OnCallStackSelected)
-  EVT_SPLITTER_SASH_POS_CHANGED(ID_SourceSplitter, moho::ScrDebugWindow::OnVerticalSashChanged)
-  EVT_SPLITTER_SASH_POS_CHANGED(ID_MainSplitter, moho::ScrDebugWindow::OnHorizontalSashChanged)
-  EVT_LIST_COL_END_DRAG(ID_CallStack, moho::ScrDebugWindow::OnCallStackColumnResized)
-  EVT_LIST_COL_END_DRAG(ID_Locals, moho::ScrDebugWindow::OnLocalsColumnResized)
-  EVT_LIST_COL_END_DRAG(ID_Globals, moho::ScrDebugWindow::OnGlobalsColumnResized)
-  EVT_MOVE(moho::ScrDebugWindow::OnMove)
-  EVT_SIZE(moho::ScrDebugWindow::OnSize)
-  EVT_CLOSE(moho::ScrDebugWindow::OnCloseWindow)
+BEGIN_EVENT_TABLE(
+  moho::ScrDebugWindow,
+  wxFrame
+)
+EVT_CUSTOM(
+  moho::EVT_SCR_PAUSE,
+  -1,
+  moho::ScrDebugWindow::OnScriptPause
+)
+EVT_MENU(
+  ID_CloseFile,
+  moho::ScrDebugWindow::OnCloseFile
+)
+EVT_MENU(
+  ID_CloseAllFiles,
+  moho::ScrDebugWindow::OnCloseAllFiles
+)
+EVT_MENU(
+  ID_ReloadAll,
+  moho::ScrDebugWindow::OnReloadAll
+)
+EVT_MENU(
+  ID_GotoLine,
+  moho::ScrDebugWindow::OnGotoLine
+)
+EVT_MENU(
+  ID_Find,
+  moho::ScrDebugWindow::OnFind
+)
+EVT_MENU(
+  ID_FindNext,
+  moho::ScrDebugWindow::OnFindNext
+)
+EVT_MENU(
+  ID_FindPrevious,
+  moho::ScrDebugWindow::OnFindPrevious
+)
+EVT_MENU(
+  ID_Step,
+  moho::ScrDebugWindow::OnStep
+)
+EVT_MENU(
+  ID_Resume,
+  moho::ScrDebugWindow::OnResume
+)
+EVT_MENU(
+  ID_EnableBreakpoints,
+  moho::ScrDebugWindow::OnEnableBreakpoints
+)
+EVT_MENU(
+  ID_DisableBreakpoints,
+  moho::ScrDebugWindow::OnDisableBreakpoints
+)
+EVT_MENU(
+  ID_ClearBreakpoints,
+  moho::ScrDebugWindow::OnClearBreakpoints
+)
+EVT_LIST_ITEM_SELECTED(
+  ID_CallStack,
+  moho::ScrDebugWindow::OnCallStackSelected
+)
+EVT_SPLITTER_SASH_POS_CHANGED(
+  ID_SourceSplitter,
+  moho::ScrDebugWindow::OnVerticalSashChanged
+)
+EVT_SPLITTER_SASH_POS_CHANGED(
+  ID_MainSplitter,
+  moho::ScrDebugWindow::OnHorizontalSashChanged
+)
+EVT_LIST_COL_END_DRAG(
+  ID_CallStack,
+  moho::ScrDebugWindow::OnCallStackColumnResized
+)
+EVT_LIST_COL_END_DRAG(
+  ID_Locals,
+  moho::ScrDebugWindow::OnLocalsColumnResized
+)
+EVT_LIST_COL_END_DRAG(
+  ID_Globals,
+  moho::ScrDebugWindow::OnGlobalsColumnResized
+)
+EVT_MOVE(
+  moho::ScrDebugWindow::OnMove
+)
+EVT_SIZE(
+  moho::ScrDebugWindow::OnSize
+)
+EVT_CLOSE(
+  moho::ScrDebugWindow::OnCloseWindow
+)
 END_EVENT_TABLE()
 
 /**
@@ -110,7 +179,13 @@ END_EVENT_TABLE()
  */
 moho::ScrDebugWindow::ScrDebugWindow()
   : wxFrame(
-      nullptr, -1, wxT("Debugger"), wxDefaultPosition, wxDefaultSize, wxDEFAULT_FRAME_STYLE, wxT("ScrDebugWindow")
+      nullptr,
+      -1,
+      wxT("Debugger"),
+      wxDefaultPosition,
+      wxDefaultSize,
+      wxDEFAULT_FRAME_STYLE,
+      wxT("ScrDebugWindow")
     )
   , mInitializing(true)
   , mThreadId(0)
@@ -153,25 +228,29 @@ moho::ScrDebugWindow::ScrDebugWindow()
   toolBar->AddTool(ID_Step, wxT("Step"), LoadToolBitmap("/coderes/engine/dbg_tool_step.bmp"), wxT("Step into"));
   toolBar->AddSeparator();
   toolBar->AddTool(
-    ID_EnableBreakpoints, wxT("Enable"), LoadToolBitmap("/coderes/engine/dbg_tool_enablebreakpoints.bmp"),
+    ID_EnableBreakpoints,
+    wxT("Enable"),
+    LoadToolBitmap("/coderes/engine/dbg_tool_enablebreakpoints.bmp"),
     wxT("Enable all breakpoints")
   );
   toolBar->AddTool(
-    ID_DisableBreakpoints, wxT("Disable"), LoadToolBitmap("/coderes/engine/dbg_tool_disablebreakpoints.bmp"),
+    ID_DisableBreakpoints,
+    wxT("Disable"),
+    LoadToolBitmap("/coderes/engine/dbg_tool_disablebreakpoints.bmp"),
     wxT("Disable all breakpoints")
   );
   toolBar->AddSeparator();
   toolBar->AddTool(
-    ID_ClearBreakpoints, wxT("Clear"), LoadToolBitmap("/coderes/engine/dbg_tool_clearbreakpoints.bmp"),
+    ID_ClearBreakpoints,
+    wxT("Clear"),
+    LoadToolBitmap("/coderes/engine/dbg_tool_clearbreakpoints.bmp"),
     wxT("Clear breakpoints")
   );
   toolBar->AddSeparator();
   mFindText = new wxTextCtrl(toolBar, ID_FindText, wxEmptyString, wxDefaultPosition, wxSize(196, -1));
   toolBar->AddControl(mFindText);
   toolBar->AddTool(ID_Find, wxT("Find"), LoadToolBitmap("/coderes/engine/dbg_tool_find.bmp"), wxT("Find"));
-  toolBar->AddTool(
-    ID_FindNext, wxT("Next"), LoadToolBitmap("/coderes/engine/dbg_tool_findnext.bmp"), wxT("Find Next")
-  );
+  toolBar->AddTool(ID_FindNext, wxT("Next"), LoadToolBitmap("/coderes/engine/dbg_tool_findnext.bmp"), wxT("Find Next"));
   toolBar->AddTool(
     ID_FindPrevious, wxT("Previous"), LoadToolBitmap("/coderes/engine/dbg_tool_findprev.bmp"), wxT("Find Previous")
   );
@@ -187,7 +266,12 @@ moho::ScrDebugWindow::ScrDebugWindow()
   fa::string rootPath;
   (void)DISK_GetVFS()->FindFile(&rootPath, "/", nullptr);
   mSourceTree = new wxGenericDirCtrl(
-    sourceSplitter, ID_SourceTree, gpg::STR_Utf8ToWide(rootPath.c_str()).c_str(), wxDefaultPosition, wxDefaultSize, 0,
+    sourceSplitter,
+    ID_SourceTree,
+    gpg::STR_Utf8ToWide(rootPath.c_str()).c_str(),
+    wxDefaultPosition,
+    wxDefaultSize,
+    0,
     wxT("Script files (*.lua)|*.lua")
   );
   mSourceCtrl = new ScrSourceCtrl(sourceSplitter);
@@ -202,34 +286,45 @@ moho::ScrDebugWindow::ScrDebugWindow()
   mCallStack->InsertColumn(
     1, wxT("Function"), wxLIST_FORMAT_LEFT, prefs->GetInteger("Windows.Debug.Watch.Stack.block", 96)
   );
-  mCallStack->InsertColumn(2, wxT("Line"), wxLIST_FORMAT_RIGHT, prefs->GetInteger("Windows.Debug.Watch.Stack.line", 64));
+  mCallStack->InsertColumn(
+    2, wxT("Line"), wxLIST_FORMAT_RIGHT, prefs->GetInteger("Windows.Debug.Watch.Stack.line", 64)
+  );
 
   mLocals = new ScrWatchCtrl(
-    watchBook, ID_Locals, prefs->GetInteger("Windows.Debug.Watch.Local.name", 96),
-    prefs->GetInteger("Windows.Debug.Watch.Local.type", 64), prefs->GetInteger("Windows.Debug.Watch.Local.value", 128)
+    watchBook,
+    ID_Locals,
+    prefs->GetInteger("Windows.Debug.Watch.Local.name", 96),
+    prefs->GetInteger("Windows.Debug.Watch.Local.type", 64),
+    prefs->GetInteger("Windows.Debug.Watch.Local.value", 128)
   );
   watchBook->AddPage(mLocals, wxT("Locals"));
   mGlobals = new ScrWatchCtrl(
-    watchBook, ID_Globals, prefs->GetInteger("Windows.Debug.Watch.Global.name", 96),
-    prefs->GetInteger("Windows.Debug.Watch.Global.type", 64), prefs->GetInteger("Windows.Debug.Watch.Global.value", 128)
+    watchBook,
+    ID_Globals,
+    prefs->GetInteger("Windows.Debug.Watch.Global.name", 96),
+    prefs->GetInteger("Windows.Debug.Watch.Global.type", 64),
+    prefs->GetInteger("Windows.Debug.Watch.Global.value", 128)
   );
   watchBook->AddPage(mGlobals, wxT("Globals"));
 
   Connect(
-    mSourceTree->GetTreeCtrl()->GetId(), -1, wxEVT_COMMAND_TREE_ITEM_ACTIVATED,
+    mSourceTree->GetTreeCtrl()->GetId(),
+    -1,
+    wxEVT_COMMAND_TREE_ITEM_ACTIVATED,
     (wxObjectEventFunction)(wxEventFunction)(wxTreeEventFunction)&ScrDebugWindow::OnSourceFileActivated
   );
 
   SetSize(
-    prefs->GetInteger("Windows.Debug.x", -1), prefs->GetInteger("Windows.Debug.y", -1),
-    prefs->GetInteger("Windows.Debug.width", -1), prefs->GetInteger("Windows.Debug.height", -1)
+    prefs->GetInteger("Windows.Debug.x", -1),
+    prefs->GetInteger("Windows.Debug.y", -1),
+    prefs->GetInteger("Windows.Debug.width", -1),
+    prefs->GetInteger("Windows.Debug.height", -1)
   );
   int clientWidth;
   int clientHeight;
   GetClientSize(&clientWidth, &clientHeight);
   mainSplitter->SplitHorizontally(
-    sourceSplitter, watchBook,
-    prefs->GetInteger("Windows.Debug.Sash.horizontal", static_cast<int>(clientHeight * 0.8f))
+    sourceSplitter, watchBook, prefs->GetInteger("Windows.Debug.Sash.horizontal", static_cast<int>(clientHeight * 0.8f))
   );
   sourceSplitter->SplitVertically(
     mSourceTree, mSourceCtrl, prefs->GetInteger("Windows.Debug.Sash.vertical", static_cast<int>(clientWidth * 0.25f))
@@ -269,7 +364,9 @@ moho::ScrDebugWindow::ScrDebugWindow()
 /**
  * Address: 0x004BEBE0 (FUN_004BEBE0)
  */
-bool moho::ScrDebugWindow::OpenFile(const fa::string& fileName)
+bool moho::ScrDebugWindow::OpenFile(
+  const fa::string& fileName
+)
 {
   if (!mSourceCtrl->Open(fileName)) {
     return false;
@@ -286,7 +383,9 @@ bool moho::ScrDebugWindow::OpenFile(const fa::string& fileName)
 /**
  * Address: 0x004BECF0 (FUN_004BECF0)
  */
-void moho::ScrDebugWindow::OnScriptPause(ScrPauseEvent& event)
+void moho::ScrDebugWindow::OnScriptPause(
+  ScrPauseEvent& event
+)
 {
   if (!OpenFile(event.mSourceName) || !mSourceCtrl->SetCursorLine(event.mSourceName, event.mSourceLine)) {
     SCR_DebugResume();
@@ -326,7 +425,9 @@ void moho::ScrDebugWindow::OnScriptPause(ScrPauseEvent& event)
  *
  * std::remove here is the out-of-line 0x004C04D0; the erase is 0x004C01A0.
  */
-void moho::ScrDebugWindow::OnCloseFile(wxCommandEvent& event)
+void moho::ScrDebugWindow::OnCloseFile(
+  wxCommandEvent& event
+)
 {
   const fa::string fileName = mSourceCtrl->GetCurrentFileName();
   mSourceCtrl->CloseCurrent();
@@ -338,7 +439,9 @@ void moho::ScrDebugWindow::OnCloseFile(wxCommandEvent& event)
 /**
  * Address: 0x004BF220 (FUN_004BF220)
  */
-void moho::ScrDebugWindow::OnCloseAllFiles(wxCommandEvent& event)
+void moho::ScrDebugWindow::OnCloseAllFiles(
+  wxCommandEvent& event
+)
 {
   fa::string fileName = mSourceCtrl->GetCurrentFileName();
   while (!fileName.empty()) {
@@ -353,7 +456,9 @@ void moho::ScrDebugWindow::OnCloseAllFiles(wxCommandEvent& event)
 /**
  * Address: 0x004BF3F0 (FUN_004BF3F0)
  */
-void moho::ScrDebugWindow::OnReloadAll(wxCommandEvent& event)
+void moho::ScrDebugWindow::OnReloadAll(
+  wxCommandEvent& event
+)
 {
   mSourceCtrl->ReloadAll();
 }
@@ -361,7 +466,9 @@ void moho::ScrDebugWindow::OnReloadAll(wxCommandEvent& event)
 /**
  * Address: 0x004BF400 (FUN_004BF400)
  */
-void moho::ScrDebugWindow::OnGotoLine(wxCommandEvent& event)
+void moho::ScrDebugWindow::OnGotoLine(
+  wxCommandEvent& event
+)
 {
   ScrGotoDialog dialog;
   if (dialog.ShowModal() == wxID_OK) {
@@ -372,7 +479,9 @@ void moho::ScrDebugWindow::OnGotoLine(wxCommandEvent& event)
 /**
  * Address: 0x004BF4C0 (FUN_004BF4C0)
  */
-void moho::ScrDebugWindow::OnFind(wxCommandEvent& event)
+void moho::ScrDebugWindow::OnFind(
+  wxCommandEvent& event
+)
 {
   mFindString = gpg::STR_WideToUtf8(mFindText->GetValue().c_str());
   if (!mFindString.empty()) {
@@ -383,7 +492,9 @@ void moho::ScrDebugWindow::OnFind(wxCommandEvent& event)
 /**
  * Address: 0x004BF5B0 (FUN_004BF5B0)
  */
-void moho::ScrDebugWindow::OnFindNext(wxCommandEvent& event)
+void moho::ScrDebugWindow::OnFindNext(
+  wxCommandEvent& event
+)
 {
   if (!mFindString.empty()) {
     mSourceCtrl->FindNext(mFindString);
@@ -393,7 +504,9 @@ void moho::ScrDebugWindow::OnFindNext(wxCommandEvent& event)
 /**
  * Address: 0x004BF5F0 (FUN_004BF5F0)
  */
-void moho::ScrDebugWindow::OnFindPrevious(wxCommandEvent& event)
+void moho::ScrDebugWindow::OnFindPrevious(
+  wxCommandEvent& event
+)
 {
   if (!mFindString.empty()) {
     mSourceCtrl->FindPrevious(mFindString);
@@ -403,7 +516,9 @@ void moho::ScrDebugWindow::OnFindPrevious(wxCommandEvent& event)
 /**
  * Address: 0x004BF630 (FUN_004BF630)
  */
-void moho::ScrDebugWindow::OnStep(wxCommandEvent& event)
+void moho::ScrDebugWindow::OnStep(
+  wxCommandEvent& event
+)
 {
   mSourceCtrl->ClearCursor();
   mLocals->Clear();
@@ -416,7 +531,9 @@ void moho::ScrDebugWindow::OnStep(wxCommandEvent& event)
 /**
  * Address: 0x004BF690 (FUN_004BF690)
  */
-void moho::ScrDebugWindow::OnResume(wxCommandEvent& event)
+void moho::ScrDebugWindow::OnResume(
+  wxCommandEvent& event
+)
 {
   mSourceCtrl->ClearCursor();
   mLocals->Clear();
@@ -429,7 +546,9 @@ void moho::ScrDebugWindow::OnResume(wxCommandEvent& event)
 /**
  * Address: 0x004BF6F0 (FUN_004BF6F0)
  */
-void moho::ScrDebugWindow::OnEnableBreakpoints(wxCommandEvent& event)
+void moho::ScrDebugWindow::OnEnableBreakpoints(
+  wxCommandEvent& event
+)
 {
   mSourceCtrl->EnableBreakpoints(true);
   SCR_EnableAllBreakpoints(true);
@@ -438,7 +557,9 @@ void moho::ScrDebugWindow::OnEnableBreakpoints(wxCommandEvent& event)
 /**
  * Address: 0x004BF710 (FUN_004BF710)
  */
-void moho::ScrDebugWindow::OnDisableBreakpoints(wxCommandEvent& event)
+void moho::ScrDebugWindow::OnDisableBreakpoints(
+  wxCommandEvent& event
+)
 {
   mSourceCtrl->EnableBreakpoints(false);
   SCR_EnableAllBreakpoints(false);
@@ -447,7 +568,9 @@ void moho::ScrDebugWindow::OnDisableBreakpoints(wxCommandEvent& event)
 /**
  * Address: 0x004BF730 (FUN_004BF730)
  */
-void moho::ScrDebugWindow::OnClearBreakpoints(wxCommandEvent& event)
+void moho::ScrDebugWindow::OnClearBreakpoints(
+  wxCommandEvent& event
+)
 {
   mSourceCtrl->RemoveAllBreakpoints();
   SCR_RemoveAllBreakpoints();
@@ -456,7 +579,9 @@ void moho::ScrDebugWindow::OnClearBreakpoints(wxCommandEvent& event)
 /**
  * Address: 0x004BF750 (FUN_004BF750)
  */
-void moho::ScrDebugWindow::OnCallStackSelected(wxListEvent& event)
+void moho::ScrDebugWindow::OnCallStackSelected(
+  wxListEvent& event
+)
 {
   fa::vector<ScrActivation> callStack;
   SCR_EnumerateCallStack(callStack);
@@ -474,7 +599,9 @@ void moho::ScrDebugWindow::OnCallStackSelected(wxListEvent& event)
 /**
  * Address: 0x004BF840 (FUN_004BF840)
  */
-void moho::ScrDebugWindow::OnSourceFileActivated(wxTreeEvent& event)
+void moho::ScrDebugWindow::OnSourceFileActivated(
+  wxTreeEvent& event
+)
 {
   CVirtualFileSystem* const vfs = DISK_GetVFS();
   fa::string mountedPath;
@@ -485,7 +612,9 @@ void moho::ScrDebugWindow::OnSourceFileActivated(wxTreeEvent& event)
 /**
  * Address: 0x004BF960 (FUN_004BF960)
  */
-void moho::ScrDebugWindow::OnVerticalSashChanged(wxSplitterEvent& event)
+void moho::ScrDebugWindow::OnVerticalSashChanged(
+  wxSplitterEvent& event
+)
 {
   if (!mInitializing) {
     USER_GetPreferences()->SetInteger("Windows.Debug.Sash.vertical", event.GetSashPosition());
@@ -495,7 +624,9 @@ void moho::ScrDebugWindow::OnVerticalSashChanged(wxSplitterEvent& event)
 /**
  * Address: 0x004BFA00 (FUN_004BFA00)
  */
-void moho::ScrDebugWindow::OnHorizontalSashChanged(wxSplitterEvent& event)
+void moho::ScrDebugWindow::OnHorizontalSashChanged(
+  wxSplitterEvent& event
+)
 {
   if (!mInitializing) {
     USER_GetPreferences()->SetInteger("Windows.Debug.Sash.horizontal", event.GetSashPosition());
@@ -505,7 +636,9 @@ void moho::ScrDebugWindow::OnHorizontalSashChanged(wxSplitterEvent& event)
 /**
  * Address: 0x004BFAA0 (FUN_004BFAA0)
  */
-void moho::ScrDebugWindow::OnCallStackColumnResized(wxListEvent& event)
+void moho::ScrDebugWindow::OnCallStackColumnResized(
+  wxListEvent& event
+)
 {
   if (mInitializing) {
     return;
@@ -520,7 +653,9 @@ void moho::ScrDebugWindow::OnCallStackColumnResized(wxListEvent& event)
 /**
  * Address: 0x004BFC00 (FUN_004BFC00)
  */
-void moho::ScrDebugWindow::OnLocalsColumnResized(wxListEvent& event)
+void moho::ScrDebugWindow::OnLocalsColumnResized(
+  wxListEvent& event
+)
 {
   if (mInitializing) {
     return;
@@ -535,7 +670,9 @@ void moho::ScrDebugWindow::OnLocalsColumnResized(wxListEvent& event)
 /**
  * Address: 0x004BFD60 (FUN_004BFD60)
  */
-void moho::ScrDebugWindow::OnGlobalsColumnResized(wxListEvent& event)
+void moho::ScrDebugWindow::OnGlobalsColumnResized(
+  wxListEvent& event
+)
 {
   if (mInitializing) {
     return;
@@ -550,7 +687,9 @@ void moho::ScrDebugWindow::OnGlobalsColumnResized(wxListEvent& event)
 /**
  * Address: 0x004BFEC0 (FUN_004BFEC0)
  */
-void moho::ScrDebugWindow::OnMove(wxMoveEvent& event)
+void moho::ScrDebugWindow::OnMove(
+  wxMoveEvent& event
+)
 {
   if (mInitializing) {
     return;
@@ -564,7 +703,9 @@ void moho::ScrDebugWindow::OnMove(wxMoveEvent& event)
 /**
  * Address: 0x004BFFE0 (FUN_004BFFE0)
  */
-void moho::ScrDebugWindow::OnSize(wxSizeEvent& event)
+void moho::ScrDebugWindow::OnSize(
+  wxSizeEvent& event
+)
 {
   wxFrame::OnSize(event);
   if (mInitializing) {
@@ -579,7 +720,9 @@ void moho::ScrDebugWindow::OnSize(wxSizeEvent& event)
 /**
  * Address: 0x004C0100 (FUN_004C0100)
  */
-void moho::ScrDebugWindow::OnCloseWindow(wxCloseEvent& event)
+void moho::ScrDebugWindow::OnCloseWindow(
+  wxCloseEvent& event
+)
 {
   SCR_DestroyDebugWindow();
 }
@@ -590,25 +733,35 @@ namespace
   // debugger, for moho/misc/ScrDebugHooks.cpp (see ScrDebugHooks.h). The bodies are
   // what SCR_CreateDebugWindow, SCR_DestroyDebugWindow and the pause path did before
   // the move.
-  void OpenScrDebugWindow(moho::ScrDebugWindow*& runtimeWindow)
+  void OpenScrDebugWindow(
+    moho::ScrDebugWindow*& runtimeWindow
+  )
   {
     auto* const window = new moho::ScrDebugWindow();
     runtimeWindow = window;
     (void)window->Show(true);
   }
 
-  void DestroyScrDebugWindow(moho::ScrDebugWindow& window)
+  void DestroyScrDebugWindow(
+    moho::ScrDebugWindow& window
+  )
   {
     (void)window.Destroy();
   }
 
-  void PostScrDebugPause(moho::ScrDebugWindow& window, const fa::string& source, const int line)
+  void PostScrDebugPause(
+    moho::ScrDebugWindow& window,
+    const fa::string& source,
+    const int line
+  )
   {
     moho::ScrPauseEvent pauseEvent(source, line);
     window.AddPendingEvent(pauseEvent);
   }
 
   [[maybe_unused]] const bool gScrDebugWindowHooksSet =
-    (moho::sScrDebugWindowOpen = &OpenScrDebugWindow, moho::sScrDebugWindowDestroy = &DestroyScrDebugWindow,
-     moho::sScrDebugWindowPostPause = &PostScrDebugPause, true);
+    (moho::sScrDebugWindowOpen = &OpenScrDebugWindow,
+     moho::sScrDebugWindowDestroy = &DestroyScrDebugWindow,
+     moho::sScrDebugWindowPostPause = &PostScrDebugPause,
+     true);
 } // namespace

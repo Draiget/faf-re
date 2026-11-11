@@ -24,14 +24,23 @@ namespace faf::editor
    * Unity quaternion, and its links as indices into the file. Writes the markers named in `names` (all when empty);
    * links to markers outside them are left out, as FAFME's export does.
    */
-  std::string MarkersToFafmapmarkers(const std::vector<SaveEntry>& markers, const std::vector<std::string>& names, int mapWidth,
-                                     int mapHeight);
+  std::string MarkersToFafmapmarkers(
+    const std::vector<SaveEntry>& markers,
+    const std::vector<std::string>& names,
+    int mapWidth,
+    int mapHeight
+  );
   /**
    * Adds a `.fafmapmarkers` file's markers to `markers` under new names (the type's next free one, also clear of
    * `reserved`: the scenario's armies, which a start position is named after), with their links; false with `error`
    * when the text isn't such a file.
    */
-  bool MarkersFromFafmapmarkers(const std::string& text, std::vector<SaveEntry>& markers, MarkerImport& result, std::string& error,
-                                const std::vector<std::string>& reserved = {});
+  bool MarkersFromFafmapmarkers(
+    const std::string& text,
+    std::vector<SaveEntry>& markers,
+    MarkerImport& result,
+    std::string& error,
+    const std::vector<std::string>& reserved = {}
+  );
 
 } // namespace faf::editor

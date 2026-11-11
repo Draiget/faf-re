@@ -30,11 +30,20 @@ namespace faf::editor
     void Draw(bool& open);
     /** The Particle Browser (View > Particle Browser): every game effect in a grid; a click plays it in the preview. */
     void DrawBrowserWindow(bool& open);
-    /** The browser asked to show the Particle Editor (Edit in the Particle Editor, File > Browse in it the other way). */
-    [[nodiscard]] bool TakeOpenEditorAsk() noexcept { return std::exchange(mOpenEditorAsk, false); }
-    [[nodiscard]] bool TakeOpenBrowserAsk() noexcept { return std::exchange(mOpenBrowserAsk, false); }
+    /** The browser asked to show the Particle Editor (Edit in the Particle Editor, File > Browse in it the other way).
+     */
+    [[nodiscard]] bool TakeOpenEditorAsk() noexcept
+    {
+      return std::exchange(mOpenEditorAsk, false);
+    }
+    [[nodiscard]] bool TakeOpenBrowserAsk() noexcept
+    {
+      return std::exchange(mOpenBrowserAsk, false);
+    }
     /** "Place on the map": the effect's game path for a decoration at the view's centre; taken once. */
-    [[nodiscard]] bool TakePlaceAsk(std::string& path)
+    [[nodiscard]] bool TakePlaceAsk(
+      std::string& path
+    )
     {
       if (mPlaceAsk.empty()) {
         return false;
@@ -42,31 +51,48 @@ namespace faf::editor
       path = std::exchange(mPlaceAsk, std::string());
       return true;
     }
-    /** The open effect's path in the game's files: a game effect's own, or the map's copy once saved there; else empty. */
+    /** The open effect's path in the game's files: a game effect's own, or the map's copy once saved there; else empty.
+     */
     [[nodiscard]] std::string GamePath() const;
 
     /** Where a vault map keeps its effects (`<map>`), empty without one: the editor's own folder then. */
     void SetMapFolder(const std::filesystem::path& folder, const std::string& mapFolderName);
     /** The particle view (its own 3D view of the effect alone), rendered by the app at the start of each frame. */
-    [[nodiscard]] EdParticleViewport& Viewport() noexcept { return mViewport; }
+    [[nodiscard]] EdParticleViewport& Viewport() noexcept
+    {
+      return mViewport;
+    }
     /** Emits the preview's particles for this frame (also while the window is closed: false stops it). */
     void Frame(bool showing);
 
     /** Test runs (`/particlebrowser <search>`): the browser's search set, its first match played. */
     void TestBrowse(const std::string& search);
     /** Test runs (`/particlenew beam|trail`): a new beam or trail. */
-    void TestNew(const std::string& kind) { NewFlat(kind == "beam" ? "BeamBlueprint" : "TrailEmitterBlueprint"); }
+    void TestNew(
+      const std::string& kind
+    )
+    {
+      NewFlat(kind == "beam" ? "BeamBlueprint" : "TrailEmitterBlueprint");
+    }
     /** Test runs (`/particleopen <game path>`): opens a game emitter. */
     bool OpenGameEmitter(const std::string& path);
-    /** Test runs (`/particleswitch <game path>`): the open effect marked edited, then that one opened through the question. */
-    void TestOpenEdited(const std::string& path)
+    /** Test runs (`/particleswitch <game path>`): the open effect marked edited, then that one opened through the
+     * question. */
+    void TestOpenEdited(
+      const std::string& path
+    )
     {
       SyncGraph();
       mDirty = true;
-      OpenOther([this, path] { (void)OpenGameEmitter(path); });
+      OpenOther([this, path] {
+        (void)OpenGameEmitter(path);
+      });
     }
     /** Test runs (`/texturepicker`): the next texture input drawn opens its browser. */
-    void TestTexturePicker() noexcept { mTexturePicker.AskOpen(); }
+    void TestTexturePicker() noexcept
+    {
+      mTexturePicker.AskOpen();
+    }
     /** Opens one of FAF's effect templates (its emitters played together) as a graph. */
     bool OpenTemplate(const EffectTemplate& effect);
     /** Test runs (`/particletemplate <name>`): opens that template. */
@@ -127,7 +153,11 @@ namespace faf::editor
     bool mFrameAsk = true;
 
     // The node graph (ui/EdParticleGraph.cpp): the effect's emitters as nodes, a preview per emitter.
-    void SetGraph(const std::string& effectName, const std::vector<std::pair<std::string, EmitterBlueprint>>& emitters, const std::string& gamePaths);
+    void SetGraph(
+      const std::string& effectName,
+      const std::vector<std::pair<std::string, EmitterBlueprint>>& emitters,
+      const std::string& gamePaths
+    );
     /** The emitters again from the graph when it changed (the previews follow). */
     void SyncGraph();
     void DrawGraphMode();

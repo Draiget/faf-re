@@ -54,14 +54,15 @@ namespace moho
       return ::operator new(kBlockBytes, std::nothrow);
     }
 
-    static void Free(void* const block) noexcept
+    static void Free(
+      void* const block
+    ) noexcept
     {
       if (IsSimThread() && !gSimKeyframeRestoring.load(std::memory_order_relaxed)) {
         try {
           Blocks().push_back(block);
           return;
-        } catch (...) {
-        }
+        } catch (...) {}
       }
       ::operator delete(block);
     }
@@ -91,7 +92,10 @@ namespace moho
      * Storage whose bytes land in the binary's class holds a block for as long as it lives. While a keyframe loads
      * the list stands still, so it only notes the storage: `AdoptHeldBlocks` gives it the saved block.
      */
-    static void NoteStorageAllocated(const void* const storage, const std::size_t bytes) noexcept
+    static void NoteStorageAllocated(
+      const void* const storage,
+      const std::size_t bytes
+    ) noexcept
     {
       if (bytes <= 768u || bytes > 896u || !IsSimThread()) {
         return;
@@ -99,11 +103,12 @@ namespace moho
       const bool restoring = gSimKeyframeRestoring.load(std::memory_order_relaxed);
       try {
         AddHeld(HeldBlock{storage, bytes, restoring ? nullptr : Allocate()});
-      } catch (...) {
-      }
+      } catch (...) {}
     }
 
-    static void NoteStorageFreed(const void* const storage) noexcept
+    static void NoteStorageFreed(
+      const void* const storage
+    ) noexcept
     {
       // This runs for every free of `unsigned int` storage, and nearly none of it holds a block.
       if (!IsSimThread() || HeldFilterSlot(storage) == 0u) {
@@ -133,7 +138,9 @@ namespace moho
     }
 
     /** Replaces the free list and drops the held blocks. Only while no sim runs. */
-    static void SetFreeBlocks(std::vector<void*> blocks) noexcept
+    static void SetFreeBlocks(
+      std::vector<void*> blocks
+    ) noexcept
     {
       for (void* const block : Blocks()) {
         ::operator delete(block);
@@ -162,7 +169,9 @@ namespace moho
      * After a keyframe's load: each storage it noted gets a saved block of its size. Which one is by order, as the
      * storage has no name in the save. Saved blocks left over stay held, as a unit's stale pointer can name them.
      */
-    static void AdoptHeldBlocks(std::vector<HeldBlock> saved) noexcept
+    static void AdoptHeldBlocks(
+      std::vector<HeldBlock> saved
+    ) noexcept
     {
       for (HeldBlock& held : Held()) {
         if (held.block != nullptr) {
@@ -183,8 +192,7 @@ namespace moho
         if (candidate.block != nullptr) {
           try {
             AddHeld(HeldBlock{nullptr, candidate.bytes, candidate.block});
-          } catch (...) {
-          }
+          } catch (...) {}
         }
       }
     }
@@ -192,20 +200,25 @@ namespace moho
   private:
     static constexpr std::size_t kHeldFilterSlots = std::size_t{1} << 16u;
 
-    /** Held entries per hash of their storage: zero means no entry has it, and a shared slot only costs a walk. Static, as a heap allocation here would move what the sim gets next. */
+    /** Held entries per hash of their storage: zero means no entry has it, and a shared slot only costs a walk. Static,
+     * as a heap allocation here would move what the sim gets next. */
     [[nodiscard]] static std::uint32_t* HeldFilterSlots() noexcept
     {
       static std::uint32_t sSlots[kHeldFilterSlots] = {};
       return sSlots;
     }
 
-    [[nodiscard]] static std::uint32_t& HeldFilterSlot(const void* const storage) noexcept
+    [[nodiscard]] static std::uint32_t& HeldFilterSlot(
+      const void* const storage
+    ) noexcept
     {
       const std::uintptr_t address = reinterpret_cast<std::uintptr_t>(storage);
       return HeldFilterSlots()[((address >> 4u) ^ (address >> 20u)) & (kHeldFilterSlots - 1u)];
     }
 
-    static void AddHeld(const HeldBlock& entry)
+    static void AddHeld(
+      const HeldBlock& entry
+    )
     {
       Held().push_back(entry);
       ++HeldFilterSlot(entry.storage);

@@ -28,11 +28,17 @@ namespace faf::headless
   {
   public:
     CReplayViewPacketCheck(
-      std::int32_t army, const std::string& path, const std::string& entriesPath, std::uint32_t entriesEvery
+      std::int32_t army,
+      const std::string& path,
+      const std::string& entriesPath,
+      std::uint32_t entriesEvery
     );
     ~CReplayViewPacketCheck() override;
 
-    [[nodiscard]] bool IsOpen() const noexcept { return mFile != nullptr && (mWantEntries == (mEntries != nullptr)); }
+    [[nodiscard]] bool IsOpen() const noexcept
+    {
+      return mFile != nullptr && (mWantEntries == (mEntries != nullptr));
+    }
 
     void Install();
     void Uninstall();

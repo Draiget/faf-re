@@ -57,8 +57,8 @@ namespace gpg::gal
 
   private:
     fa::string mName;
-    Microsoft::WRL::ComPtr<ID3DX11Effect> mEffect; // keeps the technique alive
-    ID3DX11EffectTechnique* mTechnique = nullptr;  // owned by the effect
+    Microsoft::WRL::ComPtr<ID3DX11Effect> mEffect;        // keeps the technique alive
+    ID3DX11EffectTechnique* mTechnique = nullptr;         // owned by the effect
     ID3DX11EffectVectorVariable* mViewportSize = nullptr; // faf_ViewportSize, when the effect has it
     bool mBegun = false;
   };

@@ -74,7 +74,9 @@ namespace moho
    * Room for a keyframe packed by `compress2`. x86 links wxWindows' older zlib, which has no
    * `compressBound` and asks for 0.1% over the size plus 12 bytes; this is above that and above 1.2.3's bound.
    */
-  [[nodiscard]] constexpr unsigned long SIM_KeyframePackBound(const unsigned long size) noexcept
+  [[nodiscard]] constexpr unsigned long SIM_KeyframePackBound(
+    const unsigned long size
+  ) noexcept
   {
     return size + (size >> 9) + 64u;
   }

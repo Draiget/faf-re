@@ -32,8 +32,7 @@ namespace gpg::gal::imaging
 {
 #if !FAFRE_PLATFORM_WINDOWS
   struct ImageCodec::State
-  {
-  };
+  {};
 #else
   using Microsoft::WRL::ComPtr;
 
@@ -124,7 +123,10 @@ namespace gpg::gal::imaging
 #else
     char forced[8]{};
     std::size_t forcedLength = 0U;
-    if (::getenv_s(&forcedLength, forced, sizeof(forced), "FAF_IMAGECODEC_DIRECTXTEX") == 0 && forcedLength != 0U && forced[0] == '1') {
+    if (
+      ::getenv_s(&forcedLength, forced, sizeof(forced), "FAF_IMAGECODEC_DIRECTXTEX") == 0 && forcedLength != 0U &&
+      forced[0] == '1'
+    ) {
       gpg::Logf("imaging: FAF_IMAGECODEC_DIRECTXTEX=1, d3dx11_43.dll not used");
       return nullptr;
     }
@@ -134,20 +136,36 @@ namespace gpg::gal::imaging
       gpg::Logf("imaging: d3dx11_43.dll is not installed (DirectX End-User Runtime, June 2010)");
       return nullptr;
     }
-    state->getImageInfo =
-      reinterpret_cast<decltype(&::D3DX11GetImageInfoFromMemory)>(::GetProcAddress(state->module, "D3DX11GetImageInfoFromMemory"));
-    state->createTexture =
-      reinterpret_cast<decltype(&::D3DX11CreateTextureFromMemory)>(::GetProcAddress(state->module, "D3DX11CreateTextureFromMemory"));
-    state->saveToMemory =
-      reinterpret_cast<decltype(&::D3DX11SaveTextureToMemory)>(::GetProcAddress(state->module, "D3DX11SaveTextureToMemory"));
-    state->saveToFile = reinterpret_cast<decltype(&::D3DX11SaveTextureToFileA)>(::GetProcAddress(state->module, "D3DX11SaveTextureToFileA"));
-    if (state->getImageInfo == nullptr || state->createTexture == nullptr || state->saveToMemory == nullptr || state->saveToFile == nullptr) {
+    state->getImageInfo = reinterpret_cast<decltype(&::D3DX11GetImageInfoFromMemory)>(
+      ::GetProcAddress(state->module, "D3DX11GetImageInfoFromMemory")
+    );
+    state->createTexture = reinterpret_cast<decltype(&::D3DX11CreateTextureFromMemory)>(
+      ::GetProcAddress(state->module, "D3DX11CreateTextureFromMemory")
+    );
+    state->saveToMemory = reinterpret_cast<decltype(&::D3DX11SaveTextureToMemory)>(
+      ::GetProcAddress(state->module, "D3DX11SaveTextureToMemory")
+    );
+    state->saveToFile = reinterpret_cast<decltype(&::D3DX11SaveTextureToFileA)>(
+      ::GetProcAddress(state->module, "D3DX11SaveTextureToFileA")
+    );
+    if (
+      state->getImageInfo == nullptr || state->createTexture == nullptr || state->saveToMemory == nullptr ||
+      state->saveToFile == nullptr
+    ) {
       gpg::Warnf("imaging: d3dx11_43.dll lacks the texture exports");
       return nullptr;
     }
     const HRESULT result = ::D3D11CreateDevice(
-      nullptr, D3D_DRIVER_TYPE_WARP, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0U, D3D11_SDK_VERSION, &state->device,
-      nullptr, &state->context
+      nullptr,
+      D3D_DRIVER_TYPE_WARP,
+      nullptr,
+      D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+      nullptr,
+      0U,
+      D3D11_SDK_VERSION,
+      &state->device,
+      nullptr,
+      &state->context
     );
     if (FAILED(result)) {
       gpg::Warnf("imaging: no WARP device for texture decoding (HRESULT 0x%08lX)", static_cast<unsigned long>(result));
@@ -166,9 +184,15 @@ namespace gpg::gal::imaging
 #endif
   }
 
-  HRESULT ImageCodec::DecodeFull(const void* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage)
+  HRESULT ImageCodec::DecodeFull(
+    const void* const data,
+    const std::size_t bytes,
+    const DecodeOptions& options,
+    Image& outImage
+  )
   {
-    return UsesD3dx() ? DecodeWithD3dx(data, bytes, options, outImage) : DecodeWithDirectXTex(data, bytes, options, outImage);
+    return UsesD3dx() ? DecodeWithD3dx(data, bytes, options, outImage)
+                      : DecodeWithDirectXTex(data, bytes, options, outImage);
   }
 
   bool gDdsDirectLoad = true;
@@ -176,13 +200,22 @@ namespace gpg::gal::imaging
 
   namespace
   {
-    constexpr std::uint32_t FourCc(const char a, const char b, const char c, const char d) noexcept
+    constexpr std::uint32_t FourCc(
+      const char a,
+      const char b,
+      const char c,
+      const char d
+    ) noexcept
     {
-      return static_cast<std::uint32_t>(static_cast<std::uint8_t>(a)) | (static_cast<std::uint32_t>(static_cast<std::uint8_t>(b)) << 8U) |
-        (static_cast<std::uint32_t>(static_cast<std::uint8_t>(c)) << 16U) | (static_cast<std::uint32_t>(static_cast<std::uint8_t>(d)) << 24U);
+      return static_cast<std::uint32_t>(static_cast<std::uint8_t>(a)) |
+        (static_cast<std::uint32_t>(static_cast<std::uint8_t>(b)) << 8U) |
+        (static_cast<std::uint32_t>(static_cast<std::uint8_t>(c)) << 16U) |
+        (static_cast<std::uint32_t>(static_cast<std::uint8_t>(d)) << 24U);
     }
 
-    [[nodiscard]] std::uint32_t ReadU32(const std::uint8_t* const at) noexcept
+    [[nodiscard]] std::uint32_t ReadU32(
+      const std::uint8_t* const at
+    ) noexcept
     {
       std::uint32_t value = 0U;
       std::memcpy(&value, at, sizeof(value));
@@ -196,11 +229,16 @@ namespace gpg::gal::imaging
      * returns false and goes through D3DX11.
      */
     [[nodiscard]] bool TryReadBlockCompressedDds(
-      const std::uint8_t* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage
+      const std::uint8_t* const data,
+      const std::size_t bytes,
+      const DecodeOptions& options,
+      Image& outImage
     )
     {
       constexpr std::size_t kHeaderBytes = 4U + 124U;
-      if (options.format != DXGI_FORMAT_UNKNOWN || options.width != 0U || options.height != 0U || options.mipLevels != 0U) {
+      if (
+        options.format != DXGI_FORMAT_UNKNOWN || options.width != 0U || options.height != 0U || options.mipLevels != 0U
+      ) {
         return false;
       }
       if (bytes < kHeaderBytes || ReadU32(data) != FourCc('D', 'D', 'S', ' ') || ReadU32(data + 4) != 124U) {
@@ -218,7 +256,9 @@ namespace gpg::gal::imaging
       const std::uint32_t pixelFlags = ReadU32(data + 80);
       const std::uint32_t fourCc = ReadU32(data + 84);
       const std::uint32_t caps2 = ReadU32(data + 112);
-      if ((pixelFlags & kFourCcFlag) == 0U || (caps2 & kVolume) != 0U || width == 0U || height == 0U || mipCount > 16U) {
+      if (
+        (pixelFlags & kFourCcFlag) == 0U || (caps2 & kVolume) != 0U || width == 0U || height == 0U || mipCount > 16U
+      ) {
         return false;
       }
       DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
@@ -255,7 +295,9 @@ namespace gpg::gal::imaging
       const std::uint32_t topHeight = std::max(1U, height >> skip);
       // Power-of-two sides only: D3DX11 changes the data of a level whose side drops below a
       // multiple of 4 while still above 4 (the 128x6 level of a 256x12 texture).
-      const auto powerOfTwo = [](const std::uint32_t side) { return (side & (side - 1U)) == 0U; };
+      const auto powerOfTwo = [](const std::uint32_t side) {
+        return (side & (side - 1U)) == 0U;
+      };
       if (!powerOfTwo(width) || !powerOfTwo(height) || (topWidth % 4U) != 0U || (topHeight % 4U) != 0U) {
         return false;
       }
@@ -264,7 +306,8 @@ namespace gpg::gal::imaging
       std::vector<std::size_t> levelBytes(mipCount);
       std::size_t faceBytes = 0U;
       for (std::uint32_t mip = 0U; mip < mipCount; ++mip) {
-        levelBytes[mip] = dxgi::ComputeLevelLayout(format, std::max(1U, width >> mip), std::max(1U, height >> mip)).ByteSize();
+        levelBytes[mip] =
+          dxgi::ComputeLevelLayout(format, std::max(1U, width >> mip), std::max(1U, height >> mip)).ByteSize();
         faceBytes += levelBytes[mip];
       }
       if (bytes - kHeaderBytes < faceBytes * faces) {
@@ -303,14 +346,20 @@ namespace gpg::gal::imaging
      * XXH64 (Yann Collet's algorithm) of the file's bytes. The key used to be FNV-1a, one
      * multiply per byte: 16% of a 274 ms zoom frame went to hashing the textures it loaded.
      */
-    [[nodiscard]] std::uint64_t HashBytes(const void* const data, const std::size_t bytes, const std::uint64_t seed) noexcept
+    [[nodiscard]] std::uint64_t HashBytes(
+      const void* const data,
+      const std::size_t bytes,
+      const std::uint64_t seed
+    ) noexcept
     {
       constexpr std::uint64_t kPrime1 = 0x9E3779B185EBCA87ULL;
       constexpr std::uint64_t kPrime2 = 0xC2B2AE3D27D4EB4FULL;
       constexpr std::uint64_t kPrime3 = 0x165667B19E3779F9ULL;
       constexpr std::uint64_t kPrime4 = 0x85EBCA77C2B2AE63ULL;
       constexpr std::uint64_t kPrime5 = 0x27D4EB2F165667C5ULL;
-      const auto rotate = [](const std::uint64_t value, const int bits) { return (value << bits) | (value >> (64 - bits)); };
+      const auto rotate = [](const std::uint64_t value, const int bits) {
+        return (value << bits) | (value >> (64 - bits));
+      };
       const auto round = [&](std::uint64_t accumulator, const std::uint64_t input) {
         accumulator += input * kPrime2;
         return rotate(accumulator, 31) * kPrime1;
@@ -359,7 +408,12 @@ namespace gpg::gal::imaging
       return hash;
     }
 
-    [[nodiscard]] std::uint64_t DecodeCacheKey(const void* const data, const std::size_t bytes, const DecodeOptions& options, const bool d3dx)
+    [[nodiscard]] std::uint64_t DecodeCacheKey(
+      const void* const data,
+      const std::size_t bytes,
+      const DecodeOptions& options,
+      const bool d3dx
+    )
     {
       effects::Fnv1a64 hash;
       // 3: a 2D quality skip drops whole levels; entries from D3DX11's FirstMipLevel were scaled up.
@@ -376,7 +430,9 @@ namespace gpg::gal::imaging
       return HashBytes(data, bytes, hash.Value());
     }
 
-    [[nodiscard]] std::string DecodeCachePath(const std::uint64_t key)
+    [[nodiscard]] std::string DecodeCachePath(
+      const std::uint64_t key
+    )
     {
       const std::string& directory = effects::ShaderCacheDirectory();
       if (directory.empty()) {
@@ -408,7 +464,9 @@ namespace gpg::gal::imaging
         return *index;
       }
 
-      [[nodiscard]] bool Contains(const std::uint64_t key)
+      [[nodiscard]] bool Contains(
+        const std::uint64_t key
+      )
       {
         const std::lock_guard<std::mutex> lock(mMutex);
         if (!mListed) {
@@ -418,7 +476,9 @@ namespace gpg::gal::imaging
         return mKeys.count(key) != 0U;
       }
 
-      void Add(const std::uint64_t key)
+      void Add(
+        const std::uint64_t key
+      )
       {
         const std::lock_guard<std::mutex> lock(mMutex);
         mKeys.insert(key);
@@ -451,12 +511,18 @@ namespace gpg::gal::imaging
       std::unordered_set<std::uint64_t> mKeys;
     };
 
-    [[nodiscard]] bool ReadDecodeCache(const std::string& path, const std::uint64_t key, Image& outImage)
+    [[nodiscard]] bool ReadDecodeCache(
+      const std::string& path,
+      const std::uint64_t key,
+      Image& outImage
+    )
     {
       if (!DecodeCacheIndex::Instance().Contains(key)) {
         return false;
       }
-      HANDLE const file = ::CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+      HANDLE const file = ::CreateFileA(
+        path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr
+      );
       if (file == INVALID_HANDLE_VALUE) {
         return false;
       }
@@ -477,7 +543,8 @@ namespace gpg::gal::imaging
         outImage.subresources.resize(header.subresourceCount);
         const DWORD subresourceBytes = static_cast<DWORD>(header.subresourceCount * sizeof(Image::Subresource));
         outImage.bytes.resize(static_cast<std::size_t>(header.byteCount));
-        ok = ::ReadFile(file, outImage.subresources.data(), subresourceBytes, &read, nullptr) && read == subresourceBytes &&
+        ok = ::ReadFile(file, outImage.subresources.data(), subresourceBytes, &read, nullptr) &&
+          read == subresourceBytes &&
           ::ReadFile(file, outImage.bytes.data(), static_cast<DWORD>(outImage.bytes.size()), &read, nullptr) &&
           read == outImage.bytes.size();
       }
@@ -488,7 +555,11 @@ namespace gpg::gal::imaging
       return ok;
     }
 
-    void WriteDecodeCache(const std::string& path, const std::uint64_t key, const Image& image)
+    void WriteDecodeCache(
+      const std::string& path,
+      const std::uint64_t key,
+      const Image& image
+    )
     {
       DecodeCacheHeader header{};
       std::memcpy(header.magic, kDecodeCacheMagic, sizeof(kDecodeCacheMagic));
@@ -513,7 +584,8 @@ namespace gpg::gal::imaging
       const DWORD subresourceBytes = static_cast<DWORD>(image.subresources.size() * sizeof(Image::Subresource));
       DWORD written = 0U;
       const bool ok = ::WriteFile(file, &header, sizeof(header), &written, nullptr) && written == sizeof(header) &&
-        ::WriteFile(file, image.subresources.data(), subresourceBytes, &written, nullptr) && written == subresourceBytes &&
+        ::WriteFile(file, image.subresources.data(), subresourceBytes, &written, nullptr) &&
+        written == subresourceBytes &&
         ::WriteFile(file, image.bytes.data(), static_cast<DWORD>(image.bytes.size()), &written, nullptr) &&
         written == image.bytes.size();
       ::CloseHandle(file);
@@ -524,7 +596,9 @@ namespace gpg::gal::imaging
       DecodeCacheIndex::Instance().Add(key);
     }
 
-    [[nodiscard]] bool EnvironmentFlag(const char* const name)
+    [[nodiscard]] bool EnvironmentFlag(
+      const char* const name
+    )
     {
       char value[8]{};
       std::size_t length = 0U;
@@ -546,7 +620,9 @@ namespace gpg::gal::imaging
     }
   } // namespace
 
-  void ImageCodec::PreferOwnDds(const bool prefer) noexcept
+  void ImageCodec::PreferOwnDds(
+    const bool prefer
+  ) noexcept
   {
     sOwnDdsPreferred.store(prefer, std::memory_order_relaxed);
   }
@@ -562,7 +638,10 @@ namespace gpg::gal::imaging
   }
 
   HRESULT ImageCodec::Decode(
-    const void* const data, const std::size_t bytes, const DecodeOptions& requestedOptions, Image& outImage
+    const void* const data,
+    const std::size_t bytes,
+    const DecodeOptions& requestedOptions,
+    Image& outImage
   )
   {
     DecodeOptions options = requestedOptions;
@@ -581,10 +660,16 @@ namespace gpg::gal::imaging
         static std::uint32_t sTinyLevelDifferences = 0U;
         for (std::uint32_t index = 0U; same && index < outImage.subresources.size(); ++index) {
           const Image::Subresource& level = outImage.subresources[index];
-          const bool equal = std::memcmp(outImage.bytes.data() + level.offset, reference.bytes.data() + level.offset, level.slicePitch) == 0;
+          const bool equal =
+            std::memcmp(
+              outImage.bytes.data() + level.offset, reference.bytes.data() + level.offset, level.slicePitch
+            ) == 0;
           if (!equal && (level.width < 4U || level.height < 4U)) {
             if (sTinyLevelDifferences++ == 0U) {
-              gpg::Logf("imaging: DDS direct load: levels under 4x4 differ from D3DX11 (the file's bytes are kept); counted, not logged again");
+              gpg::Logf(
+                "imaging: DDS direct load: levels under 4x4 differ from D3DX11 (the file's bytes are kept); counted, "
+                "not logged again"
+              );
             }
           } else if (!equal) {
             same = false;
@@ -607,11 +692,24 @@ namespace gpg::gal::imaging
             }
           }
           gpg::Warnf(
-            "imaging: DDS direct load differs from D3DX11 (format %d/%d, %ux%u/%ux%u, mips %u/%u, slices %u/%u, %zu/%zu bytes, "
+            "imaging: DDS direct load differs from D3DX11 (format %d/%d, %ux%u/%ux%u, mips %u/%u, slices %u/%u, "
+            "%zu/%zu bytes, "
             "first difference at byte %zu (subresource %u), %zu bytes differ)",
-            static_cast<int>(outImage.format), static_cast<int>(reference.format), outImage.width, outImage.height,
-            reference.width, reference.height, outImage.mipLevels, reference.mipLevels, outImage.arraySize,
-            reference.arraySize, outImage.bytes.size(), reference.bytes.size(), firstDiff, diffSubresource, diffCount
+            static_cast<int>(outImage.format),
+            static_cast<int>(reference.format),
+            outImage.width,
+            outImage.height,
+            reference.width,
+            reference.height,
+            outImage.mipLevels,
+            reference.mipLevels,
+            outImage.arraySize,
+            reference.arraySize,
+            outImage.bytes.size(),
+            reference.bytes.size(),
+            firstDiff,
+            diffSubresource,
+            diffCount
           );
           outImage = std::move(reference);
           return result;
@@ -629,8 +727,10 @@ namespace gpg::gal::imaging
     std::string path = DecodeCachePath(key);
     // Reject pre-fix nonzero-skip cube/volume entries even if a permissive
     // D3DX decoder recognizes a resource kind the header probe did not.
-    if (!path.empty() && ReadDecodeCache(path, key, outImage) &&
-        !(options.skipMipLevels != 0U && (outImage.cube || outImage.volume))) {
+    if (
+      !path.empty() && ReadDecodeCache(path, key, outImage) &&
+      !(options.skipMipLevels != 0U && (outImage.cube || outImage.volume))
+    ) {
       tLastDecodeRoute = "cache";
       return S_OK;
     }
@@ -639,7 +739,9 @@ namespace gpg::gal::imaging
     const HRESULT result = DecodeFull(data, bytes, options, outImage);
     ::QueryPerformanceCounter(&end);
     ::QueryPerformanceFrequency(&frequency);
-    const auto microseconds = static_cast<std::uint64_t>(1000000.0 * static_cast<double>(end.QuadPart - start.QuadPart) / static_cast<double>(frequency.QuadPart));
+    const auto microseconds = static_cast<std::uint64_t>(
+      1000000.0 * static_cast<double>(end.QuadPart - start.QuadPart) / static_cast<double>(frequency.QuadPart)
+    );
     if (SUCCEEDED(result) && options.skipMipLevels != 0U && (outImage.cube || outImage.volume)) {
       // Metadata is authoritative for unusual inputs. Never write a full
       // cube/volume under the old quality-dependent identity.
@@ -651,12 +753,19 @@ namespace gpg::gal::imaging
       tLastDecodeRoute = d3dx ? "d3dx, cached for later sessions" : "directxtex, cached for later sessions";
       // Written on a background thread from a copy, so the frame does not wait for the disk.
       auto copy = std::make_shared<Image>(outImage);
-      std::thread([path, key, copy] { WriteDecodeCache(path, key, *copy); }).detach();
+      std::thread([path, key, copy] {
+        WriteDecodeCache(path, key, *copy);
+      }).detach();
     }
     return result;
   }
 
-  HRESULT ImageCodec::GetImageSize(const void* const data, const std::size_t bytes, std::uint32_t& outWidth, std::uint32_t& outHeight)
+  HRESULT ImageCodec::GetImageSize(
+    const void* const data,
+    const std::size_t bytes,
+    std::uint32_t& outWidth,
+    std::uint32_t& outHeight
+  )
   {
     if (!UsesD3dx()) {
       return GetImageSizeWithDirectXTex(data, bytes, outWidth, outHeight);
@@ -676,7 +785,12 @@ namespace gpg::gal::imaging
   }
 
 #if !FAFRE_PLATFORM_WINDOWS
-  HRESULT ImageCodec::DecodeWithD3dx(const void* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage)
+  HRESULT ImageCodec::DecodeWithD3dx(
+    const void* const data,
+    const std::size_t bytes,
+    const DecodeOptions& options,
+    Image& outImage
+  )
   {
     (void)data;
     (void)bytes;
@@ -685,7 +799,12 @@ namespace gpg::gal::imaging
     return E_NOTIMPL;
   }
 #else
-  HRESULT ImageCodec::DecodeWithD3dx(const void* const data, const std::size_t bytes, const DecodeOptions& options, Image& outImage)
+  HRESULT ImageCodec::DecodeWithD3dx(
+    const void* const data,
+    const std::size_t bytes,
+    const DecodeOptions& options,
+    Image& outImage
+  )
   {
     const std::lock_guard<std::mutex> lock(mMutex);
     State& state = *mState;
@@ -753,9 +872,11 @@ namespace gpg::gal::imaging
           return result;
         }
         for (std::uint32_t row = 0U; row < subresource.rowCount; ++row) {
-          std::memcpy(outImage.bytes.data() + subresource.offset + static_cast<std::size_t>(row) * subresource.rowPitch,
-                      static_cast<const std::uint8_t*>(mapped.pData) + static_cast<std::size_t>(row) * mapped.RowPitch,
-                      subresource.rowPitch);
+          std::memcpy(
+            outImage.bytes.data() + subresource.offset + static_cast<std::size_t>(row) * subresource.rowPitch,
+            static_cast<const std::uint8_t*>(mapped.pData) + static_cast<std::size_t>(row) * mapped.RowPitch,
+            subresource.rowPitch
+          );
         }
         state.context->Unmap(texture2D.Get(), source);
       }
@@ -818,7 +939,11 @@ namespace gpg::gal::imaging
   namespace
   {
 #if FAFRE_PLATFORM_WINDOWS
-    HRESULT CreateEncodable(ID3D11Device* const device, const Image& image, ComPtr<ID3D11Texture2D>& outTexture)
+    HRESULT CreateEncodable(
+      ID3D11Device* const device,
+      const Image& image,
+      ComPtr<ID3D11Texture2D>& outTexture
+    )
     {
       D3D11_TEXTURE2D_DESC desc{};
       desc.Width = image.width;
@@ -831,7 +956,8 @@ namespace gpg::gal::imaging
       desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
       desc.MiscFlags = image.cube ? D3D11_RESOURCE_MISC_TEXTURECUBE : 0U;
       std::vector<D3D11_SUBRESOURCE_DATA> initial;
-      for (std::uint32_t index = 0U; index < desc.MipLevels * desc.ArraySize && index < image.subresources.size(); ++index) {
+      for (std::uint32_t index = 0U; index < desc.MipLevels * desc.ArraySize && index < image.subresources.size();
+           ++index) {
         const Image::Subresource& subresource = image.subresources[index];
         D3D11_SUBRESOURCE_DATA data{};
         data.pSysMem = image.bytes.data() + subresource.offset;
@@ -890,7 +1016,10 @@ namespace gpg::gal::imaging
      * The plain DDS description, for the formats that have one. The others take the DX10 extension
      * header; R8, R8G8 and A8 too, whose plain descriptions are luminance and alpha layouts.
      */
-    [[nodiscard]] bool LegacyDdsPixelFormat(const DXGI_FORMAT format, DdsPixelFormat& out) noexcept
+    [[nodiscard]] bool LegacyDdsPixelFormat(
+      const DXGI_FORMAT format,
+      DdsPixelFormat& out
+    ) noexcept
     {
       constexpr std::uint32_t kFourCc = 0x4U;
       constexpr std::uint32_t kRgb = 0x40U;
@@ -899,7 +1028,14 @@ namespace gpg::gal::imaging
         out.flags = kFourCc;
         out.fourCc = code;
       };
-      const auto masks = [&out](const std::uint32_t flags, const std::uint32_t bits, const std::uint32_t red, const std::uint32_t green, const std::uint32_t blue, const std::uint32_t alpha) {
+      const auto masks = [&out](
+                           const std::uint32_t flags,
+                           const std::uint32_t bits,
+                           const std::uint32_t red,
+                           const std::uint32_t green,
+                           const std::uint32_t blue,
+                           const std::uint32_t alpha
+                         ) {
         out.flags = flags;
         out.bits = bits;
         out.redMask = red;
@@ -908,29 +1044,62 @@ namespace gpg::gal::imaging
         out.alphaMask = alpha;
       };
       switch (format) {
-      case DXGI_FORMAT_BC1_UNORM: fourCc(FourCc('D', 'X', 'T', '1')); return true;
-      case DXGI_FORMAT_BC2_UNORM: fourCc(FourCc('D', 'X', 'T', '3')); return true;
-      case DXGI_FORMAT_BC3_UNORM: fourCc(FourCc('D', 'X', 'T', '5')); return true;
+      case DXGI_FORMAT_BC1_UNORM:
+        fourCc(FourCc('D', 'X', 'T', '1'));
+        return true;
+      case DXGI_FORMAT_BC2_UNORM:
+        fourCc(FourCc('D', 'X', 'T', '3'));
+        return true;
+      case DXGI_FORMAT_BC3_UNORM:
+        fourCc(FourCc('D', 'X', 'T', '5'));
+        return true;
       // D3DFMT values stand in for the four characters here.
-      case DXGI_FORMAT_R16_FLOAT: fourCc(111U); return true;
-      case DXGI_FORMAT_R16G16_FLOAT: fourCc(112U); return true;
-      case DXGI_FORMAT_R16G16B16A16_FLOAT: fourCc(113U); return true;
-      case DXGI_FORMAT_R32_FLOAT: fourCc(114U); return true;
-      case DXGI_FORMAT_R32G32_FLOAT: fourCc(115U); return true;
-      case DXGI_FORMAT_R32G32B32A32_FLOAT: fourCc(116U); return true;
-      case DXGI_FORMAT_B8G8R8A8_UNORM: masks(kRgb | kAlphaPixels, 32U, 0x00FF0000U, 0x0000FF00U, 0x000000FFU, 0xFF000000U); return true;
-      case DXGI_FORMAT_R8G8B8A8_UNORM: masks(kRgb | kAlphaPixels, 32U, 0x000000FFU, 0x0000FF00U, 0x00FF0000U, 0xFF000000U); return true;
-      case DXGI_FORMAT_B8G8R8X8_UNORM: masks(kRgb, 32U, 0x00FF0000U, 0x0000FF00U, 0x000000FFU, 0U); return true;
-      case DXGI_FORMAT_B5G6R5_UNORM: masks(kRgb, 16U, 0xF800U, 0x07E0U, 0x001FU, 0U); return true;
-      default: return false;
+      case DXGI_FORMAT_R16_FLOAT:
+        fourCc(111U);
+        return true;
+      case DXGI_FORMAT_R16G16_FLOAT:
+        fourCc(112U);
+        return true;
+      case DXGI_FORMAT_R16G16B16A16_FLOAT:
+        fourCc(113U);
+        return true;
+      case DXGI_FORMAT_R32_FLOAT:
+        fourCc(114U);
+        return true;
+      case DXGI_FORMAT_R32G32_FLOAT:
+        fourCc(115U);
+        return true;
+      case DXGI_FORMAT_R32G32B32A32_FLOAT:
+        fourCc(116U);
+        return true;
+      case DXGI_FORMAT_B8G8R8A8_UNORM:
+        masks(kRgb | kAlphaPixels, 32U, 0x00FF0000U, 0x0000FF00U, 0x000000FFU, 0xFF000000U);
+        return true;
+      case DXGI_FORMAT_R8G8B8A8_UNORM:
+        masks(kRgb | kAlphaPixels, 32U, 0x000000FFU, 0x0000FF00U, 0x00FF0000U, 0xFF000000U);
+        return true;
+      case DXGI_FORMAT_B8G8R8X8_UNORM:
+        masks(kRgb, 32U, 0x00FF0000U, 0x0000FF00U, 0x000000FFU, 0U);
+        return true;
+      case DXGI_FORMAT_B5G6R5_UNORM:
+        masks(kRgb, 16U, 0xF800U, 0x07E0U, 0x001FU, 0U);
+        return true;
+      default:
+        return false;
       }
     }
   } // namespace
 
-  HRESULT ImageCodec::WriteDds(const Image& image, std::vector<std::uint8_t>& outBytes)
+  HRESULT ImageCodec::WriteDds(
+    const Image& image,
+    std::vector<std::uint8_t>& outBytes
+  )
   {
     const std::uint32_t faces = image.cube ? 6U : 1U;
-    if (image.volume || dxgi::FormatElementBytes(image.format) == 0U || image.subresources.size() < static_cast<std::size_t>(faces) * image.mipLevels) {
+    if (
+      image.volume || dxgi::FormatElementBytes(image.format) == 0U ||
+      image.subresources.size() < static_cast<std::size_t>(faces) * image.mipLevels
+    ) {
       return E_INVALIDARG;
     }
 
@@ -947,12 +1116,14 @@ namespace gpg::gal::imaging
     header.flags |= blockCompressed ? kLinearSize : kPitch;
     header.height = image.height;
     header.width = image.width;
-    header.pitchOrLinearSize = blockCompressed ? image.subresources.front().slicePitch : image.subresources.front().rowPitch;
+    header.pitchOrLinearSize =
+      blockCompressed ? image.subresources.front().slicePitch : image.subresources.front().rowPitch;
     header.mipCount = image.mipLevels;
     constexpr std::uint32_t kCapsComplex = 0x8U;
     constexpr std::uint32_t kCapsTexture = 0x1000U;
     constexpr std::uint32_t kCapsMipMap = 0x400000U;
-    header.caps = kCapsTexture | (image.mipLevels > 1U ? kCapsComplex | kCapsMipMap : 0U) | (image.cube ? kCapsComplex : 0U);
+    header.caps =
+      kCapsTexture | (image.mipLevels > 1U ? kCapsComplex | kCapsMipMap : 0U) | (image.cube ? kCapsComplex : 0U);
     header.caps2 = image.cube ? 0xFE00U : 0U; // cube map, all six faces
 
     const bool extended = !LegacyDdsPixelFormat(image.format, header.pixelFormat);
@@ -985,7 +1156,11 @@ namespace gpg::gal::imaging
     return S_OK;
   }
 
-  HRESULT ImageCodec::Encode(const Image& image, const FileFormat format, std::vector<std::uint8_t>& outBytes)
+  HRESULT ImageCodec::Encode(
+    const Image& image,
+    const FileFormat format,
+    std::vector<std::uint8_t>& outBytes
+  )
   {
     if (format == FileFormat::Dds && OwnDdsRequested()) {
       return WriteDds(image, outBytes);
@@ -1030,7 +1205,11 @@ namespace gpg::gal::imaging
      * writer refuses B8G8R8A8 (E_FAIL), the back buffer format dump_Frame saves on Direct3D 12.
      * False for other formats.
      */
-    [[nodiscard]] bool WriteBgraBmp(const Image& image, const char* const path, HRESULT& outResult)
+    [[nodiscard]] bool WriteBgraBmp(
+      const Image& image,
+      const char* const path,
+      HRESULT& outResult
+    )
     {
       const bool bgra = image.format == DXGI_FORMAT_B8G8R8A8_UNORM || image.format == DXGI_FORMAT_B8G8R8A8_UNORM_SRGB ||
         image.format == DXGI_FORMAT_B8G8R8X8_UNORM;
@@ -1055,7 +1234,8 @@ namespace gpg::gal::imaging
 
       std::vector<std::uint8_t> pixels(info.biSizeImage);
       for (std::uint32_t row = 0U; row < top.height; ++row) {
-        const std::uint8_t* const source = image.bytes.data() + top.offset + static_cast<std::size_t>(row) * top.rowPitch;
+        const std::uint8_t* const source =
+          image.bytes.data() + top.offset + static_cast<std::size_t>(row) * top.rowPitch;
         std::uint8_t* const target = pixels.data() + static_cast<std::size_t>(row) * rowBytes;
         std::memcpy(target, source, rowBytes);
         if (rgba) {
@@ -1073,14 +1253,19 @@ namespace gpg::gal::imaging
       DWORD written = 0U;
       const bool ok = ::WriteFile(handle, &file, sizeof(file), &written, nullptr) && written == sizeof(file) &&
         ::WriteFile(handle, &info, sizeof(info), &written, nullptr) && written == sizeof(info) &&
-        ::WriteFile(handle, pixels.data(), static_cast<DWORD>(pixels.size()), &written, nullptr) && written == pixels.size();
+        ::WriteFile(handle, pixels.data(), static_cast<DWORD>(pixels.size()), &written, nullptr) &&
+        written == pixels.size();
       ::CloseHandle(handle);
       outResult = ok ? S_OK : E_FAIL;
       return true;
     }
   } // namespace
 
-  HRESULT ImageCodec::EncodeToFile(const Image& image, const FileFormat format, const char* const path)
+  HRESULT ImageCodec::EncodeToFile(
+    const Image& image,
+    const FileFormat format,
+    const char* const path
+  )
   {
     if (HRESULT written = S_OK; format == FileFormat::Bmp && WriteBgraBmp(image, path, written)) {
       return written;
@@ -1092,15 +1277,23 @@ namespace gpg::gal::imaging
         HANDLE const file = ::CreateFileA(path, GENERIC_WRITE, 0U, nullptr, CREATE_ALWAYS, 0U, nullptr);
         DWORD written = 0U;
         const bool ok = file != INVALID_HANDLE_VALUE &&
-          ::WriteFile(file, encoded.data(), static_cast<DWORD>(encoded.size()), &written, nullptr) && written == encoded.size();
+          ::WriteFile(file, encoded.data(), static_cast<DWORD>(encoded.size()), &written, nullptr) &&
+          written == encoded.size();
         if (file != INVALID_HANDLE_VALUE) {
           ::CloseHandle(file);
         }
         result = ok ? S_OK : E_FAIL;
       }
       if (FAILED(result)) {
-        gpg::Warnf("imaging: DirectXTex could not save %s (DXGI format %d, %ux%u, file format %d): HRESULT 0x%08lX", path,
-                   static_cast<int>(image.format), image.width, image.height, static_cast<int>(format), static_cast<unsigned long>(result));
+        gpg::Warnf(
+          "imaging: DirectXTex could not save %s (DXGI format %d, %ux%u, file format %d): HRESULT 0x%08lX",
+          path,
+          static_cast<int>(image.format),
+          image.width,
+          image.height,
+          static_cast<int>(format),
+          static_cast<unsigned long>(result)
+        );
       }
       return result;
     }
@@ -1111,23 +1304,41 @@ namespace gpg::gal::imaging
     ComPtr<ID3D11Texture2D> texture;
     HRESULT result = CreateEncodable(mState->device.Get(), image, texture);
     if (SUCCEEDED(result)) {
-      result = mState->saveToFile(mState->context.Get(), texture.Get(), static_cast<D3DX11_IMAGE_FILE_FORMAT>(format), path);
+      result =
+        mState->saveToFile(mState->context.Get(), texture.Get(), static_cast<D3DX11_IMAGE_FILE_FORMAT>(format), path);
       if (FAILED(result)) {
-        gpg::Warnf("imaging: D3DX11 could not save %s (DXGI format %d, %ux%u, file format %d): HRESULT 0x%08lX", path,
-                   static_cast<int>(image.format), image.width, image.height, static_cast<int>(format), static_cast<unsigned long>(result));
+        gpg::Warnf(
+          "imaging: D3DX11 could not save %s (DXGI format %d, %ux%u, file format %d): HRESULT 0x%08lX",
+          path,
+          static_cast<int>(image.format),
+          image.width,
+          image.height,
+          static_cast<int>(format),
+          static_cast<unsigned long>(result)
+        );
       }
     } else {
-      gpg::Warnf("imaging: no encodable texture for %s (DXGI format %d, %ux%u): HRESULT 0x%08lX", path, static_cast<int>(image.format),
-                 image.width, image.height, static_cast<unsigned long>(result));
+      gpg::Warnf(
+        "imaging: no encodable texture for %s (DXGI format %d, %ux%u): HRESULT 0x%08lX",
+        path,
+        static_cast<int>(image.format),
+        image.width,
+        image.height,
+        static_cast<unsigned long>(result)
+      );
     }
     return result;
 #endif
   }
 
-  FileFormat ImageCodec::FromGalFormat(const int galFormat) noexcept
+  FileFormat ImageCodec::FromGalFormat(
+    const int galFormat
+  ) noexcept
   {
     // The D3D10 table (0x00D430A0): BMP, JPG, PNG, PNG, DDS.
-    constexpr FileFormat kFormats[5] = {FileFormat::Bmp, FileFormat::Jpg, FileFormat::Png, FileFormat::Png, FileFormat::Dds};
+    constexpr FileFormat kFormats[5] = {
+      FileFormat::Bmp, FileFormat::Jpg, FileFormat::Png, FileFormat::Png, FileFormat::Dds
+    };
     return (galFormat >= 0 && galFormat < 5) ? kFormats[galFormat] : FileFormat::Bmp;
   }
 } // namespace gpg::gal::imaging

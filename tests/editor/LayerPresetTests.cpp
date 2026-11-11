@@ -27,7 +27,10 @@ namespace
     "NormalScale": 2.0
 })";
 
-  TEST(LayerPreset, ReadsFafmesLayerFile)
+  TEST(
+    LayerPreset,
+    ReadsFafmesLayerFile
+  )
   {
     LayerSettings layer;
     std::string error;
@@ -42,7 +45,10 @@ namespace
     EXPECT_FALSE(faf::editor::LayerFromScmsl("{ \"LightingMultiplier\": 1 }", again, error));
   }
 
-  TEST(LayerPreset, ASetKeepsTheShaderAndAllTenLayers)
+  TEST(
+    LayerPreset,
+    ASetKeepsTheShaderAndAllTenLayers
+  )
   {
     std::vector<LayerSettings> layers(10);
     for (std::size_t i = 0; i < 10; ++i) {

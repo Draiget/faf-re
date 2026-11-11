@@ -36,7 +36,8 @@ namespace faf::editor
    * empty for a type it doesn't know.
    */
   const char* MarkerTypeUse(const std::string& type);
-  /** Whether the game reads a marker field (`hint` no, `adjacentTo` yes) and what for; empty for one it doesn't know. */
+  /** Whether the game reads a marker field (`hint` no, `adjacentTo` yes) and what for; empty for one it doesn't know.
+   */
   const char* MarkerFieldUse(const std::string& key);
 
   /** The next free name for a type among `markers` (`Mass 07`, or `ARMY_9` for a start position). */
@@ -71,7 +72,8 @@ namespace faf::editor
   };
   MarkerValue ParseMarkerValue(const std::string& text);
   std::string WriteMarkerValue(const MarkerValue& value);
-  /** A colour string as the game's markers keep them (`'ff800080'`: alpha, red, green, blue in hex); false when not one. */
+  /** A colour string as the game's markers keep them (`'ff800080'`: alpha, red, green, blue in hex); false when not
+   * one. */
   bool MarkerColourText(const std::string& text, float rgba[4]);
   std::string MarkerColourOf(const float rgba[4]);
   /** A marker's `type` string. */
@@ -94,8 +96,15 @@ namespace faf::editor
    * neighbours, as FAForeverMapEditor's air presets lay them (16 x 16 over the map, a sixteenth apart, half a step in).
    * Named after `existing` (AirPN<nn> not yet taken); heights from `height`. Returned in rows, the links set.
    */
-  std::vector<SaveEntry> AirNodeGrid(const std::vector<SaveEntry>& existing, int count, float x0, float z0, float x1, float z1,
-                                     const std::function<float(float, float)>& height);
+  std::vector<SaveEntry> AirNodeGrid(
+    const std::vector<SaveEntry>& existing,
+    int count,
+    float x0,
+    float z0,
+    float x1,
+    float z1,
+    const std::function<float(float, float)>& height
+  );
   /** Drops every link naming `name` (the marker is being deleted); returns how many markers changed. */
   int RemoveLinksTo(std::vector<SaveEntry>& markers, const std::string& name);
   /** The marker tree's groups, in the order the panel lists them. */

@@ -2,7 +2,10 @@
 
 #include <cstddef>
 
-void moho::CopySyncFilterMaskPayload(SSyncFilterMaskBlock& target, const SSyncFilterMaskBlock& source)
+void moho::CopySyncFilterMaskPayload(
+  SSyncFilterMaskBlock& target,
+  const SSyncFilterMaskBlock& source
+)
 {
   target.mFirstWordIndex = source.mFirstWordIndex;
   target.mWords.ResetFrom(source.mWords);
@@ -29,7 +32,9 @@ moho::SSyncFilter::~SSyncFilter()
  * Copies the binary-significant sync-filter payload:
  * focus army, geom-camera vector, both mask blocks, and option flag.
  */
-void moho::SSyncFilter::CopyFrom(const SSyncFilter& source)
+void moho::SSyncFilter::CopyFrom(
+  const SSyncFilter& source
+)
 {
   focusArmy = source.focusArmy;
   geoCams = source.geoCams;

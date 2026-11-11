@@ -40,7 +40,7 @@ namespace moho
      *
      * What it does:
      * Sets the reflected size (0x4C) and wires base / allocator callbacks.
-    */
+     */
     void Init() override;
 
     /**

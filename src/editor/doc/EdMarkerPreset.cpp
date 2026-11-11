@@ -48,7 +48,9 @@ namespace faf::editor
     };
     constexpr int kFafmeTypeCount = static_cast<int>(sizeof(kFafmeTypes) / sizeof(kFafmeTypes[0]));
 
-    int FafmeTypeOf(const std::string& type)
+    int FafmeTypeOf(
+      const std::string& type
+    )
     {
       for (int i = 0; i < kFafmeTypeCount; ++i) {
         if (kFafmeTypes[i] != nullptr && type == kFafmeTypes[i]) {
@@ -60,7 +62,11 @@ namespace faf::editor
 
     // MarkerObject.ScmapRotToMarkerRot: the save's orientation (radians) to the marker's rotation. A camera's is its
     // pitch from straight down and its heading; every other marker's is the orientation as Euler angles.
-    void OrientationToRotation(const std::vector<double>& orientation, const bool camera, float (&quaternion)[4])
+    void OrientationToRotation(
+      const std::vector<double>& orientation,
+      const bool camera,
+      float (&quaternion)[4]
+    )
     {
       const float x = orientation.size() > 0 ? static_cast<float>(orientation[0]) : 0.0f;
       const float y = orientation.size() > 1 ? static_cast<float>(orientation[1]) : 0.0f;
@@ -82,7 +88,11 @@ namespace faf::editor
     }
 
     // MarkerObject.MarkerRotToScmapRot, the way back.
-    void RotationToOrientation(const float (&quaternion)[4], const bool camera, double (&orientation)[3])
+    void RotationToOrientation(
+      const float (&quaternion)[4],
+      const bool camera,
+      double (&orientation)[3]
+    )
     {
       float euler[3];
       UnityQuaternionToEuler(quaternion, euler);
@@ -104,7 +114,9 @@ namespace faf::editor
       orientation[2] = 0.0;
     }
 
-    std::vector<int> JsonInts(const std::string& array)
+    std::vector<int> JsonInts(
+      const std::string& array
+    )
     {
       std::vector<int> numbers;
       const char* at = array.c_str();
@@ -121,8 +133,12 @@ namespace faf::editor
     }
   } // namespace
 
-  std::string MarkersToFafmapmarkers(const std::vector<SaveEntry>& markers, const std::vector<std::string>& names, const int mapWidth,
-                                     const int mapHeight)
+  std::string MarkersToFafmapmarkers(
+    const std::vector<SaveEntry>& markers,
+    const std::vector<std::string>& names,
+    const int mapWidth,
+    const int mapHeight
+  )
   {
     std::vector<const SaveEntry*> chosen;
     for (const SaveEntry& marker : markers) {
@@ -143,9 +159,12 @@ namespace faf::editor
       OrientationToRotation(ValueNumbers(marker.Get("orientation")), type == "Camera Info", rot);
       std::string connected;
       for (const std::string& link : MarkerLinks(marker)) {
-        const auto at = std::find_if(chosen.begin(), chosen.end(), [&](const SaveEntry* other) { return other->name == link; });
+        const auto at = std::find_if(chosen.begin(), chosen.end(), [&](const SaveEntry* other) {
+          return other->name == link;
+        });
         if (at != chosen.end()) {
-          connected += (connected.empty() ? "" : ",") + std::string("\n                ") + std::to_string(at - chosen.begin());
+          connected +=
+            (connected.empty() ? "" : ",") + std::string("\n                ") + std::to_string(at - chosen.begin());
         }
       }
       out += i == 0 ? "\n" : ",\n";
@@ -153,7 +172,8 @@ namespace faf::editor
       out += "            \"MarkerType\": " + std::to_string(FafmeTypeOf(type)) + ",\n";
       out += "            \"Pos\": " + JsonVectorText(pos, 3, "            ") + ",\n";
       out += "            \"Rot\": " + JsonVectorText(rot, 4, "            ") + ",\n";
-      out += "            \"Connected\": [" + (connected.empty() ? std::string() : connected + "\n            ") + "]\n";
+      out +=
+        "            \"Connected\": [" + (connected.empty() ? std::string() : connected + "\n            ") + "]\n";
       out += "        }";
     }
     out += chosen.empty() ? "],\n" : "\n    ],\n";
@@ -162,8 +182,13 @@ namespace faf::editor
     return out + "}";
   }
 
-  bool MarkersFromFafmapmarkers(const std::string& text, std::vector<SaveEntry>& markers, MarkerImport& result, std::string& error,
-                                const std::vector<std::string>& reserved)
+  bool MarkersFromFafmapmarkers(
+    const std::string& text,
+    std::vector<SaveEntry>& markers,
+    MarkerImport& result,
+    std::string& error,
+    const std::vector<std::string>& reserved
+  )
   {
     std::string array;
     if (!JsonValue(text, "Markers", array) || array.empty() || array.front() != '[') {
@@ -208,8 +233,10 @@ namespace faf::editor
     }
     for (std::size_t i = 0; i < made.size(); ++i) {
       for (const int other : connected[i]) {
-        if (!made[i].empty() && other >= 0 && static_cast<std::size_t>(other) < made.size() && !made[other].empty() &&
-            !MarkersLinked(markers, made[i], made[other]) && SetMarkerLink(markers, made[i], made[other], true)) {
+        if (
+          !made[i].empty() && other >= 0 && static_cast<std::size_t>(other) < made.size() && !made[other].empty() &&
+          !MarkersLinked(markers, made[i], made[other]) && SetMarkerLink(markers, made[i], made[other], true)
+        ) {
           ++result.links;
         }
       }

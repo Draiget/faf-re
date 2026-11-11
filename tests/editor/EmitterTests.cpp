@@ -1,4 +1,5 @@
-// Emitter blueprint files (src/editor/doc/EdEmitter.cpp): read, written as retail's emitter editor writes them, read back.
+// Emitter blueprint files (src/editor/doc/EdEmitter.cpp): read, written as retail's emitter editor writes them, read
+// back.
 
 #include "editor/doc/EdEmitter.h"
 #include "TestEnv.h"
@@ -14,16 +15,26 @@ namespace
 {
   using namespace faf::editor;
 
-  bool Same(const EmitterBlueprint& a, const EmitterBlueprint& b)
+  bool Same(
+    const EmitterBlueprint& a,
+    const EmitterBlueprint& b
+  )
   {
-    if (a.blueprintId != b.blueprintId || a.texture != b.texture || a.rampTexture != b.rampTexture || a.flags != b.flags ||
-        a.lowFidelity != b.lowFidelity || a.medFidelity != b.medFidelity || a.highFidelity != b.highFidelity || a.extra != b.extra) {
+    if (
+      a.blueprintId != b.blueprintId || a.texture != b.texture || a.rampTexture != b.rampTexture ||
+      a.flags != b.flags || a.lowFidelity != b.lowFidelity || a.medFidelity != b.medFidelity ||
+      a.highFidelity != b.highFidelity || a.extra != b.extra
+    ) {
       return false;
     }
     // Numbers as the file keeps them (two decimals; keys three).
-    const auto near = [](const float x, const float y, const float step) { return std::fabs(x - y) <= step * 0.51f; };
-    const float values[2][7] = {{a.lifetime, a.repeatTime, a.textureFrameCount, a.blendMode, a.lodCutoff, a.textureStripCount, a.sortOrder},
-                                {b.lifetime, b.repeatTime, b.textureFrameCount, b.blendMode, b.lodCutoff, b.textureStripCount, b.sortOrder}};
+    const auto near = [](const float x, const float y, const float step) {
+      return std::fabs(x - y) <= step * 0.51f;
+    };
+    const float values[2][7] = {
+      {a.lifetime, a.repeatTime, a.textureFrameCount, a.blendMode, a.lodCutoff, a.textureStripCount, a.sortOrder},
+      {b.lifetime, b.repeatTime, b.textureFrameCount, b.blendMode, b.lodCutoff, b.textureStripCount, b.sortOrder}
+    };
     for (int i = 0; i < 7; ++i) {
       if (!near(values[0][i], values[1][i], 0.01f)) {
         return false;
@@ -36,7 +47,10 @@ namespace
         return false;
       }
       for (std::size_t k = 0; k < x.keys.size(); ++k) {
-        if (!near(x.keys[k].x, y.keys[k].x, 0.001f) || !near(x.keys[k].y, y.keys[k].y, 0.001f) || !near(x.keys[k].z, y.keys[k].z, 0.001f)) {
+        if (
+          !near(x.keys[k].x, y.keys[k].x, 0.001f) || !near(x.keys[k].y, y.keys[k].y, 0.001f) ||
+          !near(x.keys[k].z, y.keys[k].z, 0.001f)
+        ) {
           return false;
         }
       }
@@ -44,7 +58,10 @@ namespace
     return true;
   }
 
-  TEST(Emitter, ANewEmitterWritesAndReadsBack)
+  TEST(
+    Emitter,
+    ANewEmitterWritesAndReadsBack
+  )
   {
     const EmitterBlueprint made = NewEmitter();
     const std::string text = WriteEmitter(made);
@@ -59,7 +76,10 @@ namespace
     EXPECT_NE(text.find("\t\t\t{ x=5.000,y=1.000,z=0.000 },\n"), std::string::npos); // the emit rate's key
   }
 
-  TEST(Emitter, OtherSpellingsAndUnknownKeysAreKept)
+  TEST(
+    Emitter,
+    OtherSpellingsAndUnknownKeysAreKept
+  )
   {
     const std::string text = R"(-- a hand-written emitter
 EmitterBlueprint {
@@ -90,7 +110,10 @@ EmitterBlueprint {
     EXPECT_TRUE(Same(read, again));
   }
 
-  TEST(Emitter, NotAnEmitterSaysWhere)
+  TEST(
+    Emitter,
+    NotAnEmitterSaysWhere
+  )
   {
     EmitterBlueprint read;
     std::string error;
@@ -100,7 +123,10 @@ EmitterBlueprint {
     EXPECT_EQ(error.rfind("line 2", 0), 0U) << error;
   }
 
-  TEST(Emitter, TheGamesEmittersReadAndWriteBack)
+  TEST(
+    Emitter,
+    TheGamesEmittersReadAndWriteBack
+  )
   {
     const std::string folder = faf::editor::test::EnvText("FAF_RETAIL_EMITTERS");
     if (folder.empty()) {
@@ -135,25 +161,33 @@ EmitterBlueprint {
     std::printf("emitters %d (others %d), written byte for byte as the file: %d\n", emitters, others, identical);
     EXPECT_GT(emitters, 2000);
   }
-  TEST(Emitter, CurvesSampleAsTheEngineDoes)
+  TEST(
+    Emitter,
+    CurvesSampleAsTheEngineDoes
+  )
   {
     EmitterCurve curve;
-    curve.keys = {{10.0f, 4.0f, 2.0f}, {0.0f, 0.0f, 0.0f}}; // out of order: sorted as SEfxCurve keeps them
-    EXPECT_FLOAT_EQ(EmitterCurveValue(curve, 5.0f, 0.5f), 2.0f);     // halfway, no spread at random 0.5
-    EXPECT_FLOAT_EQ(EmitterCurveValue(curve, 5.0f, 1.0f), 2.5f);     // + 0.5 * the interpolated spread 1
-    EXPECT_FLOAT_EQ(EmitterCurveValue(curve, -3.0f, 0.5f), 0.0f);    // before the first key
-    EXPECT_FLOAT_EQ(EmitterCurveValue(curve, 30.0f, 0.0f), 3.0f);    // after the last: 4 - 0.5 * 2
+    curve.keys = {{10.0f, 4.0f, 2.0f}, {0.0f, 0.0f, 0.0f}};       // out of order: sorted as SEfxCurve keeps them
+    EXPECT_FLOAT_EQ(EmitterCurveValue(curve, 5.0f, 0.5f), 2.0f);  // halfway, no spread at random 0.5
+    EXPECT_FLOAT_EQ(EmitterCurveValue(curve, 5.0f, 1.0f), 2.5f);  // + 0.5 * the interpolated spread 1
+    EXPECT_FLOAT_EQ(EmitterCurveValue(curve, -3.0f, 0.5f), 0.0f); // before the first key
+    EXPECT_FLOAT_EQ(EmitterCurveValue(curve, 30.0f, 0.0f), 3.0f); // after the last: 4 - 0.5 * 2
     EXPECT_FLOAT_EQ(EmitterCurveValue(EmitterCurve{}, 1.0f, 1.0f), 0.0f);
   }
 
-  TEST(Emitter, EmissionCarriesItsFractionsAndSpreadsOverTheTick)
+  TEST(
+    Emitter,
+    EmissionCarriesItsFractionsAndSpreadsOverTheTick
+  )
   {
     EmitterBlueprint e = NewEmitter();
     e.curves[kEmitRate].keys = {{0.0f, 2.5f, 0.0f}};
     e.curves[kVelocity].keys = {{0.0f, 2.0f, 0.0f}};
     e.curves[kYDirection].keys = {{0.0f, 1.0f, 0.0f}};
     e.flags[kGravity] = true;
-    const auto half = [] { return 0.5f; };
+    const auto half = [] {
+      return 0.5f;
+    };
     float carry = 0.0f;
     std::vector<int> counts;
     for (int tick = 0; tick < 4; ++tick) {
@@ -172,7 +206,10 @@ EmitterBlueprint {
     EXPECT_FLOAT_EQ(EmitTick(e, 1.0f, carry, half).back().birth, 0.0f);
   }
 
-  TEST(Emitter, TypeTagsAsTheEngineSetsThem)
+  TEST(
+    Emitter,
+    TypeTagsAsTheEngineSetsThem
+  )
   {
     EmitterBlueprint e = NewEmitter();
     EXPECT_EQ(EmitterTypeTag(e), "TRamp");
@@ -187,7 +224,10 @@ EmitterBlueprint {
     e.lifetime = -1.0f;
     EXPECT_FALSE(EmitterFinished(e, 1e6f));
   }
-  bool SameFlat(const FlatBlueprint& a, const FlatBlueprint& b)
+  bool SameFlat(
+    const FlatBlueprint& a,
+    const FlatBlueprint& b
+  )
   {
     if (a.kind != b.kind || a.fields.size() != b.fields.size()) {
       return false;
@@ -195,8 +235,13 @@ EmitterBlueprint {
     for (std::size_t i = 0; i < a.fields.size(); ++i) {
       const FlatValue& x = a.fields[i].second;
       const FlatValue& y = b.fields[i].second;
-      const auto near = [](const float p, const float q) { return std::fabs(p - q) <= 1e-5f * std::max(1.0f, std::fabs(p)); };
-      if (a.fields[i].first != b.fields[i].first || x.kind != y.kind || x.flag != y.flag || x.text != y.text || !near(x.number, y.number)) {
+      const auto near = [](const float p, const float q) {
+        return std::fabs(p - q) <= 1e-5f * std::max(1.0f, std::fabs(p));
+      };
+      if (
+        a.fields[i].first != b.fields[i].first || x.kind != y.kind || x.flag != y.flag || x.text != y.text ||
+        !near(x.number, y.number)
+      ) {
         return false;
       }
       for (int c = 0; c < 4; ++c) {
@@ -208,10 +253,14 @@ EmitterBlueprint {
     return true;
   }
 
-  TEST(Emitter, BeamsWithCommentsAndColoursReadAndWriteBack)
+  TEST(
+    Emitter,
+    BeamsWithCommentsAndColoursReadAndWriteBack
+  )
   {
-    const std::string text = "BeamBlueprint {\n    Lifetime = 3.0,\n    TextureName = '/textures/particles/beam_white_03.dds',\n"
-                             "    Thickness = 0.0175,\n    StartColor = {x=0,y=0.5,z=1,w=0}, # R,G,B,A\n}\n";
+    const std::string text =
+      "BeamBlueprint {\n    Lifetime = 3.0,\n    TextureName = '/textures/particles/beam_white_03.dds',\n"
+      "    Thickness = 0.0175,\n    StartColor = {x=0,y=0.5,z=1,w=0}, # R,G,B,A\n}\n";
     FlatBlueprint beam;
     std::string error;
     ASSERT_TRUE(ParseFlatBlueprint(text, beam, error)) << error;
@@ -227,7 +276,10 @@ EmitterBlueprint {
     EXPECT_FALSE(ParseFlatBlueprint("EmitterBlueprint { }", again, error));
   }
 
-  TEST(Emitter, TheGamesBeamsAndTrailsReadAndWriteBack)
+  TEST(
+    Emitter,
+    TheGamesBeamsAndTrailsReadAndWriteBack
+  )
   {
     const std::string folder = faf::editor::test::EnvText("FAF_RETAIL_EMITTERS");
     if (folder.empty()) {
@@ -247,19 +299,27 @@ EmitterBlueprint {
       std::string error;
       ASSERT_TRUE(ParseFlatBlueprint(text, read, error)) << entry.path().filename().string() << ": " << error;
       FlatBlueprint again;
-      ASSERT_TRUE(ParseFlatBlueprint(WriteFlatBlueprint(read), again, error)) << entry.path().filename().string() << ": " << error;
+      ASSERT_TRUE(ParseFlatBlueprint(WriteFlatBlueprint(read), again, error))
+        << entry.path().filename().string() << ": " << error;
       EXPECT_TRUE(SameFlat(read, again)) << entry.path().filename().string();
     }
     std::printf("beams %d, trails %d\n", beams, trails);
     EXPECT_GT(beams, 50);
     EXPECT_GT(trails, 100);
   }
-  TEST(Emitter, TheBrowserGroupsByFactionAndKind)
+  TEST(
+    Emitter,
+    TheBrowserGroupsByFactionAndKind
+  )
   {
-    EXPECT_STREQ(kEffectFactions[EffectFaction("/effects/emitters/aeon_light_displacement_missile_muzzleflash_01.bp")], "Aeon");
+    EXPECT_STREQ(
+      kEffectFactions[EffectFaction("/effects/emitters/aeon_light_displacement_missile_muzzleflash_01.bp")], "Aeon"
+    );
     EXPECT_STREQ(kEffectFactions[EffectFaction("/effects/emitters/SER_contrail.bp")], "Seraphim");
     EXPECT_STREQ(kEffectFactions[EffectFaction("/effects/emitters/destruction_damaged_smoke_01_emit.bp")], "Other");
-    EXPECT_STREQ(kEffectKinds[EffectKind("/effects/emitters/cannon_muzzle_smoke_01_emit.bp")], "Muzzle"); // before smoke
+    EXPECT_STREQ(
+      kEffectKinds[EffectKind("/effects/emitters/cannon_muzzle_smoke_01_emit.bp")], "Muzzle"
+    ); // before smoke
     EXPECT_STREQ(kEffectKinds[EffectKind("/effects/emitters/destruction_damaged_smoke_01_emit.bp")], "Explosion");
     EXPECT_STREQ(kEffectKinds[EffectKind("/effects/emitters/contrail_ser_ohw_polytrail_01_emit.bp")], "Trail");
     EXPECT_STREQ(kEffectKinds[EffectKind("/effects/emitters/quantum_generator_beam_01_emit.bp")], "Beam");

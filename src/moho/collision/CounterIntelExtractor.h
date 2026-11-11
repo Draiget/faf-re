@@ -22,7 +22,9 @@ namespace moho
      * Slot: 1
      */
     [[nodiscard]] bool Range(
-      SRangeExtractionPayload* outRange, const RUnitBlueprint* unitBlueprint, const Wm3::Vec3f& center
+      SRangeExtractionPayload* outRange,
+      const RUnitBlueprint* unitBlueprint,
+      const Wm3::Vec3f& center
     ) const override;
 
     /**

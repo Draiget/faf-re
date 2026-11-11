@@ -12,17 +12,20 @@ using namespace moho;
  * What it does:
  * Builds file-error exception payload and adopts provided callstack snapshot.
  */
-XFileError::XFileError(const std::string& message, const std::uintptr_t* const callstack, const std::uint32_t frameCount)
-    : XException(message.c_str(), false)
+XFileError::XFileError(
+  const std::string& message,
+  const std::uintptr_t* const callstack,
+  const std::uint32_t frameCount
+)
+  : XException(message.c_str(), false)
 {
-    mTopStack = frameCount;
+  mTopStack = frameCount;
 
-    if (mTopStack != 0) {
-        const std::uint32_t copyCount =
-            std::min<std::uint32_t>(mTopStack, static_cast<std::uint32_t>(mCallstack.size()));
-        // Copy native return-address slots.
-        std::copy_n(callstack, copyCount, mCallstack.data());
-    }
+  if (mTopStack != 0) {
+    const std::uint32_t copyCount = std::min<std::uint32_t>(mTopStack, static_cast<std::uint32_t>(mCallstack.size()));
+    // Copy native return-address slots.
+    std::copy_n(callstack, copyCount, mCallstack.data());
+  }
 }
 
 /**
@@ -31,10 +34,11 @@ XFileError::XFileError(const std::string& message, const std::uintptr_t* const c
  * What it does:
  * Copy-constructs file-error payload and inherited exception lanes.
  */
-XFileError::XFileError(const XFileError& other)
-    : XException(other)
-{
-}
+XFileError::XFileError(
+  const XFileError& other
+)
+  : XException(other)
+{}
 
 /**
  * Address: 0x0040FAE0 (FUN_0040FAE0, Moho::XFileError::~XFileError)

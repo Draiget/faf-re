@@ -17,7 +17,9 @@ namespace
    * `FindSessionCommandIssueHelperById`'s citation above for the shared
    * rb-tree cleanup this migration is part of).
    */
-  void DiscardActiveSessionCommandIssueHelper(const UserCommandIssueHelper& helper) noexcept
+  void DiscardActiveSessionCommandIssueHelper(
+    const UserCommandIssueHelper& helper
+  ) noexcept
   {
     CWldSession* const session = WLD_GetActiveSession();
     if (session == nullptr || session->mCommandManager == nullptr) {
@@ -26,7 +28,7 @@ namespace
 
     session->mCommandManager->mCommands.erase(static_cast<CmdId>(helper.mConstantData.cmd));
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -43,10 +45,11 @@ namespace moho
     UserCommandQueue* const managerPtr
   ) noexcept
   {
-    const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector = RebuildAndGetUserUnitManagerQueue(managerPtr);
+    const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector =
+      RebuildAndGetUserUnitManagerQueue(managerPtr);
     return static_cast<std::int32_t>(queueVector->size());
   }
-}
+} // namespace moho
 
 namespace
 {
@@ -59,7 +62,9 @@ namespace
    * seeds from stored cursor entity-id lanes, then replays queued issue events
    * (`type 0` merge, `type 3` erase) into the cache and returns that set.
    */
-  [[nodiscard]] WeakSet<UserUnit>* GetEntitiesUnderCursor(UserCommandIssueHelper& helper) noexcept
+  [[nodiscard]] WeakSet<UserUnit>* GetEntitiesUnderCursor(
+    UserCommandIssueHelper& helper
+  ) noexcept
   {
     if (helper.mVariableDataDirty != 0u) {
       helper.mVariableDataDirty = 0u;
@@ -87,7 +92,7 @@ namespace
 
     return &helper.mCursorEntitySet;
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -110,7 +115,8 @@ namespace moho
     UserCommandQueue* const manager,
     UserCommandIssueHelper* const helper,
     const CmdId cmdId,
-    const CmdId index)
+    const CmdId index
+  )
   {
     manager->issueQueue.push_back(UserManagerHelperEntry(cmdId, EUserQueueEdit::Add, helper, index));
 
@@ -128,7 +134,10 @@ namespace moho
    * {commandType, Reset, null, -1}, marks the resolved-link range dirty, and
    * restores it to inline storage.
    */
-  void ResetUserUnitManagerState(UserCommandQueue* const managerPtr, const std::int32_t commandType)
+  void ResetUserUnitManagerState(
+    UserCommandQueue* const managerPtr,
+    const std::int32_t commandType
+  )
   {
     if (managerPtr == nullptr) {
       return;
@@ -160,13 +169,13 @@ namespace moho
     manager->resolvedLinks.ResetStorageToInline();
   }
 
-/**
- * Address: 0x008C63B0 (FUN_008C63B0)
- *
- * What it does:
- * Rebinds the startup metatable-factory index lane for
- * `CScrLuaMetatableFactory<UserUnit>` and returns that singleton.
- */
+  /**
+   * Address: 0x008C63B0 (FUN_008C63B0)
+   *
+   * What it does:
+   * Rebinds the startup metatable-factory index lane for
+   * `CScrLuaMetatableFactory<UserUnit>` and returns that singleton.
+   */
   /**
    * Address: 0x008B3DC0 (FUN_008B3DC0, sub_8B3DC0)
    *
@@ -175,7 +184,10 @@ namespace moho
    * set's allocator proxy (+0x08) unwritten; the default member state here
    * zeroes it, which is not observable.
    */
-  UserCommandIssueLocalEvent::UserCommandIssueLocalEvent(const CmdId cmdId, const ECommandIssueEvent type)
+  UserCommandIssueLocalEvent::UserCommandIssueLocalEvent(
+    const CmdId cmdId,
+    const ECommandIssueEvent type
+  )
     : mCmdId(cmdId)
     , mType(type)
     , mUnits()
@@ -206,8 +218,7 @@ namespace moho
     , mDueSeqNo(dueSeqNo)
     , mLocalQueue{}
     , mCursorEntitySet()
-  {
-  }
+  {}
 
   /**
    * Address: 0x008B4C20 (FUN_008B4C20)
@@ -216,11 +227,12 @@ namespace moho
    * Retires this helper once its due sequence is reached, otherwise drains
    * due local command-issue events and marks variable data dirty.
    */
-  void UserCommandIssueHelper::AdvanceLocalEventsToBeat(const std::int32_t beat) noexcept
+  void UserCommandIssueHelper::AdvanceLocalEventsToBeat(
+    const std::int32_t beat
+  ) noexcept
   {
-    const auto dueDelta = static_cast<std::int32_t>(
-      static_cast<std::uint32_t>(mDueSeqNo) - static_cast<std::uint32_t>(beat)
-    );
+    const auto dueDelta =
+      static_cast<std::int32_t>(static_cast<std::uint32_t>(mDueSeqNo) - static_cast<std::uint32_t>(beat));
     if (mDeleteWhenDue != 0u && dueDelta <= 0) {
       this->~UserCommandIssueHelper();
       ::operator delete(this);
@@ -258,17 +270,24 @@ namespace moho
     // (0x008B4049).
   }
 
-  UserCommandIssueHelper* FindCommandIssueHelperInSession(CWldSession* const session, const CmdId commandId) noexcept
+  UserCommandIssueHelper* FindCommandIssueHelperInSession(
+    CWldSession* const session,
+    const CmdId commandId
+  ) noexcept
   {
     return FindSessionCommandIssueHelperById(session, commandId);
   }
 
-  EUnitCommandType ResolveCommandIssueHelperCommandType(const UserCommandIssueHelper& helper) noexcept
+  EUnitCommandType ResolveCommandIssueHelperCommandType(
+    const UserCommandIssueHelper& helper
+  ) noexcept
   {
     return ResolveHelperCommandType(helper);
   }
 
-  WeakSet<UserUnit>* ResolveCommandIssueCursorEntities(UserCommandIssueHelper& helper) noexcept
+  WeakSet<UserUnit>* ResolveCommandIssueCursorEntities(
+    UserCommandIssueHelper& helper
+  ) noexcept
   {
     return GetEntitiesUnderCursor(helper);
   }
@@ -280,7 +299,9 @@ namespace moho
    * Rebuilds/resolves one user-unit command queue and returns whether it
    * currently contains the supplied command-issue helper.
    */
-  gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* GetUserUnitManagerQueueLinks(UserCommandQueue* const manager) noexcept
+  gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* GetUserUnitManagerQueueLinks(
+    UserCommandQueue* const manager
+  ) noexcept
   {
     return RebuildAndGetUserUnitManagerQueue(manager);
   }
@@ -294,7 +315,8 @@ namespace moho
       return false;
     }
 
-    const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    const gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector =
+      RebuildAndGetUserUnitManagerQueue(manager);
     if (queueVector == nullptr) {
       return false;
     }
@@ -313,7 +335,9 @@ namespace moho
    * Address: 0x008B7320 (FUN_008B7320, struct_UserUnitManager::Get) - see
    * the doc comment on the declaration in UserUnit.h.
    */
-  UserCommandIssueHelper* GetUserUnitManagerLastQueuedHelper(UserCommandQueue* const manager) noexcept
+  UserCommandIssueHelper* GetUserUnitManagerLastQueuedHelper(
+    UserCommandQueue* const manager
+  ) noexcept
   {
     if (manager == nullptr) {
       return nullptr;
@@ -333,7 +357,8 @@ namespace moho
     const REntityBlueprint* const candidateBlueprint
   ) noexcept
   {
-    gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector =
+      RebuildAndGetUserUnitManagerQueue(manager);
     if (queueVector == nullptr || queueVector->empty() || candidateBlueprint == nullptr) {
       return nullptr;
     }
@@ -360,9 +385,12 @@ namespace moho
     return nullptr;
   }
 
-  UserCommandIssueHelper* GetUserUnitManagerQueueTailHelperRaw(UserCommandQueue* const manager) noexcept
+  UserCommandIssueHelper* GetUserUnitManagerQueueTailHelperRaw(
+    UserCommandQueue* const manager
+  ) noexcept
   {
-    gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector =
+      RebuildAndGetUserUnitManagerQueue(manager);
     if (queueVector == nullptr || queueVector->empty()) {
       return nullptr;
     }
@@ -379,7 +407,8 @@ namespace moho
     const EUnitCommandType commandType
   ) noexcept
   {
-    gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector =
+      RebuildAndGetUserUnitManagerQueue(manager);
     if (queueVector == nullptr) {
       return true;
     }
@@ -407,7 +436,8 @@ namespace moho
     const EUnitCommandType restartCommandType
   ) noexcept
   {
-    gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
+    gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2>* const queueVector =
+      RebuildAndGetUserUnitManagerQueue(manager);
     if (queueVector == nullptr) {
       return;
     }
@@ -434,8 +464,7 @@ namespace moho
       ReissueCommandIssueEntryAsType(queuedHelper, newCmdId, restartCommandType);
     }
   }
-}
-
+} // namespace moho
 
 /**
  * Address: 0x008BF612 (inside FUN_008BF420, once per queue)
@@ -443,7 +472,9 @@ namespace moho
  * What it does:
  * See the declaration in UserCommandQueue.h.
  */
-UserCommandQueue::UserCommandQueue(UserUnit* const owner)
+UserCommandQueue::UserCommandQueue(
+  UserUnit* const owner
+)
   : ownerUnit(owner)
   , primaryLinks()
   , issueQueue()

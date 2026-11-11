@@ -111,8 +111,7 @@ namespace moho
       // 0x0086044B: `movss xmm1, [ebp+14h]`, the fraction the world view hands
       // down, is the interpolant.
       const VTransform transform = entity->GetInterpolatedTransform(tickFraction);
-      const bool visible =
-        meshBlueprint->mIconFadeInZoom <= camera->viewport.ProjectViewportDepthRow1(transform.pos_);
+      const bool visible = meshBlueprint->mIconFadeInZoom <= camera->viewport.ProjectViewportDepthRow1(transform.pos_);
 
       const auto key = static_cast<std::int32_t>(entity->mParams.mEntityId);
       const ProjectileArcTable::iterator existing = arcTable.find(key);
@@ -167,13 +166,10 @@ namespace moho
           std::int32_t index = 0;
           do {
             const Wm3::Vector3f& from = samples[index];
-            const Wm3::Vector3f& to =
-              (index == sampleCount - 2) ? track.mLatestPosition : samples[index + 1];
+            const Wm3::Vector3f& to = (index == sampleCount - 2) ? track.mLatestPosition : samples[index + 1];
 
-            const Wm3::Vector2f fromScreen =
-              camera->Project(from, 0.0f, viewportWidth, viewportHeight, 0.0f);
-            const Wm3::Vector2f toScreen =
-              camera->Project(to, 0.0f, viewportWidth, viewportHeight, 0.0f);
+            const Wm3::Vector2f fromScreen = camera->Project(from, 0.0f, viewportWidth, viewportHeight, 0.0f);
+            const Wm3::Vector2f toScreen = camera->Project(to, 0.0f, viewportWidth, viewportHeight, 0.0f);
 
             const float x0 = std::floor(fromScreen.x);
             const float y0 = std::floor(fromScreen.y);

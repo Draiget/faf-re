@@ -32,7 +32,9 @@ namespace gpg::gal::effects
     return "float4 faf_RayShadows[8]; // engine addition (ren_RayTracedShadows), filled by the backend\n";
   }
 
-  bool IsShadowLookupSampler(const SamplerDesc& sampler)
+  bool IsShadowLookupSampler(
+    const SamplerDesc& sampler
+  )
   {
     return Lower(sampler.texture) == "shadowtexture" && Lower(sampler.name).find("blur") == std::string::npos;
   }
@@ -91,7 +93,7 @@ float4 tex2Dgrad(faf_shadow_sampler s, float2 uv, float2 dx, float2 dy) { return
 // ---- end of the cascade lookups ----
 )hlsl";
 
-    static_assert(kRayShadowVectors == 8U,"RayShadowDeclaration's array length");
+    static_assert(kRayShadowVectors == 8U, "RayShadowDeclaration's array length");
 
     // Engine addition (ren_RayTracedShadows): the lookups' third argument, the point's whole shadow
     // coordinate (RayTracedShadows.h). A call site whose coordinate has no depth passes a z of -1e30,
@@ -357,7 +359,10 @@ float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full)
      * starts with a plain name or member chain followed by `.xy`, or is a plain name or member chain alone
      * (not ending in a swizzle). Other calls keep two arguments and read the map alone.
      */
-    [[nodiscard]] std::string PassShadowCoordinates(const std::string& body, const std::vector<std::string>& samplers)
+    [[nodiscard]] std::string PassShadowCoordinates(
+      const std::string& body,
+      const std::vector<std::string>& samplers
+    )
     {
       std::string out;
       out.reserve(body.size() + 64U);
@@ -368,7 +373,8 @@ float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full)
           break;
         }
         std::size_t cursor = call + 5U;
-        const bool whole = (call == 0U || !IsIdentifierChar(body[call - 1U])) && cursor < body.size() && !IsIdentifierChar(body[cursor]);
+        const bool whole =
+          (call == 0U || !IsIdentifierChar(body[call - 1U])) && cursor < body.size() && !IsIdentifierChar(body[cursor]);
         const auto skip = [&] {
           while (cursor < body.size() && std::isspace(static_cast<unsigned char>(body[cursor])) != 0) {
             ++cursor;
@@ -386,7 +392,10 @@ float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full)
             }
             const std::string name = body.substr(nameStart, cursor - nameStart);
             skip();
-            if (std::find(samplers.begin(), samplers.end(), name) != samplers.end() && cursor < body.size() && body[cursor] == ',') {
+            if (
+              std::find(samplers.begin(), samplers.end(), name) != samplers.end() && cursor < body.size() &&
+              body[cursor] == ','
+            ) {
               ++cursor;
               const std::size_t argumentStart = cursor;
               int depth = 0;
@@ -433,7 +442,8 @@ float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full)
                   }
                   at = next;
                 }
-                const bool named = !names.empty() && std::isdigit(static_cast<unsigned char>(names.front().front())) == 0;
+                const bool named =
+                  !names.empty() && std::isdigit(static_cast<unsigned char>(names.front().front())) == 0;
                 const bool plainChain = named && at == end;
                 const auto join = [&](const std::size_t count) {
                   std::string chain;
@@ -443,7 +453,8 @@ float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full)
                   return chain;
                 };
                 // The last member of the chain, when it is a swizzle (only xyzw / rgba letters).
-                const bool swizzle = names.size() > 1U && names.back().find_first_not_of("xyzwrgba") == std::string::npos;
+                const bool swizzle =
+                  names.size() > 1U && names.back().find_first_not_of("xyzwrgba") == std::string::npos;
                 // The channel the call site reads (`tex2D( ... ).g`): the lookup then traces for it alone.
                 std::string channel;
                 {
@@ -500,7 +511,10 @@ float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full)
      * declaration and outside comments, is the first argument of a tex2D-family call. Those are the
      * calls faf_shadow_sampler answers; anything else (passing it to a function) needs a faf_sampler.
      */
-    [[nodiscard]] bool ShadowSamplerOnlyLookedUp(const std::string_view source, const SamplerDesc& sampler)
+    [[nodiscard]] bool ShadowSamplerOnlyLookedUp(
+      const std::string_view source,
+      const SamplerDesc& sampler
+    )
     {
       static constexpr std::string_view kCalls[] = {"tex2D", "tex2Dbias", "tex2Dproj", "tex2Dlod", "tex2Dgrad"};
       const std::string_view name = sampler.name;
@@ -520,7 +534,8 @@ float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full)
           index = sampler.end;
           continue;
         }
-        const bool whole = (index == 0U || !IsIdentifierChar(source[index - 1U])) && source.compare(index, name.size(), name) == 0 &&
+        const bool whole = (index == 0U || !IsIdentifierChar(source[index - 1U])) &&
+          source.compare(index, name.size(), name) == 0 &&
           (index + name.size() >= source.size() || !IsIdentifierChar(source[index + name.size()]));
         if (!whole) {
           ++index;
@@ -655,7 +670,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
 
     constexpr const char* kSamplerTypes[] = {"samplerCUBE", "sampler3D", "sampler2D", "sampler1D", "sampler"};
 
-    [[nodiscard]] const char* ViewSuffix(const TextureDimension dimension) noexcept
+    [[nodiscard]] const char* ViewSuffix(
+      const TextureDimension dimension
+    ) noexcept
     {
       switch (dimension) {
       case TextureDimension::TextureCube:
@@ -667,7 +684,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       }
     }
 
-    [[nodiscard]] const char* ViewType(const TextureDimension dimension) noexcept
+    [[nodiscard]] const char* ViewType(
+      const TextureDimension dimension
+    ) noexcept
     {
       switch (dimension) {
       case TextureDimension::TextureCube:
@@ -680,7 +699,10 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     }
 
     /** The dimensions a sampler can be read in. */
-    [[nodiscard]] std::vector<TextureDimension> SamplerDimensions(const SamplerDesc& sampler, const std::string_view source)
+    [[nodiscard]] std::vector<TextureDimension> SamplerDimensions(
+      const SamplerDesc& sampler,
+      const std::string_view source
+    )
     {
       const std::string type = Lower(sampler.declaredType);
       if (type == "samplercube") {
@@ -704,7 +726,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       return dimensions;
     }
 
-    [[nodiscard]] std::string ReplaceSamplerTypes(std::string text)
+    [[nodiscard]] std::string ReplaceSamplerTypes(
+      std::string text
+    )
     {
       for (const char* const type : kSamplerTypes) {
         text = ReplaceIdentifier(text, type, "faf_sampler");
@@ -713,7 +737,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     }
 
     /** Strips the annotation block, initializer and semantic of a global declaration. */
-    [[nodiscard]] std::string GlobalDeclaration(const Parameter& parameter)
+    [[nodiscard]] std::string GlobalDeclaration(
+      const Parameter& parameter
+    )
     {
       std::string type = " " + parameter.typeName + " ";
       for (const char* const modifier : {" const ", " uniform ", " shared ", " extern ", " volatile "}) {
@@ -729,7 +755,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       return declaration + ";";
     }
 
-    [[nodiscard]] std::string LocalCopyType(const Parameter& parameter)
+    [[nodiscard]] std::string LocalCopyType(
+      const Parameter& parameter
+    )
     {
       std::string type = " " + parameter.typeName + " ";
       for (const char* const modifier :
@@ -743,12 +771,16 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     }
 
     /** True when `body` writes `name` (assignment, compound assignment, ++/--), through an index or swizzle too. */
-    [[nodiscard]] bool AssignsIdentifier(const std::string_view body, const std::string_view name)
+    [[nodiscard]] bool AssignsIdentifier(
+      const std::string_view body,
+      const std::string_view name
+    )
     {
       std::size_t index = 0U;
       while ((index = body.find(name, index)) != std::string_view::npos) {
         const std::size_t after = index + name.size();
-        const bool whole = (index == 0U || !IsIdentifierChar(body[index - 1U])) && (after >= body.size() || !IsIdentifierChar(body[after]));
+        const bool whole = (index == 0U || !IsIdentifierChar(body[index - 1U])) &&
+          (after >= body.size() || !IsIdentifierChar(body[after]));
         if (!whole) {
           index = after;
           continue;
@@ -761,7 +793,11 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           index = after;
           continue; // a member of something else
         }
-        if (before >= 2U && ((body[before - 1U] == '+' && body[before - 2U] == '+') || (body[before - 1U] == '-' && body[before - 2U] == '-'))) {
+        if (
+          before >= 2U &&
+          ((body[before - 1U] == '+' && body[before - 2U] == '+') ||
+           (body[before - 1U] == '-' && body[before - 2U] == '-'))
+        ) {
           return true;
         }
         std::size_t next = after;
@@ -789,8 +825,12 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         if (next < body.size()) {
           const char c = body[next];
           const char c2 = (next + 1U < body.size()) ? body[next + 1U] : '\0';
-          if ((c == '=' && c2 != '=') || ((c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '&' || c == '|' || c == '^') && c2 == '=') ||
-              (c == '+' && c2 == '+') || (c == '-' && c2 == '-')) {
+          if (
+            (c == '=' && c2 != '=') ||
+            ((c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '&' || c == '|' || c == '^') &&
+             c2 == '=') ||
+            (c == '+' && c2 == '+') || (c == '-' && c2 == '-')
+          ) {
             return true;
           }
         }
@@ -800,12 +840,17 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     }
 
     /** True when `body` declares a local named `name` (`float3 name ...`): the global is shadowed. */
-    [[nodiscard]] bool DeclaresIdentifier(const std::string_view body, const std::string_view name)
+    [[nodiscard]] bool DeclaresIdentifier(
+      const std::string_view body,
+      const std::string_view name
+    )
     {
       std::size_t index = 0U;
       while ((index = body.find(name, index)) != std::string_view::npos) {
         const std::size_t after = index + name.size();
-        if ((index != 0U && IsIdentifierChar(body[index - 1U])) || (after < body.size() && IsIdentifierChar(body[after]))) {
+        if (
+          (index != 0U && IsIdentifierChar(body[index - 1U])) || (after < body.size() && IsIdentifierChar(body[after]))
+        ) {
           index = after;
           continue;
         }
@@ -818,8 +863,10 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           --begin;
         }
         const std::string_view previous = body.substr(begin, end - begin);
-        if (!previous.empty() && previous != "return" && previous != "else" && previous != "case" && previous != "in" &&
-            previous != "out" && previous != "inout" && std::isdigit(static_cast<unsigned char>(previous[0])) == 0) {
+        if (
+          !previous.empty() && previous != "return" && previous != "else" && previous != "case" && previous != "in" &&
+          previous != "out" && previous != "inout" && std::isdigit(static_cast<unsigned char>(previous[0])) == 0
+        ) {
           return true;
         }
         index = after;
@@ -836,7 +883,10 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       std::string semantic;                // the return semantic, without ':'
     };
 
-    [[nodiscard]] bool ParseFunctionHead(const std::string& head, Function& function)
+    [[nodiscard]] bool ParseFunctionHead(
+      const std::string& head,
+      Function& function
+    )
     {
       const std::size_t open = head.find('(');
       if (open == std::string::npos) {
@@ -875,13 +925,15 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       std::string modifiers; // in / out / inout / uniform ...
       std::string type;
       std::string name;
-      std::string suffix;    // array dimensions
-      std::string semantic;  // without ':'
+      std::string suffix;   // array dimensions
+      std::string semantic; // without ':'
       bool isUniform = false;
       bool isOut = false;
     };
 
-    [[nodiscard]] ParameterParts SplitParameter(const std::string& parameter)
+    [[nodiscard]] ParameterParts SplitParameter(
+      const std::string& parameter
+    )
     {
       ParameterParts parts;
       std::string declaration = parameter;
@@ -916,8 +968,10 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         } else if (word == "out" || word == "inout") {
           parts.isOut = true;
           parts.modifiers += word + " ";
-        } else if (word == "in" || word == "const" || word == "linear" || word == "centroid" || word == "nointerpolation" ||
-                   word == "noperspective" || word == "sample") {
+        } else if (
+          word == "in" || word == "const" || word == "linear" || word == "centroid" || word == "nointerpolation" ||
+          word == "noperspective" || word == "sample"
+        ) {
           parts.modifiers += word + " ";
         } else {
           parts.type += (parts.type.empty() ? "" : " ") + word;
@@ -927,7 +981,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     }
 
     /** "COLOR1" -> ("COLOR", "1"). */
-    [[nodiscard]] std::pair<std::string, std::string> SplitSemantic(const std::string& semantic)
+    [[nodiscard]] std::pair<std::string, std::string> SplitSemantic(
+      const std::string& semantic
+    )
     {
       std::size_t digits = semantic.size();
       while (digits > 0U && std::isdigit(static_cast<unsigned char>(semantic[digits - 1U])) != 0) {
@@ -943,7 +999,10 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       PixelOutput,  // COLORn -> SV_Targetn, DEPTH -> SV_Depth
     };
 
-    [[nodiscard]] std::string ModernSemantic(const std::string& semantic, const SemanticRole role)
+    [[nodiscard]] std::string ModernSemantic(
+      const std::string& semantic,
+      const SemanticRole role
+    )
     {
       const auto [name, index] = SplitSemantic(semantic);
       switch (role) {
@@ -970,7 +1029,10 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     }
 
     /** Rewrites the member semantics of a struct body for `role`. */
-    [[nodiscard]] std::string RewriteStructSemantics(const std::string& body, const SemanticRole role)
+    [[nodiscard]] std::string RewriteStructSemantics(
+      const std::string& body,
+      const SemanticRole role
+    )
     {
       std::string out;
       for (const std::string& member : SplitTopLevel(body, ';')) {
@@ -989,13 +1051,18 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       return out;
     }
 
-    [[nodiscard]] std::uint32_t AlignUp(const std::uint32_t value, const std::uint32_t alignment) noexcept
+    [[nodiscard]] std::uint32_t AlignUp(
+      const std::uint32_t value,
+      const std::uint32_t alignment
+    ) noexcept
     {
       return (value + alignment - 1U) / alignment * alignment;
     }
   } // namespace
 
-  const ConstantSlot* ConstantLayout::Find(const std::uint32_t parameter) const noexcept
+  const ConstantSlot* ConstantLayout::Find(
+    const std::uint32_t parameter
+  ) const noexcept
   {
     for (const ConstantSlot& slot : slots) {
       if (slot.parameter == parameter) {
@@ -1054,7 +1121,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     }
   } // namespace
 
-  ConstantLayout ComputeConstantLayout(const EffectDescription& description)
+  ConstantLayout ComputeConstantLayout(
+    const EffectDescription& description
+  )
   {
     ConstantLayout layout;
     std::uint32_t offset = 0U;
@@ -1064,39 +1133,52 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       slot.parameter = index;
       std::uint32_t structBytes = 0U;
       if (parameter.parameterClass == ParameterClass::Struct) {
-        const StructType* const structType = description.FindStruct(parameter.typeName.substr(parameter.typeName.rfind(' ') + 1U));
+        const StructType* const structType =
+          description.FindStruct(parameter.typeName.substr(parameter.typeName.rfind(' ') + 1U));
         if (structType == nullptr) {
           continue;
         }
         for (const StructMember& member : structType->members) {
-          if (member.parameterClass != ParameterClass::Scalar && member.parameterClass != ParameterClass::Vector &&
-              member.parameterClass != ParameterClass::Matrix) {
+          if (
+            member.parameterClass != ParameterClass::Scalar && member.parameterClass != ParameterClass::Vector &&
+            member.parameterClass != ParameterClass::Matrix
+          ) {
             structBytes = 0U;
             break; // nothing the shaders read through $Globals
           }
           const Placement placement =
             PlaceValue(structBytes, member.parameterClass, member.rows, member.columns, member.elements, false, 0U);
-          slot.members.push_back(ConstantMember{
-            placement.offset,
-            placement.size,
-            placement.elementStride,
-            member.rows,
-            member.columns,
-            std::max<std::uint32_t>(member.elements, 1U),
-            member.parameterClass,
-            member.scalarType,
-          });
+          slot.members.push_back(
+            ConstantMember{
+              placement.offset,
+              placement.size,
+              placement.elementStride,
+              member.rows,
+              member.columns,
+              std::max<std::uint32_t>(member.elements, 1U),
+              member.parameterClass,
+              member.scalarType,
+            }
+          );
           structBytes = placement.offset + placement.size;
         }
         if (structBytes == 0U) {
           continue;
         }
-      } else if (parameter.parameterClass != ParameterClass::Scalar && parameter.parameterClass != ParameterClass::Vector &&
-                 parameter.parameterClass != ParameterClass::Matrix) {
+      } else if (
+        parameter.parameterClass != ParameterClass::Scalar && parameter.parameterClass != ParameterClass::Vector &&
+        parameter.parameterClass != ParameterClass::Matrix
+      ) {
         continue;
       }
       const Placement placement = PlaceValue(
-        offset, parameter.parameterClass, parameter.rows, parameter.columns, parameter.elements, parameter.columnMajor, structBytes
+        offset,
+        parameter.parameterClass,
+        parameter.rows,
+        parameter.columns,
+        parameter.elements,
+        parameter.columnMajor,
+        structBytes
       );
       slot.offset = placement.offset;
       slot.size = placement.size;
@@ -1117,7 +1199,11 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     };
 
     /// Texture views and sampler registers.
-    TextureViews BuildTextureViews(const std::string_view source, EffectDescription& description, ModernEffect& modern)
+    TextureViews BuildTextureViews(
+      const std::string_view source,
+      EffectDescription& description,
+      ModernEffect& modern
+    )
     {
       TextureViews views;
       std::map<std::string, std::vector<TextureDimension>> textureDimensions;
@@ -1157,13 +1243,17 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     }
 
     /// The functions in the source, by name; the first definition of a name wins.
-    std::map<std::string, Function> CollectFunctions(const std::vector<Item>& items)
+    std::map<std::string, Function> CollectFunctions(
+      const std::vector<Item>& items
+    )
     {
       std::map<std::string, Function> functions;
       for (const Item& item : items) {
         Function function;
-        if (item.braced && item.head.find('(') != std::string::npos && !HasTopLevelAssignment(item.head) &&
-            ParseFunctionHead(item.head, function) && functions.find(function.name) == functions.end()) {
+        if (
+          item.braced && item.head.find('(') != std::string::npos && !HasTopLevelAssignment(item.head) &&
+          ParseFunctionHead(item.head, function) && functions.find(function.name) == functions.end()
+        ) {
           functions[function.name] = function;
         }
       }
@@ -1172,12 +1262,16 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
 
     /// The role each struct plays in a stage's signature.
     std::map<std::string, SemanticRole> AssignStructRoles(
-      EffectDescription& description, const std::map<std::string, Function>& functions, ModernEffect& modern
+      EffectDescription& description,
+      const std::map<std::string, Function>& functions,
+      ModernEffect& modern
     )
     {
       std::map<std::string, SemanticRole> structRoles;
       std::set<std::string> vertexInputStructs;
-      const auto isStruct = [&](const std::string& name) { return description.FindStruct(name) != nullptr; };
+      const auto isStruct = [&](const std::string& name) {
+        return description.FindStruct(name) != nullptr;
+      };
       // Roles belong to the struct definition, typedef'd names included.
       const auto baseStruct = [&](const std::string& name) {
         const StructType* const found = description.FindStruct(name);
@@ -1237,7 +1331,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       for (const std::string& name : vertexInputStructs) {
         const auto found = structRoles.find(name);
         if (found != structRoles.end() && found->second != SemanticRole::PixelOutput) {
-          modern.notes.push_back("struct " + name + " is both a vertex input and a stage output; semantics left as written");
+          modern.notes.push_back(
+            "struct " + name + " is both a vertex input and a stage output; semantics left as written"
+          );
           structRoles.erase(found);
         }
       }
@@ -1245,7 +1341,10 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     }
   } // namespace
 
-  ModernEffect GenerateModernHlsl(const std::string_view source, EffectDescription& description)
+  ModernEffect GenerateModernHlsl(
+    const std::string_view source,
+    EffectDescription& description
+  )
   {
     ModernEffect modern;
     const std::vector<Item> items = SplitItems(source);
@@ -1259,7 +1358,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     bool rayShadows = false;
     std::vector<std::string> shadowLookupSamplers;
     {
-      const bool declared = std::any_of(description.parameters.begin(), description.parameters.end(), [](const Parameter& parameter) {
+      const bool declared =
+        std::any_of(description.parameters.begin(), description.parameters.end(), [](const Parameter& parameter) {
         return parameter.name == kShadowCascadeParameter && parameter.elements == kShadowCascadeVectors;
       });
       bool lookups = true;
@@ -1278,7 +1378,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           }
         }
         // Engine addition (ren_RayTracedShadows): EffectProgram declares faf_RayShadows ahead of the cascades.
-        rayShadows = gRayQueryShaders && std::any_of(description.parameters.begin(), description.parameters.end(), [](const Parameter& parameter) {
+        rayShadows = gRayQueryShaders &&
+          std::any_of(description.parameters.begin(), description.parameters.end(), [](const Parameter& parameter) {
           return parameter.name == kRayShadowParameter && parameter.elements == kRayShadowVectors;
         });
       }
@@ -1291,8 +1392,10 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
     // ---- parameters a function writes -------------------------------------------
     std::map<std::string, const Parameter*> numericParameters;
     for (const Parameter& parameter : description.parameters) {
-      if (parameter.parameterClass == ParameterClass::Scalar || parameter.parameterClass == ParameterClass::Vector ||
-          parameter.parameterClass == ParameterClass::Matrix) {
+      if (
+        parameter.parameterClass == ParameterClass::Scalar || parameter.parameterClass == ParameterClass::Vector ||
+        parameter.parameterClass == ParameterClass::Matrix
+      ) {
         numericParameters[parameter.name] = &parameter;
       }
     }
@@ -1330,31 +1433,44 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         continue;
       }
 
-      if (StartsWithWord(head, "technique") || StartsWithWord(head, "technique10") || StartsWithWord(head, "technique11") ||
-          StartsWithWord(head, "BlendState") || StartsWithWord(head, "DepthStencilState") || StartsWithWord(head, "RasterizerState") ||
-          StartsWithWord(head, "VertexShader") || StartsWithWord(head, "PixelShader") || StartsWithWord(head, "GeometryShader") ||
-          StartsWithWord(head, "HullShader") || StartsWithWord(head, "DomainShader") || StartsWithWord(head, "string")) {
+      if (
+        StartsWithWord(head, "technique") || StartsWithWord(head, "technique10") ||
+        StartsWithWord(head, "technique11") || StartsWithWord(head, "BlendState") ||
+        StartsWithWord(head, "DepthStencilState") || StartsWithWord(head, "RasterizerState") ||
+        StartsWithWord(head, "VertexShader") || StartsWithWord(head, "PixelShader") ||
+        StartsWithWord(head, "GeometryShader") || StartsWithWord(head, "HullShader") ||
+        StartsWithWord(head, "DomainShader") || StartsWithWord(head, "string")
+      ) {
         continue; // the effect description carries these
       }
 
       // Sampler states.
-      const auto sampler = std::find_if(description.samplers.begin(), description.samplers.end(), [&](const SamplerDesc& candidate) {
+      const auto sampler =
+        std::find_if(description.samplers.begin(), description.samplers.end(), [&](const SamplerDesc& candidate) {
         return candidate.begin == item.begin && candidate.end == item.end;
       });
       if (sampler != description.samplers.end()) {
         const std::size_t index = static_cast<std::size_t>(sampler - description.samplers.begin());
         const auto view = [&](const TextureDimension dimension, const char* const placeholder) -> std::string {
           const auto& dimensions = samplerDimensions[index];
-          if (sampler->texture.empty() || std::find(dimensions.begin(), dimensions.end(), dimension) == dimensions.end()) {
+          if (
+            sampler->texture.empty() || std::find(dimensions.begin(), dimensions.end(), dimension) == dimensions.end()
+          ) {
             return placeholder;
           }
           return sampler->texture + ViewSuffix(dimension);
         };
         char declaration[256]{};
-        std::snprintf(declaration, sizeof(declaration), "SamplerState faf_smp_%s : register(s%u);\n", sampler->name.c_str(),
-                      static_cast<unsigned>(index));
+        std::snprintf(
+          declaration,
+          sizeof(declaration),
+          "SamplerState faf_smp_%s : register(s%u);\n",
+          sampler->name.c_str(),
+          static_cast<unsigned>(index)
+        );
         body += declaration;
-        const char* const maker = (shadowCascades && IsShadowLookupSampler(*sampler)) ? "faf_make_shadow_sampler(" : "faf_make_sampler(";
+        const char* const maker =
+          (shadowCascades && IsShadowLookupSampler(*sampler)) ? "faf_make_shadow_sampler(" : "faf_make_sampler(";
         body += "#define " + sampler->name + " " + maker + view(TextureDimension::Texture2D, "faf_null2D") + ", " +
           view(TextureDimension::TextureCube, "faf_nullCube") + ", " + view(TextureDimension::Texture3D, "faf_null3D") +
           ", faf_smp_" + sampler->name + ")\n";
@@ -1362,7 +1478,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       }
 
       // Parameters.
-      const auto parameter = std::find_if(description.parameters.begin(), description.parameters.end(), [&](const Parameter& candidate) {
+      const auto parameter =
+        std::find_if(description.parameters.begin(), description.parameters.end(), [&](const Parameter& candidate) {
         return candidate.begin == item.begin && candidate.end == item.end;
       });
       if (parameter != description.parameters.end()) {
@@ -1370,12 +1487,21 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           for (const TextureSlot& slot : modern.textures) {
             if (slot.parameter == parameter->name) {
               char declaration[256]{};
-              std::snprintf(declaration, sizeof(declaration), "%s %s%s : register(t%u);\n", ViewType(slot.dimension),
-                            slot.parameter.c_str(), ViewSuffix(slot.dimension), static_cast<unsigned>(slot.slot));
+              std::snprintf(
+                declaration,
+                sizeof(declaration),
+                "%s %s%s : register(t%u);\n",
+                ViewType(slot.dimension),
+                slot.parameter.c_str(),
+                ViewSuffix(slot.dimension),
+                static_cast<unsigned>(slot.slot)
+              );
               body += declaration;
             }
           }
-        } else if (numericParameters.count(parameter->name) != 0U || parameter->parameterClass == ParameterClass::Struct) {
+        } else if (
+          numericParameters.count(parameter->name) != 0U || parameter->parameterClass == ParameterClass::Struct
+        ) {
           body += GlobalDeclaration(*parameter) + "\n";
           if (shadowCascades && parameter->name == kShadowCascadeParameter) {
             body += kShadowCascadeHelpers;
@@ -1399,7 +1525,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         if (role == structRoles.end()) {
           body += ReplaceSamplerTypes(original);
         } else {
-          body += "struct " + name + "\n{\n" + RewriteStructSemantics(ReplaceSamplerTypes(item.body), role->second) + "};";
+          body +=
+            "struct " + name + "\n{\n" + RewriteStructSemantics(ReplaceSamplerTypes(item.body), role->second) + "};";
         }
         continue;
       }
@@ -1428,8 +1555,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           }
           functionBody = ReplaceIdentifier(functionBody, name, "faf_local_" + name);
           std::string type = LocalCopyType(*global);
-          copies += " " + type + " faf_local_" + name + (global->elements != 0U ? "[" + std::to_string(global->elements) + "]" : "") +
-            " = " + name + ";";
+          copies += " " + type + " faf_local_" + name +
+            (global->elements != 0U ? "[" + std::to_string(global->elements) + "]" : "") + " = " + name + ";";
         }
         const std::size_t open = original.find('{', original.find(')'));
         if (shadowCascades) {
@@ -1452,14 +1579,18 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         const bool tessellated = pass.Tessellated();
         const bool namedTessellation = !pass.hullShader.function.empty() || !pass.domainShader.function.empty();
         for (const auto& [reference, stage] :
-             {std::pair{&pass.vertexShader, ShaderStage::Vertex}, std::pair{&pass.pixelShader, ShaderStage::Pixel},
-              std::pair{&pass.hullShader, ShaderStage::Hull}, std::pair{&pass.domainShader, ShaderStage::Domain}}) {
+             {std::pair{&pass.vertexShader, ShaderStage::Vertex},
+              std::pair{&pass.pixelShader, ShaderStage::Pixel},
+              std::pair{&pass.hullShader, ShaderStage::Hull},
+              std::pair{&pass.domainShader, ShaderStage::Domain}}) {
           if (reference->function.empty()) {
             continue;
           }
           if (stage == ShaderStage::Hull || stage == ShaderStage::Domain) {
             if (!tessellated) {
-              modern.notes.push_back("technique " + technique.name + ": a hull shader needs a domain shader and the reverse; ignored");
+              modern.notes.push_back(
+                "technique " + technique.name + ": a hull shader needs a domain shader and the reverse; ignored"
+              );
               reference->function.clear();
               continue;
             }
@@ -1472,7 +1603,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
             }
             const auto found = functions.find(reference->function);
             if (found == functions.end()) {
-              modern.notes.push_back("technique " + technique.name + ": shader function " + reference->function + " not found");
+              modern.notes.push_back(
+                "technique " + technique.name + ": shader function " + reference->function + " not found"
+              );
               reference->function.clear();
               continue;
             }
@@ -1507,7 +1640,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
                   callArguments += uniformArguments[nextUniform++];
                 } else {
                   const std::size_t equals = parameterText.find('=');
-                  callArguments += (equals != std::string::npos) ? Trim(parameterText.substr(equals + 1U)) : std::string("0");
+                  callArguments +=
+                    (equals != std::string::npos) ? Trim(parameterText.substr(equals + 1U)) : std::string("0");
                 }
                 continue;
               }
@@ -1518,8 +1652,10 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
               ++nextVarying;
             }
             if (nextVarying != varying.size() || pointType.empty()) {
-              modern.notes.push_back("technique " + technique.name + ": " + function.name + " needs " +
-                                     std::to_string(varying.size()) + " varying parameters");
+              modern.notes.push_back(
+                "technique " + technique.name + ": " + function.name + " needs " + std::to_string(varying.size()) +
+                " varying parameters"
+              );
               reference->function.clear();
               continue;
             }
@@ -1528,17 +1664,21 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
             if (stage == ShaderStage::Hull) {
               char constants[64]{};
               std::snprintf(constants, sizeof(constants), "faf_hsconst_%u", index);
-              wrappers += std::string("faf_tess_factors ") + constants + "(" + patch + ")\n{\n    float4 faf_f = " + call +
+              wrappers += std::string("faf_tess_factors ") + constants + "(" + patch +
+                ")\n{\n    float4 faf_f = " + call +
                 ";\n    faf_tess_factors faf_r;\n    faf_r.edges[0] = faf_f.x;\n    faf_r.edges[1] = faf_f.y;\n"
                 "    faf_r.edges[2] = faf_f.z;\n    faf_r.inside = faf_f.w;\n    return faf_r;\n}\n";
-              wrappers += std::string("[domain(\"tri\")]\n[partitioning(\"fractional_odd\")]\n[outputtopology(FAF_TESS_TOPOLOGY)]\n"
-                                      "[outputcontrolpoints(3)]\n[patchconstantfunc(\"") +
+              wrappers +=
+                std::string(
+                  "[domain(\"tri\")]\n[partitioning(\"fractional_odd\")]\n[outputtopology(FAF_TESS_TOPOLOGY)]\n"
+                  "[outputcontrolpoints(3)]\n[patchconstantfunc(\""
+                ) +
                 constants + "\")]\n[maxtessfactor(64.0)]\n" + pointType + " " + name + "(" + patch +
                 ", uint faf_id : SV_OutputControlPointID)\n{\n    return faf_patch[faf_id];\n}\n";
             } else {
               wrappers += "[domain(\"tri\")]\n" + function.returnType + " " + name +
-                "(faf_tess_factors faf_factors, float3 faf_weights : SV_DomainLocation, const OutputPatch<" + pointType +
-                ", 3> faf_patch)\n{\n    return " + call + ";\n}\n";
+                "(faf_tess_factors faf_factors, float3 faf_weights : SV_DomainLocation, const OutputPatch<" +
+                pointType + ", 3> faf_patch)\n{\n    return " + call + ";\n}\n";
             }
             modern.entries.push_back(ShaderEntry{stage, function.name, arguments, name});
             entryNames.emplace(key, name);
@@ -1548,8 +1688,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           const std::string arguments = Squeeze(reference->arguments);
           // The Direct3D 9 alpha test is part of the pixel entry: one per test.
           const std::optional<AlphaTestDesc> alphaTest = (stage == ShaderStage::Pixel) ? pass.alphaTest : std::nullopt;
-          const std::string alphaTestKey =
-            alphaTest.has_value() ? "|alphatest " + std::to_string(alphaTest->func) + " " + std::to_string(alphaTest->ref) : std::string();
+          const std::string alphaTestKey = alphaTest.has_value()
+            ? "|alphatest " + std::to_string(alphaTest->func) + " " + std::to_string(alphaTest->ref)
+            : std::string();
           const auto key = std::make_tuple(stage, reference->function, arguments + alphaTestKey);
           const auto known = entryNames.find(key);
           if (known != entryNames.end()) {
@@ -1558,13 +1699,20 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           }
           const auto found = functions.find(reference->function);
           if (found == functions.end()) {
-            modern.notes.push_back("technique " + technique.name + ": shader function " + reference->function + " not found");
+            modern.notes.push_back(
+              "technique " + technique.name + ": shader function " + reference->function + " not found"
+            );
             continue;
           }
           const Function& function = found->second;
           char name[64]{};
-          std::snprintf(name, sizeof(name), "faf_entry_%s_%u", stage == ShaderStage::Vertex ? "vs" : "ps",
-                        static_cast<unsigned>(modern.entries.size()));
+          std::snprintf(
+            name,
+            sizeof(name),
+            "faf_entry_%s_%u",
+            stage == ShaderStage::Vertex ? "vs" : "ps",
+            static_cast<unsigned>(modern.entries.size())
+          );
 
           std::vector<std::string> uniformArguments;
           if (!arguments.empty()) {
@@ -1587,7 +1735,8 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
               } else {
                 // A uniform parameter the pass leaves out takes its default.
                 const std::size_t equals = parameterText.find('=');
-                callArguments += (equals != std::string::npos) ? Trim(parameterText.substr(equals + 1U)) : std::string("0");
+                callArguments +=
+                  (equals != std::string::npos) ? Trim(parameterText.substr(equals + 1U)) : std::string("0");
               }
               continue;
             }
@@ -1622,8 +1771,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           }
           std::string returnSemantic = function.semantic;
           if (!returnSemantic.empty()) {
-            returnSemantic =
-              ModernSemantic(returnSemantic, stage == ShaderStage::Vertex ? SemanticRole::VertexOutput : SemanticRole::PixelOutput);
+            returnSemantic = ModernSemantic(
+              returnSemantic, stage == ShaderStage::Vertex ? SemanticRole::VertexOutput : SemanticRole::PixelOutput
+            );
           }
           const bool returnsVoid = (function.returnType == "void");
           // The pixel colour the wrapper post-processes: the float4 the
@@ -1633,7 +1783,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
             colour = "faf_output";
           } else if (stage == ShaderStage::Pixel) {
             for (const StructType& type : description.structs) {
-              if (type.name == function.returnType && !type.members.empty() && type.members.front().typeName == "float4") {
+              if (
+                type.name == function.returnType && !type.members.empty() && type.members.front().typeName == "float4"
+              ) {
                 colour = "faf_output." + type.members.front().name;
               }
             }
@@ -1642,17 +1794,28 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           if (!colour.empty() && alphaTest.has_value()) {
             // D3D9 compares the alpha the blender receives, in 8-bit units.
             static constexpr const char* kComparisons[] = {
-              "false", "false", "faf_alpha < faf_ref", "faf_alpha == faf_ref", "faf_alpha <= faf_ref",
-              "faf_alpha > faf_ref", "faf_alpha != faf_ref", "faf_alpha >= faf_ref", "true",
+              "false",
+              "false",
+              "faf_alpha < faf_ref",
+              "faf_alpha == faf_ref",
+              "faf_alpha <= faf_ref",
+              "faf_alpha > faf_ref",
+              "faf_alpha != faf_ref",
+              "faf_alpha >= faf_ref",
+              "true",
             };
-            post += "    uint faf_alpha = (uint)round(saturate(" + colour + ".a) * 255.0);\n    uint faf_ref = " +
-              std::to_string(alphaTest->ref) + "u;\n    if (!(" + kComparisons[alphaTest->func] + ")) discard;\n";
+            post += "    uint faf_alpha = (uint)round(saturate(" + colour +
+              ".a) * 255.0);\n    uint faf_ref = " + std::to_string(alphaTest->ref) + "u;\n    if (!(" +
+              kComparisons[alphaTest->func] + ")) discard;\n";
           } else if (alphaTest.has_value()) {
-            modern.notes.push_back("technique " + technique.name + ": alpha test on " + function.name + " without a float4 colour");
+            modern.notes.push_back(
+              "technique " + technique.name + ": alpha test on " + function.name + " without a float4 colour"
+            );
           }
           if (!colour.empty() && NanCheckRequested()) {
             // Diagnostics: a pixel whose colour is NaN or infinite turns magenta.
-            post += "    if (any(isnan(" + colour + ")) || any(isinf(" + colour + "))) " + colour + " = float4(1, 0, 1, 1);\n";
+            post += "    if (any(isnan(" + colour + ")) || any(isinf(" + colour + "))) " + colour +
+              " = float4(1, 0, 1, 1);\n";
           }
           const std::string signature = function.returnType + " " + name + "(" + parameters + ")" +
             (returnSemantic.empty() ? std::string() : " : " + returnSemantic);

@@ -16,7 +16,9 @@ namespace
 {
   std::string gDump;
 
-  std::string Capture(void (*write)(std::FILE*))
+  std::string Capture(
+    void (*write)(std::FILE*)
+  )
   {
     std::FILE* const sink = std::tmpfile();
     if (sink == nullptr) {
@@ -34,13 +36,17 @@ namespace
     return text;
   }
 
-  void WriteSection(std::FILE* const sink)
+  void WriteSection(
+    std::FILE* const sink
+  )
   {
     lua::WriteLuaCrashSection(sink, nullptr, nullptr);
   }
 
   // A C function a script calls: the section is written while the VM is inside the script's frames.
-  int DumpFromInsideLua(lua_State* const)
+  int DumpFromInsideLua(
+    lua_State* const
+  )
   {
     gDump = Capture(&WriteSection);
     return 0;
@@ -49,7 +55,10 @@ namespace
 
 using faf_lua_tests::LuaFixture;
 
-TEST_F(LuaFixture, CrashSectionListsTheVmItsNameAndRecordedErrors)
+TEST_F(
+  LuaFixture,
+  CrashSectionListsTheVmItsNameAndRecordedErrors
+)
 {
   lua::NameLuaVm(L(), "crash-dump-test");
   lua::RecordLuaError(L(), "zoo: a recorded script error");
@@ -59,7 +68,10 @@ TEST_F(LuaFixture, CrashSectionListsTheVmItsNameAndRecordedErrors)
   EXPECT_NE(section.find("zoo: a recorded script error"), std::string::npos) << section;
 }
 
-TEST_F(LuaFixture, CrashSectionShowsTheFramesOfARunningScript)
+TEST_F(
+  LuaFixture,
+  CrashSectionShowsTheFramesOfARunningScript
+)
 {
   lua::NameLuaVm(L(), "crash-dump-frames");
   lua_pushstring(L(), "dump");
@@ -70,10 +82,13 @@ TEST_F(LuaFixture, CrashSectionShowsTheFramesOfARunningScript)
   ASSERT_FALSE(gDump.empty());
   EXPECT_NE(gDump.find("crash-dump-frames"), std::string::npos) << gDump;
   EXPECT_NE(gDump.find(" frame(s)"), std::string::npos) << gDump;
-  EXPECT_NE(gDump.find(":3 (lineDefined=1"), std::string::npos) << gDump;  // inner, at the dump() call
+  EXPECT_NE(gDump.find(":3 (lineDefined=1"), std::string::npos) << gDump; // inner, at the dump() call
 }
 
-TEST(LuaCrashDump, AnAddressOutsideEveryVmIsLeftUnannotated)
+TEST(
+  LuaCrashDump,
+  AnAddressOutsideEveryVmIsLeftUnannotated
+)
 {
   int local = 0;
   std::FILE* const sink = std::tmpfile();

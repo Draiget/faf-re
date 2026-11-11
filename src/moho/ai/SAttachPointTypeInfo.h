@@ -44,4 +44,3 @@ namespace moho
 
   static_assert(sizeof(SAttachPointTypeInfo) == 0x64, "SAttachPointTypeInfo size must be 0x64");
 } // namespace moho
-

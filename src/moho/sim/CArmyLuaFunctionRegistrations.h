@@ -64,7 +64,8 @@ namespace moho
   std::uint32_t GetArmyColor(int idx);
 
   /**
-   * Address: 0x00506A30 (FUN_00506A30, ?GetPlayerColorName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@Z)
+   * Address: 0x00506A30 (FUN_00506A30,
+   * ?GetPlayerColorName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@Z)
    *
    * int idx
    *
@@ -225,8 +226,6 @@ namespace moho
    * Publishes the global Lua binder definition for `SetArmyOutOfGame`.
    */
   CScrLuaInitForm* func_SetArmyOutOfGame_LuaFuncDef();
-
-
 
   /**
    * Address: 0x00BD9D00 (FUN_00BD9D00, j_func_ListArmies_LuaFuncDef)

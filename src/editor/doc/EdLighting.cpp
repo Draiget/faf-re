@@ -7,7 +7,9 @@
 
 namespace faf::editor
 {
-  std::string LightingToScmlighting(const LightingState& lighting)
+  std::string LightingToScmlighting(
+    const LightingState& lighting
+  )
   {
     // LightingData's fields in its order (FAForeverMapEditor, UI/Tools/Lighting/LightingInfo.cs).
     std::string out = "{\n";
@@ -24,7 +26,11 @@ namespace faf::editor
     return out + "}";
   }
 
-  bool LightingFromScmlighting(const std::string& text, LightingState& lighting, std::string& error)
+  bool LightingFromScmlighting(
+    const std::string& text,
+    LightingState& lighting,
+    std::string& error
+  )
   {
     std::string probe;
     if (!JsonValue(text, "LightingMultiplier", probe) || !JsonValue(text, "SunDirection", probe)) {
@@ -43,7 +49,11 @@ namespace faf::editor
     (void)JsonFloat(text, "FogEnd", lighting.fogEnd);
     return true;
   }
-  bool LightingFromScmap(const std::string& bytes, LightingState& lighting, std::string& error)
+  bool LightingFromScmap(
+    const std::string& bytes,
+    LightingState& lighting,
+    std::string& error
+  )
   {
     std::size_t at = 0;
     const auto take = [&](void* const out, const std::size_t size) {
@@ -73,8 +83,10 @@ namespace faf::editor
     std::int32_t width = 0;
     std::int32_t height = 0;
     float heightScale = 0.0f;
-    if (!take(&previewBytes, 4) || previewBytes < 0 || (at += static_cast<std::size_t>(previewBytes)) > bytes.size() || !take(&version, 4) ||
-        !take(&width, 4) || !take(&height, 4) || !take(&heightScale, 4) || width <= 0 || height <= 0) {
+    if (
+      !take(&previewBytes, 4) || previewBytes < 0 || (at += static_cast<std::size_t>(previewBytes)) > bytes.size() ||
+      !take(&version, 4) || !take(&width, 4) || !take(&height, 4) || !take(&heightScale, 4) || width <= 0 || height <= 0
+    ) {
       error = "the .scmap ends early";
       return false;
     }

@@ -50,7 +50,6 @@ namespace moho
     void AddEnums();
   };
 
-
   static_assert(sizeof(EJobTypeTypeInfo) == 0x78, "EJobTypeTypeInfo size must be 0x78");
 
   /**

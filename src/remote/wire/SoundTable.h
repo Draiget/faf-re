@@ -41,7 +41,10 @@ namespace faf::remote::wire
     [[nodiscard]] SInterned Intern(const SSoundEntry& entry);
     /** Writes entry `id` (as `Intern` returned it) for `CSoundTableReader::ReadEntry`. */
     void WriteEntry(std::uint32_t id, BitWriter& writer) const;
-    [[nodiscard]] std::uint32_t Size() const noexcept { return static_cast<std::uint32_t>(mEntries.size()); }
+    [[nodiscard]] std::uint32_t Size() const noexcept
+    {
+      return static_cast<std::uint32_t>(mEntries.size());
+    }
 
   private:
     std::map<std::tuple<std::string, std::string, std::string, std::string>, std::uint32_t> mIds;
@@ -58,7 +61,10 @@ namespace faf::remote::wire
     /** False (table unchanged) for a malformed record, an id out of order, or a full table. */
     [[nodiscard]] bool ReadEntry(BitReader& reader);
     [[nodiscard]] const SSoundEntry* Find(std::uint32_t id) const noexcept;
-    [[nodiscard]] std::uint32_t Size() const noexcept { return static_cast<std::uint32_t>(mEntries.size()); }
+    [[nodiscard]] std::uint32_t Size() const noexcept
+    {
+      return static_cast<std::uint32_t>(mEntries.size());
+    }
 
   private:
     std::vector<SSoundEntry> mEntries;

@@ -9,7 +9,9 @@ namespace faf::remote
 {
   namespace
   {
-    [[nodiscard]] std::vector<std::uint32_t> Members(const moho::BVIntSet& set)
+    [[nodiscard]] std::vector<std::uint32_t> Members(
+      const moho::BVIntSet& set
+    )
     {
       std::vector<std::uint32_t> members;
       set.ForEachValue([&members](const unsigned int value) {
@@ -20,7 +22,10 @@ namespace faf::remote
       return members;
     }
 
-    void AssignMembers(moho::BVIntSet& set, const std::vector<std::uint32_t>& members)
+    void AssignMembers(
+      moho::BVIntSet& set,
+      const std::vector<std::uint32_t>& members
+    )
     {
       set = moho::BVIntSet{};
       for (const std::uint32_t member : members) {
@@ -29,14 +34,24 @@ namespace faf::remote
     }
   } // namespace
 
-  wire::SArmyRecord ArmyToWire(const moho::SSTIArmyVariableData& army)
+  wire::SArmyRecord ArmyToWire(
+    const moho::SSTIArmyVariableData& army
+  )
   {
     wire::SArmyRecord record;
     const moho::SEconTotals& economy = army.mEconomyTotals;
-    record.economy = {economy.mStored.ENERGY,           economy.mStored.MASS,           economy.mIncome.ENERGY,
-                      economy.mIncome.MASS,             economy.mReclaimed.ENERGY,      economy.mReclaimed.MASS,
-                      economy.mLastUseRequested.ENERGY, economy.mLastUseRequested.MASS, economy.mLastUseActual.ENERGY,
-                      economy.mLastUseActual.MASS};
+    record.economy = {
+      economy.mStored.ENERGY,
+      economy.mStored.MASS,
+      economy.mIncome.ENERGY,
+      economy.mIncome.MASS,
+      economy.mReclaimed.ENERGY,
+      economy.mReclaimed.MASS,
+      economy.mLastUseRequested.ENERGY,
+      economy.mLastUseRequested.MASS,
+      economy.mLastUseActual.ENERGY,
+      economy.mLastUseActual.MASS
+    };
     record.maxStorage = {economy.mMaxStorage.ENERGY, economy.mMaxStorage.MASS};
     record.resourceSharing = army.mIsResourceSharingEnabled;
     record.neutrals = Members(army.mNeutrals);
@@ -70,7 +85,11 @@ namespace faf::remote
     return record;
   }
 
-  void ArmyFromWire(const wire::SArmyRecord& record, moho::SSTIArmyVariableData& army, moho::RRuleGameRules* const rules)
+  void ArmyFromWire(
+    const wire::SArmyRecord& record,
+    moho::SSTIArmyVariableData& army,
+    moho::RRuleGameRules* const rules
+  )
   {
     moho::SEconTotals& economy = army.mEconomyTotals;
     economy.mStored = {record.economy[0], record.economy[1]};

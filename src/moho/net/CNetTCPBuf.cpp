@@ -82,7 +82,10 @@ u_short CNetTCPBuf::GetPeerPort()
  * What it does:
  * Reads bytes using blocking socket behavior.
  */
-size_t CNetTCPBuf::VirtRead(char* const buff, const size_t len)
+size_t CNetTCPBuf::VirtRead(
+  char* const buff,
+  const size_t len
+)
 {
   return Read(buff, len, true);
 }
@@ -94,7 +97,10 @@ size_t CNetTCPBuf::VirtRead(char* const buff, const size_t len)
  * What it does:
  * Reads bytes without blocking.
  */
-size_t CNetTCPBuf::VirtReadNonBlocking(char* const buf, const size_t len)
+size_t CNetTCPBuf::VirtReadNonBlocking(
+  char* const buf,
+  const size_t len
+)
 {
   return Read(buf, len, false);
 }
@@ -121,7 +127,10 @@ bool CNetTCPBuf::VirtAtEnd()
  * What it does:
  * Writes bytes into the pending send window or directly to socket.
  */
-void CNetTCPBuf::VirtWrite(const char* data, size_t size)
+void CNetTCPBuf::VirtWrite(
+  const char* data,
+  size_t size
+)
 {
   if (mSocket == platform::net::kInvalidSocket) {
     ThrowSocketClosed();
@@ -193,7 +202,9 @@ void CNetTCPBuf::VirtFlush()
  * What it does:
  * Shuts down selected socket directions and closes when both are off.
  */
-void CNetTCPBuf::VirtClose(const Mode mode)
+void CNetTCPBuf::VirtClose(
+  const Mode mode
+)
 {
   if (mSocket == platform::net::kInvalidSocket) {
     return;
@@ -229,7 +240,9 @@ void CNetTCPBuf::VirtClose(const Mode mode)
  * What it does:
  * Initializes stream pointers/mode around an already-connected socket.
  */
-CNetTCPBuf::CNetTCPBuf(const platform::net::Socket socket) noexcept
+CNetTCPBuf::CNetTCPBuf(
+  const platform::net::Socket socket
+) noexcept
   : INetTCPSocket()
   , mSocket(socket)
   , mMode(static_cast<std::uint32_t>(ModeBoth))
@@ -251,7 +264,11 @@ CNetTCPBuf::CNetTCPBuf(const platform::net::Socket socket) noexcept
  * What it does:
  * Shared buffered read routine used by blocking/non-blocking variants.
  */
-size_t CNetTCPBuf::Read(char* buf, size_t len, const bool isBlocking)
+size_t CNetTCPBuf::Read(
+  char* buf,
+  size_t len,
+  const bool isBlocking
+)
 {
   if (mSocket == platform::net::kInvalidSocket) {
     ThrowSocketClosed();

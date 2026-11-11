@@ -71,7 +71,7 @@ namespace moho
    */
   extern bool sim_ParallelRecon;
   extern bool sim_ParallelSync;
-  extern bool sim_ParallelCoords; // Sim.cpp: the coordinate pass on workers
+  extern bool sim_ParallelCoords;          // Sim.cpp: the coordinate pass on workers
   extern bool sim_ParallelUnitSyncRefresh; // Sim.cpp: units' own sync blocks refreshed on workers
 
   /**
@@ -127,17 +127,16 @@ namespace moho
 
     /// `Run` over a callable taking `(std::size_t begin, std::size_t end)`.
     template <class Body>
-    void ParallelFor(const std::size_t count, const std::size_t grain, Body&& body)
+    void ParallelFor(
+      const std::size_t count,
+      const std::size_t grain,
+      Body&& body
+    )
     {
       using BodyType = std::remove_reference_t<Body>;
-      Run(
-        count,
-        grain,
-        [](void* const context, const std::size_t begin, const std::size_t end) {
-          (*static_cast<BodyType*>(context))(begin, end);
-        },
-        const_cast<void*>(static_cast<const void*>(std::addressof(body)))
-      );
+      Run(count, grain, [](void* const context, const std::size_t begin, const std::size_t end) {
+        (*static_cast<BodyType*>(context))(begin, end);
+      }, const_cast<void*>(static_cast<const void*>(std::addressof(body))));
     }
 
   private:

@@ -1,6 +1,5 @@
 #include "moho/sim/SimPrivate.h"
 
-
 /**
  * Address: 0x00746790 (FUN_00746790, ??0CDebugCanvas@Moho@@QAE@XZ)
  *
@@ -17,7 +16,9 @@ CDebugCanvas::CDebugCanvas()
 /**
  * Address: 0x00452070 (FUN_00452070, Moho::CDebugCanvas::DebugDrawLine)
  */
-void CDebugCanvas::DebugDrawLine(const SDebugLine& line)
+void CDebugCanvas::DebugDrawLine(
+  const SDebugLine& line
+)
 {
   lines.push_back(line);
 }
@@ -47,7 +48,9 @@ void CDebugCanvas::AddText(
 /**
  * Address: 0x006531D0 (FUN_006531D0, helper used by Moho::RDebugWeapons::OnTick)
  */
-void CDebugCanvas::AddWorldText(const SDebugWorldText& text)
+void CDebugCanvas::AddWorldText(
+  const SDebugWorldText& text
+)
 {
   worldText.push_back(text);
 }
@@ -82,7 +85,11 @@ void CDebugCanvas::AddWireCircle(
 /**
  * Address: 0x0044FA70 (FUN_0044FA70, ?AddLine@CDebugCanvas@Moho@@QAEXABV?$Vector3@M@Wm3@@0I@Z)
  */
-void CDebugCanvas::AddLine(const Wm3::Vector3f& p0, const Wm3::Vector3f& p1, const std::uint32_t depth)
+void CDebugCanvas::AddLine(
+  const Wm3::Vector3f& p0,
+  const Wm3::Vector3f& p1,
+  const std::uint32_t depth
+)
 {
   SDebugLine line{};
   line.p0 = p0;
@@ -93,7 +100,8 @@ void CDebugCanvas::AddLine(const Wm3::Vector3f& p0, const Wm3::Vector3f& p1, con
 }
 
 /**
- * Address: 0x0044FD50 (FUN_0044FD50, ?AddContouredLine@CDebugCanvas@Moho@@QAEXABV?$Vector2@M@Wm3@@0IABVCHeightField@2@@Z)
+ * Address: 0x0044FD50 (FUN_0044FD50,
+ * ?AddContouredLine@CDebugCanvas@Moho@@QAEXABV?$Vector2@M@Wm3@@0IABVCHeightField@2@@Z)
  */
 void CDebugCanvas::AddContouredLine(
   const Wm3::Vector2f& p0,
@@ -261,7 +269,10 @@ void CDebugCanvas::AddWireCoords(
 /**
  * Address: 0x00450500 (FUN_00450500, ?AddWireCoords@CDebugCanvas@Moho@@QAEXABVVTransform@2@M@Z)
  */
-void CDebugCanvas::AddWireCoords(const VTransform& transform, const float axisLength)
+void CDebugCanvas::AddWireCoords(
+  const VTransform& transform,
+  const float axisLength
+)
 {
   (void)axisLength;
   AddWireCoords(transform.pos_, transform.orient_, 1.0f);
@@ -270,7 +281,10 @@ void CDebugCanvas::AddWireCoords(const VTransform& transform, const float axisLe
 /**
  * Address: 0x00450520 (FUN_00450520, ?AddWireBox@CDebugCanvas@Moho@@QAEXABV?$Box3@M@Wm3@@I@Z)
  */
-void CDebugCanvas::AddWireBox(const Wm3::Box3f& box, const std::uint32_t depth)
+void CDebugCanvas::AddWireBox(
+  const Wm3::Box3f& box,
+  const std::uint32_t depth
+)
 {
   const Wm3::Vector3f center{box.Center[0], box.Center[1], box.Center[2]};
   const Wm3::Vector3f axis0{box.Axis[0][0], box.Axis[0][1], box.Axis[0][2]};
@@ -342,11 +356,7 @@ void CDebugCanvas::AddParabolaClosedForm(
       const float nextY = startPoint.y + (horizontalDistance * direction.y) + yOffset;
       const float nextZ = startPoint.z + (horizontalDistance * direction.z);
 
-      AddLine(
-        {previousX, previousY, previousZ},
-        {nextX, nextY, nextZ},
-        static_cast<std::uint32_t>(0xFFFFFFFFu)
-      );
+      AddLine({previousX, previousY, previousZ}, {nextX, nextY, nextZ}, static_cast<std::uint32_t>(0xFFFFFFFFu));
 
       const float nextT = t + 0.1f;
       previousX = nextX;
@@ -373,8 +383,10 @@ void CDebugCanvas::AddParabolaStepped(
 {
   Wm3::Vector3f stepVelocity = velocityStep;
 
-  const float horizontalDistance =
-    std::sqrt(((endPoint.z - startPoint.z) * (endPoint.z - startPoint.z)) + ((endPoint.x - startPoint.x) * (endPoint.x - startPoint.x)));
+  const float horizontalDistance = std::sqrt(
+    ((endPoint.z - startPoint.z) * (endPoint.z - startPoint.z)) +
+    ((endPoint.x - startPoint.x) * (endPoint.x - startPoint.x))
+  );
   const float horizontalStepLength = std::sqrt((stepVelocity.z * stepVelocity.z) + (stepVelocity.x * stepVelocity.x));
   if (horizontalStepLength <= 0.0f) {
     return;
@@ -419,7 +431,6 @@ void CDebugCanvas::AddParabolaStepped(
     }
   }
 }
-
 
 /**
  * Address: 0x00451FB0 (FUN_00451FB0, ?Clear@CDebugCanvas@Moho@@QAEXXZ)

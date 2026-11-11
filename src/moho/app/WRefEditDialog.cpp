@@ -26,7 +26,9 @@ using namespace moho;
 
 namespace
 {
-  [[nodiscard]] IUnit* ResolveIUnitBridge(UserUnit* const unit) noexcept
+  [[nodiscard]] IUnit* ResolveIUnitBridge(
+    UserUnit* const unit
+  ) noexcept
   {
     return unit ? static_cast<IUnit*>(unit) : nullptr;
   }
@@ -63,10 +65,10 @@ namespace moho
      */
     CRefTreeItemData(const gpg::RRef& ref, bool editable, const fa::string& name);
 
-    gpg::RRef mRef;      // +0x08
-    bool mEditable;      // +0x10
+    gpg::RRef mRef;   // +0x08
+    bool mEditable;   // +0x10
     fa::string mName; // +0x14
-    bool mPopulated;     // +0x30
+    bool mPopulated;  // +0x30
   };
 
   static_assert(offsetof(CRefTreeItemData, mRef) == 0x08, "CRefTreeItemData::mRef offset must be 0x08");
@@ -186,37 +188,64 @@ namespace
 {
   // wxTR_ROW_LINES | wxTR_EDIT_LABELS on top of the watch panes' style: a
   // grid of rows whose labels can be edited.
-  constexpr long kRefTreeStyle = wxTR_HAS_BUTTONS | wxTR_LINES_AT_ROOT | wxTR_EDIT_LABELS | wxTR_ROW_LINES
-    | wxTR_HIDE_ROOT | wxTR_FULL_ROW_HIGHLIGHT;
+  constexpr long kRefTreeStyle = wxTR_HAS_BUTTONS | wxTR_LINES_AT_ROOT | wxTR_EDIT_LABELS | wxTR_ROW_LINES |
+    wxTR_HIDE_ROOT | wxTR_FULL_ROW_HIGHLIGHT;
 } // namespace
 
 // Table 0x00DFFB08 = {&wxDialog::sm_eventTable (0x00D540E8), rows 0x00F59378};
 // GetEventTable (0x004A3DA0) comes with it.
-BEGIN_EVENT_TABLE(moho::WRefEditDialog, wxDialog)
-  EVT_CLOSE(moho::WRefEditDialog::OnClose)
-  EVT_TREE_ITEM_EXPANDING(-1, moho::WRefEditDialog::OnItemExpanding)
-  EVT_TREE_ITEM_ACTIVATED(-1, moho::WRefEditDialog::OnItemActivated)
-  EVT_TREE_BEGIN_LABEL_EDIT(-1, moho::WRefEditDialog::OnBeginLabelEdit)
-  EVT_TREE_END_LABEL_EDIT(-1, moho::WRefEditDialog::OnEndLabelEdit)
+BEGIN_EVENT_TABLE(
+  moho::WRefEditDialog,
+  wxDialog
+)
+EVT_CLOSE(
+  moho::WRefEditDialog::OnClose
+)
+EVT_TREE_ITEM_EXPANDING(
+  -1,
+  moho::WRefEditDialog::OnItemExpanding
+)
+EVT_TREE_ITEM_ACTIVATED(
+  -1,
+  moho::WRefEditDialog::OnItemActivated
+)
+EVT_TREE_BEGIN_LABEL_EDIT(
+  -1,
+  moho::WRefEditDialog::OnBeginLabelEdit
+)
+EVT_TREE_END_LABEL_EDIT(
+  -1,
+  moho::WRefEditDialog::OnEndLabelEdit
+)
 END_EVENT_TABLE()
 
 /**
  * Address: 0x004A3CB0 (FUN_004A3CB0)
  */
-moho::CRefTreeItemData::CRefTreeItemData(const gpg::RRef& ref, const bool editable, const fa::string& name)
+moho::CRefTreeItemData::CRefTreeItemData(
+  const gpg::RRef& ref,
+  const bool editable,
+  const fa::string& name
+)
   : mRef(ref)
   , mEditable(editable)
   , mName(name)
   , mPopulated(false)
-{
-}
+{}
 
 /**
  * Address: 0x004A3DB0 (FUN_004A3DB0, ??0WRefEditDialog@Moho@@QAE@@Z)
  */
-moho::WRefEditDialog::WRefEditDialog(const gpg::RRef& ref, const char* const name)
+moho::WRefEditDialog::WRefEditDialog(
+  const gpg::RRef& ref,
+  const char* const name
+)
   : wxDialog(
-      nullptr, -1, wxString(name, wxConvUTF8), wxDefaultPosition, wxSize(640, 480),
+      nullptr,
+      -1,
+      wxString(name, wxConvUTF8),
+      wxDefaultPosition,
+      wxSize(640, 480),
       wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER
     )
 {
@@ -236,7 +265,10 @@ moho::WRefEditDialog::WRefEditDialog(const gpg::RRef& ref, const char* const nam
  * Address: 0x004A4110 (FUN_004A4110)
  */
 wxTreeItemId moho::WRefEditDialog::AddItem(
-  const wxTreeItemId& parent, const fa::string& name, const gpg::RRef& ref, const bool editable
+  const wxTreeItemId& parent,
+  const fa::string& name,
+  const gpg::RRef& ref,
+  const bool editable
 )
 {
   const wxString label(name.c_str(), wxConvUTF8);
@@ -258,7 +290,10 @@ wxTreeItemId moho::WRefEditDialog::AddItem(
 /**
  * Address: 0x004A4260 (FUN_004A4260)
  */
-void moho::WRefEditDialog::AddChildren(const wxTreeItemId& parent, const gpg::RRef& ref)
+void moho::WRefEditDialog::AddChildren(
+  const wxTreeItemId& parent,
+  const gpg::RRef& ref
+)
 {
   const int fieldCount = ref.GetNumFields();
   for (int i = 0; i < fieldCount; ++i) {
@@ -282,7 +317,9 @@ void moho::WRefEditDialog::AddChildren(const wxTreeItemId& parent, const gpg::RR
 /**
  * Address: 0x004A45C0 (FUN_004A45C0)
  */
-void moho::WRefEditDialog::SetValue(const wxString& value)
+void moho::WRefEditDialog::SetValue(
+  const wxString& value
+)
 {
   const CRefTreeItemData* const data = static_cast<CRefTreeItemData*>(mTree->GetItemData(mActiveItem));
   const fa::string text = gpg::STR_WideToUtf8(value.c_str());
@@ -293,7 +330,9 @@ void moho::WRefEditDialog::SetValue(const wxString& value)
 /**
  * Address: 0x004A4530 (FUN_004A4530)
  */
-void moho::WRefEditDialog::OnClose(wxCloseEvent& event)
+void moho::WRefEditDialog::OnClose(
+  wxCloseEvent& event
+)
 {
   Destroy();
 }
@@ -301,7 +340,9 @@ void moho::WRefEditDialog::OnClose(wxCloseEvent& event)
 /**
  * Address: 0x004A4540 (FUN_004A4540)
  */
-void moho::WRefEditDialog::OnItemExpanding(wxTreeEvent& event)
+void moho::WRefEditDialog::OnItemExpanding(
+  wxTreeEvent& event
+)
 {
   const wxTreeItemId item = event.GetItem();
   CRefTreeItemData* const data = static_cast<CRefTreeItemData*>(mTree->GetItemData(item));
@@ -314,7 +355,9 @@ void moho::WRefEditDialog::OnItemExpanding(wxTreeEvent& event)
 /**
  * Address: 0x004A4580 (FUN_004A4580)
  */
-void moho::WRefEditDialog::OnItemActivated(wxTreeEvent& event)
+void moho::WRefEditDialog::OnItemActivated(
+  wxTreeEvent& event
+)
 {
   const wxTreeItemId item = event.GetItem();
   const CRefTreeItemData* const data = static_cast<CRefTreeItemData*>(mTree->GetItemData(item));
@@ -326,7 +369,9 @@ void moho::WRefEditDialog::OnItemActivated(wxTreeEvent& event)
 /**
  * Address: 0x004A46E0 (FUN_004A46E0)
  */
-void moho::WRefEditDialog::OnBeginLabelEdit(wxTreeEvent& event)
+void moho::WRefEditDialog::OnBeginLabelEdit(
+  wxTreeEvent& event
+)
 {
   const CRefTreeItemData* const data = static_cast<CRefTreeItemData*>(mTree->GetItemData(event.GetItem()));
   if (!data->mEditable) {
@@ -337,7 +382,9 @@ void moho::WRefEditDialog::OnBeginLabelEdit(wxTreeEvent& event)
 /**
  * Address: 0x004A4710 (FUN_004A4710)
  */
-void moho::WRefEditDialog::OnEndLabelEdit(wxTreeEvent& event)
+void moho::WRefEditDialog::OnEndLabelEdit(
+  wxTreeEvent& event
+)
 {
   const CRefTreeItemData* const data = static_cast<CRefTreeItemData*>(mTree->GetItemData(event.GetItem()));
   if (!event.IsEditCancelled()) {
@@ -349,7 +396,10 @@ void moho::WRefEditDialog::OnEndLabelEdit(wxTreeEvent& event)
  * Address: 0x004A47C0 (FUN_004A47C0, ?REF_CreateEditDialog@Moho@@YAXPAVwxWindow@@ABVRRef@gpg@@PBD_N@Z)
  */
 void moho::REF_CreateEditDialog(
-  [[maybe_unused]] wxWindow* const parent, const gpg::RRef& ref, const char* const name, const bool
+  [[maybe_unused]] wxWindow* const parent,
+  const gpg::RRef& ref,
+  const char* const name,
+  const bool
 )
 {
   WRefEditDialog* const dialog = new WRefEditDialog(ref, name);

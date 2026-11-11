@@ -23,7 +23,9 @@ namespace faf::editor
 
     /** The units' entities, each with the action. */
     template <class Action>
-    void EachUnit(Action&& action)
+    void EachUnit(
+      Action&& action
+    )
     {
       moho::CWldSession* const session = moho::WLD_GetActiveSession();
       if (session == nullptr) {
@@ -69,12 +71,16 @@ namespace faf::editor
     return units;
   }
 
-  void SetLiveUnitsHidden(const bool hidden)
+  void SetLiveUnitsHidden(
+    const bool hidden
+  )
   {
     gHidden = hidden;
   }
 
-  std::string ToggleName(const std::string& cap)
+  std::string ToggleName(
+    const std::string& cap
+  )
   {
     std::string name = cap;
     if (name.rfind("RULEUTC_", 0) == 0) {
@@ -86,7 +92,9 @@ namespace faf::editor
     return name;
   }
 
-  LiveUnitInfo ReadLiveUnit(const std::uint32_t id)
+  LiveUnitInfo ReadLiveUnit(
+    const std::uint32_t id
+  )
   {
     LiveUnitInfo info;
     moho::CWldSession* const session = moho::WLD_GetActiveSession();
@@ -95,7 +103,10 @@ namespace faf::editor
     }
     // The game's UI Lua reads it as its interface does; the result as lines, read back as one string.
     char script[3000];
-    (void)std::snprintf(script, sizeof(script), R"lua(
+    (void)std::snprintf(
+      script,
+      sizeof(script),
+      R"lua(
 __EditorLiveUnit = ''
 local u = GetUnitById('%u')
 if u and not u:IsDead() then
@@ -135,7 +146,8 @@ if u and not u:IsDead() then
     __EditorLiveUnit = table.concat(out, '\n')
 end
 )lua",
-                        id);
+      id
+    );
     if (!moho::SCR_LuaDoString(script, session->mState)) {
       return info;
     }
@@ -192,10 +204,14 @@ end
     return info;
   }
 
-  void LiveUnitDo(const std::uint32_t id, const std::string& lua)
+  void LiveUnitDo(
+    const std::uint32_t id,
+    const std::string& lua
+  )
   {
     // SimLua (a sim console command, the play's cheats on): one line, the unit found by its id.
-    std::string command = "SimLua local u = GetEntityById(" + std::to_string(id) + ") if u and not u:IsDead() then " + lua + " end";
+    std::string command =
+      "SimLua local u = GetEntityById(" + std::to_string(id) + ") if u and not u:IsDead() then " + lua + " end";
     for (char& c : command) {
       if (c == '\n' || c == '\r') {
         c = ' ';
@@ -205,11 +221,22 @@ end
     gpg::Logf("editor: live unit %u: %s", id, lua.c_str());
   }
 
-  void LiveUnitWarp(const std::uint32_t id, const float x, const float z)
+  void LiveUnitWarp(
+    const std::uint32_t id,
+    const float x,
+    const float z
+  )
   {
     char lua[200];
-    (void)std::snprintf(lua, sizeof(lua), "Warp(u, {%g, GetSurfaceHeight(%g, %g), %g})", static_cast<double>(x), static_cast<double>(x),
-                        static_cast<double>(z), static_cast<double>(z));
+    (void)std::snprintf(
+      lua,
+      sizeof(lua),
+      "Warp(u, {%g, GetSurfaceHeight(%g, %g), %g})",
+      static_cast<double>(x),
+      static_cast<double>(x),
+      static_cast<double>(z),
+      static_cast<double>(z)
+    );
     LiveUnitDo(id, lua);
   }
 } // namespace faf::editor

@@ -94,7 +94,9 @@ namespace moho
    * What it does:
    * Registers reflected lanes for all `SFootprint` members in binary order.
    */
-  void SFootprintTypeInfo::AddFields(gpg::RType* const typeInfo)
+  void SFootprintTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
     GPG_ASSERT(typeInfo != nullptr);
     GPG_ASSERT(!typeInfo->initFinished_);
@@ -112,7 +114,9 @@ namespace moho
    * What it does:
    * Loads the footprint fields in the exact binary archive order.
    */
-  void SFootprint::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SFootprint::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     archive->ReadUByte(&mSizeX);
@@ -129,7 +133,9 @@ namespace moho
    * What it does:
    * Writes the footprint fields in the exact binary archive order.
    */
-  void SFootprint::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SFootprint::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     archive->WriteUByte(mSizeX);
@@ -157,10 +163,12 @@ namespace
 {
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SFootprintTypeInfo_d68759, moho::register_SFootprintTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SFootprintTypeInfo_d68759,
+  moho::register_SFootprintTypeInfo
+)
 
 namespace moho
 {

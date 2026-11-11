@@ -72,9 +72,7 @@ namespace moho
     FormatHandle mFormat; // +0x04
   };
 
-  static_assert(
-    sizeof(CD3DVertexFormat::FormatHandle) == 0x08, "CD3DVertexFormat::FormatHandle size must be 0x08"
-  );
+  static_assert(sizeof(CD3DVertexFormat::FormatHandle) == 0x08, "CD3DVertexFormat::FormatHandle size must be 0x08");
   static_assert(offsetof(CD3DVertexFormat, mFormat) == 0x04, "CD3DVertexFormat::mFormat offset must be 0x04");
   static_assert(sizeof(CD3DVertexFormat) == 0x0C, "CD3DVertexFormat size must be 0x0C");
 } // namespace moho

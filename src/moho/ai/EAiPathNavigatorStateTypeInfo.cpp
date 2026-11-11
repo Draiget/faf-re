@@ -130,9 +130,14 @@ namespace
   [[maybe_unused]] EAiPathNavigatorStateTypeInfoBootstrap gEAiPathNavigatorStateTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EAiPathNavigatorStateTypeInfo_5c34f8, moho::register_EAiPathNavigatorStateTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EAiPathNavigatorStateTypeInfo_5c34f8,
+  moho::register_EAiPathNavigatorStateTypeInfo
+)
 
-GPG_PREREGISTER_INIT(AcquireEAiPathNavigatorStateTypeInfo_5c34f8, AcquireEAiPathNavigatorStateTypeInfo)
+GPG_PREREGISTER_INIT(
+  AcquireEAiPathNavigatorStateTypeInfo_5c34f8,
+  AcquireEAiPathNavigatorStateTypeInfo
+)

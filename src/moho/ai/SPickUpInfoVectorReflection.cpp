@@ -41,8 +41,8 @@ namespace
  */
 const char* gpg::RVectorType_SPickUpInfo::GetName() const
 {
-    static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::SPickUpInfo>()->GetName());
-    return sName.c_str();
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::SPickUpInfo>()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -52,7 +52,9 @@ const char* gpg::RVectorType_SPickUpInfo::GetName() const
  * Returns base lexical text plus reflected vector size for one
  * `vector<moho::SPickUpInfo>` instance.
  */
-fa::string gpg::RVectorType_SPickUpInfo::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_SPickUpInfo::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -149,7 +151,10 @@ void gpg::RVectorType_SPickUpInfo::SerSave(
  * Wraps `&vec[ind]` (a `moho::SPickUpInfo*` slot at stride 12) as one
  * `gpg::RRef_SPickUpInfo` reference.
  */
-gpg::RRef gpg::RVectorType_SPickUpInfo::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType_SPickUpInfo::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   gpg::RRef out{};
 
@@ -168,7 +173,9 @@ gpg::RRef gpg::RVectorType_SPickUpInfo::SubscriptIndex(void* const obj, const in
  * What it does:
  * Returns the vector element count `(last_ - first_) / sizeof(SPickUpInfo)`.
  */
-size_t gpg::RVectorType_SPickUpInfo::GetCount(void* const obj) const
+size_t gpg::RVectorType_SPickUpInfo::GetCount(
+  void* const obj
+) const
 {
   const auto* const storage = static_cast<const fa::vector<moho::SPickUpInfo>*>(obj);
   return storage ? storage->size() : 0u;
@@ -181,7 +188,10 @@ size_t gpg::RVectorType_SPickUpInfo::GetCount(void* const obj) const
  * `resize(count, SPickUpInfo())` (0x006276F0): the default entry is built on
  * the stack as the by-value fill argument. Nothing is null-tested.
  */
-void gpg::RVectorType_SPickUpInfo::SetCount(void* const obj, const int count) const
+void gpg::RVectorType_SPickUpInfo::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   static_cast<fa::vector<moho::SPickUpInfo>*>(obj)->resize(static_cast<std::size_t>(count), moho::SPickUpInfo());
 }
@@ -223,5 +233,11 @@ void moho::register_VectorSPickUpInfoType()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_VectorSPickUpInfoType_37b846, moho::preregister_VectorSPickUpInfoType)
-GPG_PREREGISTER_INIT(register_VectorSPickUpInfoType_37b846, moho::register_VectorSPickUpInfoType)
+GPG_PREREGISTER_INIT(
+  preregister_VectorSPickUpInfoType_37b846,
+  moho::preregister_VectorSPickUpInfoType
+)
+GPG_PREREGISTER_INIT(
+  register_VectorSPickUpInfoType_37b846,
+  moho::register_VectorSPickUpInfoType
+)

@@ -58,7 +58,9 @@ namespace moho
   /**
    * Address: 0x004454B0 (FUN_004454B0, Moho::RD3DTextureResourceTypeInfo::AddBase_ID3DTextureSheet)
    */
-  void RD3DTextureResourceTypeInfo::AddBase_ID3DTextureSheet(gpg::RType* const typeInfo)
+  void RD3DTextureResourceTypeInfo::AddBase_ID3DTextureSheet(
+    gpg::RType* const typeInfo
+  )
   {
     resource_reflection::AddBase(typeInfo, resource_reflection::ResolveID3DTextureSheetType());
   }
@@ -88,10 +90,12 @@ namespace
   [[maybe_unused]] RD3DTextureResourceTypeInfoBootstrap gRD3DTextureResourceTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RD3DTextureResourceTypeInfo_5d5a4d, moho::register_RD3DTextureResourceTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_RD3DTextureResourceTypeInfo_5d5a4d,
+  moho::register_RD3DTextureResourceTypeInfo
+)
 
 // Moved from moho/resource/ResourceReflectionHelpers.cpp (plan WPL.4): the reflected
 // types of the render device's texture resources, which only render code resolves.

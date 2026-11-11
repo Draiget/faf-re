@@ -52,7 +52,9 @@ namespace
    * Releases backing storage for one saved-game-army-info vector lane and
    * resets begin/end/capacity pointers to null.
    */
-  [[maybe_unused]] void ReleaseSavedGameArmyInfoVectorStorage(fa::vector<moho::SSavedGameArmyInfo>& storage)
+  [[maybe_unused]] void ReleaseSavedGameArmyInfoVectorStorage(
+    fa::vector<moho::SSavedGameArmyInfo>& storage
+  )
   {
     // Per-element destructor sweep, free, then null all three lanes: VC8
     // _Tidy(), which is what move-assigning an empty vector compiles to.
@@ -66,7 +68,12 @@ namespace
    * Reads vector count, deserializes each SSavedGameArmyInfo element, and
    * replaces the destination vector.
    */
-  void LoadSavedGameArmyInfoVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
+  void LoadSavedGameArmyInfoVector(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef*
+  )
   {
     auto* const storage = reinterpret_cast<fa::vector<moho::SSavedGameArmyInfo>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -120,7 +127,12 @@ namespace
    * What it does:
    * Writes vector count and serializes each SSavedGameArmyInfo element.
    */
-  void SaveSavedGameArmyInfoVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveSavedGameArmyInfoVector(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const storage = reinterpret_cast<fa::vector<moho::SSavedGameArmyInfo>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -198,14 +210,16 @@ gpg::RVectorType_SSavedGameArmyInfo::~RVectorType_SSavedGameArmyInfo() = default
  */
 const char* gpg::RVectorType_SSavedGameArmyInfo::GetName() const
 {
-    static const fa::string sName = gpg::STR_Printf("vector<%s>", moho::SSavedGameArmyInfo::StaticGetClass()->GetName());
-    return sName.c_str();
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", moho::SSavedGameArmyInfo::StaticGetClass()->GetName());
+  return sName.c_str();
 }
 
 /**
  * Address: 0x008821C0 (FUN_008821C0)
  */
-fa::string gpg::RVectorType_SSavedGameArmyInfo::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_SSavedGameArmyInfo::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -233,7 +247,10 @@ void gpg::RVectorType_SSavedGameArmyInfo::Init()
 /**
  * Address: 0x008822C0 (FUN_008822C0)
  */
-gpg::RRef gpg::RVectorType_SSavedGameArmyInfo::SubscriptIndex(void* obj, const int ind) const
+gpg::RRef gpg::RVectorType_SSavedGameArmyInfo::SubscriptIndex(
+  void* obj,
+  const int ind
+) const
 {
   auto* const storage = static_cast<fa::vector<moho::SSavedGameArmyInfo>*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -255,7 +272,9 @@ gpg::RRef gpg::RVectorType_SSavedGameArmyInfo::SubscriptIndex(void* obj, const i
 /**
  * Address: 0x00882260 (FUN_00882260)
  */
-size_t gpg::RVectorType_SSavedGameArmyInfo::GetCount(void* obj) const
+size_t gpg::RVectorType_SSavedGameArmyInfo::GetCount(
+  void* obj
+) const
 {
   auto* const storage = static_cast<fa::vector<moho::SSavedGameArmyInfo>*>(obj);
   return storage ? storage->size() : 0u;
@@ -264,7 +283,10 @@ size_t gpg::RVectorType_SSavedGameArmyInfo::GetCount(void* obj) const
 /**
  * Address: 0x00882290 (FUN_00882290)
  */
-void gpg::RVectorType_SSavedGameArmyInfo::SetCount(void* obj, const int count) const
+void gpg::RVectorType_SSavedGameArmyInfo::SetCount(
+  void* obj,
+  const int count
+) const
 {
   auto* const storage = static_cast<fa::vector<moho::SSavedGameArmyInfo>*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -279,7 +301,10 @@ void gpg::RVectorType_SSavedGameArmyInfo::SetCount(void* obj, const int count) c
 /**
  * Address: 0x00884040 (FUN_00884040)
  */
-gpg::RRef* gpg::RRef_SSavedGameArmyInfo(gpg::RRef* outRef, moho::SSavedGameArmyInfo* value)
+gpg::RRef* gpg::RRef_SSavedGameArmyInfo(
+  gpg::RRef* outRef,
+  moho::SSavedGameArmyInfo* value
+)
 {
   if (!outRef) {
     return nullptr;
@@ -290,7 +315,9 @@ gpg::RRef* gpg::RRef_SSavedGameArmyInfo(gpg::RRef* outRef, moho::SSavedGameArmyI
   return outRef;
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_SSavedGameArmyInfoVectorTypeStartup_7c867d, gpg::preregister_SSavedGameArmyInfoVectorTypeStartup)
+GPG_PREREGISTER_INIT(
+  preregister_SSavedGameArmyInfoVectorTypeStartup_7c867d,
+  gpg::preregister_SSavedGameArmyInfoVectorTypeStartup
+)

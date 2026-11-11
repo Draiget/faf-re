@@ -14,7 +14,10 @@ namespace
 {
   using faf::editor::NewMapSettings;
 
-  TEST(NewMap, SpawnsFormARingInsideTheMap)
+  TEST(
+    NewMap,
+    SpawnsFormARingInsideTheMap
+  )
   {
     NewMapSettings settings;
     settings.size = 1; // 512
@@ -30,7 +33,10 @@ namespace
     EXPECT_FLOAT_EQ(faf::editor::NewMapSpawns(settings)[0].x, 256.0f);
   }
 
-  TEST(NewMap, ScenarioAndSaveNameEveryArmy)
+  TEST(
+    NewMap,
+    ScenarioAndSaveNameEveryArmy
+  )
   {
     NewMapSettings settings;
     settings.folder = "test_map.v0001";
@@ -46,7 +52,10 @@ namespace
     EXPECT_EQ(save.find("['ARMY_4']"), std::string::npos);
   }
 
-  TEST(NewMap, PreviewChunkHasTheGamesLayout)
+  TEST(
+    NewMap,
+    PreviewChunkHasTheGamesLayout
+  )
   {
     NewMapSettings settings;
     settings.size = 2; // 1024

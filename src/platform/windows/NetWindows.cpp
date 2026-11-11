@@ -49,43 +49,69 @@ namespace platform::net
     return ::WSAGetLastError();
   }
 
-  Socket OpenSocket(const int family, const int type, const int protocol) noexcept
+  Socket OpenSocket(
+    const int family,
+    const int type,
+    const int protocol
+  ) noexcept
   {
     return ::socket(family, type, protocol);
   }
 
-  int CloseSocket(const Socket socket) noexcept
+  int CloseSocket(
+    const Socket socket
+  ) noexcept
   {
     return ::closesocket(socket);
   }
 
-  int SetNonBlocking(const Socket socket) noexcept
+  int SetNonBlocking(
+    const Socket socket
+  ) noexcept
   {
     u_long nonBlocking = 1;
     return ::ioctlsocket(socket, FIONBIO, &nonBlocking);
   }
 
-  int SetOption(const Socket socket, const int level, const int name, const void* const value, const int length) noexcept
+  int SetOption(
+    const Socket socket,
+    const int level,
+    const int name,
+    const void* const value,
+    const int length
+  ) noexcept
   {
     return ::setsockopt(socket, level, name, static_cast<const char*>(value), length);
   }
 
-  int Bind(const Socket socket, const sockaddr_in& address) noexcept
+  int Bind(
+    const Socket socket,
+    const sockaddr_in& address
+  ) noexcept
   {
     return ::bind(socket, reinterpret_cast<const sockaddr*>(&address), static_cast<int>(sizeof(address)));
   }
 
-  int Listen(const Socket socket, const int backlog) noexcept
+  int Listen(
+    const Socket socket,
+    const int backlog
+  ) noexcept
   {
     return ::listen(socket, backlog);
   }
 
-  int Connect(const Socket socket, const sockaddr_in& address) noexcept
+  int Connect(
+    const Socket socket,
+    const sockaddr_in& address
+  ) noexcept
   {
     return ::connect(socket, reinterpret_cast<const sockaddr*>(&address), static_cast<int>(sizeof(address)));
   }
 
-  Socket Accept(const Socket listener, sockaddr_in* const address) noexcept
+  Socket Accept(
+    const Socket listener,
+    sockaddr_in* const address
+  ) noexcept
   {
     sockaddr_in ignored{};
     sockaddr_in* const out = address != nullptr ? address : &ignored;
@@ -93,45 +119,74 @@ namespace platform::net
     return ::accept(listener, reinterpret_cast<sockaddr*>(out), &addressLen);
   }
 
-  int Send(const Socket socket, const char* const data, const int length) noexcept
+  int Send(
+    const Socket socket,
+    const char* const data,
+    const int length
+  ) noexcept
   {
     return ::send(socket, data, length, 0);
   }
 
-  int Recv(const Socket socket, char* const buffer, const int length) noexcept
+  int Recv(
+    const Socket socket,
+    char* const buffer,
+    const int length
+  ) noexcept
   {
     return ::recv(socket, buffer, length, 0);
   }
 
-  int SendTo(const Socket socket, const char* const data, const int length, const sockaddr_in& to) noexcept
+  int SendTo(
+    const Socket socket,
+    const char* const data,
+    const int length,
+    const sockaddr_in& to
+  ) noexcept
   {
     return ::sendto(socket, data, length, 0, reinterpret_cast<const sockaddr*>(&to), static_cast<int>(sizeof(to)));
   }
 
-  int RecvFrom(const Socket socket, char* const buffer, const int length, sockaddr_in* const from) noexcept
+  int RecvFrom(
+    const Socket socket,
+    char* const buffer,
+    const int length,
+    sockaddr_in* const from
+  ) noexcept
   {
     int fromLen = static_cast<int>(sizeof(*from));
     return ::recvfrom(socket, buffer, length, 0, reinterpret_cast<sockaddr*>(from), &fromLen);
   }
 
-  int Shutdown(const Socket socket, const ShutdownHow how) noexcept
+  int Shutdown(
+    const Socket socket,
+    const ShutdownHow how
+  ) noexcept
   {
     return ::shutdown(socket, how == ShutdownHow::kSend ? SD_SEND : SD_RECEIVE);
   }
 
-  int GetLocalAddress(const Socket socket, sockaddr_in* const address) noexcept
+  int GetLocalAddress(
+    const Socket socket,
+    sockaddr_in* const address
+  ) noexcept
   {
     int nameLen = static_cast<int>(sizeof(*address));
     return ::getsockname(socket, reinterpret_cast<sockaddr*>(address), &nameLen);
   }
 
-  int GetPeerAddress(const Socket socket, sockaddr_in* const address) noexcept
+  int GetPeerAddress(
+    const Socket socket,
+    sockaddr_in* const address
+  ) noexcept
   {
     int nameLen = static_cast<int>(sizeof(*address));
     return ::getpeername(socket, reinterpret_cast<sockaddr*>(address), &nameLen);
   }
 
-  int PollReadable(const Socket socket) noexcept
+  int PollReadable(
+    const Socket socket
+  ) noexcept
   {
     fd_set readFds{};
     readFds.fd_count = 1;
@@ -142,7 +197,9 @@ namespace platform::net
     return ::select(1, &readFds, nullptr, nullptr, &timeout);
   }
 
-  ConnectPoll PollConnect(const Socket socket) noexcept
+  ConnectPoll PollConnect(
+    const Socket socket
+  ) noexcept
   {
     fd_set writeFds{};
     writeFds.fd_count = 1;
@@ -171,27 +228,40 @@ namespace platform::net
     return ::WSACreateEvent();
   }
 
-  bool CloseSocketEvent(const EventHandle event) noexcept
+  bool CloseSocketEvent(
+    const EventHandle event
+  ) noexcept
   {
     return ::WSACloseEvent(event) != FALSE;
   }
 
-  bool SignalSocketEvent(const EventHandle event) noexcept
+  bool SignalSocketEvent(
+    const EventHandle event
+  ) noexcept
   {
     return ::WSASetEvent(event) != FALSE;
   }
 
-  bool ResetSocketEvent(const EventHandle event) noexcept
+  bool ResetSocketEvent(
+    const EventHandle event
+  ) noexcept
   {
     return ::WSAResetEvent(event) != FALSE;
   }
 
-  int SelectSocketEvents(const Socket socket, const EventHandle event, const long interest) noexcept
+  int SelectSocketEvents(
+    const Socket socket,
+    const EventHandle event,
+    const long interest
+  ) noexcept
   {
     return ::WSAEventSelect(socket, static_cast<WSAEVENT>(event), interest);
   }
 
-  void WaitSocketEvent(EventHandle event, const std::uint32_t timeoutMs) noexcept
+  void WaitSocketEvent(
+    EventHandle event,
+    const std::uint32_t timeoutMs
+  ) noexcept
   {
     ::WSAWaitForMultipleEvents(1, &event, false, static_cast<DWORD>(timeoutMs), true);
   }

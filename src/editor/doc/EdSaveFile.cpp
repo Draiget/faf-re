@@ -11,7 +11,10 @@ namespace faf::editor
   namespace
   {
     /** Skips whitespace and Lua comments (`-- ...`, `--[[ ... ]]`, the saves' `--[[ ]]--` banners) from `at`. */
-    std::size_t SkipSpace(const std::string& text, std::size_t at)
+    std::size_t SkipSpace(
+      const std::string& text,
+      std::size_t at
+    )
     {
       for (;;) {
         while (at < text.size() && std::isspace(static_cast<unsigned char>(text[at])) != 0) {
@@ -34,7 +37,10 @@ namespace faf::editor
     }
 
     /** The end of a quoted string starting at `at` (its quote), past the closing quote. */
-    std::size_t SkipString(const std::string& text, std::size_t at)
+    std::size_t SkipString(
+      const std::string& text,
+      std::size_t at
+    )
     {
       const char quote = text[at];
       for (++at; at < text.size(); ++at) {
@@ -48,7 +54,10 @@ namespace faf::editor
     }
 
     /** The matching closer of the bracket at `at` ('{' or '('), skipping strings and comments; npos if none. */
-    std::size_t MatchBracket(const std::string& text, std::size_t at)
+    std::size_t MatchBracket(
+      const std::string& text,
+      std::size_t at
+    )
     {
       int depth = 0;
       while (at < text.size()) {
@@ -74,7 +83,11 @@ namespace faf::editor
     }
 
     /** `['key']`, `["key"]` or a bare `key` at `at`; the name, and `at` past it. */
-    bool ReadKey(const std::string& text, std::size_t& at, std::string& key)
+    bool ReadKey(
+      const std::string& text,
+      std::size_t& at,
+      std::string& key
+    )
     {
       at = SkipSpace(text, at);
       if (at < text.size() && text[at] == '[') {
@@ -100,7 +113,10 @@ namespace faf::editor
     }
 
     /** A value's text from `at` to the ',' or '}' that ends it at its own depth; `at` left on that character. */
-    std::string ReadValue(const std::string& text, std::size_t& at)
+    std::string ReadValue(
+      const std::string& text,
+      std::size_t& at
+    )
     {
       at = SkipSpace(text, at);
       const std::size_t start = at;
@@ -125,8 +141,14 @@ namespace faf::editor
     }
 
     /** The entries `['name'] = { ['key'] = value, ... },` between `open` ('{') and `close`. */
-    bool ParseEntries(const std::string& text, const std::size_t open, const std::size_t close, std::vector<SaveEntry>& out, std::string& error,
-                      std::vector<SaveEntrySpan>* spans = nullptr)
+    bool ParseEntries(
+      const std::string& text,
+      const std::size_t open,
+      const std::size_t close,
+      std::vector<SaveEntry>& out,
+      std::string& error,
+      std::vector<SaveEntrySpan>* spans = nullptr
+    )
     {
       out.clear();
       if (spans != nullptr) {
@@ -202,7 +224,14 @@ namespace faf::editor
     }
 
     /** The block `<name> = {` (after `after`), its braces and its entries' indent. */
-    bool FindBlock(const std::string& text, const std::regex& opening, const std::size_t after, std::size_t& open, std::size_t& close, int& indent)
+    bool FindBlock(
+      const std::string& text,
+      const std::regex& opening,
+      const std::size_t after,
+      std::size_t& open,
+      std::size_t& close,
+      int& indent
+    )
     {
       std::smatch match;
       const auto begin = text.begin() + static_cast<std::ptrdiff_t>(after);
@@ -226,7 +255,9 @@ namespace faf::editor
       return true;
     }
 
-    std::string Quote(const std::string& text)
+    std::string Quote(
+      const std::string& text
+    )
     {
       std::string out = "'";
       for (const char c : text) {
@@ -238,7 +269,9 @@ namespace faf::editor
       return out + "'";
     }
 
-    std::string Number(const double value)
+    std::string Number(
+      const double value
+    )
     {
       char text[48];
       (void)std::snprintf(text, sizeof(text), "%.9g", value);
@@ -246,7 +279,9 @@ namespace faf::editor
     }
   } // namespace
 
-  std::string SaveEntry::Get(const std::string& key) const
+  std::string SaveEntry::Get(
+    const std::string& key
+  ) const
   {
     for (const auto& [k, value] : properties) {
       if (k == key) {
@@ -256,7 +291,10 @@ namespace faf::editor
     return {};
   }
 
-  void SaveEntry::Set(const std::string& key, const std::string& value)
+  void SaveEntry::Set(
+    const std::string& key,
+    const std::string& value
+  )
   {
     for (auto& [k, v] : properties) {
       if (k == key) {
@@ -267,7 +305,9 @@ namespace faf::editor
     properties.emplace_back(key, value);
   }
 
-  std::vector<double> ValueNumbers(const std::string& value)
+  std::vector<double> ValueNumbers(
+    const std::string& value
+  )
   {
     std::vector<double> numbers;
     const std::size_t open = value.find('(');
@@ -290,7 +330,9 @@ namespace faf::editor
     return numbers;
   }
 
-  std::string ValueString(const std::string& value)
+  std::string ValueString(
+    const std::string& value
+  )
   {
     const std::size_t open = value.find_first_of("'\"");
     if (open == std::string::npos) {
@@ -300,34 +342,52 @@ namespace faf::editor
     return value.substr(open + 1, end - open - 2);
   }
 
-  std::string Vector3Value(const double x, const double y, const double z)
+  std::string Vector3Value(
+    const double x,
+    const double y,
+    const double z
+  )
   {
     return "VECTOR3( " + Number(x) + ", " + Number(y) + ", " + Number(z) + " )";
   }
 
-  std::string RectangleValue(const double x0, const double y0, const double x1, const double y1)
+  std::string RectangleValue(
+    const double x0,
+    const double y0,
+    const double x1,
+    const double y1
+  )
   {
     return "RECTANGLE( " + Number(x0) + ", " + Number(y0) + ", " + Number(x1) + ", " + Number(y1) + " )";
   }
 
-  std::string StringValue(const std::string& text)
+  std::string StringValue(
+    const std::string& text
+  )
   {
     return "STRING( " + Quote(text) + " )";
   }
 
-  std::string FloatValue(const double value)
+  std::string FloatValue(
+    const double value
+  )
   {
     char text[64];
     (void)std::snprintf(text, sizeof(text), "FLOAT( %.6f )", value);
     return text;
   }
 
-  std::string BooleanValue(const bool value)
+  std::string BooleanValue(
+    const bool value
+  )
   {
     return value ? "BOOLEAN( true )" : "BOOLEAN( false )";
   }
 
-  bool SaveFile::Parse(std::string text, std::string& error)
+  bool SaveFile::Parse(
+    std::string text,
+    std::string& error
+  )
   {
     mText = std::move(text);
     mMarkerBlock = {};
@@ -340,8 +400,12 @@ namespace faf::editor
     mArmies.clear();
     // The master chain's markers (the chains below it list marker names in `Markers = {` blocks of their own).
     const std::size_t chain = mText.find("_MASTERCHAIN_");
-    if (chain != std::string::npos &&
-        FindBlock(mText, std::regex(R"(Markers\s*=\s*\{)"), chain, mMarkerBlock.open, mMarkerBlock.close, mMarkerBlock.indent)) {
+    if (
+      chain != std::string::npos &&
+      FindBlock(
+        mText, std::regex(R"(Markers\s*=\s*\{)"), chain, mMarkerBlock.open, mMarkerBlock.close, mMarkerBlock.indent
+      )
+    ) {
       mMarkerBlock.found = true;
       if (!ParseEntries(mText, mMarkerBlock.open, mMarkerBlock.close, mMarkers, error, &mMarkerBlock.spans)) {
         error = "markers: " + error;
@@ -363,7 +427,9 @@ namespace faf::editor
       }
     }
     // The chains: `['name'] = { Markers = { "a", "b", }, },` each.
-    if (FindBlock(mText, std::regex(R"(\bChains\s*=\s*\{)"), 0, mChainBlock.open, mChainBlock.close, mChainBlock.indent)) {
+    if (
+      FindBlock(mText, std::regex(R"(\bChains\s*=\s*\{)"), 0, mChainBlock.open, mChainBlock.close, mChainBlock.indent)
+    ) {
       mChainBlock.found = true;
       const std::string body = mText.substr(mChainBlock.open + 1, mChainBlock.close - mChainBlock.open - 1);
       const std::regex entry(R"(\[\s*['"]([^'"]*)['"]\s*\]\s*=\s*\{\s*Markers\s*=\s*\{([^}]*)\})");
@@ -385,7 +451,11 @@ namespace faf::editor
     return true;
   }
 
-  std::string SaveFile::ChainsText(const std::vector<MarkerChain>& chains, const int indent, const std::string& nl)
+  std::string SaveFile::ChainsText(
+    const std::vector<MarkerChain>& chains,
+    const int indent,
+    const std::string& nl
+  )
   {
     const std::string pad(static_cast<std::size_t>(indent), ' ');
     const std::string close(static_cast<std::size_t>(std::max(indent - 4, 0)), ' ');
@@ -439,9 +509,13 @@ namespace faf::editor
       replaces.push_back({&mArmyBlock, Rebuild(mArmyBlock, mArmies, mArmiesRead)});
     }
     if (mChainBlock.found && mChains != mChainsRead) {
-      replaces.push_back({&mChainBlock, ChainsText(mChains, mChainBlock.indent, mText.find("\r\n") != std::string::npos ? "\r\n" : "\n")});
+      replaces.push_back(
+        {&mChainBlock, ChainsText(mChains, mChainBlock.indent, mText.find("\r\n") != std::string::npos ? "\r\n" : "\n")}
+      );
     }
-    std::sort(replaces.begin(), replaces.end(), [](const Replace& a, const Replace& b) { return a.block->open > b.block->open; });
+    std::sort(replaces.begin(), replaces.end(), [](const Replace& a, const Replace& b) {
+      return a.block->open > b.block->open;
+    });
     std::string out = mText;
     for (const Replace& replace : replaces) {
       out.replace(replace.block->open + 1, replace.block->close - replace.block->open - 1, replace.text);
@@ -449,7 +523,11 @@ namespace faf::editor
     return out;
   }
 
-  std::string SaveFile::Rebuild(const Block& block, const std::vector<SaveEntry>& now, const std::vector<SaveEntry>& read) const
+  std::string SaveFile::Rebuild(
+    const Block& block,
+    const std::vector<SaveEntry>& now,
+    const std::vector<SaveEntry>& read
+  ) const
   {
     const std::string nl = mText.find("\r\n") != std::string::npos ? "\r\n" : "\n";
     // A value written by the editor in the file's line ends.
@@ -493,7 +571,8 @@ namespace faf::editor
       const SaveEntrySpan& span = block.spans[found];
       std::string piece = mText.substr(span.start, span.end - span.start);
       if (!(entry == read[found])) {
-        bool sameKeys = entry.properties.size() == read[found].properties.size() && span.values.size() == entry.properties.size();
+        bool sameKeys =
+          entry.properties.size() == read[found].properties.size() && span.values.size() == entry.properties.size();
         for (std::size_t k = 0; sameKeys && k < entry.properties.size(); ++k) {
           sameKeys = entry.properties[k].first == read[found].properties[k].first;
         }
@@ -515,7 +594,9 @@ namespace faf::editor
     return body;
   }
 
-  SaveEntry NewArmyEntry(const std::string& name)
+  SaveEntry NewArmyEntry(
+    const std::string& name
+  )
   {
     SaveEntry army;
     army.name = name;
@@ -526,15 +607,22 @@ namespace faf::editor
       {"faction", "0"},
       {"Economy", "{\n                mass = 0,\n                energy = 0,\n            }"},
       {"Alliances", "{\n            }"},
-      {"Units", "GROUP {\n                orders = '',\n                platoon = '',\n                Units = {\n                    ['INITIAL'] = GROUP {\n"
-                "                        orders = '',\n                        platoon = '',\n                        Units = {\n                        },\n"
-                "                    },\n                },\n            }"},
-      {"PlatoonBuilders", "{\n                next_platoon_builder_id = '0',\n                Builders = {\n                },\n            }"},
+      {"Units",
+       "GROUP {\n                orders = '',\n                platoon = '',\n                Units = {\n              "
+       "      ['INITIAL'] = GROUP {\n"
+       "                        orders = '',\n                        platoon = '',\n                        Units = "
+       "{\n                        },\n"
+       "                    },\n                },\n            }"},
+      {"PlatoonBuilders",
+       "{\n                next_platoon_builder_id = '0',\n                Builders = {\n                },\n          "
+       "  }"},
     };
     return army;
   }
 
-  std::vector<ScenarioTeam> ScenarioTeams(const std::string& scenario)
+  std::vector<ScenarioTeam> ScenarioTeams(
+    const std::string& scenario
+  )
   {
     std::vector<ScenarioTeam> teams;
     std::size_t open = 0, close = 0;
@@ -573,7 +661,10 @@ namespace faf::editor
     return teams;
   }
 
-  std::string WithScenarioTeams(const std::string& scenario, const std::vector<ScenarioTeam>& teams)
+  std::string WithScenarioTeams(
+    const std::string& scenario,
+    const std::vector<ScenarioTeam>& teams
+  )
   {
     std::size_t open = 0, close = 0;
     int indent = 0;
@@ -586,13 +677,16 @@ namespace faf::editor
       for (const std::string& army : team.armies) {
         list += Quote(army) + ",";
       }
-      body += std::string(static_cast<std::size_t>(indent), ' ') + "{ name = " + Quote(team.name) + ", armies = {" + list + "} },\n";
+      body += std::string(static_cast<std::size_t>(indent), ' ') + "{ name = " + Quote(team.name) + ", armies = {" +
+        list + "} },\n";
     }
     body += std::string(static_cast<std::size_t>(std::max(indent - 4, 0)), ' ');
     return scenario.substr(0, open + 1) + body + scenario.substr(close);
   }
 
-  std::vector<std::string> ScenarioArmies(const std::string& scenario)
+  std::vector<std::string> ScenarioArmies(
+    const std::string& scenario
+  )
   {
     // Every team's armies, in order (a map with one FFA team has them all there).
     if (const std::vector<ScenarioTeam> teams = ScenarioTeams(scenario); !teams.empty()) {
@@ -615,17 +709,26 @@ namespace faf::editor
     return armies;
   }
 
-  std::string WithScenarioArmies(const std::string& scenario, const std::vector<std::string>& armies)
+  std::string WithScenarioArmies(
+    const std::string& scenario,
+    const std::vector<std::string>& armies
+  )
   {
     std::string list;
     for (const std::string& army : armies) {
       list += Quote(army) + ",";
     }
-    return std::regex_replace(scenario, std::regex(R"(armies\s*=\s*\{[^}]*\})"), "armies = {" + list + "}",
-                              std::regex_constants::format_first_only);
+    return std::regex_replace(
+      scenario,
+      std::regex(R"(armies\s*=\s*\{[^}]*\})"),
+      "armies = {" + list + "}",
+      std::regex_constants::format_first_only
+    );
   }
 
-  std::vector<std::string> ScenarioExtraArmies(const std::string& scenario)
+  std::vector<std::string> ScenarioExtraArmies(
+    const std::string& scenario
+  )
   {
     std::vector<std::string> armies;
     std::smatch match;
@@ -644,17 +747,26 @@ namespace faf::editor
     return armies;
   }
 
-  std::string WithScenarioExtraArmies(const std::string& scenario, const std::vector<std::string>& armies)
+  std::string WithScenarioExtraArmies(
+    const std::string& scenario,
+    const std::vector<std::string>& armies
+  )
   {
     std::string list;
     for (const std::string& army : armies) {
       list += (list.empty() ? "" : " ") + army;
     }
-    return std::regex_replace(scenario, std::regex(R"(\['ExtraArmies'\]\s*=\s*STRING\(\s*'[^']*'\s*\))"),
-                              "['ExtraArmies'] = STRING( '" + list + "' )", std::regex_constants::format_first_only);
+    return std::regex_replace(
+      scenario,
+      std::regex(R"(\['ExtraArmies'\]\s*=\s*STRING\(\s*'[^']*'\s*\))"),
+      "['ExtraArmies'] = STRING( '" + list + "' )",
+      std::regex_constants::format_first_only
+    );
   }
 
-  std::optional<std::string> ScriptPlayableArea(const std::string& script)
+  std::optional<std::string> ScriptPlayableArea(
+    const std::string& script
+  )
   {
     std::smatch match;
     if (std::regex_search(script, match, std::regex(R"(SetPlayableArea\s*\(\s*['"]([^'"]+)['"])"))) {
@@ -663,7 +775,10 @@ namespace faf::editor
     return std::nullopt;
   }
 
-  std::string WithScriptPlayableArea(const std::string& script, const std::string& area)
+  std::string WithScriptPlayableArea(
+    const std::string& script,
+    const std::string& area
+  )
   {
     const std::regex call(R"([ \t]*ScenarioFramework\.SetPlayableArea\s*\(\s*['"][^'"]+['"][^)]*\)[ \t]*\r?\n?)");
     if (area.empty()) {
@@ -693,7 +808,8 @@ namespace faf::editor
   namespace
   {
     // The function the editor keeps in a map's script for its effect decorations, between these two lines.
-    constexpr const char* kEffectsBegin = "-- Map editor: effect decorations (markers of type 'Effect'). Written by the editor; edit the markers, not this.\n";
+    constexpr const char* kEffectsBegin = "-- Map editor: effect decorations (markers of type 'Effect'). Written by "
+                                          "the editor; edit the markers, not this.\n";
     constexpr const char* kEffectsEnd = "-- Map editor: end of effect decorations\n";
     constexpr const char* kEffectsBody =
       "function MapEditorEffects()\n"
@@ -718,7 +834,10 @@ namespace faf::editor
     constexpr const char* kEffectsCall = "    MapEditorEffects() -- the map editor's effect decorations\n";
   } // namespace
 
-  std::string WithScriptEffects(const std::string& script, const bool on)
+  std::string WithScriptEffects(
+    const std::string& script,
+    const bool on
+  )
   {
     std::string out = script;
     // Off first (also before turning on, so the text is the editor's current one).
@@ -755,7 +874,11 @@ namespace faf::editor
     return out;
   }
 
-  std::string WithScenarioReclaim(const std::string& scenario, const double mass, const double energy)
+  std::string WithScenarioReclaim(
+    const std::string& scenario,
+    const double mass,
+    const double energy
+  )
   {
     std::smatch match;
     const std::regex reclaim(R"((\breclaim\s*=\s*\{\s*)([-+0-9.eE]+)(\s*,\s*)([-+0-9.eE]+))");
@@ -767,11 +890,13 @@ namespace faf::editor
     (void)std::snprintf(numbers[1], sizeof(numbers[1]), "%.6f", energy);
     const std::size_t at = static_cast<std::size_t>(match.position(0));
     return scenario.substr(0, at) + match[1].str() + numbers[0] + match[3].str() + numbers[1] +
-           scenario.substr(at + static_cast<std::size_t>(match.length(0)));
+      scenario.substr(at + static_cast<std::size_t>(match.length(0)));
   }
   namespace
   {
-    std::string NumberText(const double value)
+    std::string NumberText(
+      const double value
+    )
     {
       char text[48];
       if (value == static_cast<double>(static_cast<long long>(value))) {
@@ -783,7 +908,10 @@ namespace faf::editor
     }
 
     // A string value's text: 'x' as the saves write a bare string, else the value's own wrapper (STRING( 'x' )).
-    std::string StringText(const std::string& old, const std::string& value)
+    std::string StringText(
+      const std::string& old,
+      const std::string& value
+    )
     {
       const std::size_t open = old.find('\'');
       const std::size_t close = old.rfind('\'');
@@ -794,7 +922,9 @@ namespace faf::editor
     }
   } // namespace
 
-  ArmySettings ReadArmySettings(const SaveEntry& army)
+  ArmySettings ReadArmySettings(
+    const SaveEntry& army
+  )
   {
     ArmySettings settings;
     settings.personality = ValueString(army.Get("personality"));
@@ -811,13 +941,17 @@ namespace faf::editor
     }
     const std::string alliances = army.Get("Alliances");
     const std::regex entry(R"(\[\s*'([^']*)'\s*\]\s*=\s*'([^']*)')");
-    for (auto it = std::sregex_iterator(alliances.begin(), alliances.end(), entry); it != std::sregex_iterator(); ++it) {
+    for (auto it = std::sregex_iterator(alliances.begin(), alliances.end(), entry); it != std::sregex_iterator();
+         ++it) {
       settings.alliances.emplace_back((*it)[1].str(), (*it)[2].str());
     }
     return settings;
   }
 
-  void WriteArmySettings(SaveEntry& army, const ArmySettings& settings)
+  void WriteArmySettings(
+    SaveEntry& army,
+    const ArmySettings& settings
+  )
   {
     const ArmySettings now = ReadArmySettings(army);
     if (settings.personality != now.personality) {
@@ -838,7 +972,9 @@ namespace faf::editor
       const auto replaceNumber = [&economy](const char* const key, const double value) {
         std::smatch match;
         if (std::regex_search(economy, match, std::regex(std::string(R"(\b)") + key + R"(\s*=\s*([-+0-9.eE]+))"))) {
-          economy.replace(static_cast<std::size_t>(match.position(1)), static_cast<std::size_t>(match.length(1)), NumberText(value));
+          economy.replace(
+            static_cast<std::size_t>(match.position(1)), static_cast<std::size_t>(match.length(1)), NumberText(value)
+          );
         }
       };
       replaceNumber("mass", settings.mass);
@@ -850,7 +986,8 @@ namespace faf::editor
       const std::string old = army.Get("Alliances");
       const std::size_t close = old.rfind('}');
       const std::size_t lineStart = close == std::string::npos ? std::string::npos : old.rfind('\n', close);
-      const std::string closing = lineStart == std::string::npos ? std::string(12, ' ') : old.substr(lineStart + 1, close - lineStart - 1);
+      const std::string closing =
+        lineStart == std::string::npos ? std::string(12, ' ') : old.substr(lineStart + 1, close - lineStart - 1);
       std::string text = "{\n";
       for (const auto& [other, stance] : settings.alliances) {
         text += closing + "    [" + Quote(other) + "] = " + Quote(stance) + ",\n";

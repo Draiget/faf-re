@@ -112,7 +112,8 @@ namespace moho
     "SoundHandleRecord::mTrackedEntities offset must be 0x18"
   );
   static_assert(
-    offsetof(SoundHandleRecord, mPlayingSeconds) == 0x24, "SoundHandleRecord::mPlayingSeconds offset must be 0x24"
+    offsetof(SoundHandleRecord, mPlayingSeconds) == 0x24,
+    "SoundHandleRecord::mPlayingSeconds offset must be 0x24"
   );
 
   static_assert(sizeof(fa::set<IXACTCue*>) == 0x0C, "fa::set<IXACTCue*> size must be 0x0C");
@@ -420,8 +421,8 @@ namespace moho
     gpg::fastvector_n<SoundHandleRecord, 256> mSoundHandles; // +0x140
 
     fa::set<IXACTCue*> mPendingDestroyCues; // +0x2950
-    WeakPtr<UserArmy> mListenerArmy;           // +0x295C (the army whose recon filters positional sounds)
-    TDatList<HSound, void> mActiveLoops;       // +0x2964
+    WeakPtr<UserArmy> mListenerArmy;        // +0x295C (the army whose recon filters positional sounds)
+    TDatList<HSound, void> mActiveLoops;    // +0x2964
 
     boost::shared_ptr<AudioEngine> mAmbientEngine;  // +0x296C
     boost::shared_ptr<AudioEngine> mTutorialEngine; // +0x2974
@@ -432,7 +433,7 @@ namespace moho
     float mCurrentCameraDistanceMetric; // +0x29C4
     std::uint8_t mWorldSoundsEnabled;   // +0x29C8
     std::uint8_t mReserved29C9[0x03];   // +0x29C9
-    fa::string mLanguageTag;         // +0x29CC
+    fa::string mLanguageTag;            // +0x29CC
 
     CSndVar mDuckLengthVar;            // +0x29E8
     CSndVar mDuckVar;                  // +0x2A08
@@ -443,13 +444,16 @@ namespace moho
   };
 
   static_assert(
-    offsetof(CUserSoundManager, mRecentOneShotKeys) == 0x08, "CUserSoundManager::mRecentOneShotKeys offset must be 0x08"
+    offsetof(CUserSoundManager, mRecentOneShotKeys) == 0x08,
+    "CUserSoundManager::mRecentOneShotKeys offset must be 0x08"
   );
   static_assert(
-    offsetof(CUserSoundManager, mLoopHandleIdPool) == 0x118, "CUserSoundManager::mLoopHandleIdPool offset must be 0x118"
+    offsetof(CUserSoundManager, mLoopHandleIdPool) == 0x118,
+    "CUserSoundManager::mLoopHandleIdPool offset must be 0x118"
   );
   static_assert(
-    offsetof(CUserSoundManager, mSoundHandles) == 0x140, "CUserSoundManager::mSoundHandles offset must be 0x140"
+    offsetof(CUserSoundManager, mSoundHandles) == 0x140,
+    "CUserSoundManager::mSoundHandles offset must be 0x140"
   );
   static_assert(
     offsetof(CUserSoundManager, mPendingDestroyCues) == 0x2950,
@@ -460,27 +464,32 @@ namespace moho
     "CUserSoundManager::mListenerArmy offset must be 0x295C"
   );
   static_assert(
-    offsetof(CUserSoundManager, mActiveLoops) == 0x2964, "CUserSoundManager::mActiveLoops offset must be 0x2964"
+    offsetof(CUserSoundManager, mActiveLoops) == 0x2964,
+    "CUserSoundManager::mActiveLoops offset must be 0x2964"
   );
   static_assert(
-    offsetof(CUserSoundManager, mVoiceEngine) == 0x297C, "CUserSoundManager::mVoiceEngine offset must be 0x297C"
+    offsetof(CUserSoundManager, mVoiceEngine) == 0x297C,
+    "CUserSoundManager::mVoiceEngine offset must be 0x297C"
   );
   static_assert(
     offsetof(CUserSoundManager, mCameraDistanceVar) == 0x2984,
     "CUserSoundManager::mCameraDistanceVar offset must be 0x2984"
   );
   static_assert(
-    offsetof(CUserSoundManager, mZoomPercentVar) == 0x29A4, "CUserSoundManager::mZoomPercentVar offset must be 0x29A4"
+    offsetof(CUserSoundManager, mZoomPercentVar) == 0x29A4,
+    "CUserSoundManager::mZoomPercentVar offset must be 0x29A4"
   );
   static_assert(
     offsetof(CUserSoundManager, mCurrentCameraDistanceMetric) == 0x29C4,
     "CUserSoundManager::mCurrentCameraDistanceMetric offset must be 0x29C4"
   );
   static_assert(
-    offsetof(CUserSoundManager, mLanguageTag) == 0x29CC, "CUserSoundManager::mLanguageTag offset must be 0x29CC"
+    offsetof(CUserSoundManager, mLanguageTag) == 0x29CC,
+    "CUserSoundManager::mLanguageTag offset must be 0x29CC"
   );
   static_assert(
-    offsetof(CUserSoundManager, mDuckLengthVar) == 0x29E8, "CUserSoundManager::mDuckLengthVar offset must be 0x29E8"
+    offsetof(CUserSoundManager, mDuckLengthVar) == 0x29E8,
+    "CUserSoundManager::mDuckLengthVar offset must be 0x29E8"
   );
   static_assert(offsetof(CUserSoundManager, mDuckVar) == 0x2A08, "CUserSoundManager::mDuckVar offset must be 0x2A08");
   static_assert(offsetof(CUserSoundManager, mDuckMode) == 0x2A28, "CUserSoundManager::mDuckMode offset must be 0x2A28");

@@ -35,11 +35,14 @@ namespace faf::editor
   {
     constexpr int kPicture = 96;
     // The old test switch's choices (`/vaultquery sort,players,size,ranked`), as the new filters.
-    const char* const kOldSorts[] = {"gamesPlayed", "latestVersion.updateTime", "latestVersion.createTime", "displayName"};
+    const char* const kOldSorts[] =
+      {"gamesPlayed", "latestVersion.updateTime", "latestVersion.createTime", "displayName"};
     const int kPlayersMin[] = {0, 2, 4, 6, 8, 10, 13};
     const int kPlayersMax[] = {0, 2, 4, 6, 8, 12, 0};
 
-    const char* SortLabel(const std::string& property)
+    const char* SortLabel(
+      const std::string& property
+    )
     {
       for (const VaultSortKey& key : kVaultSortKeys) {
         if (property == key.property) {
@@ -50,7 +53,10 @@ namespace faf::editor
     }
 
     /** The sizes chosen, "10 km, 20 km", or `none`. */
-    std::string SizesText(const unsigned bits, const char* none)
+    std::string SizesText(
+      const unsigned bits,
+      const char* none
+    )
     {
       std::string out;
       for (int k = 0; k < 7; ++k) {
@@ -64,11 +70,15 @@ namespace faf::editor
     std::filesystem::path SavedQueriesFile()
     {
       const char* const local = std::getenv("LOCALAPPDATA");
-      return local != nullptr ? std::filesystem::path(local) / "FAForever" / "Editor" / "vault_queries.txt" : std::filesystem::path("vault_queries.txt");
+      return local != nullptr ? std::filesystem::path(local) / "FAForever" / "Editor" / "vault_queries.txt"
+                              : std::filesystem::path("vault_queries.txt");
     }
-    const char* const kWhereNames[] = {"Everywhere", "The game's folder", "FAF's ProgramData folder", "Your vault", "Other folders"};
+    const char* const kWhereNames[] =
+      {"Everywhere", "The game's folder", "FAF's ProgramData folder", "Your vault", "Other folders"};
 
-    std::string Lower(std::string text)
+    std::string Lower(
+      std::string text
+    )
     {
       for (char& c : text) {
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -77,7 +87,9 @@ namespace faf::editor
       return text;
     }
 
-    std::string Unquote(const std::string& atom)
+    std::string Unquote(
+      const std::string& atom
+    )
     {
       if (atom.size() >= 2 && (atom.front() == '\'' || atom.front() == '"') && atom.back() == atom.front()) {
         return atom.substr(1, atom.size() - 2);
@@ -86,7 +98,9 @@ namespace faf::editor
     }
 
     /** The preview image (a DDS) inside a `.scmap`'s preview record, or empty. */
-    std::string PreviewImage(const std::vector<char>& record)
+    std::string PreviewImage(
+      const std::vector<char>& record
+    )
     {
       // 0xBEEFFEED, version, width, height; the name in UTF-16 up to a 0; tag count and tags; payload size; payload.
       std::size_t at = 16;
@@ -120,7 +134,10 @@ namespace faf::editor
     const ImVec4 kBad(0.95f, 0.45f, 0.40f, 1.0f);
 
     /** Text in the bold font at `scale` times the panel's size. */
-    void Heading(const char* const text, const float scale)
+    void Heading(
+      const char* const text,
+      const float scale
+    )
     {
       ImGui::PushFont(gBoldFont, ImGui::GetStyle().FontSizeBase * scale);
       ImGui::TextUnformatted(text);
@@ -128,7 +145,10 @@ namespace faf::editor
     }
 
     /** The editor's orange call-to-action button. */
-    bool AccentButton(const char* const label, const ImVec2& size = ImVec2(0.0f, 0.0f))
+    bool AccentButton(
+      const char* const label,
+      const ImVec2& size = ImVec2(0.0f, 0.0f)
+    )
     {
       ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(kAccent.x * 0.85f, kAccent.y * 0.85f, kAccent.z * 0.85f, 1.0f));
       ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kAccent);
@@ -142,7 +162,10 @@ namespace faf::editor
     }
 
     /** An ordinary button with the cards' rounded corners and the usual padding (SmallButton has none). */
-    bool RoundButton(const char* const label, const ImVec2& size = ImVec2(0.0f, 0.0f))
+    bool RoundButton(
+      const char* const label,
+      const ImVec2& size = ImVec2(0.0f, 0.0f)
+    )
     {
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ImGui::GetFrameHeight() * 0.25f);
       const bool pressed = ImGui::Button(label, size);
@@ -151,7 +174,9 @@ namespace faf::editor
     }
 
     /** A turning arc, `radius` pixels, in line with the text after it. */
-    void Spinner(const float radius)
+    void Spinner(
+      const float radius
+    )
     {
       const ImVec2 at = ImGui::GetCursorScreenPos();
       const float side = radius * 2.0f;
@@ -161,23 +186,37 @@ namespace faf::editor
       draw->PathClear();
       for (int i = 0; i <= 24; ++i) {
         const float a = start + static_cast<float>(i) / 24.0f * 4.4f;
-        draw->PathLineTo(ImVec2(at.x + radius + std::cos(a) * (radius - 2.0f), at.y + radius + std::sin(a) * (radius - 2.0f)));
+        draw->PathLineTo(
+          ImVec2(at.x + radius + std::cos(a) * (radius - 2.0f), at.y + radius + std::sin(a) * (radius - 2.0f))
+        );
       }
       draw->PathStroke(ImGui::GetColorU32(kAccent), 0, std::max(2.0f, radius * 0.22f));
     }
 
     /** A small rounded label (a map's size, players); `onPicture` gives it a dark backing to read over a picture. */
-    void Chip(const char* const text, const ImVec4& color, const bool onPicture = false)
+    void Chip(
+      const char* const text,
+      const ImVec4& color,
+      const bool onPicture = false
+    )
     {
       const ImVec2 size = ImGui::CalcTextSize(text);
       const ImVec2 pad(ImGui::GetStyle().FramePadding.x * 0.8f, ImGui::GetStyle().FramePadding.y * 0.4f);
       const ImVec2 at = ImGui::GetCursorScreenPos();
       if (onPicture) {
-        ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + size.x + pad.x * 2.0f, at.y + size.y + pad.y * 2.0f),
-                                                  ImGui::GetColorU32(ImVec4(0.06f, 0.06f, 0.07f, 0.85f)), size.y);
+        ImGui::GetWindowDrawList()->AddRectFilled(
+          at,
+          ImVec2(at.x + size.x + pad.x * 2.0f, at.y + size.y + pad.y * 2.0f),
+          ImGui::GetColorU32(ImVec4(0.06f, 0.06f, 0.07f, 0.85f)),
+          size.y
+        );
       }
-      ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + size.x + pad.x * 2.0f, at.y + size.y + pad.y * 2.0f),
-                                                ImGui::GetColorU32(ImVec4(color.x, color.y, color.z, 0.18f)), size.y);
+      ImGui::GetWindowDrawList()->AddRectFilled(
+        at,
+        ImVec2(at.x + size.x + pad.x * 2.0f, at.y + size.y + pad.y * 2.0f),
+        ImGui::GetColorU32(ImVec4(color.x, color.y, color.z, 0.18f)),
+        size.y
+      );
       ImGui::SetCursorScreenPos(ImVec2(at.x + pad.x, at.y + pad.y));
       ImGui::TextColored(color, "%s", text);
       ImGui::SetCursorScreenPos(at);
@@ -185,15 +224,24 @@ namespace faf::editor
     }
 
     /** A card in the middle of the panel, `width` wide at most. */
-    bool BeginCard(const char* const id, const float width)
+    bool BeginCard(
+      const char* const id,
+      const float width
+    )
     {
       const float avail = ImGui::GetContentRegionAvail().x;
       const float w = std::min(width, avail);
       ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail - w) * 0.5f);
       ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, ImGui::GetFrameHeight() * 0.4f);
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ImGui::GetFrameHeight() * 1.1f, ImGui::GetFrameHeight() * 0.9f));
+      ImGui::PushStyleVar(
+        ImGuiStyleVar_WindowPadding, ImVec2(ImGui::GetFrameHeight() * 1.1f, ImGui::GetFrameHeight() * 0.9f)
+      );
       ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.135f, 0.150f, 0.180f, 1.0f));
-      const bool open = ImGui::BeginChild(id, ImVec2(w, 0.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding);
+      const bool open = ImGui::BeginChild(
+        id,
+        ImVec2(w, 0.0f),
+        ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysUseWindowPadding
+      );
       return open;
     }
 
@@ -206,15 +254,22 @@ namespace faf::editor
 
   } // namespace
 
-  bool EdMapBrowser::OpenLink(const std::string& url)
+  bool EdMapBrowser::OpenLink(
+    const std::string& url
+  )
   {
     const int wide = ::MultiByteToWideChar(CP_UTF8, 0, url.c_str(), -1, nullptr, 0);
     std::wstring link(static_cast<std::size_t>(std::max(wide, 1)), L'\0');
     (void)::MultiByteToWideChar(CP_UTF8, 0, url.c_str(), -1, link.data(), wide);
-    const auto result = reinterpret_cast<std::intptr_t>(::ShellExecuteW(nullptr, L"open", link.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
+    const auto result =
+      reinterpret_cast<std::intptr_t>(::ShellExecuteW(nullptr, L"open", link.c_str(), nullptr, nullptr, SW_SHOWNORMAL));
     if (result <= 32) {
-      gpg::Warnf("editor: couldn't open %s in the browser (ShellExecute %lld, error %lu)", url.c_str(), static_cast<long long>(result),
-                 ::GetLastError());
+      gpg::Warnf(
+        "editor: couldn't open %s in the browser (ShellExecute %lld, error %lu)",
+        url.c_str(),
+        static_cast<long long>(result),
+        ::GetLastError()
+      );
       mLinkFailed = true;
       return false;
     }
@@ -222,11 +277,16 @@ namespace faf::editor
     return true;
   }
 
-  EdMapBrowser::EdMapBrowser(EdPlay& play, EdDocument& document)
+  EdMapBrowser::EdMapBrowser(
+    EdPlay& play,
+    EdDocument& document
+  )
     : mPlay(play)
     , mDocument(document)
   {
-    SetFafLog([](const char* const line) { gpg::Logf("%s", line); });
+    SetFafLog([](const char* const line) {
+      gpg::Logf("%s", line);
+    });
   }
 
   EdMapBrowser::~EdMapBrowser()
@@ -243,7 +303,9 @@ namespace faf::editor
     }
   }
 
-  EdMapBrowser::Details& EdMapBrowser::DetailsOf(const std::string& scenario)
+  EdMapBrowser::Details& EdMapBrowser::DetailsOf(
+    const std::string& scenario
+  )
   {
     Details& details = mDetails[scenario];
     if (!details.read && mReadsThisFrame < 12) {
@@ -257,7 +319,10 @@ namespace faf::editor
     return details;
   }
 
-  void EdMapBrowser::ReadDetails(const std::string& scenario, Details& details)
+  void EdMapBrowser::ReadDetails(
+    const std::string& scenario,
+    Details& details
+  )
   {
     details.read = true;
     // Where it is on disk, which says whose it is.
@@ -272,7 +337,10 @@ namespace faf::editor
       details.where = kWhereNames[2];
     } else if (!vault.empty() && disk.rfind(vault, 0) == 0) {
       details.where = kWhereNames[3];
-    } else if (disk.find("/supreme commander forged alliance/maps/") != std::string::npos || disk.find(".scd") != std::string::npos) {
+    } else if (
+      disk.find("/supreme commander forged alliance/maps/") != std::string::npos ||
+      disk.find(".scd") != std::string::npos
+    ) {
       details.where = kWhereNames[1];
     } else {
       details.where = kWhereNames[4];
@@ -288,8 +356,13 @@ namespace faf::editor
     }
     if (const LuaText* const size = info.Field("size"); size != nullptr && size->items.size() >= 2) {
       char text2[48];
-      (void)std::snprintf(text2, sizeof(text2), "%g x %g km", std::round(size->items[0].Number() / 51.2 * 10.0) / 10.0,
-                          std::round(size->items[1].Number() / 51.2 * 10.0) / 10.0);
+      (void)std::snprintf(
+        text2,
+        sizeof(text2),
+        "%g x %g km",
+        std::round(size->items[0].Number() / 51.2 * 10.0) / 10.0,
+        std::round(size->items[1].Number() / 51.2 * 10.0) / 10.0
+      );
       details.size = text2;
     }
     if (const LuaText* const version = info.Field("map_version")) {
@@ -309,7 +382,9 @@ namespace faf::editor
     }
   }
 
-  void EdMapBrowser::MakePicture(Details& details)
+  void EdMapBrowser::MakePicture(
+    Details& details
+  )
   {
     details.pictureAsked = true;
     gpg::gal::imaging::ImageCodec* const codec = gpg::gal::imaging::ImageCodec::Instance();
@@ -323,8 +398,10 @@ namespace faf::editor
     options.height = kPicture;
     options.mipLevels = 1;
     gpg::gal::imaging::Image decoded;
-    if (FAILED(codec->Decode(image.data(), image.size(), options, decoded)) || decoded.subresources.empty() ||
-        decoded.format != DXGI_FORMAT_B8G8R8A8_UNORM) {
+    if (
+      FAILED(codec->Decode(image.data(), image.size(), options, decoded)) || decoded.subresources.empty() ||
+      decoded.format != DXGI_FORMAT_B8G8R8A8_UNORM
+    ) {
       return;
     }
     const auto& level = decoded.subresources.front();
@@ -332,14 +409,19 @@ namespace faf::editor
     for (std::uint32_t y = 0; y < level.height; ++y) {
       for (std::uint32_t x = 0; x < level.width; ++x) {
         std::uint32_t pixel = 0;
-        std::memcpy(&pixel, decoded.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch + x * 4U, 4U);
+        std::memcpy(
+          &pixel, decoded.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch + x * 4U, 4U
+        );
         pixels[static_cast<std::size_t>(y) * level.width + x] = pixel | 0xFF000000u;
       }
     }
-    details.picture = EdImGuiRenderer::CreateImage(static_cast<int>(level.width), static_cast<int>(level.height), pixels.data());
+    details.picture =
+      EdImGuiRenderer::CreateImage(static_cast<int>(level.width), static_cast<int>(level.height), pixels.data());
   }
 
-  std::string EdMapBrowser::ListedScenario(const std::string& folder) const
+  std::string EdMapBrowser::ListedScenario(
+    const std::string& folder
+  ) const
   {
     const std::string prefix = "/maps/" + Lower(folder) + "/";
     for (const std::string& scenario : mPlay.Maps()) {
@@ -350,7 +432,9 @@ namespace faf::editor
     return {};
   }
 
-  void EdMapBrowser::OpenMap(const std::string& scenario)
+  void EdMapBrowser::OpenMap(
+    const std::string& scenario
+  )
   {
     const std::vector<std::string>& maps = mPlay.Maps();
     for (int i = 0; i < static_cast<int>(maps.size()); ++i) {
@@ -364,12 +448,16 @@ namespace faf::editor
     }
   }
 
-  void EdMapBrowser::SetFilter(const std::string& text)
+  void EdMapBrowser::SetFilter(
+    const std::string& text
+  )
   {
     (void)std::snprintf(mFilter, sizeof(mFilter), "%s", text.c_str());
   }
 
-  void EdMapBrowser::OpenFromDisk(const std::filesystem::path& scenarioFile)
+  void EdMapBrowser::OpenFromDisk(
+    const std::filesystem::path& scenarioFile
+  )
   {
     const auto refuse = [&](const std::string& why) {
       mStatus = why;
@@ -418,10 +506,13 @@ namespace faf::editor
       if (vfs != nullptr) {
         (void)vfs->FindFile(&disk, listed.c_str(), nullptr); // empty when the file isn't there
       }
-      const bool same = !disk.empty() &&
-                        std::filesystem::equivalent(std::filesystem::path(disk.c_str()).parent_path(), folder, code);
+      const bool same =
+        !disk.empty() && std::filesystem::equivalent(std::filesystem::path(disk.c_str()).parent_path(), folder, code);
       if (!same) {
-        refuse("the game already has a map folder named " + mount + " (" + std::string(disk.c_str()) + "); rename one of them");
+        refuse(
+          "the game already has a map folder named " + mount + " (" + std::string(disk.c_str()) +
+          "); rename one of them"
+        );
         return;
       }
       mStatus = "Opened " + listed;
@@ -438,13 +529,20 @@ namespace faf::editor
       refuse("mounted " + folder.string() + " as /maps/" + mount + ", but the game doesn't list a map there");
       return;
     }
-    gpg::Logf("editor: open from a folder: %s mounted as /maps/%s; opening %s", folder.string().c_str(), mount.c_str(), listed.c_str());
+    gpg::Logf(
+      "editor: open from a folder: %s mounted as /maps/%s; opening %s",
+      folder.string().c_str(),
+      mount.c_str(),
+      listed.c_str()
+    );
     mStatus = "Opened " + listed + " from " + folder.string();
     OpenMap(listed);
     (void)scenario;
   }
 
-  void EdMapBrowser::Download(const std::string& name)
+  void EdMapBrowser::Download(
+    const std::string& name
+  )
   {
     VaultMapName map;
     std::string error;
@@ -477,7 +575,12 @@ namespace faf::editor
     return query;
   }
 
-  void EdMapBrowser::SetFilters(const int sort, const int players, const int size, const bool ranked)
+  void EdMapBrowser::SetFilters(
+    const int sort,
+    const int players,
+    const int size,
+    const bool ranked
+  )
   {
     mFilters.sortProperty = kOldSorts[std::clamp(sort, 0, 3)];
     mFilters.descending = std::clamp(sort, 0, 3) != 3;
@@ -536,16 +639,22 @@ namespace faf::editor
     };
     // Row 1: author, uploaded from/to, width (the name is the search box above).
     ImGui::SetNextItemWidth(field);
-    changed |= ImGui::InputTextWithHint("##author", "Author", mAuthorText, sizeof(mAuthorText), ImGuiInputTextFlags_EnterReturnsTrue);
+    changed |= ImGui::InputTextWithHint(
+      "##author", "Author", mAuthorText, sizeof(mAuthorText), ImGuiInputTextFlags_EnterReturnsTrue
+    );
     ImGui::SameLine();
     ImGui::SetNextItemWidth(field);
-    const std::string uploaded = std::string("Uploaded: ") + (mFromText[0] ? mFromText : "any") + " to " + (mToText[0] ? mToText : "any");
+    const std::string uploaded =
+      std::string("Uploaded: ") + (mFromText[0] ? mFromText : "any") + " to " + (mToText[0] ? mToText : "any");
     if (ImGui::BeginCombo("##uploaded", uploaded.c_str())) {
       ImGui::TextDisabled("Updated after and before (YYYY-MM-DD)");
       ImGui::SetNextItemWidth(Em(130.0f));
-      changed |= ImGui::InputTextWithHint("from", "2020-01-01", mFromText, sizeof(mFromText), ImGuiInputTextFlags_EnterReturnsTrue);
+      changed |= ImGui::InputTextWithHint(
+        "from", "2020-01-01", mFromText, sizeof(mFromText), ImGuiInputTextFlags_EnterReturnsTrue
+      );
       ImGui::SetNextItemWidth(Em(130.0f));
-      changed |= ImGui::InputTextWithHint("to", "2026-12-31", mToText, sizeof(mToText), ImGuiInputTextFlags_EnterReturnsTrue);
+      changed |=
+        ImGui::InputTextWithHint("to", "2026-12-31", mToText, sizeof(mToText), ImGuiInputTextFlags_EnterReturnsTrue);
       if (ImGui::SmallButton("Any date")) {
         mFromText[0] = '\0';
         mToText[0] = '\0';
@@ -559,8 +668,9 @@ namespace faf::editor
     sizes("##height", "Height", mFilters.heights);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(field);
-    const std::string players = "Max. players: " + (mFilters.minPlayers > 0 ? std::to_string(mFilters.minPlayers) : std::string("")) + " to " +
-                                (mFilters.maxPlayers > 0 && mFilters.maxPlayers < 16 ? std::to_string(mFilters.maxPlayers) : std::string(""));
+    const std::string players =
+      "Max. players: " + (mFilters.minPlayers > 0 ? std::to_string(mFilters.minPlayers) : std::string("")) + " to " +
+      (mFilters.maxPlayers > 0 && mFilters.maxPlayers < 16 ? std::to_string(mFilters.maxPlayers) : std::string(""));
     if (ImGui::BeginCombo("##players", players.c_str())) {
       changed |= ImGui::SliderInt("from##p", &mFilters.minPlayers, 0, 16, mFilters.minPlayers == 0 ? "any" : "%d");
       int to = mFilters.maxPlayers == 0 ? 16 : mFilters.maxPlayers;
@@ -573,11 +683,18 @@ namespace faf::editor
     ImGui::SameLine();
     ImGui::SetNextItemWidth(field);
     char score[64];
-    (void)std::snprintf(score, sizeof(score), "Average reviews score: %s to %s", mFilters.minScore > 0.0f ? std::to_string(mFilters.minScore).substr(0, 3).c_str() : "",
-                        mFilters.maxScore < 5.0f ? std::to_string(mFilters.maxScore).substr(0, 3).c_str() : "");
+    (void)std::snprintf(
+      score,
+      sizeof(score),
+      "Average reviews score: %s to %s",
+      mFilters.minScore > 0.0f ? std::to_string(mFilters.minScore).substr(0, 3).c_str() : "",
+      mFilters.maxScore < 5.0f ? std::to_string(mFilters.maxScore).substr(0, 3).c_str() : ""
+    );
     if (ImGui::BeginCombo("##score", score)) {
-      changed |= ImGui::SliderFloat("from##s", &mFilters.minScore, 0.0f, 5.0f, mFilters.minScore <= 0.0f ? "any" : "%.1f");
-      changed |= ImGui::SliderFloat("to##s", &mFilters.maxScore, 0.0f, 5.0f, mFilters.maxScore >= 5.0f ? "any" : "%.1f");
+      changed |=
+        ImGui::SliderFloat("from##s", &mFilters.minScore, 0.0f, 5.0f, mFilters.minScore <= 0.0f ? "any" : "%.1f");
+      changed |=
+        ImGui::SliderFloat("to##s", &mFilters.maxScore, 0.0f, 5.0f, mFilters.maxScore >= 5.0f ? "any" : "%.1f");
       ImGui::EndCombo();
     }
     ImGui::SameLine();
@@ -619,14 +736,25 @@ namespace faf::editor
     }
     if (ImGui::BeginPopup("##savequery")) {
       ImGui::SetNextItemWidth(Em(220.0f));
-      const bool enter = ImGui::InputTextWithHint("##qname", "Name for this query", mSaveQueryName, sizeof(mSaveQueryName), ImGuiInputTextFlags_EnterReturnsTrue);
+      const bool enter = ImGui::InputTextWithHint(
+        "##qname", "Name for this query", mSaveQueryName, sizeof(mSaveQueryName), ImGuiInputTextFlags_EnterReturnsTrue
+      );
       ImGui::SameLine();
       if ((ImGui::Button("Save") || enter) && mSaveQueryName[0] != '\0') {
         VaultQuery query = Query();
         query.text = mSearchText;
         std::string name = mSaveQueryName;
         std::replace(name.begin(), name.end(), '\t', ' ');
-        mSavedQueries.erase(std::remove_if(mSavedQueries.begin(), mSavedQueries.end(), [&](const auto& q) { return q.first == name; }), mSavedQueries.end());
+        mSavedQueries.erase(
+          std::remove_if(
+            mSavedQueries.begin(),
+            mSavedQueries.end(),
+            [&](const auto& q) {
+          return q.first == name;
+        }
+          ),
+          mSavedQueries.end()
+        );
         mSavedQueries.emplace_back(name, VaultQueryText(query));
         WriteSavedQueries();
         ImGui::CloseCurrentPopup();
@@ -643,7 +771,9 @@ namespace faf::editor
       }
       for (std::size_t i = 0; i < mSavedQueries.size(); ++i) {
         ImGui::PushID(static_cast<int>(i));
-        if (ImGui::Selectable(mSavedQueries[i].first.c_str(), false, ImGuiSelectableFlags_None, ImVec2(Em(220.0f), 0.0f))) {
+        if (
+          ImGui::Selectable(mSavedQueries[i].first.c_str(), false, ImGuiSelectableFlags_None, ImVec2(Em(220.0f), 0.0f))
+        ) {
           VaultQuery query;
           if (VaultQueryFromText(mSavedQueries[i].second, query)) {
             mFilters = query;
@@ -670,21 +800,26 @@ namespace faf::editor
     if (mShowQuery) {
       VaultQuery query = Query();
       query.text = mSearchText;
-      std::string text = VaultQueryFilter(query) + "  (sort " + (query.descending ? "-" : "") + query.sortProperty + ")";
+      std::string text =
+        VaultQueryFilter(query) + "  (sort " + (query.descending ? "-" : "") + query.sortProperty + ")";
       ImGui::SetNextItemWidth(-1.0f);
       ImGui::InputText("##query", text.data(), text.size() + 1, ImGuiInputTextFlags_ReadOnly);
     }
     return changed;
   }
 
-  void EdMapBrowser::AskSearch(const std::string& text)
+  void EdMapBrowser::AskSearch(
+    const std::string& text
+  )
   {
     mAskedSearch = text.empty() ? std::string(" ") : text;
     (void)std::snprintf(mSearchText, sizeof(mSearchText), "%s", mAskedSearch == " " ? "" : mAskedSearch.c_str());
     ShowVault();
   }
 
-  std::uint64_t EdMapBrowser::VaultPicture(const std::string& url)
+  std::uint64_t EdMapBrowser::VaultPicture(
+    const std::string& url
+  )
   {
     if (url.empty()) {
       return 0;
@@ -709,18 +844,24 @@ namespace faf::editor
       options.height = kPicture * 2;
       options.mipLevels = 1;
       gpg::gal::imaging::Image decoded;
-      if (SUCCEEDED(codec->Decode(bytes.data(), bytes.size(), options, decoded)) && !decoded.subresources.empty() &&
-          decoded.format == DXGI_FORMAT_B8G8R8A8_UNORM) {
+      if (
+        SUCCEEDED(codec->Decode(bytes.data(), bytes.size(), options, decoded)) && !decoded.subresources.empty() &&
+        decoded.format == DXGI_FORMAT_B8G8R8A8_UNORM
+      ) {
         const auto& level = decoded.subresources.front();
         std::vector<std::uint32_t> pixels(static_cast<std::size_t>(level.width) * level.height);
         for (std::uint32_t y = 0; y < level.height; ++y) {
-          std::memcpy(pixels.data() + static_cast<std::size_t>(y) * level.width,
-                      decoded.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch, level.width * 4U);
+          std::memcpy(
+            pixels.data() + static_cast<std::size_t>(y) * level.width,
+            decoded.bytes.data() + level.offset + static_cast<std::size_t>(y) * level.rowPitch,
+            level.width * 4U
+          );
         }
         for (std::uint32_t& pixel : pixels) {
           pixel |= 0xFF000000u;
         }
-        picture = EdImGuiRenderer::CreateImage(static_cast<int>(level.width), static_cast<int>(level.height), pixels.data());
+        picture =
+          EdImGuiRenderer::CreateImage(static_cast<int>(level.width), static_cast<int>(level.height), pixels.data());
       }
     }
     if (picture == 0) {
@@ -742,12 +883,29 @@ namespace faf::editor
     if (int pages = 0; mFaf.TakeResults(mFound, pages)) {
       mSearchPages = pages;
       mSearchedOnce = true;
-      gpg::Logf("editor: vault search %s (sort %s%s) page %d of %d: %zu maps%s%s", VaultQueryFilter(Query()).c_str(), mFilters.descending ? "-" : "",
-                mFilters.sortProperty.c_str(), mSearchPage, pages, mFound.size(), mFaf.Message().empty() ? "" : "; ", mFaf.Message().c_str());
+      gpg::Logf(
+        "editor: vault search %s (sort %s%s) page %d of %d: %zu maps%s%s",
+        VaultQueryFilter(Query()).c_str(),
+        mFilters.descending ? "-" : "",
+        mFilters.sortProperty.c_str(),
+        mSearchPage,
+        pages,
+        mFound.size(),
+        mFaf.Message().empty() ? "" : "; ",
+        mFaf.Message().c_str()
+      );
       for (std::size_t i = 0; i < mFound.size() && i < 5; ++i) {
-        gpg::Logf("editor:   %s (%s), %d players, %d x %d, v%s, %d games%s", mFound[i].name.c_str(), mFound[i].folder.c_str(),
-                  mFound[i].players, mFound[i].width, mFound[i].height, mFound[i].version.c_str(), mFound[i].gamesPlayed,
-                  mFound[i].ranked ? ", ranked" : "");
+        gpg::Logf(
+          "editor:   %s (%s), %d players, %d x %d, v%s, %d games%s",
+          mFound[i].name.c_str(),
+          mFound[i].folder.c_str(),
+          mFound[i].players,
+          mFound[i].width,
+          mFound[i].height,
+          mFound[i].version.c_str(),
+          mFound[i].gamesPlayed,
+          mFound[i].ranked ? ", ranked" : ""
+        );
       }
     }
     if (!mAskedSearch.empty() && mFaf.GetState() == EdFafSession::State::LoggedIn && !mFaf.Searching()) {
@@ -774,7 +932,9 @@ namespace faf::editor
       const std::string scenario = ListedScenario(map.folder);
       if (scenario.empty()) {
         mStatus += "; but the game doesn't list it (see the log)";
-        gpg::Warnf("editor: vault: %s mounted, but no _scenario.lua in /maps/%s", map.folder.c_str(), map.folder.c_str());
+        gpg::Warnf(
+          "editor: vault: %s mounted, but no _scenario.lua in /maps/%s", map.folder.c_str(), map.folder.c_str()
+        );
         return;
       }
       gpg::Logf("editor: vault: %s mounted; opening %s", map.folder.c_str(), scenario.c_str());
@@ -790,8 +950,11 @@ namespace faf::editor
     // Half the window wide, two thirds high, in its middle (pixels: a fixed size is small on a 4K screen).
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowSize(ImVec2(viewport->Size.x * 0.5f, viewport->Size.y * 0.66f), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x + viewport->Size.x * 0.5f, viewport->Pos.y + viewport->Size.y * 0.5f), ImGuiCond_FirstUseEver,
-                            ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowPos(
+      ImVec2(viewport->Pos.x + viewport->Size.x * 0.5f, viewport->Pos.y + viewport->Size.y * 0.5f),
+      ImGuiCond_FirstUseEver,
+      ImVec2(0.5f, 0.5f)
+    );
     if (!ImGui::Begin(kWindowName, &mOpen, ImGuiWindowFlags_NoDocking)) {
       ImGui::End();
       return;
@@ -801,7 +964,11 @@ namespace faf::editor
         DrawLocal();
         ImGui::EndTabItem();
       }
-      if (ImGui::BeginTabItem("FAF vault", nullptr, std::exchange(mSelectVault, false) ? ImGuiTabItemFlags_SetSelected : 0)) {
+      if (
+        ImGui::BeginTabItem(
+          "FAF vault", nullptr, std::exchange(mSelectVault, false) ? ImGuiTabItemFlags_SetSelected : 0
+        )
+      ) {
         DrawVault();
         ImGui::EndTabItem();
       }
@@ -824,8 +991,10 @@ namespace faf::editor
     std::vector<int> rows;
     for (int i = 0; i < static_cast<int>(maps.size()); ++i) {
       const std::size_t at = static_cast<std::size_t>(i);
-      if (mFilter[0] != '\0' && ImStristr(titles[at].c_str(), nullptr, mFilter, nullptr) == nullptr &&
-          ImStristr(maps[at].c_str(), nullptr, mFilter, nullptr) == nullptr) {
+      if (
+        mFilter[0] != '\0' && ImStristr(titles[at].c_str(), nullptr, mFilter, nullptr) == nullptr &&
+        ImStristr(maps[at].c_str(), nullptr, mFilter, nullptr) == nullptr
+      ) {
         continue;
       }
       if (mWhere != 0) {
@@ -846,14 +1015,17 @@ namespace faf::editor
       mOpenFileAsk = true;
     }
     if (ImGui::IsItemHovered()) {
-      ImGui::SetTooltip("A map folder anywhere on disk: pick its _scenario.lua. The editor adds it to the game's maps until it closes.");
+      ImGui::SetTooltip(
+        "A map folder anywhere on disk: pick its _scenario.lua. The editor adds it to the game's maps until it closes."
+      );
     }
     if (!mStatus.empty()) {
       ImGui::TextWrapped("%s", mStatus.c_str());
     }
 
     const float picture = ImGui::GetTextLineHeight() * 3.6f;
-    const ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable;
+    const ImGuiTableFlags flags =
+      ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable;
     if (ImGui::BeginTable("##maplist", 5, flags)) {
       ImGui::TableSetupScrollFreeze(0, 1);
       ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, picture);
@@ -873,10 +1045,17 @@ namespace faf::editor
           ImGui::PushID(index);
           ImGui::TableNextRow(0, picture);
           ImGui::TableNextColumn();
-          const bool current = mDocument.GetState() == EdDocument::State::Open && Lower(mDocument.Path()) == Lower(scenario);
-          if (ImGui::Selectable("##row", current, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick,
-                                ImVec2(0.0f, picture)) &&
-              ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+          const bool current =
+            mDocument.GetState() == EdDocument::State::Open && Lower(mDocument.Path()) == Lower(scenario);
+          if (
+            ImGui::Selectable(
+              "##row",
+              current,
+              ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick,
+              ImVec2(0.0f, picture)
+            ) &&
+            ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)
+          ) {
             OpenMap(scenario);
           }
           if (ImGui::IsItemHovered() && !details.disk.empty()) {
@@ -924,7 +1103,6 @@ namespace faf::editor
     }
   }
 
-
   void EdMapBrowser::DrawVault()
   {
     if (!mFafResumed) {
@@ -940,7 +1118,8 @@ namespace faf::editor
     {
       const std::string name = mFaf.UserName();
       const bool in = state == EdFafSession::State::LoggedIn;
-      const std::string who = in ? (name.empty() ? std::string("Signed in") : "Signed in as " + name) : std::string("Not signed in");
+      const std::string who =
+        in ? (name.empty() ? std::string("Signed in") : "Signed in as " + name) : std::string("Not signed in");
       const float outW = ImGui::CalcTextSize("Sign out").x + ImGui::GetStyle().FramePadding.x * 2.0f;
       const float chipW = ImGui::CalcTextSize(who.c_str()).x + ImGui::GetStyle().FramePadding.x * 1.6f;
       ImGui::SameLine(headerRight - chipW - (in ? outW + ImGui::GetStyle().ItemSpacing.x : 0.0f));
@@ -977,8 +1156,10 @@ namespace faf::editor
         Heading("Sign in to search the vault", 1.25f);
         ImGui::Spacing();
         ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("You sign in on FAF's own website, so the editor never sees your password. It asks only for your name "
-                            "and to keep you signed in.");
+        ImGui::TextDisabled(
+          "You sign in on FAF's own website, so the editor never sees your password. It asks only for your name "
+          "and to keep you signed in."
+        );
         ImGui::PopTextWrapPos();
         ImGui::Spacing();
         ImGui::Spacing();
@@ -988,7 +1169,10 @@ namespace faf::editor
           ImGui::AlignTextToFramePadding();
           ImGui::TextUnformatted("Connecting to FAF...");
         } else {
-          ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, ImGui::GetStyle().FramePadding.y * 2.0f));
+          ImGui::PushStyleVar(
+            ImGuiStyleVar_FramePadding,
+            ImVec2(ImGui::GetStyle().FramePadding.x, ImGui::GetStyle().FramePadding.y * 2.0f)
+          );
           if (AccentButton("Sign in with FAF", ImVec2(-FLT_MIN, 0.0f))) {
             mFaf.StartLogin();
           }
@@ -1017,8 +1201,10 @@ namespace faf::editor
         Heading("Approve the editor in your browser", 1.25f);
         ImGui::Spacing();
         ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("FAF's page opened in your browser. Sign in there if it asks, check that it shows this code, and "
-                            "approve. This window carries on by itself.");
+        ImGui::TextDisabled(
+          "FAF's page opened in your browser. Sign in there if it asks, check that it shows this code, and "
+          "approve. This window carries on by itself."
+        );
         ImGui::PopTextWrapPos();
         ImGui::Spacing();
         // The code, large, in a box: read it against the browser's.
@@ -1033,12 +1219,25 @@ namespace faf::editor
         const float boxW = ImGui::GetContentRegionAvail().x;
         const ImVec2 at = ImGui::GetCursorScreenPos();
         const float boxH = codeSize.y + ImGui::GetStyle().FramePadding.y * 6.0f;
-        ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + boxW, at.y + boxH), ImGui::GetColorU32(ImVec4(0.08f, 0.09f, 0.11f, 1.0f)),
-                                                  ImGui::GetFrameHeight() * 0.3f);
-        ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + boxW, at.y + boxH), ImGui::GetColorU32(ImVec4(kAccent.x, kAccent.y, kAccent.z, 0.6f)),
-                                            ImGui::GetFrameHeight() * 0.3f, 0, 1.5f);
-        ImGui::GetWindowDrawList()->AddText(ImVec2(at.x + (boxW - codeSize.x) * 0.5f, at.y + (boxH - codeSize.y) * 0.5f),
-                                            ImGui::GetColorU32(ImVec4(0.96f, 0.96f, 0.97f, 1.0f)), spaced.c_str());
+        ImGui::GetWindowDrawList()->AddRectFilled(
+          at,
+          ImVec2(at.x + boxW, at.y + boxH),
+          ImGui::GetColorU32(ImVec4(0.08f, 0.09f, 0.11f, 1.0f)),
+          ImGui::GetFrameHeight() * 0.3f
+        );
+        ImGui::GetWindowDrawList()->AddRect(
+          at,
+          ImVec2(at.x + boxW, at.y + boxH),
+          ImGui::GetColorU32(ImVec4(kAccent.x, kAccent.y, kAccent.z, 0.6f)),
+          ImGui::GetFrameHeight() * 0.3f,
+          0,
+          1.5f
+        );
+        ImGui::GetWindowDrawList()->AddText(
+          ImVec2(at.x + (boxW - codeSize.x) * 0.5f, at.y + (boxH - codeSize.y) * 0.5f),
+          ImGui::GetColorU32(ImVec4(0.96f, 0.96f, 0.97f, 1.0f)),
+          spaced.c_str()
+        );
         ImGui::Dummy(ImVec2(boxW, boxH));
         ImGui::PopFont();
         ImGui::Spacing();
@@ -1059,8 +1258,10 @@ namespace faf::editor
         }
         std::string link = mFaf.VerifyUrl();
         ImGui::PushFont(gMonoFont, 0.0f);
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Copy link").x - ImGui::GetStyle().FramePadding.x * 2.0f -
-                                ImGui::GetStyle().ItemSpacing.x);
+        ImGui::SetNextItemWidth(
+          ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize("Copy link").x -
+          ImGui::GetStyle().FramePadding.x * 2.0f - ImGui::GetStyle().ItemSpacing.x
+        );
         ImGui::InputText("##link", link.data(), link.size() + 1, ImGuiInputTextFlags_ReadOnly);
         ImGui::PopFont();
         ImGui::SameLine();
@@ -1085,7 +1286,9 @@ namespace faf::editor
     DrawVaultSearch();
   }
 
-  void EdMapBrowser::DrawDownloadProgress(const float width)
+  void EdMapBrowser::DrawDownloadProgress(
+    const float width
+  )
   {
     const double received = static_cast<double>(mDownload.Received()) / 1048576.0;
     const double total = static_cast<double>(mDownload.Total()) / 1048576.0;
@@ -1098,8 +1301,11 @@ namespace faf::editor
     // Unpacking (all received): the bar full, its text saying so.
     const bool unpacking = total > 0.0 && received >= total;
     ImGui::PushStyleColor(ImGuiCol_PlotHistogram, kAccent);
-    ImGui::ProgressBar(total > 0.0 ? static_cast<float>(received / total) : -1.0f * static_cast<float>(ImGui::GetTime()),
-                       ImVec2(width < 0.0f && width > -1.5f ? ImGui::GetContentRegionAvail().x : width, 0.0f), unpacking ? "Unpacking..." : text);
+    ImGui::ProgressBar(
+      total > 0.0 ? static_cast<float>(received / total) : -1.0f * static_cast<float>(ImGui::GetTime()),
+      ImVec2(width < 0.0f && width > -1.5f ? ImGui::GetContentRegionAvail().x : width, 0.0f),
+      unpacking ? "Unpacking..." : text
+    );
     ImGui::PopStyleColor();
   }
 
@@ -1110,10 +1316,17 @@ namespace faf::editor
       return;
     }
     const bool working = mDownload.GetState() == EdVaultDownload::State::Working;
-    ImGui::TextDisabled("Download any vault map without signing in: its folder name (dualgap_adaptive.v0012) or its link.");
+    ImGui::TextDisabled(
+      "Download any vault map without signing in: its folder name (dualgap_adaptive.v0012) or its link."
+    );
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.7f);
-    const bool entered = ImGui::InputTextWithHint("##vaultname", "folder name or download link", mVaultName, sizeof(mVaultName),
-                                                  ImGuiInputTextFlags_EnterReturnsTrue);
+    const bool entered = ImGui::InputTextWithHint(
+      "##vaultname",
+      "folder name or download link",
+      mVaultName,
+      sizeof(mVaultName),
+      ImGuiInputTextFlags_EnterReturnsTrue
+    );
     ImGui::SameLine();
     ImGui::BeginDisabled(working || mVaultName[0] == '\0');
     if (ImGui::Button("Download and open") || (entered && !working && mVaultName[0] != '\0')) {
@@ -1129,15 +1342,19 @@ namespace faf::editor
   void EdMapBrowser::DrawVaultSearch()
   {
     // The search bar: large, the first thing to use.
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x * 1.5f, ImGui::GetStyle().FramePadding.y * 2.0f));
+    ImGui::PushStyleVar(
+      ImGuiStyleVar_FramePadding,
+      ImVec2(ImGui::GetStyle().FramePadding.x * 1.5f, ImGui::GetStyle().FramePadding.y * 2.0f)
+    );
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ImGui::GetFrameHeight() * 0.3f);
     const float searchW = ImGui::CalcTextSize("Search").x + ImGui::GetStyle().FramePadding.x * 4.0f;
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - searchW - ImGui::GetStyle().ItemSpacing.x);
     if (!mSearchedOnce && !mFaf.Searching() && mSearchText[0] == '\0') {
       ImGui::SetKeyboardFocusHere();
     }
-    const bool entered = ImGui::InputTextWithHint("##vaultsearch", "Search maps by name", mSearchText, sizeof(mSearchText),
-                                                  ImGuiInputTextFlags_EnterReturnsTrue);
+    const bool entered = ImGui::InputTextWithHint(
+      "##vaultsearch", "Search maps by name", mSearchText, sizeof(mSearchText), ImGuiInputTextFlags_EnterReturnsTrue
+    );
     ImGui::SameLine();
     ImGui::BeginDisabled(mFaf.Searching());
     if (AccentButton("Search", ImVec2(searchW, 0.0f)) || (entered && !mFaf.Searching())) {
@@ -1168,12 +1385,19 @@ namespace faf::editor
     } else if (mSearchedOnce) {
       const float lineRight = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
       ImGui::AlignTextToFramePadding();
-      ImGui::TextDisabled("%s", mFound.empty() ? "No maps match" : (std::string("By ") + SortLabel(mFilters.sortProperty) + (mFilters.descending ? ", most first" : ", least first")).c_str());
+      ImGui::TextDisabled(
+        "%s",
+        mFound.empty() ? "No maps match"
+                       : (std::string("By ") + SortLabel(mFilters.sortProperty) +
+                          (mFilters.descending ? ", most first" : ", least first"))
+                           .c_str()
+      );
       if (mSearchPages > 1) {
         char page[32];
         (void)std::snprintf(page, sizeof(page), "Page %d of %d", mSearchPage, mSearchPages);
-        const float pagerW = ImGui::CalcTextSize("< Previous").x + ImGui::CalcTextSize("Next >").x + ImGui::CalcTextSize(page).x +
-                             ImGui::GetStyle().FramePadding.x * 4.0f + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+        const float pagerW = ImGui::CalcTextSize("< Previous").x + ImGui::CalcTextSize("Next >").x +
+          ImGui::CalcTextSize(page).x + ImGui::GetStyle().FramePadding.x * 4.0f +
+          ImGui::GetStyle().ItemSpacing.x * 2.0f;
         ImGui::SameLine(lineRight - pagerW);
         ImGui::BeginDisabled(mSearchPage <= 1);
         if (RoundButton("< Previous")) {
@@ -1197,10 +1421,19 @@ namespace faf::editor
 
     // The maps as cards: picture, name, size and players, one button.
     const float cardW = ImGui::GetFontSize() * 13.0f;
-    const int columns = std::max(1, static_cast<int>((ImGui::GetContentRegionAvail().x + ImGui::GetStyle().ItemSpacing.x) /
-                                                     (cardW + ImGui::GetStyle().ItemSpacing.x)));
+    const int columns = std::max(
+      1,
+      static_cast<int>(
+        (ImGui::GetContentRegionAvail().x + ImGui::GetStyle().ItemSpacing.x) / (cardW + ImGui::GetStyle().ItemSpacing.x)
+      )
+    );
     const bool working = mDownload.GetState() == EdVaultDownload::State::Working;
-    if (!mFound.empty() && ImGui::BeginChild("##vaultcards", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar)) {
+    if (
+      !mFound.empty() &&
+      ImGui::BeginChild(
+        "##vaultcards", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar
+      )
+    ) {
       if (ImGui::BeginTable("##vaultgrid", columns, ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_PadOuterX)) {
         for (std::size_t i = 0; i < mFound.size(); ++i) {
           const VaultMap& map = mFound[i];
@@ -1213,12 +1446,17 @@ namespace faf::editor
           if (image != 0) {
             ImGui::Image(static_cast<ImTextureID>(image), ImVec2(w, w));
           } else {
-            ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + w, at.y + w), ImGui::GetColorU32(ImVec4(0.10f, 0.11f, 0.13f, 1.0f)));
+            ImGui::GetWindowDrawList()->AddRectFilled(
+              at, ImVec2(at.x + w, at.y + w), ImGui::GetColorU32(ImVec4(0.10f, 0.11f, 0.13f, 1.0f))
+            );
             const bool none = map.thumbnail.empty() || mVaultNoPicture.count(map.thumbnail) != 0;
             if (none) {
               const ImVec2 text = ImGui::CalcTextSize("No picture");
-              ImGui::GetWindowDrawList()->AddText(ImVec2(at.x + (w - text.x) * 0.5f, at.y + (w - text.y) * 0.5f),
-                                                  ImGui::GetColorU32(ImGuiCol_TextDisabled), "No picture");
+              ImGui::GetWindowDrawList()->AddText(
+                ImVec2(at.x + (w - text.x) * 0.5f, at.y + (w - text.y) * 0.5f),
+                ImGui::GetColorU32(ImGuiCol_TextDisabled),
+                "No picture"
+              );
             } else {
               const float radius = w * 0.08f;
               ImGui::SetCursorScreenPos(ImVec2(at.x + w * 0.5f - radius, at.y + w * 0.5f - radius));
@@ -1228,7 +1466,9 @@ namespace faf::editor
             ImGui::Dummy(ImVec2(w, w));
           }
           if (map.ranked) {
-            ImGui::SetCursorScreenPos(ImVec2(at.x + ImGui::GetStyle().FramePadding.x, at.y + ImGui::GetStyle().FramePadding.y));
+            ImGui::SetCursorScreenPos(
+              ImVec2(at.x + ImGui::GetStyle().FramePadding.x, at.y + ImGui::GetStyle().FramePadding.y)
+            );
             Chip("Ranked", kAccent, true);
             ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + w + ImGui::GetStyle().ItemSpacing.y));
           }
@@ -1256,7 +1496,10 @@ namespace faf::editor
             DrawDownloadProgress(-FLT_MIN);
           } else {
             ImGui::BeginDisabled(working);
-            if (here ? ImGui::Button("Open", ImVec2(-FLT_MIN, 0.0f)) : AccentButton("Download and open", ImVec2(-FLT_MIN, 0.0f))) {
+            if (
+              here ? ImGui::Button("Open", ImVec2(-FLT_MIN, 0.0f))
+                   : AccentButton("Download and open", ImVec2(-FLT_MIN, 0.0f))
+            ) {
               Download(map.folder);
             }
             ImGui::EndDisabled();

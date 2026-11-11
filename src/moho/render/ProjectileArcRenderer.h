@@ -91,9 +91,16 @@ namespace moho
      * destination pointing at the source's buffer - and the map needs the
      * track copyable to build a node.
      */
-    ProjectileArcTrack(const ProjectileArcTrack& other) { *this = other; }
+    ProjectileArcTrack(
+      const ProjectileArcTrack& other
+    )
+    {
+      *this = other;
+    }
 
-    ProjectileArcTrack& operator=(const ProjectileArcTrack& other)
+    ProjectileArcTrack& operator=(
+      const ProjectileArcTrack& other
+    )
     {
       if (this != &other) {
         mActive = other.mActive;
@@ -107,9 +114,7 @@ namespace moho
   };
 
   static_assert(offsetof(ProjectileArcTrack, mActive) == 0x0000, "ProjectileArcTrack::mActive offset must be 0x0000");
-  static_assert(
-    offsetof(ProjectileArcTrack, mSamples) == 0x0008, "ProjectileArcTrack::mSamples offset must be 0x0008"
-  );
+  static_assert(offsetof(ProjectileArcTrack, mSamples) == 0x0008, "ProjectileArcTrack::mSamples offset must be 0x0008");
   static_assert(
     offsetof(ProjectileArcTrack, mTicksSinceSample) == 0x0C18,
     "ProjectileArcTrack::mTicksSinceSample offset must be 0x0C18"
@@ -118,9 +123,7 @@ namespace moho
     offsetof(ProjectileArcTrack, mLatestPosition) == 0x0C1C,
     "ProjectileArcTrack::mLatestPosition offset must be 0x0C1C"
   );
-  static_assert(
-    offsetof(ProjectileArcTrack, mVisible) == 0x0C28, "ProjectileArcTrack::mVisible offset must be 0x0C28"
-  );
+  static_assert(offsetof(ProjectileArcTrack, mVisible) == 0x0C28, "ProjectileArcTrack::mVisible offset must be 0x0C28");
   static_assert(sizeof(ProjectileArcTrack) == 0x0C30, "ProjectileArcTrack size must be 0x0C30");
   static_assert(alignof(ProjectileArcTrack) == 8, "ProjectileArcTrack must be 8-aligned");
 
@@ -167,7 +170,6 @@ namespace moho
    * that types it so) and pinned the interpolant to `0.0f`, which left every
    * trail a sub-tick behind its projectile.
    */
-  void RenderProjectileArcs(
-    CWldSession* session, GeomCamera3* camera, CD3DPrimBatcher* primBatcher, float tickFraction
-  );
+  void
+  RenderProjectileArcs(CWldSession* session, GeomCamera3* camera, CD3DPrimBatcher* primBatcher, float tickFraction);
 } // namespace moho

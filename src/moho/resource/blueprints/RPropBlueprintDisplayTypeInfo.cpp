@@ -63,7 +63,12 @@ namespace moho
   {
     size_ = sizeof(RPropBlueprintDisplay);
     gpg::RType::Init();
-    AddField<moho::RResId>("MeshBlueprint", offsetof(RPropBlueprintDisplay, MeshBlueprint), 3, "Name of mesh blueprint to use. Leave blank to use default mesh.");
+    AddField<moho::RResId>(
+      "MeshBlueprint",
+      offsetof(RPropBlueprintDisplay, MeshBlueprint),
+      3,
+      "Name of mesh blueprint to use. Leave blank to use default mesh."
+    );
     AddField<float>("UniformScale", offsetof(RPropBlueprintDisplay, UniformScale), 3, "Uniform scale to apply to mesh");
     Finish();
   }
@@ -79,4 +84,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RPropBlueprintDisplayTypeInfo_882cea, moho::register_RPropBlueprintDisplayTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_RPropBlueprintDisplayTypeInfo_882cea,
+  moho::register_RPropBlueprintDisplayTypeInfo
+)

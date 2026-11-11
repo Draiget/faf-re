@@ -15,7 +15,7 @@ namespace gpg::gal
 {
   class GpuBuffer;
   class GpuProgram;
-}
+} // namespace gpg::gal
 
 namespace faf::editor
 {
@@ -51,7 +51,9 @@ namespace faf::editor
     static constexpr std::uint64_t kGameViewImage = 3U;
     static void SetGameViewSource(gpg::gal::RenderTarget* (*source)());
     /** A colour target as an image for `ImGui::Image` and the draw lists (its pointer with the low bit set). */
-    static std::uint64_t TargetImage(gpg::gal::RenderTarget* target)
+    static std::uint64_t TargetImage(
+      gpg::gal::RenderTarget* target
+    )
     {
       return target != nullptr ? (static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(target)) | 1U) : 0U;
     }

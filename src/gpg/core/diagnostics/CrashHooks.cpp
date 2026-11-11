@@ -74,7 +74,10 @@ namespace gpg::diag
     return sPath;
   }
 
-  void DiagLine(const char* const format, ...)
+  void DiagLine(
+    const char* const format,
+    ...
+  )
   {
     std::FILE* sink = nullptr;
     if (::fopen_s(&sink, DiagLogPath(), "a") != 0 || sink == nullptr) {
@@ -116,8 +119,8 @@ namespace gpg::diag
       // WinApp.cpp already initialises dbghelp for the crash reporter. A second
       // call fails with ERROR_INVALID_PARAMETER and that is fine - the handle is
       // already usable, so treat "already initialised" as success.
-      sReady = ::SymInitialize(::GetCurrentProcess(), nullptr, TRUE) != FALSE
-        || ::GetLastError() == ERROR_INVALID_PARAMETER;
+      sReady =
+        ::SymInitialize(::GetCurrentProcess(), nullptr, TRUE) != FALSE || ::GetLastError() == ERROR_INVALID_PARAMETER;
     }
     return sReady;
   }
@@ -127,7 +130,11 @@ namespace gpg::diag
 
   } // namespace
 
-  void DiagDescribeAddress(const void* const address, char* const out, const std::size_t outBytes)
+  void DiagDescribeAddress(
+    const void* const address,
+    char* const out,
+    const std::size_t outBytes
+  )
   {
     const auto raw = reinterpret_cast<DWORD64>(address);
 
@@ -136,12 +143,14 @@ namespace gpg::diag
     char moduleName[MAX_PATH] = "?";
     DWORD64 moduleBase = 0;
     HMODULE module = nullptr;
-    if (::GetModuleHandleExA(
-          GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-          static_cast<LPCSTR>(address),
-          &module
-        ) != FALSE
-        && module != nullptr) {
+    if (
+      ::GetModuleHandleExA(
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        static_cast<LPCSTR>(address),
+        &module
+      ) != FALSE &&
+      module != nullptr
+    ) {
       moduleBase = reinterpret_cast<DWORD64>(module);
       char fullPath[MAX_PATH] = {};
       if (::GetModuleFileNameA(module, fullPath, static_cast<DWORD>(sizeof(fullPath))) != 0u) {
@@ -170,8 +179,14 @@ namespace gpg::diag
         // with the real fault's stack already discarded.
         if (::SymGetLineFromAddr64(::GetCurrentProcess(), raw, &lineOffset, &line) != FALSE) {
           (void)::_snprintf_s(
-            symbolText, sizeof(symbolText), _TRUNCATE, " %s+0x%llX (%s:%lu)",
-            symbol->Name, symbolOffset, (line.FileName != nullptr) ? line.FileName : "?", line.LineNumber
+            symbolText,
+            sizeof(symbolText),
+            _TRUNCATE,
+            " %s+0x%llX (%s:%lu)",
+            symbol->Name,
+            symbolOffset,
+            (line.FileName != nullptr) ? line.FileName : "?",
+            line.LineNumber
           );
         } else {
           (void)::_snprintf_s(symbolText, sizeof(symbolText), _TRUNCATE, " %s+0x%llX", symbol->Name, symbolOffset);
@@ -180,12 +195,20 @@ namespace gpg::diag
     }
 
     (void)::_snprintf_s(
-      out, outBytes, _TRUNCATE, "%08llX %s+0x%llX%s",
-      raw, moduleName, (moduleBase != 0) ? (raw - moduleBase) : 0ull, symbolText
+      out,
+      outBytes,
+      _TRUNCATE,
+      "%08llX %s+0x%llX%s",
+      raw,
+      moduleName,
+      (moduleBase != 0) ? (raw - moduleBase) : 0ull,
+      symbolText
     );
   }
 
-  void DiagLogStack(const char* const tag)
+  void DiagLogStack(
+    const char* const tag
+  )
   {
     void* frames[40] = {};
     const USHORT captured = ::RtlCaptureStackBackTrace(1, 40, frames, nullptr);
@@ -201,11 +224,14 @@ namespace gpg::diag
   namespace
   {
 
-    [[maybe_unused]] int CrtReportToDiagLog(const int reportType, char* const message, int* const returnValue)
+    [[maybe_unused]] int CrtReportToDiagLog(
+      const int reportType,
+      char* const message,
+      int* const returnValue
+    )
     {
       static const char* const kKind[] = {"WARN", "ERROR", "ASSERT"};
-      const char* const kind =
-        (reportType >= 0 && reportType < 3) ? kKind[reportType] : "?";
+      const char* const kind = (reportType >= 0 && reportType < 3) ? kKind[reportType] : "?";
       DiagLine("[CRTDIAG] %s: %s", kind, (message != nullptr) ? message : "(null)");
       DiagLogStack("crt-report");
 
@@ -215,7 +241,9 @@ namespace gpg::diag
       return 0; // fall through to the CRT's own reporting too
     }
 
-    void DiagAbortSignalHandler(int)
+    void DiagAbortSignalHandler(
+      int
+    )
     {
       DiagLine("[CRTDIAG] abort() raised");
       DiagLogStack("abort");
@@ -252,7 +280,9 @@ namespace gpg::diag
 
     // First-chance, log-only. Always continues the search, so the debugger still
     // receives every exception exactly as before.
-    LONG CALLBACK DiagVectoredHandler(EXCEPTION_POINTERS* const info)
+    LONG CALLBACK DiagVectoredHandler(
+      EXCEPTION_POINTERS* const info
+    )
     {
       if (info == nullptr || info->ExceptionRecord == nullptr) {
         return EXCEPTION_CONTINUE_SEARCH;
@@ -279,9 +309,10 @@ namespace gpg::diag
         return EXCEPTION_CONTINUE_SEARCH;
       }
 
-      if (code != EXCEPTION_BREAKPOINT && code != EXCEPTION_ACCESS_VIOLATION
-          && code != EXCEPTION_ILLEGAL_INSTRUCTION && code != EXCEPTION_INT_DIVIDE_BY_ZERO
-          && code != EXCEPTION_STACK_OVERFLOW) {
+      if (
+        code != EXCEPTION_BREAKPOINT && code != EXCEPTION_ACCESS_VIOLATION && code != EXCEPTION_ILLEGAL_INSTRUCTION &&
+        code != EXCEPTION_INT_DIVIDE_BY_ZERO && code != EXCEPTION_STACK_OVERFLOW
+      ) {
         return EXCEPTION_CONTINUE_SEARCH;
       }
 
@@ -295,14 +326,19 @@ namespace gpg::diag
         const ULONG_PTR kind = info->ExceptionRecord->ExceptionInformation[0];
         const ULONG_PTR target = info->ExceptionRecord->ExceptionInformation[1];
         (void)::sprintf_s(
-          detail, sizeof(detail), " %s address %08IX",
-          (kind == 0) ? "reading" : ((kind == 1) ? "writing" : "executing"), target
+          detail,
+          sizeof(detail),
+          " %s address %08IX",
+          (kind == 0) ? "reading" : ((kind == 1) ? "writing" : "executing"),
+          target
         );
       }
 
       DiagLine(
         "[FAULT] code=0x%08lX at %08IX%s",
-        code, reinterpret_cast<std::uintptr_t>(info->ExceptionRecord->ExceptionAddress), detail
+        code,
+        reinterpret_cast<std::uintptr_t>(info->ExceptionRecord->ExceptionAddress),
+        detail
       );
       DiagLogStack("fault");
       return EXCEPTION_CONTINUE_SEARCH;
@@ -327,7 +363,9 @@ namespace gpg::diag
 
   } // namespace
 
-  void InstallCrtDiagnosticHooks(const CrtDiagOptions& options)
+  void InstallCrtDiagnosticHooks(
+    const CrtDiagOptions& options
+  )
   {
     (void)_CrtSetReportHook(&CrtReportToDiagLog);
     (void)_set_invalid_parameter_handler(&CrtInvalidParameterToDiagLog);

@@ -13,13 +13,19 @@ namespace gpg::gal::vulkan
   {
     constexpr VkDeviceSize kBlockSize = 64ULL << 20U;
 
-    [[nodiscard]] VkDeviceSize AlignUp(const VkDeviceSize value, const VkDeviceSize alignment) noexcept
+    [[nodiscard]] VkDeviceSize AlignUp(
+      const VkDeviceSize value,
+      const VkDeviceSize alignment
+    ) noexcept
     {
       return (alignment <= 1U) ? value : (value + alignment - 1U) / alignment * alignment;
     }
   } // namespace
 
-  void MemoryAllocator::Initialize(const VkPhysicalDevice physicalDevice, const VkDevice device)
+  void MemoryAllocator::Initialize(
+    const VkPhysicalDevice physicalDevice,
+    const VkDevice device
+  )
   {
     mDevice = device;
     Vk().vkGetPhysicalDeviceMemoryProperties(physicalDevice, &mProperties);
@@ -39,7 +45,10 @@ namespace gpg::gal::vulkan
     mDevice = VK_NULL_HANDLE;
   }
 
-  std::uint32_t MemoryAllocator::FindType(const std::uint32_t typeBits, const VkMemoryPropertyFlags required) const
+  std::uint32_t MemoryAllocator::FindType(
+    const std::uint32_t typeBits,
+    const VkMemoryPropertyFlags required
+  ) const
   {
     for (std::uint32_t type = 0U; type < mProperties.memoryTypeCount; ++type) {
       if ((typeBits & (1U << type)) != 0U && (mProperties.memoryTypes[type].propertyFlags & required) == required) {
@@ -49,7 +58,11 @@ namespace gpg::gal::vulkan
     backend::ThrowError("VulkanMemoryAllocator.cpp", __LINE__, "no Vulkan memory type fits the resource");
   }
 
-  Allocation MemoryAllocator::Allocate(const VkMemoryRequirements& requirements, const VkMemoryPropertyFlags required, const bool linear)
+  Allocation MemoryAllocator::Allocate(
+    const VkMemoryRequirements& requirements,
+    const VkMemoryPropertyFlags required,
+    const bool linear
+  )
   {
     const std::uint32_t type = FindType(requirements.memoryTypeBits, required);
     const bool hostVisible = (mProperties.memoryTypes[type].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0U;
@@ -123,7 +136,9 @@ namespace gpg::gal::vulkan
     } unpublished{mDevice, block.get()};
     if (hostVisible) {
       void* mapped = nullptr;
-      CheckVk("VulkanMemoryAllocator.cpp", __LINE__, Vk().vkMapMemory(mDevice, block->memory, 0U, VK_WHOLE_SIZE, 0U, &mapped));
+      CheckVk(
+        "VulkanMemoryAllocator.cpp", __LINE__, Vk().vkMapMemory(mDevice, block->memory, 0U, VK_WHOLE_SIZE, 0U, &mapped)
+      );
       block->mapped = static_cast<std::uint8_t*>(mapped);
     }
     if (requirements.size < block->size) {
@@ -151,7 +166,9 @@ namespace gpg::gal::vulkan
     return allocation;
   }
 
-  void MemoryAllocator::Free(const Allocation& allocation) noexcept
+  void MemoryAllocator::Free(
+    const Allocation& allocation
+  ) noexcept
   {
     if (allocation.block < 0 || static_cast<std::size_t>(allocation.block) >= mBlocks.size()) {
       return;
@@ -184,7 +201,8 @@ namespace gpg::gal::vulkan
       return candidate.free.size() == 1U && candidate.free.begin()->second == candidate.size;
     };
     const bool anotherEmpty = std::any_of(mBlocks.begin(), mBlocks.end(), [&](const std::unique_ptr<Block>& other) {
-      return other != nullptr && other.get() != block && other->type == block->type && other->linear == block->linear && wholeFree(*other);
+      return other != nullptr && other.get() != block && other->type == block->type && other->linear == block->linear &&
+        wholeFree(*other);
     });
     if (wholeFree(*block) && (block->size > kBlockSize || anotherEmpty)) {
       if (block->mapped != nullptr) {

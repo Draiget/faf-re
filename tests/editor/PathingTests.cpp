@@ -17,7 +17,10 @@ namespace
     return heights;
   }
 
-  TEST(Pathing, ASteepWallSplitsTheLand)
+  TEST(
+    Pathing,
+    ASteepWallSplitsTheLand
+  )
   {
     const std::vector<std::uint16_t> heights = Field();
     faf::editor::PathFootprint tank;
@@ -39,7 +42,10 @@ namespace
     EXPECT_EQ(faf::editor::ConnectAreas(all, 8, 8, areas), 1);
   }
 
-  TEST(Pathing, WaterDepthDecidesForLandAndShips)
+  TEST(
+    Pathing,
+    WaterDepthDecidesForLandAndShips
+  )
   {
     // Flat ground at 10 under a sea at 15: 5 units of water everywhere.
     const std::vector<std::uint16_t> heights(81, static_cast<std::uint16_t>(10 * 128));
@@ -58,7 +64,10 @@ namespace
     EXPECT_EQ(faf::editor::PassableCells(heights.data(), 9, 9, false, 15.0f, ship)[0], 0);
   }
 
-  TEST(Pathing, AResourceBesideTheWayIsReached)
+  TEST(
+    Pathing,
+    AResourceBesideTheWayIsReached
+  )
   {
     std::vector<int> areas(64, 0);
     areas[10] = 3; // cell (2, 1)

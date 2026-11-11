@@ -17,27 +17,32 @@ namespace
    * A table key as a row name: booleans and numbers printed, strings as they
    * are, anything else "<unknown>".
    */
-  fa::string FormatWatchKeyForTree(const LuaPlus::LuaObject& key)
+  fa::string FormatWatchKeyForTree(
+    const LuaPlus::LuaObject& key
+  )
   {
     switch (key.Type()) {
-      case LUA_TBOOLEAN:
-        return key.GetBoolean() ? "true" : "false";
-      case LUA_TNUMBER: {
-        std::ostringstream stream;
-        stream << static_cast<float>(key.GetNumber()); // FA's lua_Number is a float
-        return stream.str().c_str();
-      }
-      case LUA_TSTRING:
-        return key.GetString();
-      default:
-        return "<unknown>";
+    case LUA_TBOOLEAN:
+      return key.GetBoolean() ? "true" : "false";
+    case LUA_TNUMBER: {
+      std::ostringstream stream;
+      stream << static_cast<float>(key.GetNumber()); // FA's lua_Number is a float
+      return stream.str().c_str();
+    }
+    case LUA_TSTRING:
+      return key.GetString();
+    default:
+      return "<unknown>";
     }
   }
 } // namespace
 
 // Table 0x00DFF60C = {&wxTreeListCtrl::sm_eventTable (0x00D52EFC), rows 0x00F596D4};
 // GetEventTable (0x004D6FE0) comes with it.
-BEGIN_EVENT_TABLE(moho::ScrWatchCtrl, wxTreeListCtrl)
+BEGIN_EVENT_TABLE(
+  moho::ScrWatchCtrl,
+  wxTreeListCtrl
+)
 END_EVENT_TABLE()
 
 /**
@@ -61,7 +66,9 @@ moho::ScrWatchCtrl::ScrWatchCtrl(
   mRoot = AddRoot(wxT("VARIABLES"));
 
   Connect(
-    GetId(), -1, wxEVT_COMMAND_TREE_ITEM_ACTIVATED,
+    GetId(),
+    -1,
+    wxEVT_COMMAND_TREE_ITEM_ACTIVATED,
     (wxObjectEventFunction)(wxEventFunction)(wxTreeEventFunction)&ScrWatchCtrl::OnItemActivate
   );
 }
@@ -75,9 +82,12 @@ void moho::ScrWatchCtrl::Clear()
 }
 
 /**
- * Address: 0x004D7220 (FUN_004D7220, ?Update@ScrWatchCtrl@Moho@@QAEXABV?$vector@VScrWatch@Moho@@V?$allocator@VScrWatch@Moho@@@std@@@std@@@Z)
+ * Address: 0x004D7220 (FUN_004D7220,
+ * ?Update@ScrWatchCtrl@Moho@@QAEXABV?$vector@VScrWatch@Moho@@V?$allocator@VScrWatch@Moho@@@std@@@std@@@Z)
  */
-void moho::ScrWatchCtrl::Update(const fa::vector<ScrWatch>& watches)
+void moho::ScrWatchCtrl::Update(
+  const fa::vector<ScrWatch>& watches
+)
 {
   Clear();
   for (fa::vector<ScrWatch>::const_iterator watch = watches.begin(); watch != watches.end(); ++watch) {
@@ -89,7 +99,9 @@ void moho::ScrWatchCtrl::Update(const fa::vector<ScrWatch>& watches)
 /**
  * Address: 0x004D7380 (FUN_004D7380, ?OnItemActivate@ScrWatchCtrl@Moho@@QAEXAAVwxTreeEvent@@@Z)
  */
-void moho::ScrWatchCtrl::OnItemActivate(wxTreeEvent& event)
+void moho::ScrWatchCtrl::OnItemActivate(
+  wxTreeEvent& event
+)
 {
   const wxTreeItemId item = event.GetItem();
   if (!item.IsOk()) {
@@ -124,7 +136,10 @@ void moho::ScrWatchCtrl::OnItemActivate(wxTreeEvent& event)
 /**
  * Address: 0x004D7580 (FUN_004D7580, ?AddWatch@ScrWatchCtrl@Moho@@AAEXABVwxTreeItemId@@ABVScrWatch@2@@Z)
  */
-void moho::ScrWatchCtrl::AddWatch(const wxTreeItemId& parent, const ScrWatch& watch)
+void moho::ScrWatchCtrl::AddWatch(
+  const wxTreeItemId& parent,
+  const ScrWatch& watch
+)
 {
   const wxTreeItemId item = AppendItem(parent, gpg::STR_Utf8ToWide(watch.name.c_str()).c_str());
   SetItemData(item, new TreeData(watch));

@@ -53,110 +53,122 @@
 
 namespace fa
 {
+  /**
+   * Address: 0x00769560 (inlined into every `_Buckno` call site; also
+   *          0x007692F0 and 0x0076AC60)
+   *
+   * IDA signature:
+   * v3 = ldiv(*a2, 127773);
+   * v4 = 16807 * v3.rem - 2836 * v3.quot;
+   * if (v4 < 0) v4 += 0x7FFFFFFF;
+   *
+   * What it does:
+   * `stdext::hash_compare`'s pseudorandomizing transform - one step of the
+   * Park-Miller "minimal standard" generator using Schrage decomposition so
+   * the 32-bit intermediate never overflows. Key types that supply their own
+   * `hash_value` end in this step over their hash; integral keys reach it
+   * through `hash_compare` after the `_HASH_SEED` XOR.
+   */
+  [[nodiscard]] inline std::size_t hash_value(
+    long key
+  ) noexcept
+  {
+    // `ldiv`'s quotient and remainder are by definition `key / 127773` and `key % 127773` (both
+    // truncating, C99 7.20.6.2); written out, the compiler turns the constant division into a
+    // multiply instead of a library call on every hash.
+    const long quot = key / 127773L;
+    const long rem = key % 127773L;
+    long scrambled = 16807L * rem - 2836L * quot;
+    if (scrambled < 0) {
+      scrambled += 2147483647L;
+    }
+    return static_cast<std::size_t>(scrambled);
+  }
+
+  /** VC8's `_HASH_SEED`. */
+  inline constexpr std::size_t hash_seed = 0xDEADBEEFu;
+
+  /**
+   * MSVC8 `stdext::hash_compare`: bundles the hash function and the strict
+   * weak ordering used to keep each bucket window sorted.
+   *
+   * Holds `Pred` by value (an empty `std::less` in every engine
+   * instantiation), which is what gives the enclosing `hash_map` its 4-byte
+   * leading member.
+   */
+  template <class Key, class Pred = std::less<Key>>
+  class hash_compare
+  {
+    Pred comp;
+
+  public:
+    static constexpr std::size_t bucket_size = 4;
+    static constexpr std::size_t min_buckets = 8;
+
+    hash_compare() = default;
+
+    explicit hash_compare(
+      const Pred& pred
+    )
+      : comp(pred)
+    {}
+
     /**
-     * Address: 0x00769560 (inlined into every `_Buckno` call site; also
-     *          0x007692F0 and 0x0076AC60)
-     *
-     * IDA signature:
-     * v3 = ldiv(*a2, 127773);
-     * v4 = 16807 * v3.rem - 2836 * v3.quot;
-     * if (v4 < 0) v4 += 0x7FFFFFFF;
-     *
-     * What it does:
-     * `stdext::hash_compare`'s pseudorandomizing transform - one step of the
-     * Park-Miller "minimal standard" generator using Schrage decomposition so
-     * the 32-bit intermediate never overflows. Key types that supply their own
-     * `hash_value` end in this step over their hash; integral keys reach it
-     * through `hash_compare` after the `_HASH_SEED` XOR.
+     * Hashes one key. An integral key is VC8's `hash_value(key) = key ^
+     * _HASH_SEED` then the Park-Miller step (`xor edx, 0DEADBEEFh` ahead of
+     * the `ldiv(.., 127773)` in `MemHookAddr`'s insert, 0x008D4CC3); any
+     * other key type supplies its own `hash_value`, found via ADL.
      */
-    [[nodiscard]] inline std::size_t hash_value(long key) noexcept
+    [[nodiscard]] std::size_t operator()(
+      const Key& key
+    ) const
     {
-        // `ldiv`'s quotient and remainder are by definition `key / 127773` and `key % 127773` (both
-        // truncating, C99 7.20.6.2); written out, the compiler turns the constant division into a
-        // multiply instead of a library call on every hash.
-        const long quot = key / 127773L;
-        const long rem = key % 127773L;
-        long scrambled = 16807L * rem - 2836L * quot;
-        if (scrambled < 0) {
-            scrambled += 2147483647L;
-        }
-        return static_cast<std::size_t>(scrambled);
+      if constexpr (std::is_pointer_v<Key>) {
+        // VC8 hashes the low address bits, while std::less<Key>
+        // compares the complete pointer. Collisions are valid on x64.
+        return hash_value(static_cast<long>(reinterpret_cast<std::uintptr_t>(key) ^ hash_seed));
+      } else if constexpr (std::is_integral_v<Key>) {
+        return hash_value(static_cast<long>(static_cast<std::size_t>(key) ^ hash_seed));
+      } else {
+        return hash_value(key);
+      }
     }
 
-    /** VC8's `_HASH_SEED`. */
-    inline constexpr std::size_t hash_seed = 0xDEADBEEFu;
-
-    /**
-     * MSVC8 `stdext::hash_compare`: bundles the hash function and the strict
-     * weak ordering used to keep each bucket window sorted.
-     *
-     * Holds `Pred` by value (an empty `std::less` in every engine
-     * instantiation), which is what gives the enclosing `hash_map` its 4-byte
-     * leading member.
-     */
-    template <class Key, class Pred = std::less<Key>>
-    class hash_compare
+    /** Orders two keys inside a bucket window. */
+    [[nodiscard]] bool operator()(
+      const Key& lhs,
+      const Key& rhs
+    ) const
     {
-        Pred comp;
+      return comp(lhs, rhs);
+    }
+  };
 
-    public:
-        static constexpr std::size_t bucket_size = 4;
-        static constexpr std::size_t min_buckets = 8;
-
-        hash_compare() = default;
-
-        explicit hash_compare(const Pred& pred)
-            : comp(pred)
-        {
-        }
-
-        /**
-         * Hashes one key. An integral key is VC8's `hash_value(key) = key ^
-         * _HASH_SEED` then the Park-Miller step (`xor edx, 0DEADBEEFh` ahead of
-         * the `ldiv(.., 127773)` in `MemHookAddr`'s insert, 0x008D4CC3); any
-         * other key type supplies its own `hash_value`, found via ADL.
-         */
-        [[nodiscard]] std::size_t operator()(const Key& key) const
-        {
-            if constexpr (std::is_pointer_v<Key>) {
-                // VC8 hashes the low address bits, while std::less<Key>
-                // compares the complete pointer. Collisions are valid on x64.
-                return hash_value(static_cast<long>(reinterpret_cast<std::uintptr_t>(key) ^ hash_seed));
-            } else if constexpr (std::is_integral_v<Key>) {
-                return hash_value(static_cast<long>(static_cast<std::size_t>(key) ^ hash_seed));
-            } else {
-                return hash_value(key);
-            }
-        }
-
-        /** Orders two keys inside a bucket window. */
-        [[nodiscard]] bool operator()(const Key& lhs, const Key& rhs) const
-        {
-            return comp(lhs, rhs);
-        }
+  namespace detail
+  {
+    /** `hash_map`'s key is the element's `first`. */
+    struct hash_map_key
+    {
+      template <class Pair>
+      [[nodiscard]] const auto& operator()(
+        const Pair& value
+      ) const noexcept
+      {
+        return value.first;
+      }
     };
 
-    namespace detail
+    /** `hash_set`'s key is the element itself. */
+    struct hash_set_key
     {
-        /** `hash_map`'s key is the element's `first`. */
-        struct hash_map_key
-        {
-            template <class Pair>
-            [[nodiscard]] const auto& operator()(const Pair& value) const noexcept
-            {
-                return value.first;
-            }
-        };
-
-        /** `hash_set`'s key is the element itself. */
-        struct hash_set_key
-        {
-            template <class Key>
-            [[nodiscard]] const Key& operator()(const Key& value) const noexcept
-            {
-                return value;
-            }
-        };
+      template <class Key>
+      [[nodiscard]] const Key& operator()(
+        const Key& value
+      ) const noexcept
+      {
+        return value;
+      }
+    };
 
     /**
      * VC8's `_Hash`: the table `hash_map` and `hash_set` both are. `KeyOf`
@@ -166,548 +178,589 @@ namespace fa
     class hash_table
     {
     public:
-        using key_type = Key;
-        using value_type = Value;
-        using list_type = list<value_type>;
-        using iterator = typename list_type::iterator;
-        using const_iterator = typename list_type::const_iterator;
-        using size_type = std::size_t;
+      using key_type = Key;
+      using value_type = Value;
+      using list_type = list<value_type>;
+      using iterator = typename list_type::iterator;
+      using const_iterator = typename list_type::const_iterator;
+      using size_type = std::size_t;
 
     private:
-        Traits mTraits;            // +0x00
-        list_type mList;           // +0x04
-        vector<iterator> mVec;     // +0x10
-        size_type mMask;           // +0x20
-        size_type mMaxidx;         // +0x24
+      Traits mTraits;        // +0x00
+      list_type mList;       // +0x04
+      vector<iterator> mVec; // +0x10
+      size_type mMask;       // +0x20
+      size_type mMaxidx;     // +0x24
 
     public:
-        /**
-         * Address: 0x008D5350 (FUN_008D5350) - `hash_set<unsigned int>`, the
-         *          allocation log's `MemHookAddr` (0x010C6264): stores the
-         *          comparator byte, buys the list head (0x008D63F0), constructs
-         *          the bucket vector with `min_buckets + 1` copies of `end()`
-         *          (0x008D6480), then `mMask = mMaxidx = 1`. Its dynamic
-         *          initializer is 0x00BE8FA0.
-         *
-         * VC8's `_Hash` constructor: the bucket array is built by the
-         * count-value `vector` constructor, not by `_Init()`'s `assign`,
-         * which only `clear()` reaches.
-         */
-        hash_table()
-            : mTraits()
-            , mList()
-            , mVec(Traits::min_buckets + 1, mList.end())
-            , mMask(1)
-            , mMaxidx(1)
-        {
+      /**
+       * Address: 0x008D5350 (FUN_008D5350) - `hash_set<unsigned int>`, the
+       *          allocation log's `MemHookAddr` (0x010C6264): stores the
+       *          comparator byte, buys the list head (0x008D63F0), constructs
+       *          the bucket vector with `min_buckets + 1` copies of `end()`
+       *          (0x008D6480), then `mMask = mMaxidx = 1`. Its dynamic
+       *          initializer is 0x00BE8FA0.
+       *
+       * VC8's `_Hash` constructor: the bucket array is built by the
+       * count-value `vector` constructor, not by `_Init()`'s `assign`,
+       * which only `clear()` reaches.
+       */
+      hash_table()
+        : mTraits()
+        , mList()
+        , mVec(Traits::min_buckets + 1, mList.end())
+        , mMask(1)
+        , mMaxidx(1)
+      {}
+
+      [[nodiscard]] iterator begin()
+      {
+        return mList.begin();
+      }
+      [[nodiscard]] iterator end()
+      {
+        return mList.end();
+      }
+      [[nodiscard]] const_iterator begin() const
+      {
+        return mList.begin();
+      }
+      [[nodiscard]] const_iterator end() const
+      {
+        return mList.end();
+      }
+      [[nodiscard]] size_type size() const
+      {
+        return mList.size();
+      }
+      [[nodiscard]] bool empty() const
+      {
+        return mList.empty();
+      }
+
+      /**
+       * Address: 0x0082B450 (FUN_0082B450, command-graph pointer-key map)
+       *
+       * What it does:
+       * Counts the elements in the key's equal range.
+       */
+      [[nodiscard]] size_type count(
+        const key_type& key
+      )
+      {
+        const auto range = equal_range(key);
+        return static_cast<size_type>(std::distance(range.first, range.second));
+      }
+
+      /**
+       * Address: 0x007676A0 + 0x00767C70 (the two halves of the reset lane
+       *          emitted at `PathQueue::ImplBase` +0x04 / +0x10)
+       * Address: 0x00934EA0 (FUN_00934EA0, sub_934EA0) - the standalone
+       *          emission for the cluster cache's occupation-key table,
+       *          reached from `erase(first, last)`'s erase-everything path
+       *
+       * What it does:
+       * Drops every element and re-arms the bucket window array so the table
+       * is back to its freshly-constructed single-bucket state.
+       *
+       * 0x00934EA0 shows the whole sequence in one body: the list sentinel is
+       * re-pointed at itself and `mList._Mysize` zeroed up front
+       * (0x00934EA4..0x00934EB4), the detached chain is then walked and each
+       * node handed to `operator delete` (0x00934EC0..0x00934ED0), the bucket
+       * array is re-armed with nine copies of the fresh `end()` through
+       * `vector<iterator>::assign` at 0x00934300 (`push 9` =
+       * `min_buckets + 1`), and `mMask` / `mMaxidx` are both stored as 1
+       * (0x00934EEE / 0x00934EF1).
+       */
+      void clear()
+      {
+        mList.clear();
+        _Init();
+        mMask = 1;
+        mMaxidx = 1;
+      }
+
+      /**
+       * Address: 0x00769560 (FUN_00769560) / 0x0076AC60 (FUN_0076AC60)
+       *
+       * IDA signature:
+       * _DWORD *sub_769560(_DWORD *ret@<ebx>, int *key@<edi>, _DWORD *self@<esi>);
+       *
+       * What it does:
+       * Walks the sorted bucket window forward while `node.key < key`, then
+       * returns that node when the keys compare equal and `end()` otherwise.
+       *
+       * The two addresses are separate emissions of the same template body:
+       * 0x0076AC60 is the copy inlined for the `PathQueue::ImplBase` node
+       * table, 0x00769560 the one reached from `operator[]`.
+       */
+      [[nodiscard]] iterator find(
+        const key_type& key
+      )
+      {
+        const size_type bucket = _Buckno(key);
+        iterator scan = mVec[bucket];
+        const iterator windowEnd = mVec[bucket + 1];
+
+        while (scan != windowEnd) {
+          if (!mTraits(_Kfn(*scan), key)) {
+            // Ordering stops here; only an exact match is a hit.
+            return mTraits(key, _Kfn(*scan)) ? mList.end() : scan;
+          }
+          ++scan;
+        }
+        return mList.end();
+      }
+
+      /**
+       * Address: 0x007692F0 (FUN_007692F0, second half)
+       *
+       * IDA signature:
+       * int __userpurge sub_7692F0@<eax>(_DWORD *self@<edi>, int result, int *value);
+       *
+       * What it does:
+       * Grows the table when the load factor is exceeded, locates the sorted
+       * insertion point by scanning the bucket window *backwards* from its end
+       * boundary, and links the new node there. Returns `{position, false}`
+       * without inserting when an equivalent key is already present.
+       *
+       * Address: 0x008D4C10 (FUN_008D4C10) - `hash_set<unsigned int>`,
+       *          `MemHookAddr`'s `insert` with `_Grow` inlined at its head
+       *          (the `size / 4` test against `mMaxidx`, 0x008D4C1F); the
+       *          allocation log's `func_MemHook` (0x008D1F5F) tests `.second`.
+       */
+      std::pair<iterator, bool> insert(
+        const value_type& value
+      )
+      {
+        if (mMaxidx <= mList.size() / 4) {
+          _Grow();
         }
 
-        [[nodiscard]] iterator begin() { return mList.begin(); }
-        [[nodiscard]] iterator end() { return mList.end(); }
-        [[nodiscard]] const_iterator begin() const { return mList.begin(); }
-        [[nodiscard]] const_iterator end() const { return mList.end(); }
-        [[nodiscard]] size_type size() const { return mList.size(); }
-        [[nodiscard]] bool empty() const { return mList.empty(); }
+        const size_type bucket = _Buckno(_Kfn(value));
+        const iterator windowBegin = mVec[bucket];
+        iterator where = mVec[bucket + 1];
 
-        /**
-         * Address: 0x0082B450 (FUN_0082B450, command-graph pointer-key map)
-         *
-         * What it does:
-         * Counts the elements in the key's equal range.
-         */
-        [[nodiscard]] size_type count(const key_type& key)
-        {
-            const auto range = equal_range(key);
-            return static_cast<size_type>(std::distance(range.first, range.second));
-        }
-
-        /**
-         * Address: 0x007676A0 + 0x00767C70 (the two halves of the reset lane
-         *          emitted at `PathQueue::ImplBase` +0x04 / +0x10)
-         * Address: 0x00934EA0 (FUN_00934EA0, sub_934EA0) - the standalone
-         *          emission for the cluster cache's occupation-key table,
-         *          reached from `erase(first, last)`'s erase-everything path
-         *
-         * What it does:
-         * Drops every element and re-arms the bucket window array so the table
-         * is back to its freshly-constructed single-bucket state.
-         *
-         * 0x00934EA0 shows the whole sequence in one body: the list sentinel is
-         * re-pointed at itself and `mList._Mysize` zeroed up front
-         * (0x00934EA4..0x00934EB4), the detached chain is then walked and each
-         * node handed to `operator delete` (0x00934EC0..0x00934ED0), the bucket
-         * array is re-armed with nine copies of the fresh `end()` through
-         * `vector<iterator>::assign` at 0x00934300 (`push 9` =
-         * `min_buckets + 1`), and `mMask` / `mMaxidx` are both stored as 1
-         * (0x00934EEE / 0x00934EF1).
-         */
-        void clear()
-        {
-            mList.clear();
-            _Init();
-            mMask = 1;
-            mMaxidx = 1;
-        }
-
-        /**
-         * Address: 0x00769560 (FUN_00769560) / 0x0076AC60 (FUN_0076AC60)
-         *
-         * IDA signature:
-         * _DWORD *sub_769560(_DWORD *ret@<ebx>, int *key@<edi>, _DWORD *self@<esi>);
-         *
-         * What it does:
-         * Walks the sorted bucket window forward while `node.key < key`, then
-         * returns that node when the keys compare equal and `end()` otherwise.
-         *
-         * The two addresses are separate emissions of the same template body:
-         * 0x0076AC60 is the copy inlined for the `PathQueue::ImplBase` node
-         * table, 0x00769560 the one reached from `operator[]`.
-         */
-        [[nodiscard]] iterator find(const key_type& key)
-        {
-            const size_type bucket = _Buckno(key);
-            iterator scan = mVec[bucket];
-            const iterator windowEnd = mVec[bucket + 1];
-
-            while (scan != windowEnd) {
-                if (!mTraits(_Kfn(*scan), key)) {
-                    // Ordering stops here; only an exact match is a hit.
-                    return mTraits(key, _Kfn(*scan)) ? mList.end() : scan;
-                }
-                ++scan;
+        if (windowBegin != where) {
+          for (;;) {
+            --where;
+            if (!mTraits(_Kfn(value), _Kfn(*where))) {
+              // key(*where) <= key(value)
+              if (!mTraits(_Kfn(*where), _Kfn(value))) {
+                return std::pair<iterator, bool>(where, false);
+              }
+              ++where;
+              break;
             }
-            return mList.end();
-        }
-
-        /**
-         * Address: 0x007692F0 (FUN_007692F0, second half)
-         *
-         * IDA signature:
-         * int __userpurge sub_7692F0@<eax>(_DWORD *self@<edi>, int result, int *value);
-         *
-         * What it does:
-         * Grows the table when the load factor is exceeded, locates the sorted
-         * insertion point by scanning the bucket window *backwards* from its end
-         * boundary, and links the new node there. Returns `{position, false}`
-         * without inserting when an equivalent key is already present.
-         *
-         * Address: 0x008D4C10 (FUN_008D4C10) - `hash_set<unsigned int>`,
-         *          `MemHookAddr`'s `insert` with `_Grow` inlined at its head
-         *          (the `size / 4` test against `mMaxidx`, 0x008D4C1F); the
-         *          allocation log's `func_MemHook` (0x008D1F5F) tests `.second`.
-         */
-        std::pair<iterator, bool> insert(const value_type& value)
-        {
-            if (mMaxidx <= mList.size() / 4) {
-                _Grow();
+            if (windowBegin == where) {
+              break;
             }
-
-            const size_type bucket = _Buckno(_Kfn(value));
-            const iterator windowBegin = mVec[bucket];
-            iterator where = mVec[bucket + 1];
-
-            if (windowBegin != where) {
-                for (;;) {
-                    --where;
-                    if (!mTraits(_Kfn(value), _Kfn(*where))) {
-                        // key(*where) <= key(value)
-                        if (!mTraits(_Kfn(*where), _Kfn(value))) {
-                            return std::pair<iterator, bool>(where, false);
-                        }
-                        ++where;
-                        break;
-                    }
-                    if (windowBegin == where) {
-                        break;
-                    }
-                }
-            }
-
-            const iterator displaced = where;
-            const iterator inserted = mList.insert(where, value);
-            _RetargetBucketStarts(bucket, displaced, inserted);
-            return std::pair<iterator, bool>(inserted, true);
+          }
         }
 
-        /**
-         * Address: 0x00933EF0 (FUN_00933EF0, sub_933EF0) - the emission for the
-         *          cluster cache's occupation-key table
-         *
-         * IDA signature:
-         * _DWORD **__thiscall sub_933EF0(_DWORD *self, _DWORD **ret, unsigned __int8 *key);
-         *
-         * What it does:
-         * Returns the half-open window of elements equivalent to `key`. The
-         * bucket window is kept sorted, so the lower bound is the first node
-         * that does not compare less than `key` (the `Traits(node, key)` scan
-         * at 0x00933F16) and the upper bound the first node `key` compares less
-         * than (the mirrored `Traits(key, node)` scan at 0x00933F48).
-         *
-         * A miss is reported as `{end(), end()}`, never as a degenerate pair
-         * pointing into the window: all three miss paths - empty window, no
-         * lower bound in the window, and lower == upper - fall into the same
-         * `mList._Myhead` store at 0x00933F28.
-         *
-         * Address: 0x009345F0 (FUN_009345F0, sub_9345F0) - the emission for the
-         *          cluster cache's subcluster-key table
-         *
-         * IDA signature:
-         * _DWORD *__thiscall sub_9345F0(_DWORD *self, _DWORD *ret, gpg::HaStar::SubclusterData *key);
-         *
-         * What it does:
-         * Same lower/upper forward-scan shape as the `OccupationCacheKey`
-         * emission above, instantiated for `SubclusterCacheKey`
-         * (`gpg/core/algorithms/Cluster.cpp`): the hash/bucket lookup opens
-         * with `SubclusterData::Hash` + the Park-Miller step inlined (matching
-         * `_Buckno` below) rather than a named callee, and both scan
-         * directions call `sub_931560` (the `SubclusterData` three-way
-         * comparator, `Cluster.cpp`) as the `Traits(a,b)` ordering predicate
-         * in place of the `OccupationCacheKey` emission's own comparator. Both
-         * branches funnel into the same `{mList._Myhead, mList._Myhead}` miss
-         * pair the template returns on an empty/degenerate window.
-         */
-        [[nodiscard]] std::pair<iterator, iterator> equal_range(const key_type& key)
-        {
-            const size_type bucket = _Buckno(key);
-            const iterator windowEnd = mVec[bucket + 1];
+        const iterator displaced = where;
+        const iterator inserted = mList.insert(where, value);
+        _RetargetBucketStarts(bucket, displaced, inserted);
+        return std::pair<iterator, bool>(inserted, true);
+      }
 
-            for (iterator lower = mVec[bucket]; lower != windowEnd; ++lower) {
-                if (mTraits(_Kfn(*lower), key)) {
-                    continue;
-                }
+      /**
+       * Address: 0x00933EF0 (FUN_00933EF0, sub_933EF0) - the emission for the
+       *          cluster cache's occupation-key table
+       *
+       * IDA signature:
+       * _DWORD **__thiscall sub_933EF0(_DWORD *self, _DWORD **ret, unsigned __int8 *key);
+       *
+       * What it does:
+       * Returns the half-open window of elements equivalent to `key`. The
+       * bucket window is kept sorted, so the lower bound is the first node
+       * that does not compare less than `key` (the `Traits(node, key)` scan
+       * at 0x00933F16) and the upper bound the first node `key` compares less
+       * than (the mirrored `Traits(key, node)` scan at 0x00933F48).
+       *
+       * A miss is reported as `{end(), end()}`, never as a degenerate pair
+       * pointing into the window: all three miss paths - empty window, no
+       * lower bound in the window, and lower == upper - fall into the same
+       * `mList._Myhead` store at 0x00933F28.
+       *
+       * Address: 0x009345F0 (FUN_009345F0, sub_9345F0) - the emission for the
+       *          cluster cache's subcluster-key table
+       *
+       * IDA signature:
+       * _DWORD *__thiscall sub_9345F0(_DWORD *self, _DWORD *ret, gpg::HaStar::SubclusterData *key);
+       *
+       * What it does:
+       * Same lower/upper forward-scan shape as the `OccupationCacheKey`
+       * emission above, instantiated for `SubclusterCacheKey`
+       * (`gpg/core/algorithms/Cluster.cpp`): the hash/bucket lookup opens
+       * with `SubclusterData::Hash` + the Park-Miller step inlined (matching
+       * `_Buckno` below) rather than a named callee, and both scan
+       * directions call `sub_931560` (the `SubclusterData` three-way
+       * comparator, `Cluster.cpp`) as the `Traits(a,b)` ordering predicate
+       * in place of the `OccupationCacheKey` emission's own comparator. Both
+       * branches funnel into the same `{mList._Myhead, mList._Myhead}` miss
+       * pair the template returns on an empty/degenerate window.
+       */
+      [[nodiscard]] std::pair<iterator, iterator> equal_range(
+        const key_type& key
+      )
+      {
+        const size_type bucket = _Buckno(key);
+        const iterator windowEnd = mVec[bucket + 1];
 
-                iterator upper = lower;
-                while (upper != windowEnd && !mTraits(key, _Kfn(*upper))) {
-                    ++upper;
-                }
+        for (iterator lower = mVec[bucket]; lower != windowEnd; ++lower) {
+          if (mTraits(_Kfn(*lower), key)) {
+            continue;
+          }
 
-                if (lower == upper) {
-                    break;
-                }
-                return std::pair<iterator, iterator>(lower, upper);
-            }
+          iterator upper = lower;
+          while (upper != windowEnd && !mTraits(key, _Kfn(*upper))) {
+            ++upper;
+          }
 
-            return std::pair<iterator, iterator>(mList.end(), mList.end());
+          if (lower == upper) {
+            break;
+          }
+          return std::pair<iterator, iterator>(lower, upper);
         }
 
-        /**
-         * Address: 0x00933F80 (FUN_00933F80, sub_933F80) - the emission for the
-         *          cluster cache's occupation-key table
-         *
-         * IDA signature:
-         * _DWORD *__thiscall sub_933F80(vector_OccupationData *self, _DWORD *ret, unsigned __int8 *where);
-         *
-         * What it does:
-         * Drops one element and returns its successor.
-         *
-         * This is a bucket-window operation, not a plain list erase. Because a
-         * bucket is the window `[mVec[b], mVec[b + 1])` into the single element
-         * list, an erased node that is still named as a window start has to be
-         * handed over to its successor first, and empty buckets below share
-         * that same boundary - so the retarget walks downward for as long as
-         * the entries keep matching (0x00933F95 opens the walk, the body at
-         * 0x00933FA0 does `*slot = (*slot)->_Next`, and 0x00933FAA..0x00933FB6
-         * steps to the bucket below while it still names the erased node,
-         * stopping at index 0). Only then is the node unlinked from the list,
-         * released, and `mList._Mysize` decremented
-         * (0x00933FBF..0x00933FD5).
-         *
-         * Address: 0x009346F0 (FUN_009346F0, sub_9346F0) - the emission for the
-         *          cluster cache's subcluster-key table
-         *
-         * IDA signature:
-         * _DWORD *__thiscall sub_9346F0(_DWORD *self, _DWORD *ret, char *where);
-         *
-         * What it does:
-         * Same bucket-retarget-then-unlink shape as the `OccupationCacheKey`
-         * emission above, instantiated for `SubclusterCacheKey`
-         * (`gpg/core/algorithms/Cluster.cpp`): the bucket index is recomputed
-         * from `SubclusterData::Hash(where->first)` + the inlined Park-Miller
-         * step (this instantiation's key does not carry a separately-stored
-         * bucket index, so `_Buckno` is re-derived here rather than read back),
-         * the retarget walk is the same "shift bucket-start entries down while
-         * they still name the erased node" loop, and the freed node's key --
-         * 16 embedded `gpg::HaStar::Cluster` handles -- is torn down through
-         * the compiler's `` `eh vector destructor iterator' `` before
-         * `operator delete`, which is `mList.erase(where)`'s own key
-         * destruction for this non-trivial `value_type` (the `fa::list<T>`
-         * instantiation that call lands in is `Vector.h`'s `list<T>`; not
-         * modeled from this header).
-         */
-        iterator erase(iterator where)
-        {
-            iterator next = where;
-            ++next;
+        return std::pair<iterator, iterator>(mList.end(), mList.end());
+      }
 
-            _RetargetBucketStarts(_Buckno(_Kfn(*where)), where, next);
-            return mList.erase(where);
+      /**
+       * Address: 0x00933F80 (FUN_00933F80, sub_933F80) - the emission for the
+       *          cluster cache's occupation-key table
+       *
+       * IDA signature:
+       * _DWORD *__thiscall sub_933F80(vector_OccupationData *self, _DWORD *ret, unsigned __int8 *where);
+       *
+       * What it does:
+       * Drops one element and returns its successor.
+       *
+       * This is a bucket-window operation, not a plain list erase. Because a
+       * bucket is the window `[mVec[b], mVec[b + 1])` into the single element
+       * list, an erased node that is still named as a window start has to be
+       * handed over to its successor first, and empty buckets below share
+       * that same boundary - so the retarget walks downward for as long as
+       * the entries keep matching (0x00933F95 opens the walk, the body at
+       * 0x00933FA0 does `*slot = (*slot)->_Next`, and 0x00933FAA..0x00933FB6
+       * steps to the bucket below while it still names the erased node,
+       * stopping at index 0). Only then is the node unlinked from the list,
+       * released, and `mList._Mysize` decremented
+       * (0x00933FBF..0x00933FD5).
+       *
+       * Address: 0x009346F0 (FUN_009346F0, sub_9346F0) - the emission for the
+       *          cluster cache's subcluster-key table
+       *
+       * IDA signature:
+       * _DWORD *__thiscall sub_9346F0(_DWORD *self, _DWORD *ret, char *where);
+       *
+       * What it does:
+       * Same bucket-retarget-then-unlink shape as the `OccupationCacheKey`
+       * emission above, instantiated for `SubclusterCacheKey`
+       * (`gpg/core/algorithms/Cluster.cpp`): the bucket index is recomputed
+       * from `SubclusterData::Hash(where->first)` + the inlined Park-Miller
+       * step (this instantiation's key does not carry a separately-stored
+       * bucket index, so `_Buckno` is re-derived here rather than read back),
+       * the retarget walk is the same "shift bucket-start entries down while
+       * they still name the erased node" loop, and the freed node's key --
+       * 16 embedded `gpg::HaStar::Cluster` handles -- is torn down through
+       * the compiler's `` `eh vector destructor iterator' `` before
+       * `operator delete`, which is `mList.erase(where)`'s own key
+       * destruction for this non-trivial `value_type` (the `fa::list<T>`
+       * instantiation that call lands in is `Vector.h`'s `list<T>`; not
+       * modeled from this header).
+       */
+      iterator erase(
+        iterator where
+      )
+      {
+        iterator next = where;
+        ++next;
+
+        _RetargetBucketStarts(_Buckno(_Kfn(*where)), where, next);
+        return mList.erase(where);
+      }
+
+      /**
+       * Address: 0x00935280 (FUN_00935280, sub_935280) - the emission for the
+       *          cluster cache's occupation-key table
+       *
+       * IDA signature:
+       * _DWORD *__thiscall sub_935280(_DWORD *self, _DWORD *ret, _DWORD *first, _DWORD *last);
+       *
+       * What it does:
+       * Erases `[first, last)`. Clearing the whole table is special-cased
+       * (0x0093528D..0x00935298 tests `first == begin() && last == end()`)
+       * onto `clear()`, which re-arms the bucket array in one pass instead of
+       * retargeting boundaries once per node. Every other range is erased one
+       * element at a time with the successor latched before the node dies -
+       * `erase(first++)`, matching the `mov eax, esi; mov esi, [esi]` pair
+       * the binary emits ahead of the call at 0x009352BE.
+       *
+       * Address: 0x009352E0 (FUN_009352E0, sub_9352E0) - the emission for the
+       *          cluster cache's subcluster-key table
+       *
+       * IDA signature:
+       * _DWORD *__thiscall sub_9352E0(_DWORD *self, _DWORD *ret, _DWORD *first, _DWORD *last);
+       *
+       * What it does:
+       * Same whole-table-clear special case plus one-at-a-time fallback as
+       * the `OccupationCacheKey` emission above, instantiated for
+       * `SubclusterCacheKey`. The clear branch matches `clear()`'s own
+       * re-arm sequence exactly: `sub_933380` drops every live entry's
+       * cache backpointer (this instantiation's node value owns 16
+       * `Cluster` handles, so unlike the `OccupationCacheKey` table this
+       * walk has real per-entry work to do before the nodes are freed),
+       * `sub_9347C0(9, &bucketArray)` reseeds the bucket-index vector with
+       * `min_buckets + 1` fresh `end()` copies (`vector<iterator>::assign`,
+       * `Vector.h`), and `mMask`/`mMaxidx` are both written back to `1`
+       * (the `this + 8` / `this + 9` dword slots = `+0x20`/`+0x24`). The
+       * fallback loop tail-calls `erase(first++)` through `FUN_009346F0`
+       * (cited above), matching this member's own `while` loop precisely.
+       */
+      iterator erase(
+        iterator first,
+        iterator last
+      )
+      {
+        if (first == mList.begin() && last == mList.end()) {
+          clear();
+          return mList.begin();
         }
 
-        /**
-         * Address: 0x00935280 (FUN_00935280, sub_935280) - the emission for the
-         *          cluster cache's occupation-key table
-         *
-         * IDA signature:
-         * _DWORD *__thiscall sub_935280(_DWORD *self, _DWORD *ret, _DWORD *first, _DWORD *last);
-         *
-         * What it does:
-         * Erases `[first, last)`. Clearing the whole table is special-cased
-         * (0x0093528D..0x00935298 tests `first == begin() && last == end()`)
-         * onto `clear()`, which re-arms the bucket array in one pass instead of
-         * retargeting boundaries once per node. Every other range is erased one
-         * element at a time with the successor latched before the node dies -
-         * `erase(first++)`, matching the `mov eax, esi; mov esi, [esi]` pair
-         * the binary emits ahead of the call at 0x009352BE.
-         *
-         * Address: 0x009352E0 (FUN_009352E0, sub_9352E0) - the emission for the
-         *          cluster cache's subcluster-key table
-         *
-         * IDA signature:
-         * _DWORD *__thiscall sub_9352E0(_DWORD *self, _DWORD *ret, _DWORD *first, _DWORD *last);
-         *
-         * What it does:
-         * Same whole-table-clear special case plus one-at-a-time fallback as
-         * the `OccupationCacheKey` emission above, instantiated for
-         * `SubclusterCacheKey`. The clear branch matches `clear()`'s own
-         * re-arm sequence exactly: `sub_933380` drops every live entry's
-         * cache backpointer (this instantiation's node value owns 16
-         * `Cluster` handles, so unlike the `OccupationCacheKey` table this
-         * walk has real per-entry work to do before the nodes are freed),
-         * `sub_9347C0(9, &bucketArray)` reseeds the bucket-index vector with
-         * `min_buckets + 1` fresh `end()` copies (`vector<iterator>::assign`,
-         * `Vector.h`), and `mMask`/`mMaxidx` are both written back to `1`
-         * (the `this + 8` / `this + 9` dword slots = `+0x20`/`+0x24`). The
-         * fallback loop tail-calls `erase(first++)` through `FUN_009346F0`
-         * (cited above), matching this member's own `while` loop precisely.
-         */
-        iterator erase(iterator first, iterator last)
-        {
-            if (first == mList.begin() && last == mList.end()) {
-                clear();
-                return mList.begin();
-            }
-
-            while (first != last) {
-                erase(first++);
-            }
-            return first;
+        while (first != last) {
+          erase(first++);
         }
+        return first;
+      }
 
-        /**
-         * Address: 0x00935480 (FUN_00935480, sub_935480) - the emission for the
-         *          cluster cache's occupation-key table
-         *
-         * IDA signature:
-         * int __thiscall sub_935480(_DWORD *self, unsigned __int8 *key);
-         *
-         * What it does:
-         * Erases every element equivalent to `key` and returns how many were
-         * removed. The count is taken by walking the equivalent range before it
-         * is erased (the `mov eax, [eax]; add esi, 1` loop at 0x009354A8, which
-         * is MSVC8's `_Distance` for a bidirectional range).
-         */
-        size_type erase(const key_type& key)
-        {
-            const std::pair<iterator, iterator> range = equal_range(key);
-            const auto removed = static_cast<size_type>(std::distance(range.first, range.second));
+      /**
+       * Address: 0x00935480 (FUN_00935480, sub_935480) - the emission for the
+       *          cluster cache's occupation-key table
+       *
+       * IDA signature:
+       * int __thiscall sub_935480(_DWORD *self, unsigned __int8 *key);
+       *
+       * What it does:
+       * Erases every element equivalent to `key` and returns how many were
+       * removed. The count is taken by walking the equivalent range before it
+       * is erased (the `mov eax, [eax]; add esi, 1` loop at 0x009354A8, which
+       * is MSVC8's `_Distance` for a bidirectional range).
+       */
+      size_type erase(
+        const key_type& key
+      )
+      {
+        const std::pair<iterator, iterator> range = equal_range(key);
+        const auto removed = static_cast<size_type>(std::distance(range.first, range.second));
 
-            erase(range.first, range.second);
-            return removed;
-        }
+        erase(range.first, range.second);
+        return removed;
+      }
 
     private:
-        [[nodiscard]] static const key_type& _Kfn(const value_type& value) noexcept
-        {
-            return KeyOf{}(value);
+      [[nodiscard]] static const key_type& _Kfn(
+        const value_type& value
+      ) noexcept
+      {
+        return KeyOf{}(value);
+      }
+
+      /**
+       * Address: 0x009303F0 (FUN_009303F0), reached from `clear()`
+       * (`FUN_00930B40`; 0x00930810 is a one-`jmp` thunk into it) for the
+       * `OccupationCacheMap` instantiation
+       * (`gpg::HaStar::ClusterInternalCache<gpg::HaStar::OccupationData>`,
+       * `gpg/core/algorithms/Cluster.cpp`) -- see
+       * `fa::vector<T>::assign(count, value)`'s `Address:` block
+       * (`legacy/containers/Vector.h`) for the full evidence trail.
+       *
+       * What it does:
+       * Seeds the bucket-index vector with `min_buckets + 1` copies of the
+       * `end()` sentinel. A single `assign` call, not a separate
+       * `clear()`+`resize()` pair: the compiled bodies for this
+       * instantiation fuse both into one unconditional
+       * `insert(first_, count, value)` (`vector<T>::assign`'s own shape),
+       * which only holds when the vector starts empty on every call --
+       * true here since `_Init()` only ever runs right after `clear()` has
+       * already emptied `mList`/reset `mMask`/`mMaxidx`. `assign` reproduces that fused shape exactly;
+       * the previous `clear(); resize(...);` pair was behaviourally
+       * equivalent but did not match the binary's one-call emission.
+       */
+      void _Init()
+      {
+        mVec.assign(Traits::min_buckets + 1, mList.end());
+      }
+
+      /**
+       * Address: 0x00932080 (FUN_00932080, sub_932080) - the out-of-line
+       *          emission for the cluster cache's occupation-key table,
+       *          shared by its `find` (0x00932B70), `equal_range`
+       *          (0x00933EF0) and `erase` (0x00933F80) call sites
+       *
+       * IDA signature:
+       * unsigned int __thiscall sub_932080(vector_OccupationData *this, unsigned __int8 *key);
+       *
+       * What it does:
+       * Maps one key onto a live bucket index.
+       *
+       * `mMask + 1` is the *address space*, but only `mMaxidx` buckets exist
+       * yet; addresses beyond that fold back onto the not-yet-split half of
+       * the table. This is what makes the split in `_Grow` incremental.
+       *
+       * 0x00932080 pins the two trailing members: `mov ecx, [esi+20h]` is
+       * `mMask` and `cmp [esi+24h], eax` is `mMaxidx`, and the fold tail
+       * `shr ecx, 1; or edx, -1; sub edx, ecx; add eax, edx` is exactly
+       * `bucket - (mMask >> 1) - 1`. Everything ahead of the fold in that
+       * body is the key hash, which for this key type is
+       * `gpg::HashBytes` followed by `hash_value` above; the integral
+       * instantiations inline `_Buckno` into their call sites instead of
+       * emitting it once.
+       */
+      [[nodiscard]] size_type _Buckno(
+        const key_type& key
+      ) const
+      {
+        const size_type bucket = mTraits(key) & mMask;
+        return (mMaxidx <= bucket) ? bucket - (mMask >> 1) - 1 : bucket;
+      }
+
+      /**
+       * Hands every bucket boundary that still names `displaced` over to
+       * `replacement`. Empty buckets share boundaries, so the walk continues
+       * downward for as long as the entries keep matching, and stops at
+       * index 0.
+       *
+       * Both sides of the table need it, with opposite arguments: `insert`
+       * links a node in front of `displaced` and retargets onto the new node,
+       * while `erase` retargets onto the erased node's successor (`++mVec[b]`
+       * in the binary, which is the same store because the slot is known to
+       * hold the erased node on entry).
+       */
+      void _RetargetBucketStarts(
+        size_type bucket,
+        iterator displaced,
+        iterator replacement
+      )
+      {
+        if (mVec[bucket] != displaced) {
+          return;
+        }
+        for (;;) {
+          mVec[bucket] = replacement;
+          if (bucket == 0) {
+            return;
+          }
+          --bucket;
+          if (mVec[bucket] != displaced) {
+            return;
+          }
+        }
+      }
+
+      /**
+       * Address: 0x007692F0 (FUN_007692F0, first half)
+       *
+       * What it does:
+       * Publishes one additional bucket. The bucket whose address space is
+       * being split is rescanned, and every node that no longer hashes to it
+       * is spliced to the list tail where the new bucket window is forming.
+       * The bucket array is doubled only when the address space runs out.
+       */
+      void _Grow()
+      {
+        const size_type windowCount = mVec.size();
+        if (windowCount - 1 > mMaxidx) {
+          if (mMask < mMaxidx) {
+            mMask = 2 * mMask + 1;
+          }
+        } else {
+          mMask = 2 * windowCount - 3;
+          mVec.resize(2 * windowCount - 1, mList.end());
         }
 
-        /**
-         * Address: 0x009303F0 (FUN_009303F0), reached from `clear()`
-         * (`FUN_00930B40`; 0x00930810 is a one-`jmp` thunk into it) for the
-         * `OccupationCacheMap` instantiation
-         * (`gpg::HaStar::ClusterInternalCache<gpg::HaStar::OccupationData>`,
-         * `gpg/core/algorithms/Cluster.cpp`) -- see
-         * `fa::vector<T>::assign(count, value)`'s `Address:` block
-         * (`legacy/containers/Vector.h`) for the full evidence trail.
-         *
-         * What it does:
-         * Seeds the bucket-index vector with `min_buckets + 1` copies of the
-         * `end()` sentinel. A single `assign` call, not a separate
-         * `clear()`+`resize()` pair: the compiled bodies for this
-         * instantiation fuse both into one unconditional
-         * `insert(first_, count, value)` (`vector<T>::assign`'s own shape),
-         * which only holds when the vector starts empty on every call --
-         * true here since `_Init()` only ever runs right after `clear()` has
-         * already emptied `mList`/reset `mMask`/`mMaxidx`. `assign` reproduces that fused shape exactly;
-         * the previous `clear(); resize(...);` pair was behaviourally
-         * equivalent but did not match the binary's one-call emission.
-         */
-        void _Init()
-        {
-            mVec.assign(Traits::min_buckets + 1, mList.end());
-        }
+        const size_type splitBucket = mMaxidx - (mMask >> 1) - 1;
+        iterator scan = mVec[splitBucket];
 
-        /**
-         * Address: 0x00932080 (FUN_00932080, sub_932080) - the out-of-line
-         *          emission for the cluster cache's occupation-key table,
-         *          shared by its `find` (0x00932B70), `equal_range`
-         *          (0x00933EF0) and `erase` (0x00933F80) call sites
-         *
-         * IDA signature:
-         * unsigned int __thiscall sub_932080(vector_OccupationData *this, unsigned __int8 *key);
-         *
-         * What it does:
-         * Maps one key onto a live bucket index.
-         *
-         * `mMask + 1` is the *address space*, but only `mMaxidx` buckets exist
-         * yet; addresses beyond that fold back onto the not-yet-split half of
-         * the table. This is what makes the split in `_Grow` incremental.
-         *
-         * 0x00932080 pins the two trailing members: `mov ecx, [esi+20h]` is
-         * `mMask` and `cmp [esi+24h], eax` is `mMaxidx`, and the fold tail
-         * `shr ecx, 1; or edx, -1; sub edx, ecx; add eax, edx` is exactly
-         * `bucket - (mMask >> 1) - 1`. Everything ahead of the fold in that
-         * body is the key hash, which for this key type is
-         * `gpg::HashBytes` followed by `hash_value` above; the integral
-         * instantiations inline `_Buckno` into their call sites instead of
-         * emitting it once.
-         */
-        [[nodiscard]] size_type _Buckno(const key_type& key) const
-        {
-            const size_type bucket = mTraits(key) & mMask;
-            return (mMaxidx <= bucket) ? bucket - (mMask >> 1) - 1 : bucket;
-        }
+        while (mVec[splitBucket + 1] != scan) {
+          if ((mTraits(_Kfn(*scan)) & mMask) == splitBucket) {
+            ++scan;
+            continue;
+          }
 
-        /**
-         * Hands every bucket boundary that still names `displaced` over to
-         * `replacement`. Empty buckets share boundaries, so the walk continues
-         * downward for as long as the entries keep matching, and stops at
-         * index 0.
-         *
-         * Both sides of the table need it, with opposite arguments: `insert`
-         * links a node in front of `displaced` and retargets onto the new node,
-         * while `erase` retargets onto the erased node's successor (`++mVec[b]`
-         * in the binary, which is the same store because the slot is known to
-         * hold the erased node on entry).
-         */
-        void _RetargetBucketStarts(size_type bucket, iterator displaced, iterator replacement)
-        {
-            if (mVec[bucket] != displaced) {
-                return;
+          iterator next = scan;
+          ++next;
+
+          if (next != mList.end()) {
+            _RetargetBucketStarts(splitBucket, scan, next);
+            mList.splice(mList.end(), mList, scan, next);
+            mVec[mMaxidx + 1] = mList.end();
+            scan = mList.end();
+            --scan;
+          }
+
+          // The freshly-migrated node becomes the start of every trailing
+          // empty bucket window down to the one being split.
+          for (size_type index = mMaxidx; index > splitBucket; --index) {
+            if (mVec[index] != mList.end()) {
+              break;
             }
-            for (;;) {
-                mVec[bucket] = replacement;
-                if (bucket == 0) {
-                    return;
-                }
-                --bucket;
-                if (mVec[bucket] != displaced) {
-                    return;
-                }
-            }
+            mVec[index] = scan;
+          }
+
+          if (next == mList.end()) {
+            break;
+          }
+          scan = next;
         }
 
-        /**
-         * Address: 0x007692F0 (FUN_007692F0, first half)
-         *
-         * What it does:
-         * Publishes one additional bucket. The bucket whose address space is
-         * being split is rescanned, and every node that no longer hashes to it
-         * is spliced to the list tail where the new bucket window is forming.
-         * The bucket array is doubled only when the address space runs out.
-         */
-        void _Grow()
-        {
-            const size_type windowCount = mVec.size();
-            if (windowCount - 1 > mMaxidx) {
-                if (mMask < mMaxidx) {
-                    mMask = 2 * mMask + 1;
-                }
-            } else {
-                mMask = 2 * windowCount - 3;
-                mVec.resize(2 * windowCount - 1, mList.end());
-            }
-
-            const size_type splitBucket = mMaxidx - (mMask >> 1) - 1;
-            iterator scan = mVec[splitBucket];
-
-            while (mVec[splitBucket + 1] != scan) {
-                if ((mTraits(_Kfn(*scan)) & mMask) == splitBucket) {
-                    ++scan;
-                    continue;
-                }
-
-                iterator next = scan;
-                ++next;
-
-                if (next != mList.end()) {
-                    _RetargetBucketStarts(splitBucket, scan, next);
-                    mList.splice(mList.end(), mList, scan, next);
-                    mVec[mMaxidx + 1] = mList.end();
-                    scan = mList.end();
-                    --scan;
-                }
-
-                // The freshly-migrated node becomes the start of every trailing
-                // empty bucket window down to the one being split.
-                for (size_type index = mMaxidx; index > splitBucket; --index) {
-                    if (mVec[index] != mList.end()) {
-                        break;
-                    }
-                    mVec[index] = scan;
-                }
-
-                if (next == mList.end()) {
-                    break;
-                }
-                scan = next;
-            }
-
-            ++mMaxidx;
-        }
+        ++mMaxidx;
+      }
     };
-    } // namespace detail
+  } // namespace detail
 
-    template <class Key, class T, class Traits = hash_compare<Key>>
-    class hash_map : public detail::hash_table<Key, std::pair<const Key, T>, Traits, detail::hash_map_key>
-    {
-        using base_type = detail::hash_table<Key, std::pair<const Key, T>, Traits, detail::hash_map_key>;
+  template <class Key, class T, class Traits = hash_compare<Key>>
+  class hash_map : public detail::hash_table<Key, std::pair<const Key, T>, Traits, detail::hash_map_key>
+  {
+    using base_type = detail::hash_table<Key, std::pair<const Key, T>, Traits, detail::hash_map_key>;
 
-    public:
-        using key_type = Key;
-        using mapped_type = T;
-        using value_type = typename base_type::value_type;
-        using iterator = typename base_type::iterator;
-
-        /**
-         * Address: 0x00768F40 (FUN_00768F40)
-         *
-         * IDA signature:
-         * int __usercall sub_768F40@<eax>(int *key@<eax>, _DWORD *self@<ecx>);
-         *
-         * What it does:
-         * Returns the mapped value for `key`, default-constructing and inserting
-         * the element first when the key is absent. The binary's `+ 12` on the
-         * return value is the `pair::second` offset inside the list node.
-         */
-        [[nodiscard]] mapped_type& operator[](const key_type& key)
-        {
-            const iterator found = this->find(key);
-            if (found != this->end()) {
-                return found->second;
-            }
-            return this->insert(value_type(key, mapped_type())).first->second;
-        }
-    };
+  public:
+    using key_type = Key;
+    using mapped_type = T;
+    using value_type = typename base_type::value_type;
+    using iterator = typename base_type::iterator;
 
     /**
-     * `stdext::hash_set`: the same table keyed by the element itself. Its
-     * iterator is the list's, mutable, as VC8's was.
+     * Address: 0x00768F40 (FUN_00768F40)
+     *
+     * IDA signature:
+     * int __usercall sub_768F40@<eax>(int *key@<eax>, _DWORD *self@<ecx>);
+     *
+     * What it does:
+     * Returns the mapped value for `key`, default-constructing and inserting
+     * the element first when the key is absent. The binary's `+ 12` on the
+     * return value is the `pair::second` offset inside the list node.
      */
-    template <class Key, class Traits = hash_compare<Key>>
-    class hash_set : public detail::hash_table<Key, Key, Traits, detail::hash_set_key>
+    [[nodiscard]] mapped_type& operator[](
+      const key_type& key
+    )
     {
-    };
+      const iterator found = this->find(key);
+      if (found != this->end()) {
+        return found->second;
+      }
+      return this->insert(value_type(key, mapped_type())).first->second;
+    }
+  };
 
-    static_assert(sizeof(hash_set<unsigned int>) == 0x28, "fa::hash_set size must be 0x28");
+  /**
+   * `stdext::hash_set`: the same table keyed by the element itself. Its
+   * iterator is the list's, mutable, as VC8's was.
+   */
+  template <class Key, class Traits = hash_compare<Key>>
+  class hash_set : public detail::hash_table<Key, Key, Traits, detail::hash_set_key>
+  {};
+
+  static_assert(sizeof(hash_set<unsigned int>) == 0x28, "fa::hash_set size must be 0x28");
 } // namespace fa

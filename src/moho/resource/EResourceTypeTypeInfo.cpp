@@ -155,4 +155,7 @@ namespace
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType(typeid(EResourceType)). See
 // StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EResourceTypeTypeInfo_bc95f0, moho::register_EResourceTypeTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EResourceTypeTypeInfo_bc95f0,
+  moho::register_EResourceTypeTypeInfo
+)

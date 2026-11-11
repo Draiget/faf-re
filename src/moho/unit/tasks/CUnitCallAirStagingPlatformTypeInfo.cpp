@@ -5,7 +5,8 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitCallAirStagingPlatform.h"
+#include "moho/unit/tasks/CUnitCallAirStagingPlatform.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -21,7 +22,9 @@ namespace
     return sInstance;
   }
 
-  void InitializeAirStagingState(moho::CUnitCallAirStagingPlatform* const task)
+  void InitializeAirStagingState(
+    moho::CUnitCallAirStagingPlatform* const task
+  )
   {
     task->mPlatform.ClearLinkState();
     task->mDone = false;
@@ -73,7 +76,9 @@ namespace moho
   /**
    * Address: 0x00602F20 (FUN_00602F20, AddBase_CCommandTask)
    */
-  void __stdcall CUnitCallAirStagingPlatformTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitCallAirStagingPlatformTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<CCommandTask>(typeInfo);
   }
@@ -93,7 +98,9 @@ namespace moho
   /**
    * Address: 0x00602B90 (FUN_00602B90)
    */
-  gpg::RRef CUnitCallAirStagingPlatformTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitCallAirStagingPlatformTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CUnitCallAirStagingPlatform*>(objectStorage);
     if (task) {
@@ -106,7 +113,9 @@ namespace moho
   /**
    * Address: 0x00602B70 (FUN_00602B70)
    */
-  void CUnitCallAirStagingPlatformTypeInfo::Delete(void* const objectStorage)
+  void CUnitCallAirStagingPlatformTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitCallAirStagingPlatform*>(objectStorage);
   }
@@ -114,7 +123,9 @@ namespace moho
   /**
    * Address: 0x00602C10 (FUN_00602C10)
    */
-  void CUnitCallAirStagingPlatformTypeInfo::Destruct(void* const objectStorage)
+  void CUnitCallAirStagingPlatformTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CUnitCallAirStagingPlatform*>(objectStorage);
     if (!task) {
@@ -133,8 +144,9 @@ namespace moho
   }
 } // namespace moho
 
-
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitCallAirStagingPlatformTypeInfo_3049ed, moho::register_CUnitCallAirStagingPlatformTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitCallAirStagingPlatformTypeInfo_3049ed,
+  moho::register_CUnitCallAirStagingPlatformTypeInfo
+)

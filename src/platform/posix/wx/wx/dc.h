@@ -20,12 +20,22 @@ class wxDC : public wxObject
 {
 public:
   wxDC() = default;
-  explicit wxDC(wxWindow* const window)
+  explicit wxDC(
+    wxWindow* const window
+  )
     : m_window(window)
   {}
 
-  void SetBrush(const wxBrush& brush) { (void)brush; }
-  void GetSize(int* const width, int* const height) const
+  void SetBrush(
+    const wxBrush& brush
+  )
+  {
+    (void)brush;
+  }
+  void GetSize(
+    int* const width,
+    int* const height
+  ) const
   {
     if (m_window != nullptr) {
       m_window->GetClientSize(width, height);
@@ -38,7 +48,12 @@ public:
       *height = 0;
     }
   }
-  void DrawRectangle(const int x, const int y, const int width, const int height)
+  void DrawRectangle(
+    const int x,
+    const int y,
+    const int width,
+    const int height
+  )
   {
     (void)x;
     (void)y;
@@ -53,7 +68,9 @@ private:
 class wxPaintDC : public wxDC
 {
 public:
-  explicit wxPaintDC(wxWindow* const window)
+  explicit wxPaintDC(
+    wxWindow* const window
+  )
     : wxDC(window)
   {}
 };
@@ -61,7 +78,9 @@ public:
 class wxClientDC : public wxDC
 {
 public:
-  explicit wxClientDC(wxWindow* const window)
+  explicit wxClientDC(
+    wxWindow* const window
+  )
     : wxDC(window)
   {}
 };

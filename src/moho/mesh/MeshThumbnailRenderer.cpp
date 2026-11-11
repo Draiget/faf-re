@@ -20,12 +20,16 @@ namespace
   /** The thumbnail surfaces' side: `mov eax, 0x200` at 0x007EAB42, `push 0x200` at 0x007EABF2 and 0x007EAC75. */
   constexpr std::uint32_t kThumbnailSurfaceSize = 0x200;
 
-  [[nodiscard]] bool Finite(const float value) noexcept
+  [[nodiscard]] bool Finite(
+    const float value
+  ) noexcept
   {
     return std::isfinite(value);
   }
 
-  [[nodiscard]] bool HasFiniteBounds(const moho::MeshInstance& meshInstance) noexcept
+  [[nodiscard]] bool HasFiniteBounds(
+    const moho::MeshInstance& meshInstance
+  ) noexcept
   {
     return Finite(meshInstance.xMin) && Finite(meshInstance.yMin) && Finite(meshInstance.zMin) &&
       Finite(meshInstance.xMax) && Finite(meshInstance.yMax) && Finite(meshInstance.zMax);
@@ -49,7 +53,9 @@ namespace
     return head;
   }
 
-  void DetachNode(moho::MeshThumbnailNode* const node) noexcept
+  void DetachNode(
+    moho::MeshThumbnailNode* const node
+  ) noexcept
   {
     node->prev->next = node->next;
     node->next->prev = node->prev;
@@ -63,7 +69,9 @@ namespace
    * What it does:
    * Increments queue size and throws `length_error` when size overflows.
    */
-  void IncrementQueueSizeOrThrow(std::uint32_t& size)
+  void IncrementQueueSizeOrThrow(
+    std::uint32_t& size
+  )
   {
     if (size == std::numeric_limits<std::uint32_t>::max()) {
       throw std::length_error("list<T> too long");
@@ -89,7 +97,8 @@ namespace
    * exception-safe and releases its own partial state on failure.
    */
   moho::MeshThumbnail* ConstructMeshThumbnailInAllocatedSlot(
-    moho::MeshThumbnail* const destination, const moho::MeshThumbnail& source
+    moho::MeshThumbnail* const destination,
+    const moho::MeshThumbnail& source
   )
   {
     if (destination == nullptr) {
@@ -110,7 +119,9 @@ namespace
    * allocation-then-copy sequence matches the release binary.
    */
   void InsertBefore(
-    moho::MeshThumbnailQueue& queue, moho::MeshThumbnailNode* const position, const moho::MeshThumbnail& value
+    moho::MeshThumbnailQueue& queue,
+    moho::MeshThumbnailNode* const position,
+    const moho::MeshThumbnail& value
   )
   {
     moho::MeshThumbnailNode* const node = new moho::MeshThumbnailNode{};
@@ -145,7 +156,8 @@ namespace
    * ran and ProjectBoxByMatrix (0x007E9AD0) had no caller.
    */
   [[nodiscard]] moho::GeomCamera3 BuildThumbnailCamera(
-    const moho::MeshInstance* const meshInstance, const Wm3::Vec3f& viewOffsetHint
+    const moho::MeshInstance* const meshInstance,
+    const Wm3::Vec3f& viewOffsetHint
   )
   {
     moho::GeomCamera3 camera{};
@@ -175,9 +187,7 @@ namespace
 
     const float eyeDistance = radius * 10.0f;
     const Wm3::Vector3f eye(
-      viewOffsetHint.x * eyeDistance,
-      viewOffsetHint.y * eyeDistance,
-      viewOffsetHint.z * eyeDistance
+      viewOffsetHint.x * eyeDistance, viewOffsetHint.y * eyeDistance, viewOffsetHint.z * eyeDistance
     );
     const Wm3::Vector3f up(0.0f, 1.0f, 0.0f);
 
@@ -195,12 +205,7 @@ namespace
     const float projectedHeight = projected.Max.Y() - projected.Min.Y();
     const float extent = std::max(projectedWidth, projectedHeight);
 
-    camera.ViewInitOrtho(
-      static_cast<std::int32_t>(extent),
-      static_cast<std::int32_t>(extent),
-      nearDepth,
-      farDepth
-    );
+    camera.ViewInitOrtho(static_cast<std::int32_t>(extent), static_cast<std::int32_t>(extent), nearDepth, farDepth);
     return camera;
   }
 
@@ -237,8 +242,10 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x007FA620 (FUN_007FA620, ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z)
-   * Mangled: ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z
+   * Address: 0x007FA620 (FUN_007FA620,
+   * ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z)
+   * Mangled:
+   * ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z
    *
    * What it does:
    * Copies one texture-sheet shared-pointer lane and forwards the thumbnail
@@ -254,8 +261,9 @@ namespace moho
   )
   {
     boost::shared_ptr<ID3DTextureSheet> retainedOutputSheet(outputSheet);
-    return ren_Viewport->mThumbnailRenderer
-      .PushRequest(blueprint, orientation, color, viewOffsetHint, retainedOutputSheet, outputRect);
+    return ren_Viewport->mThumbnailRenderer.PushRequest(
+      blueprint, orientation, color, viewOffsetHint, retainedOutputSheet, outputRect
+    );
   }
 
   /**
@@ -455,7 +463,9 @@ namespace moho
    * What it does:
    * Renders one queued thumbnail entry and writes it into the destination texture sheet.
    */
-  bool MeshThumbnailRenderer::RenderThumbnail(MeshThumbnail& request)
+  bool MeshThumbnailRenderer::RenderThumbnail(
+    MeshThumbnail& request
+  )
   {
     if (request.meshInstance == nullptr) {
       return false;
@@ -498,7 +508,9 @@ namespace moho
     return true;
   }
 
-  void MeshThumbnailRenderer::ClearQueue(MeshThumbnailQueue& queue)
+  void MeshThumbnailRenderer::ClearQueue(
+    MeshThumbnailQueue& queue
+  )
   {
     if (queue.head == nullptr) {
       queue.size = 0;

@@ -12,7 +12,6 @@ namespace moho
   class CUIManager final : public IUIManager
   {
   public:
-
     /**
      * Address: 0x0084C9C0 (FUN_0084C9C0)
      *
@@ -149,17 +148,17 @@ namespace moho
     void DebugMouseOverControl(CD3DPrimBatcher* primBatcher) override;
 
   public:
-    std::uint32_t mUnknown04 = 0;           // +0x04
+    std::uint32_t mUnknown04 = 0;                                // +0x04
     gpg::fastvector_n<boost::shared_ptr<CMauiFrame>, 2> mFrames; // +0x08
-    WeakPtr<CMauiCursor> mCursor;           // +0x28
-    LuaPlus::LuaState* mLuaState = nullptr; // +0x30
-    std::uint32_t mUnknown34 = 0;           // +0x34
-    gpg::fastvector_n<wxWindow*, 2> mInputWindows; // +0x38
-    gpg::fastvector_n<wxWindow*, 2> mHostWindows; // +0x50
-    float mUIControlsAlpha = 1.0f;          // +0x68
-    float mUnknown6C = 0.0f;                // +0x6C
-    float mGCTime = 0.0f;                   // +0x70
-    std::uint32_t mUnknown74 = 0;           // +0x74
+    WeakPtr<CMauiCursor> mCursor;                                // +0x28
+    LuaPlus::LuaState* mLuaState = nullptr;                      // +0x30
+    std::uint32_t mUnknown34 = 0;                                // +0x34
+    gpg::fastvector_n<wxWindow*, 2> mInputWindows;               // +0x38
+    gpg::fastvector_n<wxWindow*, 2> mHostWindows;                // +0x50
+    float mUIControlsAlpha = 1.0f;                               // +0x68
+    float mUnknown6C = 0.0f;                                     // +0x6C
+    float mGCTime = 0.0f;                                        // +0x70
+    std::uint32_t mUnknown74 = 0;                                // +0x74
   };
 
   static_assert(sizeof(CUIManager::mFrames) == 0x20, "moho::CUIManager::mFrames size must be 0x20");

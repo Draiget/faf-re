@@ -52,7 +52,6 @@ namespace moho
   {
     using Implementation = CD3DEffect::Technique::Implementation;
 
-
     using IntAnnotationTree = Implementation::IntAnnotationTree;
     using StringAnnotationTree = Implementation::StringAnnotationTree;
     using TechniqueSet = CD3DEffect::TechniqueSet;
@@ -64,7 +63,9 @@ namespace moho
      * edit needs saying out loud - the key the tree orders on is `mName`, and
      * nothing below touches it.
      */
-    [[nodiscard]] CD3DEffect::Technique& MutableTechnique(const TechniqueSet::iterator it) noexcept
+    [[nodiscard]] CD3DEffect::Technique& MutableTechnique(
+      const TechniqueSet::iterator it
+    ) noexcept
     {
       return const_cast<CD3DEffect::Technique&>(*it);
     }
@@ -519,7 +520,11 @@ technique EditorPropOverSway_LowFidelity
 
 )fx";
 
-    [[nodiscard]] gpg::MemBuffer<char> AppendSource(const gpg::MemBuffer<char>& source, const char* const tail, const std::size_t tailBytes)
+    [[nodiscard]] gpg::MemBuffer<char> AppendSource(
+      const gpg::MemBuffer<char>& source,
+      const char* const tail,
+      const std::size_t tailBytes
+    )
     {
       const std::size_t sourceBytes = source.Size();
       gpg::MemBuffer<char> merged = gpg::AllocMemBuffer(sourceBytes + 1u + tailBytes);
@@ -538,11 +543,15 @@ technique EditorPropOverSway_LowFidelity
      * the file is missing.
      */
     [[nodiscard]] gpg::MemBuffer<const char> TerrainTessellationSource(
-      const gpg::gal::DeviceContext* const deviceContext, FWaitHandleSet* const waitHandleSet
+      const gpg::gal::DeviceContext* const deviceContext,
+      FWaitHandleSet* const waitHandleSet
     )
     {
-      if (deviceContext == nullptr || (deviceContext->mDeviceType != gpg::gal::DeviceApi::Direct3D12 &&
-                                       deviceContext->mDeviceType != gpg::gal::DeviceApi::Vulkan)) {
+      if (
+        deviceContext == nullptr ||
+        (deviceContext->mDeviceType != gpg::gal::DeviceApi::Direct3D12 &&
+         deviceContext->mDeviceType != gpg::gal::DeviceApi::Vulkan)
+      ) {
         return {};
       }
       fa::string mountedPath{};
@@ -566,7 +575,8 @@ technique EditorPropOverSway_LowFidelity
      * vertex shader, and /nobonetexture on the command line turns it off.
      */
     [[nodiscard]] bool WantsBoneTextureVariant(
-      const gpg::gal::DeviceContext* const deviceContext, const gpg::MemBuffer<const char>& source
+      const gpg::gal::DeviceContext* const deviceContext,
+      const gpg::MemBuffer<const char>& source
     )
     {
       constexpr std::string_view kMacroName = "FAF_BONE_TEXTURE";
@@ -613,12 +623,12 @@ technique EditorPropOverSway_LowFidelity
      *     the heap pointer. That capacity-versus-16 test one word higher is
      *     what pins lane+0x1C as myRes and therefore lane+0x18 as mySize.
      */
-    [[nodiscard]] bool HasConstructedLaneName(const Implementation& lane) noexcept
+    [[nodiscard]] bool HasConstructedLaneName(
+      const Implementation& lane
+    ) noexcept
     {
       return lane.mName.mySize != 0U;
     }
-
-
 
     /**
      * Address family:
@@ -644,7 +654,10 @@ technique EditorPropOverSway_LowFidelity
      * What it does:
      * Restores red-black invariants after linking one freshly allocated node.
      */
-    [[nodiscard]] bool IsDiskFileInfoNotOlder(const SDiskFileInfo& lhs, const SDiskFileInfo& rhs) noexcept
+    [[nodiscard]] bool IsDiskFileInfoNotOlder(
+      const SDiskFileInfo& lhs,
+      const SDiskFileInfo& rhs
+    ) noexcept
     {
       const LONG comparison = ::CompareFileTime(&lhs.mLastWriteTime, &rhs.mLastWriteTime);
       return comparison >= 0;
@@ -694,7 +707,9 @@ technique EditorPropOverSway_LowFidelity
       return *table;
     }
 
-    void ForgetEffectTechniques(const CD3DEffect* const effect)
+    void ForgetEffectTechniques(
+      const CD3DEffect* const effect
+    )
     {
       TechniqueMemoTable& table = GetTechniqueMemoTable();
       EffectTechniqueMemo dropped;
@@ -726,7 +741,9 @@ technique EditorPropOverSway_LowFidelity
    * What it does:
    * Initializes one implementation lane and copies one lane-name string.
    */
-  CD3DEffect::Technique::Implementation::Implementation(const fa::string& implementationName)
+  CD3DEffect::Technique::Implementation::Implementation(
+    const fa::string& implementationName
+  )
   {
     mName.assign(implementationName, 0U, fa::string::npos);
   }
@@ -801,9 +818,7 @@ technique EditorPropOverSway_LowFidelity
     return true;
   }
 
-  void CD3DEffect::Technique::Implementation::UnknownVirtualSlot()
-  {
-  }
+  void CD3DEffect::Technique::Implementation::UnknownVirtualSlot() {}
 
   /**
    * Address: 0x0042BE40 (FUN_0042BE40)
@@ -812,7 +827,9 @@ technique EditorPropOverSway_LowFidelity
    * What it does:
    * Initializes one technique with name text and three implementation lanes.
    */
-  CD3DEffect::Technique::Technique(const fa::string& techniqueName)
+  CD3DEffect::Technique::Technique(
+    const fa::string& techniqueName
+  )
   {
     mName.assign(techniqueName, 0U, fa::string::npos);
 
@@ -862,7 +879,9 @@ technique EditorPropOverSway_LowFidelity
     }
 
     std::optional<Implementation> sharedFallback{};
-    auto resolveSourceLane = [&](const std::uint32_t primary, const std::uint32_t secondary, const std::uint32_t tertiary) -> const Implementation* {
+    auto resolveSourceLane = [&](
+                               const std::uint32_t primary, const std::uint32_t secondary, const std::uint32_t tertiary
+                             ) -> const Implementation* {
       if (HasConstructedLaneName(lanes[primary])) {
         return &lanes[primary];
       }
@@ -913,9 +932,7 @@ technique EditorPropOverSway_LowFidelity
     , mFile{}
     , mEffect{}
     , mCurrentTechnique{}
-  {
-
-  }
+  {}
 
   /**
    * Address: 0x0042C520 (FUN_0042C520)
@@ -941,8 +958,6 @@ technique EditorPropOverSway_LowFidelity
     mFile.tidy(true, 0U);
     mName.tidy(true, 0U);
 
-
-
     while (mAttachedLinks != nullptr) {
       AttachedLink* const detached = mAttachedLinks;
       mAttachedLinks = detached->mNext;
@@ -957,7 +972,9 @@ technique EditorPropOverSway_LowFidelity
    * What it does:
    * Parses one sample-count argument and forwards it to the active D3D device.
    */
-  void CD3DEffect::CON_d3d_AntiAliasingSamples(const fa::vector<fa::string>& args)
+  void CD3DEffect::CON_d3d_AntiAliasingSamples(
+    const fa::vector<fa::string>& args
+  )
   {
     if (args.size() != 2U) {
       return;
@@ -984,7 +1001,9 @@ technique EditorPropOverSway_LowFidelity
    * Loads one effect source file, merges compatibility preamble state,
    * creates one gal effect object, and rebuilds fidelity definitions.
    */
-  bool CD3DEffect::InitEffectFromFile(const char* const effectFilePath)
+  bool CD3DEffect::InitEffectFromFile(
+    const char* const effectFilePath
+  )
   {
     const fa::string engineVersion = GetEngineVersion();
     ForgetEffectTechniques(this); // engine addition (ren_TechniqueMemo): the techniques belong to the old effect
@@ -995,8 +1014,8 @@ technique EditorPropOverSway_LowFidelity
       const gpg::gal::DeviceContext* const deviceContext = (device != nullptr) ? device->GetDeviceContext() : nullptr;
       const char* const compatResourcePath =
         (deviceContext != nullptr && gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType))
-          ? "/effects/d3d10states.compat"
-          : "/effects/d3d9states.compat";
+        ? "/effects/d3d10states.compat"
+        : "/effects/d3d9states.compat";
 
       FILE_EnsureWaitHandleSet();
       FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
@@ -1119,13 +1138,23 @@ technique EditorPropOverSway_LowFidelity
             // twin that failed later would draw nothing in place of its pass.
             auto* const program = dynamic_cast<gpg::gal::ProgramEffect*>(mEffect.get());
             for (const char* const name :
-                 {"TTerrainTess", "TTerrainXPTess", "TTerrainGlowTess", "TTerrainNormalsTess", "TTerrainNormalsXPTess",
-                  "TTerrainBasisTess", "TTerrainBasisBiCubicTess"}) {
+                 {"TTerrainTess",
+                  "TTerrainXPTess",
+                  "TTerrainGlowTess",
+                  "TTerrainNormalsTess",
+                  "TTerrainNormalsXPTess",
+                  "TTerrainBasisTess",
+                  "TTerrainBasisBiCubicTess"}) {
               if (program == nullptr || !program->TechniqueCompiles(name)) {
-                throw std::runtime_error(std::string("technique ") + name + " of terrain_tess.fx did not compile (see the shader messages above)");
+                throw std::runtime_error(
+                  std::string("technique ") + name +
+                  " of terrain_tess.fx did not compile (see the shader messages above)"
+                );
               }
             }
-            gpg::Logf("terrain: tessellated techniques loaded (ren_TerrainTessellation %d)", ren_TerrainTessellation ? 1 : 0);
+            gpg::Logf(
+              "terrain: tessellated techniques loaded (ren_TerrainTessellation %d)", ren_TerrainTessellation ? 1 : 0
+            );
           } catch (const std::exception& exception) {
             gpg::Warnf("%s: %s; building it without terrain tessellation", effectFilePath, exception.what());
             mEffect.reset();
@@ -1205,18 +1234,14 @@ technique EditorPropOverSway_LowFidelity
         (void)GetImplAnnotation(&fidelityIndex, implementationName, fidelityToken);
         if (fidelityIndex < 0 || fidelityIndex > 2) {
           gpg::Warnf(
-            "technique %s in effect %s has incomplete definition",
-            abstractTechniqueName.c_str(),
-            mName.c_str()
+            "technique %s in effect %s has incomplete definition", abstractTechniqueName.c_str(), mName.c_str()
           );
           continue;
         }
 
         if (HasConstructedLaneName(lanes[fidelityIndex])) {
           gpg::Warnf(
-            "redundant implementation for technique %s in effect %s",
-            abstractTechniqueName.c_str(),
-            mName.c_str()
+            "redundant implementation for technique %s in effect %s", abstractTechniqueName.c_str(), mName.c_str()
           );
           continue;
         }
@@ -1243,7 +1268,9 @@ technique EditorPropOverSway_LowFidelity
    * What it does:
    * Resolves one exact fidelity-definition node for the supplied technique.
    */
-  CD3DEffect::TechniqueSet::iterator CD3DEffect::GetFidelityDefinitions(const Technique& technique)
+  CD3DEffect::TechniqueSet::iterator CD3DEffect::GetFidelityDefinitions(
+    const Technique& technique
+  )
   {
     return mTechniques.find(technique);
   }
@@ -1254,7 +1281,9 @@ technique EditorPropOverSway_LowFidelity
    * What it does:
    * Queries the current effect for valid techniques and appends their names.
    */
-  void CD3DEffect::EnumerateValidTechniques(fa::vector<fa::string>& outTechniqueNames)
+  void CD3DEffect::EnumerateValidTechniques(
+    fa::vector<fa::string>& outTechniqueNames
+  )
   {
     fa::vector<boost::shared_ptr<gpg::gal::EffectTechnique>> techniques{};
     mEffect->GetTechniques(techniques);
@@ -1271,7 +1300,9 @@ technique EditorPropOverSway_LowFidelity
    * Selects one technique on the backing gal effect, preferring the current
    * fidelity implementation lane when present.
    */
-  void CD3DEffect::SetTechnique(const char* techniqueName)
+  void CD3DEffect::SetTechnique(
+    const char* techniqueName
+  )
   {
     // Engine addition (ren_TerrainTessellation): a terrain technique with a tessellated twin
     // "<name>Tess" (terrain_tess.fx, Direct3D 12 and Vulkan) draws through the twin.
@@ -1291,7 +1322,10 @@ technique EditorPropOverSway_LowFidelity
       TechniqueMemoTable& table = GetTechniqueMemoTable();
       const std::lock_guard<std::mutex> lock(table.mutex);
       const auto found = table.effects.find(this);
-      if (found != table.effects.end() && found->second.galEffect == mEffect.get() && found->second.fidelity == memoFidelity) {
+      if (
+        found != table.effects.end() && found->second.galEffect == mEffect.get() &&
+        found->second.fidelity == memoFidelity
+      ) {
         for (const auto& [name, technique] : found->second.techniques) {
           if (name == techniqueName) {
             mCurrentTechnique = technique;
@@ -1307,11 +1341,7 @@ technique EditorPropOverSway_LowFidelity
 
     auto selectAndWarnInvalid = [&]() {
       mCurrentTechnique = mEffect->GetTechnique(techniqueName);
-      gpg::Debugf(
-        "technique %s in effect %s has an invalid fidelity definition",
-        techniqueName,
-        mName.c_str()
-      );
+      gpg::Debugf("technique %s in effect %s has an invalid fidelity definition", techniqueName, mName.c_str());
     };
 
     if (definition == mTechniques.end()) {
@@ -1348,7 +1378,8 @@ technique EditorPropOverSway_LowFidelity
 
   /**
    * Address: 0x0042D580 (FUN_0042D580)
-   * Mangled: ?GetImplAnnotation@CD3DEffect@Moho@@AAE_NAAHABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@1@Z
+   * Mangled:
+   * ?GetImplAnnotation@CD3DEffect@Moho@@AAE_NAAHABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@1@Z
    *
    * What it does:
    * Reads one integer annotation from one implementation technique lane.
@@ -1368,7 +1399,8 @@ technique EditorPropOverSway_LowFidelity
 
   /**
    * Address: 0x0042D640 (FUN_0042D640)
-   * Mangled: ?GetIntegerAnnotation@CD3DEffect@Moho@@QAEHABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@0H@Z
+   * Mangled:
+   * ?GetIntegerAnnotation@CD3DEffect@Moho@@QAEHABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@0H@Z
    *
    * What it does:
    * Returns one integer annotation for the selected technique/fidelity lane,
@@ -1407,7 +1439,8 @@ technique EditorPropOverSway_LowFidelity
 
   /**
    * Address: 0x0042D780 (FUN_0042D780)
-   * Mangled: ?GetImplAnnotation@CD3DEffect@Moho@@AAE_NAAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@1@Z
+   * Mangled:
+   * ?GetImplAnnotation@CD3DEffect@Moho@@AAE_NAAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@1@Z
    *
    * What it does:
    * Reads one string annotation from one implementation technique lane.
@@ -1427,7 +1460,8 @@ technique EditorPropOverSway_LowFidelity
 
   /**
    * Address: 0x0042D840 (FUN_0042D840)
-   * Mangled: ?GetStringAnnotation@CD3DEffect@Moho@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@00@Z
+   * Mangled:
+   * ?GetStringAnnotation@CD3DEffect@Moho@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@00@Z
    *
    * What it does:
    * Returns one string annotation for the selected technique/fidelity lane,
@@ -1476,13 +1510,17 @@ technique EditorPropOverSway_LowFidelity
   }
 
   /**
-   * Address: 0x0042DA30 (FUN_0042DA30, ?SetTexture@CD3DEffect@Moho@@QAEXPBDV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@@Z)
+   * Address: 0x0042DA30 (FUN_0042DA30,
+   * ?SetTexture@CD3DEffect@Moho@@QAEXPBDV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@@Z)
    *
    * What it does:
    * Resolves one effect variable by name and binds one texture handle (or
    * clears the slot when texture is null).
    */
-  void CD3DEffect::SetTexture(const char* const variableName, boost::shared_ptr<ID3DTextureSheet> texture)
+  void CD3DEffect::SetTexture(
+    const char* const variableName,
+    boost::shared_ptr<ID3DTextureSheet> texture
+  )
   {
     const boost::shared_ptr<gpg::gal::EffectVariable> variable = mEffect->GetVariable(variableName);
 

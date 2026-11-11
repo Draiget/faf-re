@@ -11,7 +11,9 @@
 
 namespace faf::editor
 {
-  const char* CheckLevelName(const CheckIssue::Level level)
+  const char* CheckLevelName(
+    const CheckIssue::Level level
+  )
   {
     switch (level) {
     case CheckIssue::Level::Error:
@@ -24,7 +26,11 @@ namespace faf::editor
     return "note";
   }
 
-  bool ParseLuaError(const std::string& error, int& line, std::string& message)
+  bool ParseLuaError(
+    const std::string& error,
+    int& line,
+    std::string& message
+  )
   {
     // This engine's Lua writes `name(12): message`.
     for (std::size_t open = error.find('('); open != std::string::npos; open = error.find('(', open + 1)) {
@@ -62,7 +68,9 @@ namespace faf::editor
     return false;
   }
 
-  std::vector<CheckIssue> CheckMarkers(const MarkerCheckInput& input)
+  std::vector<CheckIssue> CheckMarkers(
+    const MarkerCheckInput& input
+  )
   {
     std::vector<CheckIssue> issues;
     if (input.markers == nullptr) {
@@ -90,17 +98,30 @@ namespace faf::editor
     const auto add = [&](const CheckIssue::Level level, const Point& p, const std::string& text) {
       issues.push_back({level, p.marker->name, text, p.x, p.z, std::string(), 0});
     };
-    const auto what = [](const Point& p) { return std::string(p.type == "Blank Marker" ? "start position" : p.type == "Mass" ? "mass point" : "hydrocarbon point"); };
+    const auto what = [](const Point& p) {
+      return std::string(
+        p.type == "Blank Marker" ? "start position"
+          : p.type == "Mass"     ? "mass point"
+                                 : "hydrocarbon point"
+      );
+    };
 
     for (const Point& p : points) {
       // On the map, and inside the playable area.
-      if (input.width > 0 && (p.x < 0.0f || p.z < 0.0f || p.x > static_cast<float>(input.width - 1) || p.z > static_cast<float>(input.height - 1))) {
+      if (
+        input.width > 0 &&
+        (p.x < 0.0f || p.z < 0.0f || p.x > static_cast<float>(input.width - 1) ||
+         p.z > static_cast<float>(input.height - 1))
+      ) {
         add(CheckIssue::Level::Error, p, what(p) + " is off the map");
         continue;
       }
       if (input.playable) {
         const auto& a = *input.playable;
-        if (p.x < static_cast<float>(a[0]) || p.z < static_cast<float>(a[1]) || p.x > static_cast<float>(a[2]) || p.z > static_cast<float>(a[3])) {
+        if (
+          p.x < static_cast<float>(a[0]) || p.z < static_cast<float>(a[1]) || p.x > static_cast<float>(a[2]) ||
+          p.z > static_cast<float>(a[3])
+        ) {
           add(CheckIssue::Level::Error, p, what(p) + " is outside the playable area");
         }
       }
@@ -109,15 +130,22 @@ namespace faf::editor
         const float ground = input.groundAt(input.groundContext, p.x, p.z);
         if (ground < input.waterLevel) {
           char text[160];
-          (void)std::snprintf(text, sizeof(text), "%s is under water (ground %.1f, sea %.1f)", what(p).c_str(), static_cast<double>(ground),
-                              static_cast<double>(input.waterLevel));
+          (void)std::snprintf(
+            text,
+            sizeof(text),
+            "%s is under water (ground %.1f, sea %.1f)",
+            what(p).c_str(),
+            static_cast<double>(ground),
+            static_cast<double>(input.waterLevel)
+          );
           add(p.type == "Blank Marker" ? CheckIssue::Level::Warning : CheckIssue::Level::Note, p, text);
         }
       }
       // A partner of its type at each symmetric copy.
       if (input.symmetry != Symmetry::None && input.width > 0) {
         float copyX[kMaxSymmetryCopies], copyZ[kMaxSymmetryCopies];
-        const int copies = HeightBrushCentres(input.width, input.height, p.x, p.z, input.symmetry, input.turns, copyX, copyZ);
+        const int copies =
+          HeightBrushCentres(input.width, input.height, p.x, p.z, input.symmetry, input.turns, copyX, copyZ);
         for (int c = 1; c < copies; ++c) {
           float nearest = 1e30f;
           for (const Point& q : points) {
@@ -127,8 +155,15 @@ namespace faf::editor
           }
           if (nearest > 2.0f) {
             char text[200];
-            (void)std::snprintf(text, sizeof(text), "%s has no partner at its symmetric copy (%.1f, %.1f); the nearest is %.1f away",
-                                what(p).c_str(), static_cast<double>(copyX[c]), static_cast<double>(copyZ[c]), static_cast<double>(nearest));
+            (void)std::snprintf(
+              text,
+              sizeof(text),
+              "%s has no partner at its symmetric copy (%.1f, %.1f); the nearest is %.1f away",
+              what(p).c_str(),
+              static_cast<double>(copyX[c]),
+              static_cast<double>(copyZ[c]),
+              static_cast<double>(nearest)
+            );
             add(CheckIssue::Level::Warning, p, text);
             break;
           }
@@ -144,14 +179,25 @@ namespace faf::editor
           continue;
         }
         if (std::fabs(a.x - b.x) < 2.0f && std::fabs(a.z - b.z) < 2.0f) {
-          add(CheckIssue::Level::Error, a, what(a) + " overlaps " + b.marker->name + " (their extractors would share ground)");
+          add(
+            CheckIssue::Level::Error,
+            a,
+            what(a) + " overlaps " + b.marker->name + " (their extractors would share ground)"
+          );
         }
       }
     }
     return issues;
   }
-  std::vector<CheckIssue> CheckPropSymmetry(const std::vector<PropPoint>& props, const Symmetry symmetry, const int turns, const int width,
-                                            const int height, const float reach, const std::size_t listed)
+  std::vector<CheckIssue> CheckPropSymmetry(
+    const std::vector<PropPoint>& props,
+    const Symmetry symmetry,
+    const int turns,
+    const int width,
+    const int height,
+    const float reach,
+    const std::size_t listed
+  )
   {
     std::vector<CheckIssue> issues;
     if (symmetry == Symmetry::None || width <= 0 || props.empty()) {
@@ -165,7 +211,12 @@ namespace faf::editor
     std::unordered_map<std::string, std::vector<std::size_t>> grid;
     grid.reserve(props.size());
     for (std::size_t i = 0; i < props.size(); ++i) {
-      grid[key(props[i].blueprint, static_cast<int>(std::floor(props[i].x / cell)), static_cast<int>(std::floor(props[i].z / cell)))].push_back(i);
+      grid[key(
+             props[i].blueprint,
+             static_cast<int>(std::floor(props[i].x / cell)),
+             static_cast<int>(std::floor(props[i].z / cell))
+           )]
+        .push_back(i);
     }
     const auto partnerNear = [&](const std::string& blueprint, const float x, const float z) {
       const int cx = static_cast<int>(std::floor(x / cell));
@@ -202,9 +253,17 @@ namespace faf::editor
         if (examples.size() < listed) {
           const std::string name = prop.blueprint.substr(prop.blueprint.find_last_of('/') + 1);
           char text[240];
-          (void)std::snprintf(text, sizeof(text), "%s at (%.1f, %.1f) has no partner at its symmetric copy (%.1f, %.1f)%s", name.c_str(),
-                              static_cast<double>(prop.x), static_cast<double>(prop.z), static_cast<double>(copyX[c]), static_cast<double>(copyZ[c]),
-                              prop.mass > 0.0f ? "" : " (no reclaim)");
+          (void)std::snprintf(
+            text,
+            sizeof(text),
+            "%s at (%.1f, %.1f) has no partner at its symmetric copy (%.1f, %.1f)%s",
+            name.c_str(),
+            static_cast<double>(prop.x),
+            static_cast<double>(prop.z),
+            static_cast<double>(copyX[c]),
+            static_cast<double>(copyZ[c]),
+            prop.mass > 0.0f ? "" : " (no reclaim)"
+          );
           CheckIssue issue;
           issue.level = CheckIssue::Level::Note;
           issue.marker = "Prop " + name;
@@ -223,8 +282,16 @@ namespace faf::editor
     summary.level = unmatchedMass > 0.0 ? CheckIssue::Level::Warning : CheckIssue::Level::Note;
     summary.marker = "Props";
     char text[240];
-    (void)std::snprintf(text, sizeof(text), "%zu of %zu props have no partner at a symmetric copy: %.0f of %.0f reclaim mass isn't mirrored%s",
-                        unmatched, props.size(), unmatchedMass, totalMass, unmatched > examples.size() ? " (the first ones listed)" : "");
+    (void)std::snprintf(
+      text,
+      sizeof(text),
+      "%zu of %zu props have no partner at a symmetric copy: %.0f of %.0f reclaim mass isn't mirrored%s",
+      unmatched,
+      props.size(),
+      unmatchedMass,
+      totalMass,
+      unmatched > examples.size() ? " (the first ones listed)" : ""
+    );
     summary.text = text;
     if (!examples.empty()) {
       summary.x = examples.front().x;

@@ -18,9 +18,6 @@ namespace moho
   struct ClutterRegion;
   class ClutterRegionKey;
 
-
-
-
   struct ClutterPayloadVTable
   {
     void(__thiscall* destroy)(void* self, int deleteFlag);
@@ -42,9 +39,9 @@ namespace moho
   struct ClutterSurfaceElement
   {
     ClutterSurfaceElementVTable* vtable; // +0x00
-    float selectionWeight; // +0x04
-    float uniformScale; // +0x08
-    RMeshBlueprint* meshBlueprint; // +0x0C
+    float selectionWeight;               // +0x04
+    float uniformScale;                  // +0x08
+    RMeshBlueprint* meshBlueprint;       // +0x0C
 
     /**
      * Address: 0x007D7E00 (FUN_007D7E00, inlined into the tail-destroy loop
@@ -157,16 +154,13 @@ namespace moho
      */
     ~ClutterSurfaceEntry();
 
-    void* vtable; // +0x00
-    std::int32_t density; // +0x04
+    void* vtable;                             // +0x00
+    std::int32_t density;                     // +0x04
     fa::vector<ClutterSurfaceElement> mSeeds; // +0x08 (16 bytes: myProxy_/first_/last_/end_)
   };
   static_assert(sizeof(ClutterSurfaceEntry) == 0x18, "ClutterSurfaceEntry size must be 0x18");
   static_assert(offsetof(ClutterSurfaceEntry, density) == 0x04, "ClutterSurfaceEntry::density offset must be 0x04");
-  static_assert(
-    offsetof(ClutterSurfaceEntry, mSeeds) == 0x08,
-    "ClutterSurfaceEntry::mSeeds offset must be 0x08"
-  );
+  static_assert(offsetof(ClutterSurfaceEntry, mSeeds) == 0x08, "ClutterSurfaceEntry::mSeeds offset must be 0x08");
 
   // The three clutter lists are all MSVC8 `list` heads -- `{proxy, head, size}`
   // at 0x0C with a `{next, prev, value}` node at 0x0C. `mList1` holds the
@@ -175,26 +169,34 @@ namespace moho
   using ClutterRegionList = fa::list<ClutterRegion*>;
   using ClutterPayloadList = fa::list<void*>;
 
-
-
-
   /**
    * The region-key element of `Clutter::mKeys`. The vtable slot at +0x00 is a
    * real vptr, not a stored field: every recovered "initializer" wrote the
    * same constant there and the tree's teardown wrote it back before freeing
    * the node, which is exactly what MSVC emits for a polymorphic class's
    * constructors and destructor.
-   * Address: 0x007D5C90 (FUN_007D5C90 -- `ClutterRegionKey(x, z)` for `moho::ClutterRegionKey`; zero callers, unreachable; formerly `InitializeRegionKeyFromCoordinates` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007D5CA0 (FUN_007D5CA0 -- `ClutterRegionKey(const ClutterRegion&)` for `moho::ClutterRegionKey`; zero callers, unreachable; formerly `InitializeRegionKeyFromRegion` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007D92A0 (FUN_007D92A0 -- the copy constructor for `moho::ClutterRegionKey`; zero callers, unreachable; formerly `InitializeRegionKeyFromSourceKey` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007D5CC0 (FUN_007D5CC0 -- `~ClutterRegionKey` -- the vtable reset MSVC emits for a polymorphic class's destructor for `moho::ClutterRegionKey`; callers 0x007D6E40, 0x007D7080; formerly `ResetRegionKeyVtable` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007D5C90 (FUN_007D5C90 -- `ClutterRegionKey(x, z)` for `moho::ClutterRegionKey`; zero callers,
+   * unreachable; formerly `InitializeRegionKeyFromCoordinates` in moho/render/Clutter.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x007D5CA0 (FUN_007D5CA0 -- `ClutterRegionKey(const ClutterRegion&)` for
+   * `moho::ClutterRegionKey`; zero callers, unreachable; formerly `InitializeRegionKeyFromRegion` in
+   * moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.) Address: 0x007D92A0 (FUN_007D92A0 -- the copy constructor
+   * for `moho::ClutterRegionKey`; zero callers, unreachable; formerly `InitializeRegionKeyFromSourceKey` in
+   * moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.) Address: 0x007D5CC0 (FUN_007D5CC0 -- `~ClutterRegionKey`
+   * -- the vtable reset MSVC emits for a polymorphic class's destructor for `moho::ClutterRegionKey`; callers
+   * 0x007D6E40, 0x007D7080; formerly `ResetRegionKeyVtable` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
    */
   class ClutterRegionKey
   {
   public:
     ClutterRegionKey() noexcept = default;
 
-    ClutterRegionKey(const std::int32_t x, const std::int32_t z) noexcept : mX(x), mZ(z) {}
+    ClutterRegionKey(
+      const std::int32_t x,
+      const std::int32_t z
+    ) noexcept
+      : mX(x)
+      , mZ(z)
+    {}
 
     explicit ClutterRegionKey(const ClutterRegion& region) noexcept;
 
@@ -215,7 +217,10 @@ namespace moho
    */
   struct ClutterRegionKeyLess
   {
-    [[nodiscard]] bool operator()(const ClutterRegionKey& lhs, const ClutterRegionKey& rhs) const noexcept
+    [[nodiscard]] bool operator()(
+      const ClutterRegionKey& lhs,
+      const ClutterRegionKey& rhs
+    ) const noexcept
     {
       return (lhs.mX < rhs.mX) || (lhs.mX == rhs.mX && lhs.mZ < rhs.mZ);
     }
@@ -224,35 +229,27 @@ namespace moho
   using ClutterRegionKeySet = fa::set<ClutterRegionKey, ClutterRegionKeyLess>;
   static_assert(sizeof(ClutterRegionKeySet) == 0x0C, "ClutterRegionKeySet size must be 0x0C");
 
-
-
   struct ClutterRegionMapPayloadVTable
   {
     void(__thiscall* destroy)(void* self, int deleteFlag);
   };
-  static_assert(
-    sizeof(ClutterRegionMapPayloadVTable) == 0x4, "ClutterRegionMapPayloadVTable size must be 0x4"
-  );
+  static_assert(sizeof(ClutterRegionMapPayloadVTable) == 0x4, "ClutterRegionMapPayloadVTable size must be 0x4");
 
   struct ClutterRegionMapPayloadHeader
   {
     ClutterRegionMapPayloadVTable* vtable; // +0x00
   };
-  static_assert(
-    sizeof(ClutterRegionMapPayloadHeader) == 0x4, "ClutterRegionMapPayloadHeader size must be 0x4"
-  );
-
-
+  static_assert(sizeof(ClutterRegionMapPayloadHeader) == 0x4, "ClutterRegionMapPayloadHeader size must be 0x4");
 
   struct ClutterRegion
   {
-    void* vtable; // +0x00
-    ClutterRegion* mNext; // +0x04
-    ClutterRegion* mPrev; // +0x08
-    std::int32_t mX; // +0x0C
-    std::int32_t mZ; // +0x10
+    void* vtable;               // +0x00
+    ClutterRegion* mNext;       // +0x04
+    ClutterRegion* mPrev;       // +0x08
+    std::int32_t mX;            // +0x0C
+    std::int32_t mZ;            // +0x10
     Wm3::AxisAlignedBox3f mBox; // +0x14
-    ClutterPayloadList mMap; // +0x2C
+    ClutterPayloadList mMap;    // +0x2C
 
     /**
      * Address: 0x007D5EE0 (FUN_007D5EE0, ??0Region@Clutter@Moho@@QAE@@Z)
@@ -448,7 +445,8 @@ namespace moho
     const ClutterSurfaceEntry& GetSurface(std::uint8_t terrainType);
 
     /**
-     * Address: 0x007D7430 (FUN_007D7430, ?ClutterRegion@Clutter@Moho@@AAEXPBVGeomCamera3@2@ABVCHeightField@2@PAVRegion@12@MABVSurface@12@@Z)
+     * Address: 0x007D7430 (FUN_007D7430,
+     * ?ClutterRegion@Clutter@Moho@@AAEXPBVGeomCamera3@2@ABVCHeightField@2@PAVRegion@12@MABVSurface@12@@Z)
      *
      * What it does:
      * Spawns clutter mesh instances for one region based on per-surface
@@ -463,13 +461,13 @@ namespace moho
     );
 
   public:
-    std::uint8_t reserved00[0x04]; // +0x00 (vtable lane)
-    ClutterRegionList mList1; // +0x04
-    ClutterRegionList mList2; // +0x10
-    std::uint8_t mBuffer[0x100]; // +0x1C
+    std::uint8_t reserved00[0x04];      // +0x00 (vtable lane)
+    ClutterRegionList mList1;           // +0x04
+    ClutterRegionList mList2;           // +0x10
+    std::uint8_t mBuffer[0x100];        // +0x1C
     ClutterSurfaceEntry mSurfaces[256]; // +0x11C
-    ClutterRegionKeySet mKeys; // +0x191C
-    ClutterRegion* mCurRegion; // +0x1928
+    ClutterRegionKeySet mKeys;          // +0x191C
+    ClutterRegion* mCurRegion;          // +0x1928
   };
 
   static_assert(offsetof(Clutter, mList1) == 0x04, "Clutter::mList1 offset must be 0x04");

@@ -11,10 +11,12 @@ namespace
   using faf_lua_tests::Contains;
 
   class LuaDebugLib : public faf_lua_tests::LuaFixture
-  {
-  };
+  {};
 
-  TEST_F(LuaDebugLib, GetinfoDescribesFunctionsAndLevels)
+  TEST_F(
+    LuaDebugLib,
+    GetinfoDescribesFunctionsAndLevels
+  )
   {
     EXPECT_EQ(Str("return debug.getinfo(1, 'S').what"), "main");
     EXPECT_EQ(Str("return debug.getinfo(1, 'S').source"), "=test");
@@ -25,39 +27,63 @@ namespace
     EXPECT_EQ(Str("return debug.getinfo(print, 'S').what"), "C");
     EXPECT_EQ(Num("local a, b = 1, 2 local function f() return a + b end return debug.getinfo(f, 'u').nups"), 2.0);
     EXPECT_TRUE(Bool("local function f() end return debug.getinfo(f, 'f').func == f"));
-    EXPECT_EQ(Str("function named_fn() return debug.getinfo(1, 'n').name end local r = named_fn() return r"), "named_fn");
-    EXPECT_EQ(Str("function named_fn2() return debug.getinfo(1, 'n').namewhat end local r = named_fn2() return r"), "global");
-    EXPECT_EQ(Str("local t = {} function t.m() return debug.getinfo(1, 'n').namewhat end local r = t.m() return r"), "field");
+    EXPECT_EQ(
+      Str("function named_fn() return debug.getinfo(1, 'n').name end local r = named_fn() return r"), "named_fn"
+    );
+    EXPECT_EQ(
+      Str("function named_fn2() return debug.getinfo(1, 'n').namewhat end local r = named_fn2() return r"), "global"
+    );
+    EXPECT_EQ(
+      Str("local t = {} function t.m() return debug.getinfo(1, 'n').namewhat end local r = t.m() return r"), "field"
+    );
     EXPECT_TRUE(Run("return debug.getinfo(100)").IsNil());
     EXPECT_TRUE(Contains(ErrorOf("return debug.getinfo('x')"), "function or level expected"));
     // A tail call leaves a "tail" record in the caller's place.
-    EXPECT_EQ(Str("local function g() return debug.getinfo(2, 'S').what end local function f() return g() end local r = f() return r"), "tail");
+    EXPECT_EQ(
+      Str(
+        "local function g() return debug.getinfo(2, 'S').what end local function f() return g() end local r = f() "
+        "return r"
+      ),
+      "tail"
+    );
   }
 
-  TEST_F(LuaDebugLib, LocalsAndUpvalues)
+  TEST_F(
+    LuaDebugLib,
+    LocalsAndUpvalues
+  )
   {
     EXPECT_EQ(Str("local a, b = 10, 'x' local n, v = debug.getlocal(1, 2) return n .. v"), "bx");
     EXPECT_EQ(Str("local a = 10 local n, v = debug.getlocal(1, 1) return n .. v"), "a10");
     EXPECT_TRUE(Run("local a = 1 return debug.getlocal(1, 50)").IsNil());
     EXPECT_EQ(Num("local a = 1 debug.setlocal(1, 1, 99) return a"), 99.0);
-    EXPECT_EQ(Str("local up = 5 local function f() return up end local n, v = debug.getupvalue(f, 1) return n .. v"), "up5");
+    EXPECT_EQ(
+      Str("local up = 5 local function f() return up end local n, v = debug.getupvalue(f, 1) return n .. v"), "up5"
+    );
     EXPECT_EQ(Num("local up = 5 local function f() return up end debug.setupvalue(f, 1, 6) return f()"), 6.0);
     EXPECT_TRUE(Run("local function f() end return debug.getupvalue(f, 1)").IsNil());
     EXPECT_TRUE(Contains(ErrorOf("debug.getlocal(100, 1)"), "level out of range"));
   }
 
-  TEST_F(LuaDebugLib, Traceback)
+  TEST_F(
+    LuaDebugLib,
+    Traceback
+  )
   {
     const std::string plain = Str("return debug.traceback()");
     EXPECT_TRUE(Contains(plain, "stack traceback:")) << plain;
-    const std::string withMessage = Str("local function inner() return debug.traceback('msg') end local r = inner() return r");
+    const std::string withMessage =
+      Str("local function inner() return debug.traceback('msg') end local r = inner() return r");
     EXPECT_EQ(withMessage.rfind("msg", 0), 0u) << withMessage;
     EXPECT_TRUE(Contains(withMessage, "stack traceback:")) << withMessage;
     EXPECT_TRUE(Contains(withMessage, "test(")) << withMessage;
     EXPECT_TRUE(Contains(Str("return _TRACEBACK('via global')"), "via global"));
   }
 
-  TEST_F(LuaDebugLib, LineAndCountHooks)
+  TEST_F(
+    LuaDebugLib,
+    LineAndCountHooks
+  )
   {
     EXPECT_TRUE(Bool(R"(
       local lines = {}
@@ -90,7 +116,10 @@ namespace
   }
 
   // Fork: debug.listcode / listk / listlocals (0x00911FC0, 0x009120B0, 0x00912130).
-  TEST_F(LuaDebugLib, ForkListings)
+  TEST_F(
+    LuaDebugLib,
+    ForkListings
+  )
   {
     EXPECT_EQ(Num("return debug.listcode(function(a, b) return a + b end).numparams"), 2.0);
     EXPECT_TRUE(Bool("return debug.listcode(function(a, b) return a + b end).maxstack >= 2"));

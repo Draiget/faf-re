@@ -124,21 +124,28 @@ namespace moho
     {
       return _mm_loadu_ps(&x);
     }
-    MOHO_FORCEINLINE void store(__m128 v)
+    MOHO_FORCEINLINE void store(
+      __m128 v
+    )
     {
       _mm_storeu_ps(&x, v);
     }
 
     /** Compile-time splat: Lane is template immediate -> valid for _mm_shuffle_ps. */
     template <int Lane>
-    static MOHO_FORCEINLINE __m128 splat(__m128 v)
+    static MOHO_FORCEINLINE __m128 splat(
+      __m128 v
+    )
     {
       static_assert(Lane >= 0 && Lane <= 3, "Lane out of range");
       return _mm_shuffle_ps(v, v, _MM_SHUFFLE(Lane, Lane, Lane, Lane));
     }
 
     /** Runtime splat wrapper: dispatches to compile-time variants (keeps imm8 constant). */
-    static MOHO_FORCEINLINE __m128 splat_lane(__m128 v, int i)
+    static MOHO_FORCEINLINE __m128 splat_lane(
+      __m128 v,
+      int i
+    )
     {
       switch (i & 3) {
       case 0:

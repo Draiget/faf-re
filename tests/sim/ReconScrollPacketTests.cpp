@@ -16,17 +16,27 @@ namespace
 {
   using namespace moho;
 
-  void Check(bool value, const char* what)
+  void Check(
+    bool value,
+    const char* what
+  )
   {
     EXPECT_TRUE(value) << what;
   }
 
-  std::uint32_t Bits(float f)
+  std::uint32_t Bits(
+    float f
+  )
   {
     return std::bit_cast<std::uint32_t>(f);
   }
 
-  void RunReconTest(int workers, bool enabled, bool finish, std::size_t count)
+  void RunReconTest(
+    int workers,
+    bool enabled,
+    bool finish,
+    std::size_t count
+  )
   {
     sim_Workers = workers;
     sim_ParallelSync = true;
@@ -51,8 +61,7 @@ namespace
     std::size_t deferredCount = 0;
     {
       CUnitUpdateFills fills(&packet);
-      for (std::size_t i = 0; i < count; ++i)
-      {
+      for (std::size_t i = 0; i < count; ++i) {
         auto* entry = QueueEntityVariableUpdateDeferred(&packet, static_cast<EntId>(i + 1), source);
         bool deferred = entry != nullptr;
         deferredCount += deferred;
@@ -61,8 +70,7 @@ namespace
         ASSERT_NE(entry, nullptr) << "queue entry"; // dereferenced below
 
         // Every second record is ordinary: catches marker reuse and neighbor corruption.
-        if ((i % 2) == 0)
-        {
+        if ((i % 2) == 0) {
           SSTIEntityVariableData creator;
           creator.mScrollBeatStart = {-0.0f, 18.0f};
           creator.mScrollBeatEnd = {19.0f, 20.0f};
@@ -71,8 +79,7 @@ namespace
           creator.mScrollBeatEnd = {91.0f, 92.0f};
           bool reconDeferred = OverrideDeferredEntityUpdateFromRecon(&packet, &recon);
           Check(reconDeferred == deferred, "newest deferred ownership");
-          if (!reconDeferred)
-          {
+          if (!reconDeferred) {
             entry->mVariableData.mMeshBlueprint = recon.mStiMesh;
             entry->mVariableData.mScmResource = recon.mMesh;
             entry->mVariableData.mHealth = recon.mHealth;
@@ -91,13 +98,11 @@ namespace
 
     // Finish/destructor has completed all reads before the source is mutated.
     source.mAuxValueVector[2].mAttachedEntityId = 54321;
-    if (workers > 0 && enabled && finish)
-    {
+    if (workers > 0 && enabled && finish) {
       const auto actualWorkers = CSimWorkerPool::Get().WorkerCount();
       Check(actualWorkers > 0, "worker pool available after Finish");
       std::printf(
-        "packet count=%zu configured workers=%d pool workers=%u; dispatch completed\n",
-        count, workers, actualWorkers
+        "packet count=%zu configured workers=%d pool workers=%u; dispatch completed\n", count, workers, actualWorkers
       );
       // The caller helps with chunks: this does not assert a worker took a chunk.
     }
@@ -105,24 +110,17 @@ namespace
     const auto expectedDeferred = (workers > 0 && enabled) ? (count < 65536 ? count : 65536) : 0;
     Check(deferredCount == expectedDeferred, "serial/deferred/full-list path");
     ASSERT_GE(packet.mEntityUpdates.size(), count) << "every queued record in the packet";
-    for (std::size_t i = 0; i < count; ++i)
-    {
+    for (std::size_t i = 0; i < count; ++i) {
       const auto& entry = packet.mEntityUpdates[i];
       const auto& v = entry.mVariableData;
       Check(entry.mEntityId == static_cast<EntId>(i + 1), "record identity");
       Check(v.mRequestRefreshUI == 1, "queue-time refresh snapshot");
-      Check(
-        v.mAuxValueVector.size() == 3 && v.mAuxValueVector[2].mAttachedEntityId == 12345,
-        "owned aux payload copy"
-      );
-      if ((i % 2) == 0)
-      {
+      Check(v.mAuxValueVector.size() == 3 && v.mAuxValueVector[2].mAttachedEntityId == 12345, "owned aux payload copy");
+      if ((i % 2) == 0) {
         Check(Bits(v.mScrollBeatStart.x) == 0x80000000u && v.mScrollBeatStart.y == 18.0f, "captured start bits");
         Check(v.mScrollBeatEnd.x == 19.0f && v.mScrollBeatEnd.y == 20.0f, "captured end, not creator mutation");
         Check(v.mHealth == 17.0f && v.mMaxHealth == 41.0f && v.mFractionComplete == 0.75f, "recon overrides retained");
-      }
-      else
-      {
+      } else {
         Check(v.mScrollBeatStart.x == -1.0f && v.mScrollBeatStart.y == -2.0f, "ordinary start unaffected");
         Check(v.mScrollBeatEnd.x == -3.0f && v.mScrollBeatEnd.y == -4.0f, "ordinary end unaffected");
         Check(v.mHealth == 13.0f && v.mMaxHealth == 31.0f, "ordinary health unaffected");
@@ -142,9 +140,12 @@ namespace
     SSyncData empty;
     OverrideEntityUpdateScroll(&empty, source);
   }
-}
+} // namespace
 
-TEST(Existing_ReconScrollPacket, SnapshotOwnershipAndEndpoints)
+TEST(
+  Existing_ReconScrollPacket,
+  SnapshotOwnershipAndEndpoints
+)
 {
   RunReconTest(0, true, true, 257);
   RunReconTest(2, false, true, 257);

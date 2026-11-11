@@ -41,22 +41,30 @@ namespace fa
   using Head = NodeBase;
 
   /** Return root pointer. */
-  inline NodeBase* root(Head* head) noexcept
+  inline NodeBase* root(
+    Head* head
+  ) noexcept
   {
     return head->parent;
   }
   /** Return leftmost node. */
-  inline NodeBase* leftmost(Head* head) noexcept
+  inline NodeBase* leftmost(
+    Head* head
+  ) noexcept
   {
     return head->left;
   }
   /** Return rightmost node. */
-  inline NodeBase* rightmost(Head* head) noexcept
+  inline NodeBase* rightmost(
+    Head* head
+  ) noexcept
   {
     return head->right;
   }
   /** Return end() sentinel (same as head). */
-  inline NodeBase* end(Head* head) noexcept
+  inline NodeBase* end(
+    Head* head
+  ) noexcept
   {
     return head;
   }
@@ -64,7 +72,10 @@ namespace fa
   /**
    * Inorder successor (like std::_Tree::_Next).
    */
-  inline NodeBase* next(NodeBase* x, Head* head) noexcept
+  inline NodeBase* next(
+    NodeBase* x,
+    Head* head
+  ) noexcept
   {
     if (x->right) {
       x = x->right;
@@ -83,7 +94,9 @@ namespace fa
   /**
    * Reset head to empty state.
    */
-  inline void reset_empty(Head* head) noexcept
+  inline void reset_empty(
+    Head* head
+  ) noexcept
   {
     head->parent = head;
     head->left = head;
@@ -96,7 +109,13 @@ namespace fa
    * destroy_node: callback that must deallocate the physical node block.
    * It is called once per erased node; value destruction is caller's duty if needed.
    */
-  template <class Destroy> void erase_range(Head* head, NodeBase* first, NodeBase* last, Destroy destroyNode)
+  template <class Destroy>
+  void erase_range(
+    Head* head,
+    NodeBase* first,
+    NodeBase* last,
+    Destroy destroyNode
+  )
   {
     for (NodeBase* n = first; n != last;) {
       NodeBase* nxt = next(n, head); // compute successor before destroying
@@ -110,7 +129,11 @@ namespace fa
    *
    * destroy_node: see erase_range.
    */
-  template <class Destroy> void clear_all(Head* head, Destroy destroyNode)
+  template <class Destroy>
+  void clear_all(
+    Head* head,
+    Destroy destroyNode
+  )
   {
     if (!head)
       return;
@@ -127,11 +150,14 @@ namespace fa
    * - static Node* right(Node*) noexcept;
    * - static bool is_sentinel(const Node*) noexcept;
    */
-  template <class Node, class Traits> class SentinelTreeView
+  template <class Node, class Traits>
+  class SentinelTreeView
   {
   public:
-    explicit SentinelTreeView(Node* head) noexcept :
-        head_(head)
+    explicit SentinelTreeView(
+      Node* head
+    ) noexcept
+      : head_(head)
     {}
 
     [[nodiscard]] Node* head() const noexcept
@@ -144,7 +170,10 @@ namespace fa
     }
 
     template <class Key, class NodeLessThanKey>
-    [[nodiscard]] Node* lower_bound(const Key& key, NodeLessThanKey nodeLessThanKey) const noexcept
+    [[nodiscard]] Node* lower_bound(
+      const Key& key,
+      NodeLessThanKey nodeLessThanKey
+    ) const noexcept
     {
       if (!head_) {
         return nullptr;
@@ -164,7 +193,10 @@ namespace fa
     }
 
     template <class Key, class NodeLessThanKey>
-    [[nodiscard]] Node* find_equal_or_head(const Key& key, NodeLessThanKey nodeLessThanKey) const noexcept
+    [[nodiscard]] Node* find_equal_or_head(
+      const Key& key,
+      NodeLessThanKey nodeLessThanKey
+    ) const noexcept
     {
       if (!head_) {
         return nullptr;
@@ -185,19 +217,27 @@ namespace fa
   template <class Node, auto ParentMember, auto LeftMember, auto RightMember, auto SentinelMember>
   struct MemberSentinelTreeTraits
   {
-    [[nodiscard]] static Node* parent(Node* node) noexcept
+    [[nodiscard]] static Node* parent(
+      Node* node
+    ) noexcept
     {
       return node ? node->*ParentMember : nullptr;
     }
-    [[nodiscard]] static Node* left(Node* node) noexcept
+    [[nodiscard]] static Node* left(
+      Node* node
+    ) noexcept
     {
       return node ? node->*LeftMember : nullptr;
     }
-    [[nodiscard]] static Node* right(Node* node) noexcept
+    [[nodiscard]] static Node* right(
+      Node* node
+    ) noexcept
     {
       return node ? node->*RightMember : nullptr;
     }
-    [[nodiscard]] static bool is_sentinel(const Node* node) noexcept
+    [[nodiscard]] static bool is_sentinel(
+      const Node* node
+    ) noexcept
     {
       return node == nullptr || (node->*SentinelMember) != 0;
     }
@@ -215,7 +255,11 @@ namespace fa
     auto SentinelMember,
     class Key,
     class NodeLessThanKey>
-  [[nodiscard]] Node* lower_bound_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
+  [[nodiscard]] Node* lower_bound_node(
+    Node* head,
+    const Key& key,
+    NodeLessThanKey nodeLessThanKey
+  ) noexcept
   {
     return MemberSentinelTree<Node, ParentMember, LeftMember, RightMember, SentinelMember>{head}.lower_bound(
       key, nodeLessThanKey
@@ -230,27 +274,38 @@ namespace fa
     auto SentinelMember,
     class Key,
     class NodeLessThanKey>
-  [[nodiscard]] Node* find_equal_or_head_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
+  [[nodiscard]] Node* find_equal_or_head_node(
+    Node* head,
+    const Key& key,
+    NodeLessThanKey nodeLessThanKey
+  ) noexcept
   {
-    return MemberSentinelTree<Node, ParentMember, LeftMember, RightMember, SentinelMember>{head}
-      .find_equal_or_head(key, nodeLessThanKey);
-  }
-
-  template <class Node, auto Node::* SentinelMember, class Key, class NodeLessThanKey>
-  [[nodiscard]] Node* lower_bound_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
-  {
-    return MemberSentinelTree<Node, &Node::parent, &Node::left, &Node::right, SentinelMember>{head}.lower_bound(
-      key,
-      nodeLessThanKey
+    return MemberSentinelTree<Node, ParentMember, LeftMember, RightMember, SentinelMember>{head}.find_equal_or_head(
+      key, nodeLessThanKey
     );
   }
 
   template <class Node, auto Node::* SentinelMember, class Key, class NodeLessThanKey>
-  [[nodiscard]] Node* find_equal_or_head_node(Node* head, const Key& key, NodeLessThanKey nodeLessThanKey) noexcept
+  [[nodiscard]] Node* lower_bound_node(
+    Node* head,
+    const Key& key,
+    NodeLessThanKey nodeLessThanKey
+  ) noexcept
+  {
+    return MemberSentinelTree<Node, &Node::parent, &Node::left, &Node::right, SentinelMember>{head}.lower_bound(
+      key, nodeLessThanKey
+    );
+  }
+
+  template <class Node, auto Node::* SentinelMember, class Key, class NodeLessThanKey>
+  [[nodiscard]] Node* find_equal_or_head_node(
+    Node* head,
+    const Key& key,
+    NodeLessThanKey nodeLessThanKey
+  ) noexcept
   {
     return MemberSentinelTree<Node, &Node::parent, &Node::left, &Node::right, SentinelMember>{head}.find_equal_or_head(
-      key,
-      nodeLessThanKey
+      key, nodeLessThanKey
     );
   }
 
@@ -259,7 +314,9 @@ namespace fa
    */
   struct DefaultNodeDeleter
   {
-    void operator()(NodeBase* n) const noexcept
+    void operator()(
+      NodeBase* n
+    ) const noexcept
     {
       operator delete(n);
     }
@@ -269,7 +326,8 @@ namespace fa
    * Embedded tree that owns only the sentinel head and deletes all nodes on destruction.
    * Nodes must begin with NodeBase layout.
    */
-  template <class NodeDeleter = DefaultNodeDeleter> class EmbeddedTree
+  template <class NodeDeleter = DefaultNodeDeleter>
+  class EmbeddedTree
   {
   public:
     EmbeddedTree() noexcept

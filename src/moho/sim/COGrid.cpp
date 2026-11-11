@@ -117,7 +117,9 @@ void moho::InitGridTraversalLine(
  * What it does:
  * Advances one grid-boundary edge (X or Z) based on segment crossing order.
  */
-void moho::AdvanceGridTraversalEdge(GridTraversalLine& line) noexcept
+void moho::AdvanceGridTraversalEdge(
+  GridTraversalLine& line
+) noexcept
 {
   const std::int32_t nextXEdge = line.xEdge + line.step;
   const std::int32_t nextZEdge = line.zEdge + line.step;
@@ -143,7 +145,9 @@ void moho::AdvanceGridTraversalEdge(GridTraversalLine& line) noexcept
  * Decodes current signed cell coordinates from masked traversal edge state.
  */
 void moho::GetGridTraversalCell(
-  const GridTraversalLine& line, std::int32_t& outX, std::int32_t& outZ
+  const GridTraversalLine& line,
+  std::int32_t& outX,
+  std::int32_t& outZ
 ) noexcept
 {
   outX = line.xEdge ^ line.xMask;
@@ -156,7 +160,9 @@ void moho::GetGridTraversalCell(
  * What it does:
  * Returns true once traversal edges move past the segment end coordinates.
  */
-bool moho::IsGridTraversalBeyondEnd(const GridTraversalLine& line) noexcept
+bool moho::IsGridTraversalBeyondEnd(
+  const GridTraversalLine& line
+) noexcept
 {
   return static_cast<float>(line.xEdge) > line.x1 || static_cast<float>(line.zEdge) > line.z1;
 }
@@ -192,7 +198,9 @@ namespace
     }
 
     /// True the first time `shape` is seen since `Begin`.
-    [[nodiscard]] bool Insert(const moho::CollisionShapeBase* const shape)
+    [[nodiscard]] bool Insert(
+      const moho::CollisionShapeBase* const shape
+    )
     {
       if ((mSize + 1u) * 2u > mSlots.size()) {
         Grow();
@@ -207,7 +215,9 @@ namespace
       std::uint32_t stamp = 0u;
     };
 
-    [[nodiscard]] bool Place(const moho::CollisionShapeBase* const shape) noexcept
+    [[nodiscard]] bool Place(
+      const moho::CollisionShapeBase* const shape
+    ) noexcept
     {
       const std::size_t mask = mSlots.size() - 1u;
       // Fibonacci hashing of the pointer; shapes are at least 4-byte aligned.
@@ -250,7 +260,10 @@ namespace
    * Claims `shape` for the current gather. On the owning thread this is the binary's
    * `if (!mMarked) { mMarked = 1; ... }`; on a pool worker it is a thread-private set test.
    */
-  [[nodiscard]] bool ClaimGatherShape(moho::CollisionShapeBase* const shape, const bool useSharedMarks)
+  [[nodiscard]] bool ClaimGatherShape(
+    moho::CollisionShapeBase* const shape,
+    const bool useSharedMarks
+  )
   {
     if (useSharedMarks) {
       if (shape->mMarked != 0u) {
@@ -385,19 +398,25 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] std::uint32_t GetCoGridMapWidthMinusOne(const moho::Sim* const sim) noexcept
+  [[nodiscard]] std::uint32_t GetCoGridMapWidthMinusOne(
+    const moho::Sim* const sim
+  ) noexcept
   {
     const moho::CHeightField* const field = sim->mMapData->GetHeightField();
     return static_cast<std::uint32_t>(field->width - 1);
   }
 
-  [[nodiscard]] std::uint32_t GetCoGridMapHeightMinusOne(const moho::Sim* const sim) noexcept
+  [[nodiscard]] std::uint32_t GetCoGridMapHeightMinusOne(
+    const moho::Sim* const sim
+  ) noexcept
   {
     const moho::CHeightField* const field = sim->mMapData->GetHeightField();
     return static_cast<std::uint32_t>(field->height - 1);
   }
 
-  [[nodiscard]] std::uint16_t ClampCollisionCellStartToU16(const int value) noexcept
+  [[nodiscard]] std::uint16_t ClampCollisionCellStartToU16(
+    const int value
+  ) noexcept
   {
     if (value <= 0) {
       return 0u;
@@ -408,8 +427,10 @@ namespace
     return static_cast<std::uint16_t>(value);
   }
 
-  [[nodiscard]] std::uint16_t
-  ClampCollisionCellExtentToU16(const int extentCandidate, const std::uint16_t startCell) noexcept
+  [[nodiscard]] std::uint16_t ClampCollisionCellExtentToU16(
+    const int extentCandidate,
+    const std::uint16_t startCell
+  ) noexcept
   {
     const int maxExtent = 0xFFFF - static_cast<int>(startCell);
     int extent = extentCandidate;
@@ -429,7 +450,9 @@ namespace moho
   /**
    * Address: 0x007205B0 (FUN_007205B0, Moho::COGrid::COGrid)
    */
-  COGrid::COGrid(Sim* const simArg)
+  COGrid::COGrid(
+    Sim* const simArg
+  )
     : sim(simArg)
     , mEntityOccupationManager(GetCoGridMapWidthMinusOne(simArg), GetCoGridMapHeightMinusOne(simArg))
     , terrainOccupation(GetCoGridMapWidthMinusOne(simArg), GetCoGridMapHeightMinusOne(simArg))
@@ -440,11 +463,16 @@ namespace moho
   /**
    * Address: 0x004FCD20 (FUN_004FCD20, Moho::EntityOccupationManager::EntityOccupationManager)
    */
-  EntityOccupationManager::EntityOccupationManager(const std::uint32_t width, const std::uint32_t height)
+  EntityOccupationManager::EntityOccupationManager(
+    const std::uint32_t width,
+    const std::uint32_t height
+  )
     : mWidth(static_cast<std::int32_t>(width >> 2))
     , mHeight(static_cast<std::int32_t>(height >> 2))
     , mLastIndex(0)
-    , mGridWidthShift(mWidth > 0 ? static_cast<std::int32_t>(std::bit_width(static_cast<std::uint32_t>(mWidth)) - 1u) : -1)
+    , mGridWidthShift(
+        mWidth > 0 ? static_cast<std::int32_t>(std::bit_width(static_cast<std::uint32_t>(mWidth)) - 1u) : -1
+      )
     , mUnitBuckets(nullptr)
     , mPropBuckets(nullptr)
     , mEntityBuckets(nullptr)
@@ -480,7 +508,9 @@ namespace moho
    * What it does:
    * Marks `mOccupation` set over `rect` by filling the rectangle extents.
    */
-  void COGrid::OccupyRect(const gpg::Rect2i& rect)
+  void COGrid::OccupyRect(
+    const gpg::Rect2i& rect
+  )
   {
     mOccupation.FillRect(rect, true);
   }
@@ -491,7 +521,9 @@ namespace moho
    * What it does:
    * Clears `mOccupation` bits over `rect`.
    */
-  void COGrid::VacateRect(const gpg::Rect2i& rect)
+  void COGrid::VacateRect(
+    const gpg::Rect2i& rect
+  )
   {
     mOccupation.FillRect(rect, false);
   }
@@ -502,7 +534,9 @@ namespace moho
    * What it does:
    * Returns whether any `mOccupation` bit over `rect` is set.
    */
-  bool COGrid::IsRectOccupied(const gpg::Rect2i& rect) const
+  bool COGrid::IsRectOccupied(
+    const gpg::Rect2i& rect
+  ) const
   {
     return mOccupation.GetRectOr(rect.x0, rect.z0, rect.x1 - rect.x0, rect.z1 - rect.z0, true);
   }
@@ -532,7 +566,9 @@ namespace moho
    * Ensures free-node list contains at least `requiredFreeNodes` entries by
    * allocating 0x2000-node chunks (0x10000 bytes each) and linking them.
    */
-  void EntityOccupationManager::EnsureSize(const int requiredFreeNodes)
+  void EntityOccupationManager::EnsureSize(
+    const int requiredFreeNodes
+  )
   {
     while (mFreeNodeCount < requiredFreeNodes) {
       // 0x2000 nodes: 0x10000 bytes on x86. 0x004FCEA5: `call 0x00A82130`
@@ -554,7 +590,10 @@ namespace moho
    * Chooses the bucket array for a shape's family bits: units, props, then
    * entities/projectiles; shared by `AddColShapeAt` and `RemoveColShapeAt`.
    */
-  static EntityCollisionCellNode** SelectBucketArray(EntityOccupationManager& grid, const std::uint32_t bucketFlags) noexcept
+  static EntityCollisionCellNode** SelectBucketArray(
+    EntityOccupationManager& grid,
+    const std::uint32_t bucketFlags
+  ) noexcept
   {
     if ((bucketFlags & 0x100u) != 0u) {
       return grid.mUnitBuckets;
@@ -575,7 +614,10 @@ namespace moho
    * Pops one node from the grid free-list, tags ownership to `shape`, then
    * prepends it to the selected collision bucket chain.
    */
-  void EntityOccupationManager::AddColShapeAt(CollisionShapeBase* const shape, const int bucketIndex)
+  void EntityOccupationManager::AddColShapeAt(
+    CollisionShapeBase* const shape,
+    const int bucketIndex
+  )
   {
     if ((shape->mBucketFlags & 0x0F00u) == 0u) {
       return;
@@ -592,7 +634,10 @@ namespace moho
     --mFreeNodeCount;
   }
 
-  void EntityOccupationManager::SaveBucketOrder(gpg::WriteArchive* const archive, const EntityDB& entities) const
+  void EntityOccupationManager::SaveBucketOrder(
+    gpg::WriteArchive* const archive,
+    const EntityDB& entities
+  ) const
   {
     int entityCount = 0;
     for (const auto& [id, entity] : entities.mAllUnits) {
@@ -621,7 +666,8 @@ namespace moho
         }
         archive->WriteInt(count);
         for (const EntityCollisionCellNode* node = buckets[bucket]; node != nullptr; node = node->next) {
-          const Entity* const entity = static_cast<const Entity*>(static_cast<const CollisionShape<Entity>*>(node->owner));
+          const Entity* const entity =
+            static_cast<const Entity*>(static_cast<const CollisionShape<Entity>*>(node->owner));
           archive->WriteUInt(static_cast<unsigned int>(entity->id_));
         }
       }
@@ -629,7 +675,10 @@ namespace moho
     }
   }
 
-  void EntityOccupationManager::LoadBucketOrder(gpg::ReadArchive* const archive, const EntityDB& entities)
+  void EntityOccupationManager::LoadBucketOrder(
+    gpg::ReadArchive* const archive,
+    const EntityDB& entities
+  )
   {
     EntityCollisionCellNode** const families[] = {mUnitBuckets, mPropBuckets, mEntityBuckets};
     for (EntityCollisionCellNode** const buckets : families) {
@@ -704,7 +753,10 @@ namespace moho
    * Removes `shape`'s node from the selected bucket chain and returns the node
    * to the grid free-list.
    */
-  void EntityOccupationManager::RemoveColShapeAt(const int bucketIndex, CollisionShapeBase* const shape)
+  void EntityOccupationManager::RemoveColShapeAt(
+    const int bucketIndex,
+    CollisionShapeBase* const shape
+  )
   {
     if ((shape->mBucketFlags & 0x0F00u) == 0u) {
       return;
@@ -782,12 +834,16 @@ namespace moho
     thread_local CollisionShapeBase::DeferredRelink* tDeferredRelink = nullptr;
   } // namespace
 
-  void CollisionShapeBase::SetDeferredRelinkSlot(DeferredRelink* const slot) noexcept
+  void CollisionShapeBase::SetDeferredRelinkSlot(
+    DeferredRelink* const slot
+  ) noexcept
   {
     tDeferredRelink = slot;
   }
 
-  void CollisionShapeBase::RelinkTo(const CollisionDBRect& rect)
+  void CollisionShapeBase::RelinkTo(
+    const CollisionDBRect& rect
+  )
   {
     if (tDeferredRelink != nullptr) {
       // Engine addition: held back for the owner thread (sim_ParallelCoords).
@@ -811,7 +867,9 @@ namespace moho
    * Reads primitive AABB, rebuilds quantized shape rectangle, and if changed:
    * removes old bucket membership, writes new rectangle, then re-adds membership.
    */
-  void CollisionShapeBase::UpdateRect(const CColPrimitiveBase* const primitive)
+  void CollisionShapeBase::UpdateRect(
+    const CColPrimitiveBase* const primitive
+  )
   {
     CollisionDBRect rect{};
     if (primitive != nullptr) {
@@ -827,7 +885,9 @@ namespace moho
    * Rebuilds quantized collision-cell rectangle directly from bounds and
    * relinks bucket membership only when the rectangle changed.
    */
-  void CollisionShapeBase::UpdateRect(const Wm3::AxisAlignedBox3f& bounds)
+  void CollisionShapeBase::UpdateRect(
+    const Wm3::AxisAlignedBox3f& bounds
+  )
   {
     CollisionDBRect rect{};
     (void)func_AABoxToRect(&rect, bounds);
@@ -847,7 +907,9 @@ namespace moho
    * Address: 0x004FD000 (FUN_004FD000, Moho::EntityOccupationManager::GatherUnmarkedUnitsInRect)
    */
   int EntityOccupationManager::GatherUnmarkedUnitsInRect(
-    gpg::core::FastVectorInline<CollisionShapeBase*>& outSpans, const CollisionDBRect& rect, const EEntityType flags
+    gpg::core::FastVectorInline<CollisionShapeBase*>& outSpans,
+    const CollisionDBRect& rect,
+    const EEntityType flags
   )
   {
     outSpans.ResetStorageToInline();
@@ -949,7 +1011,9 @@ namespace moho
    * Address: 0x00722DF0 (FUN_00722DF0, Moho::EntityOccupationManager::GatherUnmarkedEntities)
    */
   int EntityOccupationManager::GatherUnmarkedEntities(
-    gpg::core::FastVectorInline<Entity*>& outEntities, const CollisionDBRect& rect, const EEntityType flags
+    gpg::core::FastVectorInline<Entity*>& outEntities,
+    const CollisionDBRect& rect,
+    const EEntityType flags
   )
   {
     // Same buffer reuse as `GatherUnmarkedEntitiesInLine`: gather shapes into
@@ -1009,10 +1073,8 @@ namespace moho
     // actually tests the low three OC_* bits (land/seabed/sub) together as
     // the "terrain" occupancy bucket. Expose the mask explicitly so recovered
     // behavior code can keep using named bits instead of raw hex.
-    constexpr std::uint8_t kTerrainOccupancyMask =
-      static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND)
-      | static_cast<std::uint8_t>(EOccupancyCaps::OC_SEABED)
-      | static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
+    constexpr std::uint8_t kTerrainOccupancyMask = static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND) |
+      static_cast<std::uint8_t>(EOccupancyCaps::OC_SEABED) | static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
   } // namespace
 
   /**
@@ -1030,7 +1092,10 @@ namespace moho
    * path-cluster covering `rect` dirty so future path queries see the newly
    * occupied cells.
    */
-  void COGrid::ExecuteOccupy(const EOccupancyCaps caps, const gpg::Rect2i& rect)
+  void COGrid::ExecuteOccupy(
+    const EOccupancyCaps caps,
+    const gpg::Rect2i& rect
+  )
   {
     const std::uint8_t capsBits = static_cast<std::uint8_t>(caps);
     const int rectWidth = rect.x1 - rect.x0;
@@ -1056,7 +1121,10 @@ namespace moho
    * and dirties the covering path clusters. Freed cells become available for
    * future construction / pathing again.
    */
-  void COGrid::ReleaseOccupy(const EOccupancyCaps caps, const gpg::Rect2i& rect)
+  void COGrid::ReleaseOccupy(
+    const EOccupancyCaps caps,
+    const gpg::Rect2i& rect
+  )
   {
     const std::uint8_t capsBits = static_cast<std::uint8_t>(caps);
     const int rectWidth = rect.x1 - rect.x0;
@@ -1077,7 +1145,10 @@ namespace moho
      * The footprint's cells at `origin`: (x, z, x + mSizeX, z + mSizeZ), from
      * the 16-bit origin words and the footprint's two size bytes.
      */
-    [[nodiscard]] gpg::Rect2i FootprintRectAt(const SOCellPos& origin, const SFootprint& footprint) noexcept
+    [[nodiscard]] gpg::Rect2i FootprintRectAt(
+      const SOCellPos& origin,
+      const SFootprint& footprint
+    ) noexcept
     {
       const int x0 = origin.x;
       const int z0 = origin.z;
@@ -1091,7 +1162,10 @@ namespace moho
    * What it does:
    * Occupies the footprint's cells at `origin` with its own occupancy caps.
    */
-  void COGrid::ExecuteOccupy(const SOCellPos& origin, const SFootprint& footprint)
+  void COGrid::ExecuteOccupy(
+    const SOCellPos& origin,
+    const SFootprint& footprint
+  )
   {
     ExecuteOccupy(footprint.mOccupancyCaps, FootprintRectAt(origin, footprint));
   }
@@ -1102,7 +1176,10 @@ namespace moho
    * What it does:
    * Releases the footprint's cells at `origin`.
    */
-  void COGrid::ReleaseOccupy(const SOCellPos& origin, const SFootprint& footprint)
+  void COGrid::ReleaseOccupy(
+    const SOCellPos& origin,
+    const SFootprint& footprint
+  )
   {
     ReleaseOccupy(footprint.mOccupancyCaps, FootprintRectAt(origin, footprint));
   }
@@ -1181,8 +1258,9 @@ namespace moho
     };
   } // namespace
 
-
-  [[nodiscard]] static Wm3::AxisAlignedBox3f BuildAxisAlignedBoundsFromOrientedBox(const Wm3::Box3f& box) noexcept
+  [[nodiscard]] static Wm3::AxisAlignedBox3f BuildAxisAlignedBoundsFromOrientedBox(
+    const Wm3::Box3f& box
+  ) noexcept
   {
     return moho::AxisAlignedBoundsFromBox(box);
   }
@@ -1202,7 +1280,11 @@ namespace moho
     &sim_CollectPrefetch
   );
 
-  static void PrefetchCollectCandidates(Entity* const* const candidates, const int index, const int count) noexcept
+  static void PrefetchCollectCandidates(
+    Entity* const* const candidates,
+    const int index,
+    const int count
+  ) noexcept
   {
     if (index + 4 < count) {
       if (const Entity* const ahead = candidates[index + 4]; ahead != nullptr) {
@@ -1223,9 +1305,8 @@ namespace moho
   {
     const Wm3::Vec3f& entityMin = entity.mAABox.Min;
     const Wm3::Vec3f& entityMax = entity.mAABox.Max;
-    return !(bounds.Min.x > entityMax.x) && !(entityMin.x > bounds.Max.x) &&
-      !(bounds.Min.y > entityMax.y) && !(entityMin.y > bounds.Max.y) &&
-      !(bounds.Min.z > entityMax.z) && !(entityMin.z > bounds.Max.z);
+    return !(bounds.Min.x > entityMax.x) && !(entityMin.x > bounds.Max.x) && !(bounds.Min.y > entityMax.y) &&
+      !(entityMin.y > bounds.Max.y) && !(bounds.Min.z > entityMax.z) && !(entityMin.z > bounds.Max.z);
   }
 
   [[nodiscard]] static Wm3::AxisAlignedBox3f BuildAxisAlignedBoundsFromSphere(
@@ -1274,8 +1355,7 @@ namespace moho
 
     GatherScratch<Entity*, kGatherInlineCapacity, kGatherBinaryCapacity> gatherScratch{};
     gpg::core::FastVectorInline<Entity*>& gatheredEntities = gatherScratch.Get();
-    const int gatheredCount =
-      mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, queryRect, flags);
+    const int gatheredCount = mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, queryRect, flags);
 
     outCollisions.ResetStorageToInline();
 
@@ -1301,16 +1381,14 @@ namespace moho
       const Wm3::Vec3f& sourceMax = source->mAABox.Max;
       const Wm3::Vec3f& candidateMin = candidate->mAABox.Min;
       const Wm3::Vec3f& candidateMax = candidate->mAABox.Max;
-      if (!(sourceMin.x <= candidateMax.x && candidateMin.x <= sourceMax.x &&
-            sourceMin.y <= candidateMax.y && candidateMin.y <= sourceMax.y &&
-            sourceMin.z <= candidateMax.z && candidateMin.z <= sourceMax.z)) {
+      if (!(sourceMin.x <= candidateMax.x && candidateMin.x <= sourceMax.x && sourceMin.y <= candidateMax.y &&
+            candidateMin.y <= sourceMax.y && sourceMin.z <= candidateMax.z && candidateMin.z <= sourceMax.z)) {
         continue;
       }
 
       CColPrimitiveBase* const sourcePrimitive = source->CollisionExtents;
       CColPrimitiveBase* const candidatePrimitive = candidate->CollisionExtents;
-      if (candidatePrimitive == nullptr ||
-          !candidatePrimitive->Collide(sourcePrimitive, &collisionResult)) {
+      if (candidatePrimitive == nullptr || !candidatePrimitive->Collide(sourcePrimitive, &collisionResult)) {
         continue;
       }
 
@@ -1417,7 +1495,12 @@ namespace moho
    * See the header declaration — footprint-AABB gather + per-candidate oriented
    * box intersection, first confirmed blocker wins.
    */
-  bool COGrid::UnitIsBlocked(const SOCellPos& cellPos, COGrid& grid, Unit* const unit, const int mode)
+  bool COGrid::UnitIsBlocked(
+    const SOCellPos& cellPos,
+    COGrid& grid,
+    Unit* const unit,
+    const int mode
+  )
   {
     // Query unit footprint drives both the gather AABB span and the later
     // oriented-box half-extents.
@@ -1446,9 +1529,8 @@ namespace moho
     // and nothing in the loop writes `unit`'s blueprint or alt-footprint flags,
     // so `unit->GetFootprint()` (a pure read; it already succeeded above)
     // returns this same `queryFootprint`. The float expressions are unchanged.
-    const bool queryIgnoresStructures =
-      (static_cast<std::uint8_t>(queryFootprint.mFlags) &
-       static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures)) != 0u;
+    const bool queryIgnoresStructures = (static_cast<std::uint8_t>(queryFootprint.mFlags) &
+                                         static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures)) != 0u;
 
     // Precise oriented-box intersection using the query unit's footprint
     // half-extents (X, 1000, Z), centered on the query box XZ midpoint.
@@ -1486,8 +1568,7 @@ namespace moho
       }
 
       Unit* const other = candidate->IsUnit();
-      const bool formationDiffers =
-        unit->IsUnitState(UNITSTATE_Attacking) || other->IsUnitState(UNITSTATE_Attacking) ||
+      const bool formationDiffers = unit->IsUnitState(UNITSTATE_Attacking) || other->IsUnitState(UNITSTATE_Attacking) ||
         unit->mInfoCache.mFormationLayer == nullptr ||
         unit->mInfoCache.mFormationLayer != other->mInfoCache.mFormationLayer;
       if (!formationDiffers || func_IsSourceUnit(mode, *unit, other)) {
@@ -1535,7 +1616,12 @@ namespace moho
    * lies inside the swept volume.
    */
   [[nodiscard]] bool SweptPathBlockedByUnit(
-    COGrid& grid, Unit* const unit, const Wm3::Vector3f& fromCenter, const Wm3::Vector3f& toCenter, const int mode)
+    COGrid& grid,
+    Unit* const unit,
+    const Wm3::Vector3f& fromCenter,
+    const Wm3::Vector3f& toCenter,
+    const int mode
+  )
   {
     assert(unit != nullptr && "SweptPathBlockedByUnit: the moving unit is required");
     if (fromCenter == toCenter) {
@@ -1550,9 +1636,8 @@ namespace moho
 
     const RUnitBlueprint* const blueprint = unit->GetBlueprint();
     const Wm3::Vector3f center{
-      (fromCenter.x + toCenter.x) * 0.5f,
-      (fromCenter.y + toCenter.y) * 0.5f,
-      (fromCenter.z + toCenter.z) * 0.5f};
+      (fromCenter.x + toCenter.x) * 0.5f, (fromCenter.y + toCenter.y) * 0.5f, (fromCenter.z + toCenter.z) * 0.5f
+    };
 
     Wm3::Vector3f crossAxis;
     (void)MultQuadVec(&crossAxis, &direction, &kSweptPathCrossRotation);
@@ -1568,7 +1653,8 @@ namespace moho
       direction,
       static_cast<float>(blueprint->mSizeX) * 0.55555558f,
       1000.0f,
-      halfLength);
+      halfLength
+    );
 
     // Engine change (sim_SweptProbeEarlyOut): the answer is "some candidate passes every test",
     // and every test below only reads state, so the cheap unit tests run before the box overlap
@@ -1638,7 +1724,12 @@ namespace moho
    * the footprint between the two cell centres (SweptPathBlockedByUnit).
    */
   bool PathTransitionBlocked(
-    const SOCellPos& toCell, const SOCellPos& fromCell, COGrid& grid, Unit* const unit, const int mode)
+    const SOCellPos& toCell,
+    const SOCellPos& fromCell,
+    COGrid& grid,
+    Unit* const unit,
+    const int mode
+  )
   {
     if (fromCell.x == toCell.x && fromCell.z == toCell.z) {
       return COGrid::UnitIsBlocked(fromCell, grid, unit, mode);
@@ -1649,9 +1740,11 @@ namespace moho
     const float halfSizeZ = static_cast<float>(footprint.mSizeZ) * 0.5f;
 
     const Wm3::Vector3f fromCenter{
-      halfSizeX + static_cast<float>(fromCell.x), 0.0f, halfSizeZ + static_cast<float>(fromCell.z)};
+      halfSizeX + static_cast<float>(fromCell.x), 0.0f, halfSizeZ + static_cast<float>(fromCell.z)
+    };
     const Wm3::Vector3f toCenter{
-      halfSizeX + static_cast<float>(toCell.x), 0.0f, halfSizeZ + static_cast<float>(toCell.z)};
+      halfSizeX + static_cast<float>(toCell.x), 0.0f, halfSizeZ + static_cast<float>(toCell.z)
+    };
 
     return SweptPathBlockedByUnit(grid, unit, fromCenter, toCenter, mode);
   }
@@ -1781,7 +1874,9 @@ namespace moho
    * What it does:
    * Returns `true` when `this` and `other` differ in any lane.
    */
-  bool CollisionDBRect::NotEqual(const CollisionDBRect& other) const noexcept
+  bool CollisionDBRect::NotEqual(
+    const CollisionDBRect& other
+  ) const noexcept
   {
     return other.mStartX != mStartX || other.mWidth != mWidth || other.mStartZ != mStartZ || other.mHeight != mHeight;
   }
@@ -1799,7 +1894,10 @@ namespace moho
    * cells: `kWorldToCollisionCellShift`), clamping the start corners into
    * `[0, 0xFFFF]`, and ensuring the resulting width/height are at least 1.
    */
-  CollisionDBRect* func_Rect2fToInt16(CollisionDBRect* const out, const gpg::Rect2f& rect)
+  CollisionDBRect* func_Rect2fToInt16(
+    CollisionDBRect* const out,
+    const gpg::Rect2f& rect
+  )
   {
     constexpr int kCollisionCellMaxValue = 0xFFFF;
 
@@ -1870,7 +1968,10 @@ namespace moho
    * starts past the last cell yields an empty rect rather than a negative
    * width that would wrap when stored as `uint16_t`.
    */
-  CollisionDBRect* func_AABoxToRect(CollisionDBRect* const out, const Wm3::AxisAlignedBox3f& box)
+  CollisionDBRect* func_AABoxToRect(
+    CollisionDBRect* const out,
+    const Wm3::AxisAlignedBox3f& box
+  )
   {
     const int minCellX = fa::FloorToIntX87(box.Min.x) >> kWorldToCollisionCellShift;
     const int minCellZ = fa::FloorToIntX87(box.Min.z) >> kWorldToCollisionCellShift;
@@ -1899,7 +2000,10 @@ namespace moho
    * entity, filters to non-mobile units, and tests their per-unit skirt
    * rectangles against `rect` for overlap.
    */
-  bool COGrid_RectHasBlockingUnit(const gpg::Rect2f& rect, COGrid& grid)
+  bool COGrid_RectHasBlockingUnit(
+    const gpg::Rect2f& rect,
+    COGrid& grid
+  )
   {
     CollisionDBRect cellRect{};
     (void)func_Rect2fToInt16(&cellRect, rect);
@@ -1932,10 +2036,12 @@ namespace moho
       const RUnitBlueprint* const unitBlueprint = ownerUnit->GetBlueprint();
       const gpg::Rect2f unitSkirtRect = unitBlueprint->GetSkirtRect(unitPosXZ);
 
-      if (unitSkirtRect.x1 > rect.x0 && rect.x1 > unitSkirtRect.x0 &&
-          unitSkirtRect.z1 > rect.z0 && rect.z1 > unitSkirtRect.z0 &&
-          rect.x1 > rect.x0 && !(rect.z0 >= rect.z1) && // 0x007208B6: jae rejects, NaN passes
-          unitSkirtRect.x1 > unitSkirtRect.x0 && !(unitSkirtRect.z0 >= unitSkirtRect.z1)) { // 0x007208C3: jb accepts NaN
+      if (
+        unitSkirtRect.x1 > rect.x0 && rect.x1 > unitSkirtRect.x0 && unitSkirtRect.z1 > rect.z0 &&
+        rect.z1 > unitSkirtRect.z0 && rect.x1 > rect.x0 &&
+        !(rect.z0 >= rect.z1) && // 0x007208B6: jae rejects, NaN passes
+        unitSkirtRect.x1 > unitSkirtRect.x0 && !(unitSkirtRect.z0 >= unitSkirtRect.z1)
+      ) { // 0x007208C3: jb accepts NaN
         return true;
       }
     }
@@ -2025,4 +2131,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_COGridTypeInfo_dc0e5e, moho::register_COGridTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_COGridTypeInfo_dc0e5e,
+  moho::register_COGridTypeInfo
+)

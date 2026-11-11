@@ -43,14 +43,19 @@ namespace moho
   // every connector (issue #233: the links run before the lobby's connector
   // exists); the connector that sends to the address first receives from it.
   void NET_SetPeerTransport(
-    CNetUDPConnector* connector, std::uint32_t addrHost, std::uint16_t portHost,
+    CNetUDPConnector* connector,
+    std::uint32_t addrHost,
+    std::uint16_t portHost,
     std::shared_ptr<INetPeerTransport> transport
   );
 
   // Sends through the transport for addrHost:portHost; false when there is
   // none and the caller sends on the socket.
   bool NET_SendThroughPeerTransport(
-    const CNetUDPConnector* connector, std::uint32_t addrHost, std::uint16_t portHost, const void* data,
+    const CNetUDPConnector* connector,
+    std::uint32_t addrHost,
+    std::uint16_t portHost,
+    const void* data,
     std::size_t size
   );
 
@@ -60,7 +65,10 @@ namespace moho
   // transport registered for every connector; until one has, up to 256
   // datagrams wait.
   void NET_DeliverFromPeerTransport(
-    CNetUDPConnector* connector, std::uint32_t addrHost, std::uint16_t portHost, const void* data,
+    CNetUDPConnector* connector,
+    std::uint32_t addrHost,
+    std::uint16_t portHost,
+    const void* data,
     std::size_t size
   );
 

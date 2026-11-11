@@ -177,30 +177,30 @@ namespace moho
     /// The unit whose motion drives the thrust direction. Null on an instance
     /// built by the reflection construction paths, until deserialization
     /// binds one.
-    WeakPtr<Unit> mUnit;           // +0x80
+    WeakPtr<Unit> mUnit; // +0x80
     /// Name this manipulator was created under. Written by both constructors
     /// and carried through save/load; no code in the binary reads it back.
-    fa::string mLabel;          // +0x88
+    fa::string mLabel; // +0x88
     /// Bone this manipulator swivels, and the bone whose world transform the
     /// roll correction is measured at.
     std::int32_t mThrustBoneIndex; // +0xA4
     /// Written `false` by both constructors and carried through save/load.
     /// Like `mLabel`, nothing in the binary reads it back -- no code path
     /// outside the two serializers touches +0xA8.
-    bool mThrusting;               // +0xA8
-    std::uint8_t mPadA9_AB[3]{};   // +0xA9
+    bool mThrusting;             // +0xA8
+    std::uint8_t mPadA9_AB[3]{}; // +0xA9
     /// Per-axis lower bound on the bone-local thrust direction.
-    Wm3::Vector3f mCapMin;         // +0xAC
+    Wm3::Vector3f mCapMin; // +0xAC
     /// Per-axis upper bound on the bone-local thrust direction.
-    Wm3::Vector3f mCapMax;         // +0xB8
+    Wm3::Vector3f mCapMax; // +0xB8
     /// Scales how much the roll-induced bone displacement adds to the thrust.
-    float mTurnForceMult;          // +0xC4
+    float mTurnForceMult; // +0xC4
     /// Largest orientation change allowed per tick, in radians.
-    float mTurnSpeed;              // +0xC8
+    float mTurnSpeed; // +0xC8
     /// The watched bone's local +Z axis at construction -- the direction the
     /// nozzle points before any thrust is applied, and the `currentUp` every
     /// shortest-arc delta is measured from.
-    Wm3::Vector3f mRestDirection;  // +0xCC
+    Wm3::Vector3f mRestDirection; // +0xCC
     /// The delta rotation applied to the watched bone last tick.
     Wm3::Quaternionf mOrientation; // +0xD8
   };
@@ -211,20 +211,14 @@ namespace moho
     offsetof(CThrustManipulator, mThrustBoneIndex) == 0xA4,
     "CThrustManipulator::mThrustBoneIndex offset must be 0xA4"
   );
-  static_assert(
-    offsetof(CThrustManipulator, mThrusting) == 0xA8,
-    "CThrustManipulator::mThrusting offset must be 0xA8"
-  );
+  static_assert(offsetof(CThrustManipulator, mThrusting) == 0xA8, "CThrustManipulator::mThrusting offset must be 0xA8");
   static_assert(offsetof(CThrustManipulator, mCapMin) == 0xAC, "CThrustManipulator::mCapMin offset must be 0xAC");
   static_assert(offsetof(CThrustManipulator, mCapMax) == 0xB8, "CThrustManipulator::mCapMax offset must be 0xB8");
   static_assert(
     offsetof(CThrustManipulator, mTurnForceMult) == 0xC4,
     "CThrustManipulator::mTurnForceMult offset must be 0xC4"
   );
-  static_assert(
-    offsetof(CThrustManipulator, mTurnSpeed) == 0xC8,
-    "CThrustManipulator::mTurnSpeed offset must be 0xC8"
-  );
+  static_assert(offsetof(CThrustManipulator, mTurnSpeed) == 0xC8, "CThrustManipulator::mTurnSpeed offset must be 0xC8");
   static_assert(
     offsetof(CThrustManipulator, mRestDirection) == 0xCC,
     "CThrustManipulator::mRestDirection offset must be 0xCC"

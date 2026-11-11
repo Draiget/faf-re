@@ -10,5 +10,8 @@ class wxDialog : public wxWindow
 {
 public:
   wxDialog() = default;
-  virtual int ShowModal() { return wxID_CANCEL; }
+  virtual int ShowModal()
+  {
+    return wxID_CANCEL;
+  }
 };

@@ -35,7 +35,9 @@ namespace gpg::gal::effects
       std::uint32_t operand1 = 0; // count / signedness / length id
     };
 
-    [[nodiscard]] std::vector<std::uint32_t> Words(const std::vector<std::uint8_t>& code)
+    [[nodiscard]] std::vector<std::uint32_t> Words(
+      const std::vector<std::uint8_t>& code
+    )
     {
       std::vector<std::uint32_t> words(code.size() / 4U);
       if (!words.empty()) {
@@ -44,7 +46,11 @@ namespace gpg::gal::effects
       return words;
     }
 
-    [[nodiscard]] std::string LiteralString(const std::vector<std::uint32_t>& words, const std::size_t first, const std::size_t end)
+    [[nodiscard]] std::string LiteralString(
+      const std::vector<std::uint32_t>& words,
+      const std::size_t first,
+      const std::size_t end
+    )
     {
       std::string text;
       for (std::size_t index = first; index < end; ++index) {
@@ -60,7 +66,9 @@ namespace gpg::gal::effects
     }
   } // namespace
 
-  SpirvInterface ReflectSpirvInterface(const std::vector<std::uint8_t>& code)
+  SpirvInterface ReflectSpirvInterface(
+    const std::vector<std::uint8_t>& code
+  )
   {
     SpirvInterface result;
     const std::vector<std::uint32_t> words = Words(code);
@@ -181,7 +189,8 @@ namespace gpg::gal::effects
       while (digits > 0U && std::isdigit(static_cast<unsigned char>(semantic[digits - 1U])) != 0) {
         --digits;
       }
-      entry.semanticIndex = (digits < semantic.size()) ? static_cast<std::uint32_t>(std::stoul(semantic.substr(digits))) : 0U;
+      entry.semanticIndex =
+        (digits < semantic.size()) ? static_cast<std::uint32_t>(std::stoul(semantic.substr(digits))) : 0U;
       entry.semantic = semantic.substr(0U, digits);
       if (entry.semantic.rfind("SV_", 0U) == 0U) {
         entry.builtIn = true;
@@ -192,7 +201,8 @@ namespace gpg::gal::effects
   }
 
   std::vector<std::uint8_t> PatchSpirvInputLocations(
-    const std::vector<std::uint8_t>& code, const std::map<std::uint32_t, std::uint32_t>& locations
+    const std::vector<std::uint8_t>& code,
+    const std::map<std::uint32_t, std::uint32_t>& locations
   )
   {
     std::vector<std::uint32_t> words = Words(code);
@@ -218,7 +228,9 @@ namespace gpg::gal::effects
     return patched;
   }
 
-  std::vector<std::uint8_t> StripSpirvReflection(const std::vector<std::uint8_t>& code)
+  std::vector<std::uint8_t> StripSpirvReflection(
+    const std::vector<std::uint8_t>& code
+  )
   {
     constexpr std::uint16_t kOpExtension = 10;
     constexpr std::uint16_t kOpMemberDecorateString = 5633;
@@ -244,8 +256,11 @@ namespace gpg::gal::effects
         drop = name == "SPV_GOOGLE_hlsl_functionality1" || name == "SPV_GOOGLE_user_type";
       }
       if (!drop) {
-        kept.insert(kept.end(), words.begin() + static_cast<std::ptrdiff_t>(index),
-                    words.begin() + static_cast<std::ptrdiff_t>(index + count));
+        kept.insert(
+          kept.end(),
+          words.begin() + static_cast<std::ptrdiff_t>(index),
+          words.begin() + static_cast<std::ptrdiff_t>(index + count)
+        );
       }
       index += count;
     }
@@ -257,7 +272,9 @@ namespace gpg::gal::effects
 
 namespace gpg::gal::effects
 {
-  std::uint64_t ReflectSpirvTextureSlots(const std::vector<std::uint8_t>& code)
+  std::uint64_t ReflectSpirvTextureSlots(
+    const std::vector<std::uint8_t>& code
+  )
   {
     constexpr std::uint64_t kAll = ~std::uint64_t{0};
     constexpr std::uint16_t kOpTypeImage = 25;
@@ -272,7 +289,7 @@ namespace gpg::gal::effects
     }
     std::map<std::uint32_t, std::uint32_t> bindings;
     std::map<std::uint32_t, std::uint32_t> sets;
-    std::map<std::uint32_t, std::uint16_t> typeOps;     // type id -> opcode
+    std::map<std::uint32_t, std::uint16_t> typeOps;      // type id -> opcode
     std::map<std::uint32_t, std::uint32_t> elementTypes; // array / pointer type id -> element / pointee type id
     std::vector<std::pair<std::uint32_t, std::uint32_t>> variables; // (variable id, pointer type id), UniformConstant
     for (std::size_t at = 5U; at < words.size();) {

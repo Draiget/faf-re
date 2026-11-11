@@ -22,7 +22,10 @@ namespace
 
   struct CLuaWldUIProviderTypeInfoBootstrap
   {
-    CLuaWldUIProviderTypeInfoBootstrap() { moho::register_CLuaWldUIProviderTypeInfoStartup(); }
+    CLuaWldUIProviderTypeInfoBootstrap()
+    {
+      moho::register_CLuaWldUIProviderTypeInfoStartup();
+    }
   };
   CLuaWldUIProviderTypeInfoBootstrap gCLuaWldUIProviderTypeInfoBootstrap;
 
@@ -37,7 +40,9 @@ namespace
    * `RType::IsDerivedFrom` cannot walk from it to CScriptObject and every
    * reflected reference built from a CLuaWldUIProvider fails its upcast.
    */
-  void AddCScriptObjectBase(gpg::RType& typeInfo)
+  void AddCScriptObjectBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CScriptObject>(&typeInfo);
   }
@@ -98,4 +103,7 @@ void moho::register_CLuaWldUIProviderTypeInfoStartup()
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CLuaWldUIProviderTypeInfoStartup_86a3e0, moho::register_CLuaWldUIProviderTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CLuaWldUIProviderTypeInfoStartup_86a3e0,
+  moho::register_CLuaWldUIProviderTypeInfoStartup
+)

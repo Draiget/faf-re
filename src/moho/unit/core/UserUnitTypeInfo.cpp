@@ -69,7 +69,9 @@ namespace moho
     }
 
     gpg::RType* const baseType = CScriptObject::sType;
-    const gpg::RField base(baseType->GetName(), baseType, gpg::BaseSubobjectOffset<UserUnit, CScriptObject>(), 0, nullptr);
+    const gpg::RField base(
+      baseType->GetName(), baseType, gpg::BaseSubobjectOffset<UserUnit, CScriptObject>(), 0, nullptr
+    );
     AddBase(base);
   }
 
@@ -136,4 +138,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_UserUnitTypeInfo_497a76, moho::register_UserUnitTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_UserUnitTypeInfo_497a76,
+  moho::register_UserUnitTypeInfo
+)

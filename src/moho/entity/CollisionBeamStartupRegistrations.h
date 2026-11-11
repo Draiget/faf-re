@@ -48,7 +48,6 @@ namespace moho
 
   static_assert(sizeof(ECollisionBeamEventTypeInfo) == 0x78, "ECollisionBeamEventTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x00BD4B40 (FUN_00BD4B40, initialize_CollisionBeamTrigConstants)
    *

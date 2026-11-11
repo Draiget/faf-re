@@ -8,7 +8,8 @@ namespace faf::editor
   // The little JSON FAForeverMapEditor's preset files need (Unity's JsonUtility output): keys looked up by name,
   // vectors as {"x", "y", "z", "w"} objects.
 
-  /** The text of `key`'s value: a number, true/false, a string's contents, or an {object} / [array] with its brackets. */
+  /** The text of `key`'s value: a number, true/false, a string's contents, or an {object} / [array] with its brackets.
+   */
   bool JsonValue(const std::string& text, const std::string& key, std::string& out);
   /** `key`'s number into `out` (left as it was when absent). */
   bool JsonFloat(const std::string& text, const std::string& key, float& out);

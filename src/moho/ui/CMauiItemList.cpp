@@ -99,7 +99,7 @@ namespace
       itemList->mCurSelection = currentSelection - 1;
     }
   }
-}
+} // namespace
 
 gpg::RType* moho::CMauiItemList::sType = nullptr;
 
@@ -959,7 +959,6 @@ void moho::CMauiItemList::DoRender(
     return;
   }
 
-
   const std::int32_t visibleLineCount = LinesVisible();
 
   const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
@@ -971,8 +970,7 @@ void moho::CMauiItemList::DoRender(
 
   // Background quad spanning the full control rectangle.
   {
-    const boost::shared_ptr<CD3DBatchTexture> backgroundTexture =
-      CD3DBatchTexture::FromSolidColor(mBackgroundColor);
+    const boost::shared_ptr<CD3DBatchTexture> backgroundTexture = CD3DBatchTexture::FromSolidColor(mBackgroundColor);
     primBatcher->SetTexture(backgroundTexture);
 
     const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, top, vertexColor, 0.0f, 0.0f);
@@ -1386,8 +1384,7 @@ bool moho::CMauiItemList::HandleEvent(
     }
 
     const char* const callbackName = eventData.mEventType == MET_ButtonPress ? "OnClick" : "OnDoubleClick";
-    LuaPlus::LuaState* const activeState =
-      mLuaObj.GetActiveState();
+    LuaPlus::LuaState* const activeState = mLuaObj.GetActiveState();
     LuaPlus::LuaObject eventObject{};
     const LuaPlus::LuaObject* const createdEvent =
       CreateLuaEventObject(const_cast<SMauiEventData*>(&eventData), &eventObject, activeState);

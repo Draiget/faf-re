@@ -41,7 +41,12 @@ namespace faf::editor
    * A map archive's files written into `mapsFolder/<folder>/`; false with `error` when the archive isn't that map's
    * (no `_scenario.lua`, an entry outside its folder) or a file can't be written.
    */
-  bool InstallMapZip(const std::string& zip, const std::string& folder, const std::filesystem::path& mapsFolder, std::string& error);
+  bool InstallMapZip(
+    const std::string& zip,
+    const std::string& folder,
+    const std::filesystem::path& mapsFolder,
+    std::string& error
+  );
 
   /** One map download from the vault, on its own thread: download, then install into the vault's maps folder. */
   class EdVaultDownload
@@ -58,16 +63,31 @@ namespace faf::editor
     ~EdVaultDownload();
     /** Starts it; false while another runs. */
     bool Start(const VaultMapName& map, const std::filesystem::path& mapsFolder);
-    [[nodiscard]] State GetState() const noexcept { return mState.load(); }
+    [[nodiscard]] State GetState() const noexcept
+    {
+      return mState.load();
+    }
     /** What it is doing, or why it failed. */
     [[nodiscard]] std::string Message() const;
     /** The map installed: its folder name and where it is on disk. */
-    [[nodiscard]] const VaultMapName& Map() const noexcept { return mMap; }
-    [[nodiscard]] std::filesystem::path Folder() const { return mMapsFolder / mMap.folder; }
+    [[nodiscard]] const VaultMapName& Map() const noexcept
+    {
+      return mMap;
+    }
+    [[nodiscard]] std::filesystem::path Folder() const
+    {
+      return mMapsFolder / mMap.folder;
+    }
     /** Bytes received so far. */
-    [[nodiscard]] std::uint64_t Received() const noexcept { return mReceived.load(); }
+    [[nodiscard]] std::uint64_t Received() const noexcept
+    {
+      return mReceived.load();
+    }
     /** The archive's size as the vault announced it, 0 until known. */
-    [[nodiscard]] std::uint64_t Total() const noexcept { return mTotal.load(); }
+    [[nodiscard]] std::uint64_t Total() const noexcept
+    {
+      return mTotal.load();
+    }
     /** Back to Idle once the caller has taken the result. */
     void Reset();
 

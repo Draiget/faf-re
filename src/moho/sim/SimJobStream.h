@@ -67,12 +67,12 @@ namespace moho
     /// Totals since start, counted on the sim thread; jobs the workers ran = queued - stolen.
     struct SStats
     {
-      std::uint64_t mQueued = 0;    // jobs handed to the stream
-      std::uint64_t mStolen = 0;    // jobs the sim thread ran itself in Finish / FinishAll
-      std::uint64_t mWaited = 0;    // jobs the sim thread waited for while a worker ran them
+      std::uint64_t mQueued = 0;           // jobs handed to the stream
+      std::uint64_t mStolen = 0;           // jobs the sim thread ran itself in Finish / FinishAll
+      std::uint64_t mWaited = 0;           // jobs the sim thread waited for while a worker ran them
       std::uint64_t mWaitMicroseconds = 0; // time spent in those waits
-      std::uint64_t mWakeCalls = 0; // Enqueues that woke a sleeping worker (a system call)
-      std::uint64_t mOpens = 0;     // Open calls (one pool StartAsync / FinishAsync pair each)
+      std::uint64_t mWakeCalls = 0;        // Enqueues that woke a sleeping worker (a system call)
+      std::uint64_t mOpens = 0;            // Open calls (one pool StartAsync / FinishAsync pair each)
     };
     [[nodiscard]] const SStats& Stats() const noexcept;
 

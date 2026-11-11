@@ -86,11 +86,16 @@ namespace moho
   {
     mPrefix = "FORMATIONSTATUS_";
 
-    AddEnum(StripPrefix("FORMATIONSTATUS_FormationUpdated"), static_cast<std::int32_t>(FORMATIONSTATUS_FormationUpdated));
+    AddEnum(
+      StripPrefix("FORMATIONSTATUS_FormationUpdated"), static_cast<std::int32_t>(FORMATIONSTATUS_FormationUpdated)
+    );
     AddEnum(StripPrefix("FORMATIONSTATUS_FormationAtGoal"), static_cast<std::int32_t>(FORMATIONSTATUS_FormationAtGoal));
   }
 } // namespace moho
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EFormationdStatusTypeInfo, moho::register_EFormationdStatusTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EFormationdStatusTypeInfo,
+  moho::register_EFormationdStatusTypeInfo
+)

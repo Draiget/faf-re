@@ -32,7 +32,10 @@ namespace faf::headless
     constexpr float kPositionTolerance = 1.0e-3f;
     constexpr float kRotationTolerance = 1.0e-4f;
 
-    [[nodiscard]] bool SameBits(const moho::VTransform& a, const moho::VTransform& b) noexcept
+    [[nodiscard]] bool SameBits(
+      const moho::VTransform& a,
+      const moho::VTransform& b
+    ) noexcept
     {
       const float av[7] = {a.orient_.w, a.orient_.x, a.orient_.y, a.orient_.z, a.pos_.x, a.pos_.y, a.pos_.z};
       const float bv[7] = {b.orient_.w, b.orient_.x, b.orient_.y, b.orient_.z, b.pos_.x, b.pos_.y, b.pos_.z};
@@ -44,14 +47,17 @@ namespace faf::headless
       return true;
     }
 
-    [[nodiscard]] bool WithinTolerance(const moho::VTransform& a, const moho::VTransform& b) noexcept
+    [[nodiscard]] bool WithinTolerance(
+      const moho::VTransform& a,
+      const moho::VTransform& b
+    ) noexcept
     {
-      return std::fabs(a.pos_.x - b.pos_.x) < kPositionTolerance && std::fabs(a.pos_.y - b.pos_.y) < kPositionTolerance
-          && std::fabs(a.pos_.z - b.pos_.z) < kPositionTolerance
-          && std::fabs(a.orient_.w - b.orient_.w) < kRotationTolerance
-          && std::fabs(a.orient_.x - b.orient_.x) < kRotationTolerance
-          && std::fabs(a.orient_.y - b.orient_.y) < kRotationTolerance
-          && std::fabs(a.orient_.z - b.orient_.z) < kRotationTolerance;
+      return std::fabs(a.pos_.x - b.pos_.x) < kPositionTolerance &&
+        std::fabs(a.pos_.y - b.pos_.y) < kPositionTolerance && std::fabs(a.pos_.z - b.pos_.z) < kPositionTolerance &&
+        std::fabs(a.orient_.w - b.orient_.w) < kRotationTolerance &&
+        std::fabs(a.orient_.x - b.orient_.x) < kRotationTolerance &&
+        std::fabs(a.orient_.y - b.orient_.y) < kRotationTolerance &&
+        std::fabs(a.orient_.z - b.orient_.z) < kRotationTolerance;
     }
 
     // Per pose, the class of the manipulator that last changed each bone this beat (null: none).
@@ -60,7 +66,11 @@ namespace faf::headless
     std::mutex sWriterMutex;
     std::unordered_map<const moho::CAniPose*, std::vector<const char*>> sBoneWriters;
 
-    void RecordBoneWrite(const moho::CAniPose* const pose, const char* const manipulatorClass, const int boneIndex)
+    void RecordBoneWrite(
+      const moho::CAniPose* const pose,
+      const char* const manipulatorClass,
+      const int boneIndex
+    )
     {
       const std::lock_guard<std::mutex> lock(sWriterMutex);
       std::vector<const char*>& writers = sBoneWriters[pose];
@@ -85,7 +95,9 @@ namespace faf::headless
     std::mutex sCallMutex;
     std::unordered_map<const void*, SLuaFunctionCalls> sLuaCalls;
 
-    [[nodiscard]] std::string ManipulatorBindingName(const void* const function)
+    [[nodiscard]] std::string ManipulatorBindingName(
+      const void* const function
+    )
     {
 #if defined(_WIN32)
       if (!gpg::diag::DiagSymbolsReady()) {
@@ -96,8 +108,10 @@ namespace faf::headless
       symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
       symbol->MaxNameLen = 255;
       DWORD64 offset = 0;
-      if (::SymFromAddr(::GetCurrentProcess(), reinterpret_cast<DWORD64>(function), &offset, symbol) == FALSE
-          || offset != 0) {
+      if (
+        ::SymFromAddr(::GetCurrentProcess(), reinterpret_cast<DWORD64>(function), &offset, symbol) == FALSE ||
+        offset != 0
+      ) {
         return {};
       }
       const char* const cfunc = std::strstr(symbol->Name, "cfunc_");
@@ -110,8 +124,15 @@ namespace faf::headless
       }
       const std::string name(cfunc + 6);
       static constexpr const char* kConstructors[] = {
-        "CreateAnimator", "CreateRotator", "CreateSlider", "CreateSlaver", "CreateAimController",
-        "CreateBuilderArmController", "CreateFootPlantController", "CreateThrustController", "CreateStorageManip",
+        "CreateAnimator",
+        "CreateRotator",
+        "CreateSlider",
+        "CreateSlaver",
+        "CreateAimController",
+        "CreateBuilderArmController",
+        "CreateFootPlantController",
+        "CreateThrustController",
+        "CreateStorageManip",
         "CreateCollisionDetector",
       };
       for (const char* const constructor : kConstructors) {
@@ -122,7 +143,9 @@ namespace faf::headless
       return name.find("Manipulator") != std::string::npos ? name : std::string();
     }
 
-    void RecordLuaCall(int (*const function)(lua_State*))
+    void RecordLuaCall(
+      int (*const function)(lua_State*)
+    )
     {
       const void* const key = reinterpret_cast<const void*>(function);
       const std::lock_guard<std::mutex> lock(sCallMutex);
@@ -134,7 +157,9 @@ namespace faf::headless
     }
   } // namespace
 
-  CReplayBoneStats::CReplayBoneStats(const std::string& path)
+  CReplayBoneStats::CReplayBoneStats(
+    const std::string& path
+  )
     : mPath(path)
   {
     moho::gAniBoneWriteHook = &RecordBoneWrite;
@@ -155,7 +180,9 @@ namespace faf::headless
     }
   }
 
-  void CReplayBoneStats::OnPacket(const moho::SSyncData& packet)
+  void CReplayBoneStats::OnPacket(
+    const moho::SSyncData& packet
+  )
   {
     for (const moho::SCreateUnitParams& params : packet.mNewUnits) {
       mUnits[params.mEntityId].blueprint =
@@ -200,8 +227,7 @@ namespace faf::headless
             ++unitExact;
             if (!WithinTolerance(bone.mLocalTransform, unit.bones[i])) {
               ++unitTolerance;
-              const char* const writer =
-                !haveWriters ? "(no record)" : (writers[i] != nullptr ? writers[i] : "(rest)");
+              const char* const writer = !haveWriters ? "(no record)" : (writers[i] != nullptr ? writers[i] : "(rest)");
               SWriterTotals& writerTotals = mWriters[writer];
               ++writerTotals.changedOverTolerance;
               ++writerTotals.byBlueprint[unit.blueprint];
@@ -239,7 +265,12 @@ namespace faf::headless
     mChangedPerBeat.push_back(changedTolerance);
     if (mFile != nullptr) {
       std::fprintf(
-        mFile, "%d,%u,%llu,%u,%u\n", packet.mCurBeat, unitsWithPose, static_cast<unsigned long long>(bones), changedExact,
+        mFile,
+        "%d,%u,%llu,%u,%u\n",
+        packet.mCurBeat,
+        unitsWithPose,
+        static_cast<unsigned long long>(bones),
+        changedExact,
         changedTolerance
       );
     }
@@ -257,8 +288,14 @@ namespace faf::headless
       for (const auto& [name, totals] : mBlueprints) {
         const double n = static_cast<double>(totals.unitBeats);
         std::fprintf(
-          blueprintFile, "%s,%llu,%.1f,%.2f,%.2f,%u\n", name.c_str(), static_cast<unsigned long long>(totals.unitBeats),
-          totals.bones / n, totals.changedExact / n, totals.changedOverTolerance / n, totals.maxChanged
+          blueprintFile,
+          "%s,%llu,%.1f,%.2f,%.2f,%u\n",
+          name.c_str(),
+          static_cast<unsigned long long>(totals.unitBeats),
+          totals.bones / n,
+          totals.changedExact / n,
+          totals.changedOverTolerance / n,
+          totals.maxChanged
         );
       }
       std::fclose(blueprintFile);
@@ -287,7 +324,11 @@ namespace faf::headless
     for (const auto& [name, totals] : mWriters) {
       char part[128];
       std::snprintf(
-        part, sizeof(part), "%s%s %.1f%%", writerSummary.empty() ? "" : ", ", name.c_str(),
+        part,
+        sizeof(part),
+        "%s%s %.1f%%",
+        writerSummary.empty() ? "" : ", ",
+        name.c_str(),
         changedTotal == 0 ? 0.0 : 100.0 * static_cast<double>(totals.changedOverTolerance) / changedTotal
       );
       writerSummary += part;
@@ -307,7 +348,10 @@ namespace faf::headless
       for (const auto& [name, calls] : byName) {
         manipulatorCalls += calls;
         std::fprintf(
-          callFile, "%s,%llu,%.3f\n", name.c_str(), static_cast<unsigned long long>(calls),
+          callFile,
+          "%s,%llu,%.3f\n",
+          name.c_str(),
+          static_cast<unsigned long long>(calls),
           mBeats == 0 ? 0.0 : static_cast<double>(calls) / static_cast<double>(mBeats)
         );
       }
@@ -324,15 +368,23 @@ namespace faf::headless
     const std::uint32_t p95 = sorted.empty() ? 0u : sorted[static_cast<std::size_t>(0.95 * (sorted.size() - 1))];
     char text[512];
     std::snprintf(
-      text, sizeof(text),
+      text,
+      sizeof(text),
       "bones: %llu beats, %zu blueprints, changed bones (over tolerance) per beat mean %.0f p95 %u max %u; at %.0f "
       "bytes per bone delta %.1f KB/s for one full-vision view",
-      static_cast<unsigned long long>(mBeats), mBlueprints.size(), mean, p95, sorted.empty() ? 0u : sorted.back(),
-      kBytesPerBoneDelta, mean * kBytesPerBoneDelta * 10.0 / 1000.0
+      static_cast<unsigned long long>(mBeats),
+      mBlueprints.size(),
+      mean,
+      p95,
+      sorted.empty() ? 0u : sorted.back(),
+      kBytesPerBoneDelta,
+      mean * kBytesPerBoneDelta * 10.0 / 1000.0
     );
     char calls[128];
     std::snprintf(
-      calls, sizeof(calls), "; manipulator Lua calls %llu (%.1f per beat)",
+      calls,
+      sizeof(calls),
+      "; manipulator Lua calls %llu (%.1f per beat)",
       static_cast<unsigned long long>(manipulatorCalls),
       mBeats == 0 ? 0.0 : static_cast<double>(manipulatorCalls) / static_cast<double>(mBeats)
     );

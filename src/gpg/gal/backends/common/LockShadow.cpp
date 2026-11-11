@@ -69,12 +69,14 @@ namespace gpg::gal::backend
           std::strcpy(name, "?");
         }
 #else
-        if (::GetModuleHandleExA(
-              GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-              static_cast<LPCSTR>(frames[index]),
-              &module
-            ) != FALSE &&
-            ::GetModuleFileNameA(module, name, MAX_PATH) != 0U) {
+        if (
+          ::GetModuleHandleExA(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+            static_cast<LPCSTR>(frames[index]),
+            &module
+          ) != FALSE &&
+          ::GetModuleFileNameA(module, name, MAX_PATH) != 0U
+        ) {
           offset -= reinterpret_cast<std::uintptr_t>(module);
         } else {
           std::strcpy(name, "?");
@@ -82,7 +84,11 @@ namespace gpg::gal::backend
 #endif
         const char* const base = std::max(std::strrchr(name, '\\'), std::strrchr(name, '/'));
         used += static_cast<std::size_t>(std::snprintf(
-          line + used, sizeof(line) - used, " %s+0x%zX", (base != nullptr) ? base + 1 : name, static_cast<std::size_t>(offset)
+          line + used,
+          sizeof(line) - used,
+          " %s+0x%zX",
+          (base != nullptr) ? base + 1 : name,
+          static_cast<std::size_t>(offset)
         ));
       }
       gpg::Warnf("  called from%s", line);
@@ -90,7 +96,10 @@ namespace gpg::gal::backend
 
     /** Logs (up to kMaxReports times a run) and breaks when asked to. */
     template <class... Args>
-    void Report(const char* const format, Args... args)
+    void Report(
+      const char* const format,
+      Args... args
+    )
     {
       if (sReports.fetch_add(1) < kMaxReports) {
         gpg::Warnf(format, args...);
@@ -112,13 +121,17 @@ namespace gpg::gal::backend
     return sTotalBytes.load();
   }
 
-  void LockShadow::Account(const std::size_t previousCapacity) noexcept
+  void LockShadow::Account(
+    const std::size_t previousCapacity
+  ) noexcept
   {
     sTotalBytes.fetch_add(mBytes.capacity());
     sTotalBytes.fetch_sub(previousCapacity);
   }
 
-  void LockShadow::Reset(const std::uint32_t byteWidth)
+  void LockShadow::Reset(
+    const std::uint32_t byteWidth
+  )
   {
     const std::size_t previous = mBytes.capacity();
     mByteWidth = byteWidth;
@@ -135,19 +148,28 @@ namespace gpg::gal::backend
     Account(previous);
   }
 
-  void LockShadow::Arm(const std::size_t from)
+  void LockShadow::Arm(
+    const std::size_t from
+  )
   {
     mGuardStart = from;
     std::memset(mBytes.data() + from, kGuardFill, mBytes.size() - from);
   }
 
-  std::uint8_t* LockShadow::Map(const std::uint32_t offset, const std::uint32_t size, const char* const kind)
+  std::uint8_t* LockShadow::Map(
+    const std::uint32_t offset,
+    const std::uint32_t size,
+    const char* const kind
+  )
   {
     std::uint32_t end = (size == 0U) ? mByteWidth : offset + size;
     if (size != 0U && (end < offset || end > mByteWidth)) {
       Report(
         "gal: %s lock past the end: offset %u size %u, buffer %u bytes - the part past the end is not drawn",
-        (kind != nullptr) ? kind : "buffer", offset, size, mByteWidth
+        (kind != nullptr) ? kind : "buffer",
+        offset,
+        size,
+        mByteWidth
       );
       end = std::max(end, offset);
       if (static_cast<std::size_t>(end) + kGuardBytes > mBytes.size()) {
@@ -163,7 +185,9 @@ namespace gpg::gal::backend
     return mBytes.data() + offset;
   }
 
-  void LockShadow::CheckGuard(const char* const kind)
+  void LockShadow::CheckGuard(
+    const char* const kind
+  )
   {
     const std::uint8_t* const guard = mBytes.data() + mGuardStart;
     const std::size_t length = mBytes.size() - mGuardStart;
@@ -176,7 +200,10 @@ namespace gpg::gal::backend
     }
     Report(
       "gal: %s written past its end: %zu bytes beyond the %u locked (buffer %u bytes)",
-      (kind != nullptr) ? kind : "buffer", dirty, mMappedEnd, mByteWidth
+      (kind != nullptr) ? kind : "buffer",
+      dirty,
+      mMappedEnd,
+      mByteWidth
     );
     Arm(mGuardStart);
   }

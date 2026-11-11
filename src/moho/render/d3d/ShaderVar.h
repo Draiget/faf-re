@@ -102,9 +102,9 @@ namespace moho
     ShaderVar* SetMatrix4x4(const gpg::gal::Matrix* matrix);
 
   public:
-    fa::string mVariableName{};                             // +0x00
-    fa::string mEffectFileName{};                           // +0x1C
-    CD3DEffect::AttachedLink mEffectLink{};                    // +0x38
+    fa::string mVariableName{};                                    // +0x00
+    fa::string mEffectFileName{};                                  // +0x1C
+    CD3DEffect::AttachedLink mEffectLink{};                        // +0x38
     boost::shared_ptr<gpg::gal::EffectVariable> mEffectVariable{}; // +0x40
   };
 
@@ -131,11 +131,8 @@ namespace moho
    * `RegisterShaderVar(variableName, shaderVar, effectFileName)` and returns
    * the shader-var slot.
    */
-  ShaderVar* RegisterShaderVarFromEffectFileFirst(
-    const char* effectFileName,
-    const char* variableName,
-    ShaderVar* shaderVar
-  );
+  ShaderVar*
+  RegisterShaderVarFromEffectFileFirst(const char* effectFileName, const char* variableName, ShaderVar* shaderVar);
 
   /**
    * Address: 0x00BEF140 (FUN_00BEF140, dynamic atexit destructor for `shaderVarPrimBatcherCompositeMatrix`)

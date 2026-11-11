@@ -36,7 +36,9 @@ namespace
 
   /// Class sizes: 16..64 by 8, 80..256 by 16, then 8 classes each by 32, 64, ... 2048 up to 16 KB. A free
   /// block holds two links, so 16 is the floor. The fine steps keep what packing saved on table headers.
-  [[nodiscard]] constexpr std::uint32_t ClassBytes(const std::uint32_t sizeClass) noexcept
+  [[nodiscard]] constexpr std::uint32_t ClassBytes(
+    const std::uint32_t sizeClass
+  ) noexcept
   {
     if (sizeClass < 7u) {
       return (sizeClass + 2u) * 8u;
@@ -66,7 +68,9 @@ namespace
   };
   constexpr ClassTable kClassTable{};
 
-  [[nodiscard]] inline std::uint32_t ClassOf(const std::size_t bytes) noexcept
+  [[nodiscard]] inline std::uint32_t ClassOf(
+    const std::size_t bytes
+  ) noexcept
   {
     return kClassTable.classOfQuantum[(bytes + 7u) / 8u];
   }
@@ -77,7 +81,9 @@ namespace
     FreeBlock* nextBatch; // on a batch's first block in a global list: the next batch
   };
 
-  [[nodiscard]] constexpr std::uint32_t BatchBlocks(const std::uint32_t sizeClass) noexcept
+  [[nodiscard]] constexpr std::uint32_t BatchBlocks(
+    const std::uint32_t sizeClass
+  ) noexcept
   {
     const std::uint32_t blocks = 8192u / ClassBytes(sizeClass);
     return (blocks < 4u) ? 4u : (blocks > 256u ? 256u : blocks);
@@ -123,16 +129,18 @@ namespace
   GlobalClassLists gGlobal[kClassCount];
   constinit thread_local ThreadLists tLists{};
 
-  [[nodiscard]] std::uintptr_t TryReserve(const std::uintptr_t address, const std::size_t bytes) noexcept
+  [[nodiscard]] std::uintptr_t TryReserve(
+    const std::uintptr_t address,
+    const std::size_t bytes
+  ) noexcept
   {
 #if defined(_WIN32)
     return reinterpret_cast<std::uintptr_t>(
       ::VirtualAlloc(reinterpret_cast<void*>(address), bytes, MEM_RESERVE, PAGE_NOACCESS)
     );
 #else
-    void* const mapped = ::mmap(
-      reinterpret_cast<void*>(address), bytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0
-    );
+    void* const mapped =
+      ::mmap(reinterpret_cast<void*>(address), bytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
     if (mapped == MAP_FAILED) {
       return 0;
     }
@@ -164,12 +172,15 @@ namespace
     }
   }
 
-  [[nodiscard]] bool CommitThrough(const std::size_t endBytes) noexcept
+  [[nodiscard]] bool CommitThrough(
+    const std::size_t endBytes
+  ) noexcept
   {
     if (endBytes <= gCommittedBytes) {
       return true;
     }
-    const std::size_t want = (endBytes - gCommittedBytes + kCommitChunkBytes - 1u) / kCommitChunkBytes * kCommitChunkBytes;
+    const std::size_t want =
+      (endBytes - gCommittedBytes + kCommitChunkBytes - 1u) / kCommitChunkBytes * kCommitChunkBytes;
     const std::size_t commit = (want > gReserveBytes - gCommittedBytes) ? gReserveBytes - gCommittedBytes : want;
     void* const start = reinterpret_cast<void*>(gBase + gCommittedBytes);
 #if defined(_WIN32)
@@ -186,7 +197,9 @@ namespace
   }
 
   /// Takes `spans` new spans. Caller holds gSpanLock.
-  [[nodiscard]] std::size_t TakeSpans(const std::size_t spans) noexcept
+  [[nodiscard]] std::size_t TakeSpans(
+    const std::size_t spans
+  ) noexcept
   {
     if ((gNextSpan + spans) * kSpanBytes > gReserveBytes || !CommitThrough((gNextSpan + spans) * kSpanBytes)) {
       return kSpanCount;
@@ -197,7 +210,9 @@ namespace
   }
 
   // Preserve the old first-fit / swap-pop choice until it cannot satisfy a request.
-  [[nodiscard]] std::size_t TakeFreeRun(const std::size_t spans) noexcept
+  [[nodiscard]] std::size_t TakeFreeRun(
+    const std::size_t spans
+  ) noexcept
   {
     for (std::size_t index = 0; index < gFreeRunCount; ++index) {
       LargeRun& run = gFreeRuns[index];
@@ -215,7 +230,10 @@ namespace
     return kSpanCount;
   }
 
-  [[nodiscard]] FreeBlock* CarveSpan(const std::uint32_t sizeClass, std::uint32_t& outCount) noexcept
+  [[nodiscard]] FreeBlock* CarveSpan(
+    const std::uint32_t sizeClass,
+    std::uint32_t& outCount
+  ) noexcept
   {
     std::size_t span = kSpanCount;
     {
@@ -244,7 +262,10 @@ namespace
     return head;
   }
 
-  [[nodiscard]] FreeBlock* Refill(const std::uint32_t sizeClass, std::uint32_t& outCount) noexcept
+  [[nodiscard]] FreeBlock* Refill(
+    const std::uint32_t sizeClass,
+    std::uint32_t& outCount
+  ) noexcept
   {
     GlobalClassLists& global = gGlobal[sizeClass];
     FreeBlock* taken = nullptr;
@@ -275,7 +296,10 @@ namespace
     return (taken != nullptr) ? taken : CarveSpan(sizeClass, outCount);
   }
 
-  void ReturnBatch(ThreadLists& lists, const std::uint32_t sizeClass) noexcept
+  void ReturnBatch(
+    ThreadLists& lists,
+    const std::uint32_t sizeClass
+  ) noexcept
   {
     const std::uint32_t batch = BatchBlocks(sizeClass);
     FreeBlock* const first = lists.head[sizeClass];
@@ -293,7 +317,9 @@ namespace
     global.batches = first;
   }
 
-  void ReturnAll(ThreadLists& lists) noexcept
+  void ReturnAll(
+    ThreadLists& lists
+  ) noexcept
   {
     for (std::uint32_t sizeClass = 0; sizeClass < kClassCount; ++sizeClass) {
       FreeBlock* block = lists.head[sizeClass];
@@ -357,7 +383,9 @@ namespace
     gFreeRunsChanged = false;
   }
 
-  [[nodiscard]] std::size_t TakeAdjacentRun(const std::size_t spans) noexcept
+  [[nodiscard]] std::size_t TakeAdjacentRun(
+    const std::size_t spans
+  ) noexcept
   {
     SummarizeAdjacentRuns();
     if (spans > gLargestAdjacentRun) {
@@ -385,7 +413,9 @@ namespace
     return first;
   }
 
-  [[nodiscard]] void* AllocateLarge(const std::size_t bytes) noexcept
+  [[nodiscard]] void* AllocateLarge(
+    const std::size_t bytes
+  ) noexcept
   {
     // Also prevents rounding overflow on an impossible request.
     if (bytes > gReserveBytes) {
@@ -412,7 +442,9 @@ namespace
     return reinterpret_cast<void*>(gBase + first * kSpanBytes);
   }
 
-  void FreeLarge(const std::size_t first) noexcept
+  void FreeLarge(
+    const std::size_t first
+  ) noexcept
   {
     std::lock_guard<std::mutex> guard(gSpanLock);
     const std::size_t spans = gLargeSpans[first];
@@ -446,7 +478,9 @@ namespace
     }
   }
 
-  [[nodiscard]] std::size_t BlockBytes(const void* const block) noexcept
+  [[nodiscard]] std::size_t BlockBytes(
+    const void* const block
+  ) noexcept
   {
     const std::size_t span = (reinterpret_cast<std::uintptr_t>(block) - gBase) / kSpanBytes;
     const std::uint8_t sizeClass = gSpanClass[span];
@@ -472,7 +506,9 @@ namespace lua
     std::call_once(gReserveOnce, &Reserve);
   }
 
-  void* ArenaAllocate(const std::size_t bytes) noexcept
+  void* ArenaAllocate(
+    const std::size_t bytes
+  ) noexcept
   {
     ArenaReserve();
     if (bytes > kMaxSmallBytes) {
@@ -503,7 +539,11 @@ namespace lua
     return block;
   }
 
-  void* ArenaReallocate(void* const block, const std::size_t oldBytes, const std::size_t bytes) noexcept
+  void* ArenaReallocate(
+    void* const block,
+    const std::size_t oldBytes,
+    const std::size_t bytes
+  ) noexcept
   {
     if (block == nullptr) {
       return ArenaAllocate(bytes);
@@ -523,7 +563,9 @@ namespace lua
     return moved;
   }
 
-  void ArenaFree(void* const block) noexcept
+  void ArenaFree(
+    void* const block
+  ) noexcept
   {
     if (block == nullptr) {
       return;
@@ -546,7 +588,9 @@ namespace lua
     }
   }
 
-  void* const* ArenaLightCell(void* const pointer) noexcept
+  void* const* ArenaLightCell(
+    void* const pointer
+  ) noexcept
   {
     LightCells& lights = Lights();
     std::lock_guard<std::mutex> guard(lights.lock);

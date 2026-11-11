@@ -28,11 +28,26 @@ namespace
   {
     std::vector<std::uint16_t> heights = std::vector<std::uint16_t>(kField * kField, 2560); // 20 units
     std::vector<std::uint64_t> texels = std::vector<std::uint64_t>(kMask * kMask, 0);
-    [[nodiscard]] MaskTerrain Terrain() const { return {heights.data(), kField, kField}; }
-    [[nodiscard]] std::uint64_t At(const int x, const int z) const { return texels[static_cast<std::size_t>(z * kMask + x)]; }
+    [[nodiscard]] MaskTerrain Terrain() const
+    {
+      return {heights.data(), kField, kField};
+    }
+    [[nodiscard]] std::uint64_t At(
+      const int x,
+      const int z
+    ) const
+    {
+      return texels[static_cast<std::size_t>(z * kMask + x)];
+    }
   };
 
-  void Step(World& world, MaskBrush brush, const float x, const float z, const float seconds)
+  void Step(
+    World& world,
+    MaskBrush brush,
+    const float x,
+    const float z,
+    const float seconds
+  )
   {
     static std::uint32_t steps = 0;
     brush.step = ++steps;
@@ -42,7 +57,10 @@ namespace
   class EveryMaskSymmetry : public ::testing::TestWithParam<Symmetry>
   {};
 
-  TEST_P(EveryMaskSymmetry, MirroredMasksStayIdentical)
+  TEST_P(
+    EveryMaskSymmetry,
+    MirroredMasksStayIdentical
+  )
   {
     World world;
     std::mt19937 random(11u + static_cast<unsigned>(GetParam()));
@@ -74,12 +92,24 @@ namespace
   }
 
   INSTANTIATE_TEST_SUITE_P(
-    MaskBrush, EveryMaskSymmetry,
-    ::testing::Values(Symmetry::LeftRight, Symmetry::TopBottom, Symmetry::DiagonalBack, Symmetry::DiagonalForward, Symmetry::HalfTurn,
-                      Symmetry::BothAxes, Symmetry::BothDiagonals, Symmetry::QuarterTurns)
+    MaskBrush,
+    EveryMaskSymmetry,
+    ::testing::Values(
+      Symmetry::LeftRight,
+      Symmetry::TopBottom,
+      Symmetry::DiagonalBack,
+      Symmetry::DiagonalForward,
+      Symmetry::HalfTurn,
+      Symmetry::BothAxes,
+      Symmetry::BothDiagonals,
+      Symmetry::QuarterTurns
+    )
   );
 
-  TEST(MaskBrush, PaintAndEraseReachTheirEndsEvenWeak)
+  TEST(
+    MaskBrush,
+    PaintAndEraseReachTheirEndsEvenWeak
+  )
   {
     World world;
     MaskBrush brush;
@@ -98,7 +128,10 @@ namespace
     EXPECT_EQ(MaskByte(world.At(15, 15), 3), 0);
   }
 
-  TEST(MaskBrush, PaintLowersTheLayersAbove)
+  TEST(
+    MaskBrush,
+    PaintLowersTheLayersAbove
+  )
   {
     World world;
     for (std::uint64_t& texel : world.texels) {
@@ -121,7 +154,10 @@ namespace
     EXPECT_EQ(MaskByte(kept.At(15, 15), 5), 255);
   }
 
-  TEST(MaskBrush, LimitsAndRulesFollowTheGround)
+  TEST(
+    MaskBrush,
+    LimitsAndRulesFollowTheGround
+  )
   {
     World world;
     // The left half high (60 units), the right half low (20).
@@ -150,27 +186,37 @@ namespace
     EXPECT_EQ(MaskByte(world.At(4, 16), 6), 0);
   }
 
-  TEST(MaskBrush, SymmetryCheckFindsAPlantedTexelAndRepairsIt)
+  TEST(
+    MaskBrush,
+    SymmetryCheckFindsAPlantedTexelAndRepairsIt
+  )
   {
-    for (const Symmetry symmetry : {Symmetry::LeftRight, Symmetry::BothDiagonals, Symmetry::QuarterTurns, Symmetry::NWay}) {
+    for (const Symmetry symmetry :
+         {Symmetry::LeftRight, Symmetry::BothDiagonals, Symmetry::QuarterTurns, Symmetry::NWay}) {
       World world;
       MaskBrush brush;
       brush.shape.symmetry = symmetry;
       brush.shape.radius = 12.0f;
       brush.layer = 2;
       Step(world, brush, 20.0f, 14.0f, 0.3f);
-      EXPECT_EQ(faf::editor::CheckMaskSymmetry(world.texels.data(), kMask, kMask, symmetry, 3).differing, 0) << static_cast<int>(symmetry);
+      EXPECT_EQ(faf::editor::CheckMaskSymmetry(world.texels.data(), kMask, kMask, symmetry, 3).differing, 0)
+        << static_cast<int>(symmetry);
       std::uint64_t& planted = world.texels[static_cast<std::size_t>(3 * kMask + 25)];
       planted = faf::editor::WithMaskByte(planted, 6, 90);
-      const faf::editor::MaskSymmetryReport report = faf::editor::CheckMaskSymmetry(world.texels.data(), kMask, kMask, symmetry, 3);
+      const faf::editor::MaskSymmetryReport report =
+        faf::editor::CheckMaskSymmetry(world.texels.data(), kMask, kMask, symmetry, 3);
       EXPECT_GE(report.differing, 1) << static_cast<int>(symmetry);
       EXPECT_EQ(report.largest, 90) << static_cast<int>(symmetry);
       (void)faf::editor::MakeMasksSymmetric(world.texels.data(), kMask, kMask, symmetry, 3);
-      EXPECT_EQ(faf::editor::CheckMaskSymmetry(world.texels.data(), kMask, kMask, symmetry, 3).differing, 0) << static_cast<int>(symmetry);
+      EXPECT_EQ(faf::editor::CheckMaskSymmetry(world.texels.data(), kMask, kMask, symmetry, 3).differing, 0)
+        << static_cast<int>(symmetry);
     }
   }
 
-  TEST(MaskBrush, HistoryUndoesByteForByte)
+  TEST(
+    MaskBrush,
+    HistoryUndoesByteForByte
+  )
   {
     World world;
     faf::editor::MaskHistory history;

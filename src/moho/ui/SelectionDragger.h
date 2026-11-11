@@ -188,25 +188,19 @@ namespace moho
   public:
     // +0x00 vptr and +0x04 `WeakObject::weakLinkHead_` belong to the
     // `ISelectionDragger`/`IMauiDragger` bases; this class starts at +0x08.
-    CWldSession* mSess;       // +0x08
-    CameraImpl* mCam;         // +0x0C
-    float mX0;                // +0x10
-    float mY0;                // +0x14
-    Wm3::Vector3f mPos;       // +0x18
+    CWldSession* mSess; // +0x08
+    CameraImpl* mCam;   // +0x0C
+    float mX0;          // +0x10
+    float mY0;          // +0x14
+    Wm3::Vector3f mPos; // +0x18
   };
 
-  static_assert(offsetof(SelectionDragger, mSess) == 0x08,
-                "SelectionDragger::mSess offset must be 0x08");
-  static_assert(offsetof(SelectionDragger, mCam) == 0x0C,
-                "SelectionDragger::mCam offset must be 0x0C");
-  static_assert(offsetof(SelectionDragger, mX0) == 0x10,
-                "SelectionDragger::mX0 offset must be 0x10");
-  static_assert(offsetof(SelectionDragger, mY0) == 0x14,
-                "SelectionDragger::mY0 offset must be 0x14");
-  static_assert(offsetof(SelectionDragger, mPos) == 0x18,
-                "SelectionDragger::mPos offset must be 0x18");
-  static_assert(sizeof(SelectionDragger) == 0x24,
-                "SelectionDragger size must be 0x24");
+  static_assert(offsetof(SelectionDragger, mSess) == 0x08, "SelectionDragger::mSess offset must be 0x08");
+  static_assert(offsetof(SelectionDragger, mCam) == 0x0C, "SelectionDragger::mCam offset must be 0x0C");
+  static_assert(offsetof(SelectionDragger, mX0) == 0x10, "SelectionDragger::mX0 offset must be 0x10");
+  static_assert(offsetof(SelectionDragger, mY0) == 0x14, "SelectionDragger::mY0 offset must be 0x14");
+  static_assert(offsetof(SelectionDragger, mPos) == 0x18, "SelectionDragger::mPos offset must be 0x18");
+  static_assert(sizeof(SelectionDragger) == 0x24, "SelectionDragger size must be 0x24");
 
   /**
    * Rubber-band (screen-rectangle) selection dragger.
@@ -314,20 +308,16 @@ namespace moho
     [[nodiscard]] bool HasActiveSelectionDrag() const override;
 
   public:
-    std::uint8_t mStretch;   // +0x24
+    std::uint8_t mStretch; // +0x24
     std::uint8_t pad_0025[3];
-    float mX1;               // +0x28
-    float mY1;               // +0x2C
+    float mX1; // +0x28
+    float mY1; // +0x2C
   };
 
-  static_assert(offsetof(SelectionDragger2D, mStretch) == 0x24,
-                "SelectionDragger2D::mStretch offset must be 0x24");
-  static_assert(offsetof(SelectionDragger2D, mX1) == 0x28,
-                "SelectionDragger2D::mX1 offset must be 0x28");
-  static_assert(offsetof(SelectionDragger2D, mY1) == 0x2C,
-                "SelectionDragger2D::mY1 offset must be 0x2C");
-  static_assert(sizeof(SelectionDragger2D) == 0x30,
-                "SelectionDragger2D size must be 0x30");
+  static_assert(offsetof(SelectionDragger2D, mStretch) == 0x24, "SelectionDragger2D::mStretch offset must be 0x24");
+  static_assert(offsetof(SelectionDragger2D, mX1) == 0x28, "SelectionDragger2D::mX1 offset must be 0x28");
+  static_assert(offsetof(SelectionDragger2D, mY1) == 0x2C, "SelectionDragger2D::mY1 offset must be 0x2C");
+  static_assert(sizeof(SelectionDragger2D) == 0x30, "SelectionDragger2D size must be 0x30");
 
   /**
    * Volumetric (world-space) selection dragger, used whenever
@@ -502,7 +492,7 @@ namespace moho
     [[nodiscard]] bool HasActiveSelectionDrag() const override;
 
   public:
-    std::uint8_t mStretch;     // +0x24
+    std::uint8_t mStretch; // +0x24
     std::uint8_t pad_0025[3];
     Wm3::Vector3f mDragEndPos; // +0x28
 
@@ -553,20 +543,28 @@ namespace moho
     IDecalManager* mDecalManager; // +0x4C
   };
 
-  static_assert(offsetof(SelectionDragger3D, mStretch) == 0x24,
-                "SelectionDragger3D::mStretch offset must be 0x24");
-  static_assert(offsetof(SelectionDragger3D, mDragEndPos) == 0x28,
-                "SelectionDragger3D::mDragEndPos offset must be 0x28");
-  static_assert(offsetof(SelectionDragger3D, mAlbedoDecal) == 0x34,
-                "SelectionDragger3D::mAlbedoDecal offset must be 0x34");
-  static_assert(offsetof(SelectionDragger3D, mWaterAlbedoDecal) == 0x3C,
-                "SelectionDragger3D::mWaterAlbedoDecal offset must be 0x3C");
-  static_assert(offsetof(SelectionDragger3D, mHighlightTexture) == 0x44,
-                "SelectionDragger3D::mHighlightTexture offset must be 0x44");
-  static_assert(offsetof(SelectionDragger3D, mDecalManager) == 0x4C,
-                "SelectionDragger3D::mDecalManager offset must be 0x4C");
-  static_assert(sizeof(SelectionDragger3D) == 0x50,
-                "SelectionDragger3D size must be 0x50");
+  static_assert(offsetof(SelectionDragger3D, mStretch) == 0x24, "SelectionDragger3D::mStretch offset must be 0x24");
+  static_assert(
+    offsetof(SelectionDragger3D, mDragEndPos) == 0x28,
+    "SelectionDragger3D::mDragEndPos offset must be 0x28"
+  );
+  static_assert(
+    offsetof(SelectionDragger3D, mAlbedoDecal) == 0x34,
+    "SelectionDragger3D::mAlbedoDecal offset must be 0x34"
+  );
+  static_assert(
+    offsetof(SelectionDragger3D, mWaterAlbedoDecal) == 0x3C,
+    "SelectionDragger3D::mWaterAlbedoDecal offset must be 0x3C"
+  );
+  static_assert(
+    offsetof(SelectionDragger3D, mHighlightTexture) == 0x44,
+    "SelectionDragger3D::mHighlightTexture offset must be 0x44"
+  );
+  static_assert(
+    offsetof(SelectionDragger3D, mDecalManager) == 0x4C,
+    "SelectionDragger3D::mDecalManager offset must be 0x4C"
+  );
+  static_assert(sizeof(SelectionDragger3D) == 0x50, "SelectionDragger3D size must be 0x50");
 
   /**
    * Address: 0x00863F10 (FUN_00863F10)

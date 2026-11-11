@@ -41,20 +41,35 @@ namespace faf::remote
      * The last sealed beat's synced entities, by id ascending. Raw pointers: valid until the sim
      * runs its next tick, so a reader takes what it needs from `OnBeatChanges`.
      */
-    [[nodiscard]] const std::vector<SChangedEntity>& Entities() const noexcept { return mSealed; }
+    [[nodiscard]] const std::vector<SChangedEntity>& Entities() const noexcept
+    {
+      return mSealed;
+    }
     /** The sealed beat (`Sim::mCurBeat` when its walk ended). */
-    [[nodiscard]] std::uint32_t Beat() const noexcept { return mBeat; }
+    [[nodiscard]] std::uint32_t Beat() const noexcept
+    {
+      return mBeat;
+    }
     /**
      * Plan WP13.6: the next beat sealed holds every entity of the sim, as a focus change's walk does, so a view that
      * starts then learns of what hasn't changed since the game's start. Every view acts on them as on any changed one.
      */
-    void RequestEveryEntity() noexcept { mEveryEntity = true; }
+    void RequestEveryEntity() noexcept
+    {
+      mEveryEntity = true;
+    }
     /** Whether the last sealed beat holds every entity (`RequestEveryEntity`). */
-    [[nodiscard]] bool EveryEntitySealed() const noexcept { return mEveryEntitySealed; }
+    [[nodiscard]] bool EveryEntitySealed() const noexcept
+    {
+      return mEveryEntitySealed;
+    }
 
   protected:
     /** A beat was sealed: `Entities()` is its change set and `packet` its packet. */
-    virtual void OnBeatChanges(moho::Sim& sim, const moho::SSyncData& packet)
+    virtual void OnBeatChanges(
+      moho::Sim& sim,
+      const moho::SSyncData& packet
+    )
     {
       (void)sim;
       (void)packet;
@@ -63,7 +78,7 @@ namespace faf::remote
   private:
     std::vector<SChangedEntity> mPending; // the walk in progress
     std::vector<SChangedEntity> mSealed;  // the last beat's, sorted by id
-    bool mPendingRefreshUI = false;        // the entity about to sync
+    bool mPendingRefreshUI = false;       // the entity about to sync
     std::uint32_t mBeat = 0;
     bool mEveryEntity = false;
     bool mEveryEntitySealed = false;

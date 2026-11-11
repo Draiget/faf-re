@@ -41,7 +41,6 @@ namespace moho
    */
   void register_CAimManipulatorTypeInfo();
 
-
   /**
    * Address: 0x00BD2350 (FUN_00BD2350, register_CScrLuaMetatableFactory_CAimManipulator_Index)
    *

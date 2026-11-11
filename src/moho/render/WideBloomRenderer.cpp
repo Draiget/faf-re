@@ -39,7 +39,9 @@ namespace moho
     constexpr int kGlowTargetFormat = 2;
   } // namespace
 
-  WideBloomRenderer& WideBloomRenderer::Get(const int head)
+  WideBloomRenderer& WideBloomRenderer::Get(
+    const int head
+  )
   {
     static WideBloomRenderer sRenderers[2];
     return sRenderers[head == 1 ? 1 : 0];
@@ -58,8 +60,9 @@ namespace moho
       *this = WideBloomRenderer();
       mDevice = device;
       gpg::gal::DeviceContext* const context = device->GetDeviceContext();
-      const bool modern = context != nullptr
-        && (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 || context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
+      const bool modern = context != nullptr &&
+        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
+         context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
       if (modern && (device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureVertexPulling) != 0U) {
         gpg::gal::GpuProgramDesc desc{};
         desc.source = kWideBloomShaderSource;
@@ -88,7 +91,10 @@ namespace moho
     return mSupported;
   }
 
-  bool WideBloomRenderer::EnsureLevels(const int glowWidth, const int glowHeight)
+  bool WideBloomRenderer::EnsureLevels(
+    const int glowWidth,
+    const int glowHeight
+  )
   {
     if (glowWidth == mGlowWidth && glowHeight == mGlowHeight && mLevels[kLevels - 1].target) {
       return true;
@@ -108,7 +114,9 @@ namespace moho
       resources->CreateRenderTarget(created, width, height, kGlowTargetFormat);
       level.target = created;
       if (!level.target) {
-        gpg::Logf("Bloom: wide glow target %dx%d could not be created; ren_BloomWide off for this device", width, height);
+        gpg::Logf(
+          "Bloom: wide glow target %dx%d could not be created; ren_BloomWide off for this device", width, height
+        );
         mSupported = false;
         return false;
       }
@@ -117,7 +125,10 @@ namespace moho
   }
 
   void WideBloomRenderer::Render(
-    const int head, const boost::shared_ptr<ID3DRenderTarget>& glow, const int glowWidth, const int glowHeight
+    const int head,
+    const boost::shared_ptr<ID3DRenderTarget>& glow,
+    const int glowWidth,
+    const int glowHeight
   )
   {
     if (!mSupported || !glow || glowWidth <= 1 || glowHeight <= 1 || !EnsureLevels(glowWidth, glowHeight)) {
@@ -136,9 +147,16 @@ namespace moho
 
     // One full-target triangle from `source` (`sourceWidth` by `sourceHeight`) into the bound
     // target (`width` by `height`) with `program`.
-    const auto pass = [&](gpg::gal::GpuProgram* const program, const boost::shared_ptr<ID3DRenderTarget>& source,
-                          const int sourceWidth, const int sourceHeight, const int width, const int height,
-                          const float weight, const float threshold) {
+    const auto pass = [&](
+                        gpg::gal::GpuProgram* const program,
+                        const boost::shared_ptr<ID3DRenderTarget>& source,
+                        const int sourceWidth,
+                        const int sourceHeight,
+                        const int width,
+                        const int height,
+                        const float weight,
+                        const float threshold
+                      ) {
       ID3DRenderTarget::SurfaceHandle surface{};
       (void)source->GetSurface(surface);
       if (!surface) {
@@ -148,11 +166,18 @@ namespace moho
       Wm3::Vector2i size{width, height};
       device->SetViewport(&pos, &size, 0.0f, 1.0f);
       const float constants[12] = {
-        1.0f / static_cast<float>(sourceWidth), 1.0f / static_cast<float>(sourceHeight),
-        static_cast<float>(sourceWidth), static_cast<float>(sourceHeight),
-        1.0f / static_cast<float>(width), 1.0f / static_cast<float>(height),
-        static_cast<float>(width), static_cast<float>(height),
-        weight, threshold, 0.0f, 0.0f,
+        1.0f / static_cast<float>(sourceWidth),
+        1.0f / static_cast<float>(sourceHeight),
+        static_cast<float>(sourceWidth),
+        static_cast<float>(sourceHeight),
+        1.0f / static_cast<float>(width),
+        1.0f / static_cast<float>(height),
+        static_cast<float>(width),
+        static_cast<float>(height),
+        weight,
+        threshold,
+        0.0f,
+        0.0f,
       };
       gpg::gal::GpuDrawCall draw{};
       draw.program = program;
@@ -190,8 +215,16 @@ namespace moho
     device->SetRenderTarget2(head, false, 0, 1.0f, 0);
     const int headWidth = device->GetHeadWidth(static_cast<unsigned int>(head));
     const int headHeight = device->GetHeadHeight(static_cast<unsigned int>(head));
-    pass(mUp.get(), mLevels[0].target, mLevels[0].width, mLevels[0].height, headWidth, headHeight,
-         std::min(ren_BloomWide, 2.0f) / static_cast<float>(kLevels), 0.0f);
+    pass(
+      mUp.get(),
+      mLevels[0].target,
+      mLevels[0].width,
+      mLevels[0].height,
+      headWidth,
+      headHeight,
+      std::min(ren_BloomWide, 2.0f) / static_cast<float>(kLevels),
+      0.0f
+    );
 
     device->SetViewport(&savedPos, &savedSize, savedMinZ, savedMaxZ);
   }

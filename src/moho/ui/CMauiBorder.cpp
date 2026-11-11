@@ -7,7 +7,7 @@ namespace
   constexpr const char* kCMauiBorderSetNewTexturesHelpText =
     "SetNewTextures(vertical, horizontal, upperLeft, upperRight, lowerLeft, lowerRight)";
   constexpr const char* kCMauiBorderSetSolidColorHelpText = "SetSolidColor(color)";
-}
+} // namespace
 
 gpg::RType* moho::CMauiBorder::sType = nullptr;
 
@@ -355,8 +355,7 @@ void moho::CMauiBorder::DoRender(
   const float top = CScriptLazyVar_float::GetValue(&mTopLV);
   const float right = CScriptLazyVar_float::GetValue(&mRightLV);
   const float bottom = CScriptLazyVar_float::GetValue(&mBottomLV);
-  const float borderWidth =
-    static_cast<float>(FloorFrndintAdjustDown(CScriptLazyVar_float::GetValue(&mBorderWidthLV)));
+  const float borderWidth = static_cast<float>(FloorFrndintAdjustDown(CScriptLazyVar_float::GetValue(&mBorderWidthLV)));
   const float borderHeight =
     static_cast<float>(FloorFrndintAdjustDown(CScriptLazyVar_float::GetValue(&mBorderHeightLV)));
 

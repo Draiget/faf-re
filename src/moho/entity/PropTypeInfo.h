@@ -104,4 +104,3 @@ namespace moho
    */
   void register_PropTypeInfo();
 } // namespace moho
-

@@ -248,16 +248,16 @@ namespace moho
      */
     void OnCloseWindow(wxCloseEvent& event);
 
-    bool mInitializing;                        // +0x178 holds the save handlers off while building
-    std::uint32_t mThreadId;                   // +0x17C the creating thread
-    wxGenericDirCtrl* mSourceTree;             // +0x180
-    ScrSourceCtrl* mSourceCtrl;                // +0x184
-    wxListCtrl* mCallStack;                    // +0x188
-    ScrWatchCtrl* mLocals;                     // +0x18C
-    ScrWatchCtrl* mGlobals;                    // +0x190
-    fa::string mFindString;                 // +0x194
-    wxTextCtrl* mFindText;                     // +0x1B0
-    fa::list<fa::string> mRecentFiles;   // +0x1B4 Options.Debug.Files
+    bool mInitializing;                // +0x178 holds the save handlers off while building
+    std::uint32_t mThreadId;           // +0x17C the creating thread
+    wxGenericDirCtrl* mSourceTree;     // +0x180
+    ScrSourceCtrl* mSourceCtrl;        // +0x184
+    wxListCtrl* mCallStack;            // +0x188
+    ScrWatchCtrl* mLocals;             // +0x18C
+    ScrWatchCtrl* mGlobals;            // +0x190
+    fa::string mFindString;            // +0x194
+    wxTextCtrl* mFindText;             // +0x1B0
+    fa::list<fa::string> mRecentFiles; // +0x1B4 Options.Debug.Files
 
     DECLARE_EVENT_TABLE()
   };

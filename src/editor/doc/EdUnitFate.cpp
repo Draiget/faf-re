@@ -8,7 +8,11 @@ namespace faf::editor
 {
   namespace
   {
-    bool FindPath(const UnitGroup& group, const std::string& unit, std::vector<std::string>& path)
+    bool FindPath(
+      const UnitGroup& group,
+      const std::string& unit,
+      std::vector<std::string>& path
+    )
     {
       for (const SaveUnit& member : group.units) {
         if (member.name == unit) {
@@ -25,9 +29,11 @@ namespace faf::editor
       return false;
     }
 
-
     /** The arguments of the call whose `(` is at `open`, split at top-level commas (strings and nesting skipped). */
-    std::vector<std::string> Arguments(const std::string& text, const std::size_t open)
+    std::vector<std::string> Arguments(
+      const std::string& text,
+      const std::size_t open
+    )
     {
       std::vector<std::string> args(1);
       int depth = 0;
@@ -58,7 +64,9 @@ namespace faf::editor
       return args;
     }
 
-    std::string Trim(const std::string& text)
+    std::string Trim(
+      const std::string& text
+    )
     {
       std::size_t a = 0;
       std::size_t b = text.size();
@@ -73,13 +81,16 @@ namespace faf::editor
 
   } // namespace
 
-  std::vector<ScriptGroupCreation> ScriptGroupCreations(const std::string& script)
+  std::vector<ScriptGroupCreation> ScriptGroupCreations(
+    const std::string& script
+  )
   {
     {
       std::vector<ScriptGroupCreation> groups;
       // ScenarioUtilities' group creators: CreateArmyGroup(army, group, wreckage), CreateArmyGroupAsPlatoon(...),
       // CreateArmyTree(army, group) and their kin all take the group's name second.
-      for (std::size_t at = script.find("CreateArmy"); at != std::string::npos; at = script.find("CreateArmy", at + 10)) {
+      for (std::size_t at = script.find("CreateArmy"); at != std::string::npos;
+           at = script.find("CreateArmy", at + 10)) {
         const std::size_t open = script.find('(', at);
         if (open == std::string::npos || open - at > 40) {
           continue;
@@ -95,7 +106,10 @@ namespace faf::editor
         }
         const std::size_t close = second.find(second[0], 1);
         ScriptGroupCreation group;
-        if (const std::string first = Trim(args[0]); first.size() >= 2 && (first[0] == '\'' || first[0] == '"') && first.back() == first[0]) {
+        if (
+          const std::string first = Trim(args[0]);
+          first.size() >= 2 && (first[0] == '\'' || first[0] == '"') && first.back() == first[0]
+        ) {
           group.army = first.substr(1, first.size() - 2);
         }
         group.name = second.substr(1, close - 1);
@@ -110,7 +124,13 @@ namespace faf::editor
   namespace
   {
     /** A number after `name =` in text[from, to), or `otherwise`. */
-    double NumberAfter(const std::string& text, const std::size_t from, const std::size_t to, const char* const name, const double otherwise)
+    double NumberAfter(
+      const std::string& text,
+      const std::size_t from,
+      const std::size_t to,
+      const char* const name,
+      const double otherwise
+    )
     {
       const std::string key = name;
       for (std::size_t at = text.find(key, from); at != std::string::npos && at < to; at = text.find(key, at + 1)) {
@@ -129,7 +149,10 @@ namespace faf::editor
     }
   } // namespace
 
-  std::vector<std::string> UnitGroupPath(const UnitGroup& root, const std::string& unit)
+  std::vector<std::string> UnitGroupPath(
+    const UnitGroup& root,
+    const std::string& unit
+  )
   {
     std::vector<std::string> path;
     if (!FindPath(root, unit, path)) {
@@ -138,7 +161,11 @@ namespace faf::editor
     return path;
   }
 
-  UnitFate FateOfUnit(const std::vector<std::string>& path, const bool civilian, const std::string& script)
+  UnitFate FateOfUnit(
+    const std::vector<std::string>& path,
+    const bool civilian,
+    const std::string& script
+  )
   {
     UnitFate fate;
     // The game finds INITIAL and WRECKAGE by name anywhere in the army's tree (FindUnitGroup), and takes all under it.
@@ -154,8 +181,9 @@ namespace faf::editor
       if (group == "INITIAL") {
         fate.kind = UnitFate::Kind::Unit;
         fate.group = group;
-        fate.text = civilian ? "A unit from the start (the army's INITIAL group), unless the lobby's Civilians option is \"removed\"."
-                             : "A unit from the start: the army's INITIAL group.";
+        fate.text = civilian
+          ? "A unit from the start (the army's INITIAL group), unless the lobby's Civilians option is \"removed\"."
+          : "A unit from the start: the army's INITIAL group.";
         return fate;
       }
     }
@@ -175,21 +203,28 @@ namespace faf::editor
       fate.group = *group;
       if (asWreck && asUnit) {
         fate.kind = UnitFate::Kind::ScriptEither;
-        fate.text = "Only when the map's script creates the group " + *group + ": as wrecks or as live units, as a lobby option picks.";
+        fate.text = "Only when the map's script creates the group " + *group +
+          ": as wrecks or as live units, as a lobby option picks.";
       } else {
         fate.kind = asWreck ? UnitFate::Kind::ScriptWreck : UnitFate::Kind::ScriptUnit;
-        fate.text = "Only when the map's script creates the group " + *group + (asWreck ? ", as wrecks" : ", as units") +
-                    " (a lobby option often decides it).";
+        fate.text = "Only when the map's script creates the group " + *group +
+          (asWreck ? ", as wrecks" : ", as units") + " (a lobby option often decides it).";
       }
       return fate;
     }
     fate.group = path.empty() ? std::string() : path.back();
-    fate.text = path.empty() ? "Not in a group: never in a game."
-                             : "Never in a game: nothing creates the group " + fate.group + " (the map's script doesn't name it).";
+    fate.text = path.empty()
+      ? "Not in a group: never in a game."
+      : "Never in a game: nothing creates the group " + fate.group + " (the map's script doesn't name it).";
     return fate;
   }
 
-  WreckValue WreckOfUnit(const std::string& text, const double buildCostMass, const double buildCostEnergy, const bool underwater)
+  WreckValue WreckOfUnit(
+    const std::string& text,
+    const double buildCostMass,
+    const double buildCostEnergy,
+    const bool underwater
+  )
   {
     WreckValue wreck;
     // The blueprint's top-level `Wreckage = { ... }` table.
@@ -199,7 +234,9 @@ namespace faf::editor
       while (i < text.size() && (text[i] == ' ' || text[i] == '\t')) {
         ++i;
       }
-      if (i < text.size() && text[i] == '=' && (at == 0 || std::isalnum(static_cast<unsigned char>(text[at - 1])) == 0)) {
+      if (
+        i < text.size() && text[i] == '=' && (at == 0 || std::isalnum(static_cast<unsigned char>(text[at - 1])) == 0)
+      ) {
         start = text.find('{', i);
         break;
       }
@@ -214,7 +251,8 @@ namespace faf::editor
         return wreck;
       }
       const std::string naval = std::string("Categories = {") + list.substr(list.find('{') + 1) +
-                                "},\nWreckage = { Blueprint = '/props/DefaultWreckage/DefaultWreckage_prop.bp', EnergyMult = 0, MassMult = 0.9 }";
+        "},\nWreckage = { Blueprint = '/props/DefaultWreckage/DefaultWreckage_prop.bp', EnergyMult = 0, MassMult = 0.9 "
+        "}";
       return WreckOfUnit(naval, buildCostMass, buildCostEnergy, underwater);
     }
     int depth = 0;
@@ -239,11 +277,12 @@ namespace faf::editor
       const std::string categories = close == std::string::npos ? std::string() : text.substr(open, close - open);
       const auto has = [&](const char* const category) {
         return categories.find(std::string("\"") + category + "\"") != std::string::npos ||
-               categories.find(std::string("'") + category + "'") != std::string::npos;
+          categories.find(std::string("'") + category + "'") != std::string::npos;
       };
       // Unit.lua's CreateWreckageProp: TECH1 0.9, TECH2 0.8, TECH3 0.7, EXPERIMENTAL 0.6, anything else 0.9.
-      static constexpr std::pair<const char*, double> kOrder[] = {{"EXPERIMENTAL", 0.6}, {"SUBCOMMANDER", 0.9}, {"COMMAND", 0.9},
-                                                                   {"TECH1", 0.9},        {"TECH2", 0.8},        {"TECH3", 0.7}};
+      static constexpr std::pair<const char*, double> kOrder[] = {
+        {"EXPERIMENTAL", 0.6}, {"SUBCOMMANDER", 0.9}, {"COMMAND", 0.9}, {"TECH1", 0.9}, {"TECH2", 0.8}, {"TECH3", 0.7}
+      };
       for (const auto& [category, mult] : kOrder) {
         if (has(category)) {
           tech = mult;

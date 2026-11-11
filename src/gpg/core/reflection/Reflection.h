@@ -334,7 +334,10 @@ namespace gpg
    */
   struct CStrLess
   {
-    bool operator()(const char* a, const char* b) const noexcept
+    bool operator()(
+      const char* a,
+      const char* b
+    ) const noexcept
     {
       if (a == b)
         return false;
@@ -352,7 +355,10 @@ namespace gpg
    */
   struct TypeInfoLess
   {
-    bool operator()(const std::type_info* a, const std::type_info* b) const noexcept
+    bool operator()(
+      const std::type_info* a,
+      const std::type_info* b
+    ) const noexcept
     {
       if (a == b)
         return false;
@@ -641,8 +647,8 @@ namespace gpg
      */
     const RIndexed* IsPointer() const;
 
-    int GetNumBases() const;                 // gpgcore.dll
-    RRef GetBase(int ind) const;             // gpgcore.dll
+    int GetNumBases() const;     // gpgcore.dll
+    RRef GetBase(int ind) const; // gpgcore.dll
 
     /**
      * Address: 0x004CC9B0 (FUN_004CC9B0, gpg::RRef::GetNumFields)
@@ -658,68 +664,97 @@ namespace gpg
 
     /**
      * Address: 0x004C1690 (FUN_004C1690 -- `Upcast<LuaPlus::LuaState>`; formerly `RRef::CastLuaState`.)
-     * Address: 0x00585270 (FUN_00585270 -- `Upcast<moho::SimArmy>`; formerly `UpcastToSimArmy` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x00585460 (FUN_00585460 -- `Upcast<moho::CAiPersonality>`; formerly `UpcastToCAiPersonality` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x005943C0 (FUN_005943C0 -- `Upcast<moho::CAiBrain>`; formerly `UpcastToCAiBrain` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x0059A030 (FUN_0059A030 -- `Upcast<moho::CUnitCommandQueue>`; formerly `UpcastCUnitCommandQueueRef` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x0059EB00 (FUN_0059EB00 -- `Upcast<moho::IFormationInstance>`; formerly `UpcastToIFormationInstance` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x005A89B0 (FUN_005A89B0 -- `Upcast<moho::Entity>`; formerly `UpcastToEntity` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x005A9A00 (FUN_005A9A00 -- `Upcast<moho::CAiPathNavigator>`; formerly `UpcastToCAiPathNavigator` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x005ACC60 (FUN_005ACC60 -- `Upcast<moho::PathQueue>`; formerly `UpcastToPathQueue` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x005B1B90 (FUN_005B1B90 -- `Upcast<moho::CAiPathFinder>`; formerly `UpcastToCAiPathFinder` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x005CE500 (FUN_005CE500 -- `Upcast<moho::CInfluenceMap>`; formerly `UpcastToCInfluenceMap` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x005D1710 (FUN_005D1710 -- `Upcast<moho::UnitWeapon>`; formerly `UpcastToUnitWeapon` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x005D1C30 (FUN_005D1C30 -- `Upcast<moho::CEconRequest>`; formerly `UpcastToCEconRequest` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x005D5280 (FUN_005D5280 -- `Upcast<moho::CAiPathSpline>`; formerly `UpcastToCAiPathSpline` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x005D52C0 (FUN_005D52C0 -- `Upcast<moho::CUnitMotion>`; formerly `UpcastToCUnitMotion` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x005E0680 (FUN_005E0680 -- `Upcast<moho::CAcquireTargetTask>`; formerly `UpcastToCAcquireTargetTask` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x005F5240 (FUN_005F5240 -- `Upcast<moho::CUnitCommand>`; formerly `UpcastToCUnitCommand` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x0063D720 (FUN_0063D720 -- `Upcast<moho::IAniManipulator>`; formerly `UpcastToIAniManipulator` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x0063EDD0 (FUN_0063EDD0 -- `Upcast<moho::CAniActor>`; formerly `UpcastToCAniActor` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006587A0 (FUN_006587A0 -- `Upcast<moho::IEffect>`; formerly `UpcastToIEffect` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x00671140 (FUN_00671140 -- `Upcast<moho::CDecalHandle>`; formerly `UpcastToCDecalHandle` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x00680F10 (FUN_00680F10 -- `Upcast<moho::PositionHistory>`; formerly `UpcastToPositionHistory` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006831F0 (FUN_006831F0 -- `Upcast<moho::CColPrimitiveBase>`; formerly `UpcastToCColPrimitiveBase` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006833E0 (FUN_006833E0 -- `Upcast<moho::CIntel>`; formerly `UpcastToCIntel` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006835C0 (FUN_006835C0 -- `Upcast<moho::CTextureScroller>`; formerly `UpcastToCTextureScroller` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006837A0 (FUN_006837A0 -- `Upcast<moho::SPhysBody>`; formerly `UpcastToSPhysBody` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x00683980 (FUN_00683980 -- `Upcast<moho::Motor>`; formerly `UpcastToMotor` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006B21A0 (FUN_006B21A0 -- `Upcast<moho::CEconomyEvent>`; formerly `UpcastToCEconomyEvent` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006B5990 (FUN_006B5990 -- `Upcast<moho::IAiSteering>`; formerly `UpcastToIAiSteering` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006B5B80 (FUN_006B5B80 -- `Upcast<moho::CEconStorage>`; formerly `UpcastToCEconStorage` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006B5D60 (FUN_006B5D60 -- `Upcast<moho::IAiAttacker>`; formerly `UpcastToIAiAttacker` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006B5F50 (FUN_006B5F50 -- `Upcast<moho::IAiCommandDispatch>`; formerly `UpcastToIAiCommandDispatch` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006B6140 (FUN_006B6140 -- `Upcast<moho::IAiNavigator>`; formerly `UpcastToIAiNavigator` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006B6330 (FUN_006B6330 -- `Upcast<moho::IAiBuilder>`; formerly `UpcastToIAiBuilder` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006B6520 (FUN_006B6520 -- `Upcast<moho::IAiSiloBuild>`; formerly `UpcastToIAiSiloBuild` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006B6710 (FUN_006B6710 -- `Upcast<moho::IAiTransport>`; formerly `UpcastToIAiTransport` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x006E07A0 (FUN_006E07A0 -- `Upcast<moho::CFireWeaponTask>`; formerly `UpcastToCFireWeaponTask` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x00707600 (FUN_00707600 -- `Upcast<moho::IAiReconDB>`; formerly `UpcastToIAiReconDB` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x007077F0 (FUN_007077F0 -- `Upcast<moho::CEconomy>`; formerly `UpcastToCEconomy` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x007079D0 (FUN_007079D0 -- `Upcast<moho::CArmyStats>`; formerly `UpcastToCArmyStats` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x007149D0 (FUN_007149D0 -- `Upcast<moho::CArmyStatItem>`; formerly `UpcastToCArmyStatItem` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x0072B0E0 (FUN_0072B0E0 -- `Upcast<moho::CSquad>`; formerly `UpcastToCSquad` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x00758230 (FUN_00758230 -- `Upcast<moho::CRandomStream>`; formerly `UpcastToCRandomStream` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x00758270 (FUN_00758270 -- `Upcast<moho::SPhysConstants>`; formerly `UpcastToSPhysConstants` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x007582B0 (FUN_007582B0 -- `Upcast<moho::IAiFormationDB>`; formerly `UpcastToIAiFormationDB` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x007586B0 (FUN_007586B0 -- `Upcast<moho::CCommandDB>`; formerly `UpcastToCCommandDb` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x007586F0 (FUN_007586F0 -- `Upcast<moho::CDecalBuffer>`; formerly `UpcastToCDecalBuffer` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x007588D0 (FUN_007588D0 -- `Upcast<moho::IEffectManager>`; formerly `UpcastToIEffectManager` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x00758AC0 (FUN_00758AC0 -- `Upcast<moho::ISoundManager>`; formerly `UpcastToISoundManager` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x00758CB0 (FUN_00758CB0 -- `Upcast<moho::EntityDB>`; formerly `UpcastToCEntityDb` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x0076B6E0 (FUN_0076B6E0 -- `Upcast<moho::PathQueue::Impl>`; formerly `UpcastToPathQueueImpl` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x0076ED90 (FUN_0076ED90 -- `Upcast<moho::CIntelPosHandle>`; formerly `UpcastToCIntelPosHandle` in gpg/core/containers/ReadArchive.cpp.)
-     * Address: 0x0054EBC0 (FUN_0054EBC0 -- `Upcast<moho::CAniPose>`, the type check of `ReadPointerShared<moho::CAniPose>`; formerly `gpg::RRef::Upcast_CAniPose` in gpg/core/containers/ArchiveSerialization.cpp.)
-     * Address: 0x005503B0 (FUN_005503B0 -- `Upcast<moho::CAniSkel>`, the type check of `ReadPointerShared<moho::CAniSkel>`; formerly `gpg::RRef::Upcast_CAniSkel` in gpg/core/containers/ArchiveSerialization.cpp.)
-     * Address: 0x0055FD70 (FUN_0055FD70 -- `Upcast<moho::Stats<moho::StatItem>>`, the type check of `ReadPointerShared<moho::Stats<moho::StatItem>>`; formerly `gpg::RRef::Upcast_StatsStatItem` in gpg/core/containers/ArchiveSerialization.cpp.)
-     * Address: 0x00551FA0 (FUN_00551FA0 -- `Upcast<moho::CIntelGrid>`, the type check of `ReadPointerShared<moho::CIntelGrid>`; formerly `gpg::RRef::Upcast_CIntelGrid` in gpg/core/containers/ArchiveSerialization.cpp.)
-     * Address: 0x005CE6E0 (FUN_005CE6E0 -- `Upcast<moho::CIntelGrid>`, the type check of `ReadPointerShared<moho::CIntelGrid>`; formerly a second `gpg::RRef::Upcast_CIntelGrid` in gpg/core/containers/ArchiveSerialization.cpp.)
-     * Address: 0x006431A0 (FUN_006431A0 -- `Upcast<moho::RScaResource>`, the type check of `ReadPointerShared<moho::RScaResource>`; formerly `gpg::RRef::Upcast_RScaResource` in gpg/core/containers/ArchiveSerialization.cpp.)
-     * Address: 0x0055AB30 (FUN_0055AB30 -- `Upcast<moho::RScmResource>`, the type check of `ReadPointerShared<moho::RScmResource>`; formerly `gpg::RRef::Upcast_RScmResource` in gpg/core/containers/ArchiveSerialization.cpp.)
-     * Address: 0x00714A10 (FUN_00714A10 -- `Upcast<moho::STrigger>`, the type check of `ReadPointerShared<moho::STrigger>`; formerly `gpg::RRef::Upcast_STrigger` in gpg/core/containers/ArchiveSerialization.cpp.)
-     * Address: 0x008849B0 (FUN_008849B0 -- `Upcast<moho::SSessionSaveData>`, the type check of `ReadPointerShared<moho::SSessionSaveData>`; formerly `func_CastSSessionSaveData` in gpg/core/containers/ArchiveSerialization.cpp.)
-     * Address: 0x007584A0 (FUN_007584A0 -- `Upcast<moho::ISimResources>`, the type check of `ReadPointerShared<moho::ISimResources>`; formerly `func_CastISimResources` in gpg/core/containers/ArchiveSerialization.cpp.)
-     * Address: 0x00885110 (FUN_00885110 -- `Upcast<moho::LaunchInfoBase>`, the type check of `ReadPointerShared<moho::LaunchInfoBase>`; formerly `func_CastLaunchInfoBase` in gpg/core/containers/ArchiveSerialization.cpp.)
+     * Address: 0x00585270 (FUN_00585270 -- `Upcast<moho::SimArmy>`; formerly `UpcastToSimArmy` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x00585460 (FUN_00585460 -- `Upcast<moho::CAiPersonality>`;
+     * formerly `UpcastToCAiPersonality` in gpg/core/containers/ReadArchive.cpp.) Address: 0x005943C0 (FUN_005943C0 --
+     * `Upcast<moho::CAiBrain>`; formerly `UpcastToCAiBrain` in gpg/core/containers/ReadArchive.cpp.) Address:
+     * 0x0059A030 (FUN_0059A030 -- `Upcast<moho::CUnitCommandQueue>`; formerly `UpcastCUnitCommandQueueRef` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x0059EB00 (FUN_0059EB00 -- `Upcast<moho::IFormationInstance>`;
+     * formerly `UpcastToIFormationInstance` in gpg/core/containers/ReadArchive.cpp.) Address: 0x005A89B0 (FUN_005A89B0
+     * -- `Upcast<moho::Entity>`; formerly `UpcastToEntity` in gpg/core/containers/ReadArchive.cpp.) Address: 0x005A9A00
+     * (FUN_005A9A00 -- `Upcast<moho::CAiPathNavigator>`; formerly `UpcastToCAiPathNavigator` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x005ACC60 (FUN_005ACC60 -- `Upcast<moho::PathQueue>`; formerly
+     * `UpcastToPathQueue` in gpg/core/containers/ReadArchive.cpp.) Address: 0x005B1B90 (FUN_005B1B90 --
+     * `Upcast<moho::CAiPathFinder>`; formerly `UpcastToCAiPathFinder` in gpg/core/containers/ReadArchive.cpp.) Address:
+     * 0x005CE500 (FUN_005CE500 -- `Upcast<moho::CInfluenceMap>`; formerly `UpcastToCInfluenceMap` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x005D1710 (FUN_005D1710 -- `Upcast<moho::UnitWeapon>`; formerly
+     * `UpcastToUnitWeapon` in gpg/core/containers/ReadArchive.cpp.) Address: 0x005D1C30 (FUN_005D1C30 --
+     * `Upcast<moho::CEconRequest>`; formerly `UpcastToCEconRequest` in gpg/core/containers/ReadArchive.cpp.) Address:
+     * 0x005D5280 (FUN_005D5280 -- `Upcast<moho::CAiPathSpline>`; formerly `UpcastToCAiPathSpline` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x005D52C0 (FUN_005D52C0 -- `Upcast<moho::CUnitMotion>`; formerly
+     * `UpcastToCUnitMotion` in gpg/core/containers/ReadArchive.cpp.) Address: 0x005E0680 (FUN_005E0680 --
+     * `Upcast<moho::CAcquireTargetTask>`; formerly `UpcastToCAcquireTargetTask` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x005F5240 (FUN_005F5240 -- `Upcast<moho::CUnitCommand>`; formerly
+     * `UpcastToCUnitCommand` in gpg/core/containers/ReadArchive.cpp.) Address: 0x0063D720 (FUN_0063D720 --
+     * `Upcast<moho::IAniManipulator>`; formerly `UpcastToIAniManipulator` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x0063EDD0 (FUN_0063EDD0 -- `Upcast<moho::CAniActor>`; formerly `UpcastToCAniActor` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x006587A0 (FUN_006587A0 -- `Upcast<moho::IEffect>`; formerly
+     * `UpcastToIEffect` in gpg/core/containers/ReadArchive.cpp.) Address: 0x00671140 (FUN_00671140 --
+     * `Upcast<moho::CDecalHandle>`; formerly `UpcastToCDecalHandle` in gpg/core/containers/ReadArchive.cpp.) Address:
+     * 0x00680F10 (FUN_00680F10 -- `Upcast<moho::PositionHistory>`; formerly `UpcastToPositionHistory` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x006831F0 (FUN_006831F0 -- `Upcast<moho::CColPrimitiveBase>`;
+     * formerly `UpcastToCColPrimitiveBase` in gpg/core/containers/ReadArchive.cpp.) Address: 0x006833E0 (FUN_006833E0
+     * -- `Upcast<moho::CIntel>`; formerly `UpcastToCIntel` in gpg/core/containers/ReadArchive.cpp.) Address: 0x006835C0
+     * (FUN_006835C0 -- `Upcast<moho::CTextureScroller>`; formerly `UpcastToCTextureScroller` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x006837A0 (FUN_006837A0 -- `Upcast<moho::SPhysBody>`; formerly
+     * `UpcastToSPhysBody` in gpg/core/containers/ReadArchive.cpp.) Address: 0x00683980 (FUN_00683980 --
+     * `Upcast<moho::Motor>`; formerly `UpcastToMotor` in gpg/core/containers/ReadArchive.cpp.) Address: 0x006B21A0
+     * (FUN_006B21A0 -- `Upcast<moho::CEconomyEvent>`; formerly `UpcastToCEconomyEvent` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x006B5990 (FUN_006B5990 -- `Upcast<moho::IAiSteering>`; formerly
+     * `UpcastToIAiSteering` in gpg/core/containers/ReadArchive.cpp.) Address: 0x006B5B80 (FUN_006B5B80 --
+     * `Upcast<moho::CEconStorage>`; formerly `UpcastToCEconStorage` in gpg/core/containers/ReadArchive.cpp.) Address:
+     * 0x006B5D60 (FUN_006B5D60 -- `Upcast<moho::IAiAttacker>`; formerly `UpcastToIAiAttacker` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x006B5F50 (FUN_006B5F50 -- `Upcast<moho::IAiCommandDispatch>`;
+     * formerly `UpcastToIAiCommandDispatch` in gpg/core/containers/ReadArchive.cpp.) Address: 0x006B6140 (FUN_006B6140
+     * -- `Upcast<moho::IAiNavigator>`; formerly `UpcastToIAiNavigator` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x006B6330 (FUN_006B6330 -- `Upcast<moho::IAiBuilder>`; formerly `UpcastToIAiBuilder` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x006B6520 (FUN_006B6520 -- `Upcast<moho::IAiSiloBuild>`; formerly
+     * `UpcastToIAiSiloBuild` in gpg/core/containers/ReadArchive.cpp.) Address: 0x006B6710 (FUN_006B6710 --
+     * `Upcast<moho::IAiTransport>`; formerly `UpcastToIAiTransport` in gpg/core/containers/ReadArchive.cpp.) Address:
+     * 0x006E07A0 (FUN_006E07A0 -- `Upcast<moho::CFireWeaponTask>`; formerly `UpcastToCFireWeaponTask` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x00707600 (FUN_00707600 -- `Upcast<moho::IAiReconDB>`; formerly
+     * `UpcastToIAiReconDB` in gpg/core/containers/ReadArchive.cpp.) Address: 0x007077F0 (FUN_007077F0 --
+     * `Upcast<moho::CEconomy>`; formerly `UpcastToCEconomy` in gpg/core/containers/ReadArchive.cpp.) Address:
+     * 0x007079D0 (FUN_007079D0 -- `Upcast<moho::CArmyStats>`; formerly `UpcastToCArmyStats` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x007149D0 (FUN_007149D0 -- `Upcast<moho::CArmyStatItem>`;
+     * formerly `UpcastToCArmyStatItem` in gpg/core/containers/ReadArchive.cpp.) Address: 0x0072B0E0 (FUN_0072B0E0 --
+     * `Upcast<moho::CSquad>`; formerly `UpcastToCSquad` in gpg/core/containers/ReadArchive.cpp.) Address: 0x00758230
+     * (FUN_00758230 -- `Upcast<moho::CRandomStream>`; formerly `UpcastToCRandomStream` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x00758270 (FUN_00758270 -- `Upcast<moho::SPhysConstants>`;
+     * formerly `UpcastToSPhysConstants` in gpg/core/containers/ReadArchive.cpp.) Address: 0x007582B0 (FUN_007582B0 --
+     * `Upcast<moho::IAiFormationDB>`; formerly `UpcastToIAiFormationDB` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x007586B0 (FUN_007586B0 -- `Upcast<moho::CCommandDB>`; formerly `UpcastToCCommandDb` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x007586F0 (FUN_007586F0 -- `Upcast<moho::CDecalBuffer>`; formerly
+     * `UpcastToCDecalBuffer` in gpg/core/containers/ReadArchive.cpp.) Address: 0x007588D0 (FUN_007588D0 --
+     * `Upcast<moho::IEffectManager>`; formerly `UpcastToIEffectManager` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x00758AC0 (FUN_00758AC0 -- `Upcast<moho::ISoundManager>`; formerly `UpcastToISoundManager` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x00758CB0 (FUN_00758CB0 -- `Upcast<moho::EntityDB>`; formerly
+     * `UpcastToCEntityDb` in gpg/core/containers/ReadArchive.cpp.) Address: 0x0076B6E0 (FUN_0076B6E0 --
+     * `Upcast<moho::PathQueue::Impl>`; formerly `UpcastToPathQueueImpl` in gpg/core/containers/ReadArchive.cpp.)
+     * Address: 0x0076ED90 (FUN_0076ED90 -- `Upcast<moho::CIntelPosHandle>`; formerly `UpcastToCIntelPosHandle` in
+     * gpg/core/containers/ReadArchive.cpp.) Address: 0x0054EBC0 (FUN_0054EBC0 -- `Upcast<moho::CAniPose>`, the type
+     * check of `ReadPointerShared<moho::CAniPose>`; formerly `gpg::RRef::Upcast_CAniPose` in
+     * gpg/core/containers/ArchiveSerialization.cpp.) Address: 0x005503B0 (FUN_005503B0 -- `Upcast<moho::CAniSkel>`, the
+     * type check of `ReadPointerShared<moho::CAniSkel>`; formerly `gpg::RRef::Upcast_CAniSkel` in
+     * gpg/core/containers/ArchiveSerialization.cpp.) Address: 0x0055FD70 (FUN_0055FD70 --
+     * `Upcast<moho::Stats<moho::StatItem>>`, the type check of `ReadPointerShared<moho::Stats<moho::StatItem>>`;
+     * formerly `gpg::RRef::Upcast_StatsStatItem` in gpg/core/containers/ArchiveSerialization.cpp.) Address: 0x00551FA0
+     * (FUN_00551FA0 -- `Upcast<moho::CIntelGrid>`, the type check of `ReadPointerShared<moho::CIntelGrid>`; formerly
+     * `gpg::RRef::Upcast_CIntelGrid` in gpg/core/containers/ArchiveSerialization.cpp.) Address: 0x005CE6E0
+     * (FUN_005CE6E0 -- `Upcast<moho::CIntelGrid>`, the type check of `ReadPointerShared<moho::CIntelGrid>`; formerly a
+     * second `gpg::RRef::Upcast_CIntelGrid` in gpg/core/containers/ArchiveSerialization.cpp.) Address: 0x006431A0
+     * (FUN_006431A0 -- `Upcast<moho::RScaResource>`, the type check of `ReadPointerShared<moho::RScaResource>`;
+     * formerly `gpg::RRef::Upcast_RScaResource` in gpg/core/containers/ArchiveSerialization.cpp.) Address: 0x0055AB30
+     * (FUN_0055AB30 -- `Upcast<moho::RScmResource>`, the type check of `ReadPointerShared<moho::RScmResource>`;
+     * formerly `gpg::RRef::Upcast_RScmResource` in gpg/core/containers/ArchiveSerialization.cpp.) Address: 0x00714A10
+     * (FUN_00714A10 -- `Upcast<moho::STrigger>`, the type check of `ReadPointerShared<moho::STrigger>`; formerly
+     * `gpg::RRef::Upcast_STrigger` in gpg/core/containers/ArchiveSerialization.cpp.) Address: 0x008849B0 (FUN_008849B0
+     * -- `Upcast<moho::SSessionSaveData>`, the type check of `ReadPointerShared<moho::SSessionSaveData>`; formerly
+     * `func_CastSSessionSaveData` in gpg/core/containers/ArchiveSerialization.cpp.) Address: 0x007584A0 (FUN_007584A0
+     * -- `Upcast<moho::ISimResources>`, the type check of `ReadPointerShared<moho::ISimResources>`; formerly
+     * `func_CastISimResources` in gpg/core/containers/ArchiveSerialization.cpp.) Address: 0x00885110 (FUN_00885110 --
+     * `Upcast<moho::LaunchInfoBase>`, the type check of `ReadPointerShared<moho::LaunchInfoBase>`; formerly
+     * `func_CastLaunchInfoBase` in gpg/core/containers/ArchiveSerialization.cpp.)
      *
      * What it does:
      * This reference's object as a `T*` (`REF_UpcastPtr` to `T`'s type), or
@@ -1093,50 +1128,70 @@ namespace gpg
    * in moho/sim/CDamage.cpp, removed 2026-09-30.)
    * Address: 0x0054CFC0 (FUN_0054CFC0 -- `RTypeOf<moho::CAniDefaultSkel>`; formerly `CachedDefaultSkelType` in
    * moho/animation/CAniDefaultSkelConstruct.cpp, removed 2026-09-30.)
-   * Address: 0x00786160 (FUN_00786160 -- `RTypeOf<moho::CMauiBorder>`; formerly `CachedCMauiBorderUpcastType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
-   * Address: 0x0078D920 (FUN_0078D920 -- `RTypeOf<moho::CMauiCursor>`; formerly `CachedCMauiCursorUpcastType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
-   * Address: 0x00794E40 (FUN_00794E40 -- `RTypeOf<moho::CMauiEdit>`; formerly `CachedCMauiEditType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
-   * Address: 0x007A23C0 (FUN_007A23C0 -- `RTypeOf<moho::CMauiScrollbar>`; formerly `CachedCMauiScrollbarType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
-   * Address: 0x007C8D70 (FUN_007C8D70 -- `RTypeOf<moho::CLobby>`; formerly `CachedCLobbyTypeBridge` in moho/net/CLobby.cpp, removed 2026-11-04.)
-   * Address: 0x0086A380 (FUN_0086A380 -- `RTypeOf<moho::CLuaWldUIProvider>`; formerly `CachedCLuaWldUIProviderUpcastType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.)
-   * Address: 0x0087F010 (FUN_0087F010 -- `RTypeOf<ScriptedDecal>`; formerly `CachedScriptedDecalType` in moho/script/ScriptedDecal.cpp, removed 2026-11-04.)
-   * Address: 0x004023E0 (FUN_004023E0 -- `RTypeOf<RType>`; formerly `CachedRTypeDescriptor` in gpg/core/reflection/Reflection.cpp, removed 2026-11-04.)
-   * Address: 0x00402890 (FUN_00402890 -- `RTypeOf<unsigned int>`; formerly `CachedUIntType` in gpg/core/containers/FastVectorUIntReflection.cpp, removed 2026-11-04.)
-   * Address: 0x0040E140 (FUN_0040E140 -- `RTypeOf<float>`; formerly `CachedFloatType` in gpg/core/reflection/Reflection.cpp, removed 2026-11-04.)
-   * Address: 0x004A4E10 (FUN_004A4E10 -- `RTypeOf<char>`; formerly `GetCharRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
-   * Address: 0x004A4E30 (FUN_004A4E30 -- `RTypeOf<short>`; formerly `GetShortRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
-   * Address: 0x004A4E50 (FUN_004A4E50 -- `RTypeOf<int>`; formerly `GetIntRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
-   * Address: 0x004A4E70 (FUN_004A4E70 -- `RTypeOf<long>`; formerly `GetLongRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
-   * Address: 0x004A4E90 (FUN_004A4E90 -- `RTypeOf<signed char>`; formerly `GetSignedCharRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
-   * Address: 0x004A4EB0 (FUN_004A4EB0 -- `RTypeOf<unsigned char>`; formerly `GetUnsignedCharRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
-   * Address: 0x004A4ED0 (FUN_004A4ED0 -- `RTypeOf<bool>`; formerly `GetBoolRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
-   * Address: 0x004A4EF0 (FUN_004A4EF0 -- `RTypeOf<fa::string>`; formerly `GetStringRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
-   * Address: 0x0050CAB0 (FUN_0050CAB0 -- `RTypeOf<moho::SCoordsVec2>`; formerly `ResolveSCoordsVec2Type` in moho/containers/SCoordsVec2TypeInfo.cpp, removed 2026-11-04.)
-   * Address: 0x0050CAD0 (FUN_0050CAD0 -- `RTypeOf<moho::SOCellPos>`; formerly `ResolveSOCellPosType` in moho/sim/SOCellPosTypeInfo.cpp, removed 2026-11-04.)
-   * Address: 0x0050CB10 (FUN_0050CB10 -- `RTypeOf<SPointVector>`; formerly `CachedSPointVectorType` in moho/ai/SPointVectorTypeInfo.cpp, removed 2026-11-04.)
-   * Address: 0x00510450 (FUN_00510450 -- `RTypeOf<moho::REmitterBlueprintCurve>`; formerly `CachedEmitterBlueprintCurveType` in moho/resource/blueprints/REmitterCurveTypeInfo.cpp, removed 2026-11-04.)
-   * Address: 0x00510490 (FUN_00510490 -- `RTypeOf<moho::REmitterBlueprint>`; formerly `CachedEmitterBlueprintType` in moho/resource/blueprints/REmitterBlueprintTypeInfo.cpp, removed 2026-11-04.)
-   * Address: 0x005104B0 (FUN_005104B0 -- `RTypeOf<moho::RTrailBlueprint>`; formerly `CachedTrailBlueprintType` in moho/resource/blueprints/RTrailBlueprintTypeInfo.cpp, removed 2026-11-04.)
-   * Address: 0x0051CC40 (FUN_0051CC40 -- `RTypeOf<RProjectileBlueprint>`; formerly `ResolveRProjectileBlueprintType` in moho/resource/blueprints/RProjectileBlueprint.cpp, removed 2026-11-04.)
-   * Address: 0x00528340 (FUN_00528340 -- `RTypeOf<RMeshBlueprint>`; formerly `ResolveRMeshBlueprintType` in moho/resource/blueprints/RMeshBlueprint.cpp, removed 2026-11-04.)
-   * Address: 0x0054CFE0 (FUN_0054CFE0 -- `RTypeOf<CAniPose>`; formerly `CachedCAniPoseType` in moho/animation/CAniPoseTypeInfo.cpp, removed 2026-11-04.)
-   * Address: 0x0072AA20 (FUN_0072AA20 -- `RTypeOf<moho::CSquad>`; formerly `CachedCSquadType` in moho/sim/CPlatoon.cpp, removed 2026-11-04.)
-   * Address: 0x0077B940 (FUN_0077B940 -- `RTypeOf<moho::SDecalInfo>`; formerly `CachedSDecalInfoType` in moho/render/CDecalTypes.cpp, removed 2026-11-04.)
-   * Address: 0x0094F4D0 (FUN_0094F4D0 -- `RTypeOf<gpg::ArchiveToken>`; formerly `CachedArchiveTokenType` in gpg/core/containers/ArchiveTokenTypeInfo.cpp, removed 2026-11-04.)
-   * Address: 0x0050D390 (FUN_0050D390 -- `RTypeOf<gpg::Rect2i>`, slot 0x010C6D98; formerly `CachedRect2iType`
-   * in gpg/core/reflection/Reflection.cpp, removed 2026-10-01.)
-   * Address: 0x006D2EA0 (FUN_006D2EA0 -- `RTypeOf<moho::WeakEntitySetTemplate<moho::Unit>>`; formerly
-   * `ResolveWeakUnitSetType` in moho/serialization/WeakUnitSetSerializer.cpp, removed 2026-10-01.)
-   * Address: 0x00508290 (FUN_00508290 -- `RTypeOf<moho::CIntelGrid>`; formerly `ResolveCIntelGridType` in moho/sim/SDelayedSubVizInfoReflection.cpp, removed 2026-11-05.)
-   * Address: 0x006EBFA0 (FUN_006EBFA0 -- `RTypeOf<Broadcaster<ECommandEvent>>`; formerly `ResolveLegacyBroadcasterCommandEventType` in moho/unit/CUnitCommand.cpp, removed 2026-11-05.)
-   * Address: 0x0071EF60 (FUN_0071EF60 -- `RTypeOf<UIntInfluenceMapEntryMap>`; formerly `CachedInfluenceMapEntryMapType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
-   * Address: 0x0071EF80 (FUN_0071EF80 -- `RTypeOf<fa::vector<moho::SThreat>>`; formerly `CachedSThreatVectorType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
-   * Address: 0x0071FEA0 (FUN_0071FEA0 -- `RTypeOf<UIntIntMap>`; formerly `CachedUIntIntMapTypeLegacyLane` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
-   * Address: 0x0071FEC0 (FUN_0071FEC0 -- `RTypeOf<InfluenceGridVector>`; formerly `CachedInfluenceGridVectorTypeLegacyLane` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
-   * Address: 0x0078B440 (FUN_0078B440 -- `RTypeOf<moho::EMauiScrollAxis>`; formerly `CachedEMauiScrollAxisType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-05.)
-   * Address: 0x0078EB20 (FUN_0078EB20 -- `RTypeOf<moho::EMauiKeyCode>`; formerly `CachedEMauiKeyCodeType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-05.)
-   * Address: 0x00795FA0 (FUN_00795FA0 -- `RTypeOf<moho::EMauiEventType>`; formerly `CachedEMauiEventType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-05.)
-   * Address: 0x008C6520 (FUN_008C6520 -- `RTypeOf<moho::UserEntity>`; formerly `ResolveUserEntityTypeCacheLane` in moho/entity/UserEntity.cpp, removed 2026-11-05.)
+   * Address: 0x00786160 (FUN_00786160 -- `RTypeOf<moho::CMauiBorder>`; formerly `CachedCMauiBorderUpcastType` in
+   * moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.) Address: 0x0078D920 (FUN_0078D920 --
+   * `RTypeOf<moho::CMauiCursor>`; formerly `CachedCMauiCursorUpcastType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp,
+   * removed 2026-11-04.) Address: 0x00794E40 (FUN_00794E40 -- `RTypeOf<moho::CMauiEdit>`; formerly
+   * `CachedCMauiEditType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.) Address: 0x007A23C0
+   * (FUN_007A23C0 -- `RTypeOf<moho::CMauiScrollbar>`; formerly `CachedCMauiScrollbarType` in
+   * moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.) Address: 0x007C8D70 (FUN_007C8D70 --
+   * `RTypeOf<moho::CLobby>`; formerly `CachedCLobbyTypeBridge` in moho/net/CLobby.cpp, removed 2026-11-04.) Address:
+   * 0x0086A380 (FUN_0086A380 -- `RTypeOf<moho::CLuaWldUIProvider>`; formerly `CachedCLuaWldUIProviderUpcastType` in
+   * moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-04.) Address: 0x0087F010 (FUN_0087F010 --
+   * `RTypeOf<ScriptedDecal>`; formerly `CachedScriptedDecalType` in moho/script/ScriptedDecal.cpp, removed 2026-11-04.)
+   * Address: 0x004023E0 (FUN_004023E0 -- `RTypeOf<RType>`; formerly `CachedRTypeDescriptor` in
+   * gpg/core/reflection/Reflection.cpp, removed 2026-11-04.) Address: 0x00402890 (FUN_00402890 -- `RTypeOf<unsigned
+   * int>`; formerly `CachedUIntType` in gpg/core/containers/FastVectorUIntReflection.cpp, removed 2026-11-04.) Address:
+   * 0x0040E140 (FUN_0040E140 -- `RTypeOf<float>`; formerly `CachedFloatType` in gpg/core/reflection/Reflection.cpp,
+   * removed 2026-11-04.) Address: 0x004A4E10 (FUN_004A4E10 -- `RTypeOf<char>`; formerly `GetCharRType` in
+   * moho/sim/Sim.cpp, removed 2026-11-04.) Address: 0x004A4E30 (FUN_004A4E30 -- `RTypeOf<short>`; formerly
+   * `GetShortRType` in moho/sim/Sim.cpp, removed 2026-11-04.) Address: 0x004A4E50 (FUN_004A4E50 -- `RTypeOf<int>`;
+   * formerly `GetIntRType` in moho/sim/Sim.cpp, removed 2026-11-04.) Address: 0x004A4E70 (FUN_004A4E70 --
+   * `RTypeOf<long>`; formerly `GetLongRType` in moho/sim/Sim.cpp, removed 2026-11-04.) Address: 0x004A4E90
+   * (FUN_004A4E90 -- `RTypeOf<signed char>`; formerly `GetSignedCharRType` in moho/sim/Sim.cpp, removed 2026-11-04.)
+   * Address: 0x004A4EB0 (FUN_004A4EB0 -- `RTypeOf<unsigned char>`; formerly `GetUnsignedCharRType` in moho/sim/Sim.cpp,
+   * removed 2026-11-04.) Address: 0x004A4ED0 (FUN_004A4ED0 -- `RTypeOf<bool>`; formerly `GetBoolRType` in
+   * moho/sim/Sim.cpp, removed 2026-11-04.) Address: 0x004A4EF0 (FUN_004A4EF0 -- `RTypeOf<fa::string>`; formerly
+   * `GetStringRType` in moho/sim/Sim.cpp, removed 2026-11-04.) Address: 0x0050CAB0 (FUN_0050CAB0 --
+   * `RTypeOf<moho::SCoordsVec2>`; formerly `ResolveSCoordsVec2Type` in moho/containers/SCoordsVec2TypeInfo.cpp, removed
+   * 2026-11-04.) Address: 0x0050CAD0 (FUN_0050CAD0 -- `RTypeOf<moho::SOCellPos>`; formerly `ResolveSOCellPosType` in
+   * moho/sim/SOCellPosTypeInfo.cpp, removed 2026-11-04.) Address: 0x0050CB10 (FUN_0050CB10 -- `RTypeOf<SPointVector>`;
+   * formerly `CachedSPointVectorType` in moho/ai/SPointVectorTypeInfo.cpp, removed 2026-11-04.) Address: 0x00510450
+   * (FUN_00510450 -- `RTypeOf<moho::REmitterBlueprintCurve>`; formerly `CachedEmitterBlueprintCurveType` in
+   * moho/resource/blueprints/REmitterCurveTypeInfo.cpp, removed 2026-11-04.) Address: 0x00510490 (FUN_00510490 --
+   * `RTypeOf<moho::REmitterBlueprint>`; formerly `CachedEmitterBlueprintType` in
+   * moho/resource/blueprints/REmitterBlueprintTypeInfo.cpp, removed 2026-11-04.) Address: 0x005104B0 (FUN_005104B0 --
+   * `RTypeOf<moho::RTrailBlueprint>`; formerly `CachedTrailBlueprintType` in
+   * moho/resource/blueprints/RTrailBlueprintTypeInfo.cpp, removed 2026-11-04.) Address: 0x0051CC40 (FUN_0051CC40 --
+   * `RTypeOf<RProjectileBlueprint>`; formerly `ResolveRProjectileBlueprintType` in
+   * moho/resource/blueprints/RProjectileBlueprint.cpp, removed 2026-11-04.) Address: 0x00528340 (FUN_00528340 --
+   * `RTypeOf<RMeshBlueprint>`; formerly `ResolveRMeshBlueprintType` in moho/resource/blueprints/RMeshBlueprint.cpp,
+   * removed 2026-11-04.) Address: 0x0054CFE0 (FUN_0054CFE0 -- `RTypeOf<CAniPose>`; formerly `CachedCAniPoseType` in
+   * moho/animation/CAniPoseTypeInfo.cpp, removed 2026-11-04.) Address: 0x0072AA20 (FUN_0072AA20 --
+   * `RTypeOf<moho::CSquad>`; formerly `CachedCSquadType` in moho/sim/CPlatoon.cpp, removed 2026-11-04.) Address:
+   * 0x0077B940 (FUN_0077B940 -- `RTypeOf<moho::SDecalInfo>`; formerly `CachedSDecalInfoType` in
+   * moho/render/CDecalTypes.cpp, removed 2026-11-04.) Address: 0x0094F4D0 (FUN_0094F4D0 --
+   * `RTypeOf<gpg::ArchiveToken>`; formerly `CachedArchiveTokenType` in gpg/core/containers/ArchiveTokenTypeInfo.cpp,
+   * removed 2026-11-04.) Address: 0x0050D390 (FUN_0050D390 -- `RTypeOf<gpg::Rect2i>`, slot 0x010C6D98; formerly
+   * `CachedRect2iType` in gpg/core/reflection/Reflection.cpp, removed 2026-10-01.) Address: 0x006D2EA0 (FUN_006D2EA0 --
+   * `RTypeOf<moho::WeakEntitySetTemplate<moho::Unit>>`; formerly `ResolveWeakUnitSetType` in
+   * moho/serialization/WeakUnitSetSerializer.cpp, removed 2026-10-01.) Address: 0x00508290 (FUN_00508290 --
+   * `RTypeOf<moho::CIntelGrid>`; formerly `ResolveCIntelGridType` in moho/sim/SDelayedSubVizInfoReflection.cpp, removed
+   * 2026-11-05.) Address: 0x006EBFA0 (FUN_006EBFA0 -- `RTypeOf<Broadcaster<ECommandEvent>>`; formerly
+   * `ResolveLegacyBroadcasterCommandEventType` in moho/unit/CUnitCommand.cpp, removed 2026-11-05.) Address: 0x0071EF60
+   * (FUN_0071EF60 -- `RTypeOf<UIntInfluenceMapEntryMap>`; formerly `CachedInfluenceMapEntryMapType` in
+   * moho/sim/CInfluenceMap.cpp, removed 2026-11-05.) Address: 0x0071EF80 (FUN_0071EF80 --
+   * `RTypeOf<fa::vector<moho::SThreat>>`; formerly `CachedSThreatVectorType` in moho/sim/CInfluenceMap.cpp, removed
+   * 2026-11-05.) Address: 0x0071FEA0 (FUN_0071FEA0 -- `RTypeOf<UIntIntMap>`; formerly `CachedUIntIntMapTypeLegacyLane`
+   * in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.) Address: 0x0071FEC0 (FUN_0071FEC0 --
+   * `RTypeOf<InfluenceGridVector>`; formerly `CachedInfluenceGridVectorTypeLegacyLane` in moho/sim/CInfluenceMap.cpp,
+   * removed 2026-11-05.) Address: 0x0078B440 (FUN_0078B440 -- `RTypeOf<moho::EMauiScrollAxis>`; formerly
+   * `CachedEMauiScrollAxisType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-05.) Address: 0x0078EB20
+   * (FUN_0078EB20 -- `RTypeOf<moho::EMauiKeyCode>`; formerly `CachedEMauiKeyCodeType` in
+   * moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed 2026-11-05.) Address: 0x00795FA0 (FUN_00795FA0 --
+   * `RTypeOf<moho::EMauiEventType>`; formerly `CachedEMauiEventType` in moho/ui/UiRuntimeTypeUpcastBridges.cpp, removed
+   * 2026-11-05.) Address: 0x008C6520 (FUN_008C6520 -- `RTypeOf<moho::UserEntity>`; formerly
+   * `ResolveUserEntityTypeCacheLane` in moho/entity/UserEntity.cpp, removed 2026-11-05.)
    *
    * A pointer type is the exception: its descriptor is the pointee's
    * `RPointerType` object, which `U::GetPointerType()` constructs before it
@@ -1159,16 +1214,21 @@ namespace gpg
   }
 
   /**
-   * Address: 0x0053B1E0 (FUN_0053B1E0 -- `SetShared<moho::RScaResource>`; formerly `SetConstructResultSharedScaResource` in moho/resource/RScaResource.cpp.)
-   * Address: 0x00539D80 (FUN_00539D80 -- `SetShared<moho::RScmResource>`; formerly `SetConstructResultSharedModelResource` in moho/resource/RScmResource.cpp.)
-   * Address: 0x00539C80 (FUN_00539C80 -- `SetShared<const moho::CAniSkel>`; formerly `SetConstructResultSharedAniSkel` in moho/resource/CAniResourceSkelConstruct.cpp.)
+   * Address: 0x0053B1E0 (FUN_0053B1E0 -- `SetShared<moho::RScaResource>`; formerly
+   * `SetConstructResultSharedScaResource` in moho/resource/RScaResource.cpp.) Address: 0x00539D80 (FUN_00539D80 --
+   * `SetShared<moho::RScmResource>`; formerly `SetConstructResultSharedModelResource` in
+   * moho/resource/RScmResource.cpp.) Address: 0x00539C80 (FUN_00539C80 -- `SetShared<const moho::CAniSkel>`; formerly
+   * `SetConstructResultSharedAniSkel` in moho/resource/CAniResourceSkelConstruct.cpp.)
    *
    * What it does:
    * Copies the pointer into a `shared_ptr<void>`, looks up `T`'s type through
    * its cache slot, and hands both to the untyped `SetShared`.
    */
   template <class T>
-  void SerConstructResult::SetShared(const boost::shared_ptr<T>& object, const unsigned int flags)
+  void SerConstructResult::SetShared(
+    const boost::shared_ptr<T>& object,
+    const unsigned int flags
+  )
   {
     using Object = std::remove_const_t<T>;
     SetShared(boost::shared_ptr<void>(boost::const_pointer_cast<Object>(object)), RTypeOf<Object>(), flags);
@@ -2282,8 +2342,7 @@ namespace gpg
     using save_construct_args_func_t =
       void (*)(WriteArchive* archive, void* object, int version, RRef* ownerRef, SerSaveConstructArgsResult* result);
     using save_func_t = void (*)(WriteArchive*, std::intptr_t, int, RRef*);
-    using construct_func_t =
-      void (*)(ReadArchive* archive, int version, RRef* ownerRef, SerConstructResult* result);
+    using construct_func_t = void (*)(ReadArchive* archive, int version, RRef* ownerRef, SerConstructResult* result);
     using load_func_t = void (*)(ReadArchive*, std::intptr_t, int, RRef*);
     using new_ref_func_t = RRef (*)();
     using cpy_ref_func_t = RRef (*)(RRef*);
@@ -2599,71 +2658,88 @@ namespace gpg
      * Address: 0x004EDFD0 (FUN_004EDFD0 -- `AddField<Wm3::Vector3f>`, binary name `AddField_Vector3f`.)
      * Address: 0x00510D50 (FUN_00510D50 -- `AddField<moho::RResId>`, binary name `AddField_RResId`.)
      * Address: 0x0050D010 (FUN_0050D010 -- `AddField<unsigned char>`, binary name `AddField_uchar`.)
-     * Address: 0x00510F10 (FUN_00510F10 -- `AddField<moho::REmitterBlueprintCurve>`, binary name `AddField_REmitterBlueprintCurve`.)
-     * Address: 0x00510FF0 (FUN_00510FF0 -- `AddField<moho::Vector4f>`, binary name `AddField_Vector4f`.)
-     * Address: 0x00513230 (FUN_00513230 -- `AddField<fa::vector<fa::string>>`, binary name `AddField_vector_string`.)
-     * Address: 0x00513330 (FUN_00513330 -- `AddField<moho::SFootprint>`, binary name `AddField_SFootprint`.)
-     * Address: 0x005146E0 (FUN_005146E0 -- `AddField<fa::list<moho::SNamedFootprint>>`, with its name
+     * Address: 0x00510F10 (FUN_00510F10 -- `AddField<moho::REmitterBlueprintCurve>`, binary name
+     * `AddField_REmitterBlueprintCurve`.) Address: 0x00510FF0 (FUN_00510FF0 -- `AddField<moho::Vector4f>`, binary name
+     * `AddField_Vector4f`.) Address: 0x00513230 (FUN_00513230 -- `AddField<fa::vector<fa::string>>`, binary name
+     * `AddField_vector_string`.) Address: 0x00513330 (FUN_00513330 -- `AddField<moho::SFootprint>`, binary name
+     * `AddField_SFootprint`.) Address: 0x005146E0 (FUN_005146E0 -- `AddField<fa::list<moho::SNamedFootprint>>`, with
+     * its name
      * `"Footprints"` and offset 0 folded in: `SRuleFootprintsBlueprintTypeInfo::AddFields` 0x00513FA0 and
      * `Init` 0x00513ED0 reach it with the type in ESI.)
-     * Address: 0x004F08F0 (FUN_004F08F0 -- `AddField<Wm3::Quaternionf>("r", ...)` for `VTransform::orient_`, name and offset folded in;
-     * formerly `AddQuaternionRotationField in moho/render/camera/VTransform.cpp` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x005132B0 (FUN_005132B0 -- `AddField<moho::ECollisionShape>("CollisionShape", ...)` for `REntityBlueprint::mCollisionShape`, name and offset folded in;
-     * formerly `REntityBlueprintTypeInfo::AddFieldCollisionShape` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0051A330 (FUN_0051A330 -- `AddField<fa::vector<moho::RMeshBlueprintLOD>>("LODs", ...)` for `RMeshBlueprint::mLods`, name and offset folded in;
-     * formerly `RMeshBlueprintTypeInfo::AddFieldLods` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0051CDC0 (FUN_0051CDC0 -- `AddField<moho::RProjectileBlueprintDisplay>("Display", ...)` for `RProjectileBlueprint::Display`, name and offset folded in;
-     * formerly `RProjectileBlueprintTypeInfo::AddFieldDisplay` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0051CE40 (FUN_0051CE40 -- `AddField<moho::RProjectileBlueprintEconomy>("Economy", ...)` for `RProjectileBlueprint::Economy`, name and offset folded in;
-     * formerly `RProjectileBlueprintTypeInfo::AddFieldEconomy` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0051CEC0 (FUN_0051CEC0 -- `AddField<moho::RProjectileBlueprintPhysics>("Physics", ...)` for `RProjectileBlueprint::Physics`, name and offset folded in;
-     * formerly `RProjectileBlueprintTypeInfo::AddFieldPhysics` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0051DF00 (FUN_0051DF00 -- `AddField<moho::RPropBlueprintDisplay>("Display", ...)` for `RPropBlueprint::Display`, name and offset folded in;
-     * formerly `RPropBlueprintTypeInfo::AddFieldDisplay` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0051DF80 (FUN_0051DF80 -- `AddField<moho::RPropBlueprintDefense>("Defense", ...)` for `RPropBlueprint::Defense`, name and offset folded in;
-     * formerly `RPropBlueprintTypeInfo::AddFieldDefense` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0051E000 (FUN_0051E000 -- `AddField<moho::RPropBlueprintEconomy>("Economy", ...)` for `RPropBlueprint::Economy`, name and offset folded in;
-     * formerly `RPropBlueprintTypeInfo::AddFieldEconomy` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x005252A0 (FUN_005252A0 -- `AddField<moho::ERuleBPUnitCommandCaps>("CommandCaps", ...)` for `RUnitBlueprintGeneral::CommandCaps`, name and offset folded in;
-     * formerly `RUnitBlueprintGeneralTypeInfo::AddFieldCommandCaps` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525320 (FUN_00525320 -- `AddField<moho::ERuleBPUnitToggleCaps>("ToggleCaps", ...)` for `RUnitBlueprintGeneral::ToggleCaps`, name and offset folded in;
-     * formerly `RUnitBlueprintGeneralTypeInfo::AddFieldToggleCaps` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525420 (FUN_00525420 -- `AddField<moho::ELayer>("BuildOnLayerCaps", ...)` for `RUnitBlueprintPhysics::BuildOnLayerCapsMask`, name and offset folded in;
-     * formerly `RUnitBlueprintPhysicsTypeInfo::AddFieldBuildOnLayerCaps` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x005254A0 (FUN_005254A0 -- `AddField<moho::ERuleBPUnitBuildRestriction>("BuildRestriction", ...)` for `RUnitBlueprintPhysics::BuildRestriction`, name and offset folded in;
-     * formerly `RUnitBlueprintPhysicsTypeInfo::AddFieldBuildRestriction` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x005255A0 (FUN_005255A0 -- `AddField<moho::RUnitBlueprintDefenseShield>("Shield", ...)` for `RUnitBlueprintDefense::Shield`, name and offset folded in;
-     * formerly `RUnitBlueprintDefenseTypeInfo::AddFieldShield` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x005256A0 (FUN_005256A0 -- `AddField<moho::UnitWeaponRangeCategory>("RangeCategory", ...)` for `RUnitBlueprintWeapon::RangeCategory`, name and offset folded in;
-     * formerly `RUnitBlueprintWeaponTypeInfo::AddFieldRangeCategory` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525720 (FUN_00525720 -- `AddField<moho::ERuleBPUnitWeaponBallisticArc>("BallisticArc", ...)` for `RUnitBlueprintWeapon::BallisticArc`, name and offset folded in;
-     * formerly `RUnitBlueprintWeaponTypeInfo::AddFieldBallisticArc` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x005257A0 (FUN_005257A0 -- `AddField<moho::ERuleBPUnitWeaponTargetType>("TargetType", ...)` for `RUnitBlueprintWeapon::TargetType`, name and offset folded in;
-     * formerly `RUnitBlueprintWeaponTypeInfo::AddFieldTargetType` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525880 (FUN_00525880 -- `AddField<moho::RUnitBlueprintGeneral>("General", ...)` for `RUnitBlueprint::General`, name and offset folded in;
-     * formerly `RUnitBlueprintTypeInfo::AddFieldGeneral` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525900 (FUN_00525900 -- `AddField<moho::RUnitBlueprintDisplay>("Display", ...)` for `RUnitBlueprint::Display`, name and offset folded in;
-     * formerly `RUnitBlueprintTypeInfo::AddFieldDisplaySection` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525980 (FUN_00525980 -- `AddField<moho::RUnitBlueprintPhysics>("Physics", ...)` for `RUnitBlueprint::Physics`, name and offset folded in;
+     * Address: 0x004F08F0 (FUN_004F08F0 -- `AddField<Wm3::Quaternionf>("r", ...)` for `VTransform::orient_`, name and
+     * offset folded in; formerly `AddQuaternionRotationField in moho/render/camera/VTransform.cpp` (RULE ONE), removed
+     * 2026-09-30.) Address: 0x005132B0 (FUN_005132B0 -- `AddField<moho::ECollisionShape>("CollisionShape", ...)` for
+     * `REntityBlueprint::mCollisionShape`, name and offset folded in; formerly
+     * `REntityBlueprintTypeInfo::AddFieldCollisionShape` (RULE ONE), removed 2026-09-30.) Address: 0x0051A330
+     * (FUN_0051A330 -- `AddField<fa::vector<moho::RMeshBlueprintLOD>>("LODs", ...)` for `RMeshBlueprint::mLods`, name
+     * and offset folded in; formerly `RMeshBlueprintTypeInfo::AddFieldLods` (RULE ONE), removed 2026-09-30.) Address:
+     * 0x0051CDC0 (FUN_0051CDC0 -- `AddField<moho::RProjectileBlueprintDisplay>("Display", ...)` for
+     * `RProjectileBlueprint::Display`, name and offset folded in; formerly
+     * `RProjectileBlueprintTypeInfo::AddFieldDisplay` (RULE ONE), removed 2026-09-30.) Address: 0x0051CE40
+     * (FUN_0051CE40 -- `AddField<moho::RProjectileBlueprintEconomy>("Economy", ...)` for
+     * `RProjectileBlueprint::Economy`, name and offset folded in; formerly
+     * `RProjectileBlueprintTypeInfo::AddFieldEconomy` (RULE ONE), removed 2026-09-30.) Address: 0x0051CEC0
+     * (FUN_0051CEC0 -- `AddField<moho::RProjectileBlueprintPhysics>("Physics", ...)` for
+     * `RProjectileBlueprint::Physics`, name and offset folded in; formerly
+     * `RProjectileBlueprintTypeInfo::AddFieldPhysics` (RULE ONE), removed 2026-09-30.) Address: 0x0051DF00
+     * (FUN_0051DF00 -- `AddField<moho::RPropBlueprintDisplay>("Display", ...)` for `RPropBlueprint::Display`, name and
+     * offset folded in; formerly `RPropBlueprintTypeInfo::AddFieldDisplay` (RULE ONE), removed 2026-09-30.) Address:
+     * 0x0051DF80 (FUN_0051DF80 -- `AddField<moho::RPropBlueprintDefense>("Defense", ...)` for
+     * `RPropBlueprint::Defense`, name and offset folded in; formerly `RPropBlueprintTypeInfo::AddFieldDefense` (RULE
+     * ONE), removed 2026-09-30.) Address: 0x0051E000 (FUN_0051E000 -- `AddField<moho::RPropBlueprintEconomy>("Economy",
+     * ...)` for `RPropBlueprint::Economy`, name and offset folded in; formerly
+     * `RPropBlueprintTypeInfo::AddFieldEconomy` (RULE ONE), removed 2026-09-30.) Address: 0x005252A0 (FUN_005252A0 --
+     * `AddField<moho::ERuleBPUnitCommandCaps>("CommandCaps", ...)` for `RUnitBlueprintGeneral::CommandCaps`, name and
+     * offset folded in; formerly `RUnitBlueprintGeneralTypeInfo::AddFieldCommandCaps` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525320 (FUN_00525320 -- `AddField<moho::ERuleBPUnitToggleCaps>("ToggleCaps", ...)` for
+     * `RUnitBlueprintGeneral::ToggleCaps`, name and offset folded in; formerly
+     * `RUnitBlueprintGeneralTypeInfo::AddFieldToggleCaps` (RULE ONE), removed 2026-09-30.) Address: 0x00525420
+     * (FUN_00525420 -- `AddField<moho::ELayer>("BuildOnLayerCaps", ...)` for
+     * `RUnitBlueprintPhysics::BuildOnLayerCapsMask`, name and offset folded in; formerly
+     * `RUnitBlueprintPhysicsTypeInfo::AddFieldBuildOnLayerCaps` (RULE ONE), removed 2026-09-30.) Address: 0x005254A0
+     * (FUN_005254A0 -- `AddField<moho::ERuleBPUnitBuildRestriction>("BuildRestriction", ...)` for
+     * `RUnitBlueprintPhysics::BuildRestriction`, name and offset folded in; formerly
+     * `RUnitBlueprintPhysicsTypeInfo::AddFieldBuildRestriction` (RULE ONE), removed 2026-09-30.) Address: 0x005255A0
+     * (FUN_005255A0 -- `AddField<moho::RUnitBlueprintDefenseShield>("Shield", ...)` for
+     * `RUnitBlueprintDefense::Shield`, name and offset folded in; formerly
+     * `RUnitBlueprintDefenseTypeInfo::AddFieldShield` (RULE ONE), removed 2026-09-30.) Address: 0x005256A0
+     * (FUN_005256A0 -- `AddField<moho::UnitWeaponRangeCategory>("RangeCategory", ...)` for
+     * `RUnitBlueprintWeapon::RangeCategory`, name and offset folded in; formerly
+     * `RUnitBlueprintWeaponTypeInfo::AddFieldRangeCategory` (RULE ONE), removed 2026-09-30.) Address: 0x00525720
+     * (FUN_00525720 -- `AddField<moho::ERuleBPUnitWeaponBallisticArc>("BallisticArc", ...)` for
+     * `RUnitBlueprintWeapon::BallisticArc`, name and offset folded in; formerly
+     * `RUnitBlueprintWeaponTypeInfo::AddFieldBallisticArc` (RULE ONE), removed 2026-09-30.) Address: 0x005257A0
+     * (FUN_005257A0 -- `AddField<moho::ERuleBPUnitWeaponTargetType>("TargetType", ...)` for
+     * `RUnitBlueprintWeapon::TargetType`, name and offset folded in; formerly
+     * `RUnitBlueprintWeaponTypeInfo::AddFieldTargetType` (RULE ONE), removed 2026-09-30.) Address: 0x00525880
+     * (FUN_00525880 -- `AddField<moho::RUnitBlueprintGeneral>("General", ...)` for `RUnitBlueprint::General`, name and
+     * offset folded in; formerly `RUnitBlueprintTypeInfo::AddFieldGeneral` (RULE ONE), removed 2026-09-30.) Address:
+     * 0x00525900 (FUN_00525900 -- `AddField<moho::RUnitBlueprintDisplay>("Display", ...)` for
+     * `RUnitBlueprint::Display`, name and offset folded in; formerly `RUnitBlueprintTypeInfo::AddFieldDisplaySection`
+     * (RULE ONE), removed 2026-09-30.) Address: 0x00525980 (FUN_00525980 --
+     * `AddField<moho::RUnitBlueprintPhysics>("Physics", ...)` for `RUnitBlueprint::Physics`, name and offset folded in;
      * formerly `RUnitBlueprintTypeInfo::AddFieldPhysicsSection` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525A00 (FUN_00525A00 -- `AddField<moho::RUnitBlueprintAir>("Air", ...)` for `RUnitBlueprint::Air`, name and offset folded in;
-     * formerly `RUnitBlueprintTypeInfo::AddFieldAirSection` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525A80 (FUN_00525A80 -- `AddField<moho::RUnitBlueprintTransport>("Transport", ...)` for `RUnitBlueprint::Transport`, name and offset folded in;
-     * formerly `RUnitBlueprintTypeInfo::AddFieldTransportSection` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525B00 (FUN_00525B00 -- `AddField<moho::RUnitBlueprintDefense>("Defense", ...)` for `RUnitBlueprint::Defense`, name and offset folded in;
-     * formerly `RUnitBlueprintTypeInfo::AddFieldDefenseSection` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525B80 (FUN_00525B80 -- `AddField<moho::RUnitBlueprintAI>("AI", ...)` for `RUnitBlueprint::AI`, name and offset folded in;
-     * formerly `RUnitBlueprintTypeInfo::AddFieldAiSection` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525C00 (FUN_00525C00 -- `AddField<moho::RUnitBlueprintIntel>("Intel", ...)` for `RUnitBlueprint::Intel`, name and offset folded in;
-     * formerly `RUnitBlueprintTypeInfo::AddFieldIntelSection` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525C80 (FUN_00525C80 -- `AddField<fa::vector<moho::RUnitBlueprintWeapon>>("Weapons", ...)` for `RUnitBlueprint::Weapons`, name and offset folded in;
-     * formerly `RUnitBlueprintTypeInfo::AddFieldWeaponSection` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x00525D00 (FUN_00525D00 -- `AddField<moho::RUnitBlueprintEconomy>("Economy", ...)` for `RUnitBlueprint::Economy`, name and offset folded in;
-     * formerly `RUnitBlueprintTypeInfo::AddFieldEconomySection` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0073A710 (FUN_0073A710 -- `AddField<moho::CDamageMethod>("Method", ...)` for `CDamage::mMethod`, name and offset folded in;
-     * formerly `CDamageTypeInfo::AddFieldMethod` (RULE ONE), removed 2026-09-30.)
-     * Address: 0x0073A790 (FUN_0073A790 -- `AddField<moho::SMinMax<float>>("MinMaxRadius", ...)` for `CDamage::mRadius`, name and offset folded in;
-     * formerly `CDamageTypeInfo::AddFieldMinMaxRadius` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525A00 (FUN_00525A00 -- `AddField<moho::RUnitBlueprintAir>("Air", ...)` for `RUnitBlueprint::Air`,
+     * name and offset folded in; formerly `RUnitBlueprintTypeInfo::AddFieldAirSection` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525A80 (FUN_00525A80 -- `AddField<moho::RUnitBlueprintTransport>("Transport", ...)` for
+     * `RUnitBlueprint::Transport`, name and offset folded in; formerly
+     * `RUnitBlueprintTypeInfo::AddFieldTransportSection` (RULE ONE), removed 2026-09-30.) Address: 0x00525B00
+     * (FUN_00525B00 -- `AddField<moho::RUnitBlueprintDefense>("Defense", ...)` for `RUnitBlueprint::Defense`, name and
+     * offset folded in; formerly `RUnitBlueprintTypeInfo::AddFieldDefenseSection` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525B80 (FUN_00525B80 -- `AddField<moho::RUnitBlueprintAI>("AI", ...)` for `RUnitBlueprint::AI`, name
+     * and offset folded in; formerly `RUnitBlueprintTypeInfo::AddFieldAiSection` (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00525C00 (FUN_00525C00 -- `AddField<moho::RUnitBlueprintIntel>("Intel", ...)` for
+     * `RUnitBlueprint::Intel`, name and offset folded in; formerly `RUnitBlueprintTypeInfo::AddFieldIntelSection` (RULE
+     * ONE), removed 2026-09-30.) Address: 0x00525C80 (FUN_00525C80 --
+     * `AddField<fa::vector<moho::RUnitBlueprintWeapon>>("Weapons", ...)` for `RUnitBlueprint::Weapons`, name and offset
+     * folded in; formerly `RUnitBlueprintTypeInfo::AddFieldWeaponSection` (RULE ONE), removed 2026-09-30.) Address:
+     * 0x00525D00 (FUN_00525D00 -- `AddField<moho::RUnitBlueprintEconomy>("Economy", ...)` for
+     * `RUnitBlueprint::Economy`, name and offset folded in; formerly `RUnitBlueprintTypeInfo::AddFieldEconomySection`
+     * (RULE ONE), removed 2026-09-30.) Address: 0x0073A710 (FUN_0073A710 -- `AddField<moho::CDamageMethod>("Method",
+     * ...)` for `CDamage::mMethod`, name and offset folded in; formerly `CDamageTypeInfo::AddFieldMethod` (RULE ONE),
+     * removed 2026-09-30.) Address: 0x0073A790 (FUN_0073A790 -- `AddField<moho::SMinMax<float>>("MinMaxRadius", ...)`
+     * for `CDamage::mRadius`, name and offset folded in; formerly `CDamageTypeInfo::AddFieldMinMaxRadius` (RULE ONE),
+     * removed 2026-09-30.)
      *
      * What it does:
      * Appends one reflected field of type `T` at `offset`: asserts the type is
@@ -2671,7 +2747,10 @@ namespace gpg
      * `{name, RTypeOf<T>(), offset}` and hands back the new entry.
      */
     template <class T>
-    RField* AddField(const char* const name, const int offset)
+    RField* AddField(
+      const char* const name,
+      const int offset
+    )
     {
       GPG_ASSERT(!initFinished_);
       fields_.push_back(RField{name, RTypeOf<T>(), offset});
@@ -2686,7 +2765,12 @@ namespace gpg
      * `[eax+0x10] = desc` after each field.
      */
     template <class T>
-    RField* AddField(const char* const name, const int offset, const int flags, const char* const desc)
+    RField* AddField(
+      const char* const name,
+      const int offset,
+      const int flags,
+      const char* const desc
+    )
     {
       RField* const field = AddField<T>(name, offset);
       field->mFlags = flags;
@@ -2791,7 +2875,8 @@ namespace gpg
 
   namespace detail
   {
-    inline constexpr char kSerializationHeaderPath[] = "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
+    inline constexpr char kSerializationHeaderPath[] =
+      "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/serialization.h";
   } // namespace detail
 
   /**
@@ -2800,7 +2885,10 @@ namespace gpg
    * overload in its own namespace.
    */
   template <class T>
-  void SerLoadMembers(ReadArchive* const archive, T& object)
+  void SerLoadMembers(
+    ReadArchive* const archive,
+    T& object
+  )
   {
     object.MemberDeserialize(archive);
   }
@@ -2810,7 +2898,10 @@ namespace gpg
    * `MemberSerialize`, or an overload in `T`'s namespace.
    */
   template <class T>
-  void SerSaveMembers(WriteArchive* const archive, const T& object)
+  void SerSaveMembers(
+    WriteArchive* const archive,
+    const T& object
+  )
   {
     object.MemberSerialize(archive);
   }
@@ -2845,7 +2936,9 @@ namespace gpg
     ~SerSaveLoadHelper() = default;
 
     /**
-     * Address: 0x005B9230 (FUN_005B9230 -- `Init()` for `SValuePair`; formerly `InstallMohoSValuePairSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
+     * Address: 0x005B9230 (FUN_005B9230 -- `Init()` for `SValuePair`; formerly
+     * `InstallMohoSValuePairSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup
+     * was disproven.)
      *
      * What it does:
      * Installs this helper's load/save callbacks on `T`'s type (vtable slot 0,
@@ -2876,7 +2969,12 @@ namespace gpg
      * takes that too (the Lua objects read their payload against the
      * owning thread).
      */
-    static void Deserialize(ReadArchive* const archive, const std::intptr_t objectPtr, const int version, RRef* const ownerRef)
+    static void Deserialize(
+      ReadArchive* const archive,
+      const std::intptr_t objectPtr,
+      const int version,
+      RRef* const ownerRef
+    )
     {
       T& object = *reinterpret_cast<T*>(objectPtr);
       if constexpr (requires { object.MemberDeserialize(archive, version, *ownerRef); }) {
@@ -2896,7 +2994,12 @@ namespace gpg
      * `T::MemberSerialize`, with the version and the owner reference when
      * `T`'s takes them.
      */
-    static void Serialize(WriteArchive* const archive, const std::intptr_t objectPtr, const int version, RRef* const ownerRef)
+    static void Serialize(
+      WriteArchive* const archive,
+      const std::intptr_t objectPtr,
+      const int version,
+      RRef* const ownerRef
+    )
     {
       T& object = *reinterpret_cast<T*>(objectPtr);
       if constexpr (requires { object.MemberSerialize(archive, version, *ownerRef); }) {
@@ -2957,12 +3060,19 @@ namespace gpg
       type->deleteFunc_ = mDeleteFunc;
     }
 
-    static void Construct(ReadArchive* const archive, const int version, RRef* const ownerRef, SerConstructResult* const result)
+    static void Construct(
+      ReadArchive* const archive,
+      const int version,
+      RRef* const ownerRef,
+      SerConstructResult* const result
+    )
     {
       T::MemberConstruct(*archive, version, *ownerRef, *result);
     }
 
-    static void Delete(void* const object)
+    static void Delete(
+      void* const object
+    )
     {
       GPG_NONVIRTUAL_DESTROY(delete static_cast<T*>(object));
     }
@@ -3271,7 +3381,12 @@ namespace gpg
      * Reads one `IntType` lane from the archive and stores it into the
      * reflected object as a `T` value.
      */
-    static void Deserialize(ReadArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const)
+    static void Deserialize(
+      ReadArchive* const archive,
+      const std::intptr_t objectPtr,
+      const int,
+      RRef* const
+    )
     {
       IntType value{};
       archive->ReadInt(&value);
@@ -3304,7 +3419,12 @@ namespace gpg
      * What it does:
      * Writes the reflected object's `T` value as one `IntType` lane.
      */
-    static void Serialize(WriteArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const)
+    static void Serialize(
+      WriteArchive* const archive,
+      const std::intptr_t objectPtr,
+      const int,
+      RRef* const
+    )
     {
       const auto value = *reinterpret_cast<const T*>(objectPtr);
       archive->WriteInt(static_cast<int>(value));
@@ -3353,22 +3473,39 @@ namespace gpg
      *     confirmed via `incoming_xrefs` from both the real
      *     `PrimitiveSerHelper<EThreatType,int>` vtable and the dead
      *     `SerSaveLoadHelper<EThreatType>` sibling vtable.
-     * Address: 0x00523110 (FUN_00523110 -- `Init()` for `ERuleBPUnitMovementType`; formerly `InstallMohoERuleBPUnitMovementTypeSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x005231B0 (FUN_005231B0 -- `Init()` for `ERuleBPUnitCommandCaps`; formerly `InstallMohoERuleBPUnitCommandCapsSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x00523250 (FUN_00523250 -- `Init()` for `ERuleBPUnitToggleCaps`; formerly `InstallMohoERuleBPUnitToggleCapsSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x005982F0 (FUN_005982F0 -- `Init()` for `ECollisionType`; formerly `InstallMohoECollisionTypeSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x005A6EF0 (FUN_005A6EF0 -- `Init()` for `EAiNavigatorStatus`; formerly `InstallMohoEAiNavigatorStatusSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x005A6F90 (FUN_005A6F90 -- `Init()` for `EAiNavigatorEvent`; formerly `InstallMohoEAiNavigatorEventSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x005DB720 (FUN_005DB720 -- `Init()` for `EAiAttackerEvent`; formerly `InstallMohoEAiAttackerEventSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x005E34A0 (FUN_005E34A0 -- `Init()` for `EAiTargetType`; formerly `InstallMohoEAiTargetTypeSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x005E8B90 (FUN_005E8B90 -- `Init()` for `EAiTransportEvent`; formerly `InstallMohoEAiTransportEventSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x0062F870 (FUN_0062F870 -- `Init()` for `EPathPointState`; formerly `InstallMohoEPathPointStateSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x0069E860 (FUN_0069E860 -- `Init()` for `EProjectileImpactEvent`; formerly `InstallMohoEProjectileImpactEventSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x00718900 (FUN_00718900 -- `Init()` for `EThreatType`; formerly `InstallMohoEThreatTypeSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup was disproven.)
-     * Address: 0x0055C860 (FUN_0055C860 -- `Init()` for `PrimitiveSerHelper<moho::EJobType, int>`, vftable slot 0; formerly cited in gpg/core/containers/ArchiveSerialization.cpp as `InstallMohoEJobTypeSerializerCallbacks`.)
-     * Address: 0x0055C900 (FUN_0055C900 -- `Init()` for `PrimitiveSerHelper<moho::EFireState, int>`, vftable slot 0; formerly cited in gpg/core/containers/ArchiveSerialization.cpp as `InstallMohoEFireStateSerializerCallbacks`.)
-     * Address: 0x0055C9A0 (FUN_0055C9A0 -- `Init()` for `PrimitiveSerHelper<moho::EUnitState, int>`, vftable slot 0; formerly cited in gpg/core/containers/ArchiveSerialization.cpp as `InstallMohoEUnitStateSerializerCallbacks`.)
-     * Address: 0x006E9760 (FUN_006E9760 -- `Init()` for `PrimitiveSerHelper<moho::ECommandEvent, int>`, vftable slot 0; formerly cited in gpg/core/containers/ArchiveSerialization.cpp as `InstallMohoECommandEventSerializerCallbacks`.)
+     * Address: 0x00523110 (FUN_00523110 -- `Init()` for `ERuleBPUnitMovementType`; formerly
+     * `InstallMohoERuleBPUnitMovementTypeSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose
+     * by-name lookup was disproven.) Address: 0x005231B0 (FUN_005231B0 -- `Init()` for `ERuleBPUnitCommandCaps`;
+     * formerly `InstallMohoERuleBPUnitCommandCapsSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp,
+     * whose by-name lookup was disproven.) Address: 0x00523250 (FUN_00523250 -- `Init()` for `ERuleBPUnitToggleCaps`;
+     * formerly `InstallMohoERuleBPUnitToggleCapsSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp,
+     * whose by-name lookup was disproven.) Address: 0x005982F0 (FUN_005982F0 -- `Init()` for `ECollisionType`; formerly
+     * `InstallMohoECollisionTypeSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name
+     * lookup was disproven.) Address: 0x005A6EF0 (FUN_005A6EF0 -- `Init()` for `EAiNavigatorStatus`; formerly
+     * `InstallMohoEAiNavigatorStatusSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name
+     * lookup was disproven.) Address: 0x005A6F90 (FUN_005A6F90 -- `Init()` for `EAiNavigatorEvent`; formerly
+     * `InstallMohoEAiNavigatorEventSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name
+     * lookup was disproven.) Address: 0x005DB720 (FUN_005DB720 -- `Init()` for `EAiAttackerEvent`; formerly
+     * `InstallMohoEAiAttackerEventSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name
+     * lookup was disproven.) Address: 0x005E34A0 (FUN_005E34A0 -- `Init()` for `EAiTargetType`; formerly
+     * `InstallMohoEAiTargetTypeSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name
+     * lookup was disproven.) Address: 0x005E8B90 (FUN_005E8B90 -- `Init()` for `EAiTransportEvent`; formerly
+     * `InstallMohoEAiTransportEventSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name
+     * lookup was disproven.) Address: 0x0062F870 (FUN_0062F870 -- `Init()` for `EPathPointState`; formerly
+     * `InstallMohoEPathPointStateSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name
+     * lookup was disproven.) Address: 0x0069E860 (FUN_0069E860 -- `Init()` for `EProjectileImpactEvent`; formerly
+     * `InstallMohoEProjectileImpactEventSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose
+     * by-name lookup was disproven.) Address: 0x00718900 (FUN_00718900 -- `Init()` for `EThreatType`; formerly
+     * `InstallMohoEThreatTypeSerializerCallbacks` in gpg/core/containers/ArchiveSerialization.cpp, whose by-name lookup
+     * was disproven.) Address: 0x0055C860 (FUN_0055C860 -- `Init()` for `PrimitiveSerHelper<moho::EJobType, int>`,
+     * vftable slot 0; formerly cited in gpg/core/containers/ArchiveSerialization.cpp as
+     * `InstallMohoEJobTypeSerializerCallbacks`.) Address: 0x0055C900 (FUN_0055C900 -- `Init()` for
+     * `PrimitiveSerHelper<moho::EFireState, int>`, vftable slot 0; formerly cited in
+     * gpg/core/containers/ArchiveSerialization.cpp as `InstallMohoEFireStateSerializerCallbacks`.) Address: 0x0055C9A0
+     * (FUN_0055C9A0 -- `Init()` for `PrimitiveSerHelper<moho::EUnitState, int>`, vftable slot 0; formerly cited in
+     * gpg/core/containers/ArchiveSerialization.cpp as `InstallMohoEUnitStateSerializerCallbacks`.) Address: 0x006E9760
+     * (FUN_006E9760 -- `Init()` for `PrimitiveSerHelper<moho::ECommandEvent, int>`, vftable slot 0; formerly cited in
+     * gpg/core/containers/ArchiveSerialization.cpp as `InstallMohoECommandEventSerializerCallbacks`.)
      *
      * What it does:
      * Lazily resolves `T`'s RTTI and installs load/save callbacks from this
@@ -3674,7 +3811,8 @@ namespace gpg
     RType* GetPointeeType() const override;
   };
   static_assert(
-    sizeof(RPointerType<moho::CAcquireTargetTask>) == 0x68, "RPointerType<CAcquireTargetTask> size must be 0x68"
+    sizeof(RPointerType<moho::CAcquireTargetTask>) == 0x68,
+    "RPointerType<CAcquireTargetTask> size must be 0x68"
   );
 
   /**
@@ -4414,9 +4552,7 @@ namespace gpg
     [[nodiscard]]
     RType* GetPointeeType() const override;
   };
-  static_assert(
-    sizeof(RPointerType<moho::CEconomyEvent>) == 0x68, "RPointerType<CEconomyEvent> size must be 0x68"
-  );
+  static_assert(sizeof(RPointerType<moho::CEconomyEvent>) == 0x68, "RPointerType<CEconomyEvent> size must be 0x68");
 
   /**
    * VFTABLE: 0x00E017C0
@@ -4470,9 +4606,9 @@ namespace gpg
 
     /**
      * Address: 0x00421310 (FUN_00421310)
-      * Alias of FUN_00421620 (non-canonical helper lane).
-      * Alias of FUN_00421660 (non-canonical helper lane).
-      * Alias of FUN_00421670 (non-canonical helper lane).
+     * Alias of FUN_00421620 (non-canonical helper lane).
+     * Alias of FUN_00421660 (non-canonical helper lane).
+     * Alias of FUN_00421670 (non-canonical helper lane).
      * Demangled: gpg::RPointerType_CLuaConOutputHandler::Init
      */
     void Init() override;
@@ -4482,7 +4618,8 @@ namespace gpg
     RType* GetPointeeType() const override;
   };
   static_assert(
-    sizeof(RPointerType<moho::CLuaConOutputHandler>) == 0x68, "RPointerType<CLuaConOutputHandler> size must be 0x68"
+    sizeof(RPointerType<moho::CLuaConOutputHandler>) == 0x68,
+    "RPointerType<CLuaConOutputHandler> size must be 0x68"
   );
 
   /**
@@ -4704,7 +4841,8 @@ namespace gpg
     RType* GetPointeeType() const override;
   };
   static_assert(
-    sizeof(RPointerType<moho::IFormationInstance>) == 0x68, "RPointerType<IFormationInstance> size must be 0x68"
+    sizeof(RPointerType<moho::IFormationInstance>) == 0x68,
+    "RPointerType<IFormationInstance> size must be 0x68"
   );
 
   /**
@@ -4791,9 +4929,7 @@ namespace gpg
     [[nodiscard]]
     RType* GetPointeeType() const override;
   };
-  static_assert(
-    sizeof(RPointerType<moho::RUnitBlueprint>) == 0x68, "RPointerType<RUnitBlueprint> size must be 0x68"
-  );
+  static_assert(sizeof(RPointerType<moho::RUnitBlueprint>) == 0x68, "RPointerType<RUnitBlueprint> size must be 0x68");
 
   /**
    * Source hints:
@@ -4921,9 +5057,7 @@ namespace gpg
     [[nodiscard]]
     RType* GetPointeeType() const override;
   };
-  static_assert(
-    sizeof(RPointerType<moho::CArmyStatItem>) == 0x68, "RPointerType<CArmyStatItem> size must be 0x68"
-  );
+  static_assert(sizeof(RPointerType<moho::CArmyStatItem>) == 0x68, "RPointerType<CArmyStatItem> size must be 0x68");
 
   template <class T>
   class RVectorType;
@@ -5080,7 +5214,6 @@ namespace gpg
   };
   static_assert(sizeof(RVectorType<moho::SimArmy*>) == 0x68, "RVectorType<SimArmy*> size must be 0x68");
 
-
   /**
    * Address: 0x005F1A20 (FUN_005F1A20)
    * Address: 0x005F44A0 (FUN_005F44A0)
@@ -5154,79 +5287,92 @@ namespace gpg
     return static_cast<int>(reinterpret_cast<std::uintptr_t>(static_cast<Base*>(derived)) - kProbeAddress);
   }
   /**
-   * Address: 0x004081E0 (FUN_004081E0 -- `ReadPointer<moho::STaskEventLinkage>`; formerly `ReadPointer_STaskEventLinkage`.)
-   * Address: 0x0040B640 (FUN_0040B640 -- `ReadPointer<moho::CTask>`; formerly `ReadPointer_CTask`.)
-   * Address: 0x0040C4A0 (FUN_0040C4A0 -- `ReadPointer<moho::CTaskThread>`; formerly `ReadPointer_CTaskThread`.)
-   * Address: 0x0040D650 (FUN_0040D650 -- `ReadPointer<moho::CTaskStage>`; formerly `ReadPointer_CTaskStage`.)
-   * Address: 0x004C1520 (FUN_004C1520 -- `ReadPointer<LuaPlus::LuaState>`; formerly `ReadPointer_LuaState`.)
-   * Address: 0x004E63A0 (FUN_004E63A0 -- `ReadPointer<moho::CSndParams>`; formerly `ReadPointer_CSndParams`.)
-   * Address: 0x004E64E0 (FUN_004E64E0 -- `ReadPointer<moho::HSound>`; formerly `ReadPointer_HSound`.)
-   * Address: 0x005096E0 (FUN_005096E0 -- `ReadPointer<moho::STIMap>`; formerly `ReadPointer_STIMap`.)
-   * Address: 0x00511790 (FUN_00511790 -- `ReadPointer<moho::RRuleGameRules>`; formerly `ReadPointer_RRuleGameRules`.)
-   * Address: 0x005375C0 (FUN_005375C0 -- `ReadPointer<moho::RRuleGameRules>` (a second copy); formerly `ReadPointer_RRuleGameRules`.)
-   * Address: 0x00527480 (FUN_00527480 -- `ReadPointer<moho::RUnitBlueprint>`; formerly `ReadPointer_RUnitBlueprint2`.)
-   * Address: 0x00541E00 (FUN_00541E00 -- `ReadPointer<moho::IUnit>`; formerly `ReadPointer_IUnit`.)
-   * Address: 0x00554E80 (FUN_00554E80 -- `ReadPointer<moho::REntityBlueprint>`; formerly `ReadPointer_REntityBlueprint`.)
-   * Address: 0x0055A7E0 (FUN_0055A7E0 -- `ReadPointer<moho::RMeshBlueprint>`; formerly `ReadPointer_RMeshBlueprint`.)
-   * Address: 0x0055A920 (FUN_0055A920 -- `ReadPointer<moho::CSndParams>`; formerly `ReadPointer_CSndParams2`.)
-   * Address: 0x0055F640 (FUN_0055F640 -- `ReadPointer<moho::RUnitBlueprint>`; formerly `ReadPointer_RUnitBlueprint`.)
-   * Address: 0x00571230 (FUN_00571230 -- `ReadPointer<moho::Listener<moho::EFormationdStatus>>`; formerly `ReadPointer_Listener_EFormationdStatus`.)
+   * Address: 0x004081E0 (FUN_004081E0 -- `ReadPointer<moho::STaskEventLinkage>`; formerly
+   * `ReadPointer_STaskEventLinkage`.) Address: 0x0040B640 (FUN_0040B640 -- `ReadPointer<moho::CTask>`; formerly
+   * `ReadPointer_CTask`.) Address: 0x0040C4A0 (FUN_0040C4A0 -- `ReadPointer<moho::CTaskThread>`; formerly
+   * `ReadPointer_CTaskThread`.) Address: 0x0040D650 (FUN_0040D650 -- `ReadPointer<moho::CTaskStage>`; formerly
+   * `ReadPointer_CTaskStage`.) Address: 0x004C1520 (FUN_004C1520 -- `ReadPointer<LuaPlus::LuaState>`; formerly
+   * `ReadPointer_LuaState`.) Address: 0x004E63A0 (FUN_004E63A0 -- `ReadPointer<moho::CSndParams>`; formerly
+   * `ReadPointer_CSndParams`.) Address: 0x004E64E0 (FUN_004E64E0 -- `ReadPointer<moho::HSound>`; formerly
+   * `ReadPointer_HSound`.) Address: 0x005096E0 (FUN_005096E0 -- `ReadPointer<moho::STIMap>`; formerly
+   * `ReadPointer_STIMap`.) Address: 0x00511790 (FUN_00511790 -- `ReadPointer<moho::RRuleGameRules>`; formerly
+   * `ReadPointer_RRuleGameRules`.) Address: 0x005375C0 (FUN_005375C0 -- `ReadPointer<moho::RRuleGameRules>` (a second
+   * copy); formerly `ReadPointer_RRuleGameRules`.) Address: 0x00527480 (FUN_00527480 --
+   * `ReadPointer<moho::RUnitBlueprint>`; formerly `ReadPointer_RUnitBlueprint2`.) Address: 0x00541E00 (FUN_00541E00 --
+   * `ReadPointer<moho::IUnit>`; formerly `ReadPointer_IUnit`.) Address: 0x00554E80 (FUN_00554E80 --
+   * `ReadPointer<moho::REntityBlueprint>`; formerly `ReadPointer_REntityBlueprint`.) Address: 0x0055A7E0 (FUN_0055A7E0
+   * -- `ReadPointer<moho::RMeshBlueprint>`; formerly `ReadPointer_RMeshBlueprint`.) Address: 0x0055A920 (FUN_0055A920
+   * -- `ReadPointer<moho::CSndParams>`; formerly `ReadPointer_CSndParams2`.) Address: 0x0055F640 (FUN_0055F640 --
+   * `ReadPointer<moho::RUnitBlueprint>`; formerly `ReadPointer_RUnitBlueprint`.) Address: 0x00571230 (FUN_00571230 --
+   * `ReadPointer<moho::Listener<moho::EFormationdStatus>>`; formerly `ReadPointer_Listener_EFormationdStatus`.)
    * Address: 0x00584D30 (FUN_00584D30 -- `ReadPointer<moho::SimArmy>`; formerly `ReadPointer_SimArmy`.)
    * Address: 0x00584FB0 (FUN_00584FB0 -- `ReadPointer<moho::Sim>`; formerly `ReadPointer_Sim`.)
-   * Address: 0x00599ED0 (FUN_00599ED0 -- `ReadPointer<moho::CUnitCommandQueue>`; formerly `ReadPointer_CUnitCommandQueue`.)
-   * Address: 0x0059E810 (FUN_0059E810 -- `ReadPointer<moho::IFormationInstance>`; formerly `ReadPointer_IFormationInstance`.)
-   * Address: 0x005A2900 (FUN_005A2900 -- `ReadPointer<moho::Unit>`; formerly `ReadPointer_Unit`.)
-   * Address: 0x005A8130 (FUN_005A8130 -- `ReadPointer<moho::Listener<moho::EAiNavigatorEvent>>`; formerly `ReadPointer_Listener_EAiNavigatorEvent`.)
+   * Address: 0x00599ED0 (FUN_00599ED0 -- `ReadPointer<moho::CUnitCommandQueue>`; formerly
+   * `ReadPointer_CUnitCommandQueue`.) Address: 0x0059E810 (FUN_0059E810 -- `ReadPointer<moho::IFormationInstance>`;
+   * formerly `ReadPointer_IFormationInstance`.) Address: 0x005A2900 (FUN_005A2900 -- `ReadPointer<moho::Unit>`;
+   * formerly `ReadPointer_Unit`.) Address: 0x005A8130 (FUN_005A8130 --
+   * `ReadPointer<moho::Listener<moho::EAiNavigatorEvent>>`; formerly `ReadPointer_Listener_EAiNavigatorEvent`.)
    * Address: 0x005AC9A0 (FUN_005AC9A0 -- `ReadPointer<moho::PathQueue>`; formerly `ReadPointer_PathQueue`.)
    * Address: 0x005ACAE0 (FUN_005ACAE0 -- `ReadPointer<moho::COGrid>`; formerly `ReadPointer_COGrid`.)
    * Address: 0x005CC370 (FUN_005CC370 -- `ReadPointer<moho::ReconBlip>`; formerly `ReadPointer_ReconBlip`.)
    * Address: 0x005CE0E0 (FUN_005CE0E0 -- `ReadPointer<moho::CInfluenceMap>`; formerly `ReadPointer_CInfluenceMap`.)
    * Address: 0x005D13E0 (FUN_005D13E0 -- `ReadPointer<moho::UnitWeapon>`; formerly `ReadPointer_UnitWeapon`.)
    * Address: 0x005D5120 (FUN_005D5120 -- `ReadPointer<moho::CUnitMotion>`; formerly `ReadPointer_CUnitMotion`.)
-   * Address: 0x005DF0F0 (FUN_005DF0F0 -- `ReadPointer<moho::Listener<moho::EAiAttackerEvent>>`; formerly `ReadPointer_Listener_EAiAttackerEvent`.)
-   * Address: 0x005E10B0 (FUN_005E10B0 -- `ReadPointer<moho::CAcquireTargetTask>`; formerly `ReadPointer_CAcquireTargetTask`.)
-   * Address: 0x005E21D0 (FUN_005E21D0 -- `ReadPointer<moho::CAiAttackerImpl>`; formerly `ReadPointer_CAiAttackerImpl`.)
-   * Address: 0x005EC540 (FUN_005EC540 -- `ReadPointer<moho::Listener<moho::EAiTransportEvent>>`; formerly `ReadPointer_Listener_EAiTransportEvent`.)
-   * Address: 0x005F2170 (FUN_005F2170 -- `ReadPointer<moho::CCommandTask>`; formerly `ReadPointer_CCommandTask`.)
-   * Address: 0x005F5100 (FUN_005F5100 -- `ReadPointer<moho::CUnitCommand>`; formerly `ReadPointer_CUnitCommand`.)
-   * Address: 0x0060D940 (FUN_0060D940 -- `ReadPointer<moho::EAiResult>`; formerly `ReadPointer_EAiResult`.)
-   * Address: 0x00633FB0 (FUN_00633FB0 -- `ReadPointer<moho::RUnitBlueprintWeapon>`; formerly `ReadPointer_RUnitBlueprintWeapon`.)
-   * Address: 0x006340F0 (FUN_006340F0 -- `ReadPointer<moho::RProjectileBlueprint>`; formerly `ReadPointer_RProjectileBlueprint`.)
-   * Address: 0x0063E530 (FUN_0063E530 -- `ReadPointer<moho::CAniPose>`; formerly `ReadPointer_CAniPose`.)
-   * Address: 0x0063EC70 (FUN_0063EC70 -- `ReadPointer<moho::CAniActor>`; formerly `ReadPointer_CAniActor`.)
-   * Address: 0x006607B0 (FUN_006607B0 -- `ReadPointer<moho::REmitterBlueprint>`; formerly `ReadPointer_REmitterBlueprint`.)
-   * Address: 0x006729C0 (FUN_006729C0 -- `ReadPointer<moho::RTrailBlueprint>`; formerly `ReadPointer_RTrailBlueprint`.)
-   * Address: 0x006756E0 (FUN_006756E0 -- `ReadPointer<moho::ManyToOneListener<moho::ECollisionBeamEvent>>`; formerly `ReadPointer_ManyToOneListener_ECollisionBeamEvent`.)
-   * Address: 0x006761B0 (FUN_006761B0 -- `ReadPointer<moho::IEffect>`; formerly `ReadPointer_IEffect`.)
-   * Address: 0x00680FB0 (FUN_00680FB0 -- `ReadPointer<moho::Entity>`; formerly `ReadPointer_Entity`.)
-   * Address: 0x006895A0 (FUN_006895A0 -- `ReadPointer<moho::EntitySetBase>`; formerly `ReadPointer_EntitySetBase`.)
-   * Address: 0x00698900 (FUN_00698900 -- `ReadPointer<moho::SPhysConstants>`; formerly `ReadPointer_SPhysConstants`.)
-   * Address: 0x0069F920 (FUN_0069F920 -- `ReadPointer<moho::ManyToOneListener<moho::EProjectileImpactEvent>>`; formerly `ReadPointer_ManyToOneListener_EProjectileImpactEvent`.)
-   * Address: 0x006BC1E0 (FUN_006BC1E0 -- `ReadPointer<moho::CPathPoint>`; formerly `ReadPointer_CPathPoint`.)
-   * Address: 0x006E0500 (FUN_006E0500 -- `ReadPointer<moho::IAiAttacker>`; formerly `ReadPointer_IAiAttacker`.)
-   * Address: 0x006EB870 (FUN_006EB870 -- `ReadPointer<moho::Listener<moho::ECommandEvent>>`; formerly `ReadPointer_Listener_ECommandEvent`.)
-   * Address: 0x006F8F60 (FUN_006F8F60 -- `ReadPointer<moho::Listener<moho::EUnitCommandQueueStatus>>`; formerly `ReadPointer_Listener_EUnitCommandQueueStatus`.)
-   * Address: 0x00713F30 (FUN_00713F30 -- `ReadPointer<moho::CAiBrain>`; formerly `ReadPointer_CAiBrain`.)
-   * Address: 0x007141B0 (FUN_007141B0 -- `ReadPointer<moho::CArmyStatItem>`; formerly `ReadPointer_CArmyStatItem`.)
-   * Address: 0x007545A0 (FUN_007545A0 -- `ReadPointer<moho::Shield>`; formerly `ReadPointer_Shield`.)
-   * Address: 0x0076A8E0 (FUN_0076A8E0 -- `ReadPointer<moho::IPathTraveler>`; formerly `ReadPointer_IPathTraveler`.)
-   * Address: 0x0076B1C0 (FUN_0076B1C0 -- `ReadPointer<moho::PathTables>`; formerly `ReadPointer_PathTables`.)
-   * Address: 0x007703A0 (FUN_007703A0 -- `ReadPointer<moho::IAiReconDB>`; formerly `ReadPointer_IAiReconDB`.)
-   * Address: 0x00771550 (FUN_00771550 -- `ReadPointer<moho::IEffectManager>`; formerly `ReadPointer_IEffectManager`.)
-   * Address: 0x007745F0 (FUN_007745F0 -- `ReadPointer<moho::CEconRequest>`; formerly `ReadPointer_CEconRequest`.)
-   * Address: 0x00774BF0 (FUN_00774BF0 -- `ReadPointer<moho::CEconomy>`; formerly `ReadPointer_CEconomy`.)
-   * Address: 0x0090BA60 (FUN_0090BA60 -- `ReadPointer<lua_State>`; formerly `ReadPointer_lua_State`.)
-   * Address: 0x00921830 (FUN_00921830 -- `ReadPointer<TString>`; formerly `ReadPointer_TString`.)
-   * Address: 0x00921950 (FUN_00921950 -- `ReadPointer<Table>`; formerly `ReadPointer_Table`.)
-   * Address: 0x00921A70 (FUN_00921A70 -- `ReadPointer<LClosure>`; formerly `ReadPointer_LClosure`.)
-   * Address: 0x00921B90 (FUN_00921B90 -- `ReadPointer<Udata>`; formerly `ReadPointer_Udata`.)
+   * Address: 0x005DF0F0 (FUN_005DF0F0 -- `ReadPointer<moho::Listener<moho::EAiAttackerEvent>>`; formerly
+   * `ReadPointer_Listener_EAiAttackerEvent`.) Address: 0x005E10B0 (FUN_005E10B0 --
+   * `ReadPointer<moho::CAcquireTargetTask>`; formerly `ReadPointer_CAcquireTargetTask`.) Address: 0x005E21D0
+   * (FUN_005E21D0 -- `ReadPointer<moho::CAiAttackerImpl>`; formerly `ReadPointer_CAiAttackerImpl`.) Address: 0x005EC540
+   * (FUN_005EC540 -- `ReadPointer<moho::Listener<moho::EAiTransportEvent>>`; formerly
+   * `ReadPointer_Listener_EAiTransportEvent`.) Address: 0x005F2170 (FUN_005F2170 -- `ReadPointer<moho::CCommandTask>`;
+   * formerly `ReadPointer_CCommandTask`.) Address: 0x005F5100 (FUN_005F5100 -- `ReadPointer<moho::CUnitCommand>`;
+   * formerly `ReadPointer_CUnitCommand`.) Address: 0x0060D940 (FUN_0060D940 -- `ReadPointer<moho::EAiResult>`; formerly
+   * `ReadPointer_EAiResult`.) Address: 0x00633FB0 (FUN_00633FB0 -- `ReadPointer<moho::RUnitBlueprintWeapon>`; formerly
+   * `ReadPointer_RUnitBlueprintWeapon`.) Address: 0x006340F0 (FUN_006340F0 --
+   * `ReadPointer<moho::RProjectileBlueprint>`; formerly `ReadPointer_RProjectileBlueprint`.) Address: 0x0063E530
+   * (FUN_0063E530 -- `ReadPointer<moho::CAniPose>`; formerly `ReadPointer_CAniPose`.) Address: 0x0063EC70 (FUN_0063EC70
+   * -- `ReadPointer<moho::CAniActor>`; formerly `ReadPointer_CAniActor`.) Address: 0x006607B0 (FUN_006607B0 --
+   * `ReadPointer<moho::REmitterBlueprint>`; formerly `ReadPointer_REmitterBlueprint`.) Address: 0x006729C0
+   * (FUN_006729C0 -- `ReadPointer<moho::RTrailBlueprint>`; formerly `ReadPointer_RTrailBlueprint`.) Address: 0x006756E0
+   * (FUN_006756E0 -- `ReadPointer<moho::ManyToOneListener<moho::ECollisionBeamEvent>>`; formerly
+   * `ReadPointer_ManyToOneListener_ECollisionBeamEvent`.) Address: 0x006761B0 (FUN_006761B0 --
+   * `ReadPointer<moho::IEffect>`; formerly `ReadPointer_IEffect`.) Address: 0x00680FB0 (FUN_00680FB0 --
+   * `ReadPointer<moho::Entity>`; formerly `ReadPointer_Entity`.) Address: 0x006895A0 (FUN_006895A0 --
+   * `ReadPointer<moho::EntitySetBase>`; formerly `ReadPointer_EntitySetBase`.) Address: 0x00698900 (FUN_00698900 --
+   * `ReadPointer<moho::SPhysConstants>`; formerly `ReadPointer_SPhysConstants`.) Address: 0x0069F920 (FUN_0069F920 --
+   * `ReadPointer<moho::ManyToOneListener<moho::EProjectileImpactEvent>>`; formerly
+   * `ReadPointer_ManyToOneListener_EProjectileImpactEvent`.) Address: 0x006BC1E0 (FUN_006BC1E0 --
+   * `ReadPointer<moho::CPathPoint>`; formerly `ReadPointer_CPathPoint`.) Address: 0x006E0500 (FUN_006E0500 --
+   * `ReadPointer<moho::IAiAttacker>`; formerly `ReadPointer_IAiAttacker`.) Address: 0x006EB870 (FUN_006EB870 --
+   * `ReadPointer<moho::Listener<moho::ECommandEvent>>`; formerly `ReadPointer_Listener_ECommandEvent`.) Address:
+   * 0x006F8F60 (FUN_006F8F60 -- `ReadPointer<moho::Listener<moho::EUnitCommandQueueStatus>>`; formerly
+   * `ReadPointer_Listener_EUnitCommandQueueStatus`.) Address: 0x00713F30 (FUN_00713F30 --
+   * `ReadPointer<moho::CAiBrain>`; formerly `ReadPointer_CAiBrain`.) Address: 0x007141B0 (FUN_007141B0 --
+   * `ReadPointer<moho::CArmyStatItem>`; formerly `ReadPointer_CArmyStatItem`.) Address: 0x007545A0 (FUN_007545A0 --
+   * `ReadPointer<moho::Shield>`; formerly `ReadPointer_Shield`.) Address: 0x0076A8E0 (FUN_0076A8E0 --
+   * `ReadPointer<moho::IPathTraveler>`; formerly `ReadPointer_IPathTraveler`.) Address: 0x0076B1C0 (FUN_0076B1C0 --
+   * `ReadPointer<moho::PathTables>`; formerly `ReadPointer_PathTables`.) Address: 0x007703A0 (FUN_007703A0 --
+   * `ReadPointer<moho::IAiReconDB>`; formerly `ReadPointer_IAiReconDB`.) Address: 0x00771550 (FUN_00771550 --
+   * `ReadPointer<moho::IEffectManager>`; formerly `ReadPointer_IEffectManager`.) Address: 0x007745F0 (FUN_007745F0 --
+   * `ReadPointer<moho::CEconRequest>`; formerly `ReadPointer_CEconRequest`.) Address: 0x00774BF0 (FUN_00774BF0 --
+   * `ReadPointer<moho::CEconomy>`; formerly `ReadPointer_CEconomy`.) Address: 0x0090BA60 (FUN_0090BA60 --
+   * `ReadPointer<lua_State>`; formerly `ReadPointer_lua_State`.) Address: 0x00921830 (FUN_00921830 --
+   * `ReadPointer<TString>`; formerly `ReadPointer_TString`.) Address: 0x00921950 (FUN_00921950 -- `ReadPointer<Table>`;
+   * formerly `ReadPointer_Table`.) Address: 0x00921A70 (FUN_00921A70 -- `ReadPointer<LClosure>`; formerly
+   * `ReadPointer_LClosure`.) Address: 0x00921B90 (FUN_00921B90 -- `ReadPointer<Udata>`; formerly `ReadPointer_Udata`.)
    * Address: 0x00921CB0 (FUN_00921CB0 -- `ReadPointer<Proto>`; formerly `ReadPointer_Proto`.)
    * Address: 0x00921DD0 (FUN_00921DD0 -- `ReadPointer<UpVal>`; formerly `ReadPointer_UpVal`.)
-   * Address: 0x006988A0 (FUN_006988A0 -- `ReadPointer<moho::SPhysConstants>` into a slot; no references in the PE; formerly `ReadRawPointerFromSPhysConstantsSlotLaneLegacyB` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00698840 (FUN_00698840 -- `ReadPointer<moho::SPhysConstants>` into a slot; no references in the PE; formerly `ReadRawPointerFromSPhysConstantsSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00689150 (FUN_00689150 -- `ReadPointer<moho::EntitySetBase>` into a slot; no references in the PE; formerly `ReadRawPointerFromEntitySetBaseSlotLaneLegacyB` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00688BD0 (FUN_00688BD0 -- `ReadPointer<moho::EntitySetBase>` into a slot; no references in the PE; formerly `ReadRawPointerFromEntitySetBaseSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006E0200 (FUN_006E0200 -- `ReadPointer<moho::IAiAttacker>` into a slot; no references in the PE; formerly `ReadRawPointerFromIAiAttackerSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x006988A0 (FUN_006988A0 -- `ReadPointer<moho::SPhysConstants>` into a slot; no references in the PE;
+   * formerly `ReadRawPointerFromSPhysConstantsSlotLaneLegacyB` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00698840 (FUN_00698840 -- `ReadPointer<moho::SPhysConstants>` into a slot; no references in
+   * the PE; formerly `ReadRawPointerFromSPhysConstantsSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp,
+   * removed 2026-09-30.) Address: 0x00689150 (FUN_00689150 -- `ReadPointer<moho::EntitySetBase>` into a slot; no
+   * references in the PE; formerly `ReadRawPointerFromEntitySetBaseSlotLaneLegacyB` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00688BD0 (FUN_00688BD0 --
+   * `ReadPointer<moho::EntitySetBase>` into a slot; no references in the PE; formerly
+   * `ReadRawPointerFromEntitySetBaseSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006E0200 (FUN_006E0200 -- `ReadPointer<moho::IAiAttacker>` into a slot; no references in
+   * the PE; formerly `ReadRawPointerFromIAiAttackerSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp,
+   * removed 2026-09-30.)
    *
    * What it does:
    * Reads one tracked pointer (`ReadRawPointer` 0x00953720) and stores its
@@ -5234,7 +5380,10 @@ namespace gpg
    * a `T` throws `SerializationError`. Ownership is left as it is.
    */
   template <class T>
-  ReadArchive* ReadArchive::ReadPointer(T** const outValue, const RRef* const ownerRef)
+  ReadArchive* ReadArchive::ReadPointer(
+    T** const outValue,
+    const RRef* const ownerRef
+  )
   {
     const TrackedPointerInfo& tracked = ReadRawPointer(this, *ownerRef);
     const RRef source{tracked.object, tracked.type};
@@ -5245,118 +5394,205 @@ namespace gpg
 
     *outValue = source.Upcast<T>();
     if (*outValue == nullptr) {
-      throw SerializationError(STR_Printf(
-        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
-        "instead",
-        RTypeOf<T>()->GetName(),
-        source.GetTypeName()
-      ).c_str());
+      throw SerializationError(
+        STR_Printf(
+          "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+          "instead",
+          RTypeOf<T>()->GetName(),
+          source.GetTypeName()
+        )
+          .c_str()
+      );
     }
     return this;
   }
 
   /**
-   * Address: 0x00407A50 (FUN_00407A50 -- `ReadPointerOwned<moho::STaskEventLinkage>`; formerly `ReadPointerOwned_STaskEventLinkage`.)
-   * Address: 0x0040B530 (FUN_0040B530 -- `ReadPointerOwned<moho::CTask>`; formerly `ReadPointerOwned_CTask`.)
-   * Address: 0x0040B800 (FUN_0040B800 -- `ReadPointerOwned<moho::CTaskThread>`; formerly `ReadPointerOwned_CTaskThread`.)
-   * Address: 0x0041A3D0 (FUN_0041A3D0 -- `ReadPointerOwned<moho::StatItem>`; formerly `ReadPointerOwned_StatItem`.)
-   * Address: 0x004CC550 (FUN_004CC550 -- `ReadPointerOwned<LuaPlus::LuaState>`; formerly `ReadPointerOwned_LuaState`.)
-   * Address: 0x00584E70 (FUN_00584E70 -- `ReadPointerOwned<moho::CAiPersonality>`; formerly `ReadPointerOwned_CAiPersonality`.)
-   * Address: 0x005850F0 (FUN_005850F0 -- `ReadPointerOwned<moho::CTaskStage>`; formerly `ReadPointerOwned_CTaskStage`.)
-   * Address: 0x005A98A0 (FUN_005A98A0 -- `ReadPointerOwned<moho::CAiPathNavigator>`; formerly `ReadPointerOwned_CAiPathNavigator`.)
-   * Address: 0x005B1A50 (FUN_005B1A50 -- `ReadPointerOwned<moho::CAiPathFinder>`; formerly `ReadPointerOwned_CAiPathFinder`.)
-   * Address: 0x005D1AD0 (FUN_005D1AD0 -- `ReadPointerOwned<moho::CEconRequest>`; formerly `ReadPointerOwned_CEconRequest`.)
-   * Address: 0x005D4FE0 (FUN_005D4FE0 -- `ReadPointerOwned<moho::CAiPathSpline>`; formerly `ReadPointerOwned_CAiPathSpline`.)
-   * Address: 0x005DEC30 (FUN_005DEC30 -- `ReadPointerOwned<moho::UnitWeapon>`; formerly `ReadPointerOwned_UnitWeapon`.)
-   * Address: 0x005DED40 (FUN_005DED40 -- `ReadPointerOwned<moho::CAcquireTargetTask>`; formerly `ReadPointerOwned_CAcquireTargetTask`.)
-   * Address: 0x0063CB90 (FUN_0063CB90 -- `ReadPointerOwned<moho::IAniManipulator>`; formerly `ReadPointerOwned_IAniManipulator`.)
-   * Address: 0x0066C350 (FUN_0066C350 -- `ReadPointerOwned<moho::IEffect>`; formerly `ReadPointerOwned_IEffect`.)
-   * Address: 0x006829F0 (FUN_006829F0 -- `ReadPointerOwned<moho::PositionHistory>`; formerly `ReadPointerOwned_PositionHistory`.)
-   * Address: 0x00682B30 (FUN_00682B30 -- `ReadPointerOwned<moho::CColPrimitiveBase>`; formerly `ReadPointerOwned_CColPrimitiveBase`.)
+   * Address: 0x00407A50 (FUN_00407A50 -- `ReadPointerOwned<moho::STaskEventLinkage>`; formerly
+   * `ReadPointerOwned_STaskEventLinkage`.) Address: 0x0040B530 (FUN_0040B530 -- `ReadPointerOwned<moho::CTask>`;
+   * formerly `ReadPointerOwned_CTask`.) Address: 0x0040B800 (FUN_0040B800 -- `ReadPointerOwned<moho::CTaskThread>`;
+   * formerly `ReadPointerOwned_CTaskThread`.) Address: 0x0041A3D0 (FUN_0041A3D0 -- `ReadPointerOwned<moho::StatItem>`;
+   * formerly `ReadPointerOwned_StatItem`.) Address: 0x004CC550 (FUN_004CC550 -- `ReadPointerOwned<LuaPlus::LuaState>`;
+   * formerly `ReadPointerOwned_LuaState`.) Address: 0x00584E70 (FUN_00584E70 --
+   * `ReadPointerOwned<moho::CAiPersonality>`; formerly `ReadPointerOwned_CAiPersonality`.) Address: 0x005850F0
+   * (FUN_005850F0 -- `ReadPointerOwned<moho::CTaskStage>`; formerly `ReadPointerOwned_CTaskStage`.) Address: 0x005A98A0
+   * (FUN_005A98A0 -- `ReadPointerOwned<moho::CAiPathNavigator>`; formerly `ReadPointerOwned_CAiPathNavigator`.)
+   * Address: 0x005B1A50 (FUN_005B1A50 -- `ReadPointerOwned<moho::CAiPathFinder>`; formerly
+   * `ReadPointerOwned_CAiPathFinder`.) Address: 0x005D1AD0 (FUN_005D1AD0 -- `ReadPointerOwned<moho::CEconRequest>`;
+   * formerly `ReadPointerOwned_CEconRequest`.) Address: 0x005D4FE0 (FUN_005D4FE0 --
+   * `ReadPointerOwned<moho::CAiPathSpline>`; formerly `ReadPointerOwned_CAiPathSpline`.) Address: 0x005DEC30
+   * (FUN_005DEC30 -- `ReadPointerOwned<moho::UnitWeapon>`; formerly `ReadPointerOwned_UnitWeapon`.) Address: 0x005DED40
+   * (FUN_005DED40 -- `ReadPointerOwned<moho::CAcquireTargetTask>`; formerly `ReadPointerOwned_CAcquireTargetTask`.)
+   * Address: 0x0063CB90 (FUN_0063CB90 -- `ReadPointerOwned<moho::IAniManipulator>`; formerly
+   * `ReadPointerOwned_IAniManipulator`.) Address: 0x0066C350 (FUN_0066C350 -- `ReadPointerOwned<moho::IEffect>`;
+   * formerly `ReadPointerOwned_IEffect`.) Address: 0x006829F0 (FUN_006829F0 --
+   * `ReadPointerOwned<moho::PositionHistory>`; formerly `ReadPointerOwned_PositionHistory`.) Address: 0x00682B30
+   * (FUN_00682B30 -- `ReadPointerOwned<moho::CColPrimitiveBase>`; formerly `ReadPointerOwned_CColPrimitiveBase`.)
    * Address: 0x00682C70 (FUN_00682C70 -- `ReadPointerOwned<moho::CIntel>`; formerly `ReadPointerOwned_CIntel`.)
-   * Address: 0x00682DB0 (FUN_00682DB0 -- `ReadPointerOwned<moho::CTextureScroller>`; formerly `ReadPointerOwned_CTextureScroller`.)
-   * Address: 0x00682EF0 (FUN_00682EF0 -- `ReadPointerOwned<moho::SPhysBody>`; formerly `ReadPointerOwned_SPhysBody`.)
-   * Address: 0x00683030 (FUN_00683030 -- `ReadPointerOwned<moho::Motor>`; formerly `ReadPointerOwned_Motor`.)
-   * Address: 0x00688AC0 (FUN_00688AC0 -- `ReadPointerOwned<moho::Entity>`; formerly `ReadPointerOwned_Entity`.)
-   * Address: 0x006B10F0 (FUN_006B10F0 -- `ReadPointerOwned<moho::CEconomyEvent>`; formerly `ReadPointerOwned_CEconomyEvent`.)
-   * Address: 0x006B4A70 (FUN_006B4A70 -- `ReadPointerOwned<moho::IAiSteering>`; formerly `ReadPointerOwned_IAiSteering`.)
-   * Address: 0x006B4BB0 (FUN_006B4BB0 -- `ReadPointerOwned<moho::CUnitMotion>`; formerly `ReadPointerOwned_CUnitMotion`.)
-   * Address: 0x006B4CF0 (FUN_006B4CF0 -- `ReadPointerOwned<moho::CUnitCommandQueue>`; formerly `ReadPointerOwned_CUnitCommandQueue`.)
-   * Address: 0x006B4E30 (FUN_006B4E30 -- `ReadPointerOwned<moho::IFormationInstance>`; formerly `ReadPointerOwned_IFormationInstance`.)
-   * Address: 0x006B4F70 (FUN_006B4F70 -- `ReadPointerOwned<moho::CEconStorage>`; formerly `ReadPointerOwned_CEconStorage`.)
-   * Address: 0x006B50B0 (FUN_006B50B0 -- `ReadPointerOwned<moho::CAniActor>`; formerly `ReadPointerOwned_CAniActor`.)
-   * Address: 0x006B51F0 (FUN_006B51F0 -- `ReadPointerOwned<moho::IAiAttacker>`; formerly `ReadPointerOwned_IAiAttacker`.)
-   * Address: 0x006B5330 (FUN_006B5330 -- `ReadPointerOwned<moho::IAiCommandDispatch>`; formerly `ReadPointerOwned_IAiCommandDispatch`.)
-   * Address: 0x006B5470 (FUN_006B5470 -- `ReadPointerOwned<moho::IAiNavigator>`; formerly `ReadPointerOwned_IAiNavigator`.)
-   * Address: 0x006B55B0 (FUN_006B55B0 -- `ReadPointerOwned<moho::IAiBuilder>`; formerly `ReadPointerOwned_IAiBuilder`.)
-   * Address: 0x006B56F0 (FUN_006B56F0 -- `ReadPointerOwned<moho::IAiSiloBuild>`; formerly `ReadPointerOwned_IAiSiloBuild`.)
-   * Address: 0x006B5830 (FUN_006B5830 -- `ReadPointerOwned<moho::IAiTransport>`; formerly `ReadPointerOwned_IAiTransport`.)
-   * Address: 0x006E0640 (FUN_006E0640 -- `ReadPointerOwned<moho::CFireWeaponTask>`; formerly `ReadPointerOwned_CFireWeaponTask`.)
-   * Address: 0x006E2B60 (FUN_006E2B60 -- `ReadPointerOwned<moho::CUnitCommand>`; formerly `ReadPointerOwned_CUnitCommand`.)
-   * Address: 0x007040E0 (FUN_007040E0 -- `ReadPointerOwned<moho::CPlatoon>`; formerly `ReadPointerOwned_CPlatoon`.)
-   * Address: 0x00706E20 (FUN_00706E20 -- `ReadPointerOwned<moho::CAiBrain>`; formerly `ReadPointerOwned_CAiBrain`.)
-   * Address: 0x00706F60 (FUN_00706F60 -- `ReadPointerOwned<moho::IAiReconDB>`; formerly `ReadPointerOwned_IAiReconDB`.)
-   * Address: 0x007070A0 (FUN_007070A0 -- `ReadPointerOwned<moho::CEconomy>`; formerly `ReadPointerOwned_CEconomy`.)
-   * Address: 0x007071E0 (FUN_007071E0 -- `ReadPointerOwned<moho::CArmyStats>`; formerly `ReadPointerOwned_CArmyStats`.)
-   * Address: 0x00707320 (FUN_00707320 -- `ReadPointerOwned<moho::CInfluenceMap>`; formerly `ReadPointerOwned_CInfluenceMap`.)
-   * Address: 0x00707460 (FUN_00707460 -- `ReadPointerOwned<moho::PathQueue>`; formerly `ReadPointerOwned_PathQueue`.)
-   * Address: 0x00714070 (FUN_00714070 -- `ReadPointerOwned<moho::CArmyStatItem>`; formerly `ReadPointerOwned_CArmyStatItem`.)
+   * Address: 0x00682DB0 (FUN_00682DB0 -- `ReadPointerOwned<moho::CTextureScroller>`; formerly
+   * `ReadPointerOwned_CTextureScroller`.) Address: 0x00682EF0 (FUN_00682EF0 -- `ReadPointerOwned<moho::SPhysBody>`;
+   * formerly `ReadPointerOwned_SPhysBody`.) Address: 0x00683030 (FUN_00683030 -- `ReadPointerOwned<moho::Motor>`;
+   * formerly `ReadPointerOwned_Motor`.) Address: 0x00688AC0 (FUN_00688AC0 -- `ReadPointerOwned<moho::Entity>`; formerly
+   * `ReadPointerOwned_Entity`.) Address: 0x006B10F0 (FUN_006B10F0 -- `ReadPointerOwned<moho::CEconomyEvent>`; formerly
+   * `ReadPointerOwned_CEconomyEvent`.) Address: 0x006B4A70 (FUN_006B4A70 -- `ReadPointerOwned<moho::IAiSteering>`;
+   * formerly `ReadPointerOwned_IAiSteering`.) Address: 0x006B4BB0 (FUN_006B4BB0 --
+   * `ReadPointerOwned<moho::CUnitMotion>`; formerly `ReadPointerOwned_CUnitMotion`.) Address: 0x006B4CF0 (FUN_006B4CF0
+   * -- `ReadPointerOwned<moho::CUnitCommandQueue>`; formerly `ReadPointerOwned_CUnitCommandQueue`.) Address: 0x006B4E30
+   * (FUN_006B4E30 -- `ReadPointerOwned<moho::IFormationInstance>`; formerly `ReadPointerOwned_IFormationInstance`.)
+   * Address: 0x006B4F70 (FUN_006B4F70 -- `ReadPointerOwned<moho::CEconStorage>`; formerly
+   * `ReadPointerOwned_CEconStorage`.) Address: 0x006B50B0 (FUN_006B50B0 -- `ReadPointerOwned<moho::CAniActor>`;
+   * formerly `ReadPointerOwned_CAniActor`.) Address: 0x006B51F0 (FUN_006B51F0 -- `ReadPointerOwned<moho::IAiAttacker>`;
+   * formerly `ReadPointerOwned_IAiAttacker`.) Address: 0x006B5330 (FUN_006B5330 --
+   * `ReadPointerOwned<moho::IAiCommandDispatch>`; formerly `ReadPointerOwned_IAiCommandDispatch`.) Address: 0x006B5470
+   * (FUN_006B5470 -- `ReadPointerOwned<moho::IAiNavigator>`; formerly `ReadPointerOwned_IAiNavigator`.) Address:
+   * 0x006B55B0 (FUN_006B55B0 -- `ReadPointerOwned<moho::IAiBuilder>`; formerly `ReadPointerOwned_IAiBuilder`.) Address:
+   * 0x006B56F0 (FUN_006B56F0 -- `ReadPointerOwned<moho::IAiSiloBuild>`; formerly `ReadPointerOwned_IAiSiloBuild`.)
+   * Address: 0x006B5830 (FUN_006B5830 -- `ReadPointerOwned<moho::IAiTransport>`; formerly
+   * `ReadPointerOwned_IAiTransport`.) Address: 0x006E0640 (FUN_006E0640 -- `ReadPointerOwned<moho::CFireWeaponTask>`;
+   * formerly `ReadPointerOwned_CFireWeaponTask`.) Address: 0x006E2B60 (FUN_006E2B60 --
+   * `ReadPointerOwned<moho::CUnitCommand>`; formerly `ReadPointerOwned_CUnitCommand`.) Address: 0x007040E0
+   * (FUN_007040E0 -- `ReadPointerOwned<moho::CPlatoon>`; formerly `ReadPointerOwned_CPlatoon`.) Address: 0x00706E20
+   * (FUN_00706E20 -- `ReadPointerOwned<moho::CAiBrain>`; formerly `ReadPointerOwned_CAiBrain`.) Address: 0x00706F60
+   * (FUN_00706F60 -- `ReadPointerOwned<moho::IAiReconDB>`; formerly `ReadPointerOwned_IAiReconDB`.) Address: 0x007070A0
+   * (FUN_007070A0 -- `ReadPointerOwned<moho::CEconomy>`; formerly `ReadPointerOwned_CEconomy`.) Address: 0x007071E0
+   * (FUN_007071E0 -- `ReadPointerOwned<moho::CArmyStats>`; formerly `ReadPointerOwned_CArmyStats`.) Address: 0x00707320
+   * (FUN_00707320 -- `ReadPointerOwned<moho::CInfluenceMap>`; formerly `ReadPointerOwned_CInfluenceMap`.) Address:
+   * 0x00707460 (FUN_00707460 -- `ReadPointerOwned<moho::PathQueue>`; formerly `ReadPointerOwned_PathQueue`.) Address:
+   * 0x00714070 (FUN_00714070 -- `ReadPointerOwned<moho::CArmyStatItem>`; formerly `ReadPointerOwned_CArmyStatItem`.)
    * Address: 0x0072ACD0 (FUN_0072ACD0 -- `ReadPointerOwned<moho::CSquad>`; formerly `ReadPointerOwned_CSquad`.)
    * Address: 0x00750FD0 (FUN_00750FD0 -- `ReadPointerOwned<moho::SimArmy>`; formerly `ReadPointerOwned_SimArmy`.)
-   * Address: 0x00757540 (FUN_00757540 -- `ReadPointerOwned<moho::CRandomStream>`; formerly `ReadPointerOwned_CRandomStream`.)
-   * Address: 0x00757680 (FUN_00757680 -- `ReadPointerOwned<moho::SPhysConstants>`; formerly `ReadPointerOwned_SPhysConstants`.)
-   * Address: 0x007577C0 (FUN_007577C0 -- `ReadPointerOwned<moho::IAiFormationDB>`; formerly `ReadPointerOwned_IAiFormationDB`.)
-   * Address: 0x00757B10 (FUN_00757B10 -- `ReadPointerOwned<moho::CCommandDB>`; formerly `ReadPointerOwned_CCommandDB`.)
-   * Address: 0x00757C50 (FUN_00757C50 -- `ReadPointerOwned<moho::CDecalBuffer>`; formerly `ReadPointerOwned_CDecalBuffer`.)
-   * Address: 0x00757D90 (FUN_00757D90 -- `ReadPointerOwned<moho::IEffectManager>`; formerly `ReadPointerOwned_IEffectManager`.)
-   * Address: 0x00757ED0 (FUN_00757ED0 -- `ReadPointerOwned<moho::ISoundManager>`; formerly `ReadPointerOwned_ISoundManager`.)
-   * Address: 0x00758010 (FUN_00758010 -- `ReadPointerOwned<moho::EntityDB>`; formerly `ReadPointerOwned_EntityDB`.)
-   * Address: 0x0076B570 (FUN_0076B570 -- `ReadPointerOwned<moho::PathQueue::Impl>`; formerly `ReadPointerOwned_PathQueue_Impl`.)
-   * Address: 0x0076EC30 (FUN_0076EC30 -- `ReadPointerOwned<moho::CIntelPosHandle>`; formerly `ReadPointerOwned_CIntelPosHandle`.)
-   * Address: 0x0077D7A0 (FUN_0077D7A0 -- `ReadPointerOwned<moho::CDecalHandle>`; formerly `ReadPointerOwned_CDecalHandle`.)
-   * Address: 0x006B3E10 (FUN_006B3E10 -- `ReadPointerOwned<moho::IFormationInstance>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIFormationInstanceSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B3EE0 (FUN_006B3EE0 -- `ReadPointerOwned<moho::IAiCommandDispatch>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIAiCommandDispatchSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00681ED0 (FUN_00681ED0 -- `ReadPointerOwned<moho::CColPrimitiveBase>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCColPrimitiveBaseSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005D15A0 (FUN_005D15A0 -- `ReadPointerOwned<moho::CEconRequest>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCEconRequestNodeSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00681FC0 (FUN_00681FC0 -- `ReadPointerOwned<moho::CTextureScroller>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCTextureScrollerSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006E02A0 (FUN_006E02A0 -- `ReadPointerOwned<?>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCFireWeaponTaskSlotLaneLegacyB` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006DFDB0 (FUN_006DFDB0 -- `ReadPointerOwned<moho::CFireWeaponTask>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCFireWeaponTaskSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00681EA0 (FUN_00681EA0 -- `ReadPointerOwned<moho::PositionHistory>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromPositionHistorySlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00584630 (FUN_00584630 -- `ReadPointerOwned<moho::CAiPersonality>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCAiPersonalitySlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005D4DD0 (FUN_005D4DD0 -- `ReadPointerOwned<moho::CAiPathSpline>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCAiPathSplineSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005D4EF0 (FUN_005D4EF0 -- `ReadPointerOwned<moho::CAiPathSpline>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCAiPathSplineSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x007128A0 (FUN_007128A0 -- `ReadPointerOwned<moho::CArmyStatItem>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCArmyStatItemSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B3FA0 (FUN_006B3FA0 -- `ReadPointerOwned<moho::IAiTransport>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIAiTransportSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B3F70 (FUN_006B3F70 -- `ReadPointerOwned<moho::IAiSiloBuild>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIAiSiloBuildSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B3F10 (FUN_006B3F10 -- `ReadPointerOwned<moho::IAiNavigator>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIAiNavigatorSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B3EB0 (FUN_006B3EB0 -- `ReadPointerOwned<moho::IAiAttacker>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIAiAttackerSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B3D80 (FUN_006B3D80 -- `ReadPointerOwned<moho::IAiSteering>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIAiSteeringSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B3F40 (FUN_006B3F40 -- `ReadPointerOwned<moho::IAiBuilder>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIAiBuilderSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x007064E0 (FUN_007064E0 -- `ReadPointerOwned<moho::IAiReconDB>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIAiReconDBSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0076EB60 (FUN_0076EB60 -- `ReadPointerOwned<moho::CIntelPosHandle>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCIntelPosHandleSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00681FF0 (FUN_00681FF0 -- `ReadPointerOwned<moho::SPhysBody>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromSPhysBodySlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00756280 (FUN_00756280 -- `ReadPointerOwned<moho::SPhysConstants>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromSPhysConstantsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00756390 (FUN_00756390 -- `ReadPointerOwned<moho::IEffectManager>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIEffectManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x007562F0 (FUN_007562F0 -- `ReadPointerOwned<moho::IAiFormationDB>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIAiFormationDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x007064B0 (FUN_007064B0 -- `ReadPointerOwned<moho::CAiBrain>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCAiBrainSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00756250 (FUN_00756250 -- `ReadPointerOwned<moho::CRandomStream>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCRandomStreamSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x007563C0 (FUN_007563C0 -- `ReadPointerOwned<moho::ISoundManager>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromISoundManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00706BC0 (FUN_00706BC0 -- `ReadPointerOwned<moho::CInfluenceMap>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00706570 (FUN_00706570 -- `ReadPointerOwned<moho::CInfluenceMap>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00756360 (FUN_00756360 -- `ReadPointerOwned<moho::CDecalBuffer>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCDecalBufferSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B4590 (FUN_006B4590 -- `ReadPointerOwned<moho::CEconStorage>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCEconStorageSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00756FF0 (FUN_00756FF0 -- `ReadPointerOwned<moho::CDecalBuffer>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCDecalBufferSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00682020 (FUN_00682020 -- `ReadPointerOwned<moho::Motor>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromMotorSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00706540 (FUN_00706540 -- `ReadPointerOwned<moho::CArmyStats>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCArmyStatsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00706B60 (FUN_00706B60 -- `ReadPointerOwned<moho::CArmyStats>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCArmyStatsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00756330 (FUN_00756330 -- `ReadPointerOwned<moho::CCommandDB>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCCommandDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00756F90 (FUN_00756F90 -- `ReadPointerOwned<moho::CCommandDB>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCCommandDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00756430 (FUN_00756430 -- `ReadPointerOwned<moho::EntityDB>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCEntityDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B4600 (FUN_006B4600 -- `ReadPointerOwned<moho::CAniActor>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00757160 (FUN_00757160 -- `ReadPointerOwned<moho::EntityDB>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCEntityDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00706C20 (FUN_00706C20 -- `ReadPointerOwned<moho::PathQueue>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromPathQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00706510 (FUN_00706510 -- `ReadPointerOwned<moho::CEconomy>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCEconomySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00706B00 (FUN_00706B00 -- `ReadPointerOwned<moho::CEconomy>` into an owning slot, deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCEconomySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x00757540 (FUN_00757540 -- `ReadPointerOwned<moho::CRandomStream>`; formerly
+   * `ReadPointerOwned_CRandomStream`.) Address: 0x00757680 (FUN_00757680 -- `ReadPointerOwned<moho::SPhysConstants>`;
+   * formerly `ReadPointerOwned_SPhysConstants`.) Address: 0x007577C0 (FUN_007577C0 --
+   * `ReadPointerOwned<moho::IAiFormationDB>`; formerly `ReadPointerOwned_IAiFormationDB`.) Address: 0x00757B10
+   * (FUN_00757B10 -- `ReadPointerOwned<moho::CCommandDB>`; formerly `ReadPointerOwned_CCommandDB`.) Address: 0x00757C50
+   * (FUN_00757C50 -- `ReadPointerOwned<moho::CDecalBuffer>`; formerly `ReadPointerOwned_CDecalBuffer`.) Address:
+   * 0x00757D90 (FUN_00757D90 -- `ReadPointerOwned<moho::IEffectManager>`; formerly `ReadPointerOwned_IEffectManager`.)
+   * Address: 0x00757ED0 (FUN_00757ED0 -- `ReadPointerOwned<moho::ISoundManager>`; formerly
+   * `ReadPointerOwned_ISoundManager`.) Address: 0x00758010 (FUN_00758010 -- `ReadPointerOwned<moho::EntityDB>`;
+   * formerly `ReadPointerOwned_EntityDB`.) Address: 0x0076B570 (FUN_0076B570 --
+   * `ReadPointerOwned<moho::PathQueue::Impl>`; formerly `ReadPointerOwned_PathQueue_Impl`.) Address: 0x0076EC30
+   * (FUN_0076EC30 -- `ReadPointerOwned<moho::CIntelPosHandle>`; formerly `ReadPointerOwned_CIntelPosHandle`.) Address:
+   * 0x0077D7A0 (FUN_0077D7A0 -- `ReadPointerOwned<moho::CDecalHandle>`; formerly `ReadPointerOwned_CDecalHandle`.)
+   * Address: 0x006B3E10 (FUN_006B3E10 -- `ReadPointerOwned<moho::IFormationInstance>` into an owning slot, deleting the
+   * object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIFormationInstanceSlotLaneLegacyA` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006B3EE0 (FUN_006B3EE0 --
+   * `ReadPointerOwned<moho::IAiCommandDispatch>` into an owning slot, deleting the object it replaces; no references in
+   * the PE; formerly `ReadOwnedRawPointerFromIAiCommandDispatchSlotLaneLegacyA` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00681ED0 (FUN_00681ED0 --
+   * `ReadPointerOwned<moho::CColPrimitiveBase>` into an owning slot, deleting the object it replaces; no references in
+   * the PE; formerly `ReadOwnedRawPointerFromCColPrimitiveBaseSlotLaneLegacyA` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x005D15A0 (FUN_005D15A0 --
+   * `ReadPointerOwned<moho::CEconRequest>` into an owning slot, deleting the object it replaces; no references in the
+   * PE; formerly `ReadOwnedRawPointerFromCEconRequestNodeSlotLaneLegacyA` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00681FC0 (FUN_00681FC0 --
+   * `ReadPointerOwned<moho::CTextureScroller>` into an owning slot, deleting the object it replaces; no references in
+   * the PE; formerly `ReadOwnedRawPointerFromCTextureScrollerSlotLaneLegacyA` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006E02A0 (FUN_006E02A0 --
+   * `ReadPointerOwned<?>` into an owning slot, deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromCFireWeaponTaskSlotLaneLegacyB` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006DFDB0 (FUN_006DFDB0 -- `ReadPointerOwned<moho::CFireWeaponTask>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromCFireWeaponTaskSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00681EA0 (FUN_00681EA0 -- `ReadPointerOwned<moho::PositionHistory>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromPositionHistorySlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00584630 (FUN_00584630 -- `ReadPointerOwned<moho::CAiPersonality>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromCAiPersonalitySlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x005D4DD0 (FUN_005D4DD0 -- `ReadPointerOwned<moho::CAiPathSpline>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromCAiPathSplineSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x005D4EF0 (FUN_005D4EF0 -- `ReadPointerOwned<moho::CAiPathSpline>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `LoadOwnedRawPointerFromCAiPathSplineSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x007128A0 (FUN_007128A0 -- `ReadPointerOwned<moho::CArmyStatItem>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromCArmyStatItemSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006B3FA0 (FUN_006B3FA0 -- `ReadPointerOwned<moho::IAiTransport>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromIAiTransportSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006B3F70 (FUN_006B3F70 -- `ReadPointerOwned<moho::IAiSiloBuild>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromIAiSiloBuildSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006B3F10 (FUN_006B3F10 -- `ReadPointerOwned<moho::IAiNavigator>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromIAiNavigatorSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006B3EB0 (FUN_006B3EB0 -- `ReadPointerOwned<moho::IAiAttacker>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromIAiAttackerSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006B3D80 (FUN_006B3D80 -- `ReadPointerOwned<moho::IAiSteering>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromIAiSteeringSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006B3F40 (FUN_006B3F40 -- `ReadPointerOwned<moho::IAiBuilder>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromIAiBuilderSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x007064E0 (FUN_007064E0 -- `ReadPointerOwned<moho::IAiReconDB>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromIAiReconDBSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x0076EB60 (FUN_0076EB60 -- `ReadPointerOwned<moho::CIntelPosHandle>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromCIntelPosHandleSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00681FF0 (FUN_00681FF0 -- `ReadPointerOwned<moho::SPhysBody>` into an owning slot, deleting
+   * the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromSPhysBodySlotLaneLegacyA` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00756280 (FUN_00756280 --
+   * `ReadPointerOwned<moho::SPhysConstants>` into an owning slot, deleting the object it replaces; no references in the
+   * PE; formerly `ReadOwnedRawPointerFromSPhysConstantsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp,
+   * removed 2026-09-30.) Address: 0x00756390 (FUN_00756390 -- `ReadPointerOwned<moho::IEffectManager>` into an owning
+   * slot, deleting the object it replaces; no references in the PE; formerly
+   * `ReadOwnedRawPointerFromIEffectManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x007562F0 (FUN_007562F0 -- `ReadPointerOwned<moho::IAiFormationDB>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromIAiFormationDBSlotLane1`
+   * in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x007064B0 (FUN_007064B0 --
+   * `ReadPointerOwned<moho::CAiBrain>` into an owning slot, deleting the object it replaces; no references in the PE;
+   * formerly `ReadOwnedRawPointerFromCAiBrainSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00756250 (FUN_00756250 -- `ReadPointerOwned<moho::CRandomStream>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCRandomStreamSlotLane1`
+   * in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x007563C0 (FUN_007563C0 --
+   * `ReadPointerOwned<moho::ISoundManager>` into an owning slot, deleting the object it replaces; no references in the
+   * PE; formerly `ReadOwnedRawPointerFromISoundManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp,
+   * removed 2026-09-30.) Address: 0x00706BC0 (FUN_00706BC0 -- `ReadPointerOwned<moho::CInfluenceMap>` into an owning
+   * slot, deleting the object it replaces; no references in the PE; formerly
+   * `LoadOwnedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00706570 (FUN_00706570 -- `ReadPointerOwned<moho::CInfluenceMap>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCInfluenceMapSlotLane1`
+   * in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00756360 (FUN_00756360 --
+   * `ReadPointerOwned<moho::CDecalBuffer>` into an owning slot, deleting the object it replaces; no references in the
+   * PE; formerly `ReadOwnedRawPointerFromCDecalBufferSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp,
+   * removed 2026-09-30.) Address: 0x006B4590 (FUN_006B4590 -- `ReadPointerOwned<moho::CEconStorage>` into an owning
+   * slot, deleting the object it replaces; no references in the PE; formerly
+   * `LoadOwnedRawPointerFromCEconStorageSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00756FF0 (FUN_00756FF0 -- `ReadPointerOwned<moho::CDecalBuffer>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCDecalBufferSlotLane1`
+   * in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00682020 (FUN_00682020 --
+   * `ReadPointerOwned<moho::Motor>` into an owning slot, deleting the object it replaces; no references in the PE;
+   * formerly `ReadOwnedRawPointerFromMotorSlotLaneLegacyA` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00706540 (FUN_00706540 -- `ReadPointerOwned<moho::CArmyStats>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCArmyStatsSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00706B60 (FUN_00706B60 --
+   * `ReadPointerOwned<moho::CArmyStats>` into an owning slot, deleting the object it replaces; no references in the PE;
+   * formerly `LoadOwnedRawPointerFromCArmyStatsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00756330 (FUN_00756330 -- `ReadPointerOwned<moho::CCommandDB>` into an owning slot,
+   * deleting the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCCommandDbSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00756F90 (FUN_00756F90 --
+   * `ReadPointerOwned<moho::CCommandDB>` into an owning slot, deleting the object it replaces; no references in the PE;
+   * formerly `LoadOwnedRawPointerFromCCommandDbSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00756430 (FUN_00756430 -- `ReadPointerOwned<moho::EntityDB>` into an owning slot, deleting
+   * the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCEntityDbSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006B4600 (FUN_006B4600 --
+   * `ReadPointerOwned<moho::CAniActor>` into an owning slot, deleting the object it replaces; no references in the PE;
+   * formerly `LoadOwnedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00757160 (FUN_00757160 -- `ReadPointerOwned<moho::EntityDB>` into an owning slot, deleting
+   * the object it replaces; no references in the PE; formerly `LoadOwnedRawPointerFromCEntityDbSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00706C20 (FUN_00706C20 --
+   * `ReadPointerOwned<moho::PathQueue>` into an owning slot, deleting the object it replaces; no references in the PE;
+   * formerly `LoadOwnedRawPointerFromPathQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00706510 (FUN_00706510 -- `ReadPointerOwned<moho::CEconomy>` into an owning slot, deleting
+   * the object it replaces; no references in the PE; formerly `ReadOwnedRawPointerFromCEconomySlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00706B00 (FUN_00706B00 --
+   * `ReadPointerOwned<moho::CEconomy>` into an owning slot, deleting the object it replaces; no references in the PE;
+   * formerly `LoadOwnedRawPointerFromCEconomySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.)
    *
    * What it does:
    * `ReadPointer`, for a pointer whose object the reader takes ownership of:
@@ -5364,7 +5600,10 @@ namespace gpg
    * archive"` otherwise), and it is marked owned once the upcast succeeds.
    */
   template <class T>
-  ReadArchive* ReadArchive::ReadPointerOwned(T** const outValue, const RRef* const ownerRef)
+  ReadArchive* ReadArchive::ReadPointerOwned(
+    T** const outValue,
+    const RRef* const ownerRef
+  )
   {
     TrackedPointerInfo& tracked = ReadRawPointer(this, *ownerRef);
     if (tracked.object == nullptr) {
@@ -5379,12 +5618,15 @@ namespace gpg
     const RRef source{tracked.object, tracked.type};
     *outValue = source.Upcast<T>();
     if (*outValue == nullptr) {
-      throw SerializationError(STR_Printf(
-        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
-        "instead",
-        RTypeOf<T>()->GetName(),
-        source.GetTypeName()
-      ).c_str());
+      throw SerializationError(
+        STR_Printf(
+          "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+          "instead",
+          RTypeOf<T>()->GetName(),
+          source.GetTypeName()
+        )
+          .c_str()
+      );
     }
 
     tracked.state = TrackedPointerState::Owned;
@@ -5392,17 +5634,26 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00884C90 (FUN_00884C90 -- `ReadPointerShared<moho::LaunchInfoBase>`, for `SSavedGameHeader::mLaunchInfo` (0x008831C0); formerly `ReadPointerShared_LaunchInfoBase`.)
-   * Address: 0x008843F0 (FUN_008843F0 -- `ReadPointerShared<moho::SSessionSaveData>`, for `LaunchInfoBase::mLoadSessionData` (`CSavedGame::CreateSinglePlayerSessionInfo` 0x008807F0); formerly `ReadPointerShared_SSessionSaveData`.)
-   * Address: 0x0055F990 (FUN_0055F990 -- `ReadPointerShared<moho::CAniPose>`, for `CAniActor` 0x0063E200, `SPerArmyReconInfo` 0x005C8DE0, `Unit` 0x0055E030; formerly `ReadPointerShared_CAniPose`.)
-   * Address: 0x0054FF20 (FUN_0054FF20 -- `ReadPointerShared<moho::CAniSkel>`, for `CAniPose::mSkeleton` (0x0054F380); formerly `ReadPointerShared_CAniSkel`.)
-   * Address: 0x0055F780 (FUN_0055F780 -- `ReadPointerShared<moho::Stats<moho::StatItem>>`, for `SSTIUnitConstantData::mStatsRoot` (0x0055DF40); formerly `ReadPointerShared_Stats_StatItem`.)
-   * Address: 0x00757900 (FUN_00757900 -- `ReadPointerShared<moho::ISimResources>`, for `Sim` 0x00754C60; formerly `ReadPointerShared_ISimResources`.)
-   * Address: 0x00551CC0 (FUN_00551CC0 -- `ReadPointerShared<moho::CIntelGrid>`, for `SSTIArmyConstantData`'s eight grids (0x00550FC0); formerly `ReadPointerShared_CIntelGrid`.)
-   * Address: 0x005CE220 (FUN_005CE220 -- `ReadPointerShared<moho::CIntelGrid>` again, a second emission for `CAiReconDBImpl`'s eight grids (0x005CCBE0), `CIntelPosHandle::mGrid` (0x00770000); formerly `ReadPointerShared_CIntelGrid2`.)
-   * Address: 0x00642F60 (FUN_00642F60 -- `ReadPointerShared<moho::RScaResource>`, for `CAnimationManipulator::mAnimationRef` (0x00642A50); formerly `ReadPointerShared_RScaResource`.)
-   * Address: 0x0055A5D0 (FUN_0055A5D0 -- `ReadPointerShared<moho::RScmResource>`, for `SSTIEntityVariableData::mScmResource` 0x00559B00, `SPerArmyReconInfo::mMesh` 0x005C8DE0; formerly `ReadPointerShared_RScmResource`.)
-   * Address: 0x007142F0 (FUN_007142F0 -- `ReadPointerShared<moho::STrigger>`, for `list<shared_ptr<STrigger>>` 0x00710620 and the `shared_ptr<STrigger>` type's load; formerly `ReadPointerShared_STrigger`.)
+   * Address: 0x00884C90 (FUN_00884C90 -- `ReadPointerShared<moho::LaunchInfoBase>`, for `SSavedGameHeader::mLaunchInfo`
+   * (0x008831C0); formerly `ReadPointerShared_LaunchInfoBase`.) Address: 0x008843F0 (FUN_008843F0 --
+   * `ReadPointerShared<moho::SSessionSaveData>`, for `LaunchInfoBase::mLoadSessionData`
+   * (`CSavedGame::CreateSinglePlayerSessionInfo` 0x008807F0); formerly `ReadPointerShared_SSessionSaveData`.) Address:
+   * 0x0055F990 (FUN_0055F990 -- `ReadPointerShared<moho::CAniPose>`, for `CAniActor` 0x0063E200, `SPerArmyReconInfo`
+   * 0x005C8DE0, `Unit` 0x0055E030; formerly `ReadPointerShared_CAniPose`.) Address: 0x0054FF20 (FUN_0054FF20 --
+   * `ReadPointerShared<moho::CAniSkel>`, for `CAniPose::mSkeleton` (0x0054F380); formerly
+   * `ReadPointerShared_CAniSkel`.) Address: 0x0055F780 (FUN_0055F780 --
+   * `ReadPointerShared<moho::Stats<moho::StatItem>>`, for `SSTIUnitConstantData::mStatsRoot` (0x0055DF40); formerly
+   * `ReadPointerShared_Stats_StatItem`.) Address: 0x00757900 (FUN_00757900 -- `ReadPointerShared<moho::ISimResources>`,
+   * for `Sim` 0x00754C60; formerly `ReadPointerShared_ISimResources`.) Address: 0x00551CC0 (FUN_00551CC0 --
+   * `ReadPointerShared<moho::CIntelGrid>`, for `SSTIArmyConstantData`'s eight grids (0x00550FC0); formerly
+   * `ReadPointerShared_CIntelGrid`.) Address: 0x005CE220 (FUN_005CE220 -- `ReadPointerShared<moho::CIntelGrid>` again,
+   * a second emission for `CAiReconDBImpl`'s eight grids (0x005CCBE0), `CIntelPosHandle::mGrid` (0x00770000); formerly
+   * `ReadPointerShared_CIntelGrid2`.) Address: 0x00642F60 (FUN_00642F60 -- `ReadPointerShared<moho::RScaResource>`, for
+   * `CAnimationManipulator::mAnimationRef` (0x00642A50); formerly `ReadPointerShared_RScaResource`.) Address:
+   * 0x0055A5D0 (FUN_0055A5D0 -- `ReadPointerShared<moho::RScmResource>`, for `SSTIEntityVariableData::mScmResource`
+   * 0x00559B00, `SPerArmyReconInfo::mMesh` 0x005C8DE0; formerly `ReadPointerShared_RScmResource`.) Address: 0x007142F0
+   * (FUN_007142F0 -- `ReadPointerShared<moho::STrigger>`, for `list<shared_ptr<STrigger>>` 0x00710620 and the
+   * `shared_ptr<STrigger>` type's load; formerly `ReadPointerShared_STrigger`.)
    *
    * The `boost::shared_ptr<T>` members those bodies call out of line (all
    * formerly per-type helpers in gpg/core/containers/ArchiveSerialization.cpp):
@@ -5417,16 +5668,16 @@ namespace gpg
    * Address: 0x0055FBA0 (FUN_0055FBA0 -- `shared_ptr<moho::Stats<moho::StatItem>>::operator=`; callers 0x0055F780.)
    * Address: 0x00550130 (FUN_00550130 -- `shared_ptr<moho::CAniSkel>::reset()`; callers 0x0054FF20.)
    * Address: 0x00551F00 (FUN_00551F00 -- `shared_ptr<moho::CIntelGrid>::reset()`; callers 0x00551CC0.)
-   * Address: 0x00550670 (FUN_00550670 -- `shared_ptr<moho::CIntelGrid>::reset()`, the null arm of 0x00551CC0/0x005CE220.)
-   * Address: 0x00714560 (FUN_00714560 -- `shared_ptr<moho::STrigger>::reset()`; callers 0x007142F0.)
-   * Address: 0x0073F5B0 (FUN_0073F5B0 -- `shared_ptr<moho::LaunchInfoBase>::reset()`; callers 0x00884C90.)
+   * Address: 0x00550670 (FUN_00550670 -- `shared_ptr<moho::CIntelGrid>::reset()`, the null arm of
+   * 0x00551CC0/0x005CE220.) Address: 0x00714560 (FUN_00714560 -- `shared_ptr<moho::STrigger>::reset()`; callers
+   * 0x007142F0.) Address: 0x0073F5B0 (FUN_0073F5B0 -- `shared_ptr<moho::LaunchInfoBase>::reset()`; callers 0x00884C90.)
    * Address: 0x00758180 (FUN_00758180 -- `shared_ptr<moho::ISimResources>::reset()`; callers 0x00757900.)
    * Address: 0x008846E0 (FUN_008846E0 -- `shared_ptr<moho::SSessionSaveData>::reset()`; callers 0x008843F0.)
    * Address: 0x0055FC00 (FUN_0055FC00 -- `shared_ptr<moho::Stats<moho::StatItem>>::reset()`; callers 0x0055F780.)
-   * Address: 0x005503F0 (FUN_005503F0 -- `static_pointer_cast<moho::CAniSkel>` of the entry's `shared_ptr<void>` (copy both words, `add_ref_copy`); callers 0x0054FF20.)
-   * Address: 0x00551FE0 (FUN_00551FE0 -- the same for `moho::CIntelGrid`; callers 0x00551CC0.)
-   * Address: 0x0055FDD0 (FUN_0055FDD0 -- the same for `moho::CAniPose`; callers 0x0055F990.)
-   * Address: 0x005CE720 (FUN_005CE720 -- the same for `moho::CIntelGrid`; callers 0x005CE220.)
+   * Address: 0x005503F0 (FUN_005503F0 -- `static_pointer_cast<moho::CAniSkel>` of the entry's `shared_ptr<void>` (copy
+   * both words, `add_ref_copy`); callers 0x0054FF20.) Address: 0x00551FE0 (FUN_00551FE0 -- the same for
+   * `moho::CIntelGrid`; callers 0x00551CC0.) Address: 0x0055FDD0 (FUN_0055FDD0 -- the same for `moho::CAniPose`;
+   * callers 0x0055F990.) Address: 0x005CE720 (FUN_005CE720 -- the same for `moho::CIntelGrid`; callers 0x005CE220.)
    * Address: 0x00714A50 (FUN_00714A50 -- the same for `moho::STrigger`; callers 0x007142F0.)
    * Address: 0x007584E0 (FUN_007584E0 -- the same for `moho::ISimResources`; callers 0x00757900.)
    * Address: 0x008849F0 (FUN_008849F0 -- the same for `moho::SSessionSaveData`; callers 0x008843F0.)
@@ -5447,7 +5698,10 @@ namespace gpg
    * `*outValue` takes the entry's control block, the pointer uncast.
    */
   template <class T>
-  ReadArchive* ReadArchive::ReadPointerShared(boost::shared_ptr<T>* const outValue, const RRef* const ownerRef)
+  ReadArchive* ReadArchive::ReadPointerShared(
+    boost::shared_ptr<T>* const outValue,
+    const RRef* const ownerRef
+  )
   {
     using Object = std::remove_cv_t<T>;
 
@@ -5471,12 +5725,15 @@ namespace gpg
 
     const RRef source{tracked.object, tracked.type};
     if (source.Upcast<Object>() == nullptr) {
-      throw SerializationError(STR_Printf(
-        "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
-        "instead",
-        RTypeOf<Object>()->GetName(),
-        source.GetTypeName()
-      ).c_str());
+      throw SerializationError(
+        STR_Printf(
+          "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+          "instead",
+          RTypeOf<Object>()->GetName(),
+          source.GetTypeName()
+        )
+          .c_str()
+      );
     }
 
     *outValue = boost::static_pointer_cast<T>(tracked.sharedPtr);
@@ -5489,7 +5746,10 @@ namespace gpg
    * into a `boost::shared_ptr<T>`, whose control block the member then takes.
    */
   template <class T>
-  ReadArchive* ReadArchive::ReadPointerShared(boost::SharedPtrRaw<T>* const outValue, const RRef* const ownerRef)
+  ReadArchive* ReadArchive::ReadPointerShared(
+    boost::SharedPtrRaw<T>* const outValue,
+    const RRef* const ownerRef
+  )
   {
     boost::shared_ptr<T> value;
     ReadPointerShared(&value, ownerRef);
@@ -5506,361 +5766,894 @@ namespace gpg
    * Per-type emissions with no references in the PE (write state and source
    * -- a value, a slot or an owner field -- folded in per copy):
    *
-   * Address: 0x004E5B00 (FUN_004E5B00 -- `SaveRawPointer` of a `moho::CSndParams` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCSndParamsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x004E5B40 (FUN_004E5B40 -- `SaveRawPointer` of a `moho::HSound` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromHSoundSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00511220 (FUN_00511220 -- `SaveRawPointer` of a `moho::RRuleGameRules` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRRuleGameRulesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00526650 (FUN_00526650 -- `SaveRawPointer` of a `moho::RUnitBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRUnitBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00541BC0 (FUN_00541BC0 -- `SaveRawPointer` of a `moho::IUnit` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIUnitSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0055A3C0 (FUN_0055A3C0 -- `SaveRawPointer` of a `moho::RScmResource` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromRScmResourceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0055A4A0 (FUN_0055A4A0 -- `SaveRawPointer` of a `moho::CSndParams` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCSndParamsSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0055F4F0 (FUN_0055F4F0 -- `SaveRawPointer` of a `moho::CAniPose` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromCAniPoseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005849F0 (FUN_005849F0 -- `SaveRawPointer` of a `moho::SimArmy` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromSimArmySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00584A50 (FUN_00584A50 -- `SaveRawPointer` of a `moho::CAiPersonality` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAiPersonalitySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00599EA0 (FUN_00599EA0 -- `SaveRawPointer` of a `moho::CUnitCommandQueue` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCUnitCommandQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005A27D0 (FUN_005A27D0 -- `SaveRawPointer` of a `moho::Unit` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromUnitSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005A9750 (FUN_005A9750 -- `SaveRawPointer` of a `moho::CAiPathNavigator` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAiPathNavigatorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005AC770 (FUN_005AC770 -- `SaveRawPointer` of a `moho::PathQueue` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromPathQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005AC7B0 (FUN_005AC7B0 -- `SaveRawPointer` of a `moho::COGrid` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCOGridSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005B1930 (FUN_005B1930 -- `SaveRawPointer` of a `moho::CAiPathFinder` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAiPathFinderSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005CA720 (FUN_005CA720 -- `SaveRawPointer` of a `moho::ReconBlip` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromReconBlipSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005CDE00 (FUN_005CDE00 -- `SaveRawPointer` of a `moho::CInfluenceMap` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005D1050 (FUN_005D1050 -- `SaveRawPointer` of a `moho::UnitWeapon` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromUnitWeaponSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005D4F10 (FUN_005D4F10 -- `SaveRawPointer` of a `moho::CAiPathSpline` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAiPathSplineSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005D4F50 (FUN_005D4F50 -- `SaveRawPointer` of a `moho::CUnitMotion` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCUnitMotionSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005DFB60 (FUN_005DFB60 -- `SaveRawPointer` of a `moho::CAcquireTargetTask` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCAcquireTargetTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005E1F00 (FUN_005E1F00 -- `SaveRawPointer` of a `moho::CAiAttackerImpl` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCAiAttackerImplSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005F50D0 (FUN_005F50D0 -- `SaveRawPointer` of a `moho::CUnitCommand` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCUnitCommandSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0060D770 (FUN_0060D770 -- `SaveRawPointer` of a `moho::EAiResult` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromEAiResultSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005332D0 (FUN_005332D0 -- `SaveRawPointer` of a `moho::RRuleGameRules` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRRuleGameRulesSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00537220 (FUN_00537220 -- `SaveRawPointer` of a `moho::RRuleGameRules` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRRuleGameRulesSlotLane3` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0055A400 (FUN_0055A400 -- `SaveRawPointer` of a `moho::RMeshBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRMeshBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0055F290 (FUN_0055F290 -- `SaveRawPointer` of a `moho::RUnitBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRUnitBlueprintSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00633F20 (FUN_00633F20 -- `SaveRawPointer` of a `moho::RUnitBlueprintWeapon` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRUnitBlueprintWeaponSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00633F60 (FUN_00633F60 -- `SaveRawPointer` of a `moho::RProjectileBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRProjectileBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0063DAD0 (FUN_0063DAD0 -- `SaveRawPointer` of a `moho::CAniPose` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCAniPoseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0063EA00 (FUN_0063EA00 -- `SaveRawPointer` of a `moho::CAniActor` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006606E0 (FUN_006606E0 -- `SaveRawPointer` of a `moho::REmitterBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromREmitterBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00672990 (FUN_00672990 -- `SaveRawPointer` of a `moho::RTrailBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRTrailBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00682520 (FUN_00682520 -- `SaveRawPointer` of a `moho::PositionHistory` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromPositionHistorySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00682570 (FUN_00682570 -- `SaveRawPointer` of a `moho::CColPrimitiveBase` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCColPrimitiveBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006826A0 (FUN_006826A0 -- `SaveRawPointer` of a `moho::CIntel` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCIntelSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00682750 (FUN_00682750 -- `SaveRawPointer` of a `moho::SPhysBody` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromSPhysBodySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006827B0 (FUN_006827B0 -- `SaveRawPointer` of a `moho::Motor` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromMotorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00689160 (FUN_00689160 -- `SaveRawPointer` of a `moho::EntitySetBase` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromEntitySetBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006988B0 (FUN_006988B0 -- `SaveRawPointer` of a `moho::SPhysConstants` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromSPhysConstantsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4450 (FUN_006B4450 -- `SaveRawPointer` of a `moho::IAiSteering` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiSteeringSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B44B0 (FUN_006B44B0 -- `SaveRawPointer` of a `moho::CUnitMotion` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCUnitMotionSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4510 (FUN_006B4510 -- `SaveRawPointer` of a `moho::CUnitCommandQueue` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCUnitCommandQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4630 (FUN_006B4630 -- `SaveRawPointer` of a `moho::CAniActor` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4680 (FUN_006B4680 -- `SaveRawPointer` of a `moho::IAiAttacker` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiAttackerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B46D0 (FUN_006B46D0 -- `SaveRawPointer` of a `moho::IAiCommandDispatch` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiCommandDispatchSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4720 (FUN_006B4720 -- `SaveRawPointer` of a `moho::IAiNavigator` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiNavigatorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4770 (FUN_006B4770 -- `SaveRawPointer` of a `moho::IAiBuilder` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiBuilderSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B47C0 (FUN_006B47C0 -- `SaveRawPointer` of a `moho::IAiSiloBuild` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiSiloBuildSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4810 (FUN_006B4810 -- `SaveRawPointer` of a `moho::IAiTransport` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiTransportSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006BBF70 (FUN_006BBF70 -- `SaveRawPointer` of a `moho::CPathPoint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCPathPointSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006E0210 (FUN_006E0210 -- `SaveRawPointer` of a `moho::IAiAttacker` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIAiAttackerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006E02C0 (FUN_006E02C0 -- `SaveRawPointer` of a `moho::CFireWeaponTask` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCFireWeaponTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00706A80 (FUN_00706A80 -- `SaveRawPointer` of a `moho::CAiBrain` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAiBrainSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00706AD0 (FUN_00706AD0 -- `SaveRawPointer` of a `moho::IAiReconDB` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiReconDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00706B90 (FUN_00706B90 -- `SaveRawPointer` of a `moho::CArmyStats` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCArmyStatsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00706BF0 (FUN_00706BF0 -- `SaveRawPointer` of a `moho::CInfluenceMap` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00712FD0 (FUN_00712FD0 -- `SaveRawPointer` of a `moho::CAiBrain` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCAiBrainSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00713100 (FUN_00713100 -- `SaveRawPointer` of a `moho::STrigger` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromSTriggerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007523F0 (FUN_007523F0 -- `SaveRawPointer` of a `moho::Shield` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromShieldSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00756E20 (FUN_00756E20 -- `SaveRawPointer` of a `moho::CRandomStream` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCRandomStreamSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00756E70 (FUN_00756E70 -- `SaveRawPointer` of a `moho::SPhysConstants` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromSPhysConstantsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00756F20 (FUN_00756F20 -- `SaveRawPointer` of a `moho::IAiFormationDB` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiFormationDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00756F60 (FUN_00756F60 -- `SaveRawPointer` of a `moho::ISimResources` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromISimResourcesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00756FC0 (FUN_00756FC0 -- `SaveRawPointer` of a `moho::CCommandDB` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCCommandDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00757020 (FUN_00757020 -- `SaveRawPointer` of a `moho::CDecalBuffer` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCDecalBufferSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00757070 (FUN_00757070 -- `SaveRawPointer` of a `moho::IEffectManager` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIEffectManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007570D0 (FUN_007570D0 -- `SaveRawPointer` of a `moho::ISoundManager` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromISoundManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00757190 (FUN_00757190 -- `SaveRawPointer` of a `moho::EntityDB` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromEntityDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00769220 (FUN_00769220 -- `SaveRawPointer` of a `moho::IPathTraveler` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIPathTravelerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00769260 (FUN_00769260 -- `SaveRawPointer` of a `moho::IPathTraveler` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIPathTravelerSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0076ABD0 (FUN_0076ABD0 -- `SaveRawPointer` of a `moho::PathTables` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromPathTablesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0076EBF0 (FUN_0076EBF0 -- `SaveRawPointer` of a `moho::CIntelPosHandle` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCIntelPosHandleSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00770310 (FUN_00770310 -- `SaveRawPointer` of a `moho::IAiReconDB` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIAiReconDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00771520 (FUN_00771520 -- `SaveRawPointer` of a `moho::IEffectManager` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIEffectManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00883A40 (FUN_00883A40 -- `SaveRawPointer` of a `moho::SSessionSaveData` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromSSessionSaveDataSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00921210 (FUN_00921210 -- `SaveRawPointer` of a `moho::TString` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromTStringSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0054FBA0 (FUN_0054FBA0 -- `SaveRawPointer` of a `moho::CAniSkel` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromCAniSkelSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00551AF0 (FUN_00551AF0 -- `SaveRawPointer` of a `moho::CIntelGrid` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromCIntelGridSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00554C30 (FUN_00554C30 -- `SaveRawPointer` of a `moho::REntityBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromREntityBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0055F390 (FUN_0055F390 -- `SaveRawPointer` of a `moho::Stats_StatItem` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromStats_StatItemSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00584B50 (FUN_00584B50 -- `SaveRawPointer` of a `moho::Sim` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromSimSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00584BB0 (FUN_00584BB0 -- `SaveRawPointer` of a `moho::CTaskStage` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCTaskStageSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0059DF70 (FUN_0059DF70 -- `SaveRawPointer` of a `moho::IFormationInstance` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIFormationInstanceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005CDE40 (FUN_005CDE40 -- `SaveRawPointer` of a `moho::CIntelGrid` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromCIntelGridSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005D1A00 (FUN_005D1A00 -- `SaveRawPointer` of a `moho::CEconRequest` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCEconRequestSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005F2140 (FUN_005F2140 -- `SaveRawPointer` of a `moho::CCommandTask` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCCommandTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00642ED0 (FUN_00642ED0 -- `SaveRawPointer` of a `moho::RScaResource` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromRScaResourceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00675B40 (FUN_00675B40 -- `SaveRawPointer` of a `moho::IEffect` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIEffectSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00682700 (FUN_00682700 -- `SaveRawPointer` of a `moho::CTextureScroller` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCTextureScrollerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4560 (FUN_006B4560 -- `SaveRawPointer` of a `moho::IFormationInstance` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIFormationInstanceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B45D0 (FUN_006B45D0 -- `SaveRawPointer` of a `moho::CEconStorage` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCEconStorageSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00706B30 (FUN_00706B30 -- `SaveRawPointer` of a `moho::CEconomy` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCEconomySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00713080 (FUN_00713080 -- `SaveRawPointer` of a `moho::CArmyStatItem` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCArmyStatItemSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007130C0 (FUN_007130C0 -- `SaveRawPointer` of a `moho::CArmyStatItem` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCArmyStatItemSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0072AED0 (FUN_0072AED0 -- `SaveRawPointer` of a `moho::CSquad` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCSquadSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007689D0 (FUN_007689D0 -- `SaveRawPointer` of a `moho::PathQueue_Impl` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromPathQueue_ImplSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0076A450 (FUN_0076A450 -- `SaveRawPointer` of a `moho::PathQueue_Impl` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromPathQueue_ImplSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0076ADA0 (FUN_0076ADA0 -- `SaveRawPointer` of a `moho::PathQueue_Impl` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromPathQueue_ImplSlotLane3` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0076B490 (FUN_0076B490 -- `SaveRawPointer` of a `moho::PathQueue_Impl` slot as `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromPathQueue_ImplSlotLane4` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007744E0 (FUN_007744E0 -- `SaveRawPointer` of a `moho::CEconRequest` slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCEconRequestSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x008847C0 (FUN_008847C0 -- `SaveRawPointer` of a `moho::LaunchInfoBase` slot as `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromLaunchInfoBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x004E5920 (FUN_004E5920 -- `WriteRawPointer` of a `moho::HSound` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromHSoundSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x004E65F0 (FUN_004E65F0 -- `WriteRawPointer` of a `moho::HSound` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromHSoundValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00511070 (FUN_00511070 -- `WriteRawPointer` of a `moho::RRuleGameRules` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRRuleGameRulesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005118A0 (FUN_005118A0 -- `WriteRawPointer` of a `moho::RRuleGameRules` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRRuleGameRulesValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00525DD0 (FUN_00525DD0 -- `WriteRawPointer` of a `moho::RUnitBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRUnitBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00527590 (FUN_00527590 -- `WriteRawPointer` of a `moho::RUnitBlueprint` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRUnitBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00541AD0 (FUN_00541AD0 -- `WriteRawPointer` of a `moho::IUnit` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIUnitSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00541F10 (FUN_00541F10 -- `WriteRawPointer` of a `moho::IUnit` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIUnitValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0055A260 (FUN_0055A260 -- `WriteRawPointer` of a `moho::RScmResource` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromRScmResourceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0055A300 (FUN_0055A300 -- `WriteRawPointer` of a `moho::CSndParams` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCSndParamsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0055A7B0 (FUN_0055A7B0 -- `WriteRawPointer` of a `moho::RScmResource` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromRScmResourceSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0055AA30 (FUN_0055AA30 -- `WriteRawPointer` of a `moho::CSndParams` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCSndParamsValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0055EF50 (FUN_0055EF50 -- `WriteRawPointer` of a `moho::CAniPose` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromCAniPoseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0055FB70 (FUN_0055FB70 -- `WriteRawPointer` of a `moho::CAniPose` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromCAniPoseSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00584720 (FUN_00584720 -- `WriteRawPointer` of a `moho::SimArmy` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromSimArmySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00584750 (FUN_00584750 -- `WriteRawPointer` of a `moho::CAiPersonality` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPersonalitySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00584E40 (FUN_00584E40 -- `WriteRawPointer` of a `moho::SimArmy` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromSimArmyValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00584F80 (FUN_00584F80 -- `WriteRawPointer` of a `moho::CAiPersonality` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPersonalityValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00599E00 (FUN_00599E00 -- `WriteRawPointer` of a `moho::CUnitCommandQueue` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitCommandQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00599FE0 (FUN_00599FE0 -- `WriteRawPointer` of a `moho::CUnitCommandQueue` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitCommandQueueValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005A2710 (FUN_005A2710 -- `WriteRawPointer` of a `moho::Unit` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromUnitSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005A2A10 (FUN_005A2A10 -- `WriteRawPointer` of a `moho::Unit` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromUnitValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005A9550 (FUN_005A9550 -- `WriteRawPointer` of a `moho::CAiPathNavigator` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathNavigatorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005A99B0 (FUN_005A99B0 -- `WriteRawPointer` of a `moho::CAiPathNavigator` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathNavigatorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005AC5A0 (FUN_005AC5A0 -- `WriteRawPointer` of a `moho::PathQueue` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromPathQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005AC5D0 (FUN_005AC5D0 -- `WriteRawPointer` of a `moho::COGrid` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCOGridSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005ACAB0 (FUN_005ACAB0 -- `WriteRawPointer` of a `moho::PathQueue` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromPathQueueValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005ACBF0 (FUN_005ACBF0 -- `WriteRawPointer` of a `moho::COGrid` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCOGridValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005B1820 (FUN_005B1820 -- `WriteRawPointer` of a `moho::CAiPathFinder` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathFinderSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005B1B60 (FUN_005B1B60 -- `WriteRawPointer` of a `moho::CAiPathFinder` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathFinderValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005C9C40 (FUN_005C9C40 -- `WriteRawPointer` of a `moho::ReconBlip` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromReconBlipSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005CC480 (FUN_005CC480 -- `WriteRawPointer` of a `moho::ReconBlip` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromReconBlipValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005CD950 (FUN_005CD950 -- `WriteRawPointer` of a `moho::CInfluenceMap` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005CE1F0 (FUN_005CE1F0 -- `WriteRawPointer` of a `moho::CInfluenceMap` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCInfluenceMapValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005D0CD0 (FUN_005D0CD0 -- `WriteRawPointer` of a `moho::UnitWeapon` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromUnitWeaponSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005D14F0 (FUN_005D14F0 -- `WriteRawPointer` of a `moho::UnitWeapon` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromUnitWeaponValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005D4E50 (FUN_005D4E50 -- `WriteRawPointer` of a `moho::CAiPathSpline` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathSplineSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005D4E80 (FUN_005D4E80 -- `WriteRawPointer` of a `moho::CUnitMotion` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitMotionSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005D50F0 (FUN_005D50F0 -- `WriteRawPointer` of a `moho::CAiPathSpline` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathSplineValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005D5230 (FUN_005D5230 -- `WriteRawPointer` of a `moho::CUnitMotion` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitMotionValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005DF2A0 (FUN_005DF2A0 -- `WriteRawPointer` of a `moho::CAcquireTargetTask` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAcquireTargetTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005E11C0 (FUN_005E11C0 -- `WriteRawPointer` of a `moho::CAcquireTargetTask` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAcquireTargetTaskValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005E1AC0 (FUN_005E1AC0 -- `WriteRawPointer` of a `moho::CAiAttackerImpl` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAiAttackerImplSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005E22E0 (FUN_005E22E0 -- `WriteRawPointer` of a `moho::CAiAttackerImpl` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAiAttackerImplValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005F5090 (FUN_005F5090 -- `WriteRawPointer` of a `moho::CUnitCommand` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitCommandSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005F5210 (FUN_005F5210 -- `WriteRawPointer` of a `moho::CUnitCommand` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitCommandValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0060D6D0 (FUN_0060D6D0 -- `WriteRawPointer` of a `moho::EAiResult` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEAiResultSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0060DA50 (FUN_0060DA50 -- `WriteRawPointer` of a `moho::EAiResult` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEAiResultValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005DEBD0 (FUN_005DEBD0 -- `WriteRawPointer` of a `moho::UnitWeapon` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromUnitWeaponValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005DEC00 (FUN_005DEC00 -- `WriteRawPointer` of a `moho::CAcquireTargetTask` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAcquireTargetTaskValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005DF200 (FUN_005DF200 -- `WriteRawPointer` of a `moho::Listener_EAiAttackerEvent` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromListener_EAiAttackerEventValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x005EC650 (FUN_005EC650 -- `WriteRawPointer` of a `moho::Listener_EAiTransportEvent` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromListener_EAiTransportEventValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0063CB30 (FUN_0063CB30 -- `WriteRawPointer` of a `moho::IAniManipulator` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAniManipulatorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0063D790 (FUN_0063D790 -- `WriteRawPointer` of a `moho::CAniPose` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAniPoseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0063E640 (FUN_0063E640 -- `WriteRawPointer` of a `moho::CAniPose` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAniPoseValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0063E900 (FUN_0063E900 -- `WriteRawPointer` of a `moho::CAniActor` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0063ED80 (FUN_0063ED80 -- `WriteRawPointer` of a `moho::CAniActor` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAniActorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006605A0 (FUN_006605A0 -- `WriteRawPointer` of a `moho::REmitterBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromREmitterBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006608C0 (FUN_006608C0 -- `WriteRawPointer` of a `moho::REmitterBlueprint` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromREmitterBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00672950 (FUN_00672950 -- `WriteRawPointer` of a `moho::RTrailBlueprint` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRTrailBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00672AD0 (FUN_00672AD0 -- `WriteRawPointer` of a `moho::RTrailBlueprint` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRTrailBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0067F890 (FUN_0067F890 -- `WriteRawPointer` of a `moho::Entity` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEntitySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006810C0 (FUN_006810C0 -- `WriteRawPointer` of a `moho::Entity` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEntityValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00682110 (FUN_00682110 -- `WriteRawPointer` of a `moho::PositionHistory` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromPositionHistorySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00682140 (FUN_00682140 -- `WriteRawPointer` of a `moho::CColPrimitiveBase` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCColPrimitiveBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006821F0 (FUN_006821F0 -- `WriteRawPointer` of a `moho::CIntel` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCIntelSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00682250 (FUN_00682250 -- `WriteRawPointer` of a `moho::SPhysBody` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromSPhysBodySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00682280 (FUN_00682280 -- `WriteRawPointer` of a `moho::Motor` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromMotorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00682B00 (FUN_00682B00 -- `WriteRawPointer` of a `moho::PositionHistory` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromPositionHistoryValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00682C40 (FUN_00682C40 -- `WriteRawPointer` of a `moho::CColPrimitiveBase` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCColPrimitiveBaseValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00682D80 (FUN_00682D80 -- `WriteRawPointer` of a `moho::CIntel` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCIntelValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00683000 (FUN_00683000 -- `WriteRawPointer` of a `moho::SPhysBody` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromSPhysBodyValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00683140 (FUN_00683140 -- `WriteRawPointer` of a `moho::Motor` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromMotorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00688BE0 (FUN_00688BE0 -- `WriteRawPointer` of a `moho::EntitySetBase` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEntitySetBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006896B0 (FUN_006896B0 -- `WriteRawPointer` of a `moho::EntitySetBase` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEntitySetBaseValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B40D0 (FUN_006B40D0 -- `WriteRawPointer` of a `moho::IAiSteering` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiSteeringSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4100 (FUN_006B4100 -- `WriteRawPointer` of a `moho::CUnitMotion` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitMotionSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4130 (FUN_006B4130 -- `WriteRawPointer` of a `moho::CUnitCommandQueue` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitCommandQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B41C0 (FUN_006B41C0 -- `WriteRawPointer` of a `moho::CAniActor` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B41F0 (FUN_006B41F0 -- `WriteRawPointer` of a `moho::IAiAttacker` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiAttackerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4220 (FUN_006B4220 -- `WriteRawPointer` of a `moho::IAiCommandDispatch` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiCommandDispatchSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4250 (FUN_006B4250 -- `WriteRawPointer` of a `moho::IAiNavigator` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiNavigatorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4280 (FUN_006B4280 -- `WriteRawPointer` of a `moho::IAiBuilder` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiBuilderSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B42B0 (FUN_006B42B0 -- `WriteRawPointer` of a `moho::IAiSiloBuild` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiSiloBuildSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B42E0 (FUN_006B42E0 -- `WriteRawPointer` of a `moho::IAiTransport` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiTransportSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4B80 (FUN_006B4B80 -- `WriteRawPointer` of a `moho::IAiSteering` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiSteeringValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4CC0 (FUN_006B4CC0 -- `WriteRawPointer` of a `moho::CUnitMotion` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitMotionValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B4E00 (FUN_006B4E00 -- `WriteRawPointer` of a `moho::CUnitCommandQueue` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitCommandQueueValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B51C0 (FUN_006B51C0 -- `WriteRawPointer` of a `moho::CAniActor` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAniActorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B5300 (FUN_006B5300 -- `WriteRawPointer` of a `moho::IAiAttacker` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiAttackerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B5440 (FUN_006B5440 -- `WriteRawPointer` of a `moho::IAiCommandDispatch` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiCommandDispatchValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B5580 (FUN_006B5580 -- `WriteRawPointer` of a `moho::IAiNavigator` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiNavigatorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B56C0 (FUN_006B56C0 -- `WriteRawPointer` of a `moho::IAiBuilder` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiBuilderValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B5800 (FUN_006B5800 -- `WriteRawPointer` of a `moho::IAiSiloBuild` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiSiloBuildValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006B5940 (FUN_006B5940 -- `WriteRawPointer` of a `moho::IAiTransport` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiTransportValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006DFE60 (FUN_006DFE60 -- `WriteRawPointer` of a `moho::IAiAttacker` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIAiAttackerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006DFED0 (FUN_006DFED0 -- `WriteRawPointer` of a `moho::CFireWeaponTask` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCFireWeaponTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006E0610 (FUN_006E0610 -- `WriteRawPointer` of a `moho::IAiAttacker` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIAiAttackerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006E0750 (FUN_006E0750 -- `WriteRawPointer` of a `moho::CFireWeaponTask` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCFireWeaponTaskValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006E2B00 (FUN_006E2B00 -- `WriteRawPointer` of a `moho::CUnitCommand` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitCommandValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x006EB980 (FUN_006EB980 -- `WriteRawPointer` of a `moho::Listener_ECommandEvent` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromListener_ECommandEventValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00706650 (FUN_00706650 -- `WriteRawPointer` of a `moho::CAiBrain` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiBrainSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00706680 (FUN_00706680 -- `WriteRawPointer` of a `moho::IAiReconDB` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiReconDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007066E0 (FUN_007066E0 -- `WriteRawPointer` of a `moho::CArmyStats` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCArmyStatsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00706710 (FUN_00706710 -- `WriteRawPointer` of a `moho::CInfluenceMap` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00706740 (FUN_00706740 -- `WriteRawPointer` of a `moho::PathQueue` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromPathQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00706F30 (FUN_00706F30 -- `WriteRawPointer` of a `moho::CAiBrain` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiBrainValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00707070 (FUN_00707070 -- `WriteRawPointer` of a `moho::IAiReconDB` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiReconDBValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007072F0 (FUN_007072F0 -- `WriteRawPointer` of a `moho::CArmyStats` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCArmyStatsValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00707430 (FUN_00707430 -- `WriteRawPointer` of a `moho::CInfluenceMap` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCInfluenceMapValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00707570 (FUN_00707570 -- `WriteRawPointer` of a `moho::PathQueue` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromPathQueueValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00712650 (FUN_00712650 -- `WriteRawPointer` of a `moho::CAiBrain` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAiBrainSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00712980 (FUN_00712980 -- `WriteRawPointer` of a `moho::STrigger` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromSTriggerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00714040 (FUN_00714040 -- `WriteRawPointer` of a `moho::CAiBrain` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAiBrainValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007144D0 (FUN_007144D0 -- `WriteRawPointer` of a `moho::STrigger` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromSTriggerSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00750FA0 (FUN_00750FA0 -- `WriteRawPointer` of a `moho::SimArmy` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromSimArmyValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00751870 (FUN_00751870 -- `WriteRawPointer` of a `moho::Shield` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromShieldSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007546B0 (FUN_007546B0 -- `WriteRawPointer` of a `moho::Shield` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromShieldValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00756460 (FUN_00756460 -- `WriteRawPointer` of a `moho::CRandomStream` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCRandomStreamSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00756490 (FUN_00756490 -- `WriteRawPointer` of a `moho::SPhysConstants` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromSPhysConstantsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00756500 (FUN_00756500 -- `WriteRawPointer` of a `moho::IAiFormationDB` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiFormationDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00756530 (FUN_00756530 -- `WriteRawPointer` of a `moho::ISimResources` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromISimResourcesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00756560 (FUN_00756560 -- `WriteRawPointer` of a `moho::CCommandDB` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCCommandDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00756590 (FUN_00756590 -- `WriteRawPointer` of a `moho::CDecalBuffer` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCDecalBufferSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007565C0 (FUN_007565C0 -- `WriteRawPointer` of a `moho::IEffectManager` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIEffectManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007565F0 (FUN_007565F0 -- `WriteRawPointer` of a `moho::ISoundManager` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromISoundManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00756660 (FUN_00756660 -- `WriteRawPointer` of a `moho::EntityDB` slot as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromEntityDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00757650 (FUN_00757650 -- `WriteRawPointer` of a `moho::CRandomStream` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCRandomStreamValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00757790 (FUN_00757790 -- `WriteRawPointer` of a `moho::SPhysConstants` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromSPhysConstantsValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x007578D0 (FUN_007578D0 -- `WriteRawPointer` of a `moho::IAiFormationDB` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiFormationDBValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00757AE0 (FUN_00757AE0 -- `WriteRawPointer` of a `moho::ISimResources` slot as `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromISimResourcesSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00757C20 (FUN_00757C20 -- `WriteRawPointer` of a `moho::CCommandDB` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCCommandDBValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00757D60 (FUN_00757D60 -- `WriteRawPointer` of a `moho::CDecalBuffer` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCDecalBufferValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00757EA0 (FUN_00757EA0 -- `WriteRawPointer` of a `moho::IEffectManager` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIEffectManagerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00757FE0 (FUN_00757FE0 -- `WriteRawPointer` of a `moho::ISoundManager` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromISoundManagerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00758120 (FUN_00758120 -- `WriteRawPointer` of a `moho::EntityDB` value as `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromEntityDBValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00763D90 (FUN_00763D90 -- `WriteRawPointer` of a `moho::Listener_NavPath` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromListener_NavPathValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00768C10 (FUN_00768C10 -- `WriteRawPointer` of a `moho::IPathTraveler` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIPathTravelerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0076A4E0 (FUN_0076A4E0 -- `WriteRawPointer` of a `moho::PathTables` slot as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromPathTablesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0076A9F0 (FUN_0076A9F0 -- `WriteRawPointer` of a `moho::IPathTraveler` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIPathTravelerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0076B2D0 (FUN_0076B2D0 -- `WriteRawPointer` of a `moho::PathTables` value as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromPathTablesValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x0069FA30 (FUN_0069FA30 -- `WritePointer<moho::ManyToOneListener<moho::EProjectileImpactEvent>>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromManyToOneListener_EProjectileImpactEventValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006757F0 (FUN_006757F0 -- `WritePointer<moho::ManyToOneListener<moho::ECollisionBeamEvent>>` from a value, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006F9070 (FUN_006F9070 -- `WritePointer<moho::Listener<moho::EUnitCommandQueueStatus>>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromListener_EUnitCommandQueueStatusValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00571340 (FUN_00571340 -- `WritePointer<moho::Listener<moho::EFormationdStatus>>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromListener_EFormationdStatusValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006340C0 (FUN_006340C0 -- `WritePointer<moho::RUnitBlueprintWeapon>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRUnitBlueprintWeaponValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00634200 (FUN_00634200 -- `WritePointer<moho::RProjectileBlueprint>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRProjectileBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00633E20 (FUN_00633E20 -- `WritePointer<moho::RProjectileBlueprint>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRProjectileBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005DEAC0 (FUN_005DEAC0 -- `WritePointer<moho::CAiAttackerImpl>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromCAiAttackerImplOwnerFieldLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005E1370 (FUN_005E1370 -- `WritePointer<moho::CAiAttackerImpl>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromCAiAttackerImplOwnerFieldLane3` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00633DF0 (FUN_00633DF0 -- `WritePointer<moho::RUnitBlueprintWeapon>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRUnitBlueprintWeaponSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005E02C0 (FUN_005E02C0 -- `WritePointer<moho::CAiAttackerImpl>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromCAiAttackerImplOwnerFieldLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0059E920 (FUN_0059E920 -- `WritePointer<IFormationInstance>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIFormationInstanceValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0059DD30 (FUN_0059DD30 -- `WritePointer<IFormationInstance>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIFormationInstanceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006EBB00 (FUN_006EBB00 -- `WritePointer<IFormationInstance>` from a value, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromIFormationInstanceValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B4F40 (FUN_006B4F40 -- `WritePointer<IFormationInstance>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromIFormationInstanceValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00554F90 (FUN_00554F90 -- `WritePointer<moho::REntityBlueprint>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromREntityBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B4160 (FUN_006B4160 -- `WritePointer<IFormationInstance>` from a slot, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromIFormationInstanceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0065A930 (FUN_0065A930 -- `WritePointer<CParticleTexture>` from a value, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromCParticleTextureValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005549F0 (FUN_005549F0 -- `WritePointer<moho::REntityBlueprint>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromREntityBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00698A10 (FUN_00698A10 -- `WritePointer<moho::SPhysConstants>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromSPhysConstantsValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00883630 (FUN_00883630 -- `WritePointer<moho::SSessionSaveData>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromSSessionSaveDataSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00682EC0 (FUN_00682EC0 -- `WritePointer<moho::CTextureScroller>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCTextureScrollerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x008845D0 (FUN_008845D0 -- `WritePointer<moho::SSessionSaveData>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromSSessionSaveDataSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0055F750 (FUN_0055F750 -- `WritePointer<moho::RUnitBlueprint>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRUnitBlueprintValueLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00771660 (FUN_00771660 -- `WritePointer<moho::IEffectManager>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIEffectManagerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0063CB60 (FUN_0063CB60 -- `WritePointer<moho::IAniManipulator*>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromIAniManipulator_PNullLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0055A8F0 (FUN_0055A8F0 -- `WritePointer<moho::RMeshBlueprint>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRMeshBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005376D0 (FUN_005376D0 -- `WritePointer<moho::RRuleGameRules>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRRuleGameRulesValueLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x007142C0 (FUN_007142C0 -- `WritePointer<CArmyStatItem>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCArmyStatItemValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0055A290 (FUN_0055A290 -- `WritePointer<moho::RMeshBlueprint>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRMeshBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0055EC40 (FUN_0055EC40 -- `WritePointer<moho::RUnitBlueprint>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRUnitBlueprintSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0076ED40 (FUN_0076ED40 -- `WritePointer<moho::CIntelPosHandle>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCIntelPosHandleValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00536D50 (FUN_00536D50 -- `WritePointer<moho::RRuleGameRules>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRRuleGameRulesSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0076A8B0 (FUN_0076A8B0 -- `WritePointer<moho::IPathTraveler>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIPathTravelerValueLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00698800 (FUN_00698800 -- `WritePointer<moho::SPhysConstants>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromSPhysConstantsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00682220 (FUN_00682220 -- `WritePointer<moho::CTextureScroller>` from a slot, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCTextureScrollerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00884E70 (FUN_00884E70 -- `WritePointer<LaunchInfoBase>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromLaunchInfoBaseSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0055ED00 (FUN_0055ED00 -- `WritePointer<moho::Stats_StatItem>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromStats_StatItemSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B10C0 (FUN_006B10C0 -- `WritePointer<moho::CEconomyEvent*>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconomyEvent_PNullLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0070E060 (FUN_0070E060 -- `WritePointer<moho::CAiBrain>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromCAiBrainOwnerFieldLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0076EB90 (FUN_0076EB90 -- `WritePointer<moho::CIntelPosHandle>` from a slot, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCIntelPosHandleSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00768BE0 (FUN_00768BE0 -- `WritePointer<moho::IPathTraveler>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIPathTravelerSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0076B680 (FUN_0076B680 -- `WritePointer<PathQueue_Impl>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromPathQueue_ImplValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0055F960 (FUN_0055F960 -- `WritePointer<moho::Stats_StatItem>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromStats_StatItemSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00883EA0 (FUN_00883EA0 -- `WritePointer<LaunchInfoBase>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromLaunchInfoBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00712940 (FUN_00712940 -- `WritePointer<CArmyStatItem>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCArmyStatItemSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00712600 (FUN_00712600 -- `WritePointer<moho::CAiBrain>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromCAiBrainOwnerFieldLane3` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005F2280 (FUN_005F2280 -- `WritePointer<CCommandTask>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCCommandTaskValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00774700 (FUN_00774700 -- `WritePointer<moho::CEconRequest>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCEconRequestValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0070E010 (FUN_0070E010 -- `WritePointer<moho::CAiBrain>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromCAiBrainOwnerFieldLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0076B330 (FUN_0076B330 -- `WritePointer<PathQueue_Impl>` from a slot, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromPathQueue_ImplSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005F2100 (FUN_005F2100 -- `WritePointer<CCommandTask>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCCommandTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00774320 (FUN_00774320 -- `WritePointer<moho::CEconRequest>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCEconRequestSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00714180 (FUN_00714180 -- `WritePointer<CArmyStatItem>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCArmyStatItemValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B1090 (FUN_006B1090 -- `WritePointer<moho::CEconomyEvent>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconomyEventValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006E2B30 (FUN_006E2B30 -- `WritePointer<moho::CUnitCommand*>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCUnitCommand_PNullLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0077D770 (FUN_0077D770 -- `WritePointer<moho::CDecalHandle*>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCDecalHandle_PNullLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B5080 (FUN_006B5080 -- `WritePointer<moho::CEconStorage>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconStorageValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00643140 (FUN_00643140 -- `WritePointer<moho::RScaResource>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromRScaResourceSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005D1BE0 (FUN_005D1BE0 -- `WritePointer<moho::CEconRequest>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconRequestValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x007704B0 (FUN_007704B0 -- `WritePointer<moho::IAiReconDB>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIAiReconDBValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00642E00 (FUN_00642E00 -- `WritePointer<moho::RScaResource>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromRScaResourceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x007128D0 (FUN_007128D0 -- `WritePointer<CArmyStatItem>` from a slot, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCArmyStatItemSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0077D740 (FUN_0077D740 -- `WritePointer<moho::CDecalHandle>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCDecalHandleValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x004E64B0 (FUN_004E64B0 -- `WritePointer<moho::CSndParams>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCSndParamsValueLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006BC2F0 (FUN_006BC2F0 -- `WritePointer<moho::CPathPoint>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCPathPointValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006B4190 (FUN_006B4190 -- `WritePointer<moho::CEconStorage>` from a slot, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconStorageSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x004E58F0 (FUN_004E58F0 -- `WritePointer<moho::CSndParams>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCSndParamsSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005D16A0 (FUN_005D16A0 -- `WritePointer<moho::CEconRequest>` from a slot, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconRequestSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006E10F0 (FUN_006E10F0 -- `WritePointer<moho::Sim>` from a slot, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromSimSlotLane1Variant2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006BBDB0 (FUN_006BBDB0 -- `WritePointer<moho::CPathPoint>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCPathPointSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00770290 (FUN_00770290 -- `WritePointer<moho::IAiReconDB>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIAiReconDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005CE400 (FUN_005CE400 -- `WritePointer<CIntelGrid>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromCIntelGridSlotLane4` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006F8CB0 (FUN_006F8CB0 -- `WritePointer<moho::Unit>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromUnitOwnerFieldLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00774D00 (FUN_00774D00 -- `WritePointer<moho::CEconomy>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCEconomyValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005518B0 (FUN_005518B0 -- `WritePointer<CIntelGrid>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromCIntelGridSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005CD980 (FUN_005CD980 -- `WritePointer<CIntelGrid>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromCIntelGridSlotLane3` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00585200 (FUN_00585200 -- `WritePointer<moho::CTaskStage>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCTaskStageValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0090B7E0 (FUN_0090B7E0 -- `WritePointer<LuaPlus::LuaState>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromLuaStateValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00551EA0 (FUN_00551EA0 -- `WritePointer<CIntelGrid>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromCIntelGridSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006762C0 (FUN_006762C0 -- `WritePointer<moho::IEffect>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIEffectValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00584830 (FUN_00584830 -- `WritePointer<moho::CTaskStage>` from a slot, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCTaskStageSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0069E420 (FUN_0069E420 -- `WritePointer<moho::Sim>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromSimOwnerFieldLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006FA5B0 (FUN_006FA5B0 -- `WritePointer<moho::Sim>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromSimOwnerFieldLane4` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00761160 (FUN_00761160 -- `WritePointer<moho::Sim>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromSimOwnerFieldLane6` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00776760 (FUN_00776760 -- `WritePointer<moho::Sim>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromSimOwnerFieldLane8` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00673950 (FUN_00673950 -- `WritePointer<moho::Sim>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromSimOwnerFieldLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006AD2C0 (FUN_006AD2C0 -- `WritePointer<moho::Sim>` from an owner field, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromSimOwnerFieldLane3` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0091EDE0 (FUN_0091EDE0 -- `WritePointer<TString>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromTStringValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00675830 (FUN_00675830 -- `WritePointer<moho::IEffect>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIEffectSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0072B1A0 (FUN_0072B1A0 -- `WritePointer<moho::CSquad>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCSquadValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x007071B0 (FUN_007071B0 -- `WritePointer<moho::CEconomy>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconomyValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00550100 (FUN_00550100 -- `WritePointer<moho::CAniSkel>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromCAniSkelSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00921420 (FUN_00921420 -- `WritePointer<TString>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromTStringSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0054FAC0 (FUN_0054FAC0 -- `WritePointer<moho::CAniSkel>` from a slot, state folded to Shared; no references in the PE; formerly `WriteSharedRawPointerFromCAniSkelSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0066C320 (FUN_0066C320 -- `WritePointer<moho::IEffect*>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromIEffect_PNullLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x009209A0 (FUN_009209A0 -- `WritePointer<UpVal>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromUpValValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x007066B0 (FUN_007066B0 -- `WritePointer<moho::CEconomy>` from a slot, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconomySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0072AE10 (FUN_0072AE10 -- `WritePointer<moho::CSquad>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCSquadSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00706C40 (FUN_00706C40 -- `WritePointer<moho::PathQueue>` from a slot, state folded to Owned; no references in the PE; formerly `SaveOwnedRawPointerFromPathQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0066C2F0 (FUN_0066C2F0 -- `WritePointer<moho::IEffect>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromIEffectValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00920970 (FUN_00920970 -- `WritePointer<Proto>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromProtoValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0091E8D0 (FUN_0091E8D0 -- `WritePointer<Table>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromTableValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x0072ADE0 (FUN_0072ADE0 -- `WritePointer<moho::CSquad>` from a value, state folded to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCSquadValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x005850C0 (FUN_005850C0 -- `WritePointer<moho::Sim>` from a value, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromSimValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00584800 (FUN_00584800 -- `WritePointer<moho::Sim>` from a slot, state folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromSimSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006E1140 (FUN_006E1140 -- `WritePointer<moho::Sim>` from a slot, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromSimSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x006E2A40 (FUN_006E2A40 -- `WritePointer<moho::Sim>` from a slot, state folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromSimSlotLane3` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
-   * Address: 0x00774B80 (FUN_00774B80 -- `WritePointer<moho::CEconomy>` from a slot, state folded to Unowned; no references in the PE; formerly `SerializeUnownedCEconomyPointer` in moho/sim/CEconStorage.cpp, removed 2026-09-30.)
-   * Address: 0x00774BC0 (FUN_00774BC0 -- the same, archive on the stack; no references in the PE; formerly `SerializeUnownedCEconomyPointerBinary` in moho/sim/CEconStorage.cpp, removed 2026-09-30.)
+   * Address: 0x004E5B00 (FUN_004E5B00 -- `SaveRawPointer` of a `moho::CSndParams` slot as `Unowned`; zero callers,
+   * unreachable; formerly `SaveUnownedRawPointerFromCSndParamsSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x004E5B40 (FUN_004E5B40 --
+   * `SaveRawPointer` of a `moho::HSound` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromHSoundSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00511220 (FUN_00511220 -- `SaveRawPointer` of a `moho::RRuleGameRules` slot as `Unowned`;
+   * zero callers, unreachable; formerly `SaveUnownedRawPointerFromRRuleGameRulesSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00526650 (FUN_00526650 --
+   * `SaveRawPointer` of a `moho::RUnitBlueprint` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromRUnitBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00541BC0 (FUN_00541BC0 -- `SaveRawPointer` of a `moho::IUnit` slot as `Unowned`;
+   * zero callers, unreachable; formerly `SaveUnownedRawPointerFromIUnitSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0055A3C0 (FUN_0055A3C0 --
+   * `SaveRawPointer` of a `moho::RScmResource` slot as `Shared`; zero callers, unreachable; formerly
+   * `SaveSharedRawPointerFromRScmResourceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x0055A4A0 (FUN_0055A4A0 -- `SaveRawPointer` of a `moho::CSndParams` slot as `Unowned`; zero
+   * callers, unreachable; formerly `SaveUnownedRawPointerFromCSndParamsSlotLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0055F4F0 (FUN_0055F4F0 --
+   * `SaveRawPointer` of a `moho::CAniPose` slot as `Shared`; zero callers, unreachable; formerly
+   * `SaveSharedRawPointerFromCAniPoseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x005849F0 (FUN_005849F0 -- `SaveRawPointer` of a `moho::SimArmy` slot as `Unowned`; zero
+   * callers, unreachable; formerly `SaveUnownedRawPointerFromSimArmySlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00584A50 (FUN_00584A50 --
+   * `SaveRawPointer` of a `moho::CAiPersonality` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCAiPersonalitySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00599EA0 (FUN_00599EA0 -- `SaveRawPointer` of a `moho::CUnitCommandQueue` slot as
+   * `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCUnitCommandQueueSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005A27D0 (FUN_005A27D0 --
+   * `SaveRawPointer` of a `moho::Unit` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromUnitSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x005A9750 (FUN_005A9750 -- `SaveRawPointer` of a `moho::CAiPathNavigator` slot as `Owned`;
+   * zero callers, unreachable; formerly `SaveOwnedRawPointerFromCAiPathNavigatorSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005AC770 (FUN_005AC770 --
+   * `SaveRawPointer` of a `moho::PathQueue` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromPathQueueSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x005AC7B0 (FUN_005AC7B0 -- `SaveRawPointer` of a `moho::COGrid` slot as `Unowned`; zero
+   * callers, unreachable; formerly `SaveUnownedRawPointerFromCOGridSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005B1930 (FUN_005B1930 --
+   * `SaveRawPointer` of a `moho::CAiPathFinder` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCAiPathFinderSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x005CA720 (FUN_005CA720 -- `SaveRawPointer` of a `moho::ReconBlip` slot as `Unowned`; zero
+   * callers, unreachable; formerly `SaveUnownedRawPointerFromReconBlipSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005CDE00 (FUN_005CDE00 --
+   * `SaveRawPointer` of a `moho::CInfluenceMap` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x005D1050 (FUN_005D1050 -- `SaveRawPointer` of a `moho::UnitWeapon` slot as
+   * `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromUnitWeaponSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005D4F10 (FUN_005D4F10 --
+   * `SaveRawPointer` of a `moho::CAiPathSpline` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCAiPathSplineSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x005D4F50 (FUN_005D4F50 -- `SaveRawPointer` of a `moho::CUnitMotion` slot as `Unowned`; zero
+   * callers, unreachable; formerly `SaveUnownedRawPointerFromCUnitMotionSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005DFB60 (FUN_005DFB60 --
+   * `SaveRawPointer` of a `moho::CAcquireTargetTask` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromCAcquireTargetTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x005E1F00 (FUN_005E1F00 -- `SaveRawPointer` of a `moho::CAiAttackerImpl` slot as
+   * `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCAiAttackerImplSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005F50D0 (FUN_005F50D0 --
+   * `SaveRawPointer` of a `moho::CUnitCommand` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromCUnitCommandSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x0060D770 (FUN_0060D770 -- `SaveRawPointer` of a `moho::EAiResult` slot as
+   * `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromEAiResultSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005332D0 (FUN_005332D0 --
+   * `SaveRawPointer` of a `moho::RRuleGameRules` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromRRuleGameRulesSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00537220 (FUN_00537220 -- `SaveRawPointer` of a `moho::RRuleGameRules` slot as
+   * `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRRuleGameRulesSlotLane3` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0055A400 (FUN_0055A400 --
+   * `SaveRawPointer` of a `moho::RMeshBlueprint` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromRMeshBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x0055F290 (FUN_0055F290 -- `SaveRawPointer` of a `moho::RUnitBlueprint` slot as
+   * `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRUnitBlueprintSlotLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00633F20 (FUN_00633F20 --
+   * `SaveRawPointer` of a `moho::RUnitBlueprintWeapon` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromRUnitBlueprintWeaponSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE
+   * ONE), removed 2026-09-10.) Address: 0x00633F60 (FUN_00633F60 -- `SaveRawPointer` of a `moho::RProjectileBlueprint`
+   * slot as `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRProjectileBlueprintSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0063DAD0 (FUN_0063DAD0 --
+   * `SaveRawPointer` of a `moho::CAniPose` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromCAniPoseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x0063EA00 (FUN_0063EA00 -- `SaveRawPointer` of a `moho::CAniActor` slot as `Unowned`; zero
+   * callers, unreachable; formerly `SaveUnownedRawPointerFromCAniActorSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006606E0 (FUN_006606E0 --
+   * `SaveRawPointer` of a `moho::REmitterBlueprint` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromREmitterBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00672990 (FUN_00672990 -- `SaveRawPointer` of a `moho::RTrailBlueprint` slot as
+   * `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromRTrailBlueprintSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00682520 (FUN_00682520 --
+   * `SaveRawPointer` of a `moho::PositionHistory` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromPositionHistorySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00682570 (FUN_00682570 -- `SaveRawPointer` of a `moho::CColPrimitiveBase` slot as
+   * `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromCColPrimitiveBaseSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006826A0 (FUN_006826A0 --
+   * `SaveRawPointer` of a `moho::CIntel` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCIntelSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00682750 (FUN_00682750 -- `SaveRawPointer` of a `moho::SPhysBody` slot as `Owned`; zero
+   * callers, unreachable; formerly `SaveOwnedRawPointerFromSPhysBodySlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006827B0 (FUN_006827B0 --
+   * `SaveRawPointer` of a `moho::Motor` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromMotorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00689160 (FUN_00689160 -- `SaveRawPointer` of a `moho::EntitySetBase` slot as `Unowned`;
+   * zero callers, unreachable; formerly `SaveUnownedRawPointerFromEntitySetBaseSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006988B0 (FUN_006988B0 --
+   * `SaveRawPointer` of a `moho::SPhysConstants` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromSPhysConstantsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x006B4450 (FUN_006B4450 -- `SaveRawPointer` of a `moho::IAiSteering` slot as
+   * `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiSteeringSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B44B0 (FUN_006B44B0 --
+   * `SaveRawPointer` of a `moho::CUnitMotion` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCUnitMotionSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006B4510 (FUN_006B4510 -- `SaveRawPointer` of a `moho::CUnitCommandQueue` slot as `Owned`;
+   * zero callers, unreachable; formerly `SaveOwnedRawPointerFromCUnitCommandQueueSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B4630 (FUN_006B4630 --
+   * `SaveRawPointer` of a `moho::CAniActor` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006B4680 (FUN_006B4680 -- `SaveRawPointer` of a `moho::IAiAttacker` slot as `Owned`; zero
+   * callers, unreachable; formerly `SaveOwnedRawPointerFromIAiAttackerSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B46D0 (FUN_006B46D0 --
+   * `SaveRawPointer` of a `moho::IAiCommandDispatch` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromIAiCommandDispatchSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x006B4720 (FUN_006B4720 -- `SaveRawPointer` of a `moho::IAiNavigator` slot as
+   * `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiNavigatorSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B4770 (FUN_006B4770 --
+   * `SaveRawPointer` of a `moho::IAiBuilder` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromIAiBuilderSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006B47C0 (FUN_006B47C0 -- `SaveRawPointer` of a `moho::IAiSiloBuild` slot as `Owned`; zero
+   * callers, unreachable; formerly `SaveOwnedRawPointerFromIAiSiloBuildSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B4810 (FUN_006B4810 --
+   * `SaveRawPointer` of a `moho::IAiTransport` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromIAiTransportSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006BBF70 (FUN_006BBF70 -- `SaveRawPointer` of a `moho::CPathPoint` slot as `Unowned`; zero
+   * callers, unreachable; formerly `SaveUnownedRawPointerFromCPathPointSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006E0210 (FUN_006E0210 --
+   * `SaveRawPointer` of a `moho::IAiAttacker` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromIAiAttackerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006E02C0 (FUN_006E02C0 -- `SaveRawPointer` of a `moho::CFireWeaponTask` slot as `Owned`;
+   * zero callers, unreachable; formerly `SaveOwnedRawPointerFromCFireWeaponTaskSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00706A80 (FUN_00706A80 --
+   * `SaveRawPointer` of a `moho::CAiBrain` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCAiBrainSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00706AD0 (FUN_00706AD0 -- `SaveRawPointer` of a `moho::IAiReconDB` slot as `Owned`; zero
+   * callers, unreachable; formerly `SaveOwnedRawPointerFromIAiReconDBSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00706B90 (FUN_00706B90 --
+   * `SaveRawPointer` of a `moho::CArmyStats` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCArmyStatsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00706BF0 (FUN_00706BF0 -- `SaveRawPointer` of a `moho::CInfluenceMap` slot as `Owned`; zero
+   * callers, unreachable; formerly `SaveOwnedRawPointerFromCInfluenceMapSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00712FD0 (FUN_00712FD0 --
+   * `SaveRawPointer` of a `moho::CAiBrain` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromCAiBrainSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00713100 (FUN_00713100 -- `SaveRawPointer` of a `moho::STrigger` slot as `Shared`; zero
+   * callers, unreachable; formerly `SaveSharedRawPointerFromSTriggerSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x007523F0 (FUN_007523F0 --
+   * `SaveRawPointer` of a `moho::Shield` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromShieldSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00756E20 (FUN_00756E20 -- `SaveRawPointer` of a `moho::CRandomStream` slot as `Owned`; zero
+   * callers, unreachable; formerly `SaveOwnedRawPointerFromCRandomStreamSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00756E70 (FUN_00756E70 --
+   * `SaveRawPointer` of a `moho::SPhysConstants` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromSPhysConstantsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00756F20 (FUN_00756F20 -- `SaveRawPointer` of a `moho::IAiFormationDB` slot as
+   * `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIAiFormationDBSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00756F60 (FUN_00756F60 --
+   * `SaveRawPointer` of a `moho::ISimResources` slot as `Shared`; zero callers, unreachable; formerly
+   * `SaveSharedRawPointerFromISimResourcesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00756FC0 (FUN_00756FC0 -- `SaveRawPointer` of a `moho::CCommandDB` slot as `Owned`;
+   * zero callers, unreachable; formerly `SaveOwnedRawPointerFromCCommandDBSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00757020 (FUN_00757020 --
+   * `SaveRawPointer` of a `moho::CDecalBuffer` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCDecalBufferSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00757070 (FUN_00757070 -- `SaveRawPointer` of a `moho::IEffectManager` slot as `Owned`;
+   * zero callers, unreachable; formerly `SaveOwnedRawPointerFromIEffectManagerSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x007570D0 (FUN_007570D0 --
+   * `SaveRawPointer` of a `moho::ISoundManager` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromISoundManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00757190 (FUN_00757190 -- `SaveRawPointer` of a `moho::EntityDB` slot as `Owned`; zero
+   * callers, unreachable; formerly `SaveOwnedRawPointerFromEntityDBSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00769220 (FUN_00769220 --
+   * `SaveRawPointer` of a `moho::IPathTraveler` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromIPathTravelerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00769260 (FUN_00769260 -- `SaveRawPointer` of a `moho::IPathTraveler` slot as
+   * `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromIPathTravelerSlotLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0076ABD0 (FUN_0076ABD0 --
+   * `SaveRawPointer` of a `moho::PathTables` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromPathTablesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x0076EBF0 (FUN_0076EBF0 -- `SaveRawPointer` of a `moho::CIntelPosHandle` slot as `Owned`;
+   * zero callers, unreachable; formerly `SaveOwnedRawPointerFromCIntelPosHandleSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00770310 (FUN_00770310 --
+   * `SaveRawPointer` of a `moho::IAiReconDB` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromIAiReconDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00771520 (FUN_00771520 -- `SaveRawPointer` of a `moho::IEffectManager` slot as `Unowned`;
+   * zero callers, unreachable; formerly `SaveUnownedRawPointerFromIEffectManagerSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00883A40 (FUN_00883A40 --
+   * `SaveRawPointer` of a `moho::SSessionSaveData` slot as `Shared`; zero callers, unreachable; formerly
+   * `SaveSharedRawPointerFromSSessionSaveDataSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00921210 (FUN_00921210 -- `SaveRawPointer` of a `moho::TString` slot as `Unowned`;
+   * zero callers, unreachable; formerly `SaveUnownedRawPointerFromTStringSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0054FBA0 (FUN_0054FBA0 --
+   * `SaveRawPointer` of a `moho::CAniSkel` slot as `Shared`; zero callers, unreachable; formerly
+   * `SaveSharedRawPointerFromCAniSkelSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00551AF0 (FUN_00551AF0 -- `SaveRawPointer` of a `moho::CIntelGrid` slot as `Shared`; zero
+   * callers, unreachable; formerly `SaveSharedRawPointerFromCIntelGridSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00554C30 (FUN_00554C30 --
+   * `SaveRawPointer` of a `moho::REntityBlueprint` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromREntityBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x0055F390 (FUN_0055F390 -- `SaveRawPointer` of a `moho::Stats_StatItem` slot as
+   * `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromStats_StatItemSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00584B50 (FUN_00584B50 --
+   * `SaveRawPointer` of a `moho::Sim` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromSimSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00584BB0 (FUN_00584BB0 -- `SaveRawPointer` of a `moho::CTaskStage` slot as `Owned`; zero
+   * callers, unreachable; formerly `SaveOwnedRawPointerFromCTaskStageSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0059DF70 (FUN_0059DF70 --
+   * `SaveRawPointer` of a `moho::IFormationInstance` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromIFormationInstanceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x005CDE40 (FUN_005CDE40 -- `SaveRawPointer` of a `moho::CIntelGrid` slot as
+   * `Shared`; zero callers, unreachable; formerly `SaveSharedRawPointerFromCIntelGridSlotLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005D1A00 (FUN_005D1A00 --
+   * `SaveRawPointer` of a `moho::CEconRequest` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCEconRequestSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x005F2140 (FUN_005F2140 -- `SaveRawPointer` of a `moho::CCommandTask` slot as `Unowned`;
+   * zero callers, unreachable; formerly `SaveUnownedRawPointerFromCCommandTaskSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00642ED0 (FUN_00642ED0 --
+   * `SaveRawPointer` of a `moho::RScaResource` slot as `Shared`; zero callers, unreachable; formerly
+   * `SaveSharedRawPointerFromRScaResourceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00675B40 (FUN_00675B40 -- `SaveRawPointer` of a `moho::IEffect` slot as `Unowned`; zero
+   * callers, unreachable; formerly `SaveUnownedRawPointerFromIEffectSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00682700 (FUN_00682700 --
+   * `SaveRawPointer` of a `moho::CTextureScroller` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCTextureScrollerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x006B4560 (FUN_006B4560 -- `SaveRawPointer` of a `moho::IFormationInstance` slot as
+   * `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromIFormationInstanceSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B45D0 (FUN_006B45D0 --
+   * `SaveRawPointer` of a `moho::CEconStorage` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCEconStorageSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00706B30 (FUN_00706B30 -- `SaveRawPointer` of a `moho::CEconomy` slot as `Owned`; zero
+   * callers, unreachable; formerly `SaveOwnedRawPointerFromCEconomySlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00713080 (FUN_00713080 --
+   * `SaveRawPointer` of a `moho::CArmyStatItem` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromCArmyStatItemSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x007130C0 (FUN_007130C0 -- `SaveRawPointer` of a `moho::CArmyStatItem` slot as `Unowned`;
+   * zero callers, unreachable; formerly `SaveUnownedRawPointerFromCArmyStatItemSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0072AED0 (FUN_0072AED0 --
+   * `SaveRawPointer` of a `moho::CSquad` slot as `Unowned`; zero callers, unreachable; formerly
+   * `SaveUnownedRawPointerFromCSquadSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x007689D0 (FUN_007689D0 -- `SaveRawPointer` of a `moho::PathQueue_Impl` slot as `Owned`;
+   * zero callers, unreachable; formerly `SaveOwnedRawPointerFromPathQueue_ImplSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0076A450 (FUN_0076A450 --
+   * `SaveRawPointer` of a `moho::PathQueue_Impl` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromPathQueue_ImplSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x0076ADA0 (FUN_0076ADA0 -- `SaveRawPointer` of a `moho::PathQueue_Impl` slot as
+   * `Owned`; zero callers, unreachable; formerly `SaveOwnedRawPointerFromPathQueue_ImplSlotLane3` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0076B490 (FUN_0076B490 --
+   * `SaveRawPointer` of a `moho::PathQueue_Impl` slot as `Owned`; zero callers, unreachable; formerly
+   * `SaveOwnedRawPointerFromPathQueue_ImplSlotLane4` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x007744E0 (FUN_007744E0 -- `SaveRawPointer` of a `moho::CEconRequest` slot as
+   * `Unowned`; zero callers, unreachable; formerly `SaveUnownedRawPointerFromCEconRequestSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x008847C0 (FUN_008847C0 --
+   * `SaveRawPointer` of a `moho::LaunchInfoBase` slot as `Shared`; zero callers, unreachable; formerly
+   * `SaveSharedRawPointerFromLaunchInfoBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x004E5920 (FUN_004E5920 -- `WriteRawPointer` of a `moho::HSound` slot as `Unowned`;
+   * zero callers, unreachable; formerly `WriteUnownedRawPointerFromHSoundSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x004E65F0 (FUN_004E65F0 --
+   * `WriteRawPointer` of a `moho::HSound` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromHSoundValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00511070 (FUN_00511070 -- `WriteRawPointer` of a `moho::RRuleGameRules` slot as `Unowned`;
+   * zero callers, unreachable; formerly `WriteUnownedRawPointerFromRRuleGameRulesSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005118A0 (FUN_005118A0 --
+   * `WriteRawPointer` of a `moho::RRuleGameRules` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromRRuleGameRulesValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00525DD0 (FUN_00525DD0 -- `WriteRawPointer` of a `moho::RUnitBlueprint` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRUnitBlueprintSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00527590 (FUN_00527590 --
+   * `WriteRawPointer` of a `moho::RUnitBlueprint` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromRUnitBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00541AD0 (FUN_00541AD0 -- `WriteRawPointer` of a `moho::IUnit` slot as `Unowned`;
+   * zero callers, unreachable; formerly `WriteUnownedRawPointerFromIUnitSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00541F10 (FUN_00541F10 --
+   * `WriteRawPointer` of a `moho::IUnit` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromIUnitValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x0055A260 (FUN_0055A260 -- `WriteRawPointer` of a `moho::RScmResource` slot as `Shared`;
+   * zero callers, unreachable; formerly `WriteSharedRawPointerFromRScmResourceSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0055A300 (FUN_0055A300 --
+   * `WriteRawPointer` of a `moho::CSndParams` slot as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCSndParamsSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x0055A7B0 (FUN_0055A7B0 -- `WriteRawPointer` of a `moho::RScmResource` slot as `Shared`;
+   * zero callers, unreachable; formerly `WriteSharedRawPointerFromRScmResourceSlotLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0055AA30 (FUN_0055AA30 --
+   * `WriteRawPointer` of a `moho::CSndParams` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCSndParamsValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x0055EF50 (FUN_0055EF50 -- `WriteRawPointer` of a `moho::CAniPose` slot as `Shared`;
+   * zero callers, unreachable; formerly `WriteSharedRawPointerFromCAniPoseSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0055FB70 (FUN_0055FB70 --
+   * `WriteRawPointer` of a `moho::CAniPose` slot as `Shared`; zero callers, unreachable; formerly
+   * `WriteSharedRawPointerFromCAniPoseSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00584720 (FUN_00584720 -- `WriteRawPointer` of a `moho::SimArmy` slot as `Unowned`; zero
+   * callers, unreachable; formerly `WriteUnownedRawPointerFromSimArmySlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00584750 (FUN_00584750 --
+   * `WriteRawPointer` of a `moho::CAiPersonality` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCAiPersonalitySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00584E40 (FUN_00584E40 -- `WriteRawPointer` of a `moho::SimArmy` value as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromSimArmyValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00584F80 (FUN_00584F80 --
+   * `WriteRawPointer` of a `moho::CAiPersonality` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCAiPersonalityValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00599E00 (FUN_00599E00 -- `WriteRawPointer` of a `moho::CUnitCommandQueue` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitCommandQueueSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00599FE0 (FUN_00599FE0 --
+   * `WriteRawPointer` of a `moho::CUnitCommandQueue` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCUnitCommandQueueValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x005A2710 (FUN_005A2710 -- `WriteRawPointer` of a `moho::Unit` slot as `Unowned`;
+   * zero callers, unreachable; formerly `WriteUnownedRawPointerFromUnitSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005A2A10 (FUN_005A2A10 --
+   * `WriteRawPointer` of a `moho::Unit` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromUnitValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x005A9550 (FUN_005A9550 -- `WriteRawPointer` of a `moho::CAiPathNavigator` slot as `Owned`;
+   * zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathNavigatorSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005A99B0 (FUN_005A99B0 --
+   * `WriteRawPointer` of a `moho::CAiPathNavigator` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCAiPathNavigatorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x005AC5A0 (FUN_005AC5A0 -- `WriteRawPointer` of a `moho::PathQueue` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromPathQueueSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005AC5D0 (FUN_005AC5D0 --
+   * `WriteRawPointer` of a `moho::COGrid` slot as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCOGridSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x005ACAB0 (FUN_005ACAB0 -- `WriteRawPointer` of a `moho::PathQueue` value as `Unowned`; zero
+   * callers, unreachable; formerly `WriteUnownedRawPointerFromPathQueueValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005ACBF0 (FUN_005ACBF0 --
+   * `WriteRawPointer` of a `moho::COGrid` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCOGridValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x005B1820 (FUN_005B1820 -- `WriteRawPointer` of a `moho::CAiPathFinder` slot as `Owned`;
+   * zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathFinderSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005B1B60 (FUN_005B1B60 --
+   * `WriteRawPointer` of a `moho::CAiPathFinder` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCAiPathFinderValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x005C9C40 (FUN_005C9C40 -- `WriteRawPointer` of a `moho::ReconBlip` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromReconBlipSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005CC480 (FUN_005CC480 --
+   * `WriteRawPointer` of a `moho::ReconBlip` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromReconBlipValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x005CD950 (FUN_005CD950 -- `WriteRawPointer` of a `moho::CInfluenceMap` slot as `Unowned`;
+   * zero callers, unreachable; formerly `WriteUnownedRawPointerFromCInfluenceMapSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005CE1F0 (FUN_005CE1F0 --
+   * `WriteRawPointer` of a `moho::CInfluenceMap` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCInfluenceMapValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x005D0CD0 (FUN_005D0CD0 -- `WriteRawPointer` of a `moho::UnitWeapon` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromUnitWeaponSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005D14F0 (FUN_005D14F0 --
+   * `WriteRawPointer` of a `moho::UnitWeapon` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromUnitWeaponValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x005D4E50 (FUN_005D4E50 -- `WriteRawPointer` of a `moho::CAiPathSpline` slot as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathSplineSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005D4E80 (FUN_005D4E80 --
+   * `WriteRawPointer` of a `moho::CUnitMotion` slot as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCUnitMotionSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x005D50F0 (FUN_005D50F0 -- `WriteRawPointer` of a `moho::CAiPathSpline` value as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiPathSplineValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005D5230 (FUN_005D5230 --
+   * `WriteRawPointer` of a `moho::CUnitMotion` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCUnitMotionValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x005DF2A0 (FUN_005DF2A0 -- `WriteRawPointer` of a `moho::CAcquireTargetTask` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAcquireTargetTaskSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005E11C0 (FUN_005E11C0 --
+   * `WriteRawPointer` of a `moho::CAcquireTargetTask` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCAcquireTargetTaskValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE
+   * ONE), removed 2026-09-10.) Address: 0x005E1AC0 (FUN_005E1AC0 -- `WriteRawPointer` of a `moho::CAiAttackerImpl` slot
+   * as `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAiAttackerImplSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005E22E0 (FUN_005E22E0 --
+   * `WriteRawPointer` of a `moho::CAiAttackerImpl` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCAiAttackerImplValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x005F5090 (FUN_005F5090 -- `WriteRawPointer` of a `moho::CUnitCommand` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCUnitCommandSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005F5210 (FUN_005F5210 --
+   * `WriteRawPointer` of a `moho::CUnitCommand` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCUnitCommandValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x0060D6D0 (FUN_0060D6D0 -- `WriteRawPointer` of a `moho::EAiResult` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromEAiResultSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0060DA50 (FUN_0060DA50 --
+   * `WriteRawPointer` of a `moho::EAiResult` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromEAiResultValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x005DEBD0 (FUN_005DEBD0 -- `WriteRawPointer` of a `moho::UnitWeapon` value as `Owned`; zero
+   * callers, unreachable; formerly `WriteOwnedRawPointerFromUnitWeaponValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x005DEC00 (FUN_005DEC00 --
+   * `WriteRawPointer` of a `moho::CAcquireTargetTask` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCAcquireTargetTaskValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x005DF200 (FUN_005DF200 -- `WriteRawPointer` of a `moho::Listener_EAiAttackerEvent`
+   * value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromListener_EAiAttackerEventValueLane1` in gpg/core/containers/ArchiveSerialization.cpp
+   * (RULE ONE), removed 2026-09-10.) Address: 0x005EC650 (FUN_005EC650 -- `WriteRawPointer` of a
+   * `moho::Listener_EAiTransportEvent` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromListener_EAiTransportEventValueLane1` in gpg/core/containers/ArchiveSerialization.cpp
+   * (RULE ONE), removed 2026-09-10.) Address: 0x0063CB30 (FUN_0063CB30 -- `WriteRawPointer` of a
+   * `moho::IAniManipulator` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromIAniManipulatorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x0063D790 (FUN_0063D790 -- `WriteRawPointer` of a `moho::CAniPose` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromCAniPoseSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0063E640 (FUN_0063E640 --
+   * `WriteRawPointer` of a `moho::CAniPose` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCAniPoseValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x0063E900 (FUN_0063E900 -- `WriteRawPointer` of a `moho::CAniActor` slot as `Unowned`; zero
+   * callers, unreachable; formerly `WriteUnownedRawPointerFromCAniActorSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0063ED80 (FUN_0063ED80 --
+   * `WriteRawPointer` of a `moho::CAniActor` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromCAniActorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006605A0 (FUN_006605A0 -- `WriteRawPointer` of a `moho::REmitterBlueprint` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromREmitterBlueprintSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006608C0 (FUN_006608C0 --
+   * `WriteRawPointer` of a `moho::REmitterBlueprint` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromREmitterBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00672950 (FUN_00672950 -- `WriteRawPointer` of a `moho::RTrailBlueprint` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromRTrailBlueprintSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00672AD0 (FUN_00672AD0 --
+   * `WriteRawPointer` of a `moho::RTrailBlueprint` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromRTrailBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x0067F890 (FUN_0067F890 -- `WriteRawPointer` of a `moho::Entity` slot as `Unowned`;
+   * zero callers, unreachable; formerly `WriteUnownedRawPointerFromEntitySlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006810C0 (FUN_006810C0 --
+   * `WriteRawPointer` of a `moho::Entity` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromEntityValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00682110 (FUN_00682110 -- `WriteRawPointer` of a `moho::PositionHistory` slot as `Owned`;
+   * zero callers, unreachable; formerly `WriteOwnedRawPointerFromPositionHistorySlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00682140 (FUN_00682140 --
+   * `WriteRawPointer` of a `moho::CColPrimitiveBase` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCColPrimitiveBaseSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x006821F0 (FUN_006821F0 -- `WriteRawPointer` of a `moho::CIntel` slot as `Owned`;
+   * zero callers, unreachable; formerly `WriteOwnedRawPointerFromCIntelSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00682250 (FUN_00682250 --
+   * `WriteRawPointer` of a `moho::SPhysBody` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromSPhysBodySlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00682280 (FUN_00682280 -- `WriteRawPointer` of a `moho::Motor` slot as `Owned`; zero
+   * callers, unreachable; formerly `WriteOwnedRawPointerFromMotorSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00682B00 (FUN_00682B00 --
+   * `WriteRawPointer` of a `moho::PositionHistory` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromPositionHistoryValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00682C40 (FUN_00682C40 -- `WriteRawPointer` of a `moho::CColPrimitiveBase` value as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCColPrimitiveBaseValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00682D80 (FUN_00682D80 --
+   * `WriteRawPointer` of a `moho::CIntel` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCIntelValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00683000 (FUN_00683000 -- `WriteRawPointer` of a `moho::SPhysBody` value as `Owned`; zero
+   * callers, unreachable; formerly `WriteOwnedRawPointerFromSPhysBodyValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00683140 (FUN_00683140 --
+   * `WriteRawPointer` of a `moho::Motor` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromMotorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00688BE0 (FUN_00688BE0 -- `WriteRawPointer` of a `moho::EntitySetBase` slot as `Unowned`;
+   * zero callers, unreachable; formerly `WriteUnownedRawPointerFromEntitySetBaseSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006896B0 (FUN_006896B0 --
+   * `WriteRawPointer` of a `moho::EntitySetBase` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromEntitySetBaseValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x006B40D0 (FUN_006B40D0 -- `WriteRawPointer` of a `moho::IAiSteering` slot as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiSteeringSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B4100 (FUN_006B4100 --
+   * `WriteRawPointer` of a `moho::CUnitMotion` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCUnitMotionSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006B4130 (FUN_006B4130 -- `WriteRawPointer` of a `moho::CUnitCommandQueue` slot as `Owned`;
+   * zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitCommandQueueSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B41C0 (FUN_006B41C0 --
+   * `WriteRawPointer` of a `moho::CAniActor` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCAniActorSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006B41F0 (FUN_006B41F0 -- `WriteRawPointer` of a `moho::IAiAttacker` slot as `Owned`; zero
+   * callers, unreachable; formerly `WriteOwnedRawPointerFromIAiAttackerSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B4220 (FUN_006B4220 --
+   * `WriteRawPointer` of a `moho::IAiCommandDispatch` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromIAiCommandDispatchSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x006B4250 (FUN_006B4250 -- `WriteRawPointer` of a `moho::IAiNavigator` slot as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiNavigatorSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B4280 (FUN_006B4280 --
+   * `WriteRawPointer` of a `moho::IAiBuilder` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromIAiBuilderSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006B42B0 (FUN_006B42B0 -- `WriteRawPointer` of a `moho::IAiSiloBuild` slot as `Owned`; zero
+   * callers, unreachable; formerly `WriteOwnedRawPointerFromIAiSiloBuildSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B42E0 (FUN_006B42E0 --
+   * `WriteRawPointer` of a `moho::IAiTransport` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromIAiTransportSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006B4B80 (FUN_006B4B80 -- `WriteRawPointer` of a `moho::IAiSteering` value as `Owned`; zero
+   * callers, unreachable; formerly `WriteOwnedRawPointerFromIAiSteeringValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B4CC0 (FUN_006B4CC0 --
+   * `WriteRawPointer` of a `moho::CUnitMotion` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCUnitMotionValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006B4E00 (FUN_006B4E00 -- `WriteRawPointer` of a `moho::CUnitCommandQueue` value as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitCommandQueueValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B51C0 (FUN_006B51C0 --
+   * `WriteRawPointer` of a `moho::CAniActor` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCAniActorValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006B5300 (FUN_006B5300 -- `WriteRawPointer` of a `moho::IAiAttacker` value as `Owned`; zero
+   * callers, unreachable; formerly `WriteOwnedRawPointerFromIAiAttackerValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B5440 (FUN_006B5440 --
+   * `WriteRawPointer` of a `moho::IAiCommandDispatch` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromIAiCommandDispatchValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x006B5580 (FUN_006B5580 -- `WriteRawPointer` of a `moho::IAiNavigator` value as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiNavigatorValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B56C0 (FUN_006B56C0 --
+   * `WriteRawPointer` of a `moho::IAiBuilder` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromIAiBuilderValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x006B5800 (FUN_006B5800 -- `WriteRawPointer` of a `moho::IAiSiloBuild` value as `Owned`;
+   * zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiSiloBuildValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006B5940 (FUN_006B5940 --
+   * `WriteRawPointer` of a `moho::IAiTransport` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromIAiTransportValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x006DFE60 (FUN_006DFE60 -- `WriteRawPointer` of a `moho::IAiAttacker` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIAiAttackerSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006DFED0 (FUN_006DFED0 --
+   * `WriteRawPointer` of a `moho::CFireWeaponTask` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCFireWeaponTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x006E0610 (FUN_006E0610 -- `WriteRawPointer` of a `moho::IAiAttacker` value as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIAiAttackerValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006E0750 (FUN_006E0750 --
+   * `WriteRawPointer` of a `moho::CFireWeaponTask` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCFireWeaponTaskValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x006E2B00 (FUN_006E2B00 -- `WriteRawPointer` of a `moho::CUnitCommand` value as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCUnitCommandValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x006EB980 (FUN_006EB980 --
+   * `WriteRawPointer` of a `moho::Listener_ECommandEvent` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromListener_ECommandEventValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE
+   * ONE), removed 2026-09-10.) Address: 0x00706650 (FUN_00706650 -- `WriteRawPointer` of a `moho::CAiBrain` slot as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCAiBrainSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00706680 (FUN_00706680 --
+   * `WriteRawPointer` of a `moho::IAiReconDB` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromIAiReconDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x007066E0 (FUN_007066E0 -- `WriteRawPointer` of a `moho::CArmyStats` slot as `Owned`; zero
+   * callers, unreachable; formerly `WriteOwnedRawPointerFromCArmyStatsSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00706710 (FUN_00706710 --
+   * `WriteRawPointer` of a `moho::CInfluenceMap` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCInfluenceMapSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00706740 (FUN_00706740 -- `WriteRawPointer` of a `moho::PathQueue` slot as `Owned`;
+   * zero callers, unreachable; formerly `WriteOwnedRawPointerFromPathQueueSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00706F30 (FUN_00706F30 --
+   * `WriteRawPointer` of a `moho::CAiBrain` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCAiBrainValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00707070 (FUN_00707070 -- `WriteRawPointer` of a `moho::IAiReconDB` value as `Owned`; zero
+   * callers, unreachable; formerly `WriteOwnedRawPointerFromIAiReconDBValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x007072F0 (FUN_007072F0 --
+   * `WriteRawPointer` of a `moho::CArmyStats` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCArmyStatsValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00707430 (FUN_00707430 -- `WriteRawPointer` of a `moho::CInfluenceMap` value as `Owned`;
+   * zero callers, unreachable; formerly `WriteOwnedRawPointerFromCInfluenceMapValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00707570 (FUN_00707570 --
+   * `WriteRawPointer` of a `moho::PathQueue` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromPathQueueValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00712650 (FUN_00712650 -- `WriteRawPointer` of a `moho::CAiBrain` slot as `Unowned`; zero
+   * callers, unreachable; formerly `WriteUnownedRawPointerFromCAiBrainSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00712980 (FUN_00712980 --
+   * `WriteRawPointer` of a `moho::STrigger` slot as `Shared`; zero callers, unreachable; formerly
+   * `WriteSharedRawPointerFromSTriggerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00714040 (FUN_00714040 -- `WriteRawPointer` of a `moho::CAiBrain` value as `Unowned`; zero
+   * callers, unreachable; formerly `WriteUnownedRawPointerFromCAiBrainValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x007144D0 (FUN_007144D0 --
+   * `WriteRawPointer` of a `moho::STrigger` slot as `Shared`; zero callers, unreachable; formerly
+   * `WriteSharedRawPointerFromSTriggerSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00750FA0 (FUN_00750FA0 -- `WriteRawPointer` of a `moho::SimArmy` value as `Owned`; zero
+   * callers, unreachable; formerly `WriteOwnedRawPointerFromSimArmyValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00751870 (FUN_00751870 --
+   * `WriteRawPointer` of a `moho::Shield` slot as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromShieldSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x007546B0 (FUN_007546B0 -- `WriteRawPointer` of a `moho::Shield` value as `Unowned`; zero
+   * callers, unreachable; formerly `WriteUnownedRawPointerFromShieldValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00756460 (FUN_00756460 --
+   * `WriteRawPointer` of a `moho::CRandomStream` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCRandomStreamSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00756490 (FUN_00756490 -- `WriteRawPointer` of a `moho::SPhysConstants` slot as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromSPhysConstantsSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00756500 (FUN_00756500 --
+   * `WriteRawPointer` of a `moho::IAiFormationDB` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromIAiFormationDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00756530 (FUN_00756530 -- `WriteRawPointer` of a `moho::ISimResources` slot as
+   * `Shared`; zero callers, unreachable; formerly `WriteSharedRawPointerFromISimResourcesSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00756560 (FUN_00756560 --
+   * `WriteRawPointer` of a `moho::CCommandDB` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCCommandDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00756590 (FUN_00756590 -- `WriteRawPointer` of a `moho::CDecalBuffer` slot as `Owned`; zero
+   * callers, unreachable; formerly `WriteOwnedRawPointerFromCDecalBufferSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x007565C0 (FUN_007565C0 --
+   * `WriteRawPointer` of a `moho::IEffectManager` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromIEffectManagerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x007565F0 (FUN_007565F0 -- `WriteRawPointer` of a `moho::ISoundManager` slot as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromISoundManagerSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00756660 (FUN_00756660 --
+   * `WriteRawPointer` of a `moho::EntityDB` slot as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromEntityDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00757650 (FUN_00757650 -- `WriteRawPointer` of a `moho::CRandomStream` value as `Owned`;
+   * zero callers, unreachable; formerly `WriteOwnedRawPointerFromCRandomStreamValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00757790 (FUN_00757790 --
+   * `WriteRawPointer` of a `moho::SPhysConstants` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromSPhysConstantsValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x007578D0 (FUN_007578D0 -- `WriteRawPointer` of a `moho::IAiFormationDB` value as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIAiFormationDBValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00757AE0 (FUN_00757AE0 --
+   * `WriteRawPointer` of a `moho::ISimResources` slot as `Shared`; zero callers, unreachable; formerly
+   * `WriteSharedRawPointerFromISimResourcesSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00757C20 (FUN_00757C20 -- `WriteRawPointer` of a `moho::CCommandDB` value as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromCCommandDBValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00757D60 (FUN_00757D60 --
+   * `WriteRawPointer` of a `moho::CDecalBuffer` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromCDecalBufferValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00757EA0 (FUN_00757EA0 -- `WriteRawPointer` of a `moho::IEffectManager` value as
+   * `Owned`; zero callers, unreachable; formerly `WriteOwnedRawPointerFromIEffectManagerValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00757FE0 (FUN_00757FE0 --
+   * `WriteRawPointer` of a `moho::ISoundManager` value as `Owned`; zero callers, unreachable; formerly
+   * `WriteOwnedRawPointerFromISoundManagerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00758120 (FUN_00758120 -- `WriteRawPointer` of a `moho::EntityDB` value as `Owned`;
+   * zero callers, unreachable; formerly `WriteOwnedRawPointerFromEntityDBValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x00763D90 (FUN_00763D90 --
+   * `WriteRawPointer` of a `moho::Listener_NavPath` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromListener_NavPathValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x00768C10 (FUN_00768C10 -- `WriteRawPointer` of a `moho::IPathTraveler` slot as
+   * `Unowned`; zero callers, unreachable; formerly `WriteUnownedRawPointerFromIPathTravelerSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0076A4E0 (FUN_0076A4E0 --
+   * `WriteRawPointer` of a `moho::PathTables` slot as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromPathTablesSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x0076A9F0 (FUN_0076A9F0 -- `WriteRawPointer` of a `moho::IPathTraveler` value as `Unowned`;
+   * zero callers, unreachable; formerly `WriteUnownedRawPointerFromIPathTravelerValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.) Address: 0x0076B2D0 (FUN_0076B2D0 --
+   * `WriteRawPointer` of a `moho::PathTables` value as `Unowned`; zero callers, unreachable; formerly
+   * `WriteUnownedRawPointerFromPathTablesValueLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x0069FA30 (FUN_0069FA30 --
+   * `WritePointer<moho::ManyToOneListener<moho::EProjectileImpactEvent>>` from a value, state folded to Unowned; no
+   * references in the PE; formerly `WriteUnownedRawPointerFromManyToOneListener_EProjectileImpactEventValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006757F0 (FUN_006757F0 --
+   * `WritePointer<moho::ManyToOneListener<moho::ECollisionBeamEvent>>` from a value, state folded to Unowned; no
+   * references in the PE; formerly `SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006F9070 (FUN_006F9070 --
+   * `WritePointer<moho::Listener<moho::EUnitCommandQueueStatus>>` from a value, state folded to Unowned; no references
+   * in the PE; formerly `WriteUnownedRawPointerFromListener_EUnitCommandQueueStatusValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00571340 (FUN_00571340 --
+   * `WritePointer<moho::Listener<moho::EFormationdStatus>>` from a value, state folded to Unowned; no references in the
+   * PE; formerly `WriteUnownedRawPointerFromListener_EFormationdStatusValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006340C0 (FUN_006340C0 --
+   * `WritePointer<moho::RUnitBlueprintWeapon>` from a value, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromRUnitBlueprintWeaponValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00634200 (FUN_00634200 -- `WritePointer<moho::RProjectileBlueprint>` from a value, state
+   * folded to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRProjectileBlueprintValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00633E20 (FUN_00633E20 --
+   * `WritePointer<moho::RProjectileBlueprint>` from a slot, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromRProjectileBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x005DEAC0 (FUN_005DEAC0 -- `WritePointer<moho::CAiAttackerImpl>` from an owner field, state
+   * folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromCAiAttackerImplOwnerFieldLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x005E1370 (FUN_005E1370 --
+   * `WritePointer<moho::CAiAttackerImpl>` from an owner field, state folded to Unowned; no references in the PE;
+   * formerly `SaveUnownedRawPointerFromCAiAttackerImplOwnerFieldLane3` in gpg/core/containers/ArchiveSerialization.cpp,
+   * removed 2026-09-30.) Address: 0x00633DF0 (FUN_00633DF0 -- `WritePointer<moho::RUnitBlueprintWeapon>` from a slot,
+   * state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromRUnitBlueprintWeaponSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x005E02C0 (FUN_005E02C0 -- `WritePointer<moho::CAiAttackerImpl>` from an owner field, state
+   * folded to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromCAiAttackerImplOwnerFieldLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0059E920 (FUN_0059E920 --
+   * `WritePointer<IFormationInstance>` from a value, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromIFormationInstanceValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x0059DD30 (FUN_0059DD30 -- `WritePointer<IFormationInstance>` from a slot, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIFormationInstanceSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006EBB00 (FUN_006EBB00 --
+   * `WritePointer<IFormationInstance>` from a value, state folded to Shared; no references in the PE; formerly
+   * `WriteSharedRawPointerFromIFormationInstanceValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006B4F40 (FUN_006B4F40 -- `WritePointer<IFormationInstance>` from a value, state folded to
+   * Owned; no references in the PE; formerly `WriteOwnedRawPointerFromIFormationInstanceValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00554F90 (FUN_00554F90 --
+   * `WritePointer<moho::REntityBlueprint>` from a value, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromREntityBlueprintValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006B4160 (FUN_006B4160 -- `WritePointer<IFormationInstance>` from a slot, state folded to
+   * Owned; no references in the PE; formerly `WriteOwnedRawPointerFromIFormationInstanceSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0065A930 (FUN_0065A930 --
+   * `WritePointer<CParticleTexture>` from a value, state folded to Shared; no references in the PE; formerly
+   * `WriteSharedRawPointerFromCParticleTextureValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x005549F0 (FUN_005549F0 -- `WritePointer<moho::REntityBlueprint>` from a slot, state folded
+   * to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromREntityBlueprintSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00698A10 (FUN_00698A10 --
+   * `WritePointer<moho::SPhysConstants>` from a value, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromSPhysConstantsValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00883630 (FUN_00883630 -- `WritePointer<moho::SSessionSaveData>` from a slot, state folded
+   * to Shared; no references in the PE; formerly `WriteSharedRawPointerFromSSessionSaveDataSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00682EC0 (FUN_00682EC0 --
+   * `WritePointer<moho::CTextureScroller>` from a value, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromCTextureScrollerValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x008845D0 (FUN_008845D0 -- `WritePointer<moho::SSessionSaveData>` from a slot, state folded
+   * to Shared; no references in the PE; formerly `WriteSharedRawPointerFromSSessionSaveDataSlotLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0055F750 (FUN_0055F750 --
+   * `WritePointer<moho::RUnitBlueprint>` from a value, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromRUnitBlueprintValueLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00771660 (FUN_00771660 -- `WritePointer<moho::IEffectManager>` from a value, state folded
+   * to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIEffectManagerValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0063CB60 (FUN_0063CB60 --
+   * `WritePointer<moho::IAniManipulator*>` from a value, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromIAniManipulator_PNullLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x0055A8F0 (FUN_0055A8F0 -- `WritePointer<moho::RMeshBlueprint>` from a value, state folded
+   * to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRMeshBlueprintValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x005376D0 (FUN_005376D0 --
+   * `WritePointer<moho::RRuleGameRules>` from a value, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromRRuleGameRulesValueLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x007142C0 (FUN_007142C0 -- `WritePointer<CArmyStatItem>` from a value, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCArmyStatItemValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0055A290 (FUN_0055A290 --
+   * `WritePointer<moho::RMeshBlueprint>` from a slot, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromRMeshBlueprintSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x0055EC40 (FUN_0055EC40 -- `WritePointer<moho::RUnitBlueprint>` from a slot, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRUnitBlueprintSlotLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0076ED40 (FUN_0076ED40 --
+   * `WritePointer<moho::CIntelPosHandle>` from a value, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromCIntelPosHandleValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00536D50 (FUN_00536D50 -- `WritePointer<moho::RRuleGameRules>` from a slot, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromRRuleGameRulesSlotLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0076A8B0 (FUN_0076A8B0 --
+   * `WritePointer<moho::IPathTraveler>` from a value, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromIPathTravelerValueLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00698800 (FUN_00698800 -- `WritePointer<moho::SPhysConstants>` from a slot, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromSPhysConstantsSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00682220 (FUN_00682220 --
+   * `WritePointer<moho::CTextureScroller>` from a slot, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromCTextureScrollerSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00884E70 (FUN_00884E70 -- `WritePointer<LaunchInfoBase>` from a slot, state folded to
+   * Shared; no references in the PE; formerly `WriteSharedRawPointerFromLaunchInfoBaseSlotLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0055ED00 (FUN_0055ED00 --
+   * `WritePointer<moho::Stats_StatItem>` from a slot, state folded to Shared; no references in the PE; formerly
+   * `WriteSharedRawPointerFromStats_StatItemSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006B10C0 (FUN_006B10C0 -- `WritePointer<moho::CEconomyEvent*>` from a value, state folded
+   * to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconomyEvent_PNullLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0070E060 (FUN_0070E060 --
+   * `WritePointer<moho::CAiBrain>` from an owner field, state folded to Unowned; no references in the PE; formerly
+   * `SaveUnownedRawPointerFromCAiBrainOwnerFieldLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x0076EB90 (FUN_0076EB90 -- `WritePointer<moho::CIntelPosHandle>` from a slot, state folded
+   * to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCIntelPosHandleSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00768BE0 (FUN_00768BE0 --
+   * `WritePointer<moho::IPathTraveler>` from a slot, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromIPathTravelerSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x0076B680 (FUN_0076B680 -- `WritePointer<PathQueue_Impl>` from a value, state folded to
+   * Owned; no references in the PE; formerly `WriteOwnedRawPointerFromPathQueue_ImplValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0055F960 (FUN_0055F960 --
+   * `WritePointer<moho::Stats_StatItem>` from a slot, state folded to Shared; no references in the PE; formerly
+   * `WriteSharedRawPointerFromStats_StatItemSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00883EA0 (FUN_00883EA0 -- `WritePointer<LaunchInfoBase>` from a slot, state folded to
+   * Shared; no references in the PE; formerly `WriteSharedRawPointerFromLaunchInfoBaseSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00712940 (FUN_00712940 --
+   * `WritePointer<CArmyStatItem>` from a slot, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromCArmyStatItemSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00712600 (FUN_00712600 -- `WritePointer<moho::CAiBrain>` from an owner field, state folded
+   * to Unowned; no references in the PE; formerly `SaveUnownedRawPointerFromCAiBrainOwnerFieldLane3` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x005F2280 (FUN_005F2280 --
+   * `WritePointer<CCommandTask>` from a value, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromCCommandTaskValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00774700 (FUN_00774700 -- `WritePointer<moho::CEconRequest>` from a value, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCEconRequestValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0070E010 (FUN_0070E010 --
+   * `WritePointer<moho::CAiBrain>` from an owner field, state folded to Unowned; no references in the PE; formerly
+   * `SaveUnownedRawPointerFromCAiBrainOwnerFieldLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x0076B330 (FUN_0076B330 -- `WritePointer<PathQueue_Impl>` from a slot, state folded to
+   * Owned; no references in the PE; formerly `WriteOwnedRawPointerFromPathQueue_ImplSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x005F2100 (FUN_005F2100 --
+   * `WritePointer<CCommandTask>` from a slot, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromCCommandTaskSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00774320 (FUN_00774320 -- `WritePointer<moho::CEconRequest>` from a slot, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCEconRequestSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00714180 (FUN_00714180 --
+   * `WritePointer<CArmyStatItem>` from a value, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromCArmyStatItemValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006B1090 (FUN_006B1090 -- `WritePointer<moho::CEconomyEvent>` from a value, state folded to
+   * Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconomyEventValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006E2B30 (FUN_006E2B30 --
+   * `WritePointer<moho::CUnitCommand*>` from a value, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromCUnitCommand_PNullLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x0077D770 (FUN_0077D770 -- `WritePointer<moho::CDecalHandle*>` from a value, state folded to
+   * Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCDecalHandle_PNullLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006B5080 (FUN_006B5080 --
+   * `WritePointer<moho::CEconStorage>` from a value, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromCEconStorageValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00643140 (FUN_00643140 -- `WritePointer<moho::RScaResource>` from a slot, state folded to
+   * Shared; no references in the PE; formerly `WriteSharedRawPointerFromRScaResourceSlotLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x005D1BE0 (FUN_005D1BE0 --
+   * `WritePointer<moho::CEconRequest>` from a value, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromCEconRequestValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x007704B0 (FUN_007704B0 -- `WritePointer<moho::IAiReconDB>` from a value, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIAiReconDBValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00642E00 (FUN_00642E00 --
+   * `WritePointer<moho::RScaResource>` from a slot, state folded to Shared; no references in the PE; formerly
+   * `WriteSharedRawPointerFromRScaResourceSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x007128D0 (FUN_007128D0 -- `WritePointer<CArmyStatItem>` from a slot, state folded to Owned;
+   * no references in the PE; formerly `WriteOwnedRawPointerFromCArmyStatItemSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0077D740 (FUN_0077D740 --
+   * `WritePointer<moho::CDecalHandle>` from a value, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromCDecalHandleValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x004E64B0 (FUN_004E64B0 -- `WritePointer<moho::CSndParams>` from a value, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCSndParamsValueLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006BC2F0 (FUN_006BC2F0 --
+   * `WritePointer<moho::CPathPoint>` from a value, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromCPathPointValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006B4190 (FUN_006B4190 -- `WritePointer<moho::CEconStorage>` from a slot, state folded to
+   * Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconStorageSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x004E58F0 (FUN_004E58F0 --
+   * `WritePointer<moho::CSndParams>` from a slot, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromCSndParamsSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x005D16A0 (FUN_005D16A0 -- `WritePointer<moho::CEconRequest>` from a slot, state folded to
+   * Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconRequestSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006E10F0 (FUN_006E10F0 --
+   * `WritePointer<moho::Sim>` from a slot, state folded to Unowned; no references in the PE; formerly
+   * `SaveUnownedRawPointerFromSimSlotLane1Variant2` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006BBDB0 (FUN_006BBDB0 -- `WritePointer<moho::CPathPoint>` from a slot, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCPathPointSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00770290 (FUN_00770290 --
+   * `WritePointer<moho::IAiReconDB>` from a slot, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromIAiReconDBSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x005CE400 (FUN_005CE400 -- `WritePointer<CIntelGrid>` from a slot, state folded to Shared;
+   * no references in the PE; formerly `WriteSharedRawPointerFromCIntelGridSlotLane4` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006F8CB0 (FUN_006F8CB0 --
+   * `WritePointer<moho::Unit>` from an owner field, state folded to Unowned; no references in the PE; formerly
+   * `SaveUnownedRawPointerFromUnitOwnerFieldLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x00774D00 (FUN_00774D00 -- `WritePointer<moho::CEconomy>` from a value, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromCEconomyValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x005518B0 (FUN_005518B0 --
+   * `WritePointer<CIntelGrid>` from a slot, state folded to Shared; no references in the PE; formerly
+   * `WriteSharedRawPointerFromCIntelGridSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x005CD980 (FUN_005CD980 -- `WritePointer<CIntelGrid>` from a slot, state folded to Shared;
+   * no references in the PE; formerly `WriteSharedRawPointerFromCIntelGridSlotLane3` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00585200 (FUN_00585200 --
+   * `WritePointer<moho::CTaskStage>` from a value, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromCTaskStageValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x0090B7E0 (FUN_0090B7E0 -- `WritePointer<LuaPlus::LuaState>` from a value, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromLuaStateValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00551EA0 (FUN_00551EA0 --
+   * `WritePointer<CIntelGrid>` from a slot, state folded to Shared; no references in the PE; formerly
+   * `WriteSharedRawPointerFromCIntelGridSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed
+   * 2026-09-30.) Address: 0x006762C0 (FUN_006762C0 -- `WritePointer<moho::IEffect>` from a value, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIEffectValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00584830 (FUN_00584830 --
+   * `WritePointer<moho::CTaskStage>` from a slot, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromCTaskStageSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x0069E420 (FUN_0069E420 -- `WritePointer<moho::Sim>` from an owner field, state folded to Unowned; no
+   * references in the PE; formerly `SaveUnownedRawPointerFromSimOwnerFieldLane2` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006FA5B0 (FUN_006FA5B0 --
+   * `WritePointer<moho::Sim>` from an owner field, state folded to Unowned; no references in the PE; formerly
+   * `SaveUnownedRawPointerFromSimOwnerFieldLane4` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x00761160 (FUN_00761160 -- `WritePointer<moho::Sim>` from an owner field, state folded to Unowned; no
+   * references in the PE; formerly `SaveUnownedRawPointerFromSimOwnerFieldLane6` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00776760 (FUN_00776760 --
+   * `WritePointer<moho::Sim>` from an owner field, state folded to Unowned; no references in the PE; formerly
+   * `SaveUnownedRawPointerFromSimOwnerFieldLane8` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x00673950 (FUN_00673950 -- `WritePointer<moho::Sim>` from an owner field, state folded to Unowned; no
+   * references in the PE; formerly `SaveUnownedRawPointerFromSimOwnerFieldLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006AD2C0 (FUN_006AD2C0 --
+   * `WritePointer<moho::Sim>` from an owner field, state folded to Unowned; no references in the PE; formerly
+   * `SaveUnownedRawPointerFromSimOwnerFieldLane3` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x0091EDE0 (FUN_0091EDE0 -- `WritePointer<TString>` from a value, state folded to Unowned; no references
+   * in the PE; formerly `WriteUnownedRawPointerFromTStringValueLane1` in gpg/core/containers/ArchiveSerialization.cpp,
+   * removed 2026-09-30.) Address: 0x00675830 (FUN_00675830 -- `WritePointer<moho::IEffect>` from a slot, state folded
+   * to Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromIEffectSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0072B1A0 (FUN_0072B1A0 --
+   * `WritePointer<moho::CSquad>` from a value, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromCSquadValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x007071B0 (FUN_007071B0 -- `WritePointer<moho::CEconomy>` from a value, state folded to Owned; no
+   * references in the PE; formerly `WriteOwnedRawPointerFromCEconomyValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x00550100 (FUN_00550100 --
+   * `WritePointer<moho::CAniSkel>` from a slot, state folded to Shared; no references in the PE; formerly
+   * `WriteSharedRawPointerFromCAniSkelSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x00921420 (FUN_00921420 -- `WritePointer<TString>` from a slot, state folded to Unowned; no references in
+   * the PE; formerly `WriteUnownedRawPointerFromTStringSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp,
+   * removed 2026-09-30.) Address: 0x0054FAC0 (FUN_0054FAC0 -- `WritePointer<moho::CAniSkel>` from a slot, state folded
+   * to Shared; no references in the PE; formerly `WriteSharedRawPointerFromCAniSkelSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0066C320 (FUN_0066C320 --
+   * `WritePointer<moho::IEffect*>` from a value, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromIEffect_PNullLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x009209A0 (FUN_009209A0 -- `WritePointer<UpVal>` from a value, state folded to Unowned; no references in
+   * the PE; formerly `WriteUnownedRawPointerFromUpValValueLane1` in gpg/core/containers/ArchiveSerialization.cpp,
+   * removed 2026-09-30.) Address: 0x007066B0 (FUN_007066B0 -- `WritePointer<moho::CEconomy>` from a slot, state folded
+   * to Owned; no references in the PE; formerly `WriteOwnedRawPointerFromCEconomySlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0072AE10 (FUN_0072AE10 --
+   * `WritePointer<moho::CSquad>` from a slot, state folded to Unowned; no references in the PE; formerly
+   * `WriteUnownedRawPointerFromCSquadSlotLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x00706C40 (FUN_00706C40 -- `WritePointer<moho::PathQueue>` from a slot, state folded to Owned; no
+   * references in the PE; formerly `SaveOwnedRawPointerFromPathQueueSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0066C2F0 (FUN_0066C2F0 --
+   * `WritePointer<moho::IEffect>` from a value, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromIEffectValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x00920970 (FUN_00920970 -- `WritePointer<Proto>` from a value, state folded to Unowned; no references in
+   * the PE; formerly `WriteUnownedRawPointerFromProtoValueLane1` in gpg/core/containers/ArchiveSerialization.cpp,
+   * removed 2026-09-30.) Address: 0x0091E8D0 (FUN_0091E8D0 -- `WritePointer<Table>` from a value, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromTableValueLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x0072ADE0 (FUN_0072ADE0 --
+   * `WritePointer<moho::CSquad>` from a value, state folded to Owned; no references in the PE; formerly
+   * `WriteOwnedRawPointerFromCSquadValueLane1` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x005850C0 (FUN_005850C0 -- `WritePointer<moho::Sim>` from a value, state folded to Unowned; no references
+   * in the PE; formerly `WriteUnownedRawPointerFromSimValueLane1` in gpg/core/containers/ArchiveSerialization.cpp,
+   * removed 2026-09-30.) Address: 0x00584800 (FUN_00584800 -- `WritePointer<moho::Sim>` from a slot, state folded to
+   * Unowned; no references in the PE; formerly `WriteUnownedRawPointerFromSimSlotLane1` in
+   * gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.) Address: 0x006E1140 (FUN_006E1140 --
+   * `WritePointer<moho::Sim>` from a slot, state folded to Unowned; no references in the PE; formerly
+   * `SaveUnownedRawPointerFromSimSlotLane2` in gpg/core/containers/ArchiveSerialization.cpp, removed 2026-09-30.)
+   * Address: 0x006E2A40 (FUN_006E2A40 -- `WritePointer<moho::Sim>` from a slot, state folded to Unowned; no references
+   * in the PE; formerly `SaveUnownedRawPointerFromSimSlotLane3` in gpg/core/containers/ArchiveSerialization.cpp,
+   * removed 2026-09-30.) Address: 0x00774B80 (FUN_00774B80 -- `WritePointer<moho::CEconomy>` from a slot, state folded
+   * to Unowned; no references in the PE; formerly `SerializeUnownedCEconomyPointer` in moho/sim/CEconStorage.cpp,
+   * removed 2026-09-30.) Address: 0x00774BC0 (FUN_00774BC0 -- the same, archive on the stack; no references in the PE;
+   * formerly `SerializeUnownedCEconomyPointerBinary` in moho/sim/CEconStorage.cpp, removed 2026-09-30.)
    *
    * What it does:
    * Writes `value` as a tracked pointer in `state`, owned by `ownerRef`:
@@ -5869,7 +6662,11 @@ namespace gpg
    * `WriteRawPointer(archive, ref, 1, owner)`, then the archive back.
    */
   template <class T>
-  WriteArchive* WriteArchive::WritePointer(T* const value, const TrackedPointerState state, const RRef& ownerRef)
+  WriteArchive* WriteArchive::WritePointer(
+    T* const value,
+    const TrackedPointerState state,
+    const RRef& ownerRef
+  )
   {
     WriteRawPointer(this, MakeRRef<T>(value), state, ownerRef);
     return this;
@@ -5899,10 +6696,13 @@ namespace gpg
        * `LookupRType` when it is not; either way it moves to the front,
        * pushing the oldest entry out.
        */
-      [[nodiscard]] RType* Find(const std::type_info& info)
+      [[nodiscard]] RType* Find(
+        const std::type_info& info
+      )
       {
         int slot = 0;
-        while (slot < 3 && !(entries[slot].typeInfo == &info || (entries[slot].typeInfo && *entries[slot].typeInfo == info))) {
+        while (slot < 3 &&
+               !(entries[slot].typeInfo == &info || (entries[slot].typeInfo && *entries[slot].typeInfo == info))) {
           ++slot;
         }
 
@@ -5931,224 +6731,230 @@ namespace gpg
    * Address: 0x0040C030 (FUN_0040C030 -- `MakeRRef<moho::CTaskThread>`; formerly `gpg::RRef_CTaskThread`.)
    * Address: 0x0040C300 (FUN_0040C300 -- `MakeRRef<moho::CTaskStage>`; formerly `gpg::RRef_CTaskStage`.)
    * Address: 0x0040F600 (FUN_0040F600 -- `MakeRRef<moho::CRandomStream>`; formerly `gpg::RRef_CRandomStream`.)
-   * Address: 0x004220D0 (FUN_004220D0 -- `MakeRRef<moho::CLuaConOutputHandler>`; formerly `gpg::RRef_CLuaConOutputHandler`.)
-   * Address: 0x004C16D0 (FUN_004C16D0 -- `MakeRRef<LuaPlus::LuaState>`; formerly `gpg::RRef_LuaState`.)
-   * Address: 0x004C8C30 (FUN_004C8C30 -- `MakeRRef<moho::CScriptObject*>`; formerly `gpg::RRef_CScriptObject_P`.)
-   * Address: 0x004C9030 (FUN_004C9030 -- `MakeRRef<moho::CScriptObject>`; formerly `gpg::RRef_CScriptObject`.)
-   * Address: 0x004CBB60 (FUN_004CBB60 -- `MakeRRef<moho::CLuaTask>`; formerly `gpg::RRef_CLuaTask`.)
-   * Address: 0x004CBE70 (FUN_004CBE70 -- `MakeRRef<moho::CWaitForTask>`; formerly `gpg::RRef_CWaitForTask`.)
-   * Address: 0x004CC040 (FUN_004CC040 -- `MakeRRef<moho::CScriptEvent>`; formerly `gpg::RRef_CScriptEvent`.)
-   * Address: 0x004E5590 (FUN_004E5590 -- `MakeRRef<moho::CSndVar>`; formerly `gpg::RRef_CSndVar`.)
-   * Address: 0x004E5730 (FUN_004E5730 -- `MakeRRef<moho::CSndParams>`; formerly `gpg::RRef_CSndParams`.)
-   * Address: 0x004E6200 (FUN_004E6200 -- `MakeRRef<moho::CSndParams*>`; formerly `gpg::RRef_CSndParams_P`.)
-   * Address: 0x004E6720 (FUN_004E6720 -- `MakeRRef<moho::HSound>`; formerly `gpg::RRef_HSound`.)
-   * Address: 0x00500730 (FUN_00500730 -- `MakeRRef<moho::CColPrimitive<Wm3::Sphere3f>>`; formerly `gpg::RRef_CColPrimitive_Sphere3f`.)
-   * Address: 0x005008E0 (FUN_005008E0 -- `MakeRRef<moho::CColPrimitive<Wm3::Box3f>>`; formerly `gpg::RRef_CColPrimitive_Box3f`.)
-   * Address: 0x0050E2A0 (FUN_0050E2A0 -- `MakeRRef<moho::RBlueprint>`; formerly `gpg::RRef_RBlueprint`.)
-   * Address: 0x00511250 (FUN_00511250 -- `MakeRRef<moho::REmitterBlueprint>`; formerly `gpg::RRef_REmitterBlueprint`.)
-   * Address: 0x00511400 (FUN_00511400 -- `MakeRRef<moho::RTrailBlueprint>`; formerly `gpg::RRef_RTrailBlueprint`.)
-   * Address: 0x005115B0 (FUN_005115B0 -- `MakeRRef<moho::RBeamBlueprint>`; formerly `gpg::RRef_RBeamBlueprint`.)
-   * Address: 0x00511940 (FUN_00511940 -- `MakeRRef<moho::RRuleGameRules>`; formerly `gpg::RRef_RRuleGameRules`.)
-   * Address: 0x00513760 (FUN_00513760 -- `MakeRRef<fa::string>`; formerly `gpg::RRef_string`.)
-   * Address: 0x00517940 (FUN_00517940 -- `MakeRRef<Wm3::Vector3f>`; formerly `gpg::RRef_Vector3f`.)
-   * Address: 0x00517AE0 (FUN_00517AE0 -- `MakeRRef<moho::REmitterCurveKey>`; formerly `gpg::RRef_REmitterCurveKey`.)
-   * Address: 0x00517D20 (FUN_00517D20 -- `MakeRRef<moho::REmitterBlueprintCurve>`; formerly `gpg::RRef_REmitterBlueprintCurve`.)
-   * Address: 0x0051AAE0 (FUN_0051AAE0 -- `MakeRRef<moho::RMeshBlueprint>`; formerly `gpg::RRef_RMeshBlueprint`.)
-   * Address: 0x0051AC90 (FUN_0051AC90 -- `MakeRRef<moho::RMeshBlueprintLOD>`; formerly `gpg::RRef_RMeshBlueprintLOD`.)
-   * Address: 0x0051CFF0 (FUN_0051CFF0 -- `MakeRRef<moho::RProjectileBlueprint>`; formerly `gpg::RRef_RProjectileBlueprint`.)
-   * Address: 0x0051E130 (FUN_0051E130 -- `MakeRRef<moho::RPropBlueprint>`; formerly `gpg::RRef_RPropBlueprint`.)
-   * Address: 0x00526C80 (FUN_00526C80 -- `MakeRRef<moho::RUnitBlueprint>`; formerly `gpg::RRef_RUnitBlueprint`.)
-   * Address: 0x00526E30 (FUN_00526E30 -- `MakeRRef<moho::RUnitBlueprintWeapon>`; formerly `gpg::RRef_RUnitBlueprintWeapon`.)
+   * Address: 0x004220D0 (FUN_004220D0 -- `MakeRRef<moho::CLuaConOutputHandler>`; formerly
+   * `gpg::RRef_CLuaConOutputHandler`.) Address: 0x004C16D0 (FUN_004C16D0 -- `MakeRRef<LuaPlus::LuaState>`; formerly
+   * `gpg::RRef_LuaState`.) Address: 0x004C8C30 (FUN_004C8C30 -- `MakeRRef<moho::CScriptObject*>`; formerly
+   * `gpg::RRef_CScriptObject_P`.) Address: 0x004C9030 (FUN_004C9030 -- `MakeRRef<moho::CScriptObject>`; formerly
+   * `gpg::RRef_CScriptObject`.) Address: 0x004CBB60 (FUN_004CBB60 -- `MakeRRef<moho::CLuaTask>`; formerly
+   * `gpg::RRef_CLuaTask`.) Address: 0x004CBE70 (FUN_004CBE70 -- `MakeRRef<moho::CWaitForTask>`; formerly
+   * `gpg::RRef_CWaitForTask`.) Address: 0x004CC040 (FUN_004CC040 -- `MakeRRef<moho::CScriptEvent>`; formerly
+   * `gpg::RRef_CScriptEvent`.) Address: 0x004E5590 (FUN_004E5590 -- `MakeRRef<moho::CSndVar>`; formerly
+   * `gpg::RRef_CSndVar`.) Address: 0x004E5730 (FUN_004E5730 -- `MakeRRef<moho::CSndParams>`; formerly
+   * `gpg::RRef_CSndParams`.) Address: 0x004E6200 (FUN_004E6200 -- `MakeRRef<moho::CSndParams*>`; formerly
+   * `gpg::RRef_CSndParams_P`.) Address: 0x004E6720 (FUN_004E6720 -- `MakeRRef<moho::HSound>`; formerly
+   * `gpg::RRef_HSound`.) Address: 0x00500730 (FUN_00500730 -- `MakeRRef<moho::CColPrimitive<Wm3::Sphere3f>>`; formerly
+   * `gpg::RRef_CColPrimitive_Sphere3f`.) Address: 0x005008E0 (FUN_005008E0 --
+   * `MakeRRef<moho::CColPrimitive<Wm3::Box3f>>`; formerly `gpg::RRef_CColPrimitive_Box3f`.) Address: 0x0050E2A0
+   * (FUN_0050E2A0 -- `MakeRRef<moho::RBlueprint>`; formerly `gpg::RRef_RBlueprint`.) Address: 0x00511250 (FUN_00511250
+   * -- `MakeRRef<moho::REmitterBlueprint>`; formerly `gpg::RRef_REmitterBlueprint`.) Address: 0x00511400 (FUN_00511400
+   * -- `MakeRRef<moho::RTrailBlueprint>`; formerly `gpg::RRef_RTrailBlueprint`.) Address: 0x005115B0 (FUN_005115B0 --
+   * `MakeRRef<moho::RBeamBlueprint>`; formerly `gpg::RRef_RBeamBlueprint`.) Address: 0x00511940 (FUN_00511940 --
+   * `MakeRRef<moho::RRuleGameRules>`; formerly `gpg::RRef_RRuleGameRules`.) Address: 0x00513760 (FUN_00513760 --
+   * `MakeRRef<fa::string>`; formerly `gpg::RRef_string`.) Address: 0x00517940 (FUN_00517940 --
+   * `MakeRRef<Wm3::Vector3f>`; formerly `gpg::RRef_Vector3f`.) Address: 0x00517AE0 (FUN_00517AE0 --
+   * `MakeRRef<moho::REmitterCurveKey>`; formerly `gpg::RRef_REmitterCurveKey`.) Address: 0x00517D20 (FUN_00517D20 --
+   * `MakeRRef<moho::REmitterBlueprintCurve>`; formerly `gpg::RRef_REmitterBlueprintCurve`.) Address: 0x0051AAE0
+   * (FUN_0051AAE0 -- `MakeRRef<moho::RMeshBlueprint>`; formerly `gpg::RRef_RMeshBlueprint`.) Address: 0x0051AC90
+   * (FUN_0051AC90 -- `MakeRRef<moho::RMeshBlueprintLOD>`; formerly `gpg::RRef_RMeshBlueprintLOD`.) Address: 0x0051CFF0
+   * (FUN_0051CFF0 -- `MakeRRef<moho::RProjectileBlueprint>`; formerly `gpg::RRef_RProjectileBlueprint`.) Address:
+   * 0x0051E130 (FUN_0051E130 -- `MakeRRef<moho::RPropBlueprint>`; formerly `gpg::RRef_RPropBlueprint`.) Address:
+   * 0x00526C80 (FUN_00526C80 -- `MakeRRef<moho::RUnitBlueprint>`; formerly `gpg::RRef_RUnitBlueprint`.) Address:
+   * 0x00526E30 (FUN_00526E30 -- `MakeRRef<moho::RUnitBlueprintWeapon>`; formerly `gpg::RRef_RUnitBlueprintWeapon`.)
    * Address: 0x00526FD0 (FUN_00526FD0 -- `MakeRRef<float>`; formerly `gpg::RRef_float`.)
-   * Address: 0x00536BA0 (FUN_00536BA0 -- `MakeRRef<moho::SRuleFootprintsBlueprint>`; formerly `gpg::RRef_SRuleFootprintsBlueprint`.)
-   * Address: 0x00537250 (FUN_00537250 -- `MakeRRef<moho::EntityCategorySet>`; formerly `gpg::RRef_EntityCategory`.)
-   * Address: 0x00541C50 (FUN_00541C50 -- `MakeRRef<moho::IUnit>`; formerly `gpg::RRef_IUnit`.)
-   * Address: 0x00544EE0 (FUN_00544EE0 -- `MakeRRef<moho::LaunchInfoNew>`; formerly `gpg::RRef_LaunchInfoNew`.)
-   * Address: 0x00549200 (FUN_00549200 -- `MakeRRef<moho::ResourceDeposit>`; formerly `gpg::RRef_ResourceDeposit`.)
-   * Address: 0x00549550 (FUN_00549550 -- `MakeRRef<moho::CSimResources>`; formerly `gpg::RRef_CSimResources`.)
-   * Address: 0x0054E690 (FUN_0054E690 -- `MakeRRef<moho::CAniPoseBone>`; formerly `gpg::RRef_CAniPoseBone`.)
-   * Address: 0x0054EA20 (FUN_0054EA20 -- `MakeRRef<moho::CAniPose>`; formerly `gpg::RRef_CAniPose`.)
-   * Address: 0x005504C0 (FUN_005504C0 -- `MakeRRef<moho::CAniSkel>`; formerly `gpg::RRef_CAniSkel`.)
-   * Address: 0x005541F0 (FUN_005541F0 -- `MakeRRef<std::int32_t>`; formerly `gpg::RRef_EntId`.)
+   * Address: 0x00536BA0 (FUN_00536BA0 -- `MakeRRef<moho::SRuleFootprintsBlueprint>`; formerly
+   * `gpg::RRef_SRuleFootprintsBlueprint`.) Address: 0x00537250 (FUN_00537250 -- `MakeRRef<moho::EntityCategorySet>`;
+   * formerly `gpg::RRef_EntityCategory`.) Address: 0x00541C50 (FUN_00541C50 -- `MakeRRef<moho::IUnit>`; formerly
+   * `gpg::RRef_IUnit`.) Address: 0x00544EE0 (FUN_00544EE0 -- `MakeRRef<moho::LaunchInfoNew>`; formerly
+   * `gpg::RRef_LaunchInfoNew`.) Address: 0x00549200 (FUN_00549200 -- `MakeRRef<moho::ResourceDeposit>`; formerly
+   * `gpg::RRef_ResourceDeposit`.) Address: 0x00549550 (FUN_00549550 -- `MakeRRef<moho::CSimResources>`; formerly
+   * `gpg::RRef_CSimResources`.) Address: 0x0054E690 (FUN_0054E690 -- `MakeRRef<moho::CAniPoseBone>`; formerly
+   * `gpg::RRef_CAniPoseBone`.) Address: 0x0054EA20 (FUN_0054EA20 -- `MakeRRef<moho::CAniPose>`; formerly
+   * `gpg::RRef_CAniPose`.) Address: 0x005504C0 (FUN_005504C0 -- `MakeRRef<moho::CAniSkel>`; formerly
+   * `gpg::RRef_CAniSkel`.) Address: 0x005541F0 (FUN_005541F0 -- `MakeRRef<std::int32_t>`; formerly `gpg::RRef_EntId`.)
    * Address: 0x00554390 (FUN_00554390 -- `MakeRRef<moho::SOCellPos>`; formerly `gpg::RRef_SOCellPos`.)
    * Address: 0x00555040 (FUN_00555040 -- `MakeRRef<moho::REntityBlueprint>`; formerly `gpg::RRef_REntityBlueprint`.)
    * Address: 0x00557BD0 (FUN_00557BD0 -- `MakeRRef<moho::RBlueprint*>`; formerly `gpg::RRef_RBlueprint_P`.)
-   * Address: 0x00559790 (FUN_00559790 -- `MakeRRef<moho::SSTIEntityAttachInfo>`; formerly `gpg::RRef_SSTIEntityAttachInfo`.)
-   * Address: 0x0055AB70 (FUN_0055AB70 -- `MakeRRef<moho::RScmResource>`; formerly `gpg::RRef_RScmResource`.)
-   * Address: 0x005725F0 (FUN_005725F0 -- `MakeRRef<moho::WeakPtr<moho::IUnit>>`; formerly `gpg::RRef_WeakPtr_IUnit`.)
-   * Address: 0x00572C90 (FUN_00572C90 -- `MakeRRef<moho::Listener<moho::EFormationdStatus>>`; formerly `gpg::RRef_Listener_EFormationdStatus`.)
-   * Address: 0x00582B50 (FUN_00582B50 -- `MakeRRef<moho::CAiBrain>`; formerly `gpg::RRef_CAiBrain`.)
-   * Address: 0x00582F00 (FUN_00582F00 -- `MakeRRef<moho::SPointVector>`; formerly `gpg::RRef_SPointVector`.)
-   * Address: 0x005832B0 (FUN_005832B0 -- `MakeRRef<bool>`; formerly `gpg::RRef_bool`.)
-   * Address: 0x00583450 (FUN_00583450 -- `MakeRRef<int>`; formerly `gpg::RRef_int`.)
-   * Address: 0x005852B0 (FUN_005852B0 -- `MakeRRef<moho::SimArmy>`; formerly `gpg::RRef_SimArmy`.)
-   * Address: 0x005854A0 (FUN_005854A0 -- `MakeRRef<moho::CAiPersonality>`; formerly `gpg::RRef_CAiPersonality`.)
-   * Address: 0x00593380 (FUN_00593380 -- `MakeRRef<moho::ETriggerOperator>`; formerly `gpg::RRef_ETriggerOperator`.)
-   * Address: 0x00593520 (FUN_00593520 -- `MakeRRef<moho::EEconResource>`; formerly `gpg::RRef_EEconResource`.)
-   * Address: 0x005937D0 (FUN_005937D0 -- `MakeRRef<moho::EAlliance>`; formerly `gpg::RRef_EAlliance`.)
-   * Address: 0x00593BC0 (FUN_00593BC0 -- `MakeRRef<moho::ESquadClass>`; formerly `gpg::RRef_ESquadClass`.)
-   * Address: 0x00593D60 (FUN_00593D60 -- `MakeRRef<moho::ECompareType>`; formerly `gpg::RRef_ECompareType`.)
-   * Address: 0x00593F00 (FUN_00593F00 -- `MakeRRef<moho::EThreatType>`; formerly `gpg::RRef_EThreatType`.)
-   * Address: 0x00599AB0 (FUN_00599AB0 -- `MakeRRef<moho::IAiCommandDispatchImpl>`; formerly `gpg::RRef_IAiCommandDispatchImpl`.)
-   * Address: 0x0059A070 (FUN_0059A070 -- `MakeRRef<moho::CUnitCommandQueue>`; formerly `gpg::RRef_CUnitCommandQueue`.)
-   * Address: 0x0059E080 (FUN_0059E080 -- `MakeRRef<moho::IFormationInstance*>`; formerly `gpg::RRef_IFormationInstance_P`.)
-   * Address: 0x0059E2E0 (FUN_0059E2E0 -- `MakeRRef<moho::CAiFormationInstance>`; formerly `gpg::RRef_CAiFormationInstance`.)
-   * Address: 0x0059E490 (FUN_0059E490 -- `MakeRRef<moho::CAiFormationDBImpl>`; formerly `gpg::RRef_CAiFormationDBImpl`.)
+   * Address: 0x00559790 (FUN_00559790 -- `MakeRRef<moho::SSTIEntityAttachInfo>`; formerly
+   * `gpg::RRef_SSTIEntityAttachInfo`.) Address: 0x0055AB70 (FUN_0055AB70 -- `MakeRRef<moho::RScmResource>`; formerly
+   * `gpg::RRef_RScmResource`.) Address: 0x005725F0 (FUN_005725F0 -- `MakeRRef<moho::WeakPtr<moho::IUnit>>`; formerly
+   * `gpg::RRef_WeakPtr_IUnit`.) Address: 0x00572C90 (FUN_00572C90 --
+   * `MakeRRef<moho::Listener<moho::EFormationdStatus>>`; formerly `gpg::RRef_Listener_EFormationdStatus`.) Address:
+   * 0x00582B50 (FUN_00582B50 -- `MakeRRef<moho::CAiBrain>`; formerly `gpg::RRef_CAiBrain`.) Address: 0x00582F00
+   * (FUN_00582F00 -- `MakeRRef<moho::SPointVector>`; formerly `gpg::RRef_SPointVector`.) Address: 0x005832B0
+   * (FUN_005832B0 -- `MakeRRef<bool>`; formerly `gpg::RRef_bool`.) Address: 0x00583450 (FUN_00583450 --
+   * `MakeRRef<int>`; formerly `gpg::RRef_int`.) Address: 0x005852B0 (FUN_005852B0 -- `MakeRRef<moho::SimArmy>`;
+   * formerly `gpg::RRef_SimArmy`.) Address: 0x005854A0 (FUN_005854A0 -- `MakeRRef<moho::CAiPersonality>`; formerly
+   * `gpg::RRef_CAiPersonality`.) Address: 0x00593380 (FUN_00593380 -- `MakeRRef<moho::ETriggerOperator>`; formerly
+   * `gpg::RRef_ETriggerOperator`.) Address: 0x00593520 (FUN_00593520 -- `MakeRRef<moho::EEconResource>`; formerly
+   * `gpg::RRef_EEconResource`.) Address: 0x005937D0 (FUN_005937D0 -- `MakeRRef<moho::EAlliance>`; formerly
+   * `gpg::RRef_EAlliance`.) Address: 0x00593BC0 (FUN_00593BC0 -- `MakeRRef<moho::ESquadClass>`; formerly
+   * `gpg::RRef_ESquadClass`.) Address: 0x00593D60 (FUN_00593D60 -- `MakeRRef<moho::ECompareType>`; formerly
+   * `gpg::RRef_ECompareType`.) Address: 0x00593F00 (FUN_00593F00 -- `MakeRRef<moho::EThreatType>`; formerly
+   * `gpg::RRef_EThreatType`.) Address: 0x00599AB0 (FUN_00599AB0 -- `MakeRRef<moho::IAiCommandDispatchImpl>`; formerly
+   * `gpg::RRef_IAiCommandDispatchImpl`.) Address: 0x0059A070 (FUN_0059A070 -- `MakeRRef<moho::CUnitCommandQueue>`;
+   * formerly `gpg::RRef_CUnitCommandQueue`.) Address: 0x0059E080 (FUN_0059E080 --
+   * `MakeRRef<moho::IFormationInstance*>`; formerly `gpg::RRef_IFormationInstance_P`.) Address: 0x0059E2E0
+   * (FUN_0059E2E0 -- `MakeRRef<moho::CAiFormationInstance>`; formerly `gpg::RRef_CAiFormationInstance`.) Address:
+   * 0x0059E490 (FUN_0059E490 -- `MakeRRef<moho::CAiFormationDBImpl>`; formerly `gpg::RRef_CAiFormationDBImpl`.)
    * Address: 0x005A2030 (FUN_005A2030 -- `MakeRRef<moho::CAiBuilderImpl>`; formerly `gpg::RRef_CAiBuilderImpl`.)
    * Address: 0x005A22A0 (FUN_005A22A0 -- `MakeRRef<moho::RUnitBlueprint*>`; formerly `gpg::RRef_RUnitBlueprint_P`.)
    * Address: 0x005A2A40 (FUN_005A2A40 -- `MakeRRef<moho::Unit>`; formerly `gpg::RRef_Unit`.)
    * Address: 0x005A85D0 (FUN_005A85D0 -- `MakeRRef<moho::CAiNavigatorLand>`; formerly `gpg::RRef_CAiNavigatorLand`.)
    * Address: 0x005A87A0 (FUN_005A87A0 -- `MakeRRef<moho::CAiNavigatorAir>`; formerly `gpg::RRef_CAiNavigatorAir`.)
-   * Address: 0x005A8A40 (FUN_005A8A40 -- `MakeRRef<moho::Listener<moho::EAiNavigatorEvent>>`; formerly `gpg::RRef_Listener_EAiNavigatorEvent`.)
-   * Address: 0x005A9A40 (FUN_005A9A40 -- `MakeRRef<moho::CAiPathNavigator>`; formerly `gpg::RRef_CAiPathNavigator`.)
-   * Address: 0x005ABD20 (FUN_005ABD20 -- `MakeRRef<moho::CAiPathFinder>`; formerly `gpg::RRef_CAiPathFinder`.)
-   * Address: 0x005ACCA0 (FUN_005ACCA0 -- `MakeRRef<moho::PathQueue>`; formerly `gpg::RRef_PathQueue`.)
-   * Address: 0x005ACE80 (FUN_005ACE80 -- `MakeRRef<moho::COGrid>`; formerly `gpg::RRef_COGrid`.)
-   * Address: 0x005B5A90 (FUN_005B5A90 -- `MakeRRef<moho::CPathPoint>`; formerly `gpg::RRef_CPathPoint`.)
-   * Address: 0x005B5D60 (FUN_005B5D60 -- `MakeRRef<moho::CAiPathSpline>`; formerly `gpg::RRef_CAiPathSpline`.)
-   * Address: 0x005CADE0 (FUN_005CADE0 -- `MakeRRef<moho::ReconBlip>`; formerly `gpg::RRef_ReconBlip`.)
-   * Address: 0x005CB020 (FUN_005CB020 -- `MakeRRef<moho::EReconFlags>`; formerly `gpg::RRef_EReconFlags`.)
-   * Address: 0x005CB790 (FUN_005CB790 -- `MakeRRef<moho::SPerArmyReconInfo>`; formerly `gpg::RRef_SPerArmyReconInfo`.)
-   * Address: 0x005CB930 (FUN_005CB930 -- `MakeRRef<moho::ReconBlip*>`; formerly `gpg::RRef_ReconBlip_P`.)
-   * Address: 0x005CC0D0 (FUN_005CC0D0 -- `MakeRRef<moho::CAiReconDBImpl>`; formerly `gpg::RRef_CAiReconDBImpl`.)
-   * Address: 0x005CE540 (FUN_005CE540 -- `MakeRRef<moho::CInfluenceMap>`; formerly `gpg::RRef_CInfluenceMap`.)
-   * Address: 0x005D0E70 (FUN_005D0E70 -- `MakeRRef<moho::CAiSiloBuildImpl>`; formerly `gpg::RRef_CAiSiloBuildImpl`.)
-   * Address: 0x005D1750 (FUN_005D1750 -- `MakeRRef<moho::UnitWeapon>`; formerly `gpg::RRef_UnitWeapon`.)
-   * Address: 0x005D1C70 (FUN_005D1C70 -- `MakeRRef<moho::CEconRequest>`; formerly `gpg::RRef_CEconRequest`.)
-   * Address: 0x005D4730 (FUN_005D4730 -- `MakeRRef<moho::CAiSteeringImpl>`; formerly `gpg::RRef_CAiSteeringImpl`.)
-   * Address: 0x005D5300 (FUN_005D5300 -- `MakeRRef<moho::CUnitMotion>`; formerly `gpg::RRef_CUnitMotion`.)
-   * Address: 0x005E0300 (FUN_005E0300 -- `MakeRRef<moho::CAiAttackerImpl>`; formerly `gpg::RRef_CAiAttackerImpl`.)
-   * Address: 0x005E04D0 (FUN_005E04D0 -- `MakeRRef<moho::CAcquireTargetTask>`; formerly `gpg::RRef_CAcquireTargetTask`.)
-   * Address: 0x005E0750 (FUN_005E0750 -- `MakeRRef<moho::UnitWeapon*>`; formerly `gpg::RRef_UnitWeapon_P`.)
-   * Address: 0x005E08D0 (FUN_005E08D0 -- `MakeRRef<moho::CAcquireTargetTask*>`; formerly `gpg::RRef_CAcquireTargetTask_P`.)
-   * Address: 0x005E0A90 (FUN_005E0A90 -- `MakeRRef<moho::Listener<moho::EAiAttackerEvent>>`; formerly `gpg::RRef_Listener_EAiAttackerEvent`.)
-   * Address: 0x005E0E80 (FUN_005E0E80 -- `MakeRRef<moho::LAiAttackerImpl>`; formerly `gpg::RRef_LAiAttackerImpl`.)
-   * Address: 0x005E3660 (FUN_005E3660 -- `MakeRRef<moho::EAiTargetType>`; formerly `gpg::RRef_EAiTargetType`.)
-   * Address: 0x005EDB00 (FUN_005EDB00 -- `MakeRRef<moho::CAiTransportImpl>`; formerly `gpg::RRef_CAiTransportImpl`.)
-   * Address: 0x005EDD30 (FUN_005EDD30 -- `MakeRRef<moho::SAiReservedTransportBone>`; formerly `gpg::RRef_SAiReservedTransportBone`.)
-   * Address: 0x005EDED0 (FUN_005EDED0 -- `MakeRRef<moho::SAttachPoint>`; formerly `gpg::RRef_SAttachPoint`.)
-   * Address: 0x005EE1B0 (FUN_005EE1B0 -- `MakeRRef<moho::Listener<moho::EAiTransportEvent>>`; formerly `gpg::RRef_Listener_EAiTransportEvent`.)
-   * Address: 0x005F5280 (FUN_005F5280 -- `MakeRRef<moho::CUnitCommand>`; formerly `gpg::RRef_CUnitCommand`.)
-   * Address: 0x0061CCA0 (FUN_0061CCA0 -- `MakeRRef<moho::CUnitPatrolTask>`; formerly `gpg::RRef_CUnitPatrolTask`.)
-   * Address: 0x005FDCD0 (FUN_005FDCD0 -- `MakeRRef<moho::CUnitMobileBuildTask>`; formerly `gpg::RRef_CUnitMobileBuildTask`.)
-   * Address: 0x005FDE80 (FUN_005FDE80 -- `MakeRRef<moho::CUnitUpgradeTask>`; formerly `gpg::RRef_CUnitUpgradeTask`.)
-   * Address: 0x005FE030 (FUN_005FE030 -- `MakeRRef<moho::CUnitRepairTask>`; formerly `gpg::RRef_CUnitRepairTask`.)
-   * Address: 0x005FE1E0 (FUN_005FE1E0 -- `MakeRRef<moho::CFactoryBuildTask>`; formerly `gpg::RRef_CFactoryBuildTask`.)
-   * Address: 0x005FE390 (FUN_005FE390 -- `MakeRRef<moho::CUnitSacrificeTask>`; formerly `gpg::RRef_CUnitSacrificeTask`.)
+   * Address: 0x005A8A40 (FUN_005A8A40 -- `MakeRRef<moho::Listener<moho::EAiNavigatorEvent>>`; formerly
+   * `gpg::RRef_Listener_EAiNavigatorEvent`.) Address: 0x005A9A40 (FUN_005A9A40 -- `MakeRRef<moho::CAiPathNavigator>`;
+   * formerly `gpg::RRef_CAiPathNavigator`.) Address: 0x005ABD20 (FUN_005ABD20 -- `MakeRRef<moho::CAiPathFinder>`;
+   * formerly `gpg::RRef_CAiPathFinder`.) Address: 0x005ACCA0 (FUN_005ACCA0 -- `MakeRRef<moho::PathQueue>`; formerly
+   * `gpg::RRef_PathQueue`.) Address: 0x005ACE80 (FUN_005ACE80 -- `MakeRRef<moho::COGrid>`; formerly
+   * `gpg::RRef_COGrid`.) Address: 0x005B5A90 (FUN_005B5A90 -- `MakeRRef<moho::CPathPoint>`; formerly
+   * `gpg::RRef_CPathPoint`.) Address: 0x005B5D60 (FUN_005B5D60 -- `MakeRRef<moho::CAiPathSpline>`; formerly
+   * `gpg::RRef_CAiPathSpline`.) Address: 0x005CADE0 (FUN_005CADE0 -- `MakeRRef<moho::ReconBlip>`; formerly
+   * `gpg::RRef_ReconBlip`.) Address: 0x005CB020 (FUN_005CB020 -- `MakeRRef<moho::EReconFlags>`; formerly
+   * `gpg::RRef_EReconFlags`.) Address: 0x005CB790 (FUN_005CB790 -- `MakeRRef<moho::SPerArmyReconInfo>`; formerly
+   * `gpg::RRef_SPerArmyReconInfo`.) Address: 0x005CB930 (FUN_005CB930 -- `MakeRRef<moho::ReconBlip*>`; formerly
+   * `gpg::RRef_ReconBlip_P`.) Address: 0x005CC0D0 (FUN_005CC0D0 -- `MakeRRef<moho::CAiReconDBImpl>`; formerly
+   * `gpg::RRef_CAiReconDBImpl`.) Address: 0x005CE540 (FUN_005CE540 -- `MakeRRef<moho::CInfluenceMap>`; formerly
+   * `gpg::RRef_CInfluenceMap`.) Address: 0x005D0E70 (FUN_005D0E70 -- `MakeRRef<moho::CAiSiloBuildImpl>`; formerly
+   * `gpg::RRef_CAiSiloBuildImpl`.) Address: 0x005D1750 (FUN_005D1750 -- `MakeRRef<moho::UnitWeapon>`; formerly
+   * `gpg::RRef_UnitWeapon`.) Address: 0x005D1C70 (FUN_005D1C70 -- `MakeRRef<moho::CEconRequest>`; formerly
+   * `gpg::RRef_CEconRequest`.) Address: 0x005D4730 (FUN_005D4730 -- `MakeRRef<moho::CAiSteeringImpl>`; formerly
+   * `gpg::RRef_CAiSteeringImpl`.) Address: 0x005D5300 (FUN_005D5300 -- `MakeRRef<moho::CUnitMotion>`; formerly
+   * `gpg::RRef_CUnitMotion`.) Address: 0x005E0300 (FUN_005E0300 -- `MakeRRef<moho::CAiAttackerImpl>`; formerly
+   * `gpg::RRef_CAiAttackerImpl`.) Address: 0x005E04D0 (FUN_005E04D0 -- `MakeRRef<moho::CAcquireTargetTask>`; formerly
+   * `gpg::RRef_CAcquireTargetTask`.) Address: 0x005E0750 (FUN_005E0750 -- `MakeRRef<moho::UnitWeapon*>`; formerly
+   * `gpg::RRef_UnitWeapon_P`.) Address: 0x005E08D0 (FUN_005E08D0 -- `MakeRRef<moho::CAcquireTargetTask*>`; formerly
+   * `gpg::RRef_CAcquireTargetTask_P`.) Address: 0x005E0A90 (FUN_005E0A90 --
+   * `MakeRRef<moho::Listener<moho::EAiAttackerEvent>>`; formerly `gpg::RRef_Listener_EAiAttackerEvent`.) Address:
+   * 0x005E0E80 (FUN_005E0E80 -- `MakeRRef<moho::LAiAttackerImpl>`; formerly `gpg::RRef_LAiAttackerImpl`.) Address:
+   * 0x005E3660 (FUN_005E3660 -- `MakeRRef<moho::EAiTargetType>`; formerly `gpg::RRef_EAiTargetType`.) Address:
+   * 0x005EDB00 (FUN_005EDB00 -- `MakeRRef<moho::CAiTransportImpl>`; formerly `gpg::RRef_CAiTransportImpl`.) Address:
+   * 0x005EDD30 (FUN_005EDD30 -- `MakeRRef<moho::SAiReservedTransportBone>`; formerly
+   * `gpg::RRef_SAiReservedTransportBone`.) Address: 0x005EDED0 (FUN_005EDED0 -- `MakeRRef<moho::SAttachPoint>`;
+   * formerly `gpg::RRef_SAttachPoint`.) Address: 0x005EE1B0 (FUN_005EE1B0 --
+   * `MakeRRef<moho::Listener<moho::EAiTransportEvent>>`; formerly `gpg::RRef_Listener_EAiTransportEvent`.) Address:
+   * 0x005F5280 (FUN_005F5280 -- `MakeRRef<moho::CUnitCommand>`; formerly `gpg::RRef_CUnitCommand`.) Address: 0x0061CCA0
+   * (FUN_0061CCA0 -- `MakeRRef<moho::CUnitPatrolTask>`; formerly `gpg::RRef_CUnitPatrolTask`.) Address: 0x005FDCD0
+   * (FUN_005FDCD0 -- `MakeRRef<moho::CUnitMobileBuildTask>`; formerly `gpg::RRef_CUnitMobileBuildTask`.) Address:
+   * 0x005FDE80 (FUN_005FDE80 -- `MakeRRef<moho::CUnitUpgradeTask>`; formerly `gpg::RRef_CUnitUpgradeTask`.) Address:
+   * 0x005FE030 (FUN_005FE030 -- `MakeRRef<moho::CUnitRepairTask>`; formerly `gpg::RRef_CUnitRepairTask`.) Address:
+   * 0x005FE1E0 (FUN_005FE1E0 -- `MakeRRef<moho::CFactoryBuildTask>`; formerly `gpg::RRef_CFactoryBuildTask`.) Address:
+   * 0x005FE390 (FUN_005FE390 -- `MakeRRef<moho::CUnitSacrificeTask>`; formerly `gpg::RRef_CUnitSacrificeTask`.)
    * Address: 0x006058B0 (FUN_006058B0 -- `MakeRRef<moho::CUnitCaptureTask>`; formerly `gpg::RRef_CUnitCaptureTask`.)
-   * Address: 0x00608090 (FUN_00608090 -- `MakeRRef<moho::CUnitCarrierRetrieve>`; formerly `gpg::RRef_CUnitCarrierRetrieve`.)
-   * Address: 0x00608240 (FUN_00608240 -- `MakeRRef<moho::CUnitCarrierLand>`; formerly `gpg::RRef_CUnitCarrierLand`.)
-   * Address: 0x006083F0 (FUN_006083F0 -- `MakeRRef<moho::CUnitCarrierLaunch>`; formerly `gpg::RRef_CUnitCarrierLaunch`.)
-   * Address: 0x0060CAB0 (FUN_0060CAB0 -- `MakeRRef<moho::CUnitGetBuiltTask>`; formerly `gpg::RRef_CUnitGetBuiltTask`.)
-   * Address: 0x0060CC60 (FUN_0060CC60 -- `MakeRRef<moho::CUnitTeleportTask>`; formerly `gpg::RRef_CUnitTeleportTask`.)
-   * Address: 0x0060D7A0 (FUN_0060D7A0 -- `MakeRRef<moho::EAiResult>`; formerly `gpg::RRef_EAiResult`.)
-   * Address: 0x00614BA0 (FUN_00614BA0 -- `MakeRRef<moho::CUnitGuardTask>`; formerly `gpg::RRef_CUnitGuardTask`.)
-   * Address: 0x00628DB0 (FUN_00628DB0 -- `MakeRRef<moho::CUnitUnloadUnits>`; formerly `gpg::RRef_CUnitUnloadUnits`.)
-   * Address: 0x0063D230 (FUN_0063D230 -- `MakeRRef<moho::CAniActor>`; formerly `gpg::RRef_CAniActor`.)
-   * Address: 0x0063D3F0 (FUN_0063D3F0 -- `MakeRRef<moho::IAniManipulator>`; formerly `gpg::RRef_IAniManipulator`.)
-   * Address: 0x0063D5A0 (FUN_0063D5A0 -- `MakeRRef<moho::IAniManipulator*>`; formerly `gpg::RRef_IAniManipulator_P`.)
-   * Address: 0x0063D800 (FUN_0063D800 -- `MakeRRef<moho::SAniManipBinding>`; formerly `gpg::RRef_SAniManipBinding`.)
-   * Address: 0x0063EAD0 (FUN_0063EAD0 -- `MakeRRef<boost::shared_ptr<moho::CAniPose>>`; formerly `gpg::RRef_shared_ptr_CAniPose`.)
-   * Address: 0x00642860 (FUN_00642860 -- `MakeRRef<std::vector<bool>::reference>`; formerly `gpg::RRef_VectorBoolReference`.)
-   * Address: 0x006431E0 (FUN_006431E0 -- `MakeRRef<moho::RScaResource>`; formerly `gpg::RRef_RScaResource`.)
-   * Address: 0x0064C960 (FUN_0064C960 -- `MakeRRef<moho::RDebugCollision>`; formerly `gpg::RRef_RDebugCollision`.)
-   * Address: 0x0064FBC0 (FUN_0064FBC0 -- `MakeRRef<moho::RDebugGrid>`; formerly `gpg::RRef_RDebugGrid`.)
-   * Address: 0x0064FD70 (FUN_0064FD70 -- `MakeRRef<moho::RDebugRadar>`; formerly `gpg::RRef_RDebugRadar`.)
-   * Address: 0x00651200 (FUN_00651200 -- `MakeRRef<moho::RDebugNavPath>`; formerly `gpg::RRef_RDebugNavPath`.)
-   * Address: 0x006513B0 (FUN_006513B0 -- `MakeRRef<moho::RDebugNavWaypoints>`; formerly `gpg::RRef_RDebugNavWaypoints`.)
-   * Address: 0x00651560 (FUN_00651560 -- `MakeRRef<moho::RDebugNavSteering>`; formerly `gpg::RRef_RDebugNavSteering`.)
-   * Address: 0x00653C50 (FUN_00653C50 -- `MakeRRef<moho::RDebugWeapons>`; formerly `gpg::RRef_RDebugWeapons`.)
-   * Address: 0x00658860 (FUN_00658860 -- `MakeRRef<moho::CEfxBeam>`; formerly `gpg::RRef_CEfxBeam`.)
-   * Address: 0x0065ADC0 (FUN_0065ADC0 -- `MakeRRef<moho::CountedPtr<moho::CParticleTexture>>`; formerly `gpg::RRef_CountedPtr_CParticleTexture`.)
-   * Address: 0x0065FCF0 (FUN_0065FCF0 -- `MakeRRef<moho::SEfxCurve>`; formerly `gpg::RRef_SEfxCurve`.)
-   * Address: 0x0066C650 (FUN_0066C650 -- `MakeRRef<moho::IEffect>`; formerly `gpg::RRef_IEffect`.)
-   * Address: 0x0066C800 (FUN_0066C800 -- `MakeRRef<moho::IEffect*>`; formerly `gpg::RRef_IEffect_P`.)
-   * Address: 0x00675DB0 (FUN_00675DB0 -- `MakeRRef<moho::CollisionBeamEntity>`; formerly `gpg::RRef_CollisionBeamEntity`.)
-   * Address: 0x00676000 (FUN_00676000 -- `MakeRRef<moho::ManyToOneListener_ECollisionBeamEvent>`; formerly `gpg::RRef_ManyToOneListener_ECollisionBeamEvent`.)
-   * Address: 0x006805E0 (FUN_006805E0 -- `MakeRRef<moho::Entity>`; formerly `gpg::RRef_Entity`.)
-   * Address: 0x006807B0 (FUN_006807B0 -- `MakeRRef<moho::Entity*>`; formerly `gpg::RRef_Entity_P`.)
-   * Address: 0x00680D70 (FUN_00680D70 -- `MakeRRef<moho::PositionHistory>`; formerly `gpg::RRef_PositionHistory`.)
-   * Address: 0x00683230 (FUN_00683230 -- `MakeRRef<moho::CColPrimitiveBase>`; formerly `gpg::RRef_CColPrimitiveBase`.)
-   * Address: 0x00683420 (FUN_00683420 -- `MakeRRef<moho::CIntel>`; formerly `gpg::RRef_CIntel`.)
-   * Address: 0x00683600 (FUN_00683600 -- `MakeRRef<moho::CTextureScroller>`; formerly `gpg::RRef_CTextureScroller`.)
-   * Address: 0x006837E0 (FUN_006837E0 -- `MakeRRef<moho::SPhysBody>`; formerly `gpg::RRef_SPhysBody`.)
-   * Address: 0x006839C0 (FUN_006839C0 -- `MakeRRef<moho::Motor>`; formerly `gpg::RRef_Motor`.)
+   * Address: 0x00608090 (FUN_00608090 -- `MakeRRef<moho::CUnitCarrierRetrieve>`; formerly
+   * `gpg::RRef_CUnitCarrierRetrieve`.) Address: 0x00608240 (FUN_00608240 -- `MakeRRef<moho::CUnitCarrierLand>`;
+   * formerly `gpg::RRef_CUnitCarrierLand`.) Address: 0x006083F0 (FUN_006083F0 -- `MakeRRef<moho::CUnitCarrierLaunch>`;
+   * formerly `gpg::RRef_CUnitCarrierLaunch`.) Address: 0x0060CAB0 (FUN_0060CAB0 -- `MakeRRef<moho::CUnitGetBuiltTask>`;
+   * formerly `gpg::RRef_CUnitGetBuiltTask`.) Address: 0x0060CC60 (FUN_0060CC60 -- `MakeRRef<moho::CUnitTeleportTask>`;
+   * formerly `gpg::RRef_CUnitTeleportTask`.) Address: 0x0060D7A0 (FUN_0060D7A0 -- `MakeRRef<moho::EAiResult>`; formerly
+   * `gpg::RRef_EAiResult`.) Address: 0x00614BA0 (FUN_00614BA0 -- `MakeRRef<moho::CUnitGuardTask>`; formerly
+   * `gpg::RRef_CUnitGuardTask`.) Address: 0x00628DB0 (FUN_00628DB0 -- `MakeRRef<moho::CUnitUnloadUnits>`; formerly
+   * `gpg::RRef_CUnitUnloadUnits`.) Address: 0x0063D230 (FUN_0063D230 -- `MakeRRef<moho::CAniActor>`; formerly
+   * `gpg::RRef_CAniActor`.) Address: 0x0063D3F0 (FUN_0063D3F0 -- `MakeRRef<moho::IAniManipulator>`; formerly
+   * `gpg::RRef_IAniManipulator`.) Address: 0x0063D5A0 (FUN_0063D5A0 -- `MakeRRef<moho::IAniManipulator*>`; formerly
+   * `gpg::RRef_IAniManipulator_P`.) Address: 0x0063D800 (FUN_0063D800 -- `MakeRRef<moho::SAniManipBinding>`; formerly
+   * `gpg::RRef_SAniManipBinding`.) Address: 0x0063EAD0 (FUN_0063EAD0 -- `MakeRRef<boost::shared_ptr<moho::CAniPose>>`;
+   * formerly `gpg::RRef_shared_ptr_CAniPose`.) Address: 0x00642860 (FUN_00642860 --
+   * `MakeRRef<std::vector<bool>::reference>`; formerly `gpg::RRef_VectorBoolReference`.) Address: 0x006431E0
+   * (FUN_006431E0 -- `MakeRRef<moho::RScaResource>`; formerly `gpg::RRef_RScaResource`.) Address: 0x0064C960
+   * (FUN_0064C960 -- `MakeRRef<moho::RDebugCollision>`; formerly `gpg::RRef_RDebugCollision`.) Address: 0x0064FBC0
+   * (FUN_0064FBC0 -- `MakeRRef<moho::RDebugGrid>`; formerly `gpg::RRef_RDebugGrid`.) Address: 0x0064FD70 (FUN_0064FD70
+   * -- `MakeRRef<moho::RDebugRadar>`; formerly `gpg::RRef_RDebugRadar`.) Address: 0x00651200 (FUN_00651200 --
+   * `MakeRRef<moho::RDebugNavPath>`; formerly `gpg::RRef_RDebugNavPath`.) Address: 0x006513B0 (FUN_006513B0 --
+   * `MakeRRef<moho::RDebugNavWaypoints>`; formerly `gpg::RRef_RDebugNavWaypoints`.) Address: 0x00651560 (FUN_00651560
+   * -- `MakeRRef<moho::RDebugNavSteering>`; formerly `gpg::RRef_RDebugNavSteering`.) Address: 0x00653C50 (FUN_00653C50
+   * -- `MakeRRef<moho::RDebugWeapons>`; formerly `gpg::RRef_RDebugWeapons`.) Address: 0x00658860 (FUN_00658860 --
+   * `MakeRRef<moho::CEfxBeam>`; formerly `gpg::RRef_CEfxBeam`.) Address: 0x0065ADC0 (FUN_0065ADC0 --
+   * `MakeRRef<moho::CountedPtr<moho::CParticleTexture>>`; formerly `gpg::RRef_CountedPtr_CParticleTexture`.) Address:
+   * 0x0065FCF0 (FUN_0065FCF0 -- `MakeRRef<moho::SEfxCurve>`; formerly `gpg::RRef_SEfxCurve`.) Address: 0x0066C650
+   * (FUN_0066C650 -- `MakeRRef<moho::IEffect>`; formerly `gpg::RRef_IEffect`.) Address: 0x0066C800 (FUN_0066C800 --
+   * `MakeRRef<moho::IEffect*>`; formerly `gpg::RRef_IEffect_P`.) Address: 0x00675DB0 (FUN_00675DB0 --
+   * `MakeRRef<moho::CollisionBeamEntity>`; formerly `gpg::RRef_CollisionBeamEntity`.) Address: 0x00676000 (FUN_00676000
+   * -- `MakeRRef<moho::ManyToOneListener_ECollisionBeamEvent>`; formerly
+   * `gpg::RRef_ManyToOneListener_ECollisionBeamEvent`.) Address: 0x006805E0 (FUN_006805E0 -- `MakeRRef<moho::Entity>`;
+   * formerly `gpg::RRef_Entity`.) Address: 0x006807B0 (FUN_006807B0 -- `MakeRRef<moho::Entity*>`; formerly
+   * `gpg::RRef_Entity_P`.) Address: 0x00680D70 (FUN_00680D70 -- `MakeRRef<moho::PositionHistory>`; formerly
+   * `gpg::RRef_PositionHistory`.) Address: 0x00683230 (FUN_00683230 -- `MakeRRef<moho::CColPrimitiveBase>`; formerly
+   * `gpg::RRef_CColPrimitiveBase`.) Address: 0x00683420 (FUN_00683420 -- `MakeRRef<moho::CIntel>`; formerly
+   * `gpg::RRef_CIntel`.) Address: 0x00683600 (FUN_00683600 -- `MakeRRef<moho::CTextureScroller>`; formerly
+   * `gpg::RRef_CTextureScroller`.) Address: 0x006837E0 (FUN_006837E0 -- `MakeRRef<moho::SPhysBody>`; formerly
+   * `gpg::RRef_SPhysBody`.) Address: 0x006839C0 (FUN_006839C0 -- `MakeRRef<moho::Motor>`; formerly `gpg::RRef_Motor`.)
    * Address: 0x00689360 (FUN_00689360 -- `MakeRRef<moho::EntityDB>`; formerly `gpg::RRef_EntityDB`.)
    * Address: 0x00689920 (FUN_00689920 -- `MakeRRef<moho::EntitySetBase>`; formerly `gpg::RRef_EntitySetBase`.)
    * Address: 0x00692DB0 (FUN_00692DB0 -- `MakeRRef<moho::EVisibilityMode>`; formerly `gpg::RRef_EVisibilityMode`.)
    * Address: 0x00692F50 (FUN_00692F50 -- `MakeRRef<moho::EIntel>`; formerly `gpg::RRef_EIntel`.)
    * Address: 0x00698D80 (FUN_00698D80 -- `MakeRRef<moho::SPhysConstants>`; formerly `gpg::RRef_SPhysConstants`.)
    * Address: 0x0069FEA0 (FUN_0069FEA0 -- `MakeRRef<moho::Projectile>`; formerly `gpg::RRef_Projectile`.)
-   * Address: 0x006A00F0 (FUN_006A00F0 -- `MakeRRef<moho::ManyToOneListener<moho::EProjectileImpactEvent>>`; formerly `gpg::RRef_ManyToOneListener_EProjectileImpactEvent`.)
-   * Address: 0x006B1C90 (FUN_006B1C90 -- `MakeRRef<moho::EUnitState>`; formerly `gpg::RRef_EUnitState`.)
-   * Address: 0x006B2020 (FUN_006B2020 -- `MakeRRef<moho::CEconomyEvent*>`; formerly `gpg::RRef_CEconomyEvent_P`.)
-   * Address: 0x006B21E0 (FUN_006B21E0 -- `MakeRRef<moho::WeakPtr<moho::Entity>>`; formerly `gpg::RRef_WeakPtr_Entity`.)
-   * Address: 0x006B3AD0 (FUN_006B3AD0 -- `MakeRRef<moho::CEconomyEvent>`; formerly `gpg::RRef_CEconomyEvent`.)
-   * Address: 0x006B59D0 (FUN_006B59D0 -- `MakeRRef<moho::IAiSteering>`; formerly `gpg::RRef_IAiSteering`.)
-   * Address: 0x006B5BC0 (FUN_006B5BC0 -- `MakeRRef<moho::CEconStorage>`; formerly `gpg::RRef_CEconStorage`.)
-   * Address: 0x006B5DA0 (FUN_006B5DA0 -- `MakeRRef<moho::IAiAttacker>`; formerly `gpg::RRef_IAiAttacker`.)
-   * Address: 0x006B5F90 (FUN_006B5F90 -- `MakeRRef<moho::IAiCommandDispatch>`; formerly `gpg::RRef_IAiCommandDispatch`.)
-   * Address: 0x006B6180 (FUN_006B6180 -- `MakeRRef<moho::IAiNavigator>`; formerly `gpg::RRef_IAiNavigator`.)
-   * Address: 0x006B6370 (FUN_006B6370 -- `MakeRRef<moho::IAiBuilder>`; formerly `gpg::RRef_IAiBuilder`.)
-   * Address: 0x006B6560 (FUN_006B6560 -- `MakeRRef<moho::IAiSiloBuild>`; formerly `gpg::RRef_IAiSiloBuild`.)
-   * Address: 0x006B6750 (FUN_006B6750 -- `MakeRRef<moho::IAiTransport>`; formerly `gpg::RRef_IAiTransport`.)
-   * Address: 0x006D1FB0 (FUN_006D1FB0 -- `MakeRRef<moho::ERuleBPUnitToggleCaps>`; formerly `gpg::RRef_ERuleBPUnitToggleCaps`.)
-   * Address: 0x006D2150 (FUN_006D2150 -- `MakeRRef<moho::EFireState>`; formerly `gpg::RRef_EFireState`.)
-   * Address: 0x006D22F0 (FUN_006D22F0 -- `MakeRRef<moho::ERuleBPUnitCommandCaps>`; formerly `gpg::RRef_ERuleBPUnitCommandCaps`.)
-   * Address: 0x006DD790 (FUN_006DD790 -- `MakeRRef<moho::ELayer>`; formerly `gpg::RRef_ELayer`.)
-   * Address: 0x006DED40 (FUN_006DED40 -- `MakeRRef<moho::CFireWeaponTask>`; formerly `gpg::RRef_CFireWeaponTask`.)
-   * Address: 0x006E3150 (FUN_006E3150 -- `MakeRRef<moho::CCommandDB>`; formerly `gpg::RRef_CCommandDB`.)
-   * Address: 0x006E3310 (FUN_006E3310 -- `MakeRRef<moho::CUnitCommand*>`; formerly `gpg::RRef_CUnitCommand_P`.)
-   * Address: 0x006EC1D0 (FUN_006EC1D0 -- `MakeRRef<moho::WeakPtr<moho::CUnitCommand>>`; formerly `gpg::RRef_WeakPtr_CUnitCommand`.)
-   * Address: 0x006EC620 (FUN_006EC620 -- `MakeRRef<moho::Listener<moho::ECommandEvent>>`; formerly `gpg::RRef_Listener_ECommandEvent`.)
-   * Address: 0x006F9410 (FUN_006F9410 -- `MakeRRef<moho::Listener<moho::EUnitCommandQueueStatus>>`; formerly `gpg::RRef_Listener_EUnitCommandQueueStatus`.)
-   * Address: 0x006FAF20 (FUN_006FAF20 -- `MakeRRef<moho::Prop>`; formerly `gpg::RRef_Prop`.)
-   * Address: 0x00705120 (FUN_00705120 -- `MakeRRef<moho::CPlatoon>`; formerly `gpg::RRef_CPlatoon`.)
-   * Address: 0x007057D0 (FUN_007057D0 -- `MakeRRef<moho::CArmyImpl>`; formerly `gpg::RRef_CArmyImpl`.)
-   * Address: 0x00707640 (FUN_00707640 -- `MakeRRef<moho::IAiReconDB>`; formerly `gpg::RRef_IAiReconDB`.)
-   * Address: 0x00707830 (FUN_00707830 -- `MakeRRef<moho::CEconomy>`; formerly `gpg::RRef_CEconomy`.)
-   * Address: 0x00707A10 (FUN_00707A10 -- `MakeRRef<moho::CArmyStats>`; formerly `gpg::RRef_CArmyStats`.)
-   * Address: 0x00713560 (FUN_00713560 -- `MakeRRef<moho::SCondition>`; formerly `gpg::RRef_SCondition`.)
-   * Address: 0x00713700 (FUN_00713700 -- `MakeRRef<moho::STrigger>`; formerly `gpg::RRef_STrigger`.)
-   * Address: 0x007139C0 (FUN_007139C0 -- `MakeRRef<moho::Stats<moho::CArmyStatItem>>`; formerly `gpg::RRef_Stats_CArmyStatItem`.)
-   * Address: 0x00713D90 (FUN_00713D90 -- `MakeRRef<moho::CArmyStatItem*>`; formerly `gpg::RRef_CArmyStatItem_P`.)
-   * Address: 0x0071E410 (FUN_0071E410 -- `MakeRRef<moho::InfluenceGrid>`; formerly `gpg::RRef_InfluenceGrid`.)
-   * Address: 0x0071E5B0 (FUN_0071E5B0 -- `MakeRRef<moho::SThreat>`; formerly `gpg::RRef_SThreat`.)
-   * Address: 0x0072AF00 (FUN_0072AF00 -- `MakeRRef<moho::CSquad>`; formerly `gpg::RRef_CSquad`.)
+   * Address: 0x006A00F0 (FUN_006A00F0 -- `MakeRRef<moho::ManyToOneListener<moho::EProjectileImpactEvent>>`; formerly
+   * `gpg::RRef_ManyToOneListener_EProjectileImpactEvent`.) Address: 0x006B1C90 (FUN_006B1C90 --
+   * `MakeRRef<moho::EUnitState>`; formerly `gpg::RRef_EUnitState`.) Address: 0x006B2020 (FUN_006B2020 --
+   * `MakeRRef<moho::CEconomyEvent*>`; formerly `gpg::RRef_CEconomyEvent_P`.) Address: 0x006B21E0 (FUN_006B21E0 --
+   * `MakeRRef<moho::WeakPtr<moho::Entity>>`; formerly `gpg::RRef_WeakPtr_Entity`.) Address: 0x006B3AD0 (FUN_006B3AD0 --
+   * `MakeRRef<moho::CEconomyEvent>`; formerly `gpg::RRef_CEconomyEvent`.) Address: 0x006B59D0 (FUN_006B59D0 --
+   * `MakeRRef<moho::IAiSteering>`; formerly `gpg::RRef_IAiSteering`.) Address: 0x006B5BC0 (FUN_006B5BC0 --
+   * `MakeRRef<moho::CEconStorage>`; formerly `gpg::RRef_CEconStorage`.) Address: 0x006B5DA0 (FUN_006B5DA0 --
+   * `MakeRRef<moho::IAiAttacker>`; formerly `gpg::RRef_IAiAttacker`.) Address: 0x006B5F90 (FUN_006B5F90 --
+   * `MakeRRef<moho::IAiCommandDispatch>`; formerly `gpg::RRef_IAiCommandDispatch`.) Address: 0x006B6180 (FUN_006B6180
+   * -- `MakeRRef<moho::IAiNavigator>`; formerly `gpg::RRef_IAiNavigator`.) Address: 0x006B6370 (FUN_006B6370 --
+   * `MakeRRef<moho::IAiBuilder>`; formerly `gpg::RRef_IAiBuilder`.) Address: 0x006B6560 (FUN_006B6560 --
+   * `MakeRRef<moho::IAiSiloBuild>`; formerly `gpg::RRef_IAiSiloBuild`.) Address: 0x006B6750 (FUN_006B6750 --
+   * `MakeRRef<moho::IAiTransport>`; formerly `gpg::RRef_IAiTransport`.) Address: 0x006D1FB0 (FUN_006D1FB0 --
+   * `MakeRRef<moho::ERuleBPUnitToggleCaps>`; formerly `gpg::RRef_ERuleBPUnitToggleCaps`.) Address: 0x006D2150
+   * (FUN_006D2150 -- `MakeRRef<moho::EFireState>`; formerly `gpg::RRef_EFireState`.) Address: 0x006D22F0 (FUN_006D22F0
+   * -- `MakeRRef<moho::ERuleBPUnitCommandCaps>`; formerly `gpg::RRef_ERuleBPUnitCommandCaps`.) Address: 0x006DD790
+   * (FUN_006DD790 -- `MakeRRef<moho::ELayer>`; formerly `gpg::RRef_ELayer`.) Address: 0x006DED40 (FUN_006DED40 --
+   * `MakeRRef<moho::CFireWeaponTask>`; formerly `gpg::RRef_CFireWeaponTask`.) Address: 0x006E3150 (FUN_006E3150 --
+   * `MakeRRef<moho::CCommandDB>`; formerly `gpg::RRef_CCommandDB`.) Address: 0x006E3310 (FUN_006E3310 --
+   * `MakeRRef<moho::CUnitCommand*>`; formerly `gpg::RRef_CUnitCommand_P`.) Address: 0x006EC1D0 (FUN_006EC1D0 --
+   * `MakeRRef<moho::WeakPtr<moho::CUnitCommand>>`; formerly `gpg::RRef_WeakPtr_CUnitCommand`.) Address: 0x006EC620
+   * (FUN_006EC620 -- `MakeRRef<moho::Listener<moho::ECommandEvent>>`; formerly `gpg::RRef_Listener_ECommandEvent`.)
+   * Address: 0x006F9410 (FUN_006F9410 -- `MakeRRef<moho::Listener<moho::EUnitCommandQueueStatus>>`; formerly
+   * `gpg::RRef_Listener_EUnitCommandQueueStatus`.) Address: 0x006FAF20 (FUN_006FAF20 -- `MakeRRef<moho::Prop>`;
+   * formerly `gpg::RRef_Prop`.) Address: 0x00705120 (FUN_00705120 -- `MakeRRef<moho::CPlatoon>`; formerly
+   * `gpg::RRef_CPlatoon`.) Address: 0x007057D0 (FUN_007057D0 -- `MakeRRef<moho::CArmyImpl>`; formerly
+   * `gpg::RRef_CArmyImpl`.) Address: 0x00707640 (FUN_00707640 -- `MakeRRef<moho::IAiReconDB>`; formerly
+   * `gpg::RRef_IAiReconDB`.) Address: 0x00707830 (FUN_00707830 -- `MakeRRef<moho::CEconomy>`; formerly
+   * `gpg::RRef_CEconomy`.) Address: 0x00707A10 (FUN_00707A10 -- `MakeRRef<moho::CArmyStats>`; formerly
+   * `gpg::RRef_CArmyStats`.) Address: 0x00713560 (FUN_00713560 -- `MakeRRef<moho::SCondition>`; formerly
+   * `gpg::RRef_SCondition`.) Address: 0x00713700 (FUN_00713700 -- `MakeRRef<moho::STrigger>`; formerly
+   * `gpg::RRef_STrigger`.) Address: 0x007139C0 (FUN_007139C0 -- `MakeRRef<moho::Stats<moho::CArmyStatItem>>`; formerly
+   * `gpg::RRef_Stats_CArmyStatItem`.) Address: 0x00713D90 (FUN_00713D90 -- `MakeRRef<moho::CArmyStatItem*>`; formerly
+   * `gpg::RRef_CArmyStatItem_P`.) Address: 0x0071E410 (FUN_0071E410 -- `MakeRRef<moho::InfluenceGrid>`; formerly
+   * `gpg::RRef_InfluenceGrid`.) Address: 0x0071E5B0 (FUN_0071E5B0 -- `MakeRRef<moho::SThreat>`; formerly
+   * `gpg::RRef_SThreat`.) Address: 0x0072AF00 (FUN_0072AF00 -- `MakeRRef<moho::CSquad>`; formerly `gpg::RRef_CSquad`.)
    * Address: 0x00736A30 (FUN_00736A30 -- `MakeRRef<unsigned char>`; formerly `gpg::RRef_uchar`.)
    * Address: 0x00753910 (FUN_00753910 -- `MakeRRef<moho::SimArmy*>`; formerly `gpg::RRef_SimArmy_P`.)
    * Address: 0x00753FC0 (FUN_00753FC0 -- `MakeRRef<moho::Shield>`; formerly `gpg::RRef_Shield`.)
    * Address: 0x007542F0 (FUN_007542F0 -- `MakeRRef<moho::Shield*>`; formerly `gpg::RRef_Shield_P`.)
    * Address: 0x00756160 (FUN_00756160 -- `MakeRRef<LuaPlus::LuaState>`; formerly `gpg::RRef_LuaState`.)
    * Address: 0x00756190 (FUN_00756190 -- `MakeRRef<moho::RRuleGameRules>`; formerly `gpg::RRef_RRuleGameRules`.)
-   * Address: 0x007561C0 (FUN_007561C0 -- `MakeRRef<moho::SRuleFootprintsBlueprint>`; formerly `gpg::RRef_SRuleFootprintsBlueprint`.)
-   * Address: 0x00756220 (FUN_00756220 -- `MakeRRef<moho::PathTables>`; formerly `gpg::RRef_PathTables`.)
-   * Address: 0x007571F0 (FUN_007571F0 -- `MakeRRef<moho::PathTables>`; formerly `gpg::RRef_PathTables`.)
-   * Address: 0x007582F0 (FUN_007582F0 -- `MakeRRef<moho::IAiFormationDB>`; formerly `gpg::RRef_IAiFormationDB`.)
-   * Address: 0x00758500 (FUN_00758500 -- `MakeRRef<moho::ISimResources>`; formerly `gpg::RRef_ISimResources`.)
-   * Address: 0x00758730 (FUN_00758730 -- `MakeRRef<moho::CDecalBuffer>`; formerly `gpg::RRef_CDecalBuffer`.)
-   * Address: 0x00758910 (FUN_00758910 -- `MakeRRef<moho::IEffectManager>`; formerly `gpg::RRef_IEffectManager`.)
-   * Address: 0x00758B00 (FUN_00758B00 -- `MakeRRef<moho::ISoundManager>`; formerly `gpg::RRef_ISoundManager`.)
-   * Address: 0x00762410 (FUN_00762410 -- `MakeRRef<moho::ISoundManager>`; formerly `gpg::RRef_ISoundManager`.)
-   * Address: 0x00762560 (FUN_00762560 -- `MakeRRef<moho::SAudioRequest>`; formerly `gpg::RRef_SAudioRequest`.)
-   * Address: 0x00762890 (FUN_00762890 -- `MakeRRef<moho::SAudioRequest>`; formerly `gpg::RRef_SAudioRequest`.)
-   * Address: 0x00764280 (FUN_00764280 -- `MakeRRef<moho::HPathCell>`; formerly `gpg::RRef_HPathCell`.)
-   * Address: 0x00764460 (FUN_00764460 -- `MakeRRef<moho::Listener<const moho::SNavPath&>>`; formerly `gpg::RRef_Listener_NavPath`.)
-   * Address: 0x0076AE70 (FUN_0076AE70 -- `MakeRRef<moho::IPathTraveler>`; formerly `gpg::RRef_IPathTraveler`.)
-   * Address: 0x0076EDD0 (FUN_0076EDD0 -- `MakeRRef<moho::CIntelPosHandle>`; formerly `gpg::RRef_CIntelPosHandle`.)
-   * Address: 0x0076FE30 (FUN_0076FE30 -- `MakeRRef<moho::CIntelCounterHandle>`; formerly `gpg::RRef_CIntelCounterHandle`.)
-   * Address: 0x0077E390 (FUN_0077E390 -- `MakeRRef<moho::CDecalHandle>`; formerly `gpg::RRef_CDecalHandle`.)
-   * Address: 0x0077E540 (FUN_0077E540 -- `MakeRRef<moho::CDecalHandle*>`; formerly `gpg::RRef_CDecalHandle_P`.)
-   * Address: 0x0078B020 (FUN_0078B020 -- `MakeRRef<moho::EMauiScrollAxis>`; formerly `gpg::RRef_EMauiScrollAxis`.)
-   * Address: 0x0078E880 (FUN_0078E880 -- `MakeRRef<moho::EMauiKeyCode>`; formerly `gpg::RRef_EMauiKeyCode`.)
-   * Address: 0x00795E00 (FUN_00795E00 -- `MakeRRef<moho::EMauiEventType>`; formerly `gpg::RRef_EMauiEventType`.)
-   * Address: 0x007CB300 (FUN_007CB300 -- `MakeRRef<moho::ENetProtocolType>`; formerly `gpg::RRef_ENetProtocol`.)
-   * Address: 0x00831EC0 (FUN_00831EC0 -- `MakeRRef<moho::EUnitCommandType>`; formerly `gpg::RRef_EUnitCommandType`.)
-   * Address: 0x0084A6F0 (FUN_0084A6F0 -- `MakeRRef<moho::ESTITargetType>`; formerly `gpg::RRef_ESTITargetType`.)
-   * Address: 0x0084ACA0 (FUN_0084ACA0 -- `MakeRRef<moho::ESpecialFileType>`; formerly `gpg::RRef_ESpecialFileType`.)
-   * Address: 0x0085FB70 (FUN_0085FB70 -- `MakeRRef<moho::EGenericIconType>`; formerly `gpg::RRef_EGenericIconType`.)
-   * Address: 0x00884A10 (FUN_00884A10 -- `MakeRRef<moho::SSessionSaveData>`; formerly `gpg::RRef_SSessionSaveData`.)
-   * Address: 0x008E0A60 (FUN_008E0A60 -- `MakeRRef<char>`; formerly `gpg::RRef_char`.)
+   * Address: 0x007561C0 (FUN_007561C0 -- `MakeRRef<moho::SRuleFootprintsBlueprint>`; formerly
+   * `gpg::RRef_SRuleFootprintsBlueprint`.) Address: 0x00756220 (FUN_00756220 -- `MakeRRef<moho::PathTables>`; formerly
+   * `gpg::RRef_PathTables`.) Address: 0x007571F0 (FUN_007571F0 -- `MakeRRef<moho::PathTables>`; formerly
+   * `gpg::RRef_PathTables`.) Address: 0x007582F0 (FUN_007582F0 -- `MakeRRef<moho::IAiFormationDB>`; formerly
+   * `gpg::RRef_IAiFormationDB`.) Address: 0x00758500 (FUN_00758500 -- `MakeRRef<moho::ISimResources>`; formerly
+   * `gpg::RRef_ISimResources`.) Address: 0x00758730 (FUN_00758730 -- `MakeRRef<moho::CDecalBuffer>`; formerly
+   * `gpg::RRef_CDecalBuffer`.) Address: 0x00758910 (FUN_00758910 -- `MakeRRef<moho::IEffectManager>`; formerly
+   * `gpg::RRef_IEffectManager`.) Address: 0x00758B00 (FUN_00758B00 -- `MakeRRef<moho::ISoundManager>`; formerly
+   * `gpg::RRef_ISoundManager`.) Address: 0x00762410 (FUN_00762410 -- `MakeRRef<moho::ISoundManager>`; formerly
+   * `gpg::RRef_ISoundManager`.) Address: 0x00762560 (FUN_00762560 -- `MakeRRef<moho::SAudioRequest>`; formerly
+   * `gpg::RRef_SAudioRequest`.) Address: 0x00762890 (FUN_00762890 -- `MakeRRef<moho::SAudioRequest>`; formerly
+   * `gpg::RRef_SAudioRequest`.) Address: 0x00764280 (FUN_00764280 -- `MakeRRef<moho::HPathCell>`; formerly
+   * `gpg::RRef_HPathCell`.) Address: 0x00764460 (FUN_00764460 -- `MakeRRef<moho::Listener<const moho::SNavPath&>>`;
+   * formerly `gpg::RRef_Listener_NavPath`.) Address: 0x0076AE70 (FUN_0076AE70 -- `MakeRRef<moho::IPathTraveler>`;
+   * formerly `gpg::RRef_IPathTraveler`.) Address: 0x0076EDD0 (FUN_0076EDD0 -- `MakeRRef<moho::CIntelPosHandle>`;
+   * formerly `gpg::RRef_CIntelPosHandle`.) Address: 0x0076FE30 (FUN_0076FE30 -- `MakeRRef<moho::CIntelCounterHandle>`;
+   * formerly `gpg::RRef_CIntelCounterHandle`.) Address: 0x0077E390 (FUN_0077E390 -- `MakeRRef<moho::CDecalHandle>`;
+   * formerly `gpg::RRef_CDecalHandle`.) Address: 0x0077E540 (FUN_0077E540 -- `MakeRRef<moho::CDecalHandle*>`; formerly
+   * `gpg::RRef_CDecalHandle_P`.) Address: 0x0078B020 (FUN_0078B020 -- `MakeRRef<moho::EMauiScrollAxis>`; formerly
+   * `gpg::RRef_EMauiScrollAxis`.) Address: 0x0078E880 (FUN_0078E880 -- `MakeRRef<moho::EMauiKeyCode>`; formerly
+   * `gpg::RRef_EMauiKeyCode`.) Address: 0x00795E00 (FUN_00795E00 -- `MakeRRef<moho::EMauiEventType>`; formerly
+   * `gpg::RRef_EMauiEventType`.) Address: 0x007CB300 (FUN_007CB300 -- `MakeRRef<moho::ENetProtocolType>`; formerly
+   * `gpg::RRef_ENetProtocol`.) Address: 0x00831EC0 (FUN_00831EC0 -- `MakeRRef<moho::EUnitCommandType>`; formerly
+   * `gpg::RRef_EUnitCommandType`.) Address: 0x0084A6F0 (FUN_0084A6F0 -- `MakeRRef<moho::ESTITargetType>`; formerly
+   * `gpg::RRef_ESTITargetType`.) Address: 0x0084ACA0 (FUN_0084ACA0 -- `MakeRRef<moho::ESpecialFileType>`; formerly
+   * `gpg::RRef_ESpecialFileType`.) Address: 0x0085FB70 (FUN_0085FB70 -- `MakeRRef<moho::EGenericIconType>`; formerly
+   * `gpg::RRef_EGenericIconType`.) Address: 0x00884A10 (FUN_00884A10 -- `MakeRRef<moho::SSessionSaveData>`; formerly
+   * `gpg::RRef_SSessionSaveData`.) Address: 0x008E0A60 (FUN_008E0A60 -- `MakeRRef<char>`; formerly `gpg::RRef_char`.)
    * Address: 0x008E0C00 (FUN_008E0C00 -- `MakeRRef<short>`; formerly `gpg::RRef_short`.)
    * Address: 0x008E0DE0 (FUN_008E0DE0 -- `MakeRRef<long>`; formerly `gpg::RRef_long`.)
    * Address: 0x008E0FC0 (FUN_008E0FC0 -- `MakeRRef<signed char>`; formerly `gpg::RRef_schar`.)
@@ -6174,34 +6980,63 @@ namespace gpg
    */
   /**
    * Engine addition: fills a caller's type slot from the first lookup and returns it.
-   * Address: 0x00508270 (FUN_00508270 -- `CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType)`; formerly `ResolveSDelayedSubVizInfoType` in moho/sim/SDelayedSubVizInfoReflection.cpp, removed 2026-11-05.)
-   * Address: 0x0054D000 (FUN_0054D000 -- `CachedLookup<moho::CAniPoseBone>(moho::CAniPoseBone::sType)`; formerly `CachedCAniPoseBoneType` in moho/animation/CAniPose.cpp, removed 2026-11-05.)
-   * Address: 0x00579570 (FUN_00579570 -- `CachedLookup<moho::CAiBrain>(moho::CAiBrain::sType)`; formerly `ResolveCAiBrainTypeCachePrimary` in moho/ai/CAiBrain.cpp, removed 2026-11-05.)
-   * Address: 0x005D4220 (FUN_005D4220 -- `CachedLookup<CAiSteeringImpl>(CAiSteeringImpl::sType)`; formerly `CachedCAiSteeringImplType` in moho/ai/CAiSteeringImplTypeInfo.cpp, removed 2026-11-05.)
-   * Address: 0x006358F0 (FUN_006358F0 -- `CachedLookup<moho::CBuilderArmManipulator>(moho::CBuilderArmManipulator::sType)`; formerly `ResolveCBuilderArmManipulatorTypeCachePrimary` in moho/ai/CBuilderArmManipulatorTypeInfo.cpp, removed 2026-11-05.)
-   * Address: 0x00636F10 (FUN_00636F10 -- `CachedLookup<moho::CBuilderArmManipulator>(moho::CBuilderArmManipulator::sType)`; formerly `ResolveCBuilderArmManipulatorTypeCacheSecondary` in moho/ai/CBuilderArmManipulatorTypeInfo.cpp, removed 2026-11-05.)
-   * Address: 0x00637840 (FUN_00637840 -- `CachedLookup<moho::CCollisionManipulator>(moho::CCollisionManipulator::sType)`; formerly `ResolveCCollisionManipulatorTypeCachePrimary` in moho/collision/CCollisionManipulator.cpp, removed 2026-11-05.)
-   * Address: 0x00638670 (FUN_00638670 -- `CachedLookup<moho::CCollisionManipulator>(moho::CCollisionManipulator::sType)`; formerly `ResolveCCollisionManipulatorTypeCacheSecondary` in moho/collision/CCollisionManipulator.cpp, removed 2026-11-05.)
-   * Address: 0x0064D000 (FUN_0064D000 -- `CachedLookup<moho::RDebugGrid>(moho::RDebugGrid::sType)`; formerly `ResolveRDebugGridTypeCachePrimary` in moho/debug/RDebugGrid.cpp, removed 2026-11-05.)
-   * Address: 0x0064D860 (FUN_0064D860 -- `CachedLookup<moho::RDebugRadar>(moho::RDebugRadar::sType)`; formerly `ResolveRDebugRadarTypeCachePrimary` in moho/debug/RDebugRadar.cpp, removed 2026-11-05.)
-   * Address: 0x0064E250 (FUN_0064E250 -- `CachedLookup<moho::RDebugGrid>(moho::RDebugGrid::sType)`; formerly `ResolveRDebugGridTypeCachePrimary` in moho/debug/RDebugGrid.cpp, removed 2026-11-05.)
-   * Address: 0x0064E290 (FUN_0064E290 -- `CachedLookup<moho::RDebugRadar>(moho::RDebugRadar::sType)`; formerly `ResolveRDebugRadarTypeCachePrimary` in moho/debug/RDebugRadar.cpp, removed 2026-11-05.)
-   * Address: 0x00652C70 (FUN_00652C70 -- `CachedLookup<moho::RDebugWeapons>(moho::RDebugWeapons::sType)`; formerly `ResolveRDebugWeaponsTypeCachePrimary` in moho/unit/core/RDebugWeapons.cpp, removed 2026-11-05.)
-   * Address: 0x00653260 (FUN_00653260 -- `CachedLookup<moho::RDebugWeapons>(moho::RDebugWeapons::sType)`; formerly `ResolveRDebugWeaponsTypeCacheSecondary` in moho/unit/core/RDebugWeapons.cpp, removed 2026-11-05.)
-   * Address: 0x00658EC0 (FUN_00658EC0 -- `CachedLookup<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType)`; formerly `CachedSEntAttachInfoType` in moho/effects/rendering/CEfxBeam.cpp, removed 2026-11-05.)
-   * Address: 0x006831D0 (FUN_006831D0 -- `CachedLookup<moho::Motor>(moho::Motor::sType)`; formerly `ResolveLegacyMotorAliasType` in moho/entity/MotorReflection.cpp, removed 2026-11-05.)
-   * Address: 0x00689740 (FUN_00689740 -- `CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType)`; formerly `ResolveEntitySetBaseType` in moho/entity/EntitySetReflection.cpp, removed 2026-11-05.)
-   * Address: 0x006940F0 (FUN_006940F0 -- `CachedLookup<WeakEntitySet>(WeakEntitySet::sType)`; formerly `ResolveWeakEntitySetType` in moho/entity/EntitySetReflection.cpp, removed 2026-11-05.)
-   * Address: 0x006ADF70 (FUN_006ADF70 -- `CachedLookup<moho::CEconomyEvent>(moho::CEconomyEvent::sType)`; formerly `CachedCEconomyEventType` in moho/misc/CEconomyEvent.cpp, removed 2026-11-05.)
-   * Address: 0x0071A8C0 (FUN_0071A8C0 -- `CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType)`; formerly `CachedInfluenceMapEntryType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
-   * Address: 0x0071A8E0 (FUN_0071A8E0 -- `CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)`; formerly `CachedInfluenceGridType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
-   * Address: 0x0071A900 (FUN_0071A900 -- `CachedLookup<moho::SThreat>(moho::SThreat::sType)`; formerly `CachedSThreatType` in moho/sim/CInfluenceMap.cpp, removed 2026-11-05.)
-   * Address: 0x00739B30 (FUN_00739B30 -- `CachedLookup<moho::CDamage>(moho::CDamage::sType)`; formerly `CachedCDamageTypeBridge` in moho/sim/CDamage.cpp, removed 2026-11-05.)
-   * Address: 0x007B5C30 (FUN_007B5C30 -- `CachedLookup<moho::CPathDebugger>(moho::CPathDebugger::sType)`; formerly `CachedCPathDebuggerTypePrimary` in moho/debug/CPathDebugger.cpp, removed 2026-11-05.)
-   * Address: 0x007B6210 (FUN_007B6210 -- `CachedLookup<moho::CPathDebugger>(moho::CPathDebugger::sType)`; formerly `CachedCPathDebuggerTypeSecondary` in moho/debug/CPathDebugger.cpp, removed 2026-11-05.)
+   * Address: 0x00508270 (FUN_00508270 -- `CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType)`;
+   * formerly `ResolveSDelayedSubVizInfoType` in moho/sim/SDelayedSubVizInfoReflection.cpp, removed 2026-11-05.)
+   * Address: 0x0054D000 (FUN_0054D000 -- `CachedLookup<moho::CAniPoseBone>(moho::CAniPoseBone::sType)`; formerly
+   * `CachedCAniPoseBoneType` in moho/animation/CAniPose.cpp, removed 2026-11-05.) Address: 0x00579570 (FUN_00579570 --
+   * `CachedLookup<moho::CAiBrain>(moho::CAiBrain::sType)`; formerly `ResolveCAiBrainTypeCachePrimary` in
+   * moho/ai/CAiBrain.cpp, removed 2026-11-05.) Address: 0x005D4220 (FUN_005D4220 --
+   * `CachedLookup<CAiSteeringImpl>(CAiSteeringImpl::sType)`; formerly `CachedCAiSteeringImplType` in
+   * moho/ai/CAiSteeringImplTypeInfo.cpp, removed 2026-11-05.) Address: 0x006358F0 (FUN_006358F0 --
+   * `CachedLookup<moho::CBuilderArmManipulator>(moho::CBuilderArmManipulator::sType)`; formerly
+   * `ResolveCBuilderArmManipulatorTypeCachePrimary` in moho/ai/CBuilderArmManipulatorTypeInfo.cpp, removed 2026-11-05.)
+   * Address: 0x00636F10 (FUN_00636F10 --
+   * `CachedLookup<moho::CBuilderArmManipulator>(moho::CBuilderArmManipulator::sType)`; formerly
+   * `ResolveCBuilderArmManipulatorTypeCacheSecondary` in moho/ai/CBuilderArmManipulatorTypeInfo.cpp, removed
+   * 2026-11-05.) Address: 0x00637840 (FUN_00637840 --
+   * `CachedLookup<moho::CCollisionManipulator>(moho::CCollisionManipulator::sType)`; formerly
+   * `ResolveCCollisionManipulatorTypeCachePrimary` in moho/collision/CCollisionManipulator.cpp, removed 2026-11-05.)
+   * Address: 0x00638670 (FUN_00638670 --
+   * `CachedLookup<moho::CCollisionManipulator>(moho::CCollisionManipulator::sType)`; formerly
+   * `ResolveCCollisionManipulatorTypeCacheSecondary` in moho/collision/CCollisionManipulator.cpp, removed 2026-11-05.)
+   * Address: 0x0064D000 (FUN_0064D000 -- `CachedLookup<moho::RDebugGrid>(moho::RDebugGrid::sType)`; formerly
+   * `ResolveRDebugGridTypeCachePrimary` in moho/debug/RDebugGrid.cpp, removed 2026-11-05.) Address: 0x0064D860
+   * (FUN_0064D860 -- `CachedLookup<moho::RDebugRadar>(moho::RDebugRadar::sType)`; formerly
+   * `ResolveRDebugRadarTypeCachePrimary` in moho/debug/RDebugRadar.cpp, removed 2026-11-05.) Address: 0x0064E250
+   * (FUN_0064E250 -- `CachedLookup<moho::RDebugGrid>(moho::RDebugGrid::sType)`; formerly
+   * `ResolveRDebugGridTypeCachePrimary` in moho/debug/RDebugGrid.cpp, removed 2026-11-05.) Address: 0x0064E290
+   * (FUN_0064E290 -- `CachedLookup<moho::RDebugRadar>(moho::RDebugRadar::sType)`; formerly
+   * `ResolveRDebugRadarTypeCachePrimary` in moho/debug/RDebugRadar.cpp, removed 2026-11-05.) Address: 0x00652C70
+   * (FUN_00652C70 -- `CachedLookup<moho::RDebugWeapons>(moho::RDebugWeapons::sType)`; formerly
+   * `ResolveRDebugWeaponsTypeCachePrimary` in moho/unit/core/RDebugWeapons.cpp, removed 2026-11-05.) Address:
+   * 0x00653260 (FUN_00653260 -- `CachedLookup<moho::RDebugWeapons>(moho::RDebugWeapons::sType)`; formerly
+   * `ResolveRDebugWeaponsTypeCacheSecondary` in moho/unit/core/RDebugWeapons.cpp, removed 2026-11-05.) Address:
+   * 0x00658EC0 (FUN_00658EC0 -- `CachedLookup<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType)`; formerly
+   * `CachedSEntAttachInfoType` in moho/effects/rendering/CEfxBeam.cpp, removed 2026-11-05.) Address: 0x006831D0
+   * (FUN_006831D0 -- `CachedLookup<moho::Motor>(moho::Motor::sType)`; formerly `ResolveLegacyMotorAliasType` in
+   * moho/entity/MotorReflection.cpp, removed 2026-11-05.) Address: 0x00689740 (FUN_00689740 --
+   * `CachedLookup<moho::EntitySetBase>(moho::EntitySetBase::sType)`; formerly `ResolveEntitySetBaseType` in
+   * moho/entity/EntitySetReflection.cpp, removed 2026-11-05.) Address: 0x006940F0 (FUN_006940F0 --
+   * `CachedLookup<WeakEntitySet>(WeakEntitySet::sType)`; formerly `ResolveWeakEntitySetType` in
+   * moho/entity/EntitySetReflection.cpp, removed 2026-11-05.) Address: 0x006ADF70 (FUN_006ADF70 --
+   * `CachedLookup<moho::CEconomyEvent>(moho::CEconomyEvent::sType)`; formerly `CachedCEconomyEventType` in
+   * moho/misc/CEconomyEvent.cpp, removed 2026-11-05.) Address: 0x0071A8C0 (FUN_0071A8C0 --
+   * `CachedLookup<moho::InfluenceMapEntry>(moho::InfluenceMapEntry::sType)`; formerly `CachedInfluenceMapEntryType` in
+   * moho/sim/CInfluenceMap.cpp, removed 2026-11-05.) Address: 0x0071A8E0 (FUN_0071A8E0 --
+   * `CachedLookup<moho::InfluenceGrid>(moho::InfluenceGrid::sType)`; formerly `CachedInfluenceGridType` in
+   * moho/sim/CInfluenceMap.cpp, removed 2026-11-05.) Address: 0x0071A900 (FUN_0071A900 --
+   * `CachedLookup<moho::SThreat>(moho::SThreat::sType)`; formerly `CachedSThreatType` in moho/sim/CInfluenceMap.cpp,
+   * removed 2026-11-05.) Address: 0x00739B30 (FUN_00739B30 -- `CachedLookup<moho::CDamage>(moho::CDamage::sType)`;
+   * formerly `CachedCDamageTypeBridge` in moho/sim/CDamage.cpp, removed 2026-11-05.) Address: 0x007B5C30 (FUN_007B5C30
+   * -- `CachedLookup<moho::CPathDebugger>(moho::CPathDebugger::sType)`; formerly `CachedCPathDebuggerTypePrimary` in
+   * moho/debug/CPathDebugger.cpp, removed 2026-11-05.) Address: 0x007B6210 (FUN_007B6210 --
+   * `CachedLookup<moho::CPathDebugger>(moho::CPathDebugger::sType)`; formerly `CachedCPathDebuggerTypeSecondary` in
+   * moho/debug/CPathDebugger.cpp, removed 2026-11-05.)
    */
   template <class T>
-  [[nodiscard]] RType* CachedLookup(RType*& slot)
+  [[nodiscard]] RType* CachedLookup(
+    RType*& slot
+  )
   {
     if (!slot) {
       slot = LookupRType(typeid(T));
@@ -6212,7 +7047,10 @@ namespace gpg
   /**
    * Engine addition: as above, for a type the caller holds as a `type_info`.
    */
-  [[nodiscard]] inline RType* CachedLookup(RType*& slot, const std::type_info& typeInfo)
+  [[nodiscard]] inline RType* CachedLookup(
+    RType*& slot,
+    const std::type_info& typeInfo
+  )
   {
     if (!slot) {
       slot = LookupRType(typeInfo);
@@ -6223,7 +7061,9 @@ namespace gpg
   /**
    * Engine addition: the first registered type among several spellings of a name.
    */
-  [[nodiscard]] inline RType* REF_FindFirstTypeNamed(const std::initializer_list<const char*> names)
+  [[nodiscard]] inline RType* REF_FindFirstTypeNamed(
+    const std::initializer_list<const char*> names
+  )
   {
     for (const char* const name : names) {
       if (!name) {
@@ -6240,7 +7080,11 @@ namespace gpg
    * Engine addition: reads a tracked pointer and upcasts it to `expectedType`.
    */
   template <typename TObject>
-  [[nodiscard]] TObject* ReadPointerAs(ReadArchive* const archive, const RRef& owner, RType* const expectedType)
+  [[nodiscard]] TObject* ReadPointerAs(
+    ReadArchive* const archive,
+    const RRef& owner,
+    RType* const expectedType
+  )
   {
     const TrackedPointerInfo tracked = ReadRawPointer(archive, owner);
     if (!tracked.object) {
@@ -6259,7 +7103,10 @@ namespace gpg
    * file. Asks the object for its dynamic type and rebases the pointer to it.
    */
   template <class TObject>
-  [[nodiscard]] RRef MakeDerivedRef(TObject* const object, RType* const baseType)
+  [[nodiscard]] RRef MakeDerivedRef(
+    TObject* const object,
+    RType* const baseType
+  )
   {
     RRef out{};
     out.mObj = nullptr;
@@ -6276,7 +7123,8 @@ namespace gpg
     }
 
     std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
+    const bool isDerived =
+      dynamicType != nullptr && baseType != nullptr && dynamicType->IsDerivedFrom(baseType, &baseOffset);
     if (!isDerived) {
       out.mObj = object;
       out.mType = dynamicType;
@@ -6292,7 +7140,9 @@ namespace gpg
    * Engine addition: a class's `GetDerivedObjectRef`: itself, under the type it reports.
    */
   template <class T>
-  [[nodiscard]] RRef MakeSelfRef(T* const self)
+  [[nodiscard]] RRef MakeSelfRef(
+    T* const self
+  )
   {
     RRef out{};
     out.mObj = self;
@@ -6305,7 +7155,11 @@ namespace gpg
    * is looked up only then.
    */
   template <class TObject>
-  RRef* WriteDerivedRef(RRef* const out, TObject* const value, RType* (*const baseType)())
+  RRef* WriteDerivedRef(
+    RRef* const out,
+    TObject* const value,
+    RType* (*const baseType)()
+  )
   {
     if (!out) {
       return nullptr;
@@ -6319,7 +7173,10 @@ namespace gpg
    * Engine addition: as above, with the type `RTypeOf` finds for the object's static type.
    */
   template <class TObject>
-  RRef* WriteDerivedRef(RRef* const out, TObject* const value)
+  RRef* WriteDerivedRef(
+    RRef* const out,
+    TObject* const value
+  )
   {
     if (!out) {
       return nullptr;
@@ -6333,7 +7190,9 @@ namespace gpg
    * Engine addition: an `RType` teardown lane: empties the field and base lists, unless null.
    */
   template <class TType>
-  void ClearTypeLists(TType* const typeInfo)
+  void ClearTypeLists(
+    TType* const typeInfo
+  )
   {
     if (typeInfo == nullptr) {
       return;
@@ -6348,7 +7207,9 @@ namespace gpg
    * `storage` unless it is null, and returns it.
    */
   template <class T>
-  T* ConstructInStorage(void* const storage)
+  T* ConstructInStorage(
+    void* const storage
+  )
   {
     auto* const object = static_cast<T*>(storage);
     if (object) {
@@ -6361,7 +7222,9 @@ namespace gpg
    * Engine addition: a TypeInfo's `Destruct`: destroys the `T` in `storage` unless it is null.
    */
   template <class T>
-  void DestructInStorage(void* const storage)
+  void DestructInStorage(
+    void* const storage
+  )
   {
     auto* const object = static_cast<T*>(storage);
     if (object) {
@@ -6374,7 +7237,10 @@ namespace gpg
    * `staticType`, which it asserts.
    */
   template <class T>
-  [[nodiscard]] RRef MakeTypedRef(T* object, RType* staticType)
+  [[nodiscard]] RRef MakeTypedRef(
+    T* object,
+    RType* staticType
+  )
   {
     RRef out{};
     out.mObj = nullptr;
@@ -6410,7 +7276,10 @@ namespace gpg
    * of every `AddBase_*`. `offset` is where the base sits in the object.
    */
   template <class Base>
-  void AddReflectedBase(RType* const typeInfo, const int offset = 0)
+  void AddReflectedBase(
+    RType* const typeInfo,
+    const int offset = 0
+  )
   {
     RType* const baseType = RTypeOf<Base>();
 
@@ -6426,7 +7295,11 @@ namespace gpg
   /**
    * Engine addition: as AddReflectedBase, for a base type the caller already has.
    */
-  inline void AddReflectedBaseType(RType* const typeInfo, RType* const baseType, const int offset = 0)
+  inline void AddReflectedBaseType(
+    RType* const typeInfo,
+    RType* const baseType,
+    const int offset = 0
+  )
   {
     RField baseField{};
     baseField.mName = baseType->GetName();
@@ -6442,7 +7315,10 @@ namespace gpg
    * the way, which RTypeOf doesn't.
    */
   template <class Base>
-  void AddReflectedBaseViaSlot(RType* const typeInfo, const int offset = 0)
+  void AddReflectedBaseViaSlot(
+    RType* const typeInfo,
+    const int offset = 0
+  )
   {
     RType* baseType = Base::sType;
     if (!baseType) {
@@ -6460,7 +7336,9 @@ namespace gpg
   }
 
   template <class T>
-  [[nodiscard]] RRef MakeRRef(T* const value)
+  [[nodiscard]] RRef MakeRRef(
+    T* const value
+  )
   {
     using Object = std::remove_cv_t<T>;
     RType* const declared = RTypeOf<Object>();
@@ -6486,7 +7364,11 @@ namespace gpg
    * reflected type, owned by the container's owner.
    */
   template <class T>
-  void ReadElement(ReadArchive* const archive, T& value, const RRef* const ownerRef)
+  void ReadElement(
+    ReadArchive* const archive,
+    T& value,
+    const RRef* const ownerRef
+  )
   {
     archive->Read(RTypeOf<T>(), &value, *ownerRef);
   }
@@ -6496,7 +7378,11 @@ namespace gpg
    * Reads one raw-pointer element: a tracked pointer the container does not own.
    */
   template <class T>
-  void ReadElement(ReadArchive* const archive, T*& value, const RRef* const ownerRef)
+  void ReadElement(
+    ReadArchive* const archive,
+    T*& value,
+    const RRef* const ownerRef
+  )
   {
     archive->ReadPointer(&value, ownerRef);
   }
@@ -6506,7 +7392,11 @@ namespace gpg
    * Reads one `boost::shared_ptr` element: a tracked pointer shared through the archive.
    */
   template <class T>
-  void ReadElement(ReadArchive* const archive, boost::shared_ptr<T>& value, const RRef* const ownerRef)
+  void ReadElement(
+    ReadArchive* const archive,
+    boost::shared_ptr<T>& value,
+    const RRef* const ownerRef
+  )
   {
     archive->ReadPointerShared(&value, ownerRef);
   }
@@ -6517,7 +7407,11 @@ namespace gpg
    * reflected type, owned by the container's owner.
    */
   template <class T>
-  void WriteElement(WriteArchive* const archive, const T& value, const RRef* const ownerRef)
+  void WriteElement(
+    WriteArchive* const archive,
+    const T& value,
+    const RRef* const ownerRef
+  )
   {
     archive->Write(RTypeOf<T>(), &value, *ownerRef);
   }
@@ -6527,7 +7421,11 @@ namespace gpg
    * Writes one raw-pointer element as an unowned tracked pointer.
    */
   template <class T>
-  void WriteElement(WriteArchive* const archive, T* const& value, const RRef* const ownerRef)
+  void WriteElement(
+    WriteArchive* const archive,
+    T* const& value,
+    const RRef* const ownerRef
+  )
   {
     archive->WritePointer(value, TrackedPointerState::Unowned, *ownerRef);
   }
@@ -6537,7 +7435,11 @@ namespace gpg
    * Writes one `boost::shared_ptr` element as a shared tracked pointer.
    */
   template <class T>
-  void WriteElement(WriteArchive* const archive, const boost::shared_ptr<T>& value, const RRef* const ownerRef)
+  void WriteElement(
+    WriteArchive* const archive,
+    const boost::shared_ptr<T>& value,
+    const RRef* const ownerRef
+  )
   {
     archive->WritePointer(value.get(), TrackedPointerState::Shared, *ownerRef);
   }

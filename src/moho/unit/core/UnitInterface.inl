@@ -7,7 +7,9 @@
  * Queues one unit-create sync packet and marks this entity interface as
  * created for subsequent SyncInterface lanes.
  */
-void Unit::CreateInterface(SSyncData* const syncData)
+void Unit::CreateInterface(
+  SSyncData* const syncData
+)
 {
   if (syncData != nullptr) {
     SCreateUnitParams createParams{};
@@ -45,7 +47,9 @@ void Unit::CreateInterface(SSyncData* const syncData)
  *   4. A default unit-update record is pushed, `id_` + `mUnitVarDat` are copied
  *      into it, and its recon-flag word (+0x230) is set to 28.
  */
-void Unit::SyncInterface(SSyncData* const syncData)
+void Unit::SyncInterface(
+  SSyncData* const syncData
+)
 {
   SSTIUnitVariableData& varData = VarDat();
   varData.mDidRefresh = false;
@@ -81,7 +85,9 @@ void Unit::SyncInterface(SSyncData* const syncData)
  * Resolves this unit's `AIDebug_<UniqueName>` stat path and clears it from
  * owning army stats.
  */
-void Unit::ShowAIDebugInfo(const bool isEnabled)
+void Unit::ShowAIDebugInfo(
+  const bool isEnabled
+)
 {
   (void)isEnabled;
 
@@ -105,7 +111,9 @@ void Unit::ShowAIDebugInfo(const bool isEnabled)
  * Finds the first raised-platform quad covering `samplePoint` in local XZ and
  * bilinearly interpolates one additional Y offset for occupancy snap lanes.
  */
-float Unit::DistanceToOccupiedRect(const Wm3::Vector3f* const samplePoint)
+float Unit::DistanceToOccupiedRect(
+  const Wm3::Vector3f* const samplePoint
+)
 {
   if (samplePoint == nullptr || IsDead()) {
     return 0.0f;
@@ -208,7 +216,9 @@ void Unit::DebugShowRaisedPlatforms()
 }
 
 // 0x006A7490
-void Unit::ToggleScriptBit(const int bitIndex)
+void Unit::ToggleScriptBit(
+  const int bitIndex
+)
 {
   const std::uint32_t shift = static_cast<std::uint32_t>(static_cast<std::uint8_t>(bitIndex)) & 0x1Fu;
   const std::uint32_t mask = 1u << shift;
@@ -221,8 +231,10 @@ void Unit::ToggleScriptBit(const int bitIndex)
   // 0x006A74DC..0x006A751B: the TRANSPORTATION test is on the attach parent
   // (`mAttachInfo` target at unit+0x194), not on this unit.
   if (IsUnitState(kTransportScriptBitGuardState)) {
-    if (Entity* const attachParent = mAttachInfo.GetAttachTargetEntity();
-        attachParent != nullptr && attachParent->IsInCategory("TRANSPORTATION")) {
+    if (
+      Entity* const attachParent = mAttachInfo.GetAttachTargetEntity();
+      attachParent != nullptr && attachParent->IsInCategory("TRANSPORTATION")
+    ) {
       return;
     }
   }
@@ -244,7 +256,9 @@ void Unit::ToggleScriptBit(const int bitIndex)
  * What it does:
  * Updates fire-state storage and marks the dirty-sync lane for replication.
  */
-void Unit::SetFireState(const std::int32_t fireState)
+void Unit::SetFireState(
+  const std::int32_t fireState
+)
 {
   if (mUnitVarDat.mFireState == fireState) {
     return;
@@ -254,11 +268,16 @@ void Unit::SetFireState(const std::int32_t fireState)
   MarkNeedsSyncGameData();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_UnitWeaponInfoTypeInfo_d3b904, moho::preregister_UnitWeaponInfoTypeInfo)
-GPG_PREREGISTER_INIT(preregister_SSTIUnitVariableDataTypeInfo_d3b904, moho::preregister_SSTIUnitVariableDataTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_UnitWeaponInfoTypeInfo_d3b904,
+  moho::preregister_UnitWeaponInfoTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_SSTIUnitVariableDataTypeInfo_d3b904,
+  moho::preregister_SSTIUnitVariableDataTypeInfo
+)
 
 namespace
 {
@@ -459,7 +478,7 @@ namespace moho
    */
   struct UnitSerializer : gpg::SerSaveLoadHelper<Unit>
   {};
-}
+} // namespace moho
 
 namespace
 {
@@ -471,7 +490,7 @@ namespace
 
   // Address: 0x010B5B80 -- process-global `UnitSerializer` singleton.
   moho::UnitSerializer gUnitSerializer;
-}
+} // namespace
 
 namespace moho
 {
@@ -486,13 +505,13 @@ namespace moho
    */
   struct SSTIUnitVariableDataSerializer : gpg::SerSaveLoadHelper<SSTIUnitVariableData>
   {};
-}
+} // namespace moho
 
 namespace
 {
   // Address: 0x010ACB54 -- process-global `SSTIUnitVariableDataSerializer` singleton.
   moho::SSTIUnitVariableDataSerializer gSSTIUnitVariableDataSerializer;
-}
+} // namespace
 
 namespace moho
 {
@@ -507,10 +526,10 @@ namespace moho
    */
   struct UnitWeaponInfoSerializer : gpg::SerSaveLoadHelper<UnitWeaponInfo>
   {};
-}
+} // namespace moho
 
 namespace
 {
   // Address: 0x010ACD0C -- process-global `UnitWeaponInfoSerializer` singleton.
   moho::UnitWeaponInfoSerializer gUnitWeaponInfoSerializer;
-}
+} // namespace

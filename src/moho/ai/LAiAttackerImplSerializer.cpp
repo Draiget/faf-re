@@ -23,12 +23,13 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<LAiAttackerImpl>::Deserialize` 0x005D61A0.
    */
-  void LAiAttackerImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+  void LAiAttackerImpl::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
     }
-
 
     gpg::RRef owner{};
     gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, owner);
@@ -53,7 +54,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<LAiAttackerImpl>::Serialize` 0x005D61D0.
    */
-  void LAiAttackerImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+  void LAiAttackerImpl::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;

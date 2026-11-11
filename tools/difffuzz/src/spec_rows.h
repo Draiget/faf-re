@@ -57,8 +57,8 @@ namespace difffuzz
     {
       const Entry* entry = nullptr;
       std::uint32_t va = 0;
-      int inWords = 0;  // total argument words
-      int outWords = 0; // 1 (eax, st0 float), 2 (st0 double, edx:eax)
+      int inWords = 0;       // total argument words
+      int outWords = 0;      // 1 (eax, st0 float), 2 (st0 double, edx:eax)
       bool floatOut = false; // st0 result: canonicalise NaN output words
       char name[16] = {};    // "spec_0091A510"
     };
@@ -67,7 +67,8 @@ namespace difffuzz
     /// prototype and the asm agree on (a pointer Hex-Rays typed int stays in,
     /// and the call crashes on it - the run reports it), register arguments
     /// single-word only, and a non-void result. `skippedWhy` counts the rest.
-    void SelectValueRows(const File& file, std::vector<Row>& rows, std::vector<std::pair<std::string, int>>& skippedWhy);
+    void
+    SelectValueRows(const File& file, std::vector<Row>& rows, std::vector<std::pair<std::string, int>>& skippedWhy);
 
     /// Fills the input words of one spec row (spec_rows.cpp): integers on the
     /// sizes and limits the engine's sizing and clamp code lives on, floats

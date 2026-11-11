@@ -53,7 +53,9 @@ namespace moho
   /**
    * Address: 0x00703E40 (FUN_00703E40, Moho::SimArmyTypeInfo::AddBase_IArmy)
    */
-  void SimArmyTypeInfo::AddBase_IArmy(gpg::RType* const typeInfo)
+  void SimArmyTypeInfo::AddBase_IArmy(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* const baseType = IArmy::StaticGetClass();
 
@@ -67,7 +69,9 @@ namespace moho
    * Wrapper lane that forwards one base-registration dispatch to
    * `AddBase_IArmy`.
    */
-  void SimArmyTypeInfo::AddBase_IArmyAdapter(gpg::RType* const typeInfo)
+  void SimArmyTypeInfo::AddBase_IArmyAdapter(
+    gpg::RType* const typeInfo
+  )
   {
     AddBase_IArmy(typeInfo);
   }
@@ -98,7 +102,9 @@ namespace
   SimArmyTypeInfoBootstrap gSimArmyTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SimArmyTypeInfo_411663, moho::register_SimArmyTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SimArmyTypeInfo_411663,
+  moho::register_SimArmyTypeInfo
+)

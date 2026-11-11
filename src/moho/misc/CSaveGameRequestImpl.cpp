@@ -41,14 +41,18 @@ namespace
 
   constexpr std::size_t kUtf16HeaderTextCopyLimit = 2047;
 
-  [[nodiscard]] fa::string MakeTempSavePath(const fa::string& basePath)
+  [[nodiscard]] fa::string MakeTempSavePath(
+    const fa::string& basePath
+  )
   {
     return basePath + ".NEW";
   }
 
   /// UTF-16 code units of a wide string: the units themselves where wchar_t is UTF-16
   /// (Windows), surrogate pairs for code points past U+FFFF where it is UTF-32 (plan WPL.6, C4).
-  [[nodiscard]] std::u16string WideToUtf16(const std::wstring& source)
+  [[nodiscard]] std::u16string WideToUtf16(
+    const std::wstring& source
+  )
   {
     std::u16string out;
     out.reserve(source.size());
@@ -67,7 +71,10 @@ namespace
   }
 
   template <std::size_t N>
-  void CopyWideStringTruncated(char16_t (&outBuffer)[N], const std::wstring& wideSource)
+  void CopyWideStringTruncated(
+    char16_t (&outBuffer)[N],
+    const std::wstring& wideSource
+  )
   {
     const std::u16string source = WideToUtf16(wideSource);
     const std::size_t maxCopy = (std::min)(N - 1, kUtf16HeaderTextCopyLimit);
@@ -78,12 +85,17 @@ namespace
     }
   }
 
-  [[nodiscard]] std::wstring Utf8ToWide(const fa::string& source)
+  [[nodiscard]] std::wstring Utf8ToWide(
+    const fa::string& source
+  )
   {
     return gpg::STR_Utf8ToWide(source.c_str());
   }
 
-  [[nodiscard]] bool RewriteSaveHeader(std::FILE* const file, const SaveGameFileHeader& header)
+  [[nodiscard]] bool RewriteSaveHeader(
+    std::FILE* const file,
+    const SaveGameFileHeader& header
+  )
   {
     if (!file) {
       return false;
@@ -104,14 +116,18 @@ namespace
   }
 
   void FillFileHeaderTextFields(
-    SaveGameFileHeader& outHeader, const fa::string& appNameUtf8, const fa::string& sessionNameUtf8
+    SaveGameFileHeader& outHeader,
+    const fa::string& appNameUtf8,
+    const fa::string& sessionNameUtf8
   )
   {
     CopyWideStringTruncated(outHeader.mAppNameUtf16, Utf8ToWide(appNameUtf8));
     CopyWideStringTruncated(outHeader.mSessionNameUtf16, Utf8ToWide(sessionNameUtf8));
   }
 
-  void FillFileHeaderGameIdFields(SaveGameFileHeader& outHeader)
+  void FillFileHeaderGameIdFields(
+    SaveGameFileHeader& outHeader
+  )
   {
     outHeader.mGameIdPart1 = moho::APP_GetGameIdPart(0);
     outHeader.mGameIdPart2 = moho::APP_GetGameIdPart(1);
@@ -119,8 +135,10 @@ namespace
     outHeader.mGameIdPart4 = moho::APP_GetGameIdPart(3);
   }
 
-
-  [[nodiscard]] bool MoveTempFileIntoSavePath(const fa::string& tempPath, const fa::string& targetPath)
+  [[nodiscard]] bool MoveTempFileIntoSavePath(
+    const fa::string& tempPath,
+    const fa::string& targetPath
+  )
   {
     const std::wstring wideTargetPath = gpg::STR_Utf8ToWide(targetPath.c_str());
     const std::wstring wideTempPath = gpg::STR_Utf8ToWide(tempPath.c_str());
@@ -129,7 +147,9 @@ namespace
     return moved;
   }
 
-  [[nodiscard]] bool DeleteTempFile(const fa::string& tempPath)
+  [[nodiscard]] bool DeleteTempFile(
+    const fa::string& tempPath
+  )
   {
     const std::wstring wideTempPath = gpg::STR_Utf8ToWide(tempPath.c_str());
     const bool deleted = ::DeleteFileW(wideTempPath.c_str()) != FALSE;
@@ -178,7 +198,9 @@ namespace moho
    * Clears one `boost::shared_ptr<std::FILE>` lane and releases the control
    * block ownership counts.
    */
-  void ReleaseSharedFileHandle(boost::shared_ptr<std::FILE>* const fileHandle)
+  void ReleaseSharedFileHandle(
+    boost::shared_ptr<std::FILE>* const fileHandle
+  )
   {
     if (fileHandle == nullptr) {
       return;
@@ -193,7 +215,9 @@ namespace moho
    * Formats the inherited `runtime_error` message as `Save/Load error %s` and
    * stores the raw message lane separately for UI/reporting paths.
    */
-  SaveLoadError::SaveLoadError(const char* const message)
+  SaveLoadError::SaveLoadError(
+    const char* const message
+  )
     : std::runtime_error(gpg::STR_Printf("Save/Load error %s", message != nullptr ? message : "").c_str())
     , mRawMessage(message != nullptr ? message : "")
   {}
@@ -204,7 +228,9 @@ namespace moho
    * What it does:
    * Copies inherited runtime-error payload and the raw save/load message lane.
    */
-  SaveLoadError::SaveLoadError(const SaveLoadError& other)
+  SaveLoadError::SaveLoadError(
+    const SaveLoadError& other
+  )
     : std::runtime_error(other)
     , mRawMessage(other.mRawMessage)
   {}
@@ -226,13 +252,14 @@ namespace moho
     return mRawMessage;
   }
 
-  void SFileStarCloser::operator()(std::FILE* const file) const noexcept
+  void SFileStarCloser::operator()(
+    std::FILE* const file
+  ) const noexcept
   {
     if (file) {
       std::fclose(file);
     }
   }
-
 
   /**
    * Address: 0x008819E0 (FUN_008819E0)
@@ -265,7 +292,9 @@ namespace moho
    * Finalizes save output, writes fixed file header payload, and dispatches
    * completion callback state.
    */
-  void CSaveGameRequestImpl::Save(const SSaveGameDispatchData& data)
+  void CSaveGameRequestImpl::Save(
+    const SSaveGameDispatchData& data
+  )
   {
     delete mArchive;
     mArchive = nullptr;

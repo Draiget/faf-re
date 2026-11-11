@@ -13,7 +13,9 @@ namespace moho
    * What it does:
    * Formats one `Vector4f` lane set as `x=%f,y=%f,z=%f,w=%f`.
    */
-  fa::string ToString(const Vector4f& value)
+  fa::string ToString(
+    const Vector4f& value
+  )
   {
     return gpg::STR_Printf("x=%f,y=%f,z=%f,w=%f", value.x, value.y, value.z, value.w);
   }
@@ -26,10 +28,17 @@ namespace moho
    * What it does:
    * Initializes all four scalar lanes in-order.
    */
-  Vector4f::Vector4f(const float xValue, const float yValue, const float zValue, const float wValue) noexcept
-    : x(xValue), y(yValue), z(zValue), w(wValue)
-  {
-  }
+  Vector4f::Vector4f(
+    const float xValue,
+    const float yValue,
+    const float zValue,
+    const float wValue
+  ) noexcept
+    : x(xValue)
+    , y(yValue)
+    , z(zValue)
+    , w(wValue)
+  {}
 
   /**
    * Address: 0x0046FAE0 (FUN_0046FAE0, Moho::Vector4f::operator[])
@@ -37,7 +46,9 @@ namespace moho
    * What it does:
    * Returns one scalar lane by unchecked index.
    */
-  float Vector4f::operator[](const std::uint32_t index) const noexcept
+  float Vector4f::operator[](
+    const std::uint32_t index
+  ) const noexcept
   {
     return (&x)[index];
   }
@@ -86,7 +97,9 @@ namespace moho
    * What it does:
    * Copies all four scalar lanes from rhs.
    */
-  Vector4f& Vector4f::operator=(const Vector4f& rhs) noexcept
+  Vector4f& Vector4f::operator=(
+    const Vector4f& rhs
+  ) noexcept
   {
     x = rhs.x;
     y = rhs.y;
@@ -101,7 +114,9 @@ namespace moho
    * What it does:
    * Multiplies all scalar lanes by one uniform scalar.
    */
-  Vector4f& Vector4f::operator*=(const float scalar) noexcept
+  Vector4f& Vector4f::operator*=(
+    const float scalar
+  ) noexcept
   {
     x *= scalar;
     y *= scalar;

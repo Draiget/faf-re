@@ -18,13 +18,18 @@ namespace faf::editor
 {
   namespace
   {
-    [[nodiscard]] std::vector<char> FileBytes(const std::filesystem::path& path)
+    [[nodiscard]] std::vector<char> FileBytes(
+      const std::filesystem::path& path
+    )
     {
       std::ifstream in(path, std::ios::binary);
       return std::vector<char>(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
     }
 
-    void Note(std::string& differences, const std::string& what)
+    void Note(
+      std::string& differences,
+      const std::string& what
+    )
     {
       if (!differences.empty()) {
         differences += "; ";
@@ -32,13 +37,21 @@ namespace faf::editor
       differences += what;
     }
 
-    void CompareMaps(moho::CWldMap& a, moho::CWldMap& b, std::string& differences)
+    void CompareMaps(
+      moho::CWldMap& a,
+      moho::CWldMap& b,
+      std::string& differences
+    )
     {
       const moho::CHeightField* const fa = a.mTerrainRes->GetHeightField();
       const moho::CHeightField* const fb = b.mTerrainRes->GetHeightField();
       if (fa == nullptr || fb == nullptr || fa->width != fb->width || fa->height != fb->height) {
         Note(differences, "height field size");
-      } else if (std::memcmp(fa->data, fb->data, static_cast<std::size_t>(fa->width) * static_cast<std::size_t>(fa->height) * 2u) != 0) {
+      } else if (
+        std::memcmp(
+          fa->data, fb->data, static_cast<std::size_t>(fa->width) * static_cast<std::size_t>(fa->height) * 2u
+        ) != 0
+      ) {
         Note(differences, "heights");
       }
       // The eight stratum masks, texel for texel, once both maps are ready for drawing (Finalize sets the
@@ -50,7 +63,11 @@ namespace faf::editor
         const moho::StratumMaterial& sa = a.mTerrainRes->GetStratumMaterial();
         const moho::StratumMaterial& sb = b.mTerrainRes->GetStratumMaterial();
         if (sa.mStratumMaskWidth != sb.mStratumMaskWidth || sa.mStratumMaskHeight != sb.mStratumMaskHeight) {
-          Note(differences, "mask size " + std::to_string(sa.mStratumMaskWidth) + "x" + std::to_string(sa.mStratumMaskHeight) + " vs " + std::to_string(sb.mStratumMaskWidth) + "x" + std::to_string(sb.mStratumMaskHeight));
+          Note(
+            differences,
+            "mask size " + std::to_string(sa.mStratumMaskWidth) + "x" + std::to_string(sa.mStratumMaskHeight) + " vs " +
+              std::to_string(sb.mStratumMaskWidth) + "x" + std::to_string(sb.mStratumMaskHeight)
+          );
         } else {
           const std::size_t count = static_cast<std::size_t>(sa.mStratumMaskWidth) * sa.mStratumMaskHeight;
           std::vector<std::uint8_t> ma(count, 1);
@@ -64,8 +81,10 @@ namespace faf::editor
           }
         }
       }
-      if (a.mTerrainRes->IsWaterEnabled() != b.mTerrainRes->IsWaterEnabled() ||
-          a.mTerrainRes->GetWaterElevation() != b.mTerrainRes->GetWaterElevation()) {
+      if (
+        a.mTerrainRes->IsWaterEnabled() != b.mTerrainRes->IsWaterEnabled() ||
+        a.mTerrainRes->GetWaterElevation() != b.mTerrainRes->GetWaterElevation()
+      ) {
         Note(differences, "water");
       }
       const moho::StratumMaterial& sa = a.mTerrainRes->GetStratumMaterial();
@@ -101,15 +120,32 @@ namespace faf::editor
       } else {
         for (std::size_t i = 0; i < pa.size(); ++i) {
           const bool path = std::strcmp(pa[i].mBlueprintPath.c_str(), pb[i].mBlueprintPath.c_str()) != 0;
-          const bool position = std::memcmp(&pa[i].mTransform.pos_, &pb[i].mTransform.pos_, sizeof(pa[i].mTransform.pos_)) != 0;
-          const bool orientation = std::memcmp(&pa[i].mTransform.orient_, &pb[i].mTransform.orient_, sizeof(pa[i].mTransform.orient_)) != 0;
+          const bool position =
+            std::memcmp(&pa[i].mTransform.pos_, &pb[i].mTransform.pos_, sizeof(pa[i].mTransform.pos_)) != 0;
+          const bool orientation =
+            std::memcmp(&pa[i].mTransform.orient_, &pb[i].mTransform.orient_, sizeof(pa[i].mTransform.orient_)) != 0;
           if (path || position || orientation) {
             char values[200];
             const Wm3::Quatf& qa = pa[i].mTransform.orient_;
             const Wm3::Quatf& qb = pb[i].mTransform.orient_;
-            (void)std::snprintf(values, sizeof(values), " (%.9g %.9g %.9g %.9g vs %.9g %.9g %.9g %.9g)", qa.w, qa.x, qa.y, qa.z, qb.w, qb.x, qb.y, qb.z);
-            Note(differences, "prop " + std::to_string(i) + (path ? " path" : "") + (position ? " position" : "") + (orientation ? " rotation" : "") +
-                                (orientation ? values : ""));
+            (void)std::snprintf(
+              values,
+              sizeof(values),
+              " (%.9g %.9g %.9g %.9g vs %.9g %.9g %.9g %.9g)",
+              qa.w,
+              qa.x,
+              qa.y,
+              qa.z,
+              qb.w,
+              qb.x,
+              qb.y,
+              qb.z
+            );
+            Note(
+              differences,
+              "prop " + std::to_string(i) + (path ? " path" : "") + (position ? " position" : "") +
+                (orientation ? " rotation" : "") + (orientation ? values : "")
+            );
             break;
           }
         }
@@ -120,7 +156,10 @@ namespace faf::editor
     }
   } // namespace
 
-  RoundTripResult RoundTripMap(EdDocument& document, const std::filesystem::path& folder)
+  RoundTripResult RoundTripMap(
+    EdDocument& document,
+    const std::filesystem::path& folder
+  )
   {
     RoundTripResult result;
     moho::CWldMap* const map = document.Map();

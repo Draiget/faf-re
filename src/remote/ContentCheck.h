@@ -32,13 +32,14 @@ namespace faf::remote
   };
 
   /**
-   * The report for rules a session loaded. `gameMods`: the launch's `GameMods` in the Lua byte form `LaunchInfoBase::mGameMods` holds (`SCR_ToString`,
-   * what the rules' `__active_mods` were made from).
+   * The report for rules a session loaded. `gameMods`: the launch's `GameMods` in the Lua byte form
+   * `LaunchInfoBase::mGameMods` holds (`SCR_ToString`, what the rules' `__active_mods` were made from).
    */
   [[nodiscard]] SContentReport MakeContentReport(moho::RRuleGameRules& rules, const std::string& gameMods);
   /** 64-bit FNV-1a over the uids, sorted, each with its terminator: the mod set whatever order it was listed in. */
   [[nodiscard]] std::uint64_t HashModUids(std::vector<std::string> uids) noexcept;
-  /** The sim mods' uids in that byte form of `GameMods`: each entry's `uid` field, or its key when the entry has none. */
+  /** The sim mods' uids in that byte form of `GameMods`: each entry's `uid` field, or its key when the entry has none.
+   */
   [[nodiscard]] std::vector<std::string> ReadModUids(const std::string& gameMods);
 
   /** Plan WP17.8: one mod a player's game runs, as it reports it. */
@@ -59,7 +60,8 @@ namespace faf::remote
   /** False unless `message` is a whole `ModReport` within the limits. */
   [[nodiscard]] bool DecodeModReport(std::span<const std::uint8_t> message, std::vector<SModEntry>& out);
   /** The UI mods of `mods` whose uid isn't in `allowed`, in report order. */
-  [[nodiscard]] std::vector<std::string> UiModsOutside(const std::vector<SModEntry>& mods, const std::vector<std::string>& allowed);
+  [[nodiscard]] std::vector<std::string>
+  UiModsOutside(const std::vector<SModEntry>& mods, const std::vector<std::string>& allowed);
 
   /** The `ContentReport` message (net/GameLinks.h): its kind, then the two hashes. */
   [[nodiscard]] std::vector<std::uint8_t> EncodeContentReport(const SContentReport& report);

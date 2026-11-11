@@ -39,7 +39,10 @@ namespace faf::editor
     /** Writes the newest undone stroke's new heights back. */
     bool Redo(T* heights, std::vector<SampleRect>& changed);
 
-    [[nodiscard]] std::size_t UndoCount() const noexcept { return mUndo.size(); }
+    [[nodiscard]] std::size_t UndoCount() const noexcept
+    {
+      return mUndo.size();
+    }
     /** The newest undo step: how many of its samples it changed (before differs from after). */
     [[nodiscard]] std::size_t NewestChangedSamples() const
     {
@@ -53,10 +56,19 @@ namespace faf::editor
       }
       return changed;
     }
-    [[nodiscard]] std::size_t RedoCount() const noexcept { return mRedo.size(); }
-    [[nodiscard]] bool Stroking() const noexcept { return mStroking; }
+    [[nodiscard]] std::size_t RedoCount() const noexcept
+    {
+      return mRedo.size();
+    }
+    [[nodiscard]] bool Stroking() const noexcept
+    {
+      return mStroking;
+    }
     /** Forgets the undone strokes (another kind of edit came after them). */
-    void ClearRedo() { mRedo.clear(); }
+    void ClearRedo()
+    {
+      mRedo.clear();
+    }
 
   private:
     struct Tile

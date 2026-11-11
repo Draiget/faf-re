@@ -26,19 +26,27 @@ namespace
   constexpr std::uint32_t kCentralHeaderSize = 46u;
   constexpr std::uint16_t kDosDate1980 = 0x0021u;
 
-  void Put16(std::string& out, const std::uint16_t value)
+  void Put16(
+    std::string& out,
+    const std::uint16_t value
+  )
   {
     out.push_back(static_cast<char>(value & 0xFFu));
     out.push_back(static_cast<char>(value >> 8));
   }
 
-  void Put32(std::string& out, const std::uint32_t value)
+  void Put32(
+    std::string& out,
+    const std::uint32_t value
+  )
   {
     Put16(out, static_cast<std::uint16_t>(value & 0xFFFFu));
     Put16(out, static_cast<std::uint16_t>(value >> 16));
   }
 
-  [[nodiscard]] std::uint32_t Crc32(const std::string& bytes)
+  [[nodiscard]] std::uint32_t Crc32(
+    const std::string& bytes
+  )
   {
     std::uint32_t crc = 0xFFFFFFFFu;
     for (const char byte : bytes) {
@@ -51,7 +59,11 @@ namespace
   }
 
   // One stored entry whose data starts at `dataOffset`, then the central directory and its end record.
-  [[nodiscard]] std::string ArchiveTail(const std::uint32_t dataOffset, const std::string& name, const std::string& payload)
+  [[nodiscard]] std::string ArchiveTail(
+    const std::uint32_t dataOffset,
+    const std::string& name,
+    const std::string& payload
+  )
   {
     const std::uint32_t localOffset = dataOffset - kLocalHeaderSize - static_cast<std::uint32_t>(name.size());
     const std::uint32_t size = static_cast<std::uint32_t>(payload.size());
@@ -109,7 +121,7 @@ namespace
     void SetUp() override
     {
       mPath = std::filesystem::temp_directory_path() /
-              ("faf_zip_offset_" + std::to_string(GetCurrentProcessId()) + "_" + std::to_string(GetParam()) + ".zip");
+        ("faf_zip_offset_" + std::to_string(GetCurrentProcessId()) + "_" + std::to_string(GetParam()) + ".zip");
       // Every read goes to the archive, so the second one seeks from the cached offset.
       moho::CZipFile::SetKeepEntryData(false);
     }
@@ -127,7 +139,10 @@ namespace
     }
 
     // False when the file system can't hold a sparse file: the test is skipped rather than writing gigabytes.
-    [[nodiscard]] bool WriteSparse(const std::uint64_t offset, const std::string& bytes) const
+    [[nodiscard]] bool WriteSparse(
+      const std::uint64_t offset,
+      const std::string& bytes
+    ) const
     {
       const HANDLE file = CreateFileW(
         mPath.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr
@@ -142,7 +157,7 @@ namespace
       written = written && SetFilePointerEx(file, position, nullptr, FILE_BEGIN) != 0;
       DWORD count = 0;
       written = written && WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &count, nullptr) != 0 &&
-                count == bytes.size();
+        count == bytes.size();
       CloseHandle(file);
       return written;
     }
@@ -150,7 +165,10 @@ namespace
     std::filesystem::path mPath;
   };
 
-  TEST_P(ZipOffset, ReadsEntryFreshAndFromCachedOffset)
+  TEST_P(
+    ZipOffset,
+    ReadsEntryFreshAndFromCachedOffset
+  )
   {
     const std::uint32_t dataOffset = GetParam();
     const std::string name = "lua/zip_offset.lua";
@@ -183,7 +201,9 @@ namespace
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-variable"
   INSTANTIATE_TEST_SUITE_P(
-    DataOffsets, ZipOffset, ::testing::Values(0x00000100u, 0x7FFFFF00u, 0x80000000u, 0xFFFFFF00u),
+    DataOffsets,
+    ZipOffset,
+    ::testing::Values(0x00000100u, 0x7FFFFF00u, 0x80000000u, 0xFFFFFF00u),
     [](const ::testing::TestParamInfo<std::uint32_t>& info) {
       char text[16];
       std::snprintf(text, sizeof(text), "At%08X", info.param);

@@ -34,12 +34,19 @@ namespace faf::remote
   class CViewIdMap
   {
   public:
-    explicit CViewIdMap(std::int32_t viewArmy) noexcept
+    explicit CViewIdMap(
+      std::int32_t viewArmy
+    ) noexcept
       : mKeptSources(viewArmy >= 0 && viewArmy < 32 ? std::uint32_t{1} << viewArmy : 0u)
     {}
 
     /** Plan WPR.35, a team's view: the armies whose projectiles keep their ids, one bit each. */
-    void SetKeptSources(const std::uint32_t armies) noexcept { mKeptSources = armies; }
+    void SetKeptSources(
+      const std::uint32_t armies
+    ) noexcept
+    {
+      mKeptSources = armies;
+    }
 
     /** Whether a sim entity id is renumbered for this view. */
     [[nodiscard]] bool MapsEntity(std::uint32_t simId) const noexcept;
@@ -54,7 +61,12 @@ namespace faf::remote
      */
     void Translate(wire::SViewFrame& frame, const OwnCommandTest& isOwnCommand);
     /** `simId` as this view's client knows it, allocating on first appearance. */
-    [[nodiscard]] std::uint32_t EntityId(const std::uint32_t simId) { return MapsEntity(simId) ? Entity(simId) : simId; }
+    [[nodiscard]] std::uint32_t EntityId(
+      const std::uint32_t simId
+    )
+    {
+      return MapsEntity(simId) ? Entity(simId) : simId;
+    }
     /** `Translate` for one record, without the sort. */
     void TranslateRecord(wire::SEntityRecord& record, const OwnCommandTest& isOwnCommand);
 
@@ -92,10 +104,14 @@ namespace faf::remote
      * the grace beats (the client may still name it). What a client sends, as the checks model it.
      */
     [[nodiscard]] bool EntityToHeldView(std::uint32_t simId, std::uint32_t& viewId) const;
-    [[nodiscard]] bool CommandToHeldView(std::uint32_t simId, const OwnCommandTest& isOwnCommand, std::uint32_t& viewId) const;
+    [[nodiscard]] bool
+    CommandToHeldView(std::uint32_t simId, const OwnCommandTest& isOwnCommand, std::uint32_t& viewId) const;
 
     /** Diagnostics: the beat a renumbered sim entity id last retired in this view, or false if it never did. */
-    [[nodiscard]] bool RetiredAt(const std::uint32_t simId, std::uint32_t& beat) const
+    [[nodiscard]] bool RetiredAt(
+      const std::uint32_t simId,
+      std::uint32_t& beat
+    ) const
     {
       const auto found = mRetiredAt.find(simId);
       if (found == mRetiredAt.end()) {
@@ -104,17 +120,33 @@ namespace faf::remote
       beat = found->second;
       return true;
     }
-    [[nodiscard]] bool CommandToView(std::uint32_t simId, const OwnCommandTest& isOwnCommand, std::uint32_t& viewId) const;
+    [[nodiscard]] bool
+    CommandToView(std::uint32_t simId, const OwnCommandTest& isOwnCommand, std::uint32_t& viewId) const;
 
-    [[nodiscard]] std::uint64_t EntitiesMapped() const noexcept { return mEntitiesMapped; }
-    [[nodiscard]] std::uint64_t CommandsMapped() const noexcept { return mCommandsMapped; }
-    [[nodiscard]] std::size_t LiveEntities() const noexcept { return mEntityToView.size(); }
-    [[nodiscard]] std::size_t LiveCommands() const noexcept { return mCommandToView.size(); }
+    [[nodiscard]] std::uint64_t EntitiesMapped() const noexcept
+    {
+      return mEntitiesMapped;
+    }
+    [[nodiscard]] std::uint64_t CommandsMapped() const noexcept
+    {
+      return mCommandsMapped;
+    }
+    [[nodiscard]] std::size_t LiveEntities() const noexcept
+    {
+      return mEntityToView.size();
+    }
+    [[nodiscard]] std::size_t LiveCommands() const noexcept
+    {
+      return mCommandToView.size();
+    }
     /**
      * Serials only count up, so a view id can come back only when a family and source's 20-bit
      * serial (or the command's 24-bit one) wraps: the times that happened (must stay 0).
      */
-    [[nodiscard]] std::uint64_t Overflows() const noexcept { return mOverflows; }
+    [[nodiscard]] std::uint64_t Overflows() const noexcept
+    {
+      return mOverflows;
+    }
 
   private:
     [[nodiscard]] std::uint32_t Entity(std::uint32_t simId);
@@ -125,17 +157,17 @@ namespace faf::remote
     std::unordered_map<std::uint32_t, std::uint32_t> mEntityToSim;
     std::unordered_map<std::uint32_t, std::uint32_t> mCommandToView;
     std::unordered_map<std::uint32_t, std::uint32_t> mCommandToSim;
-    std::vector<std::uint32_t> mNewCommands; // mapped since the last `RetireNewCommandsUnless`
+    std::vector<std::uint32_t> mNewCommands;                      // mapped since the last `RetireNewCommandsUnless`
     std::unordered_map<std::uint32_t, std::uint32_t> mNextSerial; // family and source (id >> 20) -> next serial
     struct SGrace
     {
-      std::uint32_t until;  // the beat the view id stops translating inbound
+      std::uint32_t until; // the beat the view id stops translating inbound
       std::uint32_t viewId;
       std::uint32_t simId;
       bool command;
     };
-    std::deque<SGrace> mGrace; // retired, oldest first
-    std::unordered_map<std::uint32_t, std::uint32_t> mRetiredAt; // sim id -> beat it last retired (diagnostics)
+    std::deque<SGrace> mGrace;                                       // retired, oldest first
+    std::unordered_map<std::uint32_t, std::uint32_t> mRetiredAt;     // sim id -> beat it last retired (diagnostics)
     std::unordered_map<std::uint32_t, std::uint32_t> mGraceEntities; // sim id -> view id, while in grace
     std::unordered_map<std::uint32_t, std::uint32_t> mGraceCommands;
     std::uint32_t mBeat = 0;

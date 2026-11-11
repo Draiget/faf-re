@@ -90,7 +90,10 @@ namespace
 
   struct EMauiKeyCodeTypeInfoBootstrap
   {
-    EMauiKeyCodeTypeInfoBootstrap() { register_EMauiKeyCodeTypeInfo(); }
+    EMauiKeyCodeTypeInfoBootstrap()
+    {
+      register_EMauiKeyCodeTypeInfo();
+    }
   };
 
   EMauiKeyCodeTypeInfoBootstrap gEMauiKeyCodeTypeInfoBootstrap;
@@ -98,4 +101,7 @@ namespace
 
 // Phase-1 pre-registration: the descriptor has to exist before anything calls
 // gpg::LookupRType on it. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EMauiKeyCodeTypeInfo_0079cc, register_EMauiKeyCodeTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EMauiKeyCodeTypeInfo_0079cc,
+  register_EMauiKeyCodeTypeInfo
+)

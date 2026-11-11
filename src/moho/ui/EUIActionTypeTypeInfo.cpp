@@ -18,7 +18,13 @@ namespace
     return sInstance;
   }
 
-  struct Bootstrap { Bootstrap() { moho::register_EUIActionTypeTypeInfoStartup(); } };
+  struct Bootstrap
+  {
+    Bootstrap()
+    {
+      moho::register_EUIActionTypeTypeInfoStartup();
+    }
+  };
   Bootstrap gBootstrap;
 } // namespace
 
@@ -32,7 +38,10 @@ EUIActionTypeTypeInfo::EUIActionTypeTypeInfo()
 EUIActionTypeTypeInfo::~EUIActionTypeTypeInfo() = default;
 
 /** Address: 0x00822120 */
-const char* EUIActionTypeTypeInfo::GetName() const { return "EUIActionType"; }
+const char* EUIActionTypeTypeInfo::GetName() const
+{
+  return "EUIActionType";
+}
 
 /**
  * Address: 0x00822100 (FUN_00822100, Init)
@@ -51,7 +60,9 @@ void EUIActionTypeTypeInfo::Init()
 /**
  * Address: 0x00822160 (FUN_00822160, AddEnums)
  */
-void EUIActionTypeTypeInfo::AddEnums(gpg::REnumType* const enumType)
+void EUIActionTypeTypeInfo::AddEnums(
+  gpg::REnumType* const enumType
+)
 {
   enumType->mPrefix = "EUIAT";
   enumType->AddEnum(enumType->StripPrefix("EUIAT_None"), 0);
@@ -74,7 +85,9 @@ void moho::register_EUIActionTypeTypeInfoStartup()
   (void)Acquire();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EUIActionTypeTypeInfoStartup_4d556a, moho::register_EUIActionTypeTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_EUIActionTypeTypeInfoStartup_4d556a,
+  moho::register_EUIActionTypeTypeInfoStartup
+)

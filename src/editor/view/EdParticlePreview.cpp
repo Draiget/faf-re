@@ -16,7 +16,9 @@ namespace faf::editor
 {
   namespace
   {
-    void Release(moho::CParticleTexture*& texture)
+    void Release(
+      moho::CParticleTexture*& texture
+    )
     {
       if (texture != nullptr) {
         (void)static_cast<moho::CountedObject*>(texture)->ReleaseReferenceAtomic();
@@ -25,7 +27,9 @@ namespace faf::editor
     }
 
     /** A texture for the particles, held by this preview (as WaveGenerator holds its own, WaveSystem.cpp). */
-    moho::CParticleTexture* Make(const std::string& path)
+    moho::CParticleTexture* Make(
+      const std::string& path
+    )
     {
       if (path.empty()) {
         return nullptr;
@@ -42,14 +46,18 @@ namespace faf::editor
     Release(mRamp);
   }
 
-  void EdParticlePreview::SetFlat(const FlatBlueprint& blueprint)
+  void EdParticlePreview::SetFlat(
+    const FlatBlueprint& blueprint
+  )
   {
     mFlat = blueprint;
     mUseFlat = true;
     Retexture();
   }
 
-  void EdParticlePreview::SetEmitter(const EmitterBlueprint& emitter)
+  void EdParticlePreview::SetEmitter(
+    const EmitterBlueprint& emitter
+  )
   {
     mUseFlat = false;
     mEmitter = emitter;
@@ -57,7 +65,11 @@ namespace faf::editor
     Retexture();
   }
 
-  void EdParticlePreview::SetPlace(const float x, const float y, const float z)
+  void EdParticlePreview::SetPlace(
+    const float x,
+    const float y,
+    const float z
+  )
   {
     mX = x;
     mY = y;
@@ -81,9 +93,12 @@ namespace faf::editor
     }
   }
 
-  void EdParticlePreview::FrameBeam(const int now)
+  void EdParticlePreview::FrameBeam(
+    const int now
+  )
   {
-    // The beam list is the renderer's for one tick (CWorldParticles::AdvancementBeat clears it), so each tick adds it again.
+    // The beam list is the renderer's for one tick (CWorldParticles::AdvancementBeat clears it), so each tick adds it
+    // again.
     const float lifetime = mFlat.Number("Lifetime", 1.0f);
     const float cycle = std::max(lifetime, 1.0f) + 5.0f;
     for (int tick = std::max(mLastTick + 1, now - 20); tick <= now; ++tick) {
@@ -114,11 +129,14 @@ namespace faf::editor
     beam.mUShift = mFlat.Number("UShift", 0.0f);
     beam.mVShift = mFlat.Number("VShift", 0.0f);
     beam.mRepeatRate = mFlat.Number("RepeatRate", 0.0f);
-    beam.mBlendMode = static_cast<moho::SWorldBeam::BlendMode>(std::clamp(static_cast<int>(mFlat.Number("Blendmode", 3.0f)), 0, 4));
+    beam.mBlendMode =
+      static_cast<moho::SWorldBeam::BlendMode>(std::clamp(static_cast<int>(mFlat.Number("Blendmode", 3.0f)), 0, 4));
     moho::sWorldParticles.AddBeam(beam);
   }
 
-  void EdParticlePreview::FrameTrail(const int now)
+  void EdParticlePreview::FrameTrail(
+    const int now
+  )
   {
     // The point a trail emitter rides on: a circle 15 units out, 5 up, a turn every 40 ticks.
     const auto point = [&](const float age) {
@@ -194,7 +212,9 @@ namespace faf::editor
       return;
     }
     std::uniform_real_distribution<float> unit(0.0f, 1.0f);
-    const auto random = [&] { return unit(mRandom); };
+    const auto random = [&] {
+      return unit(mRandom);
+    };
     const float frames = mEmitter.textureFrameCount > 0.0f ? mEmitter.textureFrameCount : 1.0f;
     const float strips = mEmitter.textureStripCount > 0.0f ? mEmitter.textureStripCount : 1.0f;
     // At most two seconds of ticks at once (a long stall doesn't flood the renderer).
@@ -208,7 +228,8 @@ namespace faf::editor
       }
       for (EmittedParticle p : EmitTick(mEmitter, mAge, mCarry, random)) {
         if (mScale != 1.0f) {
-          // EFFECT_SCALE, as CEfxEmitter::Tick multiplies its curves (the velocity and gravity aside: close enough here).
+          // EFFECT_SCALE, as CEfxEmitter::Tick multiplies its curves (the velocity and gravity aside: close enough
+          // here).
           for (int i = 0; i < 3; ++i) {
             p.pos[i] *= mScale;
             p.dir[i] *= mScale;
@@ -245,15 +266,28 @@ namespace faf::editor
         (void)moho::AssignCountedParticleTexturePtr(&particle.mTexture, mTexture);
         (void)moho::AssignCountedParticleTexturePtr(&particle.mRampTexture, mRamp);
         particle.mTypeTag = mTypeTag.c_str();
-        particle.mBlendMode = static_cast<moho::SWorldParticle::BlendMode>(std::clamp(static_cast<int>(mEmitter.blendMode), 0, 5));
+        particle.mBlendMode =
+          static_cast<moho::SWorldParticle::BlendMode>(std::clamp(static_cast<int>(mEmitter.blendMode), 0, 5));
         moho::sWorldParticles.AddWorldParticle(particle, nullptr);
         // The first particle and every 1000th: a line in the log: what the renderer was given (test runs read it).
         if (mEmitted % 1000 == 0) {
-          gpg::Logf("editor: particle preview tick %d (age %.0f): at %.1f %.1f %.1f, born %+.2f, life %.1f, size %.2f-%.2f, dir %.3f %.3f %.3f, %s",
-                    now, static_cast<double>(mAge), static_cast<double>(particle.mPos.x), static_cast<double>(particle.mPos.y),
-                    static_cast<double>(particle.mPos.z), static_cast<double>(particle.mInterop), static_cast<double>(particle.mLifetime),
-                    static_cast<double>(particle.mBeginSize), static_cast<double>(particle.mEndSize), static_cast<double>(particle.mDir.x),
-                    static_cast<double>(particle.mDir.y), static_cast<double>(particle.mDir.z), mTypeTag.c_str());
+          gpg::Logf(
+            "editor: particle preview tick %d (age %.0f): at %.1f %.1f %.1f, born %+.2f, life %.1f, size %.2f-%.2f, "
+            "dir %.3f %.3f %.3f, %s",
+            now,
+            static_cast<double>(mAge),
+            static_cast<double>(particle.mPos.x),
+            static_cast<double>(particle.mPos.y),
+            static_cast<double>(particle.mPos.z),
+            static_cast<double>(particle.mInterop),
+            static_cast<double>(particle.mLifetime),
+            static_cast<double>(particle.mBeginSize),
+            static_cast<double>(particle.mEndSize),
+            static_cast<double>(particle.mDir.x),
+            static_cast<double>(particle.mDir.y),
+            static_cast<double>(particle.mDir.z),
+            mTypeTag.c_str()
+          );
         }
         ++mEmitted;
       }

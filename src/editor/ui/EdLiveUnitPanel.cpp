@@ -33,7 +33,9 @@ namespace faf::editor
       readAt = now;
       info = ReadLiveUnit(readFor);
     }
-    const auto changed = [&] { readAt = -1.0; };
+    const auto changed = [&] {
+      readAt = -1.0;
+    };
     const auto each = [&](const std::string& lua) {
       for (const std::uint32_t id : ids) {
         LiveUnitDo(id, lua);
@@ -44,11 +46,16 @@ namespace faf::editor
     // What it is: the build icon, its name, the game's id, army and blueprint.
     {
       std::string icon = info.blueprint;
-      std::transform(icon.begin(), icon.end(), icon.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(icon.begin(), icon.end(), icon.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       mTools.Library().Pump(2);
       const float side = ImGui::GetFrameHeight() * 2.6f;
-      if (const std::uint64_t image = icon.empty() ? 0 : mTools.Library().Thumbnail("/textures/ui/common/icons/units/" + icon + "_icon.dds", true);
-          image != 0) {
+      if (
+        const std::uint64_t image =
+          icon.empty() ? 0 : mTools.Library().Thumbnail("/textures/ui/common/icons/units/" + icon + "_icon.dds", true);
+        image != 0
+      ) {
         ImGui::Image(static_cast<ImTextureID>(image), ImVec2(side, side));
       } else {
         ImGui::Dummy(ImVec2(side, side));
@@ -58,7 +65,9 @@ namespace faf::editor
       ImGui::TextUnformatted(info.found ? (info.name.empty() ? info.blueprint.c_str() : info.name.c_str()) : "(gone)");
       ImGui::TextDisabled("%s  |  army %d  |  game unit %u", info.blueprint.c_str(), info.army, ids.front());
       if (ids.size() > 1) {
-        ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "%zu of the game's units selected: changes go to all", ids.size());
+        ImGui::TextColored(
+          ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "%zu of the game's units selected: changes go to all", ids.size()
+        );
       }
       ImGui::EndGroup();
     }
@@ -85,7 +94,9 @@ namespace faf::editor
         health = info.health;
       }
       row("Health");
-      ImGui::SetNextItemWidth(-ImGui::CalcTextSize("Full").x - ImGui::GetStyle().FramePadding.x * 2.0f - ImGui::GetStyle().ItemSpacing.x);
+      ImGui::SetNextItemWidth(
+        -ImGui::CalcTextSize("Full").x - ImGui::GetStyle().FramePadding.x * 2.0f - ImGui::GetStyle().ItemSpacing.x
+      );
       ImGui::SliderFloat("##health", &health, 1.0f, std::max(info.maxHealth, 1.0f), "%.0f");
       editingHealth = ImGui::IsItemActive();
       if (ImGui::IsItemDeactivatedAfterEdit()) {
@@ -116,13 +127,18 @@ namespace faf::editor
         // (setting the shield's bit disables it), so those show "on" while the bit is clear; the weapon, generic and
         // special ones show the bit itself.
         const std::string name = ToggleName(toggle.cap);
-        const bool inverted = name == "Shield" || name == "Intel" || name == "Jamming" || name == "Production" || name == "Stealth" || name == "Cloak";
+        const bool inverted = name == "Shield" || name == "Intel" || name == "Jamming" || name == "Production" ||
+          name == "Stealth" || name == "Cloak";
         bool on = inverted ? !toggle.on : toggle.on;
         if (ImGui::Checkbox(((inverted ? name + " on" : name) + "##" + toggle.cap).c_str(), &on)) {
           const bool bit = inverted ? !on : on;
           each("u:SetScriptBit('" + toggle.cap + "', " + (bit ? "true" : "false") + ")");
         }
-        ImGui::SetItemTooltip("%s: the unit's script bit %s, as the game's order button sets it", toggle.cap.c_str(), toggle.on ? "set" : "clear");
+        ImGui::SetItemTooltip(
+          "%s: the unit's script bit %s, as the game's order button sets it",
+          toggle.cap.c_str(),
+          toggle.on ? "set" : "clear"
+        );
       }
     }
 
@@ -143,9 +159,14 @@ namespace faf::editor
           }
           ImGui::EndDisabled();
           if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-            ImGui::SetTooltip("%s%s%s", e->has ? (e->removable ? "Click to take it off (its Remove enhancement)" : "The blueprint has no way to take it off")
-                                               : "Click to add it at once (CreateEnhancement, no build time)",
-                              e->prerequisite.empty() ? "" : "\nNeeds first: ", e->prerequisite.c_str());
+            ImGui::SetTooltip(
+              "%s%s%s",
+              e->has ? (e->removable ? "Click to take it off (its Remove enhancement)"
+                                     : "The blueprint has no way to take it off")
+                     : "Click to add it at once (CreateEnhancement, no build time)",
+              e->prerequisite.empty() ? "" : "\nNeeds first: ",
+              e->prerequisite.c_str()
+            );
           }
           ImGui::PopID();
         }
@@ -163,7 +184,10 @@ namespace faf::editor
       }
       ImGui::SetItemTooltip("Taken out of the game at once, no wreck");
     }
-    HelpNote("The game's own unit, live in the running play: a drag in the view moves it (Warp), and each change here is "
-             "the game's own call in its sim (SimLua; the editor's plays have cheats on). Nothing here changes the map's files.");
+    HelpNote(
+      "The game's own unit, live in the running play: a drag in the view moves it (Warp), and each change here is "
+      "the game's own call in its sim (SimLua; the editor's plays have cheats on). Nothing here changes the map's "
+      "files."
+    );
   }
 } // namespace faf::editor

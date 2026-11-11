@@ -52,8 +52,12 @@ namespace moho
      * everything again.
      */
     [[nodiscard]] bool Submit(
-      MeshRenderer& meshRenderer, const MeshBatchBucketTree& meshes, const CHeightField* heightField, const GeomCamera3& lightCamera,
-      const GeomCamera3& viewCamera, const float (&sunDirection)[3]
+      MeshRenderer& meshRenderer,
+      const MeshBatchBucketTree& meshes,
+      const CHeightField* heightField,
+      const GeomCamera3& lightCamera,
+      const GeomCamera3& viewCamera,
+      const float (&sunDirection)[3]
     );
 
     /**
@@ -90,7 +94,8 @@ namespace moho
     std::uint64_t mEpoch = ~0ULL; // gpg::gal::gRaySceneEpoch the pieces belong to
     std::uint32_t mSweepFrames = 0U;
     std::map<std::pair<const RScmResource*, int>, MeshPieces> mMeshes; // resource, 1 skinned | 2 alpha-tested
-    std::vector<boost::shared_ptr<gpg::gal::Texture>> mAlphaTextures;   // this frame's, indexed by RayInstance::texture - 1
+    std::vector<boost::shared_ptr<gpg::gal::Texture>>
+      mAlphaTextures;           // this frame's, indexed by RayInstance::texture - 1
     bool mAlphaMissing = false; // this frame, an alpha-tested mesh isn't in the scene
     const CHeightField* mTerrainField = nullptr;
     std::uint64_t mTerrainRevision = ~0ULL;

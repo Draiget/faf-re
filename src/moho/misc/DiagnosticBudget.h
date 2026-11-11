@@ -25,7 +25,9 @@ namespace moho
     /// True for the first `limit` calls. Once the budget is spent this is one relaxed load: no
     /// further tickets are taken, so a hot-path probe stops paying for the atomic increment and the
     /// counter can never wrap.
-    [[nodiscard]] bool Take(const int limit) noexcept
+    [[nodiscard]] bool Take(
+      const int limit
+    ) noexcept
     {
       if (Count() >= limit) {
         return false;

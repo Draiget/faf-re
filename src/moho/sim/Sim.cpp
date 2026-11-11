@@ -13,14 +13,19 @@ namespace moho
 
   /// Engine addition: the light recon refreshes before the heavy army run next to its ReconTick.
   extern bool sim_ReconOverlap;
-}
+} // namespace moho
 
 namespace
 {
   /// Plan WPL.18: one table's keys in `lua_next` order, `depth` levels down into tables under
   /// string keys (at the top level only into `moho`). Other keys print as their number or
   /// type, never as an address.
-  void DumpLuaTableKeys(lua_State* const state, std::FILE* const out, const std::string& path, const int depth)
+  void DumpLuaTableKeys(
+    lua_State* const state,
+    std::FILE* const out,
+    const std::string& path,
+    const int depth
+  )
   {
     lua_pushnil(state);
     while (lua_next(state, -2) != 0) {
@@ -37,7 +42,9 @@ namespace
       }
       const std::string child = path.empty() ? name : path + "." + name;
       std::fprintf(out, "%s %s\n", child.c_str(), lua_typename(state, lua_type(state, -1)));
-      if (depth > 0 && keyType == LUA_TSTRING && lua_type(state, -1) == LUA_TTABLE && (!path.empty() || name == "moho")) {
+      if (
+        depth > 0 && keyType == LUA_TSTRING && lua_type(state, -1) == LUA_TTABLE && (!path.empty() || name == "moho")
+      ) {
         DumpLuaTableKeys(state, out, child, depth - 1);
       }
       lua_settop(state, -2); // pop the value, keep the key for lua_next
@@ -45,7 +52,10 @@ namespace
   }
 
   /// Plan WPL.18: the globals' `pairs()` order and that of the `moho` class tables.
-  void DumpLuaPairsOrder(lua_State* const state, const char* const path)
+  void DumpLuaPairsOrder(
+    lua_State* const state,
+    const char* const path
+  )
   {
     std::FILE* out = nullptr;
     if (state == nullptr || fopen_s(&out, path, "w") != 0 || out == nullptr) {
@@ -58,10 +68,7 @@ namespace
     lua_settop(state, top);
     std::fclose(out);
   }
-}
-
-
-
+} // namespace
 
 // Engine addition (dedicated-server plan WPL.4), declared in CSimSoundManager.h.
 moho::SoundEnabledHook moho::sSoundEnabled = nullptr;
@@ -92,9 +99,7 @@ namespace moho
 #if defined(_M_IX86)
   static_assert(sizeof(CPrfTimeLogItem) == 0x18, "CPrfTimeLogItem size must be 0x18");
 #endif
-}
-
-
+} // namespace moho
 
 /**
  * Address: 0x004A3580 (FUN_004A3580, ??1CPrfTimeLogItem@Moho@@QAE@XZ)
@@ -108,14 +113,20 @@ moho::CPrfTimeLogItem::~CPrfTimeLogItem()
 }
 namespace
 {
-  [[nodiscard]] fa::string BuildMd5TraceIndent(const std::size_t indentDepth)
+  [[nodiscard]] fa::string BuildMd5TraceIndent(
+    const std::size_t indentDepth
+  )
   {
     fa::string indent{};
     (void)indent.resize(indentDepth * 2u, ' ');
     return indent;
   }
 
-  void PrintMd5TraceLexical(FILE* const traceFile, const std::size_t indentDepth, const fa::string& lexical)
+  void PrintMd5TraceLexical(
+    FILE* const traceFile,
+    const std::size_t indentDepth,
+    const fa::string& lexical
+  )
   {
     if (traceFile == nullptr) {
       return;
@@ -125,7 +136,11 @@ namespace
     std::fprintf(traceFile, "%s%s\n", indent.c_str(), lexical.c_str());
   }
 
-  void PrintMd5TraceFieldPrefix(FILE* const traceFile, const std::size_t indentDepth, const char* const fieldName)
+  void PrintMd5TraceFieldPrefix(
+    FILE* const traceFile,
+    const std::size_t indentDepth,
+    const char* const fieldName
+  )
   {
     if (traceFile == nullptr) {
       return;
@@ -135,7 +150,11 @@ namespace
     std::fprintf(traceFile, "%s%s:\n", indent.c_str(), fieldName != nullptr ? fieldName : "");
   }
 
-  void PrintMd5TraceIndexPrefix(FILE* const traceFile, const std::size_t indentDepth, const std::uint32_t index)
+  void PrintMd5TraceIndexPrefix(
+    FILE* const traceFile,
+    const std::size_t indentDepth,
+    const std::uint32_t index
+  )
   {
     if (traceFile == nullptr) {
       return;
@@ -144,10 +163,7 @@ namespace
     const fa::string indent = BuildMd5TraceIndent(indentDepth);
     std::fprintf(traceFile, "%s[%u]:\n", indent.c_str(), index);
   }
-}
-
-
-
+} // namespace
 
 /**
  * Address: 0x004A4920 (FUN_004A4920)
@@ -168,10 +184,10 @@ void moho::REF_UpdateMD5(
 {
   gpg::RType* const refType = ref.mType;
   const std::size_t depth = static_cast<std::size_t>(indentDepth);
-  const bool isPrimitiveLike =
-    refType == gpg::RTypeOf<char>() || refType == gpg::RTypeOf<short>() || refType == gpg::RTypeOf<int>() || refType == gpg::RTypeOf<long>()
-    || refType == gpg::RTypeOf<signed char>() || refType == gpg::RTypeOf<unsigned char>() || refType == gpg::RTypeOf<float>()
-    || refType == gpg::RTypeOf<bool>() || refType->IsEnumType() != nullptr;
+  const bool isPrimitiveLike = refType == gpg::RTypeOf<char>() || refType == gpg::RTypeOf<short>() ||
+    refType == gpg::RTypeOf<int>() || refType == gpg::RTypeOf<long>() || refType == gpg::RTypeOf<signed char>() ||
+    refType == gpg::RTypeOf<unsigned char>() || refType == gpg::RTypeOf<float>() || refType == gpg::RTypeOf<bool>() ||
+    refType->IsEnumType() != nullptr;
 
   if (isPrimitiveLike) {
     if (traceFile != nullptr) {
@@ -254,7 +270,9 @@ namespace
    * What it does:
    * Returns the `Sim::mRules` pointer lane.
    */
-  [[maybe_unused]] [[nodiscard]] RRuleGameRules* ReadSimRulesLane(Sim* const sim) noexcept
+  [[maybe_unused]] [[nodiscard]] RRuleGameRules* ReadSimRulesLane(
+    Sim* const sim
+  ) noexcept
   {
     return sim != nullptr ? sim->mRules : nullptr;
   }
@@ -265,22 +283,18 @@ namespace
    * What it does:
    * Returns the `Sim::mMapData` pointer lane.
    */
-  [[maybe_unused]] [[nodiscard]] STIMap* ReadSimMapDataLane(Sim* const sim) noexcept
+  [[maybe_unused]] [[nodiscard]] STIMap* ReadSimMapDataLane(
+    Sim* const sim
+  ) noexcept
   {
     return sim != nullptr ? sim->mMapData : nullptr;
   }
 
-
-
-
-
-
-
-
-
-
   template <class THandler>
-  void ForEachSelectedUnit(EntitySetTemplate<Unit>* const selectedUnits, THandler&& handler)
+  void ForEachSelectedUnit(
+    EntitySetTemplate<Unit>* const selectedUnits,
+    THandler&& handler
+  )
   {
     if (selectedUnits == nullptr) {
       return;
@@ -294,7 +308,10 @@ namespace
     }
   }
 
-  bool ParseBoolLiteral(const char* text, bool& outValue)
+  bool ParseBoolLiteral(
+    const char* text,
+    bool& outValue
+  )
   {
     if (gpg::STR_EqualsNoCase(text, "true")) {
       outValue = true;
@@ -310,12 +327,13 @@ namespace
   }
 
   [[nodiscard]]
-  CEconStorage* GetArmyEconStorage(CArmyImpl& army) noexcept
+  CEconStorage* GetArmyEconStorage(
+    CArmyImpl& army
+  ) noexcept
   {
     CSimArmyEconomyInfo* const economyInfo = army.GetEconomy();
     return economyInfo != nullptr ? economyInfo->storageDelta : nullptr;
   }
-
 
   /**
    * Address: 0x006E0850 (FUN_006E0850)
@@ -324,8 +342,9 @@ namespace
    * Extracts the low 24-bit command-id/index payload lane from packed command
    * id storage.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ExtractPackedCommandIdLow24Bits(const std::uint32_t* const packedValue)
-    noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t ExtractPackedCommandIdLow24Bits(
+    const std::uint32_t* const packedValue
+  ) noexcept
   {
     return packedValue != nullptr ? (*packedValue & 0x00FFFFFFu) : 0u;
   }
@@ -338,7 +357,9 @@ namespace
     return commandDb ? commandDb->AddIssueData(issueData) : nullptr;
   }
 
-  [[nodiscard]] bool IsUnitIdleState(Unit* const unit) noexcept
+  [[nodiscard]] bool IsUnitIdleState(
+    Unit* const unit
+  ) noexcept
   {
     if (unit == nullptr || unit->CommandQueue == nullptr) {
       return true;
@@ -386,8 +407,10 @@ namespace
         continue;
       }
 
-      if (!candidate->IsInCategory("TRANSPORTATION") && !candidate->IsInCategory("AIRSTAGINGPLATFORM")
-          && !candidate->IsInCategory("TELEPORTATION")) {
+      if (
+        !candidate->IsInCategory("TRANSPORTATION") && !candidate->IsInCategory("AIRSTAGINGPLATFORM") &&
+        !candidate->IsInCategory("TELEPORTATION")
+      ) {
         continue;
       }
 
@@ -569,7 +592,10 @@ namespace
   }
 
   // 0x00748AA0 resolves unit blueprints from RResId via RRuleGameRules::GetUnitBlueprint.
-  const RUnitBlueprint* ResolveUnitBlueprint(RRuleGameRules* rules, const RResId& blueprintId)
+  const RUnitBlueprint* ResolveUnitBlueprint(
+    RRuleGameRules* rules,
+    const RResId& blueprintId
+  )
   {
     if (!rules) {
       return nullptr;
@@ -635,7 +661,10 @@ namespace
   // writes cos(half) into the native `.w` lane), which produced a
   // `.w`-scalar-tagged-as-`.x` quaternion for every spawned unit's initial
   // heading. Same pattern as `Unit::PredictAheadBomb`'s earlier fix.
-  VTransform BuildUnitSpawnTransform(const SCoordsVec2& pos, const float heading)
+  VTransform BuildUnitSpawnTransform(
+    const SCoordsVec2& pos,
+    const float heading
+  )
   {
     const Wm3::Vec3f headingAxis{0.0f, 1.0f, 0.0f};
     Wm3::Quatf orientation{};
@@ -644,9 +673,11 @@ namespace
     return VTransform(worldPosition, orientation);
   }
 
-
   // 0x00748D50 queues silo builds through CAiSiloBuildImpl (0=tactical, 1=nuke).
-  bool QueueSiloBuildRequest(Unit* unit, const int modeIndex)
+  bool QueueSiloBuildRequest(
+    Unit* unit,
+    const int modeIndex
+  )
   {
     if (!unit || !unit->AiSiloBuild) {
       return false;
@@ -656,7 +687,10 @@ namespace
   }
 
   // 0x00748CD0 applies orientation+position in one call via Entity::Warp.
-  void ApplyWarpTransform(Entity* entity, const VTransform& transform)
+  void ApplyWarpTransform(
+    Entity* entity,
+    const VTransform& transform
+  )
   {
     if (!entity) {
       return;
@@ -671,7 +705,9 @@ namespace
    * What it does:
    * Core Sim load-serialization routine used by Sim serializer callback.
    */
-  [[maybe_unused]] gpg::RType* FindRTypeByNameAny(const std::initializer_list<const char*>& names)
+  [[maybe_unused]] gpg::RType* FindRTypeByNameAny(
+    const std::initializer_list<const char*>& names
+  )
   {
     gpg::TypeMap& map = gpg::GetRTypeMap();
     for (const char* name : names) {
@@ -692,7 +728,6 @@ namespace
     return nullptr;
   }
 
-
   bool IsSimDebugCheatsEnabled()
   {
     return moho::console::SimDebugCheatsEnabled();
@@ -703,16 +738,22 @@ namespace
     return moho::console::SimReportCheatsEnabled();
   }
 
-  int GetCallStackFrames(std::uintptr_t* outFrames)
+  int GetCallStackFrames(
+    std::uintptr_t* outFrames
+  )
   {
     return moho::console::PlatformGetCallStack(outFrames, 0x10u);
   }
 
-  void FormatCallStack(fa::string* outText, const int frameCount, const std::uintptr_t* frames)
+  void FormatCallStack(
+    fa::string* outText,
+    const int frameCount,
+    const std::uintptr_t* frames
+  )
   {
     moho::console::PlatformFormatCallstack(outText, frameCount, frames);
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -773,14 +814,14 @@ namespace moho
     void ResetQueuedFootprint();
 
   public:
-    CArmyImpl* mOwnerContext;         // +0x0C
-    Sim* mSim;                        // +0x10
-    COGrid* mOGrid;                   // +0x14
-    PathQueue* mPathQueue;            // +0x18: the owning army's path queue (`CArmyImpl::PathFinder`)
-    SOCellPos mStartCell;             // +0x1C
-    SOCellPos mGoalCell;              // +0x20
-    const SFootprint* mFootprint;     // +0x24
-    bool mStartCellIsTraversable;     // +0x28 (asm: OCCUPY_FootprintFits tested against mStartCell, not mGoalCell)
+    CArmyImpl* mOwnerContext;     // +0x0C
+    Sim* mSim;                    // +0x10
+    COGrid* mOGrid;               // +0x14
+    PathQueue* mPathQueue;        // +0x18: the owning army's path queue (`CArmyImpl::PathFinder`)
+    SOCellPos mStartCell;         // +0x1C
+    SOCellPos mGoalCell;          // +0x20
+    const SFootprint* mFootprint; // +0x24
+    bool mStartCellIsTraversable; // +0x28 (asm: OCCUPY_FootprintFits tested against mStartCell, not mGoalCell)
   };
 
   static_assert(offsetof(PathPreviewFinder, mOwnerContext) == 0x0C, "PathPreviewFinder::mOwnerContext offset");
@@ -790,10 +831,15 @@ namespace moho
   static_assert(offsetof(PathPreviewFinder, mStartCell) == 0x1C, "PathPreviewFinder::mStartCell offset");
   static_assert(offsetof(PathPreviewFinder, mGoalCell) == 0x20, "PathPreviewFinder::mGoalCell offset");
   static_assert(offsetof(PathPreviewFinder, mFootprint) == 0x24, "PathPreviewFinder::mFootprint offset");
-  static_assert(offsetof(PathPreviewFinder, mStartCellIsTraversable) == 0x28, "PathPreviewFinder::mStartCellIsTraversable offset");
+  static_assert(
+    offsetof(PathPreviewFinder, mStartCellIsTraversable) == 0x28,
+    "PathPreviewFinder::mStartCellIsTraversable offset"
+  );
   static_assert(sizeof(PathPreviewFinder) == 0x2C, "PathPreviewFinder size must be 0x2C");
 
-  PathPreviewFinder::PathPreviewFinder(CArmyImpl* const owningArmy) noexcept
+  PathPreviewFinder::PathPreviewFinder(
+    CArmyImpl* const owningArmy
+  ) noexcept
     : IPathTraveler()
     , mOwnerContext(owningArmy)
     , mSim(owningArmy->GetSim())
@@ -803,8 +849,7 @@ namespace moho
     , mGoalCell{0, 0}
     , mFootprint(nullptr)
     , mStartCellIsTraversable(false)
-  {
-  }
+  {}
 
   /**
    * Address: 0x007657D0 (FUN_007657D0)
@@ -814,11 +859,13 @@ namespace moho
    * (implicit) destructor chain -- see `PathPreviewFinder.h` for the full
    * cross-emission evidence -- then releasing the allocation.
    */
-  void DeletePathPreviewFinder(PathPreviewFinder* const finder) noexcept
+  void DeletePathPreviewFinder(
+    PathPreviewFinder* const finder
+  ) noexcept
   {
     delete finder;
   }
-}
+} // namespace moho
 
 namespace
 {
@@ -894,7 +941,7 @@ namespace
   {
     return CopyDwordRangeNullable(destination, sourceBegin, sourceEnd);
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -903,20 +950,26 @@ namespace moho
     return mFootprint;
   }
 
-  bool PathPreviewFinder::CanTraverseCell(const SOCellPos& cellPos) const
+  bool PathPreviewFinder::CanTraverseCell(
+    const SOCellPos& cellPos
+  ) const
   {
-    return static_cast<std::uint8_t>(
-             OCCUPY_FootprintFits(*mOGrid, cellPos, *mFootprint, EOccupancyCaps::OC_ANY)
-           ) != 0u;
+    return static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, cellPos, *mFootprint, EOccupancyCaps::OC_ANY)) != 0u;
   }
 
   // Address: 0x007647A0 (FUN_007647A0) -- always-in-bounds policy for preview traversal.
-  bool PathPreviewFinder::IsInBounds(const SOCellPos&, const SOCellPos&, float*) const
+  bool PathPreviewFinder::IsInBounds(
+    const SOCellPos&,
+    const SOCellPos&,
+    float*
+  ) const
   {
     return true;
   }
 
-  float PathPreviewFinder::GetHeuristicCost(const SOCellPos& cellPos) const
+  float PathPreviewFinder::GetHeuristicCost(
+    const SOCellPos& cellPos
+  ) const
   {
     const float deltaX = std::fabs(static_cast<float>(mGoalCell.x - cellPos.x));
     const float deltaZ = std::fabs(static_cast<float>(mGoalCell.z - cellPos.z));
@@ -927,13 +980,17 @@ namespace moho
   }
 
   // Address: 0x00764A00 (FUN_00764A00) -- writes the current preview anchor cell into the output lane.
-  void PathPreviewFinder::GetAnchorCell(HPathCell* const outCell) const
+  void PathPreviewFinder::GetAnchorCell(
+    HPathCell* const outCell
+  ) const
   {
     outCell->x = static_cast<std::uint16_t>(mStartCell.x);
     outCell->z = static_cast<std::uint16_t>(mStartCell.z);
   }
 
-  bool PathPreviewFinder::IsGoalCandidateCell(const SOCellPos& cellPos) const
+  bool PathPreviewFinder::IsGoalCandidateCell(
+    const SOCellPos& cellPos
+  ) const
   {
     return cellPos.x == mGoalCell.x && cellPos.z == mGoalCell.z;
   }
@@ -950,7 +1007,9 @@ namespace moho
    * the previous footprint pointer is carried in `mMetaWord`. Clears the
    * active footprint lane before publishing.
    */
-  void PathPreviewFinder::OnPathAccepted(const SNavPath& path)
+  void PathPreviewFinder::OnPathAccepted(
+    const SNavPath& path
+  )
   {
     SArmyVectorWithMeta payload{};
     const std::size_t cellCount = path.Count();
@@ -964,7 +1023,9 @@ namespace moho
     mOwnerContext->SetUnknownVectorWithMeta(&payload);
   }
 
-  bool PathPreviewFinder::ShouldSearchRect(const gpg::Rect2i& rect) const
+  bool PathPreviewFinder::ShouldSearchRect(
+    const gpg::Rect2i& rect
+  ) const
   {
     const auto inRect = [&rect](const SOCellPos& cell) {
       return cell.x >= rect.x0 && cell.x < rect.x1 && cell.z >= rect.z0 && cell.z < rect.z1;
@@ -973,9 +1034,7 @@ namespace moho
   }
 
   // Address: 0x007647B0 (FUN_007647B0, nullsub_2211) -- no-op cancellation callback.
-  void PathPreviewFinder::OnPathSearchCancelled()
-  {
-  }
+  void PathPreviewFinder::OnPathSearchCancelled() {}
 
   /**
    * Address: 0x00764B60 (FUN_00764B60)
@@ -985,7 +1044,9 @@ namespace moho
    * own `OnPathAccepted` vtable slot, i.e. a rejected search publishes the
    * same cell payload as an accepted one.
    */
-  void PathPreviewFinder::OnPathRejected(const SNavPath& path)
+  void PathPreviewFinder::OnPathRejected(
+    const SNavPath& path
+  )
   {
     OnPathAccepted(path);
   }
@@ -1004,7 +1065,9 @@ namespace moho
   }
 
   // Address: 0x007647D0 (FUN_007647D0) -- clears one output result-cell lane.
-  void PathPreviewFinder::GetResultCell(HPathCell* const outCell) const
+  void PathPreviewFinder::GetResultCell(
+    HPathCell* const outCell
+  ) const
   {
     outCell->x = 0;
     outCell->z = 0;
@@ -1042,7 +1105,7 @@ namespace moho
     ListUnlink();
     mFootprint = nullptr;
   }
-}
+} // namespace moho
 
 namespace
 {
@@ -1053,7 +1116,9 @@ namespace
    * Chooses one live unit from the candidate unit-set lane that has a resolved
    * footprint and the largest blueprint size-Z lane.
    */
-  Unit* PathPreviewSelectLargestUnit(const EntitySetTemplate<Unit>* const unitSet)
+  Unit* PathPreviewSelectLargestUnit(
+    const EntitySetTemplate<Unit>* const unitSet
+  )
   {
     if (!unitSet) {
       return nullptr;
@@ -1088,7 +1153,9 @@ namespace
    * it has one (`IAiBuilder` slot 8, 0x00764C2B), otherwise the unit's command
    * queue (`Unit::CommandQueue` +0x4B4, list at +0x0C).
    */
-  [[nodiscard]] const fa::vector<WeakPtr<CUnitCommand>>* PathPreviewCommandList(Unit& unit)
+  [[nodiscard]] const fa::vector<WeakPtr<CUnitCommand>>* PathPreviewCommandList(
+    Unit& unit
+  )
   {
     if (IAiBuilder* const builder = unit.AiBuilder; builder != nullptr) {
       const fa::vector<WeakPtr<CUnitCommand>>& factoryQueue = builder->BuilderGetFactoryCommandQueue();
@@ -1106,7 +1173,9 @@ namespace
    * `and edx, 2` at 0x00764C92). A shift of 64 or more clears the bit, as
    * `_allshl` does.
    */
-  [[nodiscard]] bool PathPreviewSkipsCommand(const EUnitCommandType commandType) noexcept
+  [[nodiscard]] bool PathPreviewSkipsCommand(
+    const EUnitCommandType commandType
+  ) noexcept
   {
     constexpr std::uint64_t kSkippedCommandMask = 0x2D80000EAull;
     const auto shift = static_cast<std::uint32_t>(commandType);
@@ -1121,7 +1190,10 @@ namespace
    * Chooses one terminal target position from queued command-target handles
    * (walking newest-to-oldest), then falls back to the unit position lane.
    */
-  Wm3::Vector3f* PathPreviewResolveEndPosition(Wm3::Vector3f* const outPos, Unit* const unit)
+  Wm3::Vector3f* PathPreviewResolveEndPosition(
+    Wm3::Vector3f* const outPos,
+    Unit* const unit
+  )
   {
     if (const fa::vector<WeakPtr<CUnitCommand>>* const commands = PathPreviewCommandList(*unit); commands != nullptr) {
       // Newest first. The binary dereferences each command without a null
@@ -1146,7 +1218,7 @@ namespace
     outPos->z = unitPos.z;
     return outPos;
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -1204,11 +1276,9 @@ namespace moho
       }
 
       Wm3::Vector3f resolvedEndPos{};
-      const bool wantsEndPosition =
-        commandArgs->size() > 1 && (*commandArgs)[1] == "end";
-      const Wm3::Vector3f& sourcePos = wantsEndPosition
-        ? *PathPreviewResolveEndPosition(&resolvedEndPos, unit)
-        : unit->GetPosition();
+      const bool wantsEndPosition = commandArgs->size() > 1 && (*commandArgs)[1] == "end";
+      const Wm3::Vector3f& sourcePos =
+        wantsEndPosition ? *PathPreviewResolveEndPosition(&resolvedEndPos, unit) : unit->GetPosition();
 
       const RUnitBlueprint* const blueprint = unit->GetBlueprint();
       const SFootprint* const footprint = blueprint->Physics.ResolvedFootprint;
@@ -1249,12 +1319,15 @@ namespace moho
 
     return 0;
   }
-}
+} // namespace moho
 
 namespace
 {
 
-  [[nodiscard]] bool TryParseArmyIndexArg(const std::string& text, std::size_t& outIndex) noexcept
+  [[nodiscard]] bool TryParseArmyIndexArg(
+    const std::string& text,
+    std::size_t& outIndex
+  ) noexcept
   {
     if (text.empty()) {
       return false;
@@ -1272,7 +1345,9 @@ namespace
 
   template <typename THandler>
   void ForEachTargetArmyUnit(
-    Sim* const sim, const CSimConCommand::ParsedCommandArgs* const commandArgs, THandler&& handler
+    Sim* const sim,
+    const CSimConCommand::ParsedCommandArgs* const commandArgs,
+    THandler&& handler
   )
   {
     if (!sim || !sim->mEntityDB) {
@@ -1335,7 +1410,9 @@ namespace
     Unknown = 0xFFu
   };
 
-  [[nodiscard]] PurgeCategory ParsePurgeCategory(const std::string& token)
+  [[nodiscard]] PurgeCategory ParsePurgeCategory(
+    const std::string& token
+  )
   {
     const char* const text = token.c_str();
     if (gpg::STR_EqualsNoCase(text, "all") || gpg::STR_StartsWithNoCase(text, "entity")) {
@@ -1359,7 +1436,10 @@ namespace
     return PurgeCategory::Unknown;
   }
 
-  [[nodiscard]] bool EntityMatchesPurgeCategory(const Entity& entity, const PurgeCategory category)
+  [[nodiscard]] bool EntityMatchesPurgeCategory(
+    const Entity& entity,
+    const PurgeCategory category
+  )
   {
     Entity& mutableEntity = const_cast<Entity&>(entity);
     switch (category) {
@@ -1381,7 +1461,10 @@ namespace
     }
   }
 
-  [[nodiscard]] bool EntityMatchesPurgeArmyFilter(const Entity& entity, const int armyFilter) noexcept
+  [[nodiscard]] bool EntityMatchesPurgeArmyFilter(
+    const Entity& entity,
+    const int armyFilter
+  ) noexcept
   {
     if (armyFilter < 0) {
       return true;
@@ -1391,7 +1474,9 @@ namespace
     return ExtractEntityIdSourceIndex(static_cast<std::uint32_t>(entity.id_)) == armyIndex;
   }
 
-  [[nodiscard]] bool ShouldDestroyEntityForPurge(const Entity& entity) noexcept
+  [[nodiscard]] bool ShouldDestroyEntityForPurge(
+    const Entity& entity
+  ) noexcept
   {
     return entity.mVarDat.mIsDead == 0u && entity.DestroyQueuedFlag == 0u && entity.mOnDestroyDispatched == 0u;
   }
@@ -1403,7 +1488,9 @@ namespace
     return GetDbgOverlays().owners_member<RDebugOverlayClass, &RDebugOverlayClass::mOverlayClassLink>();
   }
 
-  [[nodiscard]] gpg::RType* TryFindExactDebugOverlayType(const std::string& requestedName) noexcept
+  [[nodiscard]] gpg::RType* TryFindExactDebugOverlayType(
+    const std::string& requestedName
+  ) noexcept
   {
     for (RDebugOverlayClass* const overlayClass : RegisteredDebugOverlayClasses()) {
       const char* const overlayName = overlayClass->mOverlayToken.c_str();
@@ -1427,7 +1514,8 @@ namespace
    */
   void PushBackDebugOverlayClassPtrVector(
     std::vector<const RDebugOverlayClass*>& destination,
-    const RDebugOverlayClass* const value)
+    const RDebugOverlayClass* const value
+  )
   {
     destination.push_back(value);
   }
@@ -1445,7 +1533,9 @@ namespace
     }
   }
 
-  void PrintAvailableDebugOverlayList(Sim& sim)
+  void PrintAvailableDebugOverlayList(
+    Sim& sim
+  )
   {
     sim.Printf(kDbgAvailableOverlaysText);
 
@@ -1454,7 +1544,10 @@ namespace
     }
   }
 
-  [[nodiscard]] RDebugOverlay* FindDebugOverlayInstanceByType(Sim& sim, const gpg::RType& overlayType) noexcept
+  [[nodiscard]] RDebugOverlay* FindDebugOverlayInstanceByType(
+    Sim& sim,
+    const gpg::RType& overlayType
+  ) noexcept
   {
     for (RDebugOverlay* const overlay : sim.mDebugOverlays.owners()) {
       if (overlay->GetClass() == &overlayType) {
@@ -1465,17 +1558,21 @@ namespace
     return nullptr;
   }
 
-  [[nodiscard]] RDebugOverlay* CreateDebugOverlayInstance(gpg::RType& overlayType)
+  [[nodiscard]] RDebugOverlay* CreateDebugOverlayInstance(
+    gpg::RType& overlayType
+  )
   {
     return RDebugOverlay::NewPtr(overlayType);
   }
 
-  void RemoveDebugOverlayInstance(RDebugOverlay& overlay)
+  void RemoveDebugOverlayInstance(
+    RDebugOverlay& overlay
+  )
   {
     // 0x00651E6D: the deleting destructor alone; `~RDebugOverlay` unlinks.
     delete &overlay;
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -1507,9 +1604,7 @@ namespace moho
   {
     return ::ResolveUnitBlueprintFromLuaArgumentImpl(state, blueprintObject, functionName);
   }
-}
-
-
+} // namespace moho
 
 #include "SimSyncData.inl"
 

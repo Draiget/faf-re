@@ -10,5 +10,8 @@ class wxBitmap : public wxObject
 {
 public:
   wxBitmap() = default;
-  bool Ok() const { return false; }
+  bool Ok() const
+  {
+    return false;
+  }
 };

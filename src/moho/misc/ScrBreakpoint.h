@@ -50,9 +50,9 @@ namespace moho
     void FromString(const fa::string& serializedBreakpoint);
 
   public:
-    bool enabled;      // +0x04
-    fa::string name;// +0x08
-    int line;          // +0x24
+    bool enabled;    // +0x04
+    fa::string name; // +0x08
+    int line;        // +0x24
   };
 
   static_assert(offsetof(ScrBreakpoint, enabled) == 0x04, "ScrBreakpoint::enabled offset must be 0x04");

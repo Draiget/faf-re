@@ -35,7 +35,6 @@ namespace moho
 
   static_assert(sizeof(EmitterTypeTypeInfo) == 0x78, "EmitterTypeTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x0065DEB0 (FUN_0065DEB0, register_EmitterTypeTypeInfo_00)
    *

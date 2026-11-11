@@ -17,7 +17,9 @@ namespace moho
     return gWldFrameAction;
   }
 
-  void WLD_SetFrameAction(const EWldFrameAction action)
+  void WLD_SetFrameAction(
+    const EWldFrameAction action
+  )
   {
     gWldFrameAction = action;
   }

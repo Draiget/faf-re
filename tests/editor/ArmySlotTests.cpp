@@ -10,29 +10,46 @@ namespace
   using faf::editor::Symmetry;
   using Start = std::optional<std::array<float, 2>>;
 
-  // SCMP_009's eight starts (its _save.lua), slot order as the map has it; the map is half turn symmetric, 1025 samples.
+  // SCMP_009's eight starts (its _save.lua), slot order as the map has it; the map is half turn symmetric, 1025
+  // samples.
   const std::vector<Start> kSeton = {
-    std::array<float, 2>{672.0f, 346.0f}, std::array<float, 2>{358.0f, 674.0f}, std::array<float, 2>{856.0f, 434.0f},
-    std::array<float, 2>{172.0f, 600.0f}, std::array<float, 2>{662.0f, 168.0f}, std::array<float, 2>{366.0f, 864.0f},
-    std::array<float, 2>{926.0f, 102.0f}, std::array<float, 2>{100.0f, 914.0f},
+    std::array<float, 2>{672.0f, 346.0f},
+    std::array<float, 2>{358.0f, 674.0f},
+    std::array<float, 2>{856.0f, 434.0f},
+    std::array<float, 2>{172.0f, 600.0f},
+    std::array<float, 2>{662.0f, 168.0f},
+    std::array<float, 2>{366.0f, 864.0f},
+    std::array<float, 2>{926.0f, 102.0f},
+    std::array<float, 2>{100.0f, 914.0f},
   };
 
-  TEST(ArmySlots, HalfTurnPartnersAreTheOppositeStarts)
+  TEST(
+    ArmySlots,
+    HalfTurnPartnersAreTheOppositeStarts
+  )
   {
     const std::vector<int> partners = faf::editor::MirrorPartners(kSeton, 1025, 1025, Symmetry::HalfTurn, 2);
     EXPECT_EQ(partners, (std::vector<int>{1, 0, 3, 2, 5, 4, 7, 6}));
   }
 
-  TEST(ArmySlots, PairingPutsEachStartBesideItsMirror)
+  TEST(
+    ArmySlots,
+    PairingPutsEachStartBesideItsMirror
+  )
   {
     // The same starts shuffled: slots 1, 3, 5, 7 on one side, then the other side.
-    const std::vector<Start> shuffled = {kSeton[0], kSeton[2], kSeton[4], kSeton[6], kSeton[1], kSeton[3], kSeton[5], kSeton[7]};
+    const std::vector<Start> shuffled = {
+      kSeton[0], kSeton[2], kSeton[4], kSeton[6], kSeton[1], kSeton[3], kSeton[5], kSeton[7]
+    };
     const std::vector<int> partners = faf::editor::MirrorPartners(shuffled, 1025, 1025, Symmetry::HalfTurn, 2);
     const std::vector<int> order = faf::editor::PairMirroredSlots(partners);
     EXPECT_EQ(order, (std::vector<int>{0, 4, 1, 5, 2, 6, 3, 7}));
   }
 
-  TEST(ArmySlots, NoSymmetryOrAMissingStartKeepsTheSlot)
+  TEST(
+    ArmySlots,
+    NoSymmetryOrAMissingStartKeepsTheSlot
+  )
   {
     std::vector<Start> starts = kSeton;
     starts[2] = std::nullopt;
@@ -50,16 +67,26 @@ namespace
     EXPECT_EQ(order.back() == 2 || order[order.size() - 2] == 2, true);
   }
 
-  TEST(ArmySlots, LeftRightMirror)
+  TEST(
+    ArmySlots,
+    LeftRightMirror
+  )
   {
-    const std::vector<Start> starts = {std::array<float, 2>{100.0f, 200.0f}, std::array<float, 2>{150.0f, 400.0f},
-                                       std::array<float, 2>{412.0f, 200.0f}, std::array<float, 2>{362.0f, 400.0f}};
+    const std::vector<Start> starts = {
+      std::array<float, 2>{100.0f, 200.0f},
+      std::array<float, 2>{150.0f, 400.0f},
+      std::array<float, 2>{412.0f, 200.0f},
+      std::array<float, 2>{362.0f, 400.0f}
+    };
     const std::vector<int> partners = faf::editor::MirrorPartners(starts, 513, 513, Symmetry::LeftRight, 2);
     EXPECT_EQ(partners, (std::vector<int>{2, 3, 0, 1}));
     EXPECT_EQ(faf::editor::PairMirroredSlots(partners), (std::vector<int>{0, 2, 1, 3}));
   }
 
-  TEST(ArmySlots, NextArmyName)
+  TEST(
+    ArmySlots,
+    NextArmyName
+  )
   {
     EXPECT_EQ(faf::editor::NextArmyName({}), "ARMY_1");
     EXPECT_EQ(faf::editor::NextArmyName({"ARMY_1", "ARMY_8", "NEUTRAL_CIVILIAN", "ARMY_17"}), "ARMY_18");

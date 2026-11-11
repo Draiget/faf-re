@@ -9,7 +9,11 @@ namespace faf::editor
   namespace
   {
     /** `{ a, b, ... }` with exactly `count` numbers. */
-    bool Numbers(const LuaText& value, const std::size_t count, double* const out)
+    bool Numbers(
+      const LuaText& value,
+      const std::size_t count,
+      double* const out
+    )
     {
       if (!value.isTable || !value.fields.empty() || value.items.size() != count) {
         return false;
@@ -24,7 +28,10 @@ namespace faf::editor
     }
 
     /** One body; its `unreadable` says why when a field isn't what the editor writes. */
-    WaterBody ReadBody(const std::string& text, const LuaText& value)
+    WaterBody ReadBody(
+      const std::string& text,
+      const LuaText& value
+    )
     {
       WaterBody body;
       body.hasElevation = false;
@@ -100,7 +107,10 @@ namespace faf::editor
     }
 
     /** The indentation of the line `at` is on. */
-    std::string LineIndent(const std::string& text, const std::size_t at)
+    std::string LineIndent(
+      const std::string& text,
+      const std::size_t at
+    )
     {
       const std::size_t lineStart = text.rfind('\n', at == 0 ? 0 : at - 1);
       const std::size_t from = lineStart == std::string::npos ? 0 : lineStart + 1;
@@ -111,7 +121,10 @@ namespace faf::editor
       return text.substr(from, end - from);
     }
 
-    std::string TableText(const std::vector<WaterBody>& bodies, const std::string& indent)
+    std::string TableText(
+      const std::vector<WaterBody>& bodies,
+      const std::string& indent
+    )
     {
       std::string out = "{\n";
       for (const WaterBody& body : bodies) {
@@ -121,7 +134,9 @@ namespace faf::editor
     }
   } // namespace
 
-  WaterBodiesRead ReadWaterBodies(const std::string& scenario)
+  WaterBodiesRead ReadWaterBodies(
+    const std::string& scenario
+  )
   {
     WaterBodiesRead read;
     LuaText info;
@@ -147,7 +162,9 @@ namespace faf::editor
     return read;
   }
 
-  std::string WaterBodyText(const WaterBody& body)
+  std::string WaterBodyText(
+    const WaterBody& body
+  )
   {
     if (!body.raw.empty()) {
       return body.raw;
@@ -179,8 +196,10 @@ namespace faf::editor
       parts.push_back("Outline = { " + points + " }");
     }
     if (body.hasBounds) {
-      parts.push_back("Bounds = { " + std::to_string(body.x0) + ", " + std::to_string(body.z0) + ", " + std::to_string(body.x1) + ", " +
-                      std::to_string(body.z1) + " }");
+      parts.push_back(
+        "Bounds = { " + std::to_string(body.x0) + ", " + std::to_string(body.z0) + ", " + std::to_string(body.x1) +
+        ", " + std::to_string(body.z1) + " }"
+      );
     }
     std::string out = "{ ";
     for (std::size_t i = 0; i < parts.size(); ++i) {
@@ -189,7 +208,10 @@ namespace faf::editor
     return out + (parts.empty() ? "}" : " }");
   }
 
-  std::string WithWaterBodies(const std::string& scenario, const std::vector<WaterBody>& bodies)
+  std::string WithWaterBodies(
+    const std::string& scenario,
+    const std::vector<WaterBody>& bodies
+  )
   {
     LuaText info;
     std::string error;
@@ -239,8 +261,13 @@ namespace faf::editor
     return out;
   }
 
-  std::vector<moho::SWaterBodyDesc> WaterBodyDescs(const std::vector<WaterBody>& bodies, const float deepBelow, const float abyssBelow,
-                                                   std::vector<std::string>& log, std::vector<std::size_t>* const bodyOf)
+  std::vector<moho::SWaterBodyDesc> WaterBodyDescs(
+    const std::vector<WaterBody>& bodies,
+    const float deepBelow,
+    const float abyssBelow,
+    std::vector<std::string>& log,
+    std::vector<std::size_t>* const bodyOf
+  )
   {
     // As STIMap::InstallWaterBodies reads them (src/moho/sim/STIMapWaterBodies.cpp); its lines, its defaults.
     constexpr float kDefaultDeepBelow = 2.5f;

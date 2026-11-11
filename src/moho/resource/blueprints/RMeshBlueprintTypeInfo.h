@@ -57,7 +57,6 @@ namespace moho
      * Registers mesh-blueprint field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
-
   };
 
   /**

@@ -28,8 +28,9 @@ namespace
    * Copies NAT traversal provider weak pointer only when the provider still has
    * a live strong-reference count.
    */
-  boost::weak_ptr<INetNATTraversalProvider>
-  CopyLiveNatTraversalProviderWeakPtr(const boost::weak_ptr<INetNATTraversalProvider>& provider)
+  boost::weak_ptr<INetNATTraversalProvider> CopyLiveNatTraversalProviderWeakPtr(
+    const boost::weak_ptr<INetNATTraversalProvider>& provider
+  )
   {
     if (provider.expired()) {
       return boost::weak_ptr<INetNATTraversalProvider>{};
@@ -67,7 +68,9 @@ bool CNetUDPConnector::SignalSocketEvent() noexcept
  * What it does:
  * Relinks a connection's intrusive node to the front of connector list.
  */
-CNetUDPConnection& CNetUDPConnector::RelinkConnectionToFront(CNetUDPConnection& connection) noexcept
+CNetUDPConnection& CNetUDPConnector::RelinkConnectionToFront(
+  CNetUDPConnection& connection
+) noexcept
 {
   mConnections.push_front(&connection);
   return connection;
@@ -123,7 +126,10 @@ CNetUDPConnector::~CNetUDPConnector()
  * Initializes UDP connector runtime state, arms socket events, starts worker
  * thread (`Entry`), and registers NAT traversal handler with provider.
  */
-CNetUDPConnector::CNetUDPConnector(platform::net::Socket sock, boost::weak_ptr<INetNATTraversalProvider>& prov)
+CNetUDPConnector::CNetUDPConnector(
+  platform::net::Socket sock,
+  boost::weak_ptr<INetNATTraversalProvider>& prov
+)
   : lock_{}
   , socket_{sock}
   , event_{platform::net::CreateSocketEvent()}
@@ -224,7 +230,10 @@ u_short CNetUDPConnector::GetLocalPort()
  * Finds/updates existing connection state for a remote endpoint or allocates a
  * new outgoing connection in connecting state.
  */
-CNetUDPConnection* CNetUDPConnector::Connect(const u_long address, const u_short port)
+CNetUDPConnection* CNetUDPConnector::Connect(
+  const u_long address,
+  const u_short port
+)
 {
   boost::recursive_mutex::scoped_lock lock{lock_};
   SignalSocketEvent();
@@ -277,7 +286,10 @@ CNetUDPConnection* CNetUDPConnector::Connect(const u_long address, const u_short
  * What it does:
  * Finds first pending, non-destroy-scheduled endpoint for accept/reject flow.
  */
-bool CNetUDPConnector::FindNextAddress(u_long& outAddress, u_short& outPort)
+bool CNetUDPConnector::FindNextAddress(
+  u_long& outAddress,
+  u_short& outPort
+)
 {
   boost::recursive_mutex::scoped_lock lock{lock_};
   for (auto* connection : mConnections.owners()) {
@@ -297,7 +309,10 @@ bool CNetUDPConnector::FindNextAddress(u_long& outAddress, u_short& outPort)
  * What it does:
  * Thin wrapper around `Connect(address,port)` used by accept flow.
  */
-INetConnection* CNetUDPConnector::Accept(const u_long address, const u_short port)
+INetConnection* CNetUDPConnector::Accept(
+  const u_long address,
+  const u_short port
+)
 {
   return Connect(address, port);
 }
@@ -309,7 +324,10 @@ INetConnection* CNetUDPConnector::Accept(const u_long address, const u_short por
  * What it does:
  * Marks matching pending connection for destroy.
  */
-void CNetUDPConnector::Reject(const u_long address, const u_short port)
+void CNetUDPConnector::Reject(
+  const u_long address,
+  const u_short port
+)
 {
   boost::recursive_mutex::scoped_lock lock{lock_};
   for (auto* connection : mConnections.owners()) {
@@ -376,7 +394,7 @@ void CNetUDPConnector::Pull()
 }
 
 /**
-  * Alias of FUN_0048B7F0 (non-canonical helper lane).
+ * Alias of FUN_0048B7F0 (non-canonical helper lane).
  * Address: 0x100851A0 (sub_100851A0)
  *
  * What it does:
@@ -405,7 +423,9 @@ void CNetUDPConnector::Push()
  * What it does:
  * Installs optional external wake event and pokes connector event loop.
  */
-void CNetUDPConnector::SelectEvent(const HANDLE ev)
+void CNetUDPConnector::SelectEvent(
+  const HANDLE ev
+)
 {
   boost::recursive_mutex::scoped_lock lock{lock_};
   mSelectedEvent = ev;
@@ -437,7 +457,9 @@ void CNetUDPConnector::Debug()
  * What it does:
  * Returns a snapshot view of send/recv stamps from `since` milliseconds up to current connector time.
  */
-SSendStampWindow CNetUDPConnector::SnapshotSendStamps(const int32_t since)
+SSendStampWindow CNetUDPConnector::SnapshotSendStamps(
+  const int32_t since
+)
 {
   boost::recursive_mutex::scoped_lock lock{lock_};
   const uint64_t endTimeUs = static_cast<uint64_t>(GetTime());
@@ -469,7 +491,10 @@ int64_t CNetUDPConnector::GetTime()
  * What it does:
  * Chooses lower non-`-1` timeout, treating `-1` as infinity.
  */
-int32_t CNetUDPConnector::ChooseTimeout(const int32_t current, const int32_t choice)
+int32_t CNetUDPConnector::ChooseTimeout(
+  const int32_t current,
+  const int32_t choice
+)
 {
   if (current == -1 || (choice != -1 && choice < current)) {
     return choice;
@@ -514,9 +539,7 @@ void CNetUDPConnector::ReceiveData()
       break;
     }
 
-    HandleReceivedDatagram(
-      packet, n, ntohl(static_cast<uint32_t>(from.sin_addr.s_addr)), ntohs(from.sin_port)
-    );
+    HandleReceivedDatagram(packet, n, ntohl(static_cast<uint32_t>(from.sin_addr.s_addr)), ntohs(from.sin_port));
   }
 
   // Engine addition (issue #232): datagrams in-process transports received
@@ -549,7 +572,10 @@ void CNetUDPConnector::ReceiveData()
  * same path as the socket's. `packet` is linked into the caller's batch.
  */
 void CNetUDPConnector::HandleReceivedDatagram(
-  SNetPacket* const packet, const int n, const uint32_t addrHost, const uint16_t portHost
+  SNetPacket* const packet,
+  const int n,
+  const uint32_t addrHost,
+  const uint16_t portHost
 )
 {
   packet->mSize = n;
@@ -566,11 +592,7 @@ void CNetUDPConnector::HandleReceivedDatagram(
     const fa::string hostString = NET_GetHostName(addrHost);
     const fa::string timeString = gpg::FileTimeToString(timeNow);
     gpg::Debugf(
-      "%s:                     recv %s:%hu, %s",
-      timeString.c_str(),
-      hostString.c_str(),
-      portHost,
-      packetString.c_str()
+      "%s:                     recv %s:%hu, %s", timeString.c_str(), hostString.c_str(), portHost, packetString.c_str()
     );
   }
 
@@ -710,7 +732,11 @@ void CNetUDPConnector::SignalPeerTransportDelivery() noexcept
  * Validates incoming CONNECT packet, routes it to an existing candidate
  * connection, or creates a new pending connection when needed.
  */
-void CNetUDPConnector::ProcessConnect(const SNetPacket* packet, const u_long address, const u_short port)
+void CNetUDPConnector::ProcessConnect(
+  const SNetPacket* packet,
+  const u_long address,
+  const u_short port
+)
 {
   if (packet->mSize != kNetPacketHeaderSize + sizeof(SPacketBodyConnect)) {
     if (net_DebugLevel) {
@@ -886,7 +912,9 @@ void CNetUDPConnector::LogPacket(
  * What it does:
  * Returns packet storage to pool (cap 20) or frees it when the pool is full.
  */
-void CNetUDPConnector::DisposePacket(SNetPacket* packet)
+void CNetUDPConnector::DisposePacket(
+  SNetPacket* packet
+)
 {
   if (!packet) {
     return;
@@ -908,7 +936,9 @@ void CNetUDPConnector::DisposePacket(SNetPacket* packet)
  * What it does:
  * Resets message payload buffer and writes NAT traversal packet-type byte (8).
  */
-void CNetUDPConnector::PrepareTraversalMessage(CMessage* msg)
+void CNetUDPConnector::PrepareTraversalMessage(
+  CMessage* msg
+)
 {
   msg->mBuff.Clear();
   // FastVectorN::Append signature is legacy non-const `T&`.
@@ -924,7 +954,12 @@ void CNetUDPConnector::PrepareTraversalMessage(CMessage* msg)
  * Queues NAT traversal payload for UDP send, reusing packet-pool storage when
  * available, then signals connector event.
  */
-void CNetUDPConnector::ReceivePacket(const u_long address, const u_short port, const char* dat, size_t size)
+void CNetUDPConnector::ReceivePacket(
+  const u_long address,
+  const u_short port,
+  const char* dat,
+  size_t size
+)
 {
   boost::recursive_mutex::scoped_lock lock{lock_};
   if (size > kPacketMaxSize) {
@@ -1018,7 +1053,7 @@ void CNetUDPConnector::Entry()
 }
 
 /**
-  * Alias of FUN_0048AC40 (non-canonical helper lane).
+ * Alias of FUN_0048AC40 (non-canonical helper lane).
  *
  * What it does:
  * Flushes connector outbound packet queue, then computes next wake timeout
@@ -1043,8 +1078,10 @@ int32_t CNetUDPConnector::SendData()
     const auto payloadSize = packet.mPacket->GetPayloadSize();
 
     // Engine addition (issue #232): an in-process transport for this address.
-    if (!NET_PeerTransportsActive() ||
-        !NET_SendThroughPeerTransport(this, packet.mAddr, packet.mPort, payload, payloadSize)) {
+    if (
+      !NET_PeerTransportsActive() ||
+      !NET_SendThroughPeerTransport(this, packet.mAddr, packet.mPort, payload, payloadSize)
+    ) {
       platform::net::SendTo(socket_, static_cast<const char*>(payload), static_cast<int32_t>(payloadSize), name);
     }
 
@@ -1088,7 +1125,9 @@ int32_t CNetUDPConnector::SendData()
  *
  * Binary behavior maps to `DisposePacket` (FA `0x00489ED0`).
  */
-void CNetUDPConnector::AddPacket(SNetPacket* packet)
+void CNetUDPConnector::AddPacket(
+  SNetPacket* packet
+)
 {
   DisposePacket(packet);
 }

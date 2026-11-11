@@ -21,7 +21,9 @@ namespace
     return sInstance;
   }
 
-  gpg::RRef MakeTrailBlueprintRef(moho::RTrailBlueprint* object)
+  gpg::RRef MakeTrailBlueprintRef(
+    moho::RTrailBlueprint* object
+  )
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -34,7 +36,9 @@ namespace
     return MakeTrailBlueprintRef(new moho::RTrailBlueprint());
   }
 
-  gpg::RRef ConstructTrailBlueprintRef(void* objectMemory)
+  gpg::RRef ConstructTrailBlueprintRef(
+    void* objectMemory
+  )
   {
     if (!objectMemory) {
       return MakeTrailBlueprintRef(nullptr);
@@ -44,12 +48,16 @@ namespace
     return MakeTrailBlueprintRef(object);
   }
 
-  void DeleteTrailBlueprintObject(void* objectMemory)
+  void DeleteTrailBlueprintObject(
+    void* objectMemory
+  )
   {
     delete static_cast<moho::RTrailBlueprint*>(objectMemory);
   }
 
-  void DestroyTrailBlueprintObject(void* objectMemory)
+  void DestroyTrailBlueprintObject(
+    void* objectMemory
+  )
   {
     if (!objectMemory) {
       return;
@@ -65,7 +73,9 @@ namespace
    * Binds the callback lanes used by `RTrailBlueprintTypeInfo` for object
    * allocation, placement construction, deletion, and destruction.
    */
-  [[nodiscard]] TypeInfo* BindTrailBlueprintTypeInfoHookLanes(TypeInfo* const typeInfo)
+  [[nodiscard]] TypeInfo* BindTrailBlueprintTypeInfoHookLanes(
+    TypeInfo* const typeInfo
+  )
   {
     typeInfo->newRefFunc_ = &NewTrailBlueprintRef;
     typeInfo->ctorRefFunc_ = &ConstructTrailBlueprintRef;
@@ -110,18 +120,20 @@ namespace moho
   }
 
   /**
- * Address: 0x00510E50 (FUN_00510E50, Moho::RTrailBlueprintTypeInfo::AddBase_REffectBlueprint)
- *
- * What it does:
- * Registers `REffectBlueprint` as this type's reflected base at offset 0 - single
- * inheritance, so the sub-object starts where the object does.
- */
-void RTrailBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* typeInfo)
-{
-  gpg::AddReflectedBase<moho::REffectBlueprint>(typeInfo);
-}
+   * Address: 0x00510E50 (FUN_00510E50, Moho::RTrailBlueprintTypeInfo::AddBase_REffectBlueprint)
+   *
+   * What it does:
+   * Registers `REffectBlueprint` as this type's reflected base at offset 0 - single
+   * inheritance, so the sub-object starts where the object does.
+   */
+  void RTrailBlueprintTypeInfo::AddBase_REffectBlueprint(
+    gpg::RType* typeInfo
+  )
+  {
+    gpg::AddReflectedBase<moho::REffectBlueprint>(typeInfo);
+  }
 
-/**
+  /**
    * Address: 0x0050F230 (FUN_0050F230)
    *
    * What it does:
@@ -141,7 +153,9 @@ void RTrailBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* typeInfo)
   /**
    * Address: 0x0050F330 (FUN_0050F330, Moho::RTrailBlueprintTypeInfo::AddFields)
    */
-  void RTrailBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
+  void RTrailBlueprintTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
     typeInfo->AddField<moho::RResId>("BlueprintId", offsetof(RTrailBlueprint, BlueprintId), 3, "Blueprint ID");
     typeInfo->AddField<float>("Lifetime", offsetof(RTrailBlueprint, Lifetime), 3, "Lifetime of emitter");
@@ -149,11 +163,22 @@ void RTrailBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* typeInfo)
     typeInfo->AddField<float>("Size", offsetof(RTrailBlueprint, StartSize), 3, "Startsize");
     typeInfo->AddField<float>("SortOrder", offsetof(RTrailBlueprint, SortOrder), 3, "Sort Order");
     typeInfo->AddField<std::int32_t>("BlendMode", offsetof(RTrailBlueprint, BlendMode), 3, "BlendMode");
-    typeInfo->AddField<float>("TextureRepeatRate", offsetof(RTrailBlueprint, TextureRepeatRate), 3, "Texture repeat rate in units");
+    typeInfo->AddField<float>(
+      "TextureRepeatRate", offsetof(RTrailBlueprint, TextureRepeatRate), 3, "Texture repeat rate in units"
+    );
     typeInfo->AddField<float>("LODCutoff", offsetof(RTrailBlueprint, LODCutoff), 3, "cutoff distance");
-    typeInfo->AddField<bool>("EmitIfVisible", offsetof(RTrailBlueprint, EmitIfVisible), 3, "Emit particles ONLY if this is emitter is visible");
-    typeInfo->AddField<bool>("CatchupEmit", offsetof(RTrailBlueprint, CatchupEmit), 3, "catchup particles for the ticks that we weren't visible");
-    typeInfo->AddField<fa::string>("RepeatTexture", offsetof(RTrailBlueprint, RepeatTexture), 3, "name of texture that repeats");
+    typeInfo->AddField<bool>(
+      "EmitIfVisible", offsetof(RTrailBlueprint, EmitIfVisible), 3, "Emit particles ONLY if this is emitter is visible"
+    );
+    typeInfo->AddField<bool>(
+      "CatchupEmit",
+      offsetof(RTrailBlueprint, CatchupEmit),
+      3,
+      "catchup particles for the ticks that we weren't visible"
+    );
+    typeInfo->AddField<fa::string>(
+      "RepeatTexture", offsetof(RTrailBlueprint, RepeatTexture), 3, "name of texture that repeats"
+    );
     typeInfo->AddField<fa::string>("RampTexture", offsetof(RTrailBlueprint, RampTexture), 3, "RampTextureName");
   }
 
@@ -168,4 +193,7 @@ void RTrailBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* typeInfo)
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RTrailBlueprintTypeInfo_19d3be, moho::register_RTrailBlueprintTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_RTrailBlueprintTypeInfo_19d3be,
+  moho::register_RTrailBlueprintTypeInfo
+)

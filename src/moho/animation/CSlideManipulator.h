@@ -116,12 +116,24 @@ namespace moho
     std::uint8_t mPadA9[0x07]{};      // +0xA9
   };
 
-  static_assert(offsetof(CSlideManipulator, mCurrentPosition) == 0x80, "CSlideManipulator::mCurrentPosition offset must be 0x80");
+  static_assert(
+    offsetof(CSlideManipulator, mCurrentPosition) == 0x80,
+    "CSlideManipulator::mCurrentPosition offset must be 0x80"
+  );
   static_assert(offsetof(CSlideManipulator, mGoal) == 0x8C, "CSlideManipulator::mGoal offset must be 0x8C");
   static_assert(offsetof(CSlideManipulator, mSpeed) == 0x98, "CSlideManipulator::mSpeed offset must be 0x98");
-  static_assert(offsetof(CSlideManipulator, mCurrentSpeed) == 0x9C, "CSlideManipulator::mCurrentSpeed offset must be 0x9C");
-  static_assert(offsetof(CSlideManipulator, mAcceleration) == 0xA0, "CSlideManipulator::mAcceleration offset must be 0xA0");
-  static_assert(offsetof(CSlideManipulator, mDeceleration) == 0xA4, "CSlideManipulator::mDeceleration offset must be 0xA4");
+  static_assert(
+    offsetof(CSlideManipulator, mCurrentSpeed) == 0x9C,
+    "CSlideManipulator::mCurrentSpeed offset must be 0x9C"
+  );
+  static_assert(
+    offsetof(CSlideManipulator, mAcceleration) == 0xA0,
+    "CSlideManipulator::mAcceleration offset must be 0xA0"
+  );
+  static_assert(
+    offsetof(CSlideManipulator, mDeceleration) == 0xA4,
+    "CSlideManipulator::mDeceleration offset must be 0xA4"
+  );
   static_assert(offsetof(CSlideManipulator, mWorldUnits) == 0xA8, "CSlideManipulator::mWorldUnits offset must be 0xA8");
   static_assert(sizeof(CSlideManipulator) == 0xB0, "CSlideManipulator size must be 0xB0");
 
@@ -280,7 +292,8 @@ namespace moho
 
   protected:
     /**
-     * Address: 0x00648420 (FUN_00648420, ?Create@?$CScrLuaMetatableFactory@VCSlideManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+     * Address: 0x00648420 (FUN_00648420,
+     * ?Create@?$CScrLuaMetatableFactory@VCSlideManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
      *
      * What it does:
      * Builds the metatable object used for `CSlideManipulator` Lua userdata.

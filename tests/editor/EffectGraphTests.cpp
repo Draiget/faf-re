@@ -15,13 +15,22 @@ namespace
 {
   using namespace faf::editor;
 
-  bool SameEmitter(const EmitterBlueprint& a, const EmitterBlueprint& b)
+  bool SameEmitter(
+    const EmitterBlueprint& a,
+    const EmitterBlueprint& b
+  )
   {
-    const auto near = [](const float x, const float y) { return std::fabs(x - y) <= 1e-4f * std::max(1.0f, std::fabs(x)); };
-    if (a.blueprintId != b.blueprintId || a.texture != b.texture || a.rampTexture != b.rampTexture || a.flags != b.flags ||
-        a.lowFidelity != b.lowFidelity || a.medFidelity != b.medFidelity || a.highFidelity != b.highFidelity || !near(a.lifetime, b.lifetime) ||
-        !near(a.repeatTime, b.repeatTime) || !near(a.blendMode, b.blendMode) || !near(a.textureFrameCount, b.textureFrameCount) ||
-        !near(a.textureStripCount, b.textureStripCount) || !near(a.lodCutoff, b.lodCutoff) || !near(a.sortOrder, b.sortOrder)) {
+    const auto near = [](const float x, const float y) {
+      return std::fabs(x - y) <= 1e-4f * std::max(1.0f, std::fabs(x));
+    };
+    if (
+      a.blueprintId != b.blueprintId || a.texture != b.texture || a.rampTexture != b.rampTexture ||
+      a.flags != b.flags || a.lowFidelity != b.lowFidelity || a.medFidelity != b.medFidelity ||
+      a.highFidelity != b.highFidelity || !near(a.lifetime, b.lifetime) || !near(a.repeatTime, b.repeatTime) ||
+      !near(a.blendMode, b.blendMode) || !near(a.textureFrameCount, b.textureFrameCount) ||
+      !near(a.textureStripCount, b.textureStripCount) || !near(a.lodCutoff, b.lodCutoff) ||
+      !near(a.sortOrder, b.sortOrder)
+    ) {
       return false;
     }
     for (int c = 0; c < kEmitterCurveCount; ++c) {
@@ -39,7 +48,10 @@ namespace
     return true;
   }
 
-  TEST(EffectGraph, AnEmitterBecomesAGraphAndBack)
+  TEST(
+    EffectGraph,
+    AnEmitterBecomesAGraphAndBack
+  )
   {
     EmitterBlueprint e = NewEmitter();
     e.curves[kSize].keys = {{0.0f, 1.0f, 0.5f}, {5.0f, 3.0f, 0.0f}, {10.0f, 0.5f, 0.25f}};
@@ -60,15 +72,18 @@ namespace
     EXPECT_TRUE(SameEmitter(out[0].second, e));
   }
 
-  TEST(EffectGraph, CurveNodesMakeKeysAndPinsKeepToTheirKind)
+  TEST(
+    EffectGraph,
+    CurveNodesMakeKeysAndPinsKeepToTheirKind
+  )
   {
     NodeGraph graph(EffectNodeTypes());
     const int output = graph.AddNode(kEffectOutput, 0.0f, 0.0f);
     const int emitter = graph.AddNode(kEmitterNode, 0.0f, 0.0f);
     ASSERT_EQ(graph.Link(emitter, 0, output, 0), LinkResult::Ok);
-    const int ramp = graph.AddNode("CurveOverLife", 0.0f, 0.0f);   // 0 to 1
-    const int scale = graph.AddNode("CurveScale", 0.0f, 0.0f);     // x 2
-    const int random = graph.AddNode("CurveRandom", 0.0f, 0.0f);   // 0 to 1
+    const int ramp = graph.AddNode("CurveOverLife", 0.0f, 0.0f); // 0 to 1
+    const int scale = graph.AddNode("CurveScale", 0.0f, 0.0f);   // x 2
+    const int random = graph.AddNode("CurveRandom", 0.0f, 0.0f); // 0 to 1
     const int texture = graph.AddNode(kTextureNode, 0.0f, 0.0f);
     ASSERT_EQ(graph.Link(ramp, 0, scale, 0), LinkResult::Ok);
     ASSERT_EQ(graph.Link(scale, 0, emitter, kStartSize), LinkResult::Ok);
@@ -92,21 +107,30 @@ namespace
     EXPECT_EQ(CurveKeysFromText(CurveKeysText({{1.5f, -2.0f, 0.25f}, {3.0f, 4.0f, 0.0f}})).size(), 2U);
   }
 
-  TEST(EffectGraph, PlainTemplatesAreRead)
+  TEST(
+    EffectGraph,
+    PlainTemplatesAreRead
+  )
   {
-    const std::string lua = "EmtBpPath = '/effects/emitters/'\n"
-                            "-- a comment { }\n"
-                            "ExplosionLarge = {\n    EmtBpPath .. 'Large_test_smoke.bp',\n    '/effects/emitters/x.bp',\n}\n"
-                            "Nested = {\n    { EmtBpPath .. 'a.bp' },\n}\n"
-                            "Called = table.cat(A, B)\n"
-                            "  Indented = {\n    EmtBpPath .. 'b.bp',\n  }\n";
+    const std::string lua =
+      "EmtBpPath = '/effects/emitters/'\n"
+      "-- a comment { }\n"
+      "ExplosionLarge = {\n    EmtBpPath .. 'Large_test_smoke.bp',\n    '/effects/emitters/x.bp',\n}\n"
+      "Nested = {\n    { EmtBpPath .. 'a.bp' },\n}\n"
+      "Called = table.cat(A, B)\n"
+      "  Indented = {\n    EmtBpPath .. 'b.bp',\n  }\n";
     const std::vector<EffectTemplate> templates = ParseEffectTemplates(lua);
     ASSERT_EQ(templates.size(), 1U);
     EXPECT_EQ(templates[0].name, "ExplosionLarge");
-    EXPECT_EQ(templates[0].paths, (std::vector<std::string>{"/effects/emitters/Large_test_smoke.bp", "/effects/emitters/x.bp"}));
+    EXPECT_EQ(
+      templates[0].paths, (std::vector<std::string>{"/effects/emitters/Large_test_smoke.bp", "/effects/emitters/x.bp"})
+    );
   }
 
-  TEST(EffectGraph, TheGamesEmittersAndTemplates)
+  TEST(
+    EffectGraph,
+    TheGamesEmittersAndTemplates
+  )
   {
     const std::string folder = faf::editor::test::EnvText("FAF_RETAIL_EMITTERS");
     if (folder.empty()) {
@@ -135,12 +159,12 @@ namespace
           const EmitterCurve& x = e.curves[static_cast<std::size_t>(c)];
           const EmitterCurve& y = out[0].second.curves[static_cast<std::size_t>(c)];
           if (x.keys.size() != y.keys.size() || x.xRange != y.xRange) {
-            diff += std::string(" ") + CurveInfo(c).name + " keys " + std::to_string(x.keys.size()) + "/" + std::to_string(y.keys.size()) + " range " +
-                    std::to_string(x.xRange) + "/" + std::to_string(y.xRange);
+            diff += std::string(" ") + CurveInfo(c).name + " keys " + std::to_string(x.keys.size()) + "/" +
+              std::to_string(y.keys.size()) + " range " + std::to_string(x.xRange) + "/" + std::to_string(y.xRange);
           }
         }
-        diff += " lod " + std::to_string(e.lodCutoff) + "/" + std::to_string(out[0].second.lodCutoff) + " sort " + std::to_string(e.sortOrder) + "/" +
-                std::to_string(out[0].second.sortOrder);
+        diff += " lod " + std::to_string(e.lodCutoff) + "/" + std::to_string(out[0].second.lodCutoff) + " sort " +
+          std::to_string(e.sortOrder) + "/" + std::to_string(out[0].second.sortOrder);
         ADD_FAILURE() << entry.path().filename().string() << ":" << diff;
       }
       ++checked;

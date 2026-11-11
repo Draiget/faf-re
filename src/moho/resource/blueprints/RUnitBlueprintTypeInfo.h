@@ -58,7 +58,6 @@ namespace moho
      * Registers unit-blueprint section field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
-
   };
 
   /**

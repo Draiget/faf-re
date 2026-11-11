@@ -168,7 +168,7 @@ namespace moho
     void FastRetransmitFromMask(uint16_t expected, uint32_t earlyMask);
 
     /**
-       * Address: 0x00486DB0 (FUN_00486DB0)
+     * Address: 0x00486DB0 (FUN_00486DB0)
      */
     void ProcessData(SNetPacket* packet);
 
@@ -224,7 +224,10 @@ namespace moho
      * Address: 0x00488145
      */
     template <class T>
-    constexpr T ChooseTimeout(T cur, T candidate)
+    constexpr T ChooseTimeout(
+      T cur,
+      T candidate
+    )
     {
       const T inf = static_cast<T>(-1);
       if (cur == inf) {
@@ -272,7 +275,7 @@ namespace moho
     SNetPacket* NewPacket(bool inherit, int size, EPacketType state) const;
 
     /**
-       * Address: 0x00488D80 (FUN_00488D80)
+     * Address: 0x00488D80 (FUN_00488D80)
      */
     void SendPacket(SNetPacket* packet);
 
@@ -321,7 +324,10 @@ namespace moho
     static bool ReceiverNonceDiffers32(const char (&expected)[32], const char (&received)[32]) noexcept;
 
     template <std::size_t N>
-    static bool ByteArrayDiffers(const char (&lhs)[N], const char (&rhs)[N]) noexcept
+    static bool ByteArrayDiffers(
+      const char (&lhs)[N],
+      const char (&rhs)[N]
+    ) noexcept
     {
       for (std::size_t i = 0; i < N; ++i) {
         if (lhs[i] != rhs[i]) {
@@ -349,27 +355,27 @@ namespace moho
     void AbortInput();
 
     /**
-      * Alias of FUN_00486DB0 (non-canonical helper lane).
+     * Alias of FUN_00486DB0 (non-canonical helper lane).
      */
     MOHO_FORCEINLINE bool InsertEarlySorted(SNetPacket* packet);
 
     /**
-      * Alias of FUN_00486DB0 (non-canonical helper lane).
+     * Alias of FUN_00486DB0 (non-canonical helper lane).
      */
     MOHO_FORCEINLINE SNetPacket* EarlyPopFront();
 
     /**
-      * Alias of FUN_00486DB0 (non-canonical helper lane).
+     * Alias of FUN_00486DB0 (non-canonical helper lane).
      */
     MOHO_FORCEINLINE void EarlyRebuildAckMask(uint16_t expected, uint32_t& mask);
 
     /**
-      * Alias of FUN_00486DB0 (non-canonical helper lane).
+     * Alias of FUN_00486DB0 (non-canonical helper lane).
      */
     MOHO_FORCEINLINE void ConsumePacketHeaderData(SNetPacket* packet);
 
     /**
-      * Alias of FUN_00488D80 (non-canonical helper lane).
+     * Alias of FUN_00488D80 (non-canonical helper lane).
      */
     MOHO_FORCEINLINE void InsertUnAckedSorted(SNetPacket* packet);
 

@@ -49,7 +49,10 @@ namespace
                 },
             })";
 
-  TEST(Units, AGroupReadsAndWritesBackAsTheGameWroteIt)
+  TEST(
+    Units,
+    AGroupReadsAndWritesBackAsTheGameWroteIt
+  )
   {
     faf::editor::UnitGroup group;
     std::string error;
@@ -65,7 +68,10 @@ namespace
     EXPECT_EQ(faf::editor::FormatUnitGroup(group, 12), kGroup);
   }
 
-  TEST(Units, AddedAndRemovedUnitsWriteAndReadBack)
+  TEST(
+    Units,
+    AddedAndRemovedUnitsWriteAndReadBack
+  )
   {
     faf::editor::UnitGroup group;
     std::string error;
@@ -100,7 +106,10 @@ namespace
     EXPECT_EQ(empty.groups[0].units.size(), 1u);
   }
 
-  TEST(Units, AnEmptyGroupAndBadText)
+  TEST(
+    Units,
+    AnEmptyGroupAndBadText
+  )
   {
     faf::editor::UnitGroup group;
     std::string error;
@@ -110,7 +119,10 @@ namespace
     EXPECT_FALSE(error.empty());
   }
 
-  TEST(Units, EveryRetailArmyRoundTrips)
+  TEST(
+    Units,
+    EveryRetailArmyRoundTrips
+  )
   {
     const std::string folderText = faf::editor::test::EnvText("FAF_RETAIL_MAPS");
     const char* const folder = folderText.empty() ? nullptr : folderText.c_str();
@@ -134,7 +146,8 @@ namespace
         for (const faf::editor::SaveEntry& army : save.Armies()) {
           const std::string value = army.Get("Units");
           faf::editor::UnitGroup group;
-          ASSERT_TRUE(faf::editor::ParseUnitGroup(value, group, error)) << file.path() << " " << army.name << ": " << error;
+          ASSERT_TRUE(faf::editor::ParseUnitGroup(value, group, error))
+            << file.path() << " " << army.name << ": " << error;
           const std::string written = faf::editor::FormatUnitGroup(group, 12);
           if (written != value) {
             // Where they part, with a little around it.
@@ -143,8 +156,8 @@ namespace
               ++at;
             }
             const std::size_t from = at > 80 ? at - 80 : 0;
-            ADD_FAILURE() << file.path() << " " << army.name << " differs at " << at << " | written: " << written.substr(from, 160)
-                          << " | read: " << value.substr(from, 160);
+            ADD_FAILURE() << file.path() << " " << army.name << " differs at " << at
+                          << " | written: " << written.substr(from, 160) << " | read: " << value.substr(from, 160);
           }
           std::vector<const faf::editor::SaveUnit*> all;
           faf::editor::CollectUnits(group, all);
@@ -156,7 +169,10 @@ namespace
     EXPECT_GT(armies, 0);
     std::printf("retail: %d armies, %d units round-tripped\n", armies, units);
   }
-  TEST(Units, GroupsAreAddedRenamedMovedIntoAndRemoved)
+  TEST(
+    Units,
+    GroupsAreAddedRenamedMovedIntoAndRemoved
+  )
   {
     faf::editor::UnitGroup root;
     std::string error;
@@ -166,8 +182,14 @@ namespace
     EXPECT_FALSE(faf::editor::AddGroup(root, {"INITIAL"}, "Defense"));
     // UNIT_334 into it.
     EXPECT_EQ(faf::editor::MoveUnitsTo(root, {"UNIT_334", "UNIT_999"}, {"INITIAL", "Defense"}), 1);
-    EXPECT_EQ(faf::editor::UnitNamesIn(*faf::editor::GroupAt(root, {"INITIAL", "Defense"})), (std::vector<std::string>{"UNIT_334"}));
-    EXPECT_EQ(faf::editor::UnitNamesIn(*faf::editor::GroupAt(root, {"INITIAL", "GROUP_1"})), (std::vector<std::string>{"UNIT_328"}));
+    EXPECT_EQ(
+      faf::editor::UnitNamesIn(*faf::editor::GroupAt(root, {"INITIAL", "Defense"})),
+      (std::vector<std::string>{"UNIT_334"})
+    );
+    EXPECT_EQ(
+      faf::editor::UnitNamesIn(*faf::editor::GroupAt(root, {"INITIAL", "GROUP_1"})),
+      (std::vector<std::string>{"UNIT_328"})
+    );
     // Renamed, and still found under the new name only.
     ASSERT_TRUE(faf::editor::RenameGroup(root, {"INITIAL", "Defense"}, "Defenses"));
     EXPECT_EQ(faf::editor::GroupAt(root, {"INITIAL", "Defense"}), nullptr);

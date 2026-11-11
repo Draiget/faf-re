@@ -29,7 +29,9 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] std::int32_t FloorToIndex(const float value) noexcept
+  [[nodiscard]] std::int32_t FloorToIndex(
+    const float value
+  ) noexcept
   {
     return static_cast<std::int32_t>(std::floor(value));
   }
@@ -45,7 +47,9 @@ namespace moho
    * What it does:
    * Initializes intrusive refcount/name storage and loads numbered texture frames.
    */
-  CAnimTexture::CAnimTexture(const char* const baseTextureName)
+  CAnimTexture::CAnimTexture(
+    const char* const baseTextureName
+  )
   {
     mRefCount = 0;
     LoadFramesFromBaseName(baseTextureName);
@@ -95,7 +99,9 @@ namespace moho
    * Finds a cached animation texture by name or constructs/caches a new one.
    * Returned pointer carries one intrusive reference (`mRefCount` incremented).
    */
-  CAnimTexture* CAnimTexture::FindOrCreate(const char* const baseTextureName)
+  CAnimTexture* CAnimTexture::FindOrCreate(
+    const char* const baseTextureName
+  )
   {
     const char* const keyText = baseTextureName ? baseTextureName : "";
     const fa::string key(keyText);
@@ -125,7 +131,10 @@ namespace moho
    * Samples a frame pointer by positive-wrapped frame index and returns an intrusive
    * `SharedPtrRaw` copy (`pi` refcount retained on success).
    */
-  void CAnimTexture::GetFrameAt(FrameRef& outFrame, const float frameIndex) const
+  void CAnimTexture::GetFrameAt(
+    FrameRef& outFrame,
+    const float frameIndex
+  ) const
   {
     outFrame = {};
     if (mFrames.empty()) {
@@ -158,7 +167,9 @@ namespace moho
    * What it does:
    * Stores source texture name and loads sequential numbered frames.
    */
-  void CAnimTexture::LoadFramesFromBaseName(const char* const baseTextureName)
+  void CAnimTexture::LoadFramesFromBaseName(
+    const char* const baseTextureName
+  )
   {
     mFrames.clear();
     mBaseTextureName.assign_owned(baseTextureName);
@@ -183,8 +194,10 @@ namespace moho
         break;
       }
       const FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
-      if (waitHandleSet == nullptr || waitHandleSet->mHandle == nullptr
-          || !waitHandleSet->mHandle->GetFileInfo(frameName.c_str(), nullptr)) {
+      if (
+        waitHandleSet == nullptr || waitHandleSet->mHandle == nullptr ||
+        !waitHandleSet->mHandle->GetFileInfo(frameName.c_str(), nullptr)
+      ) {
         break;
       }
     }
@@ -199,7 +212,9 @@ namespace moho
    * Increments the trailing numeric suffix in-place and wraps carries to `0`.
    * Returns false only when no suitable numeric suffix exists.
    */
-  bool CAnimTexture::IncrementFrameNameSuffix(fa::string& textureName)
+  bool CAnimTexture::IncrementFrameNameSuffix(
+    fa::string& textureName
+  )
   {
     if (!textureName.basic_sanity() || textureName.empty()) {
       return false;
@@ -251,7 +266,9 @@ namespace moho
    * What it does:
    * Appends one frame reference to internal storage, retaining `pi`.
    */
-  void CAnimTexture::AppendFrameRef(const FrameRef& frame)
+  void CAnimTexture::AppendFrameRef(
+    const FrameRef& frame
+  )
   {
     FrameRef retainedFrame = frame;
     retainedFrame.add_ref_copy();

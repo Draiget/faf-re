@@ -33,7 +33,10 @@ INetTCPServer::INetTCPServer() = default;
  * What it does:
  * Creates a listening TCP server socket bound to `hostAddress:port`.
  */
-INetTCPServer* moho::NET_CreateTCPServer(const u_long hostAddress, const u_short port)
+INetTCPServer* moho::NET_CreateTCPServer(
+  const u_long hostAddress,
+  const u_short port
+)
 {
   if (!NET_Init()) {
     return nullptr;

@@ -18,4 +18,3 @@ namespace moho
 
   static_assert(sizeof(ECommandEvent) == 0x04, "ECommandEvent size must be 0x04");
 } // namespace moho
-

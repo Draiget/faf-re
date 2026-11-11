@@ -18,7 +18,9 @@ namespace faf::remote::wire
   inline constexpr std::uint32_t kMaxLuaSyncLineBytes = 1u << 16;
 
   /** False, with nothing useful written, past the limits above. */
-  [[nodiscard]] bool EncodeLuaSyncLane(std::span<const std::uint8_t> table, const std::vector<std::string>& prints, BitWriter& writer);
+  [[nodiscard]] bool
+  EncodeLuaSyncLane(std::span<const std::uint8_t> table, const std::vector<std::string>& prints, BitWriter& writer);
   /** False, with the reader failed, past the limits above or on a short stream. */
-  [[nodiscard]] bool DecodeLuaSyncLane(BitReader& reader, std::vector<std::uint8_t>& table, std::vector<std::string>& prints);
+  [[nodiscard]] bool
+  DecodeLuaSyncLane(BitReader& reader, std::vector<std::uint8_t>& table, std::vector<std::string>& prints);
 } // namespace faf::remote::wire

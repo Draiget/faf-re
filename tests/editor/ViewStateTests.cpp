@@ -6,7 +6,10 @@
 
 namespace
 {
-  TEST(ViewState, WrittenAndReadBack)
+  TEST(
+    ViewState,
+    WrittenAndReadBack
+  )
   {
     faf::editor::ViewState state;
     state.tool = 6;
@@ -17,11 +20,15 @@ namespace
     state.props = false;
     state.gameUnits = false;
     state.hiddenMarkerTypes = {"Air Path Node", "Land Path Node"};
-    const faf::editor::ViewState back = faf::editor::ReadViewState(faf::editor::WriteViewState(state), faf::editor::ViewState{});
+    const faf::editor::ViewState back =
+      faf::editor::ReadViewState(faf::editor::WriteViewState(state), faf::editor::ViewState{});
     EXPECT_EQ(back, state);
   }
 
-  TEST(ViewState, MissingKeysKeepTheirValues)
+  TEST(
+    ViewState,
+    MissingKeysKeepTheirValues
+  )
   {
     faf::editor::ViewState now;
     now.slope = true;
@@ -37,12 +44,17 @@ namespace
     EXPECT_EQ(faf::editor::ReadViewState("gridStep=0\n", now).gridStep, 1.0f);
   }
 
-  TEST(ViewState, AFileAMap)
+  TEST(
+    ViewState,
+    AFileAMap
+  )
   {
     const std::string a = faf::editor::ViewStateFileName("/maps/scmp_009/scmp_009_scenario.lua");
     EXPECT_EQ(a.rfind("scmp_009-", 0), 0u);
     EXPECT_EQ(a.substr(a.size() - 4), ".txt");
-    EXPECT_EQ(a, faf::editor::ViewStateFileName("/MAPS/SCMP_009/scmp_009_scenario.lua")); // the same map whatever its case
+    EXPECT_EQ(
+      a, faf::editor::ViewStateFileName("/MAPS/SCMP_009/scmp_009_scenario.lua")
+    ); // the same map whatever its case
     EXPECT_NE(a, faf::editor::ViewStateFileName("C:/Users/x/Maps/scmp_009/scmp_009_scenario.lua")); // a copy elsewhere
   }
 } // namespace

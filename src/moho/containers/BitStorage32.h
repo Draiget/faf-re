@@ -22,7 +22,7 @@ namespace moho
     std::uint32_t* mWordsCapacityEnd; // +0x10
 
     /**
-      * Alias of FUN_00440030 (non-canonical helper lane).
+     * Alias of FUN_00440030 (non-canonical helper lane).
      * Address: 0x00443110 (FUN_00443110, storage-reset lane preserving base-word metadata)
      * Address: 0x00443144 (FUN_00443144, capacity-tail clear lane)
      *

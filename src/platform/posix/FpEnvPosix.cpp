@@ -60,7 +60,9 @@ namespace
     void* argument;
   };
 
-  void* StartWithSimFloatingPointEnvironment(void* const raw)
+  void* StartWithSimFloatingPointEnvironment(
+    void* const raw
+  )
   {
     const ThreadStart start = *static_cast<ThreadStart*>(raw);
     ::operator delete(raw);
@@ -72,7 +74,10 @@ namespace
 extern "C" int __real_pthread_create(pthread_t*, const pthread_attr_t*, void* (*)(void*), void*);
 
 extern "C" int __wrap_pthread_create(
-  pthread_t* const thread, const pthread_attr_t* const attributes, void* (*const routine)(void*), void* const argument
+  pthread_t* const thread,
+  const pthread_attr_t* const attributes,
+  void* (*const routine)(void*),
+  void* const argument
 )
 {
   auto* const start = static_cast<ThreadStart*>(::operator new(sizeof(ThreadStart), std::nothrow));

@@ -60,7 +60,7 @@ namespace moho
      * Builds an `RD3DTextureResource` from bytes the prefetch step mapped.
      */
     boost::shared_ptr<RD3DTextureResource>
-      LoadFromImpl(gpg::StrArg path, boost::shared_ptr<gpg::MemBuffer<const char>> prefetchData) override;
+    LoadFromImpl(gpg::StrArg path, boost::shared_ptr<gpg::MemBuffer<const char>> prefetchData) override;
   };
 
   /**

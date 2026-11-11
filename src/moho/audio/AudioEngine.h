@@ -41,9 +41,15 @@ namespace moho
   using AudioNotificationDesc = ::XACT_NOTIFICATION_DESCRIPTION;
   using AudioNotification = ::XACT_NOTIFICATION;
   static_assert(sizeof(AudioNotificationDesc) == 6 + 5 * sizeof(void*), "XACT notification descriptor size mismatch");
-  static_assert(offsetof(AudioNotificationDesc, pWaveBank) == 2 + sizeof(void*), "XACT wave-bank field offset mismatch");
+  static_assert(
+    offsetof(AudioNotificationDesc, pWaveBank) == 2 + sizeof(void*),
+    "XACT wave-bank field offset mismatch"
+  );
   static_assert(sizeof(AudioNotification) == 9 + 5 * sizeof(void*), "XACT notification size mismatch");
-  static_assert(offsetof(AudioNotification, waveBank) == 5 + sizeof(void*), "XACT notification payload offset mismatch");
+  static_assert(
+    offsetof(AudioNotification, waveBank) == 5 + sizeof(void*),
+    "XACT notification payload offset mismatch"
+  );
 
   // XACT 2.5's runtime parameters end at pRendererID. The June 2010 SDK's
   // XACT_RUNTIME_PARAMETERS adds two XAudio2 pointers, so it cannot replace
@@ -60,8 +66,14 @@ namespace moho
     PWSTR pRendererID;
   };
   static_assert(sizeof(AudioRuntimeParams) == (sizeof(void*) == 4 ? 0x24 : 0x40), "AudioRuntimeParams size mismatch");
-  static_assert(offsetof(AudioRuntimeParams, fnNotificationCallback) == offsetof(XACT_RUNTIME_PARAMETERS, fnNotificationCallback), "XACT runtime callback offset mismatch");
-  static_assert(offsetof(AudioRuntimeParams, pRendererID) == offsetof(XACT_RUNTIME_PARAMETERS, pRendererID), "XACT runtime renderer offset mismatch");
+  static_assert(
+    offsetof(AudioRuntimeParams, fnNotificationCallback) == offsetof(XACT_RUNTIME_PARAMETERS, fnNotificationCallback),
+    "XACT runtime callback offset mismatch"
+  );
+  static_assert(
+    offsetof(AudioRuntimeParams, pRendererID) == offsetof(XACT_RUNTIME_PARAMETERS, pRendererID),
+    "XACT runtime renderer offset mismatch"
+  );
 
   /**
    * Address: 0x004DE650 (FUN_004DE650, ??0WeakPtr_AudioEngine@Moho@@QAE@@Z)
@@ -140,7 +152,9 @@ namespace moho
      * VTable slot 8 (+0x20).
      */
     virtual std::int32_t __stdcall SetMatrixCoefficients(
-      std::uint32_t srcChannelCount, std::uint32_t dstChannelCount, const float* matrixCoefficients
+      std::uint32_t srcChannelCount,
+      std::uint32_t dstChannelCount,
+      const float* matrixCoefficients
     ) = 0;
 
     /**
@@ -181,11 +195,11 @@ namespace moho
     virtual std::uint32_t __stdcall Release() = 0;                                         // +0x08
     virtual std::int32_t __stdcall GetRendererCount(std::uint16_t* outRendererCount) = 0;  // +0x0C
     virtual std::int32_t __stdcall
-    GetRendererDetails(std::uint16_t rendererIndex, void* outRendererDetails) = 0;       // +0x10
-    virtual std::int32_t __stdcall GetFinalMixFormat(void* outWaveFormatExtensible) = 0; // +0x14
+    GetRendererDetails(std::uint16_t rendererIndex, void* outRendererDetails) = 0;          // +0x10
+    virtual std::int32_t __stdcall GetFinalMixFormat(void* outWaveFormatExtensible) = 0;    // +0x14
     virtual std::int32_t __stdcall Initialize(const AudioRuntimeParams* runtimeParams) = 0; // +0x18
-    virtual void __stdcall ShutDown() = 0;                                               // +0x1C
-    virtual std::int32_t __stdcall DoWork() = 0;                                         // +0x20
+    virtual void __stdcall ShutDown() = 0;                                                  // +0x1C
+    virtual std::int32_t __stdcall DoWork() = 0;                                            // +0x20
     virtual std::int32_t __stdcall CreateSoundBank(
       const void* data,
       std::int32_t sizeBytes,
@@ -231,7 +245,7 @@ namespace moho
       std::uint32_t playOffset,
       std::uint8_t loopCount,
       void** outWave
-    ) = 0;                                                                                   // +0x38
+    ) = 0;                                                                                                    // +0x38
     virtual std::int32_t __stdcall RegisterNotification(const AudioNotificationDesc* notificationDesc) = 0;   // +0x3C
     virtual std::int32_t __stdcall UnRegisterNotification(const AudioNotificationDesc* notificationDesc) = 0; // +0x40
 
@@ -329,9 +343,9 @@ namespace moho
 
   struct AudioEngineRefVector
   {
-    void* mAllocatorCookie;   // +0x00
-    AudioEngineRef* mStart;   // +0x04
-    AudioEngineRef* mFinish;  // +0x08
+    void* mAllocatorCookie;    // +0x00
+    AudioEngineRef* mStart;    // +0x04
+    AudioEngineRef* mFinish;   // +0x08
     AudioEngineRef* mCapacity; // +0x0C
   };
 
@@ -351,16 +365,16 @@ namespace moho
      */
     SoundConfiguration() noexcept;
 
-    gpg::time::Timer mTime;            // +0x00
-    AudioEngineRefVector mEngines;     // +0x08
+    gpg::time::Timer mTime;                     // +0x00
+    AudioEngineRefVector mEngines;              // +0x08
     gpg::MemBuffer<char> mGlobalSettingsBuffer; // +0x18
-    std::uint8_t mNoSound;             // +0x28
-    std::uint8_t mReserved29[0x03];    // +0x29
-    std::uint32_t mSpeakerConfiguration; // +0x2C
-    void* mAudioModule;         // +0x30 (`HMODULE`)
-    AudioRuntimeParams mRuntimeParams; // +0x34
-    std::uint8_t mAudition;            // +0x58
-    std::uint8_t mReserved59[0x07];    // +0x59
+    std::uint8_t mNoSound;                      // +0x28
+    std::uint8_t mReserved29[0x03];             // +0x29
+    std::uint32_t mSpeakerConfiguration;        // +0x2C
+    void* mAudioModule;                         // +0x30 (`HMODULE`)
+    AudioRuntimeParams mRuntimeParams;          // +0x34
+    std::uint8_t mAudition;                     // +0x58
+    std::uint8_t mReserved59[0x07];             // +0x59
 
     /**
      * Address: 0x004D9250 (FUN_004D9250, ??1struct_SoundConfig@@QAE@@Z)
@@ -413,8 +427,8 @@ namespace moho
      * `.memory/project_audiomap1_missing_rebalance_bug.md`.
      */
     fa::set<fa::string> mPausedCategoryNames; // +0x28
-    IXACTEngine* mInstance;             // +0x34
-    Audio3DListener mListener;          // +0x38
+    IXACTEngine* mInstance;                   // +0x34
+    Audio3DListener mListener;                // +0x38
 
     /**
      * Per-category volume overrides, defaulting a category to full volume
@@ -430,10 +444,10 @@ namespace moho
      * instantiation and `.memory/project_handrolled_rbtrees_are_the_wall.md`.
      */
     fa::map<std::uint16_t, float> mCategoryVolumes; // +0x6C
-    float mGlobalCategoryVolume;        // +0x78
-    Audio3DDspSettings mSettings;       // +0x7C
-    Audio3DEmitter mEmitter;            // +0xAC
-    std::uint8_t mAudioHandle[0x14];    // +0x110
+    float mGlobalCategoryVolume;                    // +0x78
+    Audio3DDspSettings mSettings;                   // +0x7C
+    Audio3DEmitter mEmitter;                        // +0xAC
+    std::uint8_t mAudioHandle[0x14];                // +0x110
   };
 
   static_assert(sizeof(IXACTCue) == sizeof(void*), "IXACTCue interface size must be pointer-sized");
@@ -516,7 +530,8 @@ namespace moho
     explicit AudioEngine(gpg::StrArg voicePath);
 
     /**
-     * Address: 0x004D9340 (FUN_004D9340, ?Create@AudioEngine@Moho@@SA?AV?$shared_ptr@VAudioEngine@Moho@@@boost@@VStrArg@gpg@@@Z)
+     * Address: 0x004D9340 (FUN_004D9340,
+     * ?Create@AudioEngine@Moho@@SA?AV?$shared_ptr@VAudioEngine@Moho@@@boost@@VStrArg@gpg@@@Z)
      *
      * gpg::StrArg voicePath
      *

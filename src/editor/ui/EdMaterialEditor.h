@@ -62,28 +62,54 @@ namespace faf::editor
     };
     [[nodiscard]] bool TakeApply(Bake& out);
     /** Test runs (`/materiallive <slot>`, `/materialapply <slot>`): Live Update into the slot on, or Apply into it. */
-    void TestLive(const int slot)
+    void TestLive(
+      const int slot
+    )
     {
       mTargetSlot = slot;
       mLive = true;
     }
-    void TestApply(const int slot) { mApplyAsk = slot; }
+    void TestApply(
+      const int slot
+    )
+    {
+      mApplyAsk = slot;
+    }
     /** What the app made of an Apply (shown in the toolbar). */
-    void SetStatus(std::string status) { mStatus = std::move(status); }
+    void SetStatus(
+      std::string status
+    )
+    {
+      mStatus = std::move(status);
+    }
 
     /** Gives the map nodes the open map's heights (asked when a graph needs them and on Refresh). */
-    void SetTerrainSource(std::function<std::shared_ptr<TerrainSource>()> source) { mTerrainSource = std::move(source); }
+    void SetTerrainSource(
+      std::function<std::shared_ptr<TerrainSource>()> source
+    )
+    {
+      mTerrainSource = std::move(source);
+    }
 
     /** The window or one of its parts has the keyboard (the app's Ctrl+S / Ctrl+Z leave it alone). */
-    [[nodiscard]] bool Focused() const noexcept { return mFocused; }
+    [[nodiscard]] bool Focused() const noexcept
+    {
+      return mFocused;
+    }
 
-    /** Opens on a layer slot: a new graph if none is open, the slot as the target, Live Update on, the window in front. */
+    /** Opens on a layer slot: a new graph if none is open, the slot as the target, Live Update on, the window in front.
+     */
     void OpenForSlot(int slot);
 
     /** For test runs (`/materialeditor`): opens a new graph. */
     void NewGraph();
     /** Opens a graph file in a new tab (test runs: `/materialopen <file>`); false when it can't be read. */
-    bool OpenFile(const std::filesystem::path& file) { return Open(file); }
+    bool OpenFile(
+      const std::filesystem::path& file
+    )
+    {
+      return Open(file);
+    }
     /** Selects the active graph's first node of the type (test runs: `/materialselect <type>`). */
     void SelectFirst(const std::string& type);
     /** The active graph's node count, 0 without one (test runs). */
@@ -180,5 +206,6 @@ namespace faf::editor
   };
 
   /** A lit preview of a stratum's albedo and normal maps: `mode` 0 a sphere, 1 a 2 x 2 plane; BGRA rows. */
-  std::vector<std::uint32_t> RenderMaterialPreview(const TexImage* albedo, const TexImage* normal, int mode, int size, float yaw, float lightYaw);
+  std::vector<std::uint32_t>
+  RenderMaterialPreview(const TexImage* albedo, const TexImage* normal, int mode, int size, float yaw, float lightYaw);
 } // namespace faf::editor

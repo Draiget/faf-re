@@ -7,39 +7,43 @@ namespace moho
 {
   namespace
   {
-    [[nodiscard]] int GetLuaTypeTag(const LuaPlus::LuaObject& valueObject) noexcept
+    [[nodiscard]] int GetLuaTypeTag(
+      const LuaPlus::LuaObject& valueObject
+    ) noexcept
     {
       return valueObject.m_object.tt;
     }
 
-    [[nodiscard]] const char* GetLuaTypeName(const int typeTag) noexcept
+    [[nodiscard]] const char* GetLuaTypeName(
+      const int typeTag
+    ) noexcept
     {
       switch (typeTag) {
-        case LUA_TNIL:
-          return "nil";
-        case LUA_TBOOLEAN:
-          return "boolean";
-        case LUA_TLIGHTUSERDATA:
-          return "lightuserdata";
-        case LUA_TNUMBER:
-          return "number";
-        case LUA_TSTRING:
-          return "string";
-        case LUA_TTABLE:
-          return "table";
-        case LUA_CFUNCTION:
-        case LUA_TFUNCTION:
-          return "function";
-        case LUA_TUSERDATA:
-          return "userdata";
-        case LUA_TTHREAD:
-          return "thread";
-        case LUA_TPROTO:
-          return "proto";
-        case LUA_TUPVALUE:
-          return "upvalue";
-        default:
-          return "<unknown>";
+      case LUA_TNIL:
+        return "nil";
+      case LUA_TBOOLEAN:
+        return "boolean";
+      case LUA_TLIGHTUSERDATA:
+        return "lightuserdata";
+      case LUA_TNUMBER:
+        return "number";
+      case LUA_TSTRING:
+        return "string";
+      case LUA_TTABLE:
+        return "table";
+      case LUA_CFUNCTION:
+      case LUA_TFUNCTION:
+        return "function";
+      case LUA_TUSERDATA:
+        return "userdata";
+      case LUA_TTHREAD:
+        return "thread";
+      case LUA_TPROTO:
+        return "proto";
+      case LUA_TUPVALUE:
+        return "upvalue";
+      default:
+        return "<unknown>";
       }
     }
 
@@ -54,8 +58,7 @@ namespace moho
   ScrWatch::ScrWatch()
     : name()
     , obj()
-  {
-  }
+  {}
 
   /**
    * Address: 0x004D6B30 (FUN_004D6B30, Moho::ScrWatch::ScrWatch)
@@ -65,7 +68,10 @@ namespace moho
    * What it does:
    * Initializes one watch entry from copied display-name and Lua object lanes.
    */
-  ScrWatch::ScrWatch(const fa::string& watchName, const LuaPlus::LuaObject& valueObject)
+  ScrWatch::ScrWatch(
+    const fa::string& watchName,
+    const LuaPlus::LuaObject& valueObject
+  )
     : name()
     , obj(valueObject)
   {
@@ -78,7 +84,9 @@ namespace moho
    * What it does:
    * Rebinds one watch object to copied name and Lua value lanes.
    */
-  ScrWatch& ScrWatch::operator=(const ScrWatch& other)
+  ScrWatch& ScrWatch::operator=(
+    const ScrWatch& other
+  )
   {
     if (this == &other) {
       return *this;
@@ -124,33 +132,33 @@ namespace moho
     fa::string valueText{};
 
     switch (GetLuaTypeTag(obj)) {
-      case LUA_TBOOLEAN:
-        valueText.assign_owned(obj.GetBoolean() ? "true" : "false");
-        break;
+    case LUA_TBOOLEAN:
+      valueText.assign_owned(obj.GetBoolean() ? "true" : "false");
+      break;
 
-      case LUA_TNUMBER: {
-        std::ostringstream numberStream{};
-        numberStream << static_cast<float>(obj.GetNumber());
-        const std::string formattedNumber = numberStream.str();
-        valueText.assign_owned(formattedNumber);
-        break;
-      }
+    case LUA_TNUMBER: {
+      std::ostringstream numberStream{};
+      numberStream << static_cast<float>(obj.GetNumber());
+      const std::string formattedNumber = numberStream.str();
+      valueText.assign_owned(formattedNumber);
+      break;
+    }
 
-      case LUA_TSTRING:
-        valueText.assign_owned(obj.GetString());
-        break;
+    case LUA_TSTRING:
+      valueText.assign_owned(obj.GetString());
+      break;
 
-      case LUA_TNIL:
-      case LUA_TLIGHTUSERDATA:
-      case LUA_TTABLE:
-      case LUA_CFUNCTION:
-      case LUA_TFUNCTION:
-        valueText.clear();
-        break;
+    case LUA_TNIL:
+    case LUA_TLIGHTUSERDATA:
+    case LUA_TTABLE:
+    case LUA_CFUNCTION:
+    case LUA_TFUNCTION:
+      valueText.clear();
+      break;
 
-      default:
-        valueText.assign_owned("<unknown>");
-        break;
+    default:
+      valueText.assign_owned("<unknown>");
+      break;
     }
 
     return valueText;

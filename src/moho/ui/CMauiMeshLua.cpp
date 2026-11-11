@@ -6,8 +6,7 @@ namespace
     "InternalCreateMesh(luaobj,parent) -- for internal use by CreateMesh()";
   constexpr const char* kCMauiMeshSetMeshHelpText = "SetMesh(meshBPName)";
   constexpr const char* kCMauiMeshSetOrientationHelpText = "SetOrientation(quaternion)";
-}
-
+} // namespace
 
 /**
  * Address: 0x0079E590 (FUN_0079E590, cfunc_InternalCreateMesh)

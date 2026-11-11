@@ -5,8 +5,11 @@
 
 namespace faf::editor::test
 {
-  /** An environment variable's text, or "" when it isn't set (the tests that read retail files take their folder so). */
-  [[nodiscard]] inline std::string EnvText(const char* const name)
+  /** An environment variable's text, or "" when it isn't set (the tests that read retail files take their folder so).
+   */
+  [[nodiscard]] inline std::string EnvText(
+    const char* const name
+  )
   {
 #if defined(_MSC_VER)
     // The MSVC runtime marks getenv unsafe (C4996, clang's -Wdeprecated-declarations); _dupenv_s is its own.

@@ -23,13 +23,18 @@ using namespace moho;
 
 namespace
 {
-  [[nodiscard]] std::int16_t GridCellCoord(const float worldCoord, const std::uint8_t footprintAxisSize) noexcept
+  [[nodiscard]] std::int16_t GridCellCoord(
+    const float worldCoord,
+    const std::uint8_t footprintAxisSize
+  ) noexcept
   {
     // Bare fistp (0x005A4B49 / 0x005A4B6E): round to nearest, ties to even.
     return static_cast<std::int16_t>(std::lrintf(worldCoord - (static_cast<float>(footprintAxisSize) * 0.5f)));
   }
 
-  [[nodiscard]] bool IsUnitIdleState(const Unit& unit) noexcept
+  [[nodiscard]] bool IsUnitIdleState(
+    const Unit& unit
+  ) noexcept
   {
     const CUnitCommandQueue* const commandQueue = unit.CommandQueue;
     if (!commandQueue) {
@@ -47,13 +52,18 @@ namespace
     return begin->GetObjectPtr() == nullptr;
   }
 
-  [[nodiscard]] bool HasMovedSincePrev(const Entity& entity) noexcept
+  [[nodiscard]] bool HasMovedSincePrev(
+    const Entity& entity
+  ) noexcept
   {
-    return entity.mVarDat.mCurTransform.pos_.x != entity.mVarDat.mLastTransform.pos_.x || entity.mVarDat.mCurTransform.pos_.y != entity.mVarDat.mLastTransform.pos_.y ||
+    return entity.mVarDat.mCurTransform.pos_.x != entity.mVarDat.mLastTransform.pos_.x ||
+      entity.mVarDat.mCurTransform.pos_.y != entity.mVarDat.mLastTransform.pos_.y ||
       entity.mVarDat.mCurTransform.pos_.z != entity.mVarDat.mLastTransform.pos_.z;
   }
 
-  [[nodiscard]] Wm3::Vector3f EstimateAirAbortStopPosition(const Unit& unit) noexcept
+  [[nodiscard]] Wm3::Vector3f EstimateAirAbortStopPosition(
+    const Unit& unit
+  ) noexcept
   {
     Wm3::Vector3f out = Wm3::Vector3f::Zero();
     unit.PredictAheadBomb(&out, 1.0f);
@@ -79,7 +89,9 @@ CAiNavigatorAir::CAiNavigatorAir()
 /**
  * Address: 0x005A4880 (FUN_005A4880, unit ctor)
  */
-CAiNavigatorAir::CAiNavigatorAir(Unit* const unit)
+CAiNavigatorAir::CAiNavigatorAir(
+  Unit* const unit
+)
   : CAiNavigatorImpl(unit)
   , mDestinationEntity{}
   , mCurrentTargetPos(Wm3::Vector3f::Zero())
@@ -103,7 +115,9 @@ CAiNavigatorAir::~CAiNavigatorAir()
  * Loads base navigator state, destination weak link, current target, goal
  * position, and formation-tracking flag.
  */
-void CAiNavigatorAir::MemberDeserialize(gpg::ReadArchive* const archive)
+void CAiNavigatorAir::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -128,7 +142,9 @@ void CAiNavigatorAir::MemberDeserialize(gpg::ReadArchive* const archive)
  * Saves base navigator state, destination weak link, current target, goal
  * position, and formation-tracking flag.
  */
-void CAiNavigatorAir::MemberSerialize(gpg::WriteArchive* const archive) const
+void CAiNavigatorAir::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -146,7 +162,9 @@ void CAiNavigatorAir::MemberSerialize(gpg::WriteArchive* const archive) const
 /**
  * Address: 0x005A4C60 (FUN_005A4C60)
  */
-void CAiNavigatorAir::SetGoal(const SAiNavigatorGoal& goal)
+void CAiNavigatorAir::SetGoal(
+  const SAiNavigatorGoal& goal
+)
 {
   if (!mUnit || mUnit->IsUnitState(UNITSTATE_Attached)) {
     return;
@@ -187,7 +205,9 @@ void CAiNavigatorAir::SetGoal(const SAiNavigatorGoal& goal)
 /**
  * Address: 0x005A4A70 (FUN_005A4A70)
  */
-void CAiNavigatorAir::SetDestUnit(Entity* const destinationEntity)
+void CAiNavigatorAir::SetDestUnit(
+  Entity* const destinationEntity
+)
 {
   mDestinationEntity.ResetFromObject(destinationEntity);
   UpdateCurrentTargetFromDestinationEntity();
@@ -212,8 +232,7 @@ void CAiNavigatorAir::AbortMove()
       Wm3::Vector3f direction = mUnit->GetVelocity();
       const float speedTimesTen =
         std::sqrt(((direction.z * direction.z) + (direction.y * direction.y)) + (direction.x * direction.x)) * 10.0f;
-      const float brakingDistance =
-        (speedTimesTen * speedTimesTen) / (blueprint->Physics.MaxAcceleration * 2.0f);
+      const float brakingDistance = (speedTimesTen * speedTimesTen) / (blueprint->Physics.MaxAcceleration * 2.0f);
       (void)Wm3::Vector3f::Normalize(&direction);
 
       const Wm3::Vec3f& position = mUnit->GetPosition();
@@ -235,7 +254,9 @@ void CAiNavigatorAir::AbortMove()
 /**
  * Address: 0x005A5080 (FUN_005A5080)
  */
-void CAiNavigatorAir::SetSpeedThroughGoal(const bool enabled)
+void CAiNavigatorAir::SetSpeedThroughGoal(
+  const bool enabled
+)
 {
   if (!mUnit || !mUnit->AiSteering) {
     return;
@@ -298,7 +319,9 @@ bool CAiNavigatorAir::FollowingLeader() const
 /**
  * Address: 0x005A4A40 (FUN_005A4A40)
  */
-void CAiNavigatorAir::IgnoreFormation(const bool ignore)
+void CAiNavigatorAir::IgnoreFormation(
+  const bool ignore
+)
 {
   mIgnoreFormation = static_cast<std::uint8_t>(ignore);
   if (ignore) {
@@ -336,7 +359,10 @@ bool CAiNavigatorAir::AtGoal() const
 /**
  * Address: 0x005A49E0 (FUN_005A49E0)
  */
-bool CAiNavigatorAir::CanPathTo(Wm3::Vector3f* outTargetPos, const SAiNavigatorGoal& goal) const
+bool CAiNavigatorAir::CanPathTo(
+  Wm3::Vector3f* outTargetPos,
+  const SAiNavigatorGoal& goal
+) const
 {
   (void)outTargetPos;
   (void)goal;
@@ -353,8 +379,10 @@ int CAiNavigatorAir::Execute()
   }
 
   Entity* const destinationEntity = mDestinationEntity.GetObjectPtr();
-  if (destinationEntity && destinationEntity->IsMobile() && HasMovedSincePrev(*destinationEntity) &&
-      mUnit->IsInCategory("TARGETCHASER")) {
+  if (
+    destinationEntity && destinationEntity->IsMobile() && HasMovedSincePrev(*destinationEntity) &&
+    mUnit->IsInCategory("TARGETCHASER")
+  ) {
     UpdateCurrentTargetFromDestinationEntity();
     return 1;
   }
@@ -365,10 +393,11 @@ int CAiNavigatorAir::Execute()
   const std::int16_t goalCellX = GridCellCoord(mGoalPos.x, footprint.mSizeX);
   const std::int16_t goalCellZ = GridCellCoord(mGoalPos.z, footprint.mSizeZ);
 
-
-  if (mUnit->UnitMotion && mUnit->UnitMotion->AtTarget() &&
-      static_cast<std::uint16_t>(currentTargetCellX) == static_cast<std::uint16_t>(goalCellX) &&
-      static_cast<std::uint16_t>(currentTargetCellZ) == static_cast<std::uint16_t>(goalCellZ)) {
+  if (
+    mUnit->UnitMotion && mUnit->UnitMotion->AtTarget() &&
+    static_cast<std::uint16_t>(currentTargetCellX) == static_cast<std::uint16_t>(goalCellX) &&
+    static_cast<std::uint16_t>(currentTargetCellZ) == static_cast<std::uint16_t>(goalCellZ)
+  ) {
     if (!mDestinationEntity.HasValue()) {
       mStatus = AINAVSTATUS_Idle;
       BroadcastEvent(AINAVEVENT_Succeeded);
@@ -397,9 +426,11 @@ int CAiNavigatorAir::Execute()
     // narrows.
     Entity* const focusEntity = mUnit->FocusEntityRef.GetObjectPtr();
     Unit* const focusUnit = (focusEntity != nullptr) ? focusEntity->IsUnit() : nullptr;
-    if (focusUnit && focusUnit->IsMobile() &&
-        (focusUnit->IsDead() || focusUnit->DestroyQueued() || !IsUnitIdleState(*focusUnit) ||
-         focusUnit->IsUnitState(UNITSTATE_MovingUp) || focusUnit->IsUnitState(UNITSTATE_MovingDown))) {
+    if (
+      focusUnit && focusUnit->IsMobile() &&
+      (focusUnit->IsDead() || focusUnit->DestroyQueued() || !IsUnitIdleState(*focusUnit) ||
+       focusUnit->IsUnitState(UNITSTATE_MovingUp) || focusUnit->IsUnitState(UNITSTATE_MovingDown))
+    ) {
       mStatus = AINAVSTATUS_Idle;
       BroadcastEvent(AINAVEVENT_Failed);
     }
@@ -413,7 +444,9 @@ int CAiNavigatorAir::Execute()
 /**
  * Address: 0x005A4B00 (FUN_005A4B00, helper used by FUN_005A4C60)
  */
-SOCellPos CAiNavigatorAir::BuildGoalCell(const SAiNavigatorGoal& goal) const
+SOCellPos CAiNavigatorAir::BuildGoalCell(
+  const SAiNavigatorGoal& goal
+) const
 {
   if (!mUnit) {
     return SOCellPos{};
@@ -446,8 +479,8 @@ SOCellPos CAiNavigatorAir::BuildGoalCell(const SAiNavigatorGoal& goal) const
 
       const auto dx = static_cast<std::int16_t>(unitCellX - static_cast<std::int16_t>(x));
       const auto dz = static_cast<std::int16_t>(unitCellZ - static_cast<std::int16_t>(z));
-      const float distSq = (static_cast<float>(dx) * static_cast<float>(dx)) +
-        (static_cast<float>(dz) * static_cast<float>(dz));
+      const float distSq =
+        (static_cast<float>(dx) * static_cast<float>(dx)) + (static_cast<float>(dz) * static_cast<float>(dz));
       if (distSq < bestDistSq) {
         bestDistSq = distSq;
         bestX = x;
@@ -532,7 +565,12 @@ namespace moho
   /**
    * Address: 0x005A5640 (FUN_005A5640)
    */
-  void CAiNavigatorAir::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CAiNavigatorAir::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CAiNavigatorAir()), 0u);
   }

@@ -19,7 +19,9 @@ namespace
 {
   volatile std::uint32_t gWatched = 0;
 
-  std::string Hex(const std::uintptr_t value)
+  std::string Hex(
+    const std::uintptr_t value
+  )
   {
     char text[32] = {};
     (void)std::snprintf(text, sizeof(text), "%llX", static_cast<unsigned long long>(value));
@@ -46,20 +48,26 @@ namespace
   }
 } // namespace
 
-TEST(ProbeWatch, SpecsItCannotArmAreTurnedDown)
+TEST(
+  ProbeWatch,
+  SpecsItCannotArmAreTurnedDown
+)
 {
   EXPECT_FALSE(gpg::diag::ParseWatchSpec(nullptr));
   EXPECT_FALSE(gpg::diag::ParseWatchSpec(""));
   EXPECT_FALSE(gpg::diag::ParseProbeSpec(nullptr));
   EXPECT_FALSE(gpg::diag::ParseProbeSpec(""));
-  EXPECT_FALSE(gpg::diag::ParseProbeSpec("0"));          // no address
-  EXPECT_FALSE(gpg::diag::ParseProbeSpec(":ecx+474"));   // an expression without an address
+  EXPECT_FALSE(gpg::diag::ParseProbeSpec("0"));        // no address
+  EXPECT_FALSE(gpg::diag::ParseProbeSpec(":ecx+474")); // an expression without an address
   EXPECT_FALSE(gpg::diag::ParseFadepProbeRequest(nullptr));
   EXPECT_FALSE(gpg::diag::ParseFadepProbeRequest("FADeepProbe nothing"));
   EXPECT_FALSE(gpg::diag::ParseFadepProbeRequest("something else"));
 }
 
-TEST(ProbeWatch, AWatchReportsTheWrite)
+TEST(
+  ProbeWatch,
+  AWatchReportsTheWrite
+)
 {
   gpg::diag::InstallProbeWatchHandler();
 
@@ -73,7 +81,10 @@ TEST(ProbeWatch, AWatchReportsTheWrite)
 }
 
 // The game's own end-to-end check (/crashtest watch): arms a watch on a local and writes it.
-TEST(ProbeWatch, SelfTestRunsThroughTheWholeWatchPath)
+TEST(
+  ProbeWatch,
+  SelfTestRunsThroughTheWholeWatchPath
+)
 {
   gpg::diag::InstallProbeWatchHandler();
   gpg::diag::ProbeWatchSelfTest();

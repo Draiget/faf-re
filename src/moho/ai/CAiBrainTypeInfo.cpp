@@ -28,7 +28,9 @@ namespace
    * Registers `CScriptObject` as one reflected base lane for `CAiBrain` at
    * offset `+0x00`.
    */
-  void AddCScriptObjectBaseToCAiBrainType(gpg::RType* const typeInfo)
+  void AddCScriptObjectBaseToCAiBrainType(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<CScriptObject>(typeInfo);
   }
@@ -93,4 +95,7 @@ void moho::register_CAiBrainTypeInfoStartup()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAiBrainTypeInfoStartup_776a4f, moho::register_CAiBrainTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CAiBrainTypeInfoStartup_776a4f,
+  moho::register_CAiBrainTypeInfoStartup
+)

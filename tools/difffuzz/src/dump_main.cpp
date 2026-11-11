@@ -60,7 +60,10 @@ namespace
 #endif
   }
 
-  [[nodiscard]] bool Matches(const char* name, const char* filter)
+  [[nodiscard]] bool Matches(
+    const char* name,
+    const char* filter
+  )
   {
     if (filter == nullptr) {
       return true;
@@ -131,7 +134,10 @@ namespace
     return name;
   }
 
-  void PrintWords(const u32* words, const int count)
+  void PrintWords(
+    const u32* words,
+    const int count
+  )
   {
     for (int i = 0; i < count; ++i) {
       std::printf(" %08X", words[i]);
@@ -177,7 +183,9 @@ namespace
         if (still < kHangSeconds || tg == nullptr) {
           continue;
         }
-        std::printf("HANG %s iteration %llu: one call ran for %d s\n  input   ", tg->name, gIteration.load(), kHangSeconds);
+        std::printf(
+          "HANG %s iteration %llu: one call ran for %d s\n  input   ", tg->name, gIteration.load(), kHangSeconds
+        );
         PrintWords(gInput, tg->inWords);
         std::printf("  (%s)\n", tg->inLayout);
         std::fflush(stdout);
@@ -187,7 +195,13 @@ namespace
   }
 
   /// Our function's outputs for one input, in the simulation's FP environment.
-  void RunOurs(const Target& tg, const u32* in, u32* outWords, const bool strictNan, const unsigned long long iteration)
+  void RunOurs(
+    const Target& tg,
+    const u32* in,
+    u32* outWords,
+    const bool strictNan,
+    const unsigned long long iteration
+  )
   {
     std::memcpy(gInput, in, sizeof(u32) * tg.inWords);
     gIteration.store(iteration);
@@ -208,7 +222,9 @@ namespace
   /// Every line of the values file whose target matches the filter: our outputs
   /// for its inputs against retail's. A selected target with no line fails too
   /// (a new target needs a new values file). Returns the number of failures.
-  int CheckValues(const Options& opt)
+  int CheckValues(
+    const Options& opt
+  )
   {
     std::FILE* const file = std::fopen(opt.values, "rb");
     if (file == nullptr) {
@@ -299,8 +315,14 @@ namespace
       }
       if (inCount != tg.inWords || outCount != tg.outWords) {
         std::printf(
-          "BAD %s:%d: %s takes %d input and %d output words, the line has %d and %d\n", opt.values, lineNumber, tg.name,
-          tg.inWords, tg.outWords, inCount, outCount
+          "BAD %s:%d: %s takes %d input and %d output words, the line has %d and %d\n",
+          opt.values,
+          lineNumber,
+          tg.name,
+          tg.inWords,
+          tg.outWords,
+          inCount,
+          outCount
         );
         ++bad;
         continue;
@@ -338,12 +360,20 @@ namespace
       }
     }
     std::printf(
-      "faf_math_dump --values: %d cases over %d targets, %d differ or missing from %s\n", cases, covered, bad, opt.values
+      "faf_math_dump --values: %d cases over %d targets, %d differ or missing from %s\n",
+      cases,
+      covered,
+      bad,
+      opt.values
     );
     return bad;
   }
 
-  void Run(const Options& opt, std::FILE* out, int& ran)
+  void Run(
+    const Options& opt,
+    std::FILE* out,
+    int& ran
+  )
   {
     int targetCount = 0;
     const Target* const targets = difffuzz::AllTargets(targetCount);
@@ -375,7 +405,10 @@ namespace
   }
 
   /// "target block" -> the rest of the line, for every line of a dump file.
-  [[nodiscard]] bool ReadDump(std::FILE* file, std::map<std::string, std::string>& lines)
+  [[nodiscard]] bool ReadDump(
+    std::FILE* file,
+    std::map<std::string, std::string>& lines
+  )
   {
     char buffer[512];
     while (std::fgets(buffer, sizeof(buffer), file) != nullptr) {
@@ -398,7 +431,10 @@ namespace
 
   /// Every line this run wrote must be in the golden file with the same hashes.
   /// Returns the number of differing or missing lines.
-  int Check(std::FILE* produced, const char* goldenPath)
+  int Check(
+    std::FILE* produced,
+    const char* goldenPath
+  )
   {
     std::FILE* const golden = std::fopen(goldenPath, "rb");
     std::map<std::string, std::string> expected;
@@ -447,20 +483,33 @@ namespace
       std::string variantNote;
       for (auto variant = variantFirst; variant != variantLast; ++variant) {
         // "inputs outputs note": the same 33 characters as a dump line's hashes, then the note.
-        if (variant->second.size() >= hashes.size() && variant->second.compare(0, hashes.size(), hashes) == 0 &&
-            (variant->second.size() == hashes.size() || variant->second[hashes.size()] == ' ')) {
-          variantNote = variant->second.size() > hashes.size() ? variant->second.substr(hashes.size() + 1) : "(no note)";
+        if (
+          variant->second.size() >= hashes.size() && variant->second.compare(0, hashes.size(), hashes) == 0 &&
+          (variant->second.size() == hashes.size() || variant->second[hashes.size()] == ' ')
+        ) {
+          variantNote =
+            variant->second.size() > hashes.size() ? variant->second.substr(hashes.size() + 1) : "(no note)";
         }
       }
       if (it == expected.end()) {
-        std::printf("MISSING %s: not in %s (iterations past the golden file's, or a new target)\n", key.c_str(), goldenPath);
+        std::printf(
+          "MISSING %s: not in %s (iterations past the golden file's, or a new target)\n", key.c_str(), goldenPath
+        );
         ++bad;
       } else if (it->second != hashes && !variantNote.empty() && it->second.substr(0, 16) == hashes.substr(0, 16)) {
-        std::printf("VARIANT %s: outputs as cpu_variants.txt lists them for %s (this CPU: %s)\n", key.c_str(), variantNote.c_str(), CpuName().c_str());
+        std::printf(
+          "VARIANT %s: outputs as cpu_variants.txt lists them for %s (this CPU: %s)\n",
+          key.c_str(),
+          variantNote.c_str(),
+          CpuName().c_str()
+        );
       } else if (it->second != hashes) {
         const bool inputs = it->second.substr(0, 16) != hashes.substr(0, 16);
         std::printf(
-          "FAIL %s: %s differ (golden %s, here %s)\n", key.c_str(), inputs ? "inputs" : "outputs", it->second.c_str(),
+          "FAIL %s: %s differ (golden %s, here %s)\n",
+          key.c_str(),
+          inputs ? "inputs" : "outputs",
+          it->second.c_str(),
           hashes.c_str()
         );
         ++bad;
@@ -476,12 +525,17 @@ namespace
   }
 } // namespace
 
-int main(int argc, char** argv)
+int main(
+  int argc,
+  char** argv
+)
 {
   Options opt;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
-    auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
+    auto next = [&]() -> const char* {
+      return i + 1 < argc ? argv[++i] : "";
+    };
     if (a == "--iters") {
       opt.iters = std::strtoull(next(), nullptr, 0);
     } else if (a == "--seed") {
@@ -506,8 +560,10 @@ int main(int argc, char** argv)
     }
   }
   const bool hashes = opt.out != nullptr || opt.check != nullptr;
-  if ((opt.out != nullptr && opt.check != nullptr) || (!hashes && opt.values == nullptr)
-      || (opt.check != nullptr && opt.lines) || (opt.values != nullptr && (opt.lines || opt.strictNan))) {
+  if (
+    (opt.out != nullptr && opt.check != nullptr) || (!hashes && opt.values == nullptr) ||
+    (opt.check != nullptr && opt.lines) || (opt.values != nullptr && (opt.lines || opt.strictNan))
+  ) {
     Usage();
     return 2;
   }
@@ -536,7 +592,11 @@ int main(int argc, char** argv)
   int ran = 0;
   Run(opt, out, ran);
   std::printf(
-    "faf_math_dump (%s): %d targets, %llu iterations each, seed 0x%llX%s\n", PlatformName(), ran, opt.iters, opt.seed,
+    "faf_math_dump (%s): %d targets, %llu iterations each, seed 0x%llX%s\n",
+    PlatformName(),
+    ran,
+    opt.iters,
+    opt.seed,
     opt.strictNan ? ", strict NaN" : ""
   );
   int result = ran == 0 ? 2 : 0;

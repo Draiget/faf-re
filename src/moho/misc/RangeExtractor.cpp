@@ -53,14 +53,18 @@ namespace
     registry[fa::string(blueprintRangeName)] = extractor;
   }
 
-  [[nodiscard]] moho::RangeExtractor* CreateWeaponExtractor(const moho::UnitWeaponRangeCategory rangeCategory)
+  [[nodiscard]] moho::RangeExtractor* CreateWeaponExtractor(
+    const moho::UnitWeaponRangeCategory rangeCategory
+  )
   {
     auto* const extractor = new moho::WeaponExtractor();
     extractor->mRangeCategory = static_cast<std::int32_t>(rangeCategory);
     return extractor;
   }
 
-  void PopulateBlueprintExtractors(BlueprintExtractorRegistry& registry)
+  void PopulateBlueprintExtractors(
+    BlueprintExtractorRegistry& registry
+  )
   {
     RegisterExtractor(registry, "AllMilitary", new moho::CombinedMilitaryExtractor());
     RegisterExtractor(registry, "DirectFire", CreateWeaponExtractor(moho::UWRC_DirectFire));
@@ -129,7 +133,9 @@ namespace
    * What it does:
    * Returns the process-global blueprint extractor registry pointer.
    */
-  [[maybe_unused]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointerLaneA(const int /*unused*/) noexcept
+  [[maybe_unused]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointerLaneA(
+    const int /*unused*/
+  ) noexcept
   {
     return GetBlueprintExtractorRegistryPointer();
   }
@@ -141,7 +147,9 @@ namespace
    * Secondary lane returning the process-global blueprint extractor registry
    * pointer.
    */
-  [[maybe_unused]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointerLaneB(const int /*unused*/) noexcept
+  [[maybe_unused]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointerLaneB(
+    const int /*unused*/
+  ) noexcept
   {
     return GetBlueprintExtractorRegistryPointer();
   }
@@ -153,7 +161,9 @@ namespace
    * Third lane returning the process-global blueprint extractor registry
    * pointer.
    */
-  [[maybe_unused]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointerLaneC(const int /*unused*/) noexcept
+  [[maybe_unused]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointerLaneC(
+    const int /*unused*/
+  ) noexcept
   {
     return GetBlueprintExtractorRegistryPointer();
   }
@@ -165,12 +175,14 @@ namespace
    * Fourth lane returning the process-global blueprint extractor registry
    * pointer.
    */
-  [[maybe_unused]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointerLaneD(const int /*unused*/) noexcept
+  [[maybe_unused]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointerLaneD(
+    const int /*unused*/
+  ) noexcept
   {
     return GetBlueprintExtractorRegistryPointer();
   }
 
-}
+} // namespace
 
 namespace moho
 {
@@ -179,7 +191,10 @@ namespace moho
    */
   RangeExtractor::~RangeExtractor() = default;
 
-  float RangeExtractor::ResolvePositiveRadius(const float preferredRadius, const float fallbackRadius) noexcept
+  float RangeExtractor::ResolvePositiveRadius(
+    const float preferredRadius,
+    const float fallbackRadius
+  ) noexcept
   {
     return preferredRadius > 0.0f ? preferredRadius : fallbackRadius;
   }
@@ -222,7 +237,10 @@ namespace moho
     return true;
   }
 
-  bool RangeExtractor::TryGetAssistOverlayRadius(const UserEntity* const userEntity, float* const outRadius) noexcept
+  bool RangeExtractor::TryGetAssistOverlayRadius(
+    const UserEntity* const userEntity,
+    float* const outRadius
+  ) noexcept
   {
     if (!userEntity || !outRadius) {
       return false;
@@ -338,7 +356,9 @@ namespace moho
    * Looks up a registered extractor by blueprint range key and returns
    * the associated instance, or `nullptr` when no mapping exists.
    */
-  RangeExtractor* GetRangeExtractor(const fa::string& extractorName)
+  RangeExtractor* GetRangeExtractor(
+    const fa::string& extractorName
+  )
   {
     if (!gBlueprintExtractorsInitialized) {
       InitializeBlueprintExtractors();

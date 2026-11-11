@@ -41,4 +41,3 @@ namespace moho
   using ManyToOneListener_EProjectileImpactEvent = ManyToOneListener<EProjectileImpactEvent>;
   using ManyToOneBroadcaster_EProjectileImpactEvent = ManyToOneBroadcaster<EProjectileImpactEvent>;
 } // namespace moho
-

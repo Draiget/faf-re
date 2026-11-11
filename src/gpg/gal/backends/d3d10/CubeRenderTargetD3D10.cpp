@@ -16,8 +16,7 @@ namespace gpg::gal
    */
   CubeRenderTargetD3D10::CubeRenderTargetD3D10()
     : context_()
-  {
-  }
+  {}
 
   /**
    * Address: 0x008F7F80 (FUN_008F7F80)
@@ -27,7 +26,9 @@ namespace gpg::gal
    * What it does:
    * Initializes one cube-render-target wrapper and default-constructs context lane.
    */
-  CubeRenderTargetD3D10::CubeRenderTargetD3D10(const CubeRenderTargetContext* const context)
+  CubeRenderTargetD3D10::CubeRenderTargetD3D10(
+    const CubeRenderTargetContext* const context
+  )
     : context_()
   {
     static_cast<void>(context);
@@ -51,5 +52,4 @@ namespace gpg::gal
   {
     return &context_;
   }
-}
-
+} // namespace gpg::gal

@@ -90,8 +90,7 @@ namespace
     const Wm3::Vec3f& cursorWorldPosition
   )
   {
-    const auto* const map =
-      worldView.mWldSession->mWldMap->mTerrainRes->mMap;
+    const auto* const map = worldView.mWldSession->mWldMap->mTerrainRes->mMap;
     return map->mHeightField->GetElevation(cursorWorldPosition.x, cursorWorldPosition.z);
   }
 
@@ -154,7 +153,7 @@ namespace
     }
     cursor->SetDefaultTexture(texturePath);
   }
-}
+} // namespace
 
 gpg::RType* moho::CMauiCursor::sType = nullptr;
 
@@ -234,7 +233,12 @@ int moho::cfunc__c_CreateCursor(
 moho::CScrLuaInitForm* moho::func__c_CreateCursor_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(), kCreateCursorName, &moho::cfunc__c_CreateCursor, nullptr, "<global>", kCreateCursorHelpText
+    moho::SCR_UserLuaInitSet(),
+    kCreateCursorName,
+    &moho::cfunc__c_CreateCursor,
+    nullptr,
+    "<global>",
+    kCreateCursorHelpText
   );
   return &binder;
 }

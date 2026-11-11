@@ -43,8 +43,8 @@ namespace moho
      */
     SSTICommandSource& operator=(const SSTICommandSource& other);
 
-    std::uint32_t mIndex; // +0x00
-    fa::string mName;  // +0x04
+    std::uint32_t mIndex;   // +0x00
+    fa::string mName;       // +0x04
     std::int32_t mTimeouts; // +0x20
   };
 
@@ -60,10 +60,7 @@ namespace moho
    * Appends one `SSTICommandSource` entry to a command-source vector lane,
    * preserving the original capacity-fast-path behavior.
    */
-  void AppendSSTICommandSource(
-    fa::vector<SSTICommandSource>& commandSources,
-    const SSTICommandSource& entry
-  );
+  void AppendSSTICommandSource(fa::vector<SSTICommandSource>& commandSources, const SSTICommandSource& entry);
 
   /**
    * Address: 0x00755810 (FUN_00755810, sub_755810)
@@ -87,8 +84,6 @@ namespace moho
    * `mSrcs` lane of a `SLaunchCommandSources` block). Used by the `Sim`
    * constructor to seed `Sim::mCommandSources` from the launch info.
    */
-  fa::vector<SSTICommandSource>* CopyConstructCommandSourceVector(
-    const fa::vector<SSTICommandSource>& src,
-    fa::vector<SSTICommandSource>* out
-  );
+  fa::vector<SSTICommandSource>*
+  CopyConstructCommandSourceVector(const fa::vector<SSTICommandSource>& src, fa::vector<SSTICommandSource>* out);
 } // namespace moho

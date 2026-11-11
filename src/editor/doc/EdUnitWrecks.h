@@ -8,7 +8,8 @@ namespace faf::editor
 {
   class EdDocument;
 
-  /** A unit blueprint's wreck as the game makes it (its costs from the kept rules, its `.bp` for the Wreckage table). */
+  /** A unit blueprint's wreck as the game makes it (its costs from the kept rules, its `.bp` for the Wreckage table).
+   */
   struct BlueprintWreck
   {
     /** False until the rules are built, or for a blueprint they don't have. */

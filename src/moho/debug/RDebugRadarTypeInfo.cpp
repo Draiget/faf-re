@@ -13,7 +13,9 @@ namespace
    * What it does:
    * Registers one debug-overlay descriptor pair for world-radar rendering.
    */
-  void RegisterRDebugRadarOverlayClass(moho::RDebugOverlayClass* const typeInfo)
+  void RegisterRDebugRadarOverlayClass(
+    moho::RDebugOverlayClass* const typeInfo
+  )
   {
     typeInfo->RegisterOverlayClass("Display the world radar", "Radar");
   }
@@ -83,7 +85,9 @@ namespace moho
   /**
    * Address: 0x0064EBA0 (FUN_0064EBA0, Moho::RDebugRadarTypeInfo::CtrRef)
    */
-  gpg::RRef RDebugRadarTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef RDebugRadarTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     return debug_reflection::CtrRef<RDebugRadar>(objectStorage, RDebugRadar::sType);
   }
@@ -91,7 +95,9 @@ namespace moho
   /**
    * Address: 0x0064EB80 (FUN_0064EB80, Moho::RDebugRadarTypeInfo::Delete)
    */
-  void RDebugRadarTypeInfo::Delete(void* const objectStorage)
+  void RDebugRadarTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     debug_reflection::Delete<RDebugRadar>(objectStorage);
   }
@@ -99,7 +105,9 @@ namespace moho
   /**
    * Address: 0x0064EBE0 (FUN_0064EBE0, Moho::RDebugRadarTypeInfo::Destruct)
    */
-  void RDebugRadarTypeInfo::Destruct(void* const objectStorage)
+  void RDebugRadarTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     debug_reflection::Destruct<RDebugRadar>(objectStorage);
   }
@@ -107,7 +115,9 @@ namespace moho
   /**
    * Address: 0x0064F3A0 (FUN_0064F3A0, Moho::RDebugRadarTypeInfo::AddBase_RDebugOverlay)
    */
-  void RDebugRadarTypeInfo::AddBase_RDebugOverlay(gpg::RType* const typeInfo)
+  void RDebugRadarTypeInfo::AddBase_RDebugOverlay(
+    gpg::RType* const typeInfo
+  )
   {
     debug_reflection::AddBaseRDebugOverlay(typeInfo);
   }

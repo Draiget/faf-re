@@ -142,9 +142,9 @@ namespace moho
     CNetDatagramSocketImpl(INetDatagramHandler* handler, platform::net::Socket sock);
 
   private:
-    INetDatagramHandler* mDatagramHandler{nullptr}; // +0x04
-    platform::net::Socket mSocket{platform::net::kInvalidSocket};                 // +0x08
-    HANDLE mEvent{nullptr};                         // +0x0C
+    INetDatagramHandler* mDatagramHandler{nullptr};               // +0x04
+    platform::net::Socket mSocket{platform::net::kInvalidSocket}; // +0x08
+    HANDLE mEvent{nullptr};                                       // +0x0C
   };
   static_assert(sizeof(CNetDatagramSocketImpl) == 0x10, "CNetDatagramSocketImpl must be 0x10");
 } // namespace moho

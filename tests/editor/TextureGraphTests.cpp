@@ -11,7 +11,11 @@ namespace
   using namespace faf::editor;
 
   /** The largest step between neighbouring pixels across the image's left/right seam, and inside it. */
-  void Steps(const TexImage& image, float& seam, float& inside)
+  void Steps(
+    const TexImage& image,
+    float& seam,
+    float& inside
+  )
   {
     seam = 0.0f;
     inside = 0.0f;
@@ -23,7 +27,10 @@ namespace
     }
   }
 
-  TEST(TextureGraph, NoiseAndCellsTileAcrossTheSeam)
+  TEST(
+    TextureGraph,
+    NoiseAndCellsTileAcrossTheSeam
+  )
   {
     NodeGraph graph(TextureNodeTypes());
     const int noise = graph.AddNode("Noise", 0.0f, 0.0f);
@@ -42,7 +49,10 @@ namespace
     }
   }
 
-  TEST(TextureGraph, OnlyWhatChangedIsComputedAgain)
+  TEST(
+    TextureGraph,
+    OnlyWhatChangedIsComputedAgain
+  )
   {
     NodeGraph graph(TextureNodeTypes());
     StartTextureGraph(graph);
@@ -66,7 +76,10 @@ namespace
     EXPECT_EQ(eval.EvaluateAll(), 4);
   }
 
-  TEST(TextureGraph, TheResultIsAtTheGraphsSizeInThePinsType)
+  TEST(
+    TextureGraph,
+    TheResultIsAtTheGraphsSizeInThePinsType
+  )
   {
     NodeGraph graph(TextureNodeTypes());
     StartTextureGraph(graph);
@@ -87,7 +100,10 @@ namespace
     EXPECT_FLOAT_EQ(mask->Pixel(63, 63)[0], 0.5f);
   }
 
-  TEST(TextureGraph, APreviewAndABakeLookTheSame)
+  TEST(
+    TextureGraph,
+    APreviewAndABakeLookTheSame
+  )
   {
     NodeGraph graph(TextureNodeTypes());
     const int noise = graph.AddNode("Noise", 0.0f, 0.0f);
@@ -112,7 +128,10 @@ namespace
     EXPECT_LT(worst, 0.12f);
   }
 
-  TEST(TextureGraph, AFlatHeightGivesAFlatNormal)
+  TEST(
+    TextureGraph,
+    AFlatHeightGivesAFlatNormal
+  )
   {
     NodeGraph graph(TextureNodeTypes());
     const int normal = graph.AddNode("HeightToNormal", 0.0f, 0.0f);
@@ -125,7 +144,10 @@ namespace
     EXPECT_NEAR(p[2], 1.0f, 1e-5f);
   }
 
-  TEST(TextureGraph, TexturesComeFromTheLoaderAndAMissingOneWarns)
+  TEST(
+    TextureGraph,
+    TexturesComeFromTheLoaderAndAMissingOneWarns
+  )
   {
     NodeGraph graph(TextureNodeTypes());
     const int texture = graph.AddNode("Texture", 0.0f, 0.0f);
@@ -151,7 +173,10 @@ namespace
     EXPECT_EQ(loads, 2);
   }
 
-  TEST(TextureGraph, MapHeightAndSlopeReadTheTerrain)
+  TEST(
+    TextureGraph,
+    MapHeightAndSlopeReadTheTerrain
+  )
   {
     NodeGraph graph(TextureNodeTypes());
     const int height = graph.AddNode("TerrainHeight", 0.0f, 0.0f);
@@ -177,7 +202,10 @@ namespace
     EXPECT_NEAR(eval.Output(slope, 0)->Pixel(8, 8)[0], 1.0f, 1e-3f);
   }
 
-  TEST(TextureGraph, EveryNodeTypeComputes)
+  TEST(
+    TextureGraph,
+    EveryNodeTypeComputes
+  )
   {
     NodeGraph graph(TextureNodeTypes());
     for (const auto& type : TextureNodeTypes().All()) {
@@ -196,7 +224,10 @@ namespace
       }
     }
   }
-  TEST(TextureGraph, MapMaskReadsTheStratumsByte)
+  TEST(
+    TextureGraph,
+    MapMaskReadsTheStratumsByte
+  )
   {
     NodeGraph graph(TextureNodeTypes());
     const int mask = graph.AddNode("TerrainMask", 0.0f, 0.0f);

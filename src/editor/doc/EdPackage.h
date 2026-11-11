@@ -37,7 +37,8 @@ namespace faf::editor
    * (and a description, else a warning). The files are every file in the folder but the editor's backups and sidecar
    * and the system's clutter (Thumbs.db, desktop.ini, *.bak).
    */
-  PackagePlan PlanPackage(const std::string& folder, const std::string& scenario, const std::vector<std::string>& files);
+  PackagePlan
+  PlanPackage(const std::string& folder, const std::string& scenario, const std::vector<std::string>& files);
 
   /** The version of a `name.vNNNN` folder, or 0. */
   int FolderVersion(const std::string& folder);

@@ -9,9 +9,10 @@
 namespace faf::editor
 {
   /**
-   * An adaptive map's lobby options as a mapper thinks of them (user ask 2026-11-11: the adaptive setup by what the player
-   * picks in the lobby, editable in one place): each option the lobby shows or the script reads, what kind it is, and
-   * what each of its choices puts on the map. The Adaptive Map window (ui/EdAdaptiveWindow.cpp) draws and edits it.
+   * An adaptive map's lobby options as a mapper thinks of them (user ask 2026-11-11: the adaptive setup by what the
+   * player picks in the lobby, editable in one place): each option the lobby shows or the script reads, what kind it
+   * is, and what each of its choices puts on the map. The Adaptive Map window (ui/EdAdaptiveWindow.cpp) draws and edits
+   * it.
    */
   struct AdaptiveOption
   {
@@ -44,8 +45,12 @@ namespace faf::editor
    * The options in the lobby's order, then the tables and loops the lobby lacks, then other options the script reads.
    * `adaptiveScript`: the map's script reads the tables (AdaptiveTablesPath).
    */
-  std::vector<AdaptiveOption> AdaptiveOptionsOf(const std::string& script, const std::vector<LobbyOptionInfo>& lobby, const AdaptiveTables& tables,
-                                                bool adaptiveScript);
+  std::vector<AdaptiveOption> AdaptiveOptionsOf(
+    const std::string& script,
+    const std::vector<LobbyOptionInfo>& lobby,
+    const AdaptiveTables& tables,
+    bool adaptiveScript
+  );
 
   /** "Optional naval wreckage" from optional_naval_wreckage. */
   std::string ReadableKey(const std::string& key);
@@ -53,7 +58,8 @@ namespace faf::editor
   /** `_options.lua` with the option written back as `option` has it (its keys kept as they are). */
   std::string WithOption(const std::string& optionsText, const LobbyOptionInfo& option);
 
-  /** Mexes, Hydros: the group (0-based) a choice adds, or -1 (the "none" choice). Value key k spawns groups 1 .. k-1. */
+  /** Mexes, Hydros: the group (0-based) a choice adds, or -1 (the "none" choice). Value key k spawns groups 1 .. k-1.
+   */
   int TableGroupOfChoice(const LobbyOptionInfo::Value& value);
   /** UnitLevels: the group a choice adds (`Optional_Wreckage_3` for key 3), or empty. */
   std::string LoopGroupOfChoice(const ScriptGroupLoop& loop, const LobbyOptionInfo::Value& value);
@@ -66,8 +72,12 @@ namespace faf::editor
     bool unit = false;
     bool maybe = false; // also depends on the game (slots, factions)
   };
-  std::vector<MadeGroup> GroupsMadeByChoice(const std::string& script, const std::vector<LobbyOptionInfo>& lobby, const std::string& key,
-                                            int valueIndex);
+  std::vector<MadeGroup> GroupsMadeByChoice(
+    const std::string& script,
+    const std::vector<LobbyOptionInfo>& lobby,
+    const std::string& key,
+    int valueIndex
+  );
 
   /** A new value for a level option: the next counted key, text "level N". */
   LobbyOptionInfo::Value NextLevelValue(const LobbyOptionInfo& option, const std::string& text);

@@ -19,7 +19,9 @@ namespace faf::editor
     gpg::gal::RenderTarget* (*sGameViewSource)() = nullptr;
   } // namespace
 
-  void EdImGuiRenderer::SetGameViewSource(gpg::gal::RenderTarget* (*source)())
+  void EdImGuiRenderer::SetGameViewSource(
+    gpg::gal::RenderTarget* (*source)()
+  )
   {
     sGameViewSource = source;
   }
@@ -107,7 +109,10 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
     };
 
     /** Copies ImGui's RGBA pixels into the BGRA texture, the whole level. */
-    void Upload(gpg::gal::Texture& texture, ImTextureData& source)
+    void Upload(
+      gpg::gal::Texture& texture,
+      ImTextureData& source
+    )
     {
       const RECT whole{};
       const gpg::gal::TextureLockRect lock = texture.Lock(0, whole, 0);
@@ -131,7 +136,11 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
     }
   } // namespace
 
-  std::uint64_t EdImGuiRenderer::CreateImage(const int width, const int height, const std::uint32_t* const bgra)
+  std::uint64_t EdImGuiRenderer::CreateImage(
+    const int width,
+    const int height,
+    const std::uint32_t* const bgra
+  )
   {
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     if (device == nullptr || width < 1 || height < 1 || bgra == nullptr) {
@@ -152,8 +161,11 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
     const RECT whole{};
     const gpg::gal::TextureLockRect lock = texture->Lock(0, whole, 0);
     for (int y = 0; y < height; ++y) {
-      std::memcpy(static_cast<std::uint8_t*>(lock.bits) + static_cast<std::ptrdiff_t>(y) * lock.pitch, bgra + static_cast<std::ptrdiff_t>(y) * width,
-                  static_cast<std::size_t>(width) * 4U);
+      std::memcpy(
+        static_cast<std::uint8_t*>(lock.bits) + static_cast<std::ptrdiff_t>(y) * lock.pitch,
+        bgra + static_cast<std::ptrdiff_t>(y) * width,
+        static_cast<std::size_t>(width) * 4U
+      );
     }
     (void)texture->Unlock(0);
     const auto id = static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(texture.get()));
@@ -161,7 +173,9 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
     return id;
   }
 
-  void EdImGuiRenderer::DestroyImage(const std::uint64_t image)
+  void EdImGuiRenderer::DestroyImage(
+    const std::uint64_t image
+  )
   {
     OwnImages().erase(image);
   }
@@ -217,7 +231,9 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
     io.BackendFlags &= ~(ImGuiBackendFlags_RendererHasVtxOffset | ImGuiBackendFlags_RendererHasTextures);
   }
 
-  void EdImGuiRenderer::UpdateTexture(ImTextureData* const texture)
+  void EdImGuiRenderer::UpdateTexture(
+    ImTextureData* const texture
+  )
   {
     if (texture->Status == ImTextureStatus_WantCreate) {
       IM_ASSERT(texture->Format == ImTextureFormat_RGBA32);
@@ -246,7 +262,10 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
     }
   }
 
-  void EdImGuiRenderer::EnsureCapacity(const std::uint32_t vertexCount, const std::uint32_t indexCount)
+  void EdImGuiRenderer::EnsureCapacity(
+    const std::uint32_t vertexCount,
+    const std::uint32_t indexCount
+  )
   {
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     if (vertexCount > mVertexCapacity) {
@@ -267,9 +286,13 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
     }
   }
 
-  void EdImGuiRenderer::Render(ImDrawData* const drawData)
+  void EdImGuiRenderer::Render(
+    ImDrawData* const drawData
+  )
   {
-    if (drawData == nullptr || drawData->DisplaySize.x <= 0.0f || drawData->DisplaySize.y <= 0.0f || mProgram == nullptr) {
+    if (
+      drawData == nullptr || drawData->DisplaySize.x <= 0.0f || drawData->DisplaySize.y <= 0.0f || mProgram == nullptr
+    ) {
       return;
     }
     if (drawData->Textures != nullptr) {
@@ -290,7 +313,11 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
     std::size_t vertexBytes = 0U;
     std::size_t indexAt = 0U;
     for (const ImDrawList* const list : drawData->CmdLists) {
-      std::memcpy(mVertexStage.data() + vertexBytes, list->VtxBuffer.Data, static_cast<std::size_t>(list->VtxBuffer.Size) * sizeof(ImDrawVert));
+      std::memcpy(
+        mVertexStage.data() + vertexBytes,
+        list->VtxBuffer.Data,
+        static_cast<std::size_t>(list->VtxBuffer.Size) * sizeof(ImDrawVert)
+      );
       std::copy_n(list->IdxBuffer.Data, list->IdxBuffer.Size, mIndexStage.data() + indexAt);
       vertexBytes += static_cast<std::size_t>(list->VtxBuffer.Size) * sizeof(ImDrawVert);
       indexAt += static_cast<std::size_t>(list->IdxBuffer.Size);
@@ -331,7 +358,10 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
           }
           continue;
         }
-        if (command.ClipRect.z <= command.ClipRect.x || command.ClipRect.w <= command.ClipRect.y || command.ElemCount == 0U) {
+        if (
+          command.ClipRect.z <= command.ClipRect.x || command.ClipRect.w <= command.ClipRect.y ||
+          command.ElemCount == 0U
+        ) {
           continue;
         }
         constants.clipRect[0] = command.ClipRect.x;
@@ -344,7 +374,8 @@ float4 ImGuiPS(ImGuiPixel input) : SV_Target
         // The game's view is looked up now; without one this frame its image is left out.
         const std::uintptr_t id = static_cast<std::uintptr_t>(command.GetTexID());
         call.bindings.textures[0] = (id & 1U) == 0U ? reinterpret_cast<gpg::gal::Texture*>(id) : nullptr;
-        call.bindings.targets[0] = (id & 1U) != 0U ? reinterpret_cast<gpg::gal::RenderTarget*>(id & ~static_cast<std::uintptr_t>(1U)) : nullptr;
+        call.bindings.targets[0] =
+          (id & 1U) != 0U ? reinterpret_cast<gpg::gal::RenderTarget*>(id & ~static_cast<std::uintptr_t>(1U)) : nullptr;
         if (id == kGameViewImage) {
           call.bindings.targets[0] = sGameViewSource != nullptr ? sGameViewSource() : nullptr;
           if (call.bindings.targets[0] == nullptr) {

@@ -99,7 +99,10 @@ namespace
     }
 })";
 
-  TEST(Skybox, ReadsFafmesFile)
+  TEST(
+    Skybox,
+    ReadsFafmesFile
+  )
   {
     SkyboxState sky;
     std::string error;
@@ -123,7 +126,10 @@ namespace
     EXPECT_FLOAT_EQ(sky.cirrus[3].speed, 0.0f);
   }
 
-  TEST(Skybox, WritesWhatItReads)
+  TEST(
+    Skybox,
+    WritesWhatItReads
+  )
   {
     SkyboxState sky;
     std::string error;

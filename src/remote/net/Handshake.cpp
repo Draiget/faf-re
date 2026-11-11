@@ -31,18 +31,26 @@ namespace faf::remote::net
     constexpr std::uint8_t kLabelAccept = 4;
     constexpr std::uint8_t kLabelCookie = 5;
 
-    void WriteU16(std::uint8_t* const out, const std::uint16_t value) noexcept
+    void WriteU16(
+      std::uint8_t* const out,
+      const std::uint16_t value
+    ) noexcept
     {
       out[0] = static_cast<std::uint8_t>(value);
       out[1] = static_cast<std::uint8_t>(value >> 8);
     }
 
-    [[nodiscard]] std::uint16_t ReadU16(const std::uint8_t* const in) noexcept
+    [[nodiscard]] std::uint16_t ReadU16(
+      const std::uint8_t* const in
+    ) noexcept
     {
       return static_cast<std::uint16_t>(in[0] | (in[1] << 8));
     }
 
-    void WriteI32(std::uint8_t* const out, const std::int32_t value) noexcept
+    void WriteI32(
+      std::uint8_t* const out,
+      const std::int32_t value
+    ) noexcept
     {
       const auto bits = static_cast<std::uint32_t>(value);
       for (int i = 0; i < 4; ++i) {
@@ -50,7 +58,9 @@ namespace faf::remote::net
       }
     }
 
-    [[nodiscard]] std::int32_t ReadI32(const std::uint8_t* const in) noexcept
+    [[nodiscard]] std::int32_t ReadI32(
+      const std::uint8_t* const in
+    ) noexcept
     {
       std::uint32_t bits = 0;
       for (int i = 0; i < 4; ++i) {
@@ -59,7 +69,12 @@ namespace faf::remote::net
       return static_cast<std::int32_t>(bits);
     }
 
-    [[nodiscard]] std::array<std::uint8_t, kProofSize> ConnectProof(const Token& token, const Cookie& cookie, const std::int32_t uid, const PublicKey& clientPublic) noexcept
+    [[nodiscard]] std::array<std::uint8_t, kProofSize> ConnectProof(
+      const Token& token,
+      const Cookie& cookie,
+      const std::int32_t uid,
+      const PublicKey& clientPublic
+    ) noexcept
     {
       std::array<std::uint8_t, 1 + kCookieSize + 4 + kPublicKeySize> message{};
       message[0] = kLabelProof;
@@ -75,7 +90,12 @@ namespace faf::remote::net
     class CSessionHasher
     {
     public:
-      CSessionHasher(const Token& token, const std::uint8_t* const shared, const PublicKey& clientPublic, const PublicKey& serverPublic) noexcept
+      CSessionHasher(
+        const Token& token,
+        const std::uint8_t* const shared,
+        const PublicKey& clientPublic,
+        const PublicKey& serverPublic
+      ) noexcept
         : mToken(token)
       {
         std::memcpy(mMessage.data() + 1, shared, kKeySize);
@@ -83,11 +103,18 @@ namespace faf::remote::net
         std::memcpy(mMessage.data() + 1 + kKeySize + kPublicKeySize, serverPublic.data(), kPublicKeySize);
       }
 
-      ~CSessionHasher() { crypto_wipe(mMessage.data(), mMessage.size()); }
+      ~CSessionHasher()
+      {
+        crypto_wipe(mMessage.data(), mMessage.size());
+      }
       CSessionHasher(const CSessionHasher&) = delete;
       CSessionHasher& operator=(const CSessionHasher&) = delete;
 
-      void Hash(const std::uint8_t label, std::uint8_t* const out, const std::size_t size) noexcept
+      void Hash(
+        const std::uint8_t label,
+        std::uint8_t* const out,
+        const std::size_t size
+      ) noexcept
       {
         mMessage[0] = label;
         crypto_blake2b_keyed(out, size, mToken.data(), mToken.size(), mMessage.data(), mMessage.size());
@@ -99,7 +126,9 @@ namespace faf::remote::net
     };
 
     /** X25519 gives all zeros for a low-order point, which would let anyone predict the result. */
-    [[nodiscard]] bool IsDegenerate(const std::uint8_t* const shared) noexcept
+    [[nodiscard]] bool IsDegenerate(
+      const std::uint8_t* const shared
+    ) noexcept
     {
       std::uint8_t any = 0;
       for (std::size_t i = 0; i < kKeySize; ++i) {
@@ -109,10 +138,15 @@ namespace faf::remote::net
     }
   } // namespace
 
-  bool FillRandom(void* const out, const std::size_t size) noexcept
+  bool FillRandom(
+    void* const out,
+    const std::size_t size
+  ) noexcept
   {
 #if defined(_WIN32)
-    return BCryptGenRandom(nullptr, static_cast<PUCHAR>(out), static_cast<ULONG>(size), BCRYPT_USE_SYSTEM_PREFERRED_RNG) == 0;
+    return BCryptGenRandom(
+             nullptr, static_cast<PUCHAR>(out), static_cast<ULONG>(size), BCRYPT_USE_SYSTEM_PREFERRED_RNG
+           ) == 0;
 #else
     auto* cursor = static_cast<std::uint8_t*>(out);
     std::size_t left = size;
@@ -128,7 +162,9 @@ namespace faf::remote::net
 #endif
   }
 
-  Token MakeToken(const std::string_view text) noexcept
+  Token MakeToken(
+    const std::string_view text
+  ) noexcept
   {
     Token token{};
     crypto_blake2b(token.data(), token.size(), reinterpret_cast<const std::uint8_t*>(text.data()), text.size());
@@ -144,9 +180,15 @@ namespace faf::remote::net
     return out;
   }
 
-  std::optional<EHandshakeType> HandshakeTypeOf(const std::uint8_t* const data, const std::size_t size) noexcept
+  std::optional<EHandshakeType> HandshakeTypeOf(
+    const std::uint8_t* const data,
+    const std::size_t size
+  ) noexcept
   {
-    if (size < 2u || data[0] != kHandshakeTag || data[1] < static_cast<std::uint8_t>(EHandshakeType::Hello) || data[1] > static_cast<std::uint8_t>(EHandshakeType::Reject)) {
+    if (
+      size < 2u || data[0] != kHandshakeTag || data[1] < static_cast<std::uint8_t>(EHandshakeType::Hello) ||
+      data[1] > static_cast<std::uint8_t>(EHandshakeType::Reject)
+    ) {
       return std::nullopt;
     }
     return static_cast<EHandshakeType>(data[1]);
@@ -159,7 +201,11 @@ namespace faf::remote::net
 
   namespace
   {
-    [[nodiscard]] Cookie CookieFor(const std::array<std::uint8_t, 32>& secret, const std::uint64_t addressKey, const std::uint64_t period) noexcept
+    [[nodiscard]] Cookie CookieFor(
+      const std::array<std::uint8_t, 32>& secret,
+      const std::uint64_t addressKey,
+      const std::uint64_t period
+    ) noexcept
     {
       std::array<std::uint8_t, 17> message{};
       message[0] = kLabelCookie;
@@ -172,24 +218,41 @@ namespace faf::remote::net
       return cookie;
     }
 
-    [[nodiscard]] bool SameCookie(const Cookie& a, const Cookie& b) noexcept
+    [[nodiscard]] bool SameCookie(
+      const Cookie& a,
+      const Cookie& b
+    ) noexcept
     {
       return crypto_verify16(a.data(), b.data()) == 0;
     }
   } // namespace
 
-  Cookie CCookieJar::Make(const std::uint64_t addressKey, const std::uint64_t nowUs) const noexcept
+  Cookie CCookieJar::Make(
+    const std::uint64_t addressKey,
+    const std::uint64_t nowUs
+  ) const noexcept
   {
     return CookieFor(mSecret, addressKey, nowUs / kPeriodUs);
   }
 
-  bool CCookieJar::Check(const Cookie& cookie, const std::uint64_t addressKey, const std::uint64_t nowUs) const noexcept
+  bool CCookieJar::Check(
+    const Cookie& cookie,
+    const std::uint64_t addressKey,
+    const std::uint64_t nowUs
+  ) const noexcept
   {
     const std::uint64_t period = nowUs / kPeriodUs;
-    return SameCookie(cookie, CookieFor(mSecret, addressKey, period)) || (period > 0u && SameCookie(cookie, CookieFor(mSecret, addressKey, period - 1u)));
+    return SameCookie(cookie, CookieFor(mSecret, addressKey, period)) ||
+      (period > 0u && SameCookie(cookie, CookieFor(mSecret, addressKey, period - 1u)));
   }
 
-  std::vector<std::uint8_t> AnswerHello(const std::uint8_t* const data, const std::size_t size, const CCookieJar& jar, const std::uint64_t addressKey, const std::uint64_t nowUs)
+  std::vector<std::uint8_t> AnswerHello(
+    const std::uint8_t* const data,
+    const std::size_t size,
+    const CCookieJar& jar,
+    const std::uint64_t addressKey,
+    const std::uint64_t nowUs
+  )
   {
     // Smaller Hellos get nothing, so nobody can use this server to send more than they sent.
     if (size < kHelloSize || HandshakeTypeOf(data, size) != EHandshakeType::Hello) {
@@ -206,9 +269,16 @@ namespace faf::remote::net
     return out;
   }
 
-  bool ReadConnect(const std::uint8_t* const data, const std::size_t size, SConnectRequest& out) noexcept
+  bool ReadConnect(
+    const std::uint8_t* const data,
+    const std::size_t size,
+    SConnectRequest& out
+  ) noexcept
   {
-    if (size != kConnectSize || HandshakeTypeOf(data, size) != EHandshakeType::Connect || ReadU16(data + 2) != kHandshakeVersion) {
+    if (
+      size != kConnectSize || HandshakeTypeOf(data, size) != EHandshakeType::Connect ||
+      ReadU16(data + 2) != kHandshakeVersion
+    ) {
       return false;
     }
     const std::uint8_t* cursor = data + 4;
@@ -222,7 +292,10 @@ namespace faf::remote::net
     return true;
   }
 
-  std::optional<SServerSession> AnswerConnect(const SConnectRequest& request, const Token& token)
+  std::optional<SServerSession> AnswerConnect(
+    const SConnectRequest& request,
+    const Token& token
+  )
   {
     const auto expected = ConnectProof(token, request.cookie, request.uid, request.clientPublic);
     if (crypto_verify16(expected.data(), request.proof.data()) != 0) {
@@ -257,12 +330,17 @@ namespace faf::remote::net
     return session;
   }
 
-  std::vector<std::uint8_t> WriteReject(const EHandshakeRefusal why)
+  std::vector<std::uint8_t> WriteReject(
+    const EHandshakeRefusal why
+  )
   {
     return {kHandshakeTag, static_cast<std::uint8_t>(EHandshakeType::Reject), static_cast<std::uint8_t>(why)};
   }
 
-  CClientHandshake::CClientHandshake(const std::int32_t uid, const Token& token) noexcept
+  CClientHandshake::CClientHandshake(
+    const std::int32_t uid,
+    const Token& token
+  ) noexcept
     : mUid(uid)
     , mToken(token)
   {}
@@ -273,7 +351,10 @@ namespace faf::remote::net
     crypto_wipe(mToken.data(), mToken.size());
   }
 
-  std::vector<std::uint8_t> CClientHandshake::OnChallenge(const std::uint8_t* const data, const std::size_t size)
+  std::vector<std::uint8_t> CClientHandshake::OnChallenge(
+    const std::uint8_t* const data,
+    const std::size_t size
+  )
   {
     if (size != kChallengeSize || HandshakeTypeOf(data, size) != EHandshakeType::Challenge) {
       return {};
@@ -304,7 +385,10 @@ namespace faf::remote::net
     return out;
   }
 
-  std::optional<ChannelKeys> CClientHandshake::OnAccept(const std::uint8_t* const data, const std::size_t size) const
+  std::optional<ChannelKeys> CClientHandshake::OnAccept(
+    const std::uint8_t* const data,
+    const std::size_t size
+  ) const
   {
     if (!mHaveKeys || size != kAcceptSize || HandshakeTypeOf(data, size) != EHandshakeType::Accept) {
       return std::nullopt;

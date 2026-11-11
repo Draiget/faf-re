@@ -80,7 +80,9 @@ namespace moho
    * What it does:
    * Registers `RRuleGameRules` as this type's reflected base at offset 0.
    */
-  void RRuleGameRulesImplTypeInfo::AddBase_RRuleGameRules(gpg::RType* const typeInfo)
+  void RRuleGameRulesImplTypeInfo::AddBase_RRuleGameRules(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RField baseField{};
     baseField.mType = RRuleGameRules::StaticGetClass();
@@ -102,4 +104,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RRuleGameRulesImplTypeInfoStartup_b5a065, moho::register_RRuleGameRulesImplTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_RRuleGameRulesImplTypeInfoStartup_b5a065,
+  moho::register_RRuleGameRulesImplTypeInfoStartup
+)

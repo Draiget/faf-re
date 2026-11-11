@@ -53,4 +53,4 @@ namespace moho
    * translation-unit-private global here.
    */
   [[nodiscard]] void*& SelectionParamsSentinel() noexcept;
-}
+} // namespace moho

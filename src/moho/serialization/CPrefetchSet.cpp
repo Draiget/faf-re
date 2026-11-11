@@ -25,7 +25,9 @@ namespace
     return Target();
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(
+    lua_State* const luaContext
+  ) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
   }
@@ -37,7 +39,9 @@ namespace
    * Upcasts one reflected reference to `CPrefetchSet*` and throws
    * `BadRefCast` on mismatch.
    */
-  [[nodiscard]] moho::CPrefetchSet* TryUpcastCPrefetchSetOrThrow(const gpg::RRef& source)
+  [[nodiscard]] moho::CPrefetchSet* TryUpcastCPrefetchSetOrThrow(
+    const gpg::RRef& source
+  )
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, moho::CPrefetchSet::StaticGetClass());
     auto* const prefetchSet = static_cast<moho::CPrefetchSet*>(upcast.mObj);
@@ -47,17 +51,15 @@ namespace
     return prefetchSet;
   }
 
-  void ValidateArgCount(LuaPlus::LuaState* const state, const char* const helpText, const int expected)
+  void ValidateArgCount(
+    LuaPlus::LuaState* const state,
+    const char* const helpText,
+    const int expected
+  )
   {
     const int actual = lua_gettop(state->m_state);
     if (actual != expected) {
-      LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected %d args, but got %d",
-        helpText ? helpText : "",
-        expected,
-        actual
-      );
+      LuaPlus::LuaState::Error(state, "%s\n  expected %d args, but got %d", helpText ? helpText : "", expected, actual);
     }
   }
 } // namespace
@@ -79,7 +81,10 @@ namespace moho
   /**
    * Address: 0x004A5290 (FUN_004A5290, Moho::CPrefetchset::Update)
    */
-  void CPrefetchSet::Update(LuaPlus::LuaObject prefetchTable, LuaPlus::LuaState* const state)
+  void CPrefetchSet::Update(
+    LuaPlus::LuaObject prefetchTable,
+    LuaPlus::LuaState* const state
+  )
   {
     fa::vector<PrefetchHandleBase> nextHandles{};
 
@@ -92,9 +97,7 @@ namespace moho
       if (!prefetchType) {
         if (state) {
           LuaPlus::LuaState::Error(
-            state,
-            "Unknown kind of resource in prefetch set: %s",
-            prefetchKind ? prefetchKind : "<null>"
+            state, "Unknown kind of resource in prefetch set: %s", prefetchKind ? prefetchKind : "<null>"
           );
         }
         kindIterator.Next();
@@ -131,7 +134,9 @@ namespace moho
   /**
    * Address: 0x004A5FC0 (FUN_004A5FC0, Moho::CScrLuaMetatableFactory<Moho::CPrefetchSet>::Create)
    */
-  LuaPlus::LuaObject CScrLuaMetatableFactory<CPrefetchSet>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CPrefetchSet>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -139,7 +144,9 @@ namespace moho
   /**
    * Address: 0x004A7D20 (FUN_004A7D20, func_CreatePrefetchSet)
    */
-  LuaPlus::LuaObject func_CreatePrefetchSet(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject func_CreatePrefetchSet(
+    LuaPlus::LuaState* const state
+  )
   {
     LuaPlus::LuaObject out;
     if (!state) {
@@ -169,9 +176,11 @@ namespace moho
 
   /**
    * Address: 0x004A7DD0 (FUN_004A7DD0, func_GetCObj_CPrefetchSet)
-    * Alias of FUN_004A8660 (non-canonical helper lane).
+   * Alias of FUN_004A8660 (non-canonical helper lane).
    */
-  CPrefetchSet* func_GetCObj_CPrefetchSet(LuaPlus::LuaObject object)
+  CPrefetchSet* func_GetCObj_CPrefetchSet(
+    LuaPlus::LuaObject object
+  )
   {
     LuaPlus::LuaObject payload(object);
     if (payload.IsTable()) {
@@ -189,7 +198,9 @@ namespace moho
   /**
    * Address: 0x004A5700 (FUN_004A5700, cfunc_CreatePrefetchSet)
    */
-  int cfunc_CreatePrefetchSet(lua_State* const luaContext)
+  int cfunc_CreatePrefetchSet(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreatePrefetchSetL(ResolveBindingState(luaContext));
   }
@@ -197,7 +208,9 @@ namespace moho
   /**
    * Address: 0x004A5780 (FUN_004A5780, cfunc_CreatePrefetchSetL)
    */
-  int cfunc_CreatePrefetchSetL(LuaPlus::LuaState* const state)
+  int cfunc_CreatePrefetchSetL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -241,7 +254,9 @@ namespace moho
   /**
    * Address: 0x004A5810 (FUN_004A5810, cfunc_CPrefetchSetUpdate)
    */
-  int cfunc_CPrefetchSetUpdate(lua_State* const luaContext)
+  int cfunc_CPrefetchSetUpdate(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPrefetchSetUpdateL(ResolveBindingState(luaContext));
   }
@@ -249,7 +264,9 @@ namespace moho
   /**
    * Address: 0x004A5890 (FUN_004A5890, cfunc_CPrefetchSetUpdateL)
    */
-  int cfunc_CPrefetchSetUpdateL(LuaPlus::LuaState* const state)
+  int cfunc_CPrefetchSetUpdateL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -300,7 +317,9 @@ namespace moho
   /**
    * Address: 0x004A5950 (FUN_004A5950, cfunc_CPrefetchSetReset)
    */
-  int cfunc_CPrefetchSetReset(lua_State* const luaContext)
+  int cfunc_CPrefetchSetReset(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPrefetchSetResetL(ResolveBindingState(luaContext));
   }
@@ -308,7 +327,9 @@ namespace moho
   /**
    * Address: 0x004A59D0 (FUN_004A59D0, cfunc_CPrefetchSetResetL)
    */
-  int cfunc_CPrefetchSetResetL(LuaPlus::LuaState* const state)
+  int cfunc_CPrefetchSetResetL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;

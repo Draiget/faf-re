@@ -66,8 +66,8 @@ namespace moho
 
   private:
     fa::string mFilename;      // +0x00
-    gpg::ReadArchive* mReader;    // +0x1C
-    SSavedGameHeader mHeader;     // +0x20
+    gpg::ReadArchive* mReader; // +0x1C
+    SSavedGameHeader mHeader;  // +0x20
   };
 
   static_assert(sizeof(CSavedGame) == 0x78, "CSavedGame size must be 0x78");
@@ -135,7 +135,8 @@ namespace moho
     int skipBeats = 0
   );
 
-  /** Engine addition (replay timeline): set, `VCR_SetupReplaySession` also reads the replay's length into `gVcrReplayBeats`. */
+  /** Engine addition (replay timeline): set, `VCR_SetupReplaySession` also reads the replay's length into
+   * `gVcrReplayBeats`. */
   extern bool gVcrScanReplayLength;
   extern std::int32_t gVcrReplayBeats;
   /** Engine addition (replay timeline): sums the stream's beats from here to its end, and comes back here. */
@@ -157,9 +158,8 @@ namespace moho
    * (moho/misc/ReplaySessionSetup.cpp). Replay and saved-game loading refuse a
    * file whose values do not, while their reader can still say why.
    */
-  [[nodiscard]] bool LaunchInfoStringsDecode(
-    const LaunchInfoBase& launchInfo, const fa::vector<fa::string>& armySetups
-  );
+  [[nodiscard]] bool
+  LaunchInfoStringsDecode(const LaunchInfoBase& launchInfo, const fa::vector<fa::string>& armySetups);
 
   /**
    * Address: 0x0088BBB0 (FUN_0088BBB0, sub_88BBB0)

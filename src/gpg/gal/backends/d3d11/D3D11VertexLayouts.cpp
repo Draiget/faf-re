@@ -252,7 +252,6 @@ namespace gpg::gal::d3d11
       {"TEXCOORD", 1U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 20U, D3D11_INPUT_PER_INSTANCE_DATA, 1U},
     };
 
-
     struct LayoutTable
     {
       const D3D11_INPUT_ELEMENT_DESC* elements;
@@ -260,7 +259,9 @@ namespace gpg::gal::d3d11
     };
 
     template <std::size_t N>
-    constexpr LayoutTable Table(const D3D11_INPUT_ELEMENT_DESC (&elements)[N]) noexcept
+    constexpr LayoutTable Table(
+      const D3D11_INPUT_ELEMENT_DESC (&elements)[N]
+    ) noexcept
     {
       return LayoutTable{elements, static_cast<std::uint32_t>(N)};
     }
@@ -294,7 +295,9 @@ namespace gpg::gal::d3d11
     };
   } // namespace
 
-  std::span<const D3D11_INPUT_ELEMENT_DESC> VertexLayoutElements(const std::uint32_t format)
+  std::span<const D3D11_INPUT_ELEMENT_DESC> VertexLayoutElements(
+    const std::uint32_t format
+  )
   {
     if (format >= kVertexFormatCount) {
       ThrowError("VertexFormatD3D11.cpp", __LINE__, "invalid vertex format specified");

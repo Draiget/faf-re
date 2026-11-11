@@ -84,7 +84,9 @@ namespace moho
     {}
 
     /** Binds the slot only; the caller links the node, which sets `nextInOwner`. */
-    explicit WeakPtrNode(WeakObject* const slot) noexcept
+    explicit WeakPtrNode(
+      WeakObject* const slot
+    ) noexcept
       : ownerLinkSlot(slot)
     {}
 
@@ -206,7 +208,9 @@ namespace moho
      * push-front with no prior unlink" every recovered constructor used to spell
      * out by hand.
      */
-    explicit WeakPtr(T* const object) noexcept
+    explicit WeakPtr(
+      T* const object
+    ) noexcept
       : WeakPtrNode(EncodeOwnerLinkSlot(object))
     {
       LinkAtOwnerHead();
@@ -239,7 +243,9 @@ namespace moho
      * in the image. Formerly `LinkBackLinkNodeFromBackRefOwner` in
      * moho/entity/EntityDb.cpp (RULE THREE), removed 2026-09-22.)
      */
-    WeakPtr(const WeakPtr<T>& other) noexcept
+    WeakPtr(
+      const WeakPtr<T>& other
+    ) noexcept
       : WeakPtrNode(other.ownerLinkSlot)
     {
       LinkAtOwnerHead();
@@ -252,17 +258,20 @@ namespace moho
      * present chain when they differ, then relinks at the new owner's head --
      * i.e. exactly `ResetFromOwnerLinkSlot(other.ownerLinkSlot)`, which is
      * why the two share one body in the binary.
-     * Address: 0x00836B90 (FUN_00836B90 -- `WeakPtr<T>::operator=` (unlink from the old owner chain, relink at `other.ownerLinkSlot`), 48-byte element; `RebuildFactoryQueueDisplaySnapshot` 0x00835DF0; callers 0x00835DF0; formerly `RelinkIntrusiveNodeViaIndirectOwner` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
-     * Address: 0x006886D0 (FUN_006886D0 -- `operator=`, node in EAX, source in
-     * EDX; zero callers, no pointer or jump to it anywhere in the image. Formerly
-     * `RebindBackLinkNode` in moho/entity/EntityDb.cpp (RULE THREE), removed
-     * 2026-09-22.)
+     * Address: 0x00836B90 (FUN_00836B90 -- `WeakPtr<T>::operator=` (unlink from the old owner chain, relink at
+     * `other.ownerLinkSlot`), 48-byte element; `RebuildFactoryQueueDisplaySnapshot` 0x00835DF0; callers 0x00835DF0;
+     * formerly `RelinkIntrusiveNodeViaIndirectOwner` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file
+     * removed 2026-09-10.) Address: 0x006886D0 (FUN_006886D0 -- `operator=`, node in EAX, source in EDX; zero callers,
+     * no pointer or jump to it anywhere in the image. Formerly `RebindBackLinkNode` in moho/entity/EntityDb.cpp (RULE
+     * THREE), removed 2026-09-22.)
      *
      * There is no self-assignment test (0x00836B90 opens with
      * `cmp [edx], ecx; jz ret`): assigning a node to itself compares equal
      * slots and does nothing.
      */
-    WeakPtr<T>& operator=(const WeakPtr<T>& other) noexcept
+    WeakPtr<T>& operator=(
+      const WeakPtr<T>& other
+    ) noexcept
     {
       ResetFromOwnerLinkSlot(other.ownerLinkSlot);
       return *this;
@@ -285,11 +294,14 @@ namespace moho
      * base says where it is with static `WeakLinkHeadOf` / `FromWeakLinkHead`
      * hooks of its own (`HasWeakLinkHeadHooks`).
      */
-    [[nodiscard]] static WeakObject* EncodeOwnerLinkSlot(T* const object) noexcept
+    [[nodiscard]] static WeakObject* EncodeOwnerLinkSlot(
+      T* const object
+    ) noexcept
     {
       static_assert(
         WeakPtrTarget<T>,
-        "WeakPtr<T>: T needs one WeakObject base, a `using WeakBase` naming the base whose WeakObject it uses, or static WeakLinkHeadOf/FromWeakLinkHead hooks"
+        "WeakPtr<T>: T needs one WeakObject base, a `using WeakBase` naming the base whose WeakObject it uses, or "
+        "static WeakLinkHeadOf/FromWeakLinkHead hooks"
       );
       if constexpr (HasWeakLinkHeadHooks<T>) {
         return T::WeakLinkHeadOf(object);
@@ -309,11 +321,14 @@ namespace moho
      * anywhere in the image. Formerly `ResolveBackLinkNodeOwner` in
      * moho/entity/EntityDb.cpp (RULE THREE), removed 2026-09-22.)
      */
-    [[nodiscard]] static T* DecodeOwnerObject(WeakObject* const slot) noexcept
+    [[nodiscard]] static T* DecodeOwnerObject(
+      WeakObject* const slot
+    ) noexcept
     {
       static_assert(
         WeakPtrTarget<T>,
-        "WeakPtr<T>: T needs one WeakObject base, a `using WeakBase` naming the base whose WeakObject it uses, or static WeakLinkHeadOf/FromWeakLinkHead hooks"
+        "WeakPtr<T>: T needs one WeakObject base, a `using WeakBase` naming the base whose WeakObject it uses, or "
+        "static WeakLinkHeadOf/FromWeakLinkHead hooks"
       );
       if constexpr (HasWeakLinkHeadHooks<T>) {
         return T::FromWeakLinkHead(slot);
@@ -350,7 +365,10 @@ namespace moho
      * `std::find` makes when a `vector<WeakPtr<T>>` is searched for a raw
      * `T*`: `CUnitCommand::RemoveUnit` finds its own queue entry that way.
      */
-    [[nodiscard]] friend bool operator==(const WeakPtr<T>& weak, const T* const object) noexcept
+    [[nodiscard]] friend bool operator==(
+      const WeakPtr<T>& weak,
+      const T* const object
+    ) noexcept
     {
       return weak.GetObjectPtr() == object;
     }
@@ -389,9 +407,13 @@ namespace moho
      * Moves this node to the chain `newOwnerLinkSlot` heads: nothing when that
      * is already its chain, otherwise off the old one and onto the front of the
      * new one (or `nextInOwner = 0` for a null slot).
-     * Address: 0x007A5610 (FUN_007A5610 -- `WeakPtr<T>::ResetFromOwnerLinkSlot` (unlink from the old chain, relink at the requested owner head); callers 0x007A4970; formerly `RebindIntrusiveOwnerSlotNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x007A5610 (FUN_007A5610 -- `WeakPtr<T>::ResetFromOwnerLinkSlot` (unlink from the old chain, relink at
+     * the requested owner head); callers 0x007A4970; formerly `RebindIntrusiveOwnerSlotNodeRuntime` in
+     * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
      */
-    void ResetFromOwnerLinkSlot(WeakObject* const newOwnerLinkSlot) noexcept
+    void ResetFromOwnerLinkSlot(
+      WeakObject* const newOwnerLinkSlot
+    ) noexcept
     {
       if (newOwnerLinkSlot == ownerLinkSlot) {
         return;
@@ -403,16 +425,15 @@ namespace moho
     }
 
     /**
-     * Address: 0x00836BD0 (FUN_00836BD0 -- `WeakPtr<T>::ResetFromObject` (the owner's weak-link head at +0x08); `UserUnit::UpdateUnitData` 0x008C0750; callers 0x008C0750; formerly `RelinkIntrusiveNodeViaOwnerOffset08` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
-     * Address: 0x00632CA0 (FUN_00632CA0 -- the `WeakPtr<UnitWeapon>` emission,
-     *   identified by its owner-link offset: the body's `add ecx, 0x14` is
-     *   the `UnitWeapon` -> `WeakObject` base cast, and `UnitWeapon` is the
-     *   only owner whose `WeakObject` sits at 0x14. The rest matches `ResetFromOwnerLinkSlot` instruction
-     *   for instruction, including the null-slot branch that writes
-     *   `nextInOwner = nullptr`. Zero callers, unreachable; formerly
-     *   `AttachNodeToOwnerHead` over an a deleted overlay in
-     *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
-     * Address: 0x0066A2A0 (FUN_0066A2A0 -- the `WeakPtr<WWinManagedFrame>` emission
+     * Address: 0x00836BD0 (FUN_00836BD0 -- `WeakPtr<T>::ResetFromObject` (the owner's weak-link head at +0x08);
+     * `UserUnit::UpdateUnitData` 0x008C0750; callers 0x008C0750; formerly `RelinkIntrusiveNodeViaOwnerOffset08` in
+     * moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.) Address: 0x00632CA0
+     * (FUN_00632CA0 -- the `WeakPtr<UnitWeapon>` emission, identified by its owner-link offset: the body's `add ecx,
+     * 0x14` is the `UnitWeapon` -> `WeakObject` base cast, and `UnitWeapon` is the only owner whose `WeakObject` sits
+     * at 0x14. The rest matches `ResetFromOwnerLinkSlot` instruction for instruction, including the null-slot branch
+     * that writes `nextInOwner = nullptr`. Zero callers, unreachable; formerly `AttachNodeToOwnerHead` over an a
+     * deleted overlay in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.) Address: 0x0066A2A0
+     * (FUN_0066A2A0 -- the `WeakPtr<WWinManagedFrame>` emission
      *   (`lea edx, [ecx+178h]` is its `WeakObject` base, after the wxFrame);
      *   caller EFX_CreateEmitterWindow 0x0066A007; formerly
      *   `RebindManagedWindowSlotToFrame` in moho/console/CConCommand.cpp, removed
@@ -449,7 +470,9 @@ namespace moho
      * All three share `function_sha256` 5c93862d...: one 70-byte body,
      * emitted once per owner type.
      */
-    void ResetFromObject(T* const object) noexcept
+    void ResetFromObject(
+      T* const object
+    ) noexcept
     {
       ResetFromOwnerLinkSlot(EncodeOwnerLinkSlot(object));
     }
@@ -461,7 +484,9 @@ namespace moho
      *   separate specialization here because the generic body carried sentinel
      *   checks the binary does not have.)
      */
-    void Set(T* const object) noexcept
+    void Set(
+      T* const object
+    ) noexcept
     {
       ResetFromObject(object);
     }
@@ -477,7 +502,11 @@ namespace moho
      * `isLeaving` sees each node as a `WeakPtrNode`: other `WeakPtr` types may share the chain.
      */
     template <class IsLeaving>
-    static void SpliceOutOfChain(WeakObject* const chainSlot, std::size_t count, IsLeaving&& isLeaving) noexcept
+    static void SpliceOutOfChain(
+      WeakObject* const chainSlot,
+      std::size_t count,
+      IsLeaving&& isLeaving
+    ) noexcept
     {
       WeakPtrNode** cursor = &chainSlot->weakLinkHead_;
       while (count != 0 && *cursor != nullptr) {
@@ -511,7 +540,9 @@ namespace moho
      *     mov  ecx, [edx]      ; head
      *     mov  [eax+4], ecx    ; nextInOwner = head
      *     mov  [edx], eax      ; head = this
-     * Address: 0x007AE140 (FUN_007AE140 -- the `WeakPtr<UserEntity>` emission: `slot = entity ? entity + 8 : 0`, pushed onto the chain; no caller, a retained copy. Formerly `LinkSelectionWeakOwnerRef` in moho/sim/CWldSession.cpp, removed 2026-09-30.)
+     * Address: 0x007AE140 (FUN_007AE140 -- the `WeakPtr<UserEntity>` emission: `slot = entity ? entity + 8 : 0`, pushed
+     * onto the chain; no caller, a retained copy. Formerly `LinkSelectionWeakOwnerRef` in moho/sim/CWldSession.cpp,
+     * removed 2026-09-30.)
      */
     void LinkAtOwnerHead() noexcept
     {
@@ -531,8 +562,12 @@ namespace moho
      * alone (0x0057D621..0x0057D63F, and all of `~WeakPtr`). The walk stops at
      * this node and nowhere else: there is no null test, because a node with a
      * slot is on that slot's chain.
-     * Address: 0x0066AF90 (FUN_0066AF90 -- the `WeakPtr<UserEntity>` emission of the splice-out walk, returning the slot it stopped on; callers the camera's target-list node teardown 0x007A71B0, 0x007A75A0, `TargetEntities` 0x007A8640, `TargetNoseCam` 0x007A8A20 and 0x00842920. Formerly `UnlinkSelectionWeakOwnerRefNoReset` in moho/sim/CWldSession.cpp, removed 2026-09-30.)
-     * Address: 0x0082BA90 (FUN_0082BA90 -- the `WeakPtr<UserCommandIssueHelper>` emission, the destructor of the rebuild's inserted stack link (0x008B7211 in 0x008B6F60). Formerly `UnlinkCommandQueueOwnerEntry` in moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
+     * Address: 0x0066AF90 (FUN_0066AF90 -- the `WeakPtr<UserEntity>` emission of the splice-out walk, returning the
+     * slot it stopped on; callers the camera's target-list node teardown 0x007A71B0, 0x007A75A0, `TargetEntities`
+     * 0x007A8640, `TargetNoseCam` 0x007A8A20 and 0x00842920. Formerly `UnlinkSelectionWeakOwnerRefNoReset` in
+     * moho/sim/CWldSession.cpp, removed 2026-09-30.) Address: 0x0082BA90 (FUN_0082BA90 -- the
+     * `WeakPtr<UserCommandIssueHelper>` emission, the destructor of the rebuild's inserted stack link (0x008B7211 in
+     * 0x008B6F60). Formerly `UnlinkCommandQueueOwnerEntry` in moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
      */
     void UnlinkFromOwner() noexcept
     {
@@ -562,7 +597,8 @@ namespace moho
   static_assert(sizeof(WeakPtr<WeakObject>) == sizeof(WeakPtrNode), "WeakPtr<T> must add no data to WeakPtrNode");
   static_assert(offsetof(WeakPtr<WeakObject>, ownerLinkSlot) == 0, "WeakPtr<T>::ownerLinkSlot must lead the node");
   static_assert(
-    offsetof(WeakPtr<WeakObject>, nextInOwner) == sizeof(void*), "WeakPtr<T>::nextInOwner must follow ownerLinkSlot"
+    offsetof(WeakPtr<WeakObject>, nextInOwner) == sizeof(void*),
+    "WeakPtr<T>::nextInOwner must follow ownerLinkSlot"
   );
   static_assert(std::is_standard_layout_v<WeakPtr<WeakObject>>, "WeakPtr<T> must stay standard layout");
 #pragma pop_macro("static_assert")

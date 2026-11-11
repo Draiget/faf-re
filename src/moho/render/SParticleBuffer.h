@@ -109,13 +109,13 @@ namespace moho
     void RenderInstances(const boost::shared_ptr<gpg::gal::VertexBuffer>& instances, int count, int startIndex);
 
   public:
-    int mMaxParticles; // +0x04
-    bool mInitialized; // +0x08
-    std::uint8_t mPadding09[3]; // +0x09
-    boost::shared_ptr<gpg::gal::VertexFormat> mVertexFormat; // +0x0C
-    boost::shared_ptr<gpg::gal::VertexBuffer> mQuadVertexBuffer; // +0x14
+    int mMaxParticles;                                               // +0x04
+    bool mInitialized;                                               // +0x08
+    std::uint8_t mPadding09[3];                                      // +0x09
+    boost::shared_ptr<gpg::gal::VertexFormat> mVertexFormat;         // +0x0C
+    boost::shared_ptr<gpg::gal::VertexBuffer> mQuadVertexBuffer;     // +0x14
     boost::shared_ptr<gpg::gal::VertexBuffer> mInstanceVertexBuffer; // +0x1C
-    boost::shared_ptr<gpg::gal::IndexBuffer> mQuadIndexBuffer; // +0x24
+    boost::shared_ptr<gpg::gal::IndexBuffer> mQuadIndexBuffer;       // +0x24
 
   private:
     /**
@@ -132,14 +132,16 @@ namespace moho
   static_assert(offsetof(ParticleBuffer, mInitialized) == 0x08, "ParticleBuffer::mInitialized offset must be 0x08");
   static_assert(offsetof(ParticleBuffer, mVertexFormat) == 0x0C, "ParticleBuffer::mVertexFormat offset must be 0x0C");
   static_assert(
-    offsetof(ParticleBuffer, mQuadVertexBuffer) == 0x14, "ParticleBuffer::mQuadVertexBuffer offset must be 0x14"
+    offsetof(ParticleBuffer, mQuadVertexBuffer) == 0x14,
+    "ParticleBuffer::mQuadVertexBuffer offset must be 0x14"
   );
   static_assert(
     offsetof(ParticleBuffer, mInstanceVertexBuffer) == 0x1C,
     "ParticleBuffer::mInstanceVertexBuffer offset must be 0x1C"
   );
   static_assert(
-    offsetof(ParticleBuffer, mQuadIndexBuffer) == 0x24, "ParticleBuffer::mQuadIndexBuffer offset must be 0x24"
+    offsetof(ParticleBuffer, mQuadIndexBuffer) == 0x24,
+    "ParticleBuffer::mQuadIndexBuffer offset must be 0x24"
   );
   static_assert(sizeof(ParticleBuffer) == 0x2C, "ParticleBuffer size must be 0x2C");
 } // namespace moho

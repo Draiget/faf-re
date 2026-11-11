@@ -39,7 +39,9 @@ namespace platform::net
   {
     thread_local int tLastError = error::kNone;
 
-    [[nodiscard]] int WinsockErrorFromErrno(const int code) noexcept
+    [[nodiscard]] int WinsockErrorFromErrno(
+      const int code
+    ) noexcept
     {
       switch (code) {
       case 0:
@@ -147,13 +149,17 @@ namespace platform::net
       return kSocketError;
     }
 
-    [[nodiscard]] bool IsNonBlocking(const Socket socket) noexcept
+    [[nodiscard]] bool IsNonBlocking(
+      const Socket socket
+    ) noexcept
     {
       const int flags = ::fcntl(socket, F_GETFL, 0);
       return flags != -1 && (flags & O_NONBLOCK) != 0;
     }
 
-    [[nodiscard]] bool IsListening(const Socket socket) noexcept
+    [[nodiscard]] bool IsListening(
+      const Socket socket
+    ) noexcept
     {
       int listening = 0;
       socklen_t length = sizeof(listening);
@@ -179,7 +185,11 @@ namespace platform::net
         return mCount.load(std::memory_order_acquire) != 0;
       }
 
-      bool Select(const Socket socket, const EventHandle event, const long interest)
+      bool Select(
+        const Socket socket,
+        const EventHandle event,
+        const long interest
+      )
       {
         const std::lock_guard<std::mutex> lock(mMutex);
         if (event == nullptr || interest == 0) {
@@ -202,7 +212,10 @@ namespace platform::net
       }
 
       /// The accepted socket takes the listener's event and conditions, as in Winsock.
-      void Inherit(const Socket listener, const Socket accepted)
+      void Inherit(
+        const Socket listener,
+        const Socket accepted
+      )
       {
         const std::lock_guard<std::mutex> lock(mMutex);
         const auto found = mRegistrations.find(listener);
@@ -218,7 +231,9 @@ namespace platform::net
         WakeLocked();
       }
 
-      void Forget(const Socket socket)
+      void Forget(
+        const Socket socket
+      )
       {
         const std::lock_guard<std::mutex> lock(mMutex);
         if (EraseLocked(socket)) {
@@ -227,7 +242,9 @@ namespace platform::net
       }
 
       /// Ends every selection that signals `event`, before the event is closed.
-      void ForgetEvent(const EventHandle event)
+      void ForgetEvent(
+        const EventHandle event
+      )
       {
         const std::lock_guard<std::mutex> lock(mMutex);
         bool erased = false;
@@ -246,7 +263,10 @@ namespace platform::net
       }
 
       /// Re-enables the selected conditions among `conditions` on `socket`.
-      void Rearm(const Socket socket, const long conditions)
+      void Rearm(
+        const Socket socket,
+        const long conditions
+      )
       {
         const std::lock_guard<std::mutex> lock(mMutex);
         const auto found = mRegistrations.find(socket);
@@ -273,7 +293,9 @@ namespace platform::net
 
       Poller() = default;
 
-      bool EraseLocked(const Socket socket)
+      bool EraseLocked(
+        const Socket socket
+      )
       {
         const bool erased = mRegistrations.erase(socket) != 0;
         mCount.store(mRegistrations.size(), std::memory_order_release);
@@ -295,7 +317,9 @@ namespace platform::net
         }
         mWakeRead = pipeEnds[0];
         mWakeWrite = pipeEnds[1];
-        std::thread([this] { Run(); }).detach();
+        std::thread([this] {
+          Run();
+        }).detach();
         mStarted = true;
         return true;
       }
@@ -309,11 +333,15 @@ namespace platform::net
         }
       }
 
-      [[nodiscard]] static short PollEventsFor(const Registration& registration) noexcept
+      [[nodiscard]] static short PollEventsFor(
+        const Registration& registration
+      ) noexcept
       {
         short events = 0;
-        if ((registration.armed & (kEventRead | kEventClose)) != 0 ||
-            (registration.listening && (registration.armed & kEventAccept) != 0)) {
+        if (
+          (registration.armed & (kEventRead | kEventClose)) != 0 ||
+          (registration.listening && (registration.armed & kEventAccept) != 0)
+        ) {
           events |= POLLIN;
         }
         if ((registration.armed & (kEventWrite | kEventConnect)) != 0) {
@@ -347,8 +375,7 @@ namespace platform::net
 
           if (fds[0].revents != 0) {
             char drain[64];
-            while (::read(mWakeRead, drain, sizeof(drain)) > 0) {
-            }
+            while (::read(mWakeRead, drain, sizeof(drain)) > 0) {}
           }
 
           const std::lock_guard<std::mutex> lock(mMutex);
@@ -386,7 +413,10 @@ namespace platform::net
       int mWakeWrite = -1;
     };
 
-    void Rearm(const Socket socket, const long conditions)
+    void Rearm(
+      const Socket socket,
+      const long conditions
+    )
     {
       Poller& poller = Poller::Get();
       if (poller.Active()) {
@@ -401,7 +431,9 @@ namespace platform::net
       0; // macOS: SO_NOSIGPIPE, set by OpenSocket and Accept
 #endif
 
-    void NoSigPipe([[maybe_unused]] const Socket socket) noexcept
+    void NoSigPipe(
+      [[maybe_unused]] const Socket socket
+    ) noexcept
     {
 #if FAFRE_PLATFORM_MACOS
       const int on = 1;
@@ -420,7 +452,11 @@ namespace platform::net
     return tLastError;
   }
 
-  Socket OpenSocket(const int family, const int type, const int protocol) noexcept
+  Socket OpenSocket(
+    const int family,
+    const int type,
+    const int protocol
+  ) noexcept
   {
     const Socket socket = ::socket(family, type, protocol);
     if (socket == kInvalidSocket) {
@@ -432,7 +468,9 @@ namespace platform::net
     return socket;
   }
 
-  int CloseSocket(const Socket socket) noexcept
+  int CloseSocket(
+    const Socket socket
+  ) noexcept
   {
     if (Poller::Get().Active()) {
       Poller::Get().Forget(socket);
@@ -440,7 +478,9 @@ namespace platform::net
     return ::close(socket) == 0 ? 0 : Fail();
   }
 
-  int SetNonBlocking(const Socket socket) noexcept
+  int SetNonBlocking(
+    const Socket socket
+  ) noexcept
   {
     const int flags = ::fcntl(socket, F_GETFL, 0);
     if (flags == -1 || ::fcntl(socket, F_SETFL, flags | O_NONBLOCK) == -1) {
@@ -449,22 +489,37 @@ namespace platform::net
     return 0;
   }
 
-  int SetOption(const Socket socket, const int level, const int name, const void* const value, const int length) noexcept
+  int SetOption(
+    const Socket socket,
+    const int level,
+    const int name,
+    const void* const value,
+    const int length
+  ) noexcept
   {
     return ::setsockopt(socket, level, name, value, static_cast<socklen_t>(length)) == 0 ? 0 : Fail();
   }
 
-  int Bind(const Socket socket, const sockaddr_in& address) noexcept
+  int Bind(
+    const Socket socket,
+    const sockaddr_in& address
+  ) noexcept
   {
     return ::bind(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0 ? 0 : Fail();
   }
 
-  int Listen(const Socket socket, const int backlog) noexcept
+  int Listen(
+    const Socket socket,
+    const int backlog
+  ) noexcept
   {
     return ::listen(socket, backlog) == 0 ? 0 : Fail();
   }
 
-  int Connect(const Socket socket, const sockaddr_in& address) noexcept
+  int Connect(
+    const Socket socket,
+    const sockaddr_in& address
+  ) noexcept
   {
     if (::connect(socket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) == 0) {
       return 0;
@@ -476,7 +531,10 @@ namespace platform::net
     return Fail();
   }
 
-  Socket Accept(const Socket listener, sockaddr_in* const address) noexcept
+  Socket Accept(
+    const Socket listener,
+    sockaddr_in* const address
+  ) noexcept
   {
     sockaddr_in ignored{};
     sockaddr_in* const out = address != nullptr ? address : &ignored;
@@ -500,7 +558,11 @@ namespace platform::net
     return accepted;
   }
 
-  int Send(const Socket socket, const char* const data, const int length) noexcept
+  int Send(
+    const Socket socket,
+    const char* const data,
+    const int length
+  ) noexcept
   {
     const ssize_t sent = ::send(socket, data, static_cast<std::size_t>(length), kSendFlags);
     if (sent < 0) {
@@ -513,7 +575,11 @@ namespace platform::net
     return static_cast<int>(sent);
   }
 
-  int Recv(const Socket socket, char* const buffer, const int length) noexcept
+  int Recv(
+    const Socket socket,
+    char* const buffer,
+    const int length
+  ) noexcept
   {
     const ssize_t received = ::recv(socket, buffer, static_cast<std::size_t>(length), 0);
     const int recvError = errno;
@@ -525,7 +591,12 @@ namespace platform::net
     return static_cast<int>(received);
   }
 
-  int SendTo(const Socket socket, const char* const data, const int length, const sockaddr_in& to) noexcept
+  int SendTo(
+    const Socket socket,
+    const char* const data,
+    const int length,
+    const sockaddr_in& to
+  ) noexcept
   {
     const ssize_t sent = ::sendto(
       socket, data, static_cast<std::size_t>(length), kSendFlags, reinterpret_cast<const sockaddr*>(&to), sizeof(to)
@@ -540,7 +611,12 @@ namespace platform::net
     return static_cast<int>(sent);
   }
 
-  int RecvFrom(const Socket socket, char* const buffer, const int length, sockaddr_in* const from) noexcept
+  int RecvFrom(
+    const Socket socket,
+    char* const buffer,
+    const int length,
+    sockaddr_in* const from
+  ) noexcept
   {
     socklen_t fromLen = sizeof(*from);
     const ssize_t received =
@@ -554,31 +630,44 @@ namespace platform::net
     return static_cast<int>(received);
   }
 
-  int Shutdown(const Socket socket, const ShutdownHow how) noexcept
+  int Shutdown(
+    const Socket socket,
+    const ShutdownHow how
+  ) noexcept
   {
     return ::shutdown(socket, how == ShutdownHow::kSend ? SHUT_WR : SHUT_RD) == 0 ? 0 : Fail();
   }
 
-  int GetLocalAddress(const Socket socket, sockaddr_in* const address) noexcept
+  int GetLocalAddress(
+    const Socket socket,
+    sockaddr_in* const address
+  ) noexcept
   {
     socklen_t nameLen = sizeof(*address);
     return ::getsockname(socket, reinterpret_cast<sockaddr*>(address), &nameLen) == 0 ? 0 : Fail();
   }
 
-  int GetPeerAddress(const Socket socket, sockaddr_in* const address) noexcept
+  int GetPeerAddress(
+    const Socket socket,
+    sockaddr_in* const address
+  ) noexcept
   {
     socklen_t nameLen = sizeof(*address);
     return ::getpeername(socket, reinterpret_cast<sockaddr*>(address), &nameLen) == 0 ? 0 : Fail();
   }
 
-  int PollReadable(const Socket socket) noexcept
+  int PollReadable(
+    const Socket socket
+  ) noexcept
   {
     pollfd entry{socket, POLLIN, 0};
     const int selected = ::poll(&entry, 1, 0);
     return selected < 0 ? Fail() : selected;
   }
 
-  ConnectPoll PollConnect(const Socket socket) noexcept
+  ConnectPoll PollConnect(
+    const Socket socket
+  ) noexcept
   {
     pollfd entry{socket, POLLOUT, 0};
     const int selected = ::poll(&entry, 1, 0);
@@ -593,8 +682,10 @@ namespace platform::net
     // writable; poll reports both as POLLOUT, so the socket's pending error tells them apart.
     int pending = 0;
     socklen_t length = sizeof(pending);
-    if ((entry.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0 ||
-        ::getsockopt(socket, SOL_SOCKET, SO_ERROR, &pending, &length) != 0 || pending != 0) {
+    if (
+      (entry.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0 ||
+      ::getsockopt(socket, SOL_SOCKET, SO_ERROR, &pending, &length) != 0 || pending != 0
+    ) {
       return ConnectPoll::kFailed;
     }
     return (entry.revents & POLLOUT) != 0 ? ConnectPoll::kConnected : ConnectPoll::kNeither;
@@ -605,7 +696,9 @@ namespace platform::net
     return ::CreateEventW(nullptr, TRUE, FALSE, nullptr);
   }
 
-  bool CloseSocketEvent(const EventHandle event) noexcept
+  bool CloseSocketEvent(
+    const EventHandle event
+  ) noexcept
   {
     if (event == nullptr) {
       return false;
@@ -616,17 +709,25 @@ namespace platform::net
     return ::CloseHandle(event) != FALSE;
   }
 
-  bool SignalSocketEvent(const EventHandle event) noexcept
+  bool SignalSocketEvent(
+    const EventHandle event
+  ) noexcept
   {
     return ::SetEvent(event) != FALSE;
   }
 
-  bool ResetSocketEvent(const EventHandle event) noexcept
+  bool ResetSocketEvent(
+    const EventHandle event
+  ) noexcept
   {
     return ::ResetEvent(event) != FALSE;
   }
 
-  int SelectSocketEvents(const Socket socket, const EventHandle event, const long interest) noexcept
+  int SelectSocketEvents(
+    const Socket socket,
+    const EventHandle event,
+    const long interest
+  ) noexcept
   {
     if (event == nullptr && interest != 0) {
       // Winsock refuses a null event (WSA_INVALID_HANDLE); the socket keeps no selection here.
@@ -643,7 +744,10 @@ namespace platform::net
     return 0;
   }
 
-  void WaitSocketEvent(const EventHandle event, const std::uint32_t timeoutMs) noexcept
+  void WaitSocketEvent(
+    const EventHandle event,
+    const std::uint32_t timeoutMs
+  ) noexcept
   {
     // Not alertable: the shim's alertable wait polls in 1 ms slices, and nothing queues calls to
     // the threads that wait here.

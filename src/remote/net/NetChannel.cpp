@@ -18,14 +18,17 @@ namespace faf::remote::net
     constexpr std::uint32_t kMaxBackoff = 6;
   } // namespace
 
-  NetChannel::NetChannel(const ChannelConfig& config)
+  NetChannel::NetChannel(
+    const ChannelConfig& config
+  )
     : mConfig(config)
     , mSender(config.maxReliableInFlight, config.maxMessageSize)
     , mRecentOutcomes(kRecentWindow, false)
     , mReceiver(config.receiveWindow, config.maxMessageSize)
   {
     if (mConfig.congestionControl) { // plan WP10.7
-      mCongestionBytes = static_cast<double>(mConfig.initialWindowDatagrams) * static_cast<double>(mConfig.maxDatagramSize);
+      mCongestionBytes =
+        static_cast<double>(mConfig.initialWindowDatagrams) * static_cast<double>(mConfig.maxDatagramSize);
       mSender.SetWindow(static_cast<std::uint64_t>(mCongestionBytes));
       mStats.congestionWindow = static_cast<std::uint64_t>(mCongestionBytes);
     }
@@ -45,7 +48,9 @@ namespace faf::remote::net
     }
   }
 
-  bool NetChannel::SetKeys(const ChannelKeys& keys)
+  bool NetChannel::SetKeys(
+    const ChannelKeys& keys
+  )
   {
     if (mKeys) {
       return false;
@@ -65,7 +70,10 @@ namespace faf::remote::net
     return budget - 1 - VarintSize(budget);
   }
 
-  bool NetChannel::SendReliable(const void* const data, const std::size_t size)
+  bool NetChannel::SendReliable(
+    const void* const data,
+    const std::size_t size
+  )
   {
     if (mState == ChannelState::TimedOut || mState == ChannelState::Failed) {
       return false;
@@ -73,10 +81,15 @@ namespace faf::remote::net
     return mSender.Queue(static_cast<const std::uint8_t*>(data), size);
   }
 
-  bool NetChannel::SendUnreliable(const void* const data, const std::size_t size)
+  bool NetChannel::SendUnreliable(
+    const void* const data,
+    const std::size_t size
+  )
   {
-    if (mState == ChannelState::TimedOut || mState == ChannelState::Failed || size > MaxUnreliableSize() ||
-        mUnreliableOut.size() >= mConfig.maxUnreliableQueued) {
+    if (
+      mState == ChannelState::TimedOut || mState == ChannelState::Failed || size > MaxUnreliableSize() ||
+      mUnreliableOut.size() >= mConfig.maxUnreliableQueued
+    ) {
       return false;
     }
     const auto* const bytes = static_cast<const std::uint8_t*>(data);
@@ -84,10 +97,15 @@ namespace faf::remote::net
     return true;
   }
 
-  bool NetChannel::SendRedundant(const void* const data, const std::size_t size)
+  bool NetChannel::SendRedundant(
+    const void* const data,
+    const std::size_t size
+  )
   {
-    if (mState == ChannelState::TimedOut || mState == ChannelState::Failed || size > MaxUnreliableSize() ||
-        mNextLaneSequence == UINT32_MAX) {
+    if (
+      mState == ChannelState::TimedOut || mState == ChannelState::Failed || size > MaxUnreliableSize() ||
+      mNextLaneSequence == UINT32_MAX
+    ) {
       return false;
     }
     if (mLaneOut.size() >= kMaxLaneMessages) {
@@ -105,7 +123,9 @@ namespace faf::remote::net
     return true;
   }
 
-  void NetChannel::LaneAcked(const std::vector<std::uint32_t>& sequences)
+  void NetChannel::LaneAcked(
+    const std::vector<std::uint32_t>& sequences
+  )
   {
     for (const std::uint32_t s : sequences) {
       const auto it = std::lower_bound(mLaneOut.begin(), mLaneOut.end(), s, [](const LaneMessage& m, std::uint32_t v) {
@@ -125,7 +145,10 @@ namespace faf::remote::net
   }
 
   void NetChannel::WriteLane(
-    ByteWriter& out, const std::size_t budget, const bool newOnly, std::vector<std::uint32_t>& carried
+    ByteWriter& out,
+    const std::size_t budget,
+    const bool newOnly,
+    std::vector<std::uint32_t>& carried
   )
   {
     const std::size_t start = out.Size();
@@ -171,7 +194,9 @@ namespace faf::remote::net
     }
   }
 
-  bool NetChannel::TakeUnreliable(std::vector<std::uint8_t>& out)
+  bool NetChannel::TakeUnreliable(
+    std::vector<std::uint8_t>& out
+  )
   {
     if (mUnreliableIn.empty()) {
       return false;
@@ -181,7 +206,9 @@ namespace faf::remote::net
     return true;
   }
 
-  std::uint64_t NetChannel::SinceLastReceivedUs(const std::uint64_t nowUs) const noexcept
+  std::uint64_t NetChannel::SinceLastReceivedUs(
+    const std::uint64_t nowUs
+  ) const noexcept
   {
     const std::uint64_t since = mStats.datagramsReceived != 0 ? mLastReceivedUs : mStartUs;
     return nowUs > since ? nowUs - since : 0;
@@ -212,9 +239,11 @@ namespace faf::remote::net
           if (!in.Ok() || below == 0 || below >= header.ack) {
             return false;
           }
-          acks.push_back({static_cast<std::uint32_t>(header.ack - below),
-                          static_cast<std::uint32_t>(bits[0] | (bits[1] << 8) | (bits[2] << 16)) |
-                            (static_cast<std::uint32_t>(bits[3]) << 24)});
+          acks.push_back(
+            {static_cast<std::uint32_t>(header.ack - below),
+             static_cast<std::uint32_t>(bits[0] | (bits[1] << 8) | (bits[2] << 16)) |
+               (static_cast<std::uint32_t>(bits[3]) << 24)}
+          );
         }
         continue;
       }
@@ -237,7 +266,11 @@ namespace faf::remote::net
     return in.Ok();
   }
 
-  ReceiveResult NetChannel::Receive(const void* const data, const std::size_t size, const std::uint64_t nowUs)
+  ReceiveResult NetChannel::Receive(
+    const void* const data,
+    const std::size_t size,
+    const std::uint64_t nowUs
+  )
   {
     if (!mStarted) {
       mStarted = true;
@@ -349,14 +382,16 @@ namespace faf::remote::net
         mAckDueUs = nowUs + mConfig.ackDelayUs;
       }
       if (header.sequence != previousNewest + 1 || ++mUnanswered >= kAckAfterUnanswered) {
-        mAckDueUs = nowUs;  // a gap, a late one, or a run of them: tell the peer at once
+        mAckDueUs = nowUs; // a gap, a late one, or a run of them: tell the peer at once
       }
     }
     return ReceiveResult::Accepted;
   }
 
   void NetChannel::ProcessAcks(
-    const DatagramHeader& header, const std::vector<AckBlock>& blocks, const std::uint64_t nowUs
+    const DatagramHeader& header,
+    const std::vector<AckBlock>& blocks,
+    const std::uint64_t nowUs
   )
   {
     if (header.ack == 0) {
@@ -374,7 +409,9 @@ namespace faf::remote::net
     DropSettled(nowUs);
   }
 
-  void NetChannel::DropSettled(const std::uint64_t nowUs)
+  void NetChannel::DropSettled(
+    const std::uint64_t nowUs
+  )
   {
     // A lost datagram stays while the peer could still ack it: within the ack chunk's reach
     // below the newest acked, and for a few retransmission timeouts.
@@ -382,8 +419,7 @@ namespace faf::remote::net
     while (!mSent.empty()) {
       const SentDatagram& front = mSent.front();
       const bool settled = front.acked ||
-                           (front.lost && (mLargestAcked - front.sequence > 33 + 32 * kMaxAckBlocks ||
-                                           nowUs - front.sentUs > keepUs));
+        (front.lost && (mLargestAcked - front.sequence > 33 + 32 * kMaxAckBlocks || nowUs - front.sentUs > keepUs));
       if (!settled) {
         break;
       }
@@ -436,7 +472,9 @@ namespace faf::remote::net
     return acked;
   }
 
-  void NetChannel::WriteAckChunk(std::vector<std::uint8_t>& out) const
+  void NetChannel::WriteAckChunk(
+    std::vector<std::uint8_t>& out
+  ) const
   {
     // Blocks of 32 below the header's range, down to the lowest sequence received since the
     // last datagram out; blocks with nothing received are left out.
@@ -470,7 +508,10 @@ namespace faf::remote::net
     }
   }
 
-  void NetChannel::SampleRtt(const std::uint64_t latestUs, const std::uint64_t adjustedUs)
+  void NetChannel::SampleRtt(
+    const std::uint64_t latestUs,
+    const std::uint64_t adjustedUs
+  )
   {
     // RFC 6298 2.2 and 2.3.
     if (mStats.rttSamples == 0) {
@@ -479,8 +520,8 @@ namespace faf::remote::net
       mStats.rttVarUs = adjustedUs / 2;
     } else {
       mStats.rttMinUs = std::min(mStats.rttMinUs, latestUs);
-      const std::uint64_t error = mStats.rttSmoothedUs > adjustedUs ? mStats.rttSmoothedUs - adjustedUs
-                                                                    : adjustedUs - mStats.rttSmoothedUs;
+      const std::uint64_t error =
+        mStats.rttSmoothedUs > adjustedUs ? mStats.rttSmoothedUs - adjustedUs : adjustedUs - mStats.rttSmoothedUs;
       mStats.rttVarUs = (3 * mStats.rttVarUs + error) / 4;
       mStats.rttSmoothedUs = (7 * mStats.rttSmoothedUs + adjustedUs) / 8;
     }
@@ -496,12 +537,13 @@ namespace faf::remote::net
     return std::clamp(rto, mConfig.minRtoUs, mConfig.maxRtoUs);
   }
 
-  void NetChannel::DetectLoss(const std::uint64_t nowUs)
+  void NetChannel::DetectLoss(
+    const std::uint64_t nowUs
+  )
   {
     const std::uint64_t rto = std::min(mConfig.maxRtoUs, Rto() << mBackoff);
-    const std::uint64_t reorderDelay = std::max<std::uint64_t>(
-      mStats.reorderTimeEighths * std::max(mStats.rttSmoothedUs, mStats.rttLatestUs) / 8, 1000
-    );
+    const std::uint64_t reorderDelay =
+      std::max<std::uint64_t>(mStats.reorderTimeEighths * std::max(mStats.rttSmoothedUs, mStats.rttLatestUs) / 8, 1000);
     bool timedOut = false;
     for (SentDatagram& sent : mSent) {
       if (sent.acked || sent.lost) {
@@ -529,7 +571,10 @@ namespace faf::remote::net
 
   // --- Sending --------------------------------------------------------------------------
 
-  void NetChannel::Poll(const std::uint64_t nowUs, std::vector<std::vector<std::uint8_t>>& out)
+  void NetChannel::Poll(
+    const std::uint64_t nowUs,
+    std::vector<std::vector<std::uint8_t>>& out
+  )
   {
     if (!mStarted) {
       mStarted = true;
@@ -556,7 +601,9 @@ namespace faf::remote::net
         const auto window = static_cast<std::uint64_t>(mCongestionBytes);
         mSender.SetWindow(mSender.InFlight() + (window > mOutstanding ? window - mOutstanding : 0u));
       }
-      const bool laneNew = std::any_of(mLaneOut.begin(), mLaneOut.end(), [](const LaneMessage& m) { return !m.sent; });
+      const bool laneNew = std::any_of(mLaneOut.begin(), mLaneOut.end(), [](const LaneMessage& m) {
+        return !m.sent;
+      });
       const bool fresh = laneNew || !mUnreliableOut.empty() || mSender.HasPending();
       const bool repeatDue = HasLaneRepeats() && nowUs - mLastLaneRepeatUs >= mConfig.redundantRepeatUs;
       if (!fresh && !(repeatDue && produced == 0)) {
@@ -670,7 +717,10 @@ namespace faf::remote::net
     out.push_back(std::move(datagram));
   }
 
-  void NetChannel::Resolve(SentDatagram& sent, const bool acked)
+  void NetChannel::Resolve(
+    SentDatagram& sent,
+    const bool acked
+  )
   {
     mOutstanding -= std::min(mOutstanding, sent.reliableBytes); // plan WP10.7: out of flight either way
     if (acked) {
@@ -684,9 +734,9 @@ namespace faf::remote::net
       ++mStats.datagramsLost;
     }
     if (mConfig.congestionControl) {
-      // Plan WP10.7: AIMD on the reliable bytes (RFC 5681). Grow by what was acked: the whole of it below the slow-start
-      // threshold (doubling each RTT), about a datagram an RTT above it; halve on a loss, once for whatever was sent
-      // before the cut (a burst lost to one overflowing buffer is one congestion event).
+      // Plan WP10.7: AIMD on the reliable bytes (RFC 5681). Grow by what was acked: the whole of it below the
+      // slow-start threshold (doubling each RTT), about a datagram an RTT above it; halve on a loss, once for whatever
+      // was sent before the cut (a burst lost to one overflowing buffer is one congestion event).
       const double datagram = static_cast<double>(mConfig.maxDatagramSize);
       const double floor = static_cast<double>(mConfig.minWindowDatagrams) * datagram;
       const double ceiling = static_cast<double>(mConfig.maxReliableInFlight);

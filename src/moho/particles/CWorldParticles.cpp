@@ -185,7 +185,6 @@ namespace moho
 namespace
 {
 
-
   constexpr int kPooledParticleBufferCount = 400;
   constexpr int kParticleBufferCapacity = 200;
   constexpr int kPooledTrailSegmentBufferCount = 100;
@@ -442,7 +441,9 @@ namespace
    * each node as it goes; with a real container the node teardown belongs to
    * the container, so only the owned payloads are released here.
    */
-  void ReleaseTrailSegmentPoolBuffers(moho::TrailSegmentPool& pool) noexcept
+  void ReleaseTrailSegmentPoolBuffers(
+    moho::TrailSegmentPool& pool
+  ) noexcept
   {
     for (moho::STrailSegmentBuffer* const segmentBuffer : pool) {
       if (segmentBuffer == nullptr) {
@@ -495,14 +496,15 @@ namespace
   /// (the raw pointer `AreParticleBucketKeysEquivalent` compares). An unresolved texture is never a
   /// match, because building the key resolves it.
   [[nodiscard]] bool ParticleTextureMatchesKey(
-    const moho::CParticleTexture* const texture, const moho::TextureSheetHandle& keyHandle
+    const moho::CParticleTexture* const texture,
+    const moho::TextureSheetHandle& keyHandle
   ) noexcept
   {
     if (texture == nullptr) {
       return keyHandle.get() == nullptr;
     }
-    return texture->mTextureResource && static_cast<const void*>(texture->mTextureResource.get()) ==
-                                          static_cast<const void*>(keyHandle.get());
+    return texture->mTextureResource &&
+      static_cast<const void*>(texture->mTextureResource.get()) == static_cast<const void*>(keyHandle.get());
   }
 
   /**
@@ -511,13 +513,16 @@ namespace
    * texture handle copies, no tag string copy. Consecutive particles of one emitter share all of
    * these, so most of a beat's particles take the cached bucket this way.
    */
-  [[nodiscard]] bool ParticleMatchesBucketKey(const moho::SParticleBucketKey& key, const moho::SWorldParticle& particle)
+  [[nodiscard]] bool ParticleMatchesBucketKey(
+    const moho::SParticleBucketKey& key,
+    const moho::SWorldParticle& particle
+  )
   {
     return key.sortScalar == particle.mReserved54 && key.dragEnabled == particle.mDragEnabled &&
-           key.blendMode == static_cast<std::int32_t>(particle.mBlendMode) &&
-           key.zMode == static_cast<std::int32_t>(particle.mZMode) &&
-           ParticleTextureMatchesKey(particle.mTexture.tex, key.texture0) &&
-           ParticleTextureMatchesKey(particle.mRampTexture.tex, key.texture1) && key.tag == particle.mTypeTag;
+      key.blendMode == static_cast<std::int32_t>(particle.mBlendMode) &&
+      key.zMode == static_cast<std::int32_t>(particle.mZMode) &&
+      ParticleTextureMatchesKey(particle.mTexture.tex, key.texture0) &&
+      ParticleTextureMatchesKey(particle.mRampTexture.tex, key.texture1) && key.tag == particle.mTypeTag;
   }
 
   [[nodiscard]] moho::SParticleBucketKey* InitializeParticleBucketKeyFromWorldParticle(
@@ -586,7 +591,9 @@ namespace
    * Throws on one null ptr-map insertion payload using the legacy message
    * contract.
    */
-  void EnsurePtrMapInsertPayloadNotNull(void* const payload)
+  void EnsurePtrMapInsertPayloadNotNull(
+    void* const payload
+  )
   {
     if (payload == nullptr) {
       throw std::runtime_error("Null pointer in ptr_map_adapter::insert()");
@@ -599,7 +606,9 @@ namespace
    * What it does:
    * Duplicate ptr-map null payload guard helper retained for binary parity.
    */
-  [[maybe_unused]] void EnsurePtrMapInsertPayloadNotNullDuplicate(void* const payload)
+  [[maybe_unused]] void EnsurePtrMapInsertPayloadNotNullDuplicate(
+    void* const payload
+  )
   {
     EnsurePtrMapInsertPayloadNotNull(payload);
   }
@@ -611,7 +620,9 @@ namespace
    * Destroys one particle-bucket payload lane and releases the owning heap
    * block when present.
    */
-  void DestroyAndDeleteParticleRenderBucket(moho::SParticleRenderBucket* const bucket) noexcept
+  void DestroyAndDeleteParticleRenderBucket(
+    moho::SParticleRenderBucket* const bucket
+  ) noexcept
   {
     if (bucket == nullptr) {
       return;
@@ -628,7 +639,9 @@ namespace
    * Destroys one trail-bucket payload lane and releases the owning heap block
    * when present.
    */
-  void DestroyAndDeleteTrailRenderBucket(moho::STrailRenderBucket* const bucket) noexcept
+  void DestroyAndDeleteTrailRenderBucket(
+    moho::STrailRenderBucket* const bucket
+  ) noexcept
   {
     if (bucket == nullptr) {
       return;
@@ -684,7 +697,7 @@ namespace
    *
    * What it does:
    * Returns one fixed legacy map helper constant (`0x03FFFFFF`).
-  */
+   */
   [[maybe_unused]] std::uint32_t GetLegacyMapHelperConstant_0x03FFFFFF() noexcept
   {
     return 0x03FFFFFFU;
@@ -1026,7 +1039,9 @@ namespace moho
    * (`mAvailableParticleBuffers.push_back`: `_Buynode` 0x0049A570 and
    * `_Incsize` 0x0049A5B0 on Vector.h).
    */
-  void CWorldParticles::ReleaseParticleBuffer(ParticleBuffer* const particleBuffer)
+  void CWorldParticles::ReleaseParticleBuffer(
+    ParticleBuffer* const particleBuffer
+  )
   {
     mAvailableParticleBuffers.push_back(particleBuffer);
   }
@@ -1059,7 +1074,9 @@ namespace moho
    * Returns one trail-segment buffer to `mTrailSegmentPool`
    * (`set::insert`, 0x00496000 on RbTree.h).
    */
-  void CWorldParticles::ReleaseTrailSegmentBuffer(STrailSegmentBuffer* const segmentBuffer)
+  void CWorldParticles::ReleaseTrailSegmentBuffer(
+    STrailSegmentBuffer* const segmentBuffer
+  )
   {
     (void)mTrailSegmentPool.insert(segmentBuffer);
   }
@@ -1071,7 +1088,9 @@ namespace moho
    * What it does:
    * Inserts one beam into the persistent beam render-bucket map.
    */
-  void CWorldParticles::AddBeam(const SWorldBeam& beam)
+  void CWorldParticles::AddBeam(
+    const SWorldBeam& beam
+  )
   {
     AddBeamToTextureBuckets(mBeams.mBuckets, beam);
   }
@@ -1100,8 +1119,10 @@ namespace moho
 
     // Engine addition: the cached bucket's key matches without building a new key (see
     // ParticleMatchesBucketKey); the path below would land in the same bucket.
-    if (ren_ParticleKeyShortcut && static_cast<std::int32_t>(particle.mBlendMode) != 5 && mCachedParticleBucket != nullptr &&
-        ParticleMatchesBucketKey(mParticleBucketLookupKey, particle)) {
+    if (
+      ren_ParticleKeyShortcut && static_cast<std::int32_t>(particle.mBlendMode) != 5 &&
+      mCachedParticleBucket != nullptr && ParticleMatchesBucketKey(mParticleBucketLookupKey, particle)
+    ) {
       mCachedParticleBucket->pendingParticles.push_back(particle);
       return;
     }
@@ -1126,8 +1147,7 @@ namespace moho
       return;
     }
 
-    if (mCachedParticleBucket != nullptr &&
-        AreParticleBucketKeysEquivalent(mParticleBucketLookupKey, lookupKey)) {
+    if (mCachedParticleBucket != nullptr && AreParticleBucketKeysEquivalent(mParticleBucketLookupKey, lookupKey)) {
       mCachedParticleBucket->pendingParticles.push_back(particle);
       ResetParticleBucketKeyResources(lookupKey);
       return;
@@ -1177,8 +1197,7 @@ namespace moho
     STrailBucketKey lookupKey{};
     (void)InitializeTrailBucketKeyFromTrail(&lookupKey, trail);
 
-    if (mCachedTrailBucket != nullptr &&
-        AreTrailBucketKeysEquivalent(mTrailBucketLookupKey, lookupKey)) {
+    if (mCachedTrailBucket != nullptr && AreTrailBucketKeysEquivalent(mTrailBucketLookupKey, lookupKey)) {
       mCachedTrailBucket->pendingTrails.push_back(trail);
       ResetTrailBucketKeyResources(lookupKey);
       return;
@@ -1211,7 +1230,9 @@ namespace moho
    * Dispatches one submit-buffer payload into world-particle, trail, and beam
    * append paths in original order.
    */
-  void CWorldParticles::AddParticles(const SParticleBuffer& batch)
+  void CWorldParticles::AddParticles(
+    const SParticleBuffer& batch
+  )
   {
     for (const SWorldParticle& particle : batch.mParticles) {
       AddWorldParticle(particle, nullptr);
@@ -1296,18 +1317,16 @@ namespace moho
     for (const auto& [bucketKey, bucket] : mTrailBuckets) {
       if (renderAboveSurface) {
         if (bucketKey.sortScalar >= waterSurface && bucket != nullptr) {
-          renderResult = static_cast<char>(
-            moho::RenderTrailBucket(*bucket, static_cast<float>(tick), suppressTLight != 0)
-          );
+          renderResult =
+            static_cast<char>(moho::RenderTrailBucket(*bucket, static_cast<float>(tick), suppressTLight != 0));
         }
       } else {
         if (bucketKey.sortScalar > waterSurface) {
           break;
         }
         if (bucket != nullptr) {
-          renderResult = static_cast<char>(
-            moho::RenderTrailBucket(*bucket, static_cast<float>(tick), suppressTLight != 0)
-          );
+          renderResult =
+            static_cast<char>(moho::RenderTrailBucket(*bucket, static_cast<float>(tick), suppressTLight != 0));
         }
       }
     }
@@ -1345,8 +1364,6 @@ namespace moho
         (void)moho::RenderParticleBucket(*bucket, static_cast<float>(tick), false);
       }
     }
-
-
   }
 
   /**
@@ -1372,7 +1389,8 @@ namespace moho
     // FAF FA-Binary-Patches #165: 4096 particle and 400 trail-segment buffers instead of 400 and 100
     // (the loop counts stored at 0x004928ED / 0x004929B2). The original pools run out in big fights,
     // which drops particles ("Particle cap exceeded") and trail segments.
-    const int particleBufferCount = ren_LargeParticlePools ? kLargePooledParticleBufferCount : kPooledParticleBufferCount;
+    const int particleBufferCount =
+      ren_LargeParticlePools ? kLargePooledParticleBufferCount : kPooledParticleBufferCount;
     const int trailSegmentBufferCount =
       ren_LargeParticlePools ? kLargePooledTrailSegmentBufferCount : kPooledTrailSegmentBufferCount;
 
@@ -1386,17 +1404,12 @@ namespace moho
     }
 
     for (int bufferIndex = 0; bufferIndex < trailSegmentBufferCount; ++bufferIndex) {
-      auto* const segmentBuffer = static_cast<STrailSegmentBuffer*>(
-        ::operator new(sizeof(STrailSegmentBuffer))
-      );
+      auto* const segmentBuffer = static_cast<STrailSegmentBuffer*>(::operator new(sizeof(STrailSegmentBuffer)));
       std::memset(segmentBuffer, 0, sizeof(STrailSegmentBuffer));
 
       segmentBuffer->maxSegments = kTrailSegmentCapacity;
-      segmentBuffer->vertexSheet = resources->NewVertexSheet(
-        kTrailVertexSheetUsageToken,
-        kTrailVertexSheetFrequencyToken,
-        trailVertexFormat
-      );
+      segmentBuffer->vertexSheet =
+        resources->NewVertexSheet(kTrailVertexSheetUsageToken, kTrailVertexSheetFrequencyToken, trailVertexFormat);
 
       if (sSharedTrailQuadIndexSheet.get() == nullptr) {
         (void)RebuildSharedTrailQuadIndexSheet();

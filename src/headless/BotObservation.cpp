@@ -25,28 +25,77 @@ namespace faf::headless
 {
   namespace
   {
-    constexpr std::uint32_t kBlipKind = 3u; // top 4 bits of a recon blip's id (remote/client/ViewMerge.h)
+    constexpr std::uint32_t kBlipKind = 3u;         // top 4 bits of a recon blip's id (remote/client/ViewMerge.h)
     constexpr std::uint32_t kShownMapWide = 0x100u; // added to a contact's recon flags: visibility mode MapPlayableRect
 
-    [[nodiscard]] constexpr std::uint32_t IdKind(const std::uint32_t id) noexcept { return id >> 28u; }
-    [[nodiscard]] constexpr std::uint32_t IdArmy(const std::uint32_t id) noexcept { return (id >> 20u) & 0xFFu; }
+    [[nodiscard]] constexpr std::uint32_t IdKind(
+      const std::uint32_t id
+    ) noexcept
+    {
+      return id >> 28u;
+    }
+    [[nodiscard]] constexpr std::uint32_t IdArmy(
+      const std::uint32_t id
+    ) noexcept
+    {
+      return (id >> 20u) & 0xFFu;
+    }
 
     constexpr const char* kCommandTypeNames[] = {
-      "None", "Stop", "Move", "Dive", "FormMove", "BuildSiloTactical", "BuildSiloNuke", "BuildFactory", "BuildMobile",
-      "BuildAssist", "Attack", "FormAttack", "Nuke", "Tactical", "Teleport", "Guard", "Patrol", "Ferry", "FormPatrol",
-      "Reclaim", "Repair", "Capture", "TransportLoadUnits", "TransportReverseLoadUnits", "TransportUnloadUnits",
-      "TransportUnloadSpecificUnits", "DetachFromTransport", "Upgrade", "Script", "AssistCommander", "KillSelf",
-      "DestroySelf", "Sacrifice", "Pause", "OverCharge", "AggressiveMove", "FormAggressiveMove", "AssistMove",
-      "SpecialAction", "Dock",
+      "None",
+      "Stop",
+      "Move",
+      "Dive",
+      "FormMove",
+      "BuildSiloTactical",
+      "BuildSiloNuke",
+      "BuildFactory",
+      "BuildMobile",
+      "BuildAssist",
+      "Attack",
+      "FormAttack",
+      "Nuke",
+      "Tactical",
+      "Teleport",
+      "Guard",
+      "Patrol",
+      "Ferry",
+      "FormPatrol",
+      "Reclaim",
+      "Repair",
+      "Capture",
+      "TransportLoadUnits",
+      "TransportReverseLoadUnits",
+      "TransportUnloadUnits",
+      "TransportUnloadSpecificUnits",
+      "DetachFromTransport",
+      "Upgrade",
+      "Script",
+      "AssistCommander",
+      "KillSelf",
+      "DestroySelf",
+      "Sacrifice",
+      "Pause",
+      "OverCharge",
+      "AggressiveMove",
+      "FormAggressiveMove",
+      "AssistMove",
+      "SpecialAction",
+      "Dock",
     };
 
-    [[nodiscard]] const char* CommandTypeName(const moho::EUnitCommandType type) noexcept
+    [[nodiscard]] const char* CommandTypeName(
+      const moho::EUnitCommandType type
+    ) noexcept
     {
       const auto index = static_cast<std::size_t>(type);
       return index < std::size(kCommandTypeNames) ? kCommandTypeNames[index] : "Unknown";
     }
 
-    void AppendEscaped(std::string& out, const char* const text)
+    void AppendEscaped(
+      std::string& out,
+      const char* const text
+    )
     {
       out += '"';
       for (const char* at = text != nullptr ? text : ""; *at != '\0'; ++at) {
@@ -65,14 +114,21 @@ namespace faf::headless
       out += '"';
     }
 
-    void AppendFloat(std::string& out, const float value)
+    void AppendFloat(
+      std::string& out,
+      const float value
+    )
     {
       char text[32];
       std::snprintf(text, sizeof(text), "%.1f", static_cast<double>(value));
       out += text;
     }
 
-    void AppendPair(std::string& out, const float mass, const float energy)
+    void AppendPair(
+      std::string& out,
+      const float mass,
+      const float energy
+    )
     {
       out += '[';
       AppendFloat(out, mass);
@@ -83,7 +139,10 @@ namespace faf::headless
 
     using EntitySet = moho::BVSet<moho::EntId, moho::EntIdUniverse>;
 
-    void AppendIds(std::string& out, const EntitySet& entities)
+    void AppendIds(
+      std::string& out,
+      const EntitySet& entities
+    )
     {
       out += '[';
       bool first = true;
@@ -97,7 +156,10 @@ namespace faf::headless
       out += ']';
     }
 
-    void AppendTarget(std::string& out, const moho::SSTITarget& target)
+    void AppendTarget(
+      std::string& out,
+      const moho::SSTITarget& target
+    )
     {
       switch (target.mType) {
       case moho::EAiTargetType::AITARGET_Entity:
@@ -127,13 +189,19 @@ namespace faf::headless
   class CBotCommandRecorder final : public moho::ICommandSink
   {
   public:
-    CBotCommandRecorder(const int army, std::vector<std::uint32_t> sources)
+    CBotCommandRecorder(
+      const int army,
+      std::vector<std::uint32_t> sources
+    )
       : mArmy(static_cast<std::uint32_t>(army))
       , mSources(std::move(sources))
     {}
 
     /** Hands over the commands of beats up to `beat`, oldest first. */
-    void Take(const int beat, std::vector<std::pair<int, std::string>>& out)
+    void Take(
+      const int beat,
+      std::vector<std::pair<int, std::string>>& out
+    )
     {
       const std::lock_guard<std::mutex> lock(mMutex);
       auto split = std::stable_partition(mCommands.begin(), mCommands.end(), [beat](const auto& entry) {
@@ -149,52 +217,86 @@ namespace faf::headless
       return mRecorded;
     }
 
-    void SetCommandSource(const moho::CommandSourceId sourceId) override
+    void SetCommandSource(
+      const moho::CommandSourceId sourceId
+    ) override
     {
       const auto source = static_cast<std::uint32_t>(sourceId);
       mOurs = std::find(mSources.begin(), mSources.end(), source) != mSources.end();
     }
 
-    void AdvanceBeat(int) override { ++mBeat; }
+    void AdvanceBeat(
+      int
+    ) override
+    {
+      ++mBeat;
+    }
 
-    void IssueCommand(const EntitySet& entities, const moho::SSTICommandIssueData& data, const bool clear) override
+    void IssueCommand(
+      const EntitySet& entities,
+      const moho::SSTICommandIssueData& data,
+      const bool clear
+    ) override
     {
       Issue("issue", entities, data, clear);
     }
 
-    void IssueFactoryCommand(const EntitySet& entities, const moho::SSTICommandIssueData& data, const bool clear) override
+    void IssueFactoryCommand(
+      const EntitySet& entities,
+      const moho::SSTICommandIssueData& data,
+      const bool clear
+    ) override
     {
       Issue("factory", entities, data, clear);
     }
 
-    void IncreaseCommandCount(const moho::CmdId id, const int count) override
+    void IncreaseCommandCount(
+      const moho::CmdId id,
+      const int count
+    ) override
     {
       if (Foreign(id)) {
         return;
       }
-      Record("{\"op\":\"count\",\"cmd\":" + std::to_string(static_cast<std::int32_t>(id)) + ",\"delta\":" + std::to_string(count) + '}');
+      Record(
+        "{\"op\":\"count\",\"cmd\":" + std::to_string(static_cast<std::int32_t>(id)) +
+        ",\"delta\":" + std::to_string(count) + '}'
+      );
     }
 
-    void DecreaseCommandCount(const moho::CmdId id, const int count) override
+    void DecreaseCommandCount(
+      const moho::CmdId id,
+      const int count
+    ) override
     {
       if (Foreign(id)) {
         return;
       }
-      Record("{\"op\":\"count\",\"cmd\":" + std::to_string(static_cast<std::int32_t>(id)) + ",\"delta\":-" + std::to_string(count) + '}');
+      Record(
+        "{\"op\":\"count\",\"cmd\":" + std::to_string(static_cast<std::int32_t>(id)) + ",\"delta\":-" +
+        std::to_string(count) + '}'
+      );
     }
 
-    void SetCommandTarget(const moho::CmdId id, const moho::SSTITarget& target) override
+    void SetCommandTarget(
+      const moho::CmdId id,
+      const moho::SSTITarget& target
+    ) override
     {
       if (Foreign(id)) {
         return;
       }
-      std::string json = "{\"op\":\"retarget\",\"cmd\":" + std::to_string(static_cast<std::int32_t>(id)) + ",\"target\":";
+      std::string json =
+        "{\"op\":\"retarget\",\"cmd\":" + std::to_string(static_cast<std::int32_t>(id)) + ",\"target\":";
       AppendTarget(json, target);
       json += '}';
       Record(std::move(json));
     }
 
-    void SetCommandType(const moho::CmdId id, const moho::EUnitCommandType type) override
+    void SetCommandType(
+      const moho::CmdId id,
+      const moho::EUnitCommandType type
+    ) override
     {
       if (Foreign(id)) {
         return;
@@ -205,7 +307,11 @@ namespace faf::headless
       Record(std::move(json));
     }
 
-    void SetCommandCells(const moho::CmdId id, const gpg::core::FastVector<moho::SOCellPos>&, const Wm3::Vector3<float>& target) override
+    void SetCommandCells(
+      const moho::CmdId id,
+      const gpg::core::FastVector<moho::SOCellPos>&,
+      const Wm3::Vector3<float>& target
+    ) override
     {
       if (Foreign(id)) {
         return;
@@ -220,18 +326,25 @@ namespace faf::headless
       Record(std::move(json));
     }
 
-    void RemoveCommandFromUnitQueue(const moho::CmdId id, const moho::EntId unitId) override
+    void RemoveCommandFromUnitQueue(
+      const moho::CmdId id,
+      const moho::EntId unitId
+    ) override
     {
       if (!Own(static_cast<std::uint32_t>(unitId))) {
         return;
       }
       Record(
-        "{\"op\":\"dequeue\",\"cmd\":" + std::to_string(static_cast<std::int32_t>(id)) + ",\"unit\":"
-        + std::to_string(static_cast<std::uint32_t>(unitId)) + '}'
+        "{\"op\":\"dequeue\",\"cmd\":" + std::to_string(static_cast<std::int32_t>(id)) +
+        ",\"unit\":" + std::to_string(static_cast<std::uint32_t>(unitId)) + '}'
       );
     }
 
-    void LuaSimCallback(const char* const fnName, const LuaPlus::LuaObject&, const EntitySet& entities) override
+    void LuaSimCallback(
+      const char* const fnName,
+      const LuaPlus::LuaObject&,
+      const EntitySet& entities
+    ) override
     {
       // The arguments are left out for now: their keys vary by callback (BotObservation.h).
       std::string json = "{\"op\":\"callback\",\"name\":";
@@ -242,12 +355,17 @@ namespace faf::headless
       Record(std::move(json));
     }
 
-    void ProcessInfoPair(const moho::EntId entityId, const gpg::StrArg key, const gpg::StrArg value) override
+    void ProcessInfoPair(
+      const moho::EntId entityId,
+      const gpg::StrArg key,
+      const gpg::StrArg value
+    ) override
     {
       if (!Own(static_cast<std::uint32_t>(entityId))) {
         return;
       }
-      std::string json = "{\"op\":\"info\",\"unit\":" + std::to_string(static_cast<std::uint32_t>(entityId)) + ",\"key\":";
+      std::string json =
+        "{\"op\":\"info\",\"unit\":" + std::to_string(static_cast<std::uint32_t>(entityId)) + ",\"key\":";
       AppendEscaped(json, key);
       json += ",\"value\":";
       AppendEscaped(json, value);
@@ -257,29 +375,69 @@ namespace faf::headless
 
     // Not a player's decision (the client manager's own, cheats, or the end of the stream).
     void OnCommandSourceTerminated() override {}
-    void VerifyChecksum(const gpg::MD5Digest&, moho::CSeqNo) override {}
+    void VerifyChecksum(
+      const gpg::MD5Digest&,
+      moho::CSeqNo
+    ) override
+    {}
     void RequestPause() override {}
     void Resume() override {}
     void SingleStep() override {}
-    void CreateUnit(uint32_t, const moho::RResId&, const moho::SCoordsVec2&, float) override {}
-    void CreateProp(const char*, const Wm3::Vec3f&) override {}
-    void DestroyEntity(moho::EntId) override {}
-    void WarpEntity(moho::EntId, const moho::VTransform&) override {}
-    void ExecuteLuaInSim(const char*, const LuaPlus::LuaObject&) override {}
-    void ExecuteDebugCommand(const char*, const Wm3::Vector3<float>&, uint32_t, const EntitySet&) override {}
+    void CreateUnit(
+      uint32_t,
+      const moho::RResId&,
+      const moho::SCoordsVec2&,
+      float
+    ) override
+    {}
+    void CreateProp(
+      const char*,
+      const Wm3::Vec3f&
+    ) override
+    {}
+    void DestroyEntity(
+      moho::EntId
+    ) override
+    {}
+    void WarpEntity(
+      moho::EntId,
+      const moho::VTransform&
+    ) override
+    {}
+    void ExecuteLuaInSim(
+      const char*,
+      const LuaPlus::LuaObject&
+    ) override
+    {}
+    void ExecuteDebugCommand(
+      const char*,
+      const Wm3::Vector3<float>&,
+      uint32_t,
+      const EntitySet&
+    ) override
+    {}
     void EndGame() override {}
 
   private:
     // Units are filtered to the focus army's. The count, retarget, retype and cells ops name a command, not a unit;
     // they are dropped for a command whose issue was dropped as another army's, and kept otherwise.
-    [[nodiscard]] bool Foreign(const moho::CmdId id) const
+    [[nodiscard]] bool Foreign(
+      const moho::CmdId id
+    ) const
     {
       return mForeignCommands.count(static_cast<std::int32_t>(id)) != 0u;
     }
 
-    [[nodiscard]] bool Own(const std::uint32_t id) const noexcept { return IdArmy(id) == mArmy && IdKind(id) != kBlipKind; }
+    [[nodiscard]] bool Own(
+      const std::uint32_t id
+    ) const noexcept
+    {
+      return IdArmy(id) == mArmy && IdKind(id) != kBlipKind;
+    }
 
-    [[nodiscard]] EntitySet OwnUnits(const EntitySet& entities) const
+    [[nodiscard]] EntitySet OwnUnits(
+      const EntitySet& entities
+    ) const
     {
       EntitySet units{};
       entities.ForEachValue([&](const unsigned int id) {
@@ -290,7 +448,12 @@ namespace faf::headless
       return units;
     }
 
-    void Issue(const char* const op, const EntitySet& entities, const moho::SSTICommandIssueData& data, const bool clear)
+    void Issue(
+      const char* const op,
+      const EntitySet& entities,
+      const moho::SSTICommandIssueData& data,
+      const bool clear
+    )
     {
       if (!mOurs) {
         return;
@@ -298,7 +461,9 @@ namespace faf::headless
       // Only the focus army's units: a source can also command another army's (shared control).
       const EntitySet units = OwnUnits(entities);
       bool any = false;
-      units.ForEachValue([&](unsigned int) { any = true; });
+      units.ForEachValue([&](unsigned int) {
+        any = true;
+      });
       if (!any) {
         // Later edits of this command (count, retarget, retype, cells) are another army's too.
         mForeignCommands.insert(data.nextCommandId);
@@ -323,7 +488,10 @@ namespace faf::headless
       Record(std::move(json), true);
     }
 
-    void Record(std::string json, const bool checked = false)
+    void Record(
+      std::string json,
+      const bool checked = false
+    )
     {
       if (!checked && !mOurs) {
         return;
@@ -347,7 +515,10 @@ namespace faf::headless
   };
 
   CBotObservation::CBotObservation(
-    moho::RRuleGameRules& rules, const int army, std::vector<std::uint32_t> sources, const int every
+    moho::RRuleGameRules& rules,
+    const int army,
+    std::vector<std::uint32_t> sources,
+    const int every
   )
     : mArmy(army)
     , mSources(std::move(sources))
@@ -365,7 +536,10 @@ namespace faf::headless
     }
   }
 
-  bool CBotObservation::Open(const std::string& path, const std::string& replayPath)
+  bool CBotObservation::Open(
+    const std::string& path,
+    const std::string& replayPath
+  )
   {
     // Binary: the same bytes, with "\n" line ends, on every platform.
     if (fopen_s(&mFile, path.c_str(), "wb") != 0) {
@@ -397,12 +571,17 @@ namespace faf::headless
     }
   }
 
-  void CBotObservation::Observe(const moho::CMessage& message, void* const context)
+  void CBotObservation::Observe(
+    const moho::CMessage& message,
+    void* const context
+  )
   {
     static_cast<CBotObservation*>(context)->OnMessage(message);
   }
 
-  void CBotObservation::OnMessage(const moho::CMessage& message)
+  void CBotObservation::OnMessage(
+    const moho::CMessage& message
+  )
   {
     if (mInside) {
       return; // this observation's own decoder
@@ -410,8 +589,17 @@ namespace faf::headless
     struct SInside
     {
       bool& inside;
-      explicit SInside(bool& flag) : inside(flag) { inside = true; }
-      ~SInside() { inside = false; }
+      explicit SInside(
+        bool& flag
+      )
+        : inside(flag)
+      {
+        inside = true;
+      }
+      ~SInside()
+      {
+        inside = false;
+      }
     } const guard(mInside);
     // Nothing this decoder throws may reach the sim's decoder, which calls this before its own decode.
     try {
@@ -424,7 +612,9 @@ namespace faf::headless
   // Visibility modes: only MapPlayableRect and ReconGrid ever show a unit. Hidden doesn't, and for any other mode
   // (0 before the entity's first update) the client keeps the mesh as it was; that is hidden here, so the view never
   // shows more than the UI.
-  bool CBotObservation::TypeKnown(const SEntity& entity) const noexcept
+  bool CBotObservation::TypeKnown(
+    const SEntity& entity
+  ) const noexcept
   {
     if (!entity.blip) {
       return true;
@@ -436,29 +626,35 @@ namespace faf::headless
       return false;
     }
     // As `UserUnit::UpdateVisibility` (0x008C09B0) shows the mesh.
-    const std::uint32_t needed = entity.mobile ? static_cast<std::uint32_t>(moho::RECON_LOSNow)
-                                               : static_cast<std::uint32_t>(moho::RECON_LOSEver);
+    const std::uint32_t needed =
+      entity.mobile ? static_cast<std::uint32_t>(moho::RECON_LOSNow) : static_cast<std::uint32_t>(moho::RECON_LOSEver);
     return (entity.recon & needed) != 0u;
   }
 
-  bool CBotObservation::InSightNow(const SEntity& entity) const noexcept
+  bool CBotObservation::InSightNow(
+    const SEntity& entity
+  ) const noexcept
   {
     // Health shows on intel bit 0x08 whatever the visibility mode (the icon's "health-valid" bit).
     return !entity.blip || (entity.recon & static_cast<std::uint32_t>(moho::RECON_LOSNow)) != 0u;
   }
 
-  bool CBotObservation::IconKnown(const SEntity& entity) const noexcept
+  bool CBotObservation::IconKnown(
+    const SEntity& entity
+  ) const noexcept
   {
     // The strategic icon picks the blueprint's own icon, and the owner's colour, on intel bit 0x10 (RECON_LOSEver),
     // mobile or not (`PickUnitStrategicIconTexture`, `PlaceUnitIcon`, CWldSessionRender.cpp); else a generic icon.
     return !entity.blip || (entity.recon & static_cast<std::uint32_t>(moho::RECON_LOSEver)) != 0u || TypeKnown(entity);
   }
 
-  bool CBotObservation::ContactShown(const SEntity& entity) const noexcept
+  bool CBotObservation::ContactShown(
+    const SEntity& entity
+  ) const noexcept
   {
     const bool shownMode =
-      entity.visibilityMode == static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::MapPlayableRect)
-      || entity.visibilityMode == static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::ReconGrid);
+      entity.visibilityMode == static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::MapPlayableRect) ||
+      entity.visibilityMode == static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::ReconGrid);
     if (entity.dead || !shownMode) {
       return false;
     }
@@ -469,15 +665,15 @@ namespace faf::headless
     if ((entity.recon & static_cast<std::uint32_t>(moho::RECON_KnownFake)) != 0u) {
       return false;
     }
-    constexpr std::uint32_t kDetectedNow = static_cast<std::uint32_t>(moho::RECON_Radar)
-                                           | static_cast<std::uint32_t>(moho::RECON_Sonar)
-                                           | static_cast<std::uint32_t>(moho::RECON_Omni)
-                                           | static_cast<std::uint32_t>(moho::RECON_LOSNow)
-                                           | static_cast<std::uint32_t>(moho::RECON_LOSEver);
+    constexpr std::uint32_t kDetectedNow = static_cast<std::uint32_t>(moho::RECON_Radar) |
+      static_cast<std::uint32_t>(moho::RECON_Sonar) | static_cast<std::uint32_t>(moho::RECON_Omni) |
+      static_cast<std::uint32_t>(moho::RECON_LOSNow) | static_cast<std::uint32_t>(moho::RECON_LOSEver);
     return (entity.recon & kDetectedNow) != 0u;
   }
 
-  const char* CBotObservation::GenericClass(const SEntity& entity) noexcept
+  const char* CBotObservation::GenericClass(
+    const SEntity& entity
+  ) noexcept
   {
     // The generic icon (`PickGenericStrategicIconTexture`, 0x0085CBD9): structure by the blueprint's own IsMobile,
     // else by the entity's layer.
@@ -498,7 +694,9 @@ namespace faf::headless
     }
   }
 
-  void CBotObservation::OnPacket(const moho::SSyncData& packet)
+  void CBotObservation::OnPacket(
+    const moho::SSyncData& packet
+  )
   {
     auto addUnit = [this](const moho::SCreateEntityParams& params) {
       SEntity& entity = mEntities[params.mEntityId];
@@ -578,8 +776,8 @@ namespace faf::headless
 
     if (!packet.mPlayableRectUpdates.empty()) {
       const gpg::Rect2i& rect = packet.mPlayableRectUpdates.back();
-      mPlayableRect = "[" + std::to_string(rect.x0) + ',' + std::to_string(rect.z0) + ',' + std::to_string(rect.x1) + ','
-                      + std::to_string(rect.z1) + ']';
+      mPlayableRect = "[" + std::to_string(rect.x0) + ',' + std::to_string(rect.z0) + ',' + std::to_string(rect.x1) +
+        ',' + std::to_string(rect.z1) + ']';
     }
 
     if (mFile != nullptr && packet.mCurBeat >= 0 && packet.mCurBeat % mEvery == 0) {
@@ -587,7 +785,10 @@ namespace faf::headless
     }
   }
 
-  void CBotObservation::WriteCommands(const int upToBeat, std::string& line)
+  void CBotObservation::WriteCommands(
+    const int upToBeat,
+    std::string& line
+  )
   {
     std::vector<std::pair<int, std::string>> commands;
     mRecorder->Take(upToBeat, commands);
@@ -604,14 +805,18 @@ namespace faf::headless
     mCommandsWritten += commands.size();
   }
 
-  void CBotObservation::WriteSample(const moho::SSyncData& packet)
+  void CBotObservation::WriteSample(
+    const moho::SSyncData& packet
+  )
   {
     std::vector<std::pair<std::uint32_t, const SEntity*>> sorted;
     sorted.reserve(mEntities.size());
     for (const auto& [id, entity] : mEntities) {
       sorted.emplace_back(id, &entity);
     }
-    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+      return a.first < b.first;
+    });
 
     std::string line = "{\"beat\":" + std::to_string(packet.mCurBeat) + ",\"tick\":" + std::to_string(packet.mCurTick);
     if (!mPlayableRect.empty()) {
@@ -639,7 +844,11 @@ namespace faf::headless
       }
       char tail[64];
       std::snprintf(
-        tail, sizeof(tail), ",%.2f,%d,%.2f]", static_cast<double>(entity->fraction), entity->busy ? 1 : 0,
+        tail,
+        sizeof(tail),
+        ",%.2f,%d,%.2f]",
+        static_cast<double>(entity->fraction),
+        entity->busy ? 1 : 0,
         static_cast<double>(entity->workProgress)
       );
       line += tail;
@@ -730,10 +939,10 @@ namespace faf::headless
 
   std::string CBotObservation::Summary() const
   {
-    return "bot-obs: army " + std::to_string(mArmy) + ", " + std::to_string(mSamples) + " samples, "
-           + std::to_string(mOwnRows) + " own-unit rows, " + std::to_string(mContactRows) + " contact rows ("
-           + std::to_string(mKnownContactRows) + " with blueprint, " + std::to_string(mIconContactRows) + " with icon), " + std::to_string(mRecorder->Recorded())
-           + " commands recorded, " + std::to_string(mCommandsWritten) + " written, "
-           + std::to_string(mDecodeErrors.load()) + " decode errors";
+    return "bot-obs: army " + std::to_string(mArmy) + ", " + std::to_string(mSamples) + " samples, " +
+      std::to_string(mOwnRows) + " own-unit rows, " + std::to_string(mContactRows) + " contact rows (" +
+      std::to_string(mKnownContactRows) + " with blueprint, " + std::to_string(mIconContactRows) + " with icon), " +
+      std::to_string(mRecorder->Recorded()) + " commands recorded, " + std::to_string(mCommandsWritten) + " written, " +
+      std::to_string(mDecodeErrors.load()) + " decode errors";
   }
 } // namespace faf::headless

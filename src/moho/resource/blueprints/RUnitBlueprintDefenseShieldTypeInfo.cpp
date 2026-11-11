@@ -64,7 +64,9 @@ namespace moho
     size_ = sizeof(RUnitBlueprintDefenseShield);
     gpg::RType::Init();
     AddField<float>("ShieldSize", offsetof(RUnitBlueprintDefenseShield, ShieldSize), 3, "Shield diameter");
-    AddField<float>("RegenAssistMult", offsetof(RUnitBlueprintDefenseShield, RegenAssistMult), 3, "Regen assist multiplier");
+    AddField<float>(
+      "RegenAssistMult", offsetof(RUnitBlueprintDefenseShield, RegenAssistMult), 3, "Regen assist multiplier"
+    );
     Finish();
   }
 
@@ -79,4 +81,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RUnitBlueprintDefenseShieldTypeInfo_bf2b10, moho::register_RUnitBlueprintDefenseShieldTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_RUnitBlueprintDefenseShieldTypeInfo_bf2b10,
+  moho::register_RUnitBlueprintDefenseShieldTypeInfo
+)

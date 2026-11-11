@@ -134,7 +134,7 @@ namespace moho
    *
    * What it does:
    * Publishes `Unit:SetCapturable(flag)` Lua binder definition.
-  */
+   */
   CScrLuaInitForm* func_UnitSetCapturable_LuaFuncDef();
 
   /**

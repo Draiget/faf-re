@@ -18,7 +18,11 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<CPrefetchSet>::Deserialize` 0x004A55F0.
    */
-  void CPrefetchSet::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+  void CPrefetchSet::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    const int,
+    const gpg::RRef& ownerRef
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -31,7 +35,11 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<CPrefetchSet>::Serialize` 0x004A5630.
    */
-  void CPrefetchSet::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef)
+  void CPrefetchSet::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    const int,
+    const gpg::RRef& ownerRef
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {

@@ -22,7 +22,10 @@ namespace
 
   struct CEconomyTypeInfoBootstrap
   {
-    CEconomyTypeInfoBootstrap() { moho::register_CEconomyTypeInfoStartup(); }
+    CEconomyTypeInfoBootstrap()
+    {
+      moho::register_CEconomyTypeInfoStartup();
+    }
   };
   CEconomyTypeInfoBootstrap gCEconomyTypeInfoBootstrap;
 } // namespace
@@ -68,7 +71,9 @@ void moho::register_CEconomyTypeInfoStartup()
   (void)AcquireCEconomyTypeInfo();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CEconomyTypeInfoStartup_e9f26e, moho::register_CEconomyTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CEconomyTypeInfoStartup_e9f26e,
+  moho::register_CEconomyTypeInfoStartup
+)

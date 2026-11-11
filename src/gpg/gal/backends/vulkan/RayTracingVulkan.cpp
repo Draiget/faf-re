@@ -25,13 +25,21 @@ namespace gpg::gal
     constexpr VkDeviceSize kRayChunkBytes = 32ULL << 20U;
     constexpr VkDeviceSize kRayInputChunkBytes = 16ULL << 20U;
 
-    [[nodiscard]] VkDeviceSize AlignUp(const VkDeviceSize value, const VkDeviceSize alignment) noexcept
+    [[nodiscard]] VkDeviceSize AlignUp(
+      const VkDeviceSize value,
+      const VkDeviceSize alignment
+    ) noexcept
     {
       return (value + alignment - 1U) & ~(alignment - 1U);
     }
   } // namespace
 
-  bool DeviceVulkan::CreateRayBuffer(const VkDeviceSize bytes, const VkBufferUsageFlags usage, const bool host, RayBuffer& out)
+  bool DeviceVulkan::CreateRayBuffer(
+    const VkDeviceSize bytes,
+    const VkBufferUsageFlags usage,
+    const bool host,
+    RayBuffer& out
+  )
   {
     out = RayBuffer{};
     VkBufferCreateInfo info{};
@@ -46,11 +54,15 @@ namespace gpg::gal
     Vk().vkGetBufferMemoryRequirements(mDevice, out.buffer, &requirements);
     VkPhysicalDeviceMemoryProperties properties{};
     Vk().vkGetPhysicalDeviceMemoryProperties(mPhysical, &properties);
-    const VkMemoryPropertyFlags wanted =
-      host ? (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    const VkMemoryPropertyFlags wanted = host
+      ? (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+      : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     std::uint32_t type = ~0U;
     for (std::uint32_t index = 0U; index < properties.memoryTypeCount; ++index) {
-      if ((requirements.memoryTypeBits & (1U << index)) != 0U && (properties.memoryTypes[index].propertyFlags & wanted) == wanted) {
+      if (
+        (requirements.memoryTypeBits & (1U << index)) != 0U &&
+        (properties.memoryTypes[index].propertyFlags & wanted) == wanted
+      ) {
         type = index;
         break;
       }
@@ -63,8 +75,10 @@ namespace gpg::gal
     allocate.pNext = &flags;
     allocate.allocationSize = requirements.size;
     allocate.memoryTypeIndex = type;
-    if (type == ~0U || Vk().vkAllocateMemory(mDevice, &allocate, nullptr, &out.memory) != VK_SUCCESS ||
-        Vk().vkBindBufferMemory(mDevice, out.buffer, out.memory, 0U) != VK_SUCCESS) {
+    if (
+      type == ~0U || Vk().vkAllocateMemory(mDevice, &allocate, nullptr, &out.memory) != VK_SUCCESS ||
+      Vk().vkBindBufferMemory(mDevice, out.buffer, out.memory, 0U) != VK_SUCCESS
+    ) {
       DestroyRayBuffer(out);
       return false;
     }
@@ -84,7 +98,9 @@ namespace gpg::gal
     return true;
   }
 
-  void DeviceVulkan::DestroyRayBuffer(RayBuffer& buffer) noexcept
+  void DeviceVulkan::DestroyRayBuffer(
+    RayBuffer& buffer
+  ) noexcept
   {
     if (buffer.buffer != VK_NULL_HANDLE) {
       Vk().vkDestroyBuffer(mDevice, buffer.buffer, nullptr);
@@ -95,7 +111,11 @@ namespace gpg::gal
     buffer = RayBuffer{};
   }
 
-  void DeviceVulkan::RetireRay(const VkAccelerationStructureKHR structure, const RayBuffer& buffer, const VkDescriptorSet set)
+  void DeviceVulkan::RetireRay(
+    const VkAccelerationStructureKHR structure,
+    const RayBuffer& buffer,
+    const VkDescriptorSet set
+  )
   {
     RayGarbage garbage;
     garbage.serial = RecordingSerial();
@@ -105,7 +125,9 @@ namespace gpg::gal
     mRayGarbage.push_back(garbage);
   }
 
-  void DeviceVulkan::CollectRayGarbage(const bool all)
+  void DeviceVulkan::CollectRayGarbage(
+    const bool all
+  )
   {
     std::uint64_t completed = 0U;
     Vk().vkGetSemaphoreCounterValue(mDevice, mTimeline, &completed);
@@ -134,7 +156,10 @@ namespace gpg::gal
     }
   }
 
-  bool DeviceVulkan::RayArenaAllocate(const VkDeviceSize bytes, RayRange& out)
+  bool DeviceVulkan::RayArenaAllocate(
+    const VkDeviceSize bytes,
+    RayRange& out
+  )
   {
     const VkDeviceSize size = AlignUp(bytes, 256U);
     for (std::uint32_t chunk = 0U; chunk < mRayChunks.size(); ++chunk) {
@@ -156,7 +181,9 @@ namespace gpg::gal
       }
     }
     RayChunk chunk;
-    if (!CreateRayBuffer(std::max(kRayChunkBytes, size), VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, false, chunk.buffer)) {
+    if (!CreateRayBuffer(
+          std::max(kRayChunkBytes, size), VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, false, chunk.buffer
+        )) {
       return false;
     }
     chunk.holes.emplace(0U, chunk.buffer.size);
@@ -164,7 +191,9 @@ namespace gpg::gal
     return RayArenaAllocate(bytes, out);
   }
 
-  void DeviceVulkan::RayArenaFree(const RayRange& range)
+  void DeviceVulkan::RayArenaFree(
+    const RayRange& range
+  )
   {
     std::map<VkDeviceSize, VkDeviceSize>& holes = mRayChunks[range.chunk].holes;
     auto inserted = holes.emplace(range.offset, range.bytes).first;
@@ -182,7 +211,12 @@ namespace gpg::gal
     }
   }
 
-  std::uint8_t* DeviceVulkan::RayInput(const VkDeviceSize bytes, VkDeviceAddress& address, VkBuffer* const buffer, VkDeviceSize* const offset)
+  std::uint8_t* DeviceVulkan::RayInput(
+    const VkDeviceSize bytes,
+    VkDeviceAddress& address,
+    VkBuffer* const buffer,
+    VkDeviceSize* const offset
+  )
   {
     const VkDeviceSize size = AlignUp(bytes, 256U);
     if (mRayInputCurrent == nullptr || mRayInputCurrent->used + size > mRayInputCurrent->buffer.size) {
@@ -199,9 +233,12 @@ namespace gpg::gal
       }
       if (mRayInputCurrent == nullptr) {
         RayInputChunk chunk;
-        if (!CreateRayBuffer(std::max(kRayInputChunkBytes, size),
-                             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true,
-                             chunk.buffer)) {
+        if (!CreateRayBuffer(
+              std::max(kRayInputChunkBytes, size),
+              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+              true,
+              chunk.buffer
+            )) {
           return nullptr;
         }
         mRayInputs.push_back(std::move(chunk));
@@ -222,7 +259,9 @@ namespace gpg::gal
     return cpu;
   }
 
-  bool DeviceVulkan::EnsureRayScratch(const VkDeviceSize bytes)
+  bool DeviceVulkan::EnsureRayScratch(
+    const VkDeviceSize bytes
+  )
   {
     const VkDeviceSize needed = bytes + mRayScratchAlignment;
     if (mRayScratch.buffer != VK_NULL_HANDLE && mRayScratch.size >= needed) {
@@ -232,11 +271,20 @@ namespace gpg::gal
       RetireRay(VK_NULL_HANDLE, mRayScratch, VK_NULL_HANDLE);
       mRayScratch = RayBuffer{};
     }
-    return CreateRayBuffer(AlignUp(std::max<VkDeviceSize>(needed, 4ULL << 20U), 65536U), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, false, mRayScratch);
+    return CreateRayBuffer(
+      AlignUp(std::max<VkDeviceSize>(needed, 4ULL << 20U), 65536U),
+      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+      false,
+      mRayScratch
+    );
   }
 
-  void DeviceVulkan::RayBarrier(const VkPipelineStageFlags2 sourceStages, const VkAccessFlags2 sourceAccess,
-                                const VkPipelineStageFlags2 destinationStages, const VkAccessFlags2 destinationAccess)
+  void DeviceVulkan::RayBarrier(
+    const VkPipelineStageFlags2 sourceStages,
+    const VkAccessFlags2 sourceAccess,
+    const VkPipelineStageFlags2 destinationStages,
+    const VkAccessFlags2 destinationAccess
+  )
   {
     VkMemoryBarrier2 barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
@@ -263,7 +311,8 @@ namespace gpg::gal
     properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     properties.pNext = &accelerationProperties;
     Vk().vkGetPhysicalDeviceProperties2(mPhysical, &properties);
-    mRayScratchAlignment = std::max<VkDeviceSize>(accelerationProperties.minAccelerationStructureScratchOffsetAlignment, 256U);
+    mRayScratchAlignment =
+      std::max<VkDeviceSize>(accelerationProperties.minAccelerationStructureScratchOffsetAlignment, 256U);
 
     // A set per scene build (one a frame), retired once the GPU is past it.
     constexpr std::uint32_t kRaySets = 64U;
@@ -342,10 +391,14 @@ namespace gpg::gal
     mRayInstances.clear();
   }
 
-  RayGeometryId DeviceVulkan::CreateRayGeometry(const RayGeometryDesc& desc)
+  RayGeometryId DeviceVulkan::CreateRayGeometry(
+    const RayGeometryDesc& desc
+  )
   {
-    if (!mRayQuery || desc.positions == nullptr || desc.indices == nullptr || desc.vertexCount == 0U || desc.indexCount < 3U ||
-        desc.positionStride < 12U) {
+    if (
+      !mRayQuery || desc.positions == nullptr || desc.indices == nullptr || desc.vertexCount == 0U ||
+      desc.indexCount < 3U || desc.positionStride < 12U
+    ) {
       return 0U;
     }
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -359,7 +412,11 @@ namespace gpg::gal
     }
     const auto* source = reinterpret_cast<const std::uint8_t*>(desc.positions);
     for (std::uint32_t vertex = 0U; vertex < desc.vertexCount; ++vertex) {
-      std::memcpy(vertices + (static_cast<std::size_t>(vertex) * 12U), source + (static_cast<std::size_t>(vertex) * desc.positionStride), 12U);
+      std::memcpy(
+        vertices + (static_cast<std::size_t>(vertex) * 12U),
+        source + (static_cast<std::size_t>(vertex) * desc.positionStride),
+        12U
+      );
     }
     std::memcpy(indices, desc.indices, static_cast<std::size_t>(triangles) * 12U);
 
@@ -386,11 +443,15 @@ namespace gpg::gal
     build.pGeometries = &geometry;
     VkAccelerationStructureBuildSizesInfoKHR sizes{};
     sizes.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-    Vk().vkGetAccelerationStructureBuildSizesKHR(mDevice, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build, &triangles, &sizes);
+    Vk().vkGetAccelerationStructureBuildSizesKHR(
+      mDevice, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build, &triangles, &sizes
+    );
 
     RayGeometryVulkan piece;
-    if (sizes.accelerationStructureSize == 0U || !RayArenaAllocate(sizes.accelerationStructureSize, piece.range) ||
-        !EnsureRayScratch(sizes.buildScratchSize)) {
+    if (
+      sizes.accelerationStructureSize == 0U || !RayArenaAllocate(sizes.accelerationStructureSize, piece.range) ||
+      !EnsureRayScratch(sizes.buildScratchSize)
+    ) {
       gpg::Logf("Vulkan: out of memory for ray geometry '%s'", desc.name);
       return 0U;
     }
@@ -416,23 +477,33 @@ namespace gpg::gal
     const VkAccelerationStructureBuildRangeInfoKHR* const ranges = &range;
     EndRendering();
     // The shared scratch buffer: the build before this one must be done with it.
-    RayBarrier(VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-               VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR | VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR,
-               VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-               VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR | VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR);
+    RayBarrier(
+      VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+      VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR | VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR,
+      VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+      VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR | VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR
+    );
     Vk().vkCmdBuildAccelerationStructuresKHR(mCommands, 1U, &build, &ranges);
-    RayBarrier(VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
-               VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR);
+    RayBarrier(
+      VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+      VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+      VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+      VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR
+    );
     if (alphaTested) {
       std::vector<float> uvs(static_cast<std::size_t>(desc.vertexCount) * 2U);
       const auto* uvSource = reinterpret_cast<const std::uint8_t*>(desc.uvs);
       for (std::uint32_t vertex = 0U; vertex < desc.vertexCount; ++vertex) {
-        std::memcpy(&uvs[static_cast<std::size_t>(vertex) * 2U], uvSource + (static_cast<std::size_t>(vertex) * desc.uvStride), 8U);
+        std::memcpy(
+          &uvs[static_cast<std::size_t>(vertex) * 2U], uvSource + (static_cast<std::size_t>(vertex) * desc.uvStride), 8U
+        );
       }
       VkDeviceSize indexOffset = 0U;
       VkDeviceSize uvOffset = 0U;
-      if (!AppendRayAttributes(desc.indices, static_cast<VkDeviceSize>(triangles) * 12U, indexOffset) ||
-          !AppendRayAttributes(uvs.data(), static_cast<VkDeviceSize>(uvs.size()) * sizeof(float), uvOffset)) {
+      if (
+        !AppendRayAttributes(desc.indices, static_cast<VkDeviceSize>(triangles) * 12U, indexOffset) ||
+        !AppendRayAttributes(uvs.data(), static_cast<VkDeviceSize>(uvs.size()) * sizeof(float), uvOffset)
+      ) {
         // Traced as opaque it would cast its cards' whole outline: no piece instead.
         RetireRay(piece.structure, RayBuffer{}, VK_NULL_HANDLE);
         mRayGarbage.back().range = piece.range;
@@ -446,7 +517,9 @@ namespace gpg::gal
     return id;
   }
 
-  void DeviceVulkan::DestroyRayGeometry(const RayGeometryId geometry)
+  void DeviceVulkan::DestroyRayGeometry(
+    const RayGeometryId geometry
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     const auto found = mRayGeometries.find(geometry);
@@ -462,7 +535,9 @@ namespace gpg::gal
   }
 
   bool DeviceVulkan::SetRayInstances(
-    const RayInstance* const instances, const std::uint32_t count, const boost::shared_ptr<Texture>* const textures,
+    const RayInstance* const instances,
+    const std::uint32_t count,
+    const boost::shared_ptr<Texture>* const textures,
     const std::uint32_t textureCount
   )
   {
@@ -482,8 +557,8 @@ namespace gpg::gal
         continue;
       }
       std::uint32_t slot = 0U;
-      const bool alphaTested = found->second.indexOffset != ~0ULL && instance.texture != 0U && instance.texture <= textureCount &&
-        textures[instance.texture - 1U] != nullptr;
+      const bool alphaTested = found->second.indexOffset != ~0ULL && instance.texture != 0U &&
+        instance.texture <= textureCount && textures[instance.texture - 1U] != nullptr;
       if (found->second.indexOffset != ~0ULL && !alphaTested) {
         continue;
       }
@@ -503,8 +578,9 @@ namespace gpg::gal
       desc.instanceCustomIndex = 0U;
       desc.mask = instance.mask;
       desc.instanceShaderBindingTableRecordOffset = 0U;
-      desc.flags = alphaTested ? VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR
-                               : (VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR | VK_GEOMETRY_INSTANCE_FORCE_OPAQUE_BIT_KHR);
+      desc.flags = alphaTested
+        ? VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR
+        : (VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR | VK_GEOMETRY_INSTANCE_FORCE_OPAQUE_BIT_KHR);
       desc.accelerationStructureReference = found->second.address;
       mRayInstances.push_back(desc);
       mRayRecords.push_back(alphaTested ? static_cast<std::uint32_t>(found->second.indexOffset) : 0U);
@@ -515,14 +591,19 @@ namespace gpg::gal
     return BuildRayScene();
   }
 
-  bool DeviceVulkan::AppendRayAttributes(const void* const data, const VkDeviceSize bytes, VkDeviceSize& offset)
+  bool DeviceVulkan::AppendRayAttributes(
+    const void* const data,
+    const VkDeviceSize bytes,
+    VkDeviceSize& offset
+  )
   {
     const VkDeviceSize needed = AlignUp(mRayAttributesUsed, 16U) + bytes;
     if (mRayAttributes.buffer == VK_NULL_HANDLE || needed > mRayAttributes.size) {
       // Grow: host-visible, so the old contents are copied on the CPU; the old buffer goes once the GPU is past it
       // (the next WriteRaySet points set 2 at the new one before any draw reads it).
       RayBuffer grown;
-      const VkDeviceSize capacity = AlignUp(std::max<VkDeviceSize>({needed, mRayAttributes.size * 2U, 1ULL << 20U}), 65536U);
+      const VkDeviceSize capacity =
+        AlignUp(std::max<VkDeviceSize>({needed, mRayAttributes.size * 2U, 1ULL << 20U}), 65536U);
       if (!CreateRayBuffer(capacity, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true, grown)) {
         return false;
       }
@@ -642,7 +723,9 @@ namespace gpg::gal
       return false;
     }
     if (count != 0U) {
-      std::memcpy(cpu, mRayInstances.data(), static_cast<std::size_t>(count) * sizeof(VkAccelerationStructureInstanceKHR));
+      std::memcpy(
+        cpu, mRayInstances.data(), static_cast<std::size_t>(count) * sizeof(VkAccelerationStructureInstanceKHR)
+      );
     }
     VkAccelerationStructureGeometryKHR geometry{};
     geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -659,7 +742,9 @@ namespace gpg::gal
     build.pGeometries = &geometry;
     VkAccelerationStructureBuildSizesInfoKHR sizes{};
     sizes.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
-    Vk().vkGetAccelerationStructureBuildSizesKHR(mDevice, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build, &count, &sizes);
+    Vk().vkGetAccelerationStructureBuildSizesKHR(
+      mDevice, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build, &count, &sizes
+    );
 
     // Scratch first: a failure after the old structure was retired would leave set 2 unbound.
     if (!EnsureRayScratch(sizes.buildScratchSize)) {
@@ -668,7 +753,8 @@ namespace gpg::gal
     if (mTlas == VK_NULL_HANDLE || mTlasBuffer.size < sizes.accelerationStructureSize) {
       // The new structure first: when it can't be made, the old one and its set stay bound (the lookups don't
       // trace it), so no draw runs with set 2 unbound.
-      const VkDeviceSize bytes = AlignUp(sizes.accelerationStructureSize + (sizes.accelerationStructureSize / 2U) + 256U, 65536U);
+      const VkDeviceSize bytes =
+        AlignUp(sizes.accelerationStructureSize + (sizes.accelerationStructureSize / 2U) + 256U, 65536U);
       RayBuffer grownBuffer;
       if (!CreateRayBuffer(bytes, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR, false, grownBuffer)) {
         return false;
@@ -698,14 +784,20 @@ namespace gpg::gal
     const VkAccelerationStructureBuildRangeInfoKHR* const ranges = &range;
     EndRendering();
     // Earlier draws read the scene being replaced; earlier builds wrote the pieces it points at and used the scratch.
-    RayBarrier(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-               VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
-               VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
-               VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR);
+    RayBarrier(
+      VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT |
+        VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+      VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+      VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+      VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR
+    );
     Vk().vkCmdBuildAccelerationStructuresKHR(mCommands, 1U, &build, &ranges);
-    RayBarrier(VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
-               VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-               VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR);
+    RayBarrier(
+      VK_PIPELINE_STAGE_2_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+      VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+      VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+      VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR
+    );
     return WriteRaySet();
   }
 } // namespace gpg::gal

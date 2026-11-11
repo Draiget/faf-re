@@ -61,22 +61,27 @@ namespace
     "CAiBrain:GetThreatAtPosition(position, ringRadius, restrictToOnMap[, threatTypeName[, armyIndex]]) - "
     "samples the army influence map around `position` (as cell coordinates) and returns the aggregate "
     "threat value for the given threat type, optionally filtered to one army";
-  constexpr const char* kAiBrainGetThreatAtPositionInvalidArmyError = "Invalid army index passed in to GetThreatAtPosition";
+  constexpr const char* kAiBrainGetThreatAtPositionInvalidArmyError =
+    "Invalid army index passed in to GetThreatAtPosition";
   constexpr const char* kAiBrainGetThreatBetweenPositionsName = "GetThreatBetweenPositions";
   constexpr const char* kAiBrainGetThreatBetweenPositionsHelpText =
-    "CAiBrain:GetThreatBetweenPositions(positionA, positionB, useRingMode, restrictToOnMap[, threatTypeName[, armyIndex]]) - "
+    "CAiBrain:GetThreatBetweenPositions(positionA, positionB, useRingMode, restrictToOnMap[, threatTypeName[, "
+    "armyIndex]]) - "
     "samples threat along a grid-aligned path between two world positions and returns the aggregated value";
-  constexpr const char* kAiBrainGetThreatBetweenPositionsInvalidArmyError = "Invalid army index passed in to GetThreatBetweenPositions";
+  constexpr const char* kAiBrainGetThreatBetweenPositionsInvalidArmyError =
+    "Invalid army index passed in to GetThreatBetweenPositions";
   constexpr const char* kAiBrainGetThreatsAroundPositionName = "GetThreatsAroundPosition";
   constexpr const char* kAiBrainGetThreatsAroundPositionHelpText =
     "CAiBrain:GetThreatsAroundPosition( position, ring, restriction, [threatType], [armyIndex] )";
-  constexpr const char* kAiBrainGetThreatsAroundPositionInvalidArmyError = "Invalid army index passed in to GetThreatsAroundPosition";
+  constexpr const char* kAiBrainGetThreatsAroundPositionInvalidArmyError =
+    "Invalid army index passed in to GetThreatsAroundPosition";
   constexpr const char* kAiBrainGetHighestThreatPositionName = "GetHighestThreatPosition";
   constexpr const char* kAiBrainGetHighestThreatPositionHelpText =
     "CAiBrain:GetHighestThreatPosition(radius, restrictToOnMap[, threatTypeName[, armyIndex]]) - "
     "returns `(position, threat)` for the cell with the highest threat across this brain's "
     "influence map. Ties are broken by closeness to the army start position";
-  constexpr const char* kAiBrainGetHighestThreatPositionInvalidArmyError = "Invalid army index passed in to GetHighestThreatPosition";
+  constexpr const char* kAiBrainGetHighestThreatPositionInvalidArmyError =
+    "Invalid army index passed in to GetHighestThreatPosition";
   constexpr const char* kAiBrainNumCurrentlyBuildingHelpText =
     "brain:NumCurrentlyBuilding( entityCategoryOfBuildee, entityCategoryOfBuilder )";
   constexpr const char* kAiBrainNumCurrentlyBuildingName = "NumCurrentlyBuilding";
@@ -138,7 +143,8 @@ namespace
   }
 
   [[nodiscard]] moho::CArmyStatItem* ResolveArmyStatPathAsInt(
-    moho::CArmyStats* const armyStats, const char* const statPath
+    moho::CArmyStats* const armyStats,
+    const char* const statPath
   )
   {
     if (armyStats == nullptr) {
@@ -149,7 +155,8 @@ namespace
   }
 
   [[nodiscard]] moho::CArmyStatItem* ResolveArmyStatPathAsFloat(
-    moho::CArmyStats* const armyStats, const char* const statPath
+    moho::CArmyStats* const armyStats,
+    const char* const statPath
   )
   {
     if (armyStats == nullptr) {
@@ -169,7 +176,6 @@ namespace
     return created;
   }
 
-
   [[nodiscard]] bool CategoryContainsBlueprint(
     const moho::EntityCategorySet* const categorySet,
     const moho::RUnitBlueprint* const blueprint
@@ -182,7 +188,9 @@ namespace
     return categorySet->Bits().Contains(blueprint->mCategoryBitIndex);
   }
 
-  [[nodiscard]] bool UnitHasHeadCommand(const moho::Unit* const unit)
+  [[nodiscard]] bool UnitHasHeadCommand(
+    const moho::Unit* const unit
+  )
   {
     if (unit == nullptr || unit->CommandQueue == nullptr) {
       return false;
@@ -222,8 +230,8 @@ namespace
       if (!unit->IsDead() && !unit->IsBeingBuilt() && !UnitHasHeadCommand(unit)) {
         const moho::RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
         if (
-          unitBlueprint != nullptr
-          && gpg::STR_EqualsNoCase(unitBlueprint->mBlueprintId.c_str(), fromBlueprint->mBlueprintId.c_str())
+          unitBlueprint != nullptr &&
+          gpg::STR_EqualsNoCase(unitBlueprint->mBlueprintId.c_str(), fromBlueprint->mBlueprintId.c_str())
         ) {
           return unit;
         }
@@ -234,9 +242,7 @@ namespace
 
     return nullptr;
   }
-}
-
-
+} // namespace
 
 /**
  * Address: 0x00585EF0 (FUN_00585EF0, cfunc_CAiBrainIsOpponentAIRunning)
@@ -245,7 +251,9 @@ namespace
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainIsOpponentAIRunningL`.
  */
-int moho::cfunc_CAiBrainIsOpponentAIRunning(lua_State* const luaContext)
+int moho::cfunc_CAiBrainIsOpponentAIRunning(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainIsOpponentAIRunningL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -276,7 +284,9 @@ CScrLuaInitForm* moho::func_CAiBrainIsOpponentAIRunning_LuaFuncDef()
  * Returns whether opponent AI should run for one brain, honoring `/noai`
  * override and `AI_RunOpponentAI` sim-convar state.
  */
-int moho::cfunc_CAiBrainIsOpponentAIRunningL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainIsOpponentAIRunningL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -292,7 +302,8 @@ int moho::cfunc_CAiBrainIsOpponentAIRunningL(LuaPlus::LuaState* const state)
   bool shouldRunOpponentAi = false;
   if (!CFG_GetArgOption("/noai", 0u, nullptr)) {
     CSimConVarBase* const runOpponentAiConVar = &moho::gSimConVar_AI_RunOpponentAI;
-    CSimConVarInstanceBase* const runOpponentAiVar = (sim && runOpponentAiConVar) ? sim->GetSimVar(runOpponentAiConVar) : nullptr;
+    CSimConVarInstanceBase* const runOpponentAiVar =
+      (sim && runOpponentAiConVar) ? sim->GetSimVar(runOpponentAiConVar) : nullptr;
     const void* const runOpponentAiStorage = runOpponentAiVar ? runOpponentAiVar->GetValueStorage() : nullptr;
     shouldRunOpponentAi = runOpponentAiStorage && (*reinterpret_cast<const std::uint8_t*>(runOpponentAiStorage) != 0u);
   }
@@ -308,7 +319,9 @@ int moho::cfunc_CAiBrainIsOpponentAIRunningL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetArmyIndexL`.
  */
-int moho::cfunc_CAiBrainGetArmyIndex(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetArmyIndex(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetArmyIndexL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -338,7 +351,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetArmyIndex_LuaFuncDef()
  * What it does:
  * Returns one-based army index for the brain's owning army.
  */
-int moho::cfunc_CAiBrainGetArmyIndexL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetArmyIndexL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kAiBrainGetArmyIndexHelpText);
@@ -357,7 +372,9 @@ int moho::cfunc_CAiBrainGetArmyIndexL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetFactionIndexL`.
  */
-int moho::cfunc_CAiBrainGetFactionIndex(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetFactionIndex(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetFactionIndexL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -387,7 +404,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetFactionIndex_LuaFuncDef()
  * What it does:
  * Returns one-based faction index for the brain's owning army.
  */
-int moho::cfunc_CAiBrainGetFactionIndexL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetFactionIndexL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kAiBrainGetFactionIndexHelpText);
@@ -406,7 +425,9 @@ int moho::cfunc_CAiBrainGetFactionIndexL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetPersonalityL`.
  */
-int moho::cfunc_CAiBrainGetPersonality(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetPersonality(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetPersonalityL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -436,7 +457,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetPersonality_LuaFuncDef()
  * What it does:
  * Returns personality Lua object for this brain, or `nil` when unavailable.
  */
-int moho::cfunc_CAiBrainGetPersonalityL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetPersonalityL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kAiBrainGetPersonalityHelpText);
@@ -460,7 +483,9 @@ int moho::cfunc_CAiBrainGetPersonalityL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetCurrentEnemyL`.
  */
-int moho::cfunc_CAiBrainGetCurrentEnemy(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetCurrentEnemy(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetCurrentEnemyL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -490,7 +515,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetCurrentEnemy_LuaFuncDef()
  * What it does:
  * Returns current enemy brain Lua object for this brain, or `nil` when none.
  */
-int moho::cfunc_CAiBrainGetCurrentEnemyL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetCurrentEnemyL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kAiBrainGetCurrentEnemyHelpText);
@@ -520,7 +547,9 @@ int moho::cfunc_CAiBrainGetCurrentEnemyL(LuaPlus::LuaState* const state)
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetUnitBlueprintL`.
  */
-int moho::cfunc_CAiBrainGetUnitBlueprint(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetUnitBlueprint(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetUnitBlueprintL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -551,7 +580,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetUnitBlueprint_LuaFuncDef()
  * Resolves one unit blueprint id string for the given AI brain and returns
  * the matching Lua blueprint object, or `nil` when no blueprint is found.
  */
-int moho::cfunc_CAiBrainGetUnitBlueprintL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetUnitBlueprintL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -592,7 +623,9 @@ int moho::cfunc_CAiBrainGetUnitBlueprintL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetArmyStatL`.
  */
-int moho::cfunc_CAiBrainGetArmyStat(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetArmyStat(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetArmyStatL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -622,7 +655,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetArmyStat_LuaFuncDef()
  * What it does:
  * Resolves one army stat by path and pushes its Lua table serialization.
  */
-int moho::cfunc_CAiBrainGetArmyStatL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetArmyStatL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -669,7 +704,9 @@ int moho::cfunc_CAiBrainGetArmyStatL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetBlueprintStatL`.
  */
-int moho::cfunc_CAiBrainGetBlueprintStat(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetBlueprintStat(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetBlueprintStatL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -699,7 +736,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetBlueprintStat_LuaFuncDef()
  * What it does:
  * Resolves one stat path and returns its blueprint-category aggregate.
  */
-int moho::cfunc_CAiBrainGetBlueprintStatL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetBlueprintStatL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -738,7 +777,9 @@ int moho::cfunc_CAiBrainGetBlueprintStatL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetCurrentUnitsL`.
  */
-int moho::cfunc_CAiBrainGetCurrentUnits(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetCurrentUnits(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetCurrentUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -768,7 +809,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetCurrentUnits_LuaFuncDef()
  * What it does:
  * Returns category-filtered `Units_Active` count truncated to integer.
  */
-int moho::cfunc_CAiBrainGetCurrentUnitsL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetCurrentUnitsL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -802,7 +845,9 @@ int moho::cfunc_CAiBrainGetCurrentUnitsL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetListOfUnitsL`.
  */
-int moho::cfunc_CAiBrainGetListOfUnits(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetListOfUnits(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetListOfUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -833,19 +878,14 @@ CScrLuaInitForm* moho::func_CAiBrainGetListOfUnits_LuaFuncDef()
  * Returns a Lua array of unit Lua objects matching category arg #2, with
  * optional idle/build filtering via args #3 and #4.
  */
-int moho::cfunc_CAiBrainGetListOfUnitsL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetListOfUnitsL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount < 3 || argumentCount > 4) {
-    LuaPlus::LuaState::Error(
-      state,
-      kLuaExpectedArgRangeWarning,
-      kAiBrainGetListOfUnitsHelpText,
-      3,
-      4,
-      argumentCount
-    );
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgRangeWarning, kAiBrainGetListOfUnitsHelpText, 3, 4, argumentCount);
   }
 
   const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
@@ -907,7 +947,9 @@ int moho::cfunc_CAiBrainGetListOfUnitsL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetArmyStartPosL`.
  */
-int moho::cfunc_CAiBrainGetArmyStartPos(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetArmyStartPos(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetArmyStartPosL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -937,7 +979,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetArmyStartPos_LuaFuncDef()
  * What it does:
  * Returns army start position as two Lua numbers: `x`, `y`.
  */
-int moho::cfunc_CAiBrainGetArmyStartPosL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetArmyStartPosL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kAiBrainGetArmyStartPosHelpText);
@@ -978,13 +1022,16 @@ int moho::cfunc_CAiBrainGetArmyStartPosL(LuaPlus::LuaState* const state)
  *     passes CanBuildStructureAt, does not overlap a resource deposit, and
  *     clears the threat gate.
  */
-int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainFindPlaceToBuildL(
+  LuaPlus::LuaState* const state
+)
 {
   Sim* const sim = lua_getglobaluserdata_typed(state->m_state);
   const int numArgs = lua_gettop(state->m_state);
   if (numArgs < 6 || numArgs > 10) {
     LuaPlus::LuaState::Error(
-      state, "%s\n  expected between %d and %d args, but got %d", kAiBrainFindPlaceToBuildHelpText, 6, 10, numArgs);
+      state, "%s\n  expected between %d and %d args, but got %d", kAiBrainFindPlaceToBuildHelpText, 6, 10, numArgs
+    );
   }
 
   // Arg types: 2 = type (string), 3 = structureName (string), 4 = buildingTypes (table).
@@ -1105,9 +1152,13 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
       candidates.push_back(SDepositCandidate{centerX, centerZ, (dx * dx) + (dz * dz)});
     }
 
-    fa::sort(candidates.data(), candidates.data() + candidates.size(), [](const SDepositCandidate& a, const SDepositCandidate& b) {
+    fa::sort(
+      candidates.data(),
+      candidates.data() + candidates.size(),
+      [](const SDepositCandidate& a, const SDepositCandidate& b) {
       return a.distanceSq < b.distanceSq;
-    });
+    }
+    );
 
     for (const SDepositCandidate& candidate : candidates) {
       const int cellWorldX = static_cast<int>(candidate.centerX);
@@ -1131,7 +1182,8 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
         }
         const int cellIndex = locX + locY * mWidth;
         const float threat = igrid->GetThreatRect(
-          cellIndex % igrid->mWidth, cellIndex / igrid->mWidth, 0, true, THREATTYPE_AntiSurface, -1);
+          cellIndex % igrid->mWidth, cellIndex / igrid->mWidth, 0, true, THREATTYPE_AntiSurface, -1
+        );
         if (threat >= static_cast<float>(optIgnoreThreatOver)) {
           continue;
         }
@@ -1230,7 +1282,8 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
 
       const Wm3::Vector3f buildPos(worldX, 0.0f, worldZ);
       if (!aiBrain->CanBuildStructureAt(
-            buildPos, structureBp, optIgnoreAlliance, static_cast<int>(worldX), static_cast<int>(worldZ))) {
+            buildPos, structureBp, optIgnoreAlliance, static_cast<int>(worldX), static_cast<int>(worldZ)
+          )) {
         continue;
       }
 
@@ -1245,8 +1298,10 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
         const float depZ0 = static_cast<float>(deposit.footprintRect.z0);
         const float depX1 = static_cast<float>(deposit.footprintRect.x1);
         const float depZ1 = static_cast<float>(deposit.footprintRect.z1);
-        if (skirt.x1 > depX0 && depX1 > skirt.x0 && skirt.z1 > depZ0 && depZ1 > skirt.z0 && depX1 > depX0 &&
-            depZ0 < depZ1 && skirt.x1 > skirt.x0 && skirt.z0 < skirt.z1) {
+        if (
+          skirt.x1 > depX0 && depX1 > skirt.x0 && skirt.z1 > depZ0 && depZ1 > skirt.z0 && depX1 > depX0 &&
+          depZ0 < depZ1 && skirt.x1 > skirt.x0 && skirt.z0 < skirt.z1
+        ) {
           skirtFits = false;
           break;
         }
@@ -1276,7 +1331,8 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
         }
         const int cellIndex = xCell + zCell * gridWidth;
         const float localThreat = igrid->GetThreatRect(
-          cellIndex % igrid->mWidth, cellIndex / igrid->mWidth, 0, true, THREATTYPE_AntiSurface, -1);
+          cellIndex % igrid->mWidth, cellIndex / igrid->mWidth, 0, true, THREATTYPE_AntiSurface, -1
+        );
         unthreatened = static_cast<float>(optIgnoreThreatOver) > localThreat;
       }
 
@@ -1304,7 +1360,9 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
  * Unwraps the Lua callback binding state and forwards to
  * `cfunc_CAiBrainFindPlaceToBuildL`.
  */
-int moho::cfunc_CAiBrainFindPlaceToBuild(lua_State* const luaContext)
+int moho::cfunc_CAiBrainFindPlaceToBuild(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainFindPlaceToBuildL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1335,7 +1393,9 @@ CScrLuaInitForm* moho::func_CAiBrainFindPlaceToBuild_LuaFuncDef()
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetAttackVectorsL`.
  */
-int moho::cfunc_CAiBrainGetAttackVectors(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetAttackVectors(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetAttackVectorsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1366,7 +1426,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetAttackVectors_LuaFuncDef()
  * Returns one Lua array of `SPointVector` objects built from the brain's
  * current attack-vector debug lanes, or `nil` when none exist.
  */
-int moho::cfunc_CAiBrainGetAttackVectorsL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetAttackVectorsL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kAiBrainGetAttackVectorsHelpText);
@@ -1419,7 +1481,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyStored_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetEconomyStoredL`.
  */
-int moho::cfunc_CAiBrainGetEconomyStored(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetEconomyStored(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetEconomyStoredL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1431,7 +1495,9 @@ int moho::cfunc_CAiBrainGetEconomyStored(lua_State* const luaContext)
  * Returns the stored economy amount (`ENERGY` or `MASS`) selected by
  * `resourceType`.
  */
-int moho::cfunc_CAiBrainGetEconomyStoredL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetEconomyStoredL(
+  LuaPlus::LuaState* const state
+)
 {
   EEconResource resource = ECON_ENERGY;
   CAiBrain* const brain = DecodeEconomyResourceQueryArgs(state, kAiBrainGetEconomyStoredHelpText, resource);
@@ -1474,7 +1540,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyIncome_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetEconomyIncomeL`.
  */
-int moho::cfunc_CAiBrainGetEconomyIncome(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetEconomyIncome(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetEconomyIncomeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1486,7 +1554,9 @@ int moho::cfunc_CAiBrainGetEconomyIncome(lua_State* const luaContext)
  * Returns the current economy income amount (`ENERGY` or `MASS`) selected by
  * `resourceType`.
  */
-int moho::cfunc_CAiBrainGetEconomyIncomeL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetEconomyIncomeL(
+  LuaPlus::LuaState* const state
+)
 {
   EEconResource resource = ECON_ENERGY;
   CAiBrain* const brain = DecodeEconomyResourceQueryArgs(state, kAiBrainGetEconomyIncomeHelpText, resource);
@@ -1529,7 +1599,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyUsage_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetEconomyUsageL`.
  */
-int moho::cfunc_CAiBrainGetEconomyUsage(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetEconomyUsage(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetEconomyUsageL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1540,7 +1612,9 @@ int moho::cfunc_CAiBrainGetEconomyUsage(lua_State* const luaContext)
  * What it does:
  * Returns last-actual economy usage (`ENERGY` or `MASS`) for `resourceType`.
  */
-int moho::cfunc_CAiBrainGetEconomyUsageL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetEconomyUsageL(
+  LuaPlus::LuaState* const state
+)
 {
   EEconResource resource = ECON_ENERGY;
   CAiBrain* const brain = DecodeEconomyResourceQueryArgs(state, kAiBrainGetEconomyUsageHelpText, resource);
@@ -1584,7 +1658,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyRequested_LuaFuncDef()
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetEconomyRequestedL`.
  */
-int moho::cfunc_CAiBrainGetEconomyRequested(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetEconomyRequested(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetEconomyRequestedL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1596,7 +1672,9 @@ int moho::cfunc_CAiBrainGetEconomyRequested(lua_State* const luaContext)
  * Returns last-requested economy amount (`ENERGY` or `MASS`) for
  * `resourceType`.
  */
-int moho::cfunc_CAiBrainGetEconomyRequestedL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetEconomyRequestedL(
+  LuaPlus::LuaState* const state
+)
 {
   EEconResource resource = ECON_ENERGY;
   CAiBrain* const brain = DecodeEconomyResourceQueryArgs(state, kAiBrainGetEconomyRequestedHelpText, resource);
@@ -1639,7 +1717,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyTrend_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetEconomyTrendL`.
  */
-int moho::cfunc_CAiBrainGetEconomyTrend(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetEconomyTrend(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetEconomyTrendL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1650,7 +1730,9 @@ int moho::cfunc_CAiBrainGetEconomyTrend(lua_State* const luaContext)
  * What it does:
  * Returns `(income - lastActualUse)` for the selected economy resource lane.
  */
-int moho::cfunc_CAiBrainGetEconomyTrendL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetEconomyTrendL(
+  LuaPlus::LuaState* const state
+)
 {
   EEconResource resource = ECON_ENERGY;
   CAiBrain* const brain = DecodeEconomyResourceQueryArgs(state, kAiBrainGetEconomyTrendHelpText, resource);
@@ -1658,8 +1740,8 @@ int moho::cfunc_CAiBrainGetEconomyTrendL(LuaPlus::LuaState* const state)
   float trend = 0.0f;
   CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
   if (economyInfo != nullptr) {
-    trend = SelectResourceLane(economyInfo->economy.mIncome, resource)
-          - SelectResourceLane(economyInfo->economy.mLastUseActual, resource);
+    trend = SelectResourceLane(economyInfo->economy.mIncome, resource) -
+      SelectResourceLane(economyInfo->economy.mLastUseActual, resource);
   }
 
   lua_State* const rawState = state->m_state;
@@ -1674,7 +1756,9 @@ int moho::cfunc_CAiBrainGetEconomyTrendL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetMapWaterRatioL`.
  */
-int moho::cfunc_CAiBrainGetMapWaterRatio(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetMapWaterRatio(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetMapWaterRatioL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1705,7 +1789,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetMapWaterRatio_LuaFuncDef()
  * Samples the current sim map and returns the share of sampled points that
  * are underwater according to map water elevation.
  */
-int moho::cfunc_CAiBrainGetMapWaterRatioL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetMapWaterRatioL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kAiBrainGetMapWaterRatioHelpText);
@@ -1727,7 +1813,9 @@ int moho::cfunc_CAiBrainGetMapWaterRatioL(LuaPlus::LuaState* const state)
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetEconomyStoredRatioL`.
  */
-int moho::cfunc_CAiBrainGetEconomyStoredRatio(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetEconomyStoredRatio(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetEconomyStoredRatioL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1758,7 +1846,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetEconomyStoredRatio_LuaFuncDef()
  * Reads `(brain, resourceType)`, resolves one economy resource enum, and
  * returns `stored/maxStorage` for the selected lane (or `0` when unavailable).
  */
-int moho::cfunc_CAiBrainGetEconomyStoredRatioL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetEconomyStoredRatioL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kAiBrainGetEconomyStoredRatioHelpText);
@@ -1798,7 +1888,9 @@ int moho::cfunc_CAiBrainGetEconomyStoredRatioL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainFindUnitL`.
  */
-int moho::cfunc_CAiBrainFindUnit(lua_State* const luaContext)
+int moho::cfunc_CAiBrainFindUnit(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainFindUnitL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1810,7 +1902,9 @@ int moho::cfunc_CAiBrainFindUnit(lua_State* const luaContext)
  * Returns the first live army unit matching the category filter in arg #2,
  * optionally requiring idle-state when arg #3 is true.
  */
-int moho::cfunc_CAiBrainFindUnitL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainFindUnitL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 3, kAiBrainFindUnitHelpText);
@@ -1873,7 +1967,9 @@ CScrLuaInitForm* moho::func_CAiBrainFindUnit_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainFindUpgradeBPL`.
  */
-int moho::cfunc_CAiBrainFindUpgradeBP(lua_State* const luaContext)
+int moho::cfunc_CAiBrainFindUpgradeBP(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainFindUpgradeBPL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1904,7 +2000,9 @@ CScrLuaInitForm* moho::func_CAiBrainFindUpgradeBP_LuaFuncDef()
  * Scans one upgrade candidate table and returns the first `toBlueprintId`
  * whose `fromBlueprintId` matches the requested `unitName` (case-insensitive).
  */
-int moho::cfunc_CAiBrainFindUpgradeBPL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainFindUpgradeBPL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 3, kAiBrainFindUpgradeBPHelpText);
@@ -1947,7 +2045,9 @@ int moho::cfunc_CAiBrainFindUpgradeBPL(LuaPlus::LuaState* const state)
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainFindUnitToUpgradeL`.
  */
-int moho::cfunc_CAiBrainFindUnitToUpgrade(lua_State* const luaContext)
+int moho::cfunc_CAiBrainFindUnitToUpgrade(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainFindUnitToUpgradeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1959,7 +2059,9 @@ int moho::cfunc_CAiBrainFindUnitToUpgrade(lua_State* const luaContext)
  * Scans candidate `(fromBlueprintId, toBlueprintId)` upgrade pairs and returns
  * the first idle army unit matching `fromBlueprintId` plus `toBlueprintId`.
  */
-int moho::cfunc_CAiBrainFindUnitToUpgradeL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainFindUnitToUpgradeL(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return 0;
@@ -2039,7 +2141,9 @@ CScrLuaInitForm* moho::func_CAiBrainFindUnitToUpgrade_LuaFuncDef()
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetAvailableFactoriesL`.
  */
-int moho::cfunc_CAiBrainGetAvailableFactories(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetAvailableFactories(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetAvailableFactoriesL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2061,18 +2165,15 @@ int moho::cfunc_CAiBrainGetAvailableFactories(lua_State* const luaContext)
  * supplied the position lane is left zero-initialized and the distance
  * is `0.0f`, matching the binary's stack-local pre-zero pass.
  */
-int moho::cfunc_CAiBrainGetAvailableFactoriesL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetAvailableFactoriesL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount < 1 || argumentCount > 3) {
     LuaPlus::LuaState::Error(
-      state,
-      kLuaExpectedArgRangeWarning,
-      kAiBrainGetAvailableFactoriesHelpText,
-      1,
-      3,
-      argumentCount
+      state, kLuaExpectedArgRangeWarning, kAiBrainGetAvailableFactoriesHelpText, 1, 3, argumentCount
     );
   }
 
@@ -2127,7 +2228,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetAvailableFactories_LuaFuncDef()
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetThreatAtPositionL`.
  */
-int moho::cfunc_CAiBrainGetThreatAtPosition(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetThreatAtPosition(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetThreatAtPositionL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2151,18 +2254,15 @@ int moho::cfunc_CAiBrainGetThreatAtPosition(lua_State* const luaContext)
  * `CInfluenceMap::VectorToCoords`, then aggregated through
  * `CInfluenceMap::GetThreatRect`.
  */
-int moho::cfunc_CAiBrainGetThreatAtPositionL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetThreatAtPositionL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount < 4 || argumentCount > 6) {
     LuaPlus::LuaState::Error(
-      state,
-      kLuaExpectedArgRangeWarning,
-      kAiBrainGetThreatAtPositionHelpText,
-      4,
-      6,
-      argumentCount
+      state, kLuaExpectedArgRangeWarning, kAiBrainGetThreatAtPositionHelpText, 4, 6, argumentCount
     );
   }
 
@@ -2246,7 +2346,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetThreatAtPosition_LuaFuncDef()
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetThreatBetweenPositionsL`.
  */
-int moho::cfunc_CAiBrainGetThreatBetweenPositions(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetThreatBetweenPositions(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetThreatBetweenPositionsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2269,18 +2371,15 @@ int moho::cfunc_CAiBrainGetThreatBetweenPositions(lua_State* const luaContext)
  * optional 1-based army index is validated against
  * `mSim->mArmiesList`.
  */
-int moho::cfunc_CAiBrainGetThreatBetweenPositionsL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetThreatBetweenPositionsL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount < 4 || argumentCount > 6) {
     LuaPlus::LuaState::Error(
-      state,
-      kLuaExpectedArgRangeWarning,
-      kAiBrainGetThreatBetweenPositionsHelpText,
-      4,
-      6,
-      argumentCount
+      state, kLuaExpectedArgRangeWarning, kAiBrainGetThreatBetweenPositionsHelpText, 4, 6, argumentCount
     );
   }
 
@@ -2359,7 +2458,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetThreatBetweenPositions_LuaFuncDef()
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetThreatsAroundPositionL`.
  */
-int moho::cfunc_CAiBrainGetThreatsAroundPosition(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetThreatsAroundPosition(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetThreatsAroundPositionL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2400,18 +2501,15 @@ CScrLuaInitForm* moho::func_CAiBrainGetThreatsAroundPosition_LuaFuncDef()
  * threat-type enum name resolved via `SCR_GetEnum`; the optional sixth arg is
  * a 1-based army index validated against `mSim->mArmiesList`.
  */
-int moho::cfunc_CAiBrainGetThreatsAroundPositionL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetThreatsAroundPositionL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount < 4 || argumentCount > 6) {
     LuaPlus::LuaState::Error(
-      state,
-      kLuaExpectedArgRangeWarning,
-      kAiBrainGetThreatsAroundPositionHelpText,
-      4,
-      6,
-      argumentCount
+      state, kLuaExpectedArgRangeWarning, kAiBrainGetThreatsAroundPositionHelpText, 4, 6, argumentCount
     );
   }
 
@@ -2483,7 +2581,9 @@ int moho::cfunc_CAiBrainGetThreatsAroundPositionL(LuaPlus::LuaState* const state
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainCanBuildStructureAtL`.
  */
-int moho::cfunc_CAiBrainCanBuildStructureAt(lua_State* const luaContext)
+int moho::cfunc_CAiBrainCanBuildStructureAt(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainCanBuildStructureAtL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2519,7 +2619,9 @@ CScrLuaInitForm* moho::func_CAiBrainCanBuildStructureAt_LuaFuncDef()
  * `CAiBrain::CanBuildStructureAt` evaluated at `location` with `ALLIANCE_None`
  * and the truncated integer cell coordinates of the location.
  */
-int moho::cfunc_CAiBrainCanBuildStructureAtL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainCanBuildStructureAtL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 3, kAiBrainCanBuildStructureAtHelpText);
@@ -2541,11 +2643,7 @@ int moho::cfunc_CAiBrainCanBuildStructureAtL(LuaPlus::LuaState* const state)
   const Wm3::Vector3f position = SCR_FromLuaCopy<Wm3::Vector3<float>>(positionObject);
 
   const bool canBuild = brain->CanBuildStructureAt(
-    position,
-    blueprint,
-    ALLIANCE_None,
-    static_cast<int>(position.x),
-    static_cast<int>(position.z)
+    position, blueprint, ALLIANCE_None, static_cast<int>(position.x), static_cast<int>(position.z)
   );
 
   lua_pushboolean(rawState, canBuild ? 1 : 0);
@@ -2560,7 +2658,9 @@ int moho::cfunc_CAiBrainCanBuildStructureAtL(LuaPlus::LuaState* const state)
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetHighestThreatPositionL`.
  */
-int moho::cfunc_CAiBrainGetHighestThreatPosition(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetHighestThreatPosition(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetHighestThreatPositionL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2578,18 +2678,15 @@ int moho::cfunc_CAiBrainGetHighestThreatPosition(lua_State* const luaContext)
  * peak threat scalar back onto the Lua stack. Returns 2 values to
  * Lua.
  */
-int moho::cfunc_CAiBrainGetHighestThreatPositionL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetHighestThreatPositionL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount < 3 || argumentCount > 5) {
     LuaPlus::LuaState::Error(
-      state,
-      kLuaExpectedArgRangeWarning,
-      kAiBrainGetHighestThreatPositionHelpText,
-      3,
-      5,
-      argumentCount
+      state, kLuaExpectedArgRangeWarning, kAiBrainGetHighestThreatPositionHelpText, 3, 5, argumentCount
     );
   }
 
@@ -2669,7 +2766,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetHighestThreatPosition_LuaFuncDef()
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainNumCurrentlyBuildingL`.
  */
-int moho::cfunc_CAiBrainNumCurrentlyBuilding(lua_State* const luaContext)
+int moho::cfunc_CAiBrainNumCurrentlyBuilding(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainNumCurrentlyBuildingL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2700,7 +2799,9 @@ CScrLuaInitForm* moho::func_CAiBrainNumCurrentlyBuilding_LuaFuncDef()
  * Counts live non-destroy-queued builder-category units in `Building`/`Upgrading`
  * state whose focused build target blueprint matches the requested buildee category.
  */
-int moho::cfunc_CAiBrainNumCurrentlyBuildingL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainNumCurrentlyBuildingL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 3, kAiBrainNumCurrentlyBuildingHelpText);
@@ -2753,7 +2854,9 @@ int moho::cfunc_CAiBrainNumCurrentlyBuildingL(LuaPlus::LuaState* const state)
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainIsAnyEngineerBuildingL`.
  */
-int moho::cfunc_CAiBrainIsAnyEngineerBuilding(lua_State* const luaContext)
+int moho::cfunc_CAiBrainIsAnyEngineerBuilding(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainIsAnyEngineerBuildingL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2765,7 +2868,9 @@ int moho::cfunc_CAiBrainIsAnyEngineerBuilding(lua_State* const luaContext)
  * Returns whether any engineer currently in build state matches the requested
  * category filter.
  */
-int moho::cfunc_CAiBrainIsAnyEngineerBuildingL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainIsAnyEngineerBuildingL(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return 0;
@@ -2841,7 +2946,9 @@ CScrLuaInitForm* moho::func_CAiBrainIsAnyEngineerBuilding_LuaFuncDef()
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetNumPlatoonsWithAIL`.
  */
-int moho::cfunc_CAiBrainGetNumPlatoonsWithAI(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetNumPlatoonsWithAI(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetNumPlatoonsWithAIL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2871,7 +2978,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetNumPlatoonsWithAI_LuaFuncDef()
  * What it does:
  * Resolves `(brain, planName)` and returns matching platoon count.
  */
-int moho::cfunc_CAiBrainGetNumPlatoonsWithAIL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetNumPlatoonsWithAIL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kAiBrainGetNumPlatoonsWithAIHelpText);
@@ -2897,7 +3006,9 @@ int moho::cfunc_CAiBrainGetNumPlatoonsWithAIL(LuaPlus::LuaState* const state)
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetNumPlatoonsTemplateNamedL`.
  */
-int moho::cfunc_CAiBrainGetNumPlatoonsTemplateNamed(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetNumPlatoonsTemplateNamed(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetNumPlatoonsTemplateNamedL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2928,7 +3039,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetNumPlatoonsTemplateNamed_LuaFuncDef()
  * What it does:
  * Resolves `(brain, templateName)` and returns matching platoon count.
  */
-int moho::cfunc_CAiBrainGetNumPlatoonsTemplateNamedL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetNumPlatoonsTemplateNamedL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kAiBrainGetNumPlatoonsTemplateNamedHelpText);
@@ -2953,7 +3066,9 @@ int moho::cfunc_CAiBrainGetNumPlatoonsTemplateNamedL(LuaPlus::LuaState* const st
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetPlatoonsListL`.
  */
-int moho::cfunc_CAiBrainGetPlatoonsList(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetPlatoonsList(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetPlatoonsListL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2984,7 +3099,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetPlatoonsList_LuaFuncDef()
  * Returns a Lua array of non-empty platoons from the owning army, skipping
  * the synthetic `ArmyPool` platoon entry.
  */
-int moho::cfunc_CAiBrainGetPlatoonsListL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetPlatoonsListL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kAiBrainGetPlatoonsListHelpText);
 
@@ -3027,7 +3144,9 @@ int moho::cfunc_CAiBrainGetPlatoonsListL(LuaPlus::LuaState* const state)
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetPlatoonUniquelyNamedL`.
  */
-int moho::cfunc_CAiBrainGetPlatoonUniquelyNamed(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetPlatoonUniquelyNamed(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetPlatoonUniquelyNamedL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3058,7 +3177,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetPlatoonUniquelyNamed_LuaFuncDef()
  * Resolves `(brain, platoonName)` and returns the matching platoon Lua object,
  * or `nil` when no matching platoon exists.
  */
-int moho::cfunc_CAiBrainGetPlatoonUniquelyNamedL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetPlatoonUniquelyNamedL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kAiBrainGetPlatoonUniquelyNamedHelpText);
@@ -3068,7 +3189,9 @@ int moho::cfunc_CAiBrainGetPlatoonUniquelyNamedL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject platoonNameObject(LuaPlus::LuaStackObject(state, 2));
   if (platoonNameObject.IsString() && brain != nullptr && brain->mArmy != nullptr) {
-    if (const CPlatoon* const platoon = brain->mArmy->GetPlatoonByName(platoonNameObject.GetString()); platoon != nullptr) {
+    if (
+      const CPlatoon* const platoon = brain->mArmy->GetPlatoonByName(platoonNameObject.GetString()); platoon != nullptr
+    ) {
       platoon->mLuaObj.PushStack(state);
       return 1;
     }
@@ -3085,7 +3208,9 @@ int moho::cfunc_CAiBrainGetPlatoonUniquelyNamedL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainGetNoRushTicksL`.
  */
-int moho::cfunc_CAiBrainGetNoRushTicks(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetNoRushTicks(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetNoRushTicksL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3115,7 +3240,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetNoRushTicks_LuaFuncDef()
  * What it does:
  * Returns current no-rush timer ticks for the brain owning army.
  */
-int moho::cfunc_CAiBrainGetNoRushTicksL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetNoRushTicksL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kAiBrainGetNoRushTicksHelpText);
@@ -3135,7 +3262,9 @@ int moho::cfunc_CAiBrainGetNoRushTicksL(LuaPlus::LuaState* const state)
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainFindClosestArmyWithBaseL`.
  */
-int moho::cfunc_CAiBrainFindClosestArmyWithBase(lua_State* const luaContext)
+int moho::cfunc_CAiBrainFindClosestArmyWithBase(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainFindClosestArmyWithBaseL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3167,7 +3296,9 @@ CScrLuaInitForm* moho::func_CAiBrainFindClosestArmyWithBase_LuaFuncDef()
  * alliance state that own at least one `STRUCTURE` blueprint bit, then
  * returns the Lua object of the closest qualifying army's brain (or nil).
  */
-int moho::cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainFindClosestArmyWithBaseL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kAiBrainFindClosestArmyWithBaseHelpText);
@@ -3261,13 +3392,16 @@ int moho::cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* const state)
  * CollectUnitsAroundPointFiltered, and returns a Lua array of their script
  * objects.
  */
-int moho::cfunc_CAiBrainGetUnitsAroundPointL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetUnitsAroundPointL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount < 4 || argumentCount > 5) {
     LuaPlus::LuaState::Error(
-      state, kLuaExpectedArgRangeWarning, kAiBrainGetUnitsAroundPointHelpText, 4, 5, argumentCount);
+      state, kLuaExpectedArgRangeWarning, kAiBrainGetUnitsAroundPointHelpText, 4, 5, argumentCount
+    );
   }
 
   const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
@@ -3306,7 +3440,8 @@ int moho::cfunc_CAiBrainGetUnitsAroundPointL(LuaPlus::LuaState* const state)
   } else {
     EntitySetTemplate<Unit> scratchUnits{};
     (void)CollectUnitsAroundPointFiltered(
-      brain, &scratchUnits, categorySet, point, radius, static_cast<EAlliance>(kAiBrainAllianceAnySentinel));
+      brain, &scratchUnits, categorySet, point, radius, static_cast<EAlliance>(kAiBrainAllianceAnySentinel)
+    );
     gatheredUnits.mVec.AddAll(&scratchUnits.mVec);
   }
 
@@ -3332,7 +3467,9 @@ int moho::cfunc_CAiBrainGetUnitsAroundPointL(LuaPlus::LuaState* const state)
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetUnitsAroundPointL`.
  */
-int moho::cfunc_CAiBrainGetUnitsAroundPoint(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetUnitsAroundPoint(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetUnitsAroundPointL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3363,7 +3500,9 @@ CScrLuaInitForm* moho::func_CAiBrainGetUnitsAroundPoint_LuaFuncDef()
  * Unwraps Lua callback context and forwards to
  * `cfunc_CAiBrainGetNumUnitsAroundPointL`.
  */
-int moho::cfunc_CAiBrainGetNumUnitsAroundPoint(lua_State* const luaContext)
+int moho::cfunc_CAiBrainGetNumUnitsAroundPoint(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainGetNumUnitsAroundPointL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3399,13 +3538,16 @@ CScrLuaInitForm* moho::func_CAiBrainGetNumUnitsAroundPoint_LuaFuncDef()
  * optionally a filter alliance, then returns the count from
  * `CountUnitsAroundPointFiltered`.
  */
-int moho::cfunc_CAiBrainGetNumUnitsAroundPointL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainGetNumUnitsAroundPointL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount < 4 || argumentCount > 5) {
     LuaPlus::LuaState::Error(
-      state, kLuaExpectedArgRangeWarning, kAiBrainGetNumUnitsAroundPointHelpText, 4, 5, argumentCount);
+      state, kLuaExpectedArgRangeWarning, kAiBrainGetNumUnitsAroundPointHelpText, 4, 5, argumentCount
+    );
   }
 
   const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
@@ -3450,7 +3592,9 @@ int moho::cfunc_CAiBrainGetNumUnitsAroundPointL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiBrainCanBuildPlatoonL`.
  */
-int moho::cfunc_CAiBrainCanBuildPlatoon(lua_State* const luaContext)
+int moho::cfunc_CAiBrainCanBuildPlatoon(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiBrainCanBuildPlatoonL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3487,7 +3631,9 @@ CScrLuaInitForm* moho::func_CAiBrainCanBuildPlatoon_LuaFuncDef()
  *
  * Lua signature: `CAiBrain:CanBuildPlatoon(platoonTemplate [, suggestedFactories])`.
  */
-int moho::cfunc_CAiBrainCanBuildPlatoonL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiBrainCanBuildPlatoonL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);

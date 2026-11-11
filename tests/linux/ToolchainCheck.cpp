@@ -31,7 +31,11 @@ namespace
 
   // Kept out of line so the compiler sees a*b+c as one expression it could
   // contract; with -ffp-contract=off it must round the product first.
-  [[gnu::noinline]] double MulAdd(const double a, const double b, const double c)
+  [[gnu::noinline]] double MulAdd(
+    const double a,
+    const double b,
+    const double c
+  )
   {
     return a * b + c;
   }
@@ -42,26 +46,43 @@ namespace
   }
 } // namespace
 
-TEST(LinuxToolchain, PrintsDataModel)
+TEST(
+  LinuxToolchain,
+  PrintsDataModel
+)
 {
-  std::printf("sizeof(long)=%zu sizeof(void*)=%zu sizeof(wchar_t)=%zu FLT_EVAL_METHOD=%d\n", sizeof(long),
-              sizeof(void*), sizeof(wchar_t), static_cast<int>(FLT_EVAL_METHOD));
+  std::printf(
+    "sizeof(long)=%zu sizeof(void*)=%zu sizeof(wchar_t)=%zu FLT_EVAL_METHOD=%d\n",
+    sizeof(long),
+    sizeof(void*),
+    sizeof(wchar_t),
+    static_cast<int>(FLT_EVAL_METHOD)
+  );
 }
 
-TEST(LinuxToolchain, PlainCharIsSigned)
+TEST(
+  LinuxToolchain,
+  PlainCharIsSigned
+)
 {
   EXPECT_LT(static_cast<char>(0xFF), 0);
 }
 
 // 1 + 2^-30 squared minus (1 + 2^-29): exactly 2^-60 with a fused
 // multiply-add, 0 with the product rounded to double first.
-TEST(LinuxToolchain, NoFmaContraction)
+TEST(
+  LinuxToolchain,
+  NoFmaContraction
+)
 {
   const double x = 1.0 + 0x1p-30;
   EXPECT_EQ(MulAdd(x, x, -(1.0 + 0x1p-29)), 0.0);
 }
 
-TEST(LinuxToolchain, ExceptionLeavesExternC)
+TEST(
+  LinuxToolchain,
+  ExceptionLeavesExternC
+)
 {
   bool caught = false;
   try {
@@ -72,7 +93,10 @@ TEST(LinuxToolchain, ExceptionLeavesExternC)
   EXPECT_TRUE(caught);
 }
 
-TEST(LinuxToolchain, ThreadRuns)
+TEST(
+  LinuxToolchain,
+  ThreadRuns
+)
 {
   std::vector<std::string> fromThread;
   std::thread worker([&fromThread] {
@@ -83,7 +107,10 @@ TEST(LinuxToolchain, ThreadRuns)
   EXPECT_EQ(fromThread.size(), 1u);
 }
 
-TEST(LinuxToolchain, NoFtzOrDazByDefault)
+TEST(
+  LinuxToolchain,
+  NoFtzOrDazByDefault
+)
 {
   std::printf("main thread:   fcw=0x%04X mxcsr=0x%08X\n", ReadX87ControlWord(), ReadMxcsr());
   EXPECT_EQ(ReadMxcsr() & 0x8040u, 0u);

@@ -32,7 +32,8 @@ namespace moho
 
   TConVar<float> gTConVar_ren_GradeVibrance(
     "ren_GradeVibrance",
-    "Saturation added to dull colours by ren_Grade (0.25 by default); strong colours such as team colours change little.",
+    "Saturation added to dull colours by ren_Grade (0.25 by default); strong colours such as team colours change "
+    "little.",
     &ren_GradeVibrance
   );
 
@@ -61,8 +62,9 @@ namespace moho
       *this = PostRenderer();
       mDevice = device;
       gpg::gal::DeviceContext* const context = device->GetDeviceContext();
-      const bool modern = context != nullptr
-        && (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 || context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
+      const bool modern = context != nullptr &&
+        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
+         context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
       if (modern && (device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureVertexPulling) != 0U) {
         gpg::gal::GpuProgramDesc desc{};
         desc.name = "Post";
@@ -80,13 +82,21 @@ namespace moho
       }
       mSupported = mProgram != nullptr;
       if (mSupported) {
-        gpg::Logf("Post: sharpening and grading available on this renderer (ren_Sharpen %.2f, ren_Grade %d)", ren_Sharpen, ren_Grade);
+        gpg::Logf(
+          "Post: sharpening and grading available on this renderer (ren_Sharpen %.2f, ren_Grade %d)",
+          ren_Sharpen,
+          ren_Grade
+        );
       }
     }
     return mSupported;
   }
 
-  void PostRenderer::Render(gpg::gal::RenderTarget& copy, const int width, const int height)
+  void PostRenderer::Render(
+    gpg::gal::RenderTarget& copy,
+    const int width,
+    const int height
+  )
   {
     if (!mSupported || width <= 0 || height <= 0) {
       return;

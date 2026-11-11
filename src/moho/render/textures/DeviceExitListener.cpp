@@ -53,7 +53,9 @@ namespace moho
    * On device-exit events, drops cached texture-sheet handles for all tracked
    * batch textures and destroys the global listener instance.
    */
-  void DeviceExitListener::OnEvent(const SD3DDeviceEvent& event)
+  void DeviceExitListener::OnEvent(
+    const SD3DDeviceEvent& event
+  )
   {
     if (event.mEventType != kDeviceEventTypeExit || !event.mShouldReleaseTextures) {
       return;

@@ -316,13 +316,13 @@ namespace moho
     [[nodiscard]] UserEntity* GetAttachmentParent();
 
   public:
-    CWldSession* mSession;                        // 0x0C
+    CWldSession* mSession; // 0x0C
     /// The entity's registration in the session's mesh spatial database. The
     /// constructor registers it at 0x008B8721 against `CWldSession + 0x50`
     /// (`SpatialDB_MeshInstance::Register`, 0x00501A80) with the category
     /// routing mask, and `~SpatialDB_MeshInstance` (0x00501BC0) unregisters it
     /// as an ordinary member destructor at 0x008B888D.
-    SpatialDBEntry<UserEntity> mSpatialDbEntry;   // 0x10
+    SpatialDBEntry<UserEntity> mSpatialDbEntry; // 0x10
     VisionDB::Handle* mVisionHandle;            // 0x18
     boost::shared_ptr<CAniPose> mPosePrimary;   // 0x1C
     boost::shared_ptr<CAniPose> mPoseSecondary; // 0x24
@@ -342,15 +342,15 @@ namespace moho
      * constructor seeds `mLoopIndex` at +0x34 with -1, and `UpdateEntityData`
      * refreshes `mParams` at +0x38 from the replicated ambient sound.
      */
-    HSndEntityLoop mAmbientLoop;                // 0x30
-    HSndEntityLoop* mRumbleLoopHandle;          // 0x3C
-    std::int32_t mLastFocusDamageGameTick;      // 0x40
-    SCreateEntityParams mParams;                // 0x44
-    SSTIEntityVariableData mVariableData;       // 0x50
-    UserArmy* mArmy;                // 0x120
-    VTransform mTransform;          // 0x124
-    float mLastInterpAmt;           // 0x140
-    std::uint8_t mHasInitialUpdate; // 0x144
+    HSndEntityLoop mAmbientLoop;           // 0x30
+    HSndEntityLoop* mRumbleLoopHandle;     // 0x3C
+    std::int32_t mLastFocusDamageGameTick; // 0x40
+    SCreateEntityParams mParams;           // 0x44
+    SSTIEntityVariableData mVariableData;  // 0x50
+    UserArmy* mArmy;                       // 0x120
+    VTransform mTransform;                 // 0x124
+    float mLastInterpAmt;                  // 0x140
+    std::uint8_t mHasInitialUpdate;        // 0x144
     /// Set by `CWldSession::OrphanEntity` (0x008941ED) when the sim is done
     /// with the entity but the client still has it on screen.
     std::uint8_t mMarkedForDeletion; // 0x145
@@ -378,11 +378,10 @@ namespace moho
     offsetof(UserEntity, mAmbientLoop) + offsetof(HSndEntityLoop, mParams) == 0x38,
     "UserEntity::mAmbientLoop.mParams must land at 0x38"
   );
+  static_assert(offsetof(UserEntity, mRumbleLoopHandle) == 0x3C, "UserEntity::mRumbleLoopHandle offset must be 0x3C");
   static_assert(
-    offsetof(UserEntity, mRumbleLoopHandle) == 0x3C, "UserEntity::mRumbleLoopHandle offset must be 0x3C"
-  );
-  static_assert(
-    offsetof(UserEntity, mLastFocusDamageGameTick) == 0x40, "UserEntity::mLastFocusDamageGameTick offset must be 0x40"
+    offsetof(UserEntity, mLastFocusDamageGameTick) == 0x40,
+    "UserEntity::mLastFocusDamageGameTick offset must be 0x40"
   );
   static_assert(offsetof(UserEntity, mParams) == 0x44, "UserEntity::mParams offset must be 0x44");
   static_assert(offsetof(UserEntity, mVariableData) == 0x50, "UserEntity::mVariableData offset must be 0x50");
@@ -390,5 +389,8 @@ namespace moho
   static_assert(offsetof(UserEntity, mTransform) == 0x124, "UserEntity::mTransform offset must be 0x124");
   static_assert(offsetof(UserEntity, mLastInterpAmt) == 0x140, "UserEntity::mLastInterpAmt offset must be 0x140");
   static_assert(offsetof(UserEntity, mHasInitialUpdate) == 0x144, "UserEntity::mHasInitialUpdate offset must be 0x144");
-  static_assert(offsetof(UserEntity, mMarkedForDeletion) == 0x145, "UserEntity::mMarkedForDeletion offset must be 0x145");
+  static_assert(
+    offsetof(UserEntity, mMarkedForDeletion) == 0x145,
+    "UserEntity::mMarkedForDeletion offset must be 0x145"
+  );
 } // namespace moho

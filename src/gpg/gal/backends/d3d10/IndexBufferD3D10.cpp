@@ -86,8 +86,11 @@ namespace gpg::gal
    * What it does:
    * Maps the staging buffer with recovered map-flag conversion and returns mapped data.
    */
-  std::int16_t*
-  IndexBufferD3D10::Lock(const unsigned int offset, const unsigned int size, const MohoD3DLockFlags lockFlags)
+  std::int16_t* IndexBufferD3D10::Lock(
+    const unsigned int offset,
+    const unsigned int size,
+    const MohoD3DLockFlags lockFlags
+  )
   {
     static_cast<void>(offset);
     static_cast<void>(size);
@@ -176,5 +179,4 @@ namespace gpg::gal
 
     return nativeBuffer_;
   }
-}
-
+} // namespace gpg::gal

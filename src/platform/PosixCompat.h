@@ -29,15 +29,21 @@ using ULONGLONG = std::uint64_t;
 
 #define LOBYTE(w) (static_cast<std::uint8_t>(static_cast<std::uintptr_t>(w) & 0xFFu))
 #define HIBYTE(w) (static_cast<std::uint8_t>((static_cast<std::uintptr_t>(w) >> 8) & 0xFFu))
-#define MAKEWORD(a, b) \
-  (static_cast<std::uint16_t>(LOBYTE(a) | (static_cast<std::uint16_t>(LOBYTE(b)) << 8)))
+#define MAKEWORD(a, b) (static_cast<std::uint16_t>(LOBYTE(a) | (static_cast<std::uint16_t>(LOBYTE(b)) << 8)))
 
-inline int _stricmp(const char* const lhs, const char* const rhs) noexcept
+inline int _stricmp(
+  const char* const lhs,
+  const char* const rhs
+) noexcept
 {
   return ::strcasecmp(lhs, rhs);
 }
 
-inline int _strnicmp(const char* const lhs, const char* const rhs, const std::size_t count) noexcept
+inline int _strnicmp(
+  const char* const lhs,
+  const char* const rhs,
+  const std::size_t count
+) noexcept
 {
   return ::strncasecmp(lhs, rhs, count);
 }

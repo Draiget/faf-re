@@ -29,8 +29,14 @@ namespace moho
    * here with the same shape as CAiBrain.cpp's declaration.
    */
   [[nodiscard]] bool TryBuildStructureAt(
-    SCoordsVec2* const tryPos, const RUnitBlueprint* const blueprint, Sim* const sim,
-    const int border, const bool wholeMap, const bool doCoerce, const bool useSkirt);
+    SCoordsVec2* const tryPos,
+    const RUnitBlueprint* const blueprint,
+    Sim* const sim,
+    const int border,
+    const bool wholeMap,
+    const bool doCoerce,
+    const bool useSkirt
+  );
 } // namespace moho
 
 namespace
@@ -43,42 +49,61 @@ namespace
     std::int32_t z1;
   };
 
-  [[nodiscard]] bool IsRegularRect(const SRect2i& rect) noexcept
+  [[nodiscard]] bool IsRegularRect(
+    const SRect2i& rect
+  ) noexcept
   {
     return rect.x0 >= rect.x1 || rect.z0 >= rect.z1;
   }
 
-  [[nodiscard]] bool RectsOverlapStrict(const SRect2i& lhs, const SRect2i& rhs) noexcept
+  [[nodiscard]] bool RectsOverlapStrict(
+    const SRect2i& lhs,
+    const SRect2i& rhs
+  ) noexcept
   {
     return lhs.x0 < rhs.x1 && rhs.x0 < lhs.x1 && lhs.z0 < rhs.z1 && rhs.z0 < lhs.z1;
   }
 
   // 0x005A3C31 / 0x005A3C56: `fistp` (round to nearest), then `movsx word`.
-  [[nodiscard]] std::int32_t GridCoordFromWorldCenter(const float worldCoord, const std::uint8_t footprintSize) noexcept
+  [[nodiscard]] std::int32_t GridCoordFromWorldCenter(
+    const float worldCoord,
+    const std::uint8_t footprintSize
+  ) noexcept
   {
     return static_cast<std::int16_t>(std::lrintf(worldCoord - (static_cast<float>(footprintSize) * 0.5f)));
   }
 
   // 0x005A3DAB..0x005A3DEC: the goal anchor cell placed on the map surface by
   // COORDS_ToWorldPos (terrain, or the water plane for non-seabed footprints).
-  [[nodiscard]] Wm3::Vector3f GoalCellToWorldPos(const Unit& unit, const SAiNavigatorGoal& goal)
+  [[nodiscard]] Wm3::Vector3f GoalCellToWorldPos(
+    const Unit& unit,
+    const SAiNavigatorGoal& goal
+  )
   {
     const SOCellPos cell{static_cast<std::int16_t>(goal.minX), static_cast<std::int16_t>(goal.minZ)};
     return COORDS_ToWorldPos(unit.SimulationRef->mMapData, cell, unit.GetFootprint());
   }
 
-  [[nodiscard]] bool GoalMatchForSetGoalDedup(const SAiNavigatorGoal& lhs, const SAiNavigatorGoal& rhs) noexcept
+  [[nodiscard]] bool GoalMatchForSetGoalDedup(
+    const SAiNavigatorGoal& lhs,
+    const SAiNavigatorGoal& rhs
+  ) noexcept
   {
     return lhs.minX == rhs.minX && lhs.minZ == rhs.minZ && lhs.maxX == rhs.maxX && lhs.maxZ == rhs.maxZ &&
       lhs.aux0 == rhs.aux0 && lhs.aux1 == rhs.aux1 && lhs.aux2 == rhs.aux2 && lhs.aux3 == rhs.aux3;
   }
 
-  [[nodiscard]] bool IsSingleCellGoal(const SAiNavigatorGoal& goal) noexcept
+  [[nodiscard]] bool IsSingleCellGoal(
+    const SAiNavigatorGoal& goal
+  ) noexcept
   {
     return goal.minX == (goal.maxX - 1) && goal.minZ == (goal.maxZ - 1);
   }
 
-  [[nodiscard]] SAiNavigatorGoal BuildSingleCellGoal(const std::int32_t cellX, const std::int32_t cellZ) noexcept
+  [[nodiscard]] SAiNavigatorGoal BuildSingleCellGoal(
+    const std::int32_t cellX,
+    const std::int32_t cellZ
+  ) noexcept
   {
     SAiNavigatorGoal goal{};
     goal.minX = cellX;
@@ -93,7 +118,10 @@ namespace
    * Converts one world-space center position into the lower-left goal-cell
    * coordinate for the provided footprint dimensions (inlined in `Execute`).
    */
-  [[nodiscard]] SOCellPos TargetWorldToCell(const Wm3::Vector3f& worldPos, const SFootprint& footprint) noexcept
+  [[nodiscard]] SOCellPos TargetWorldToCell(
+    const Wm3::Vector3f& worldPos,
+    const SFootprint& footprint
+  ) noexcept
   {
     // Bare fistp, never __ftol: this rounds to nearest rather than truncating.
     // Same computation as SFootprint::ToCellPos (FUN_00579300).
@@ -107,13 +135,15 @@ namespace
    * Converts a resolved XZ placement centre back into the lower-left cell of
    * the footprint standing there. Only `CAiNavigatorLand::SetGoal` calls it.
    */
-  [[nodiscard]] SOCellPos PlacementToGoalCell(const SCoordsVec2& placement, const SFootprint& footprint) noexcept
+  [[nodiscard]] SOCellPos PlacementToGoalCell(
+    const SCoordsVec2& placement,
+    const SFootprint& footprint
+  ) noexcept
   {
     // Both coordinates go through bare fistp (round to nearest), as in
     // SFootprint::ToCellPos.
     return footprint.ToCellPos(Wm3::Vec3f{placement.x, 0.0f, placement.z});
   }
-
 
   template <typename TObject>
   void WritePointerWithType(
@@ -146,7 +176,9 @@ CAiNavigatorLand::CAiNavigatorLand()
 /**
  * Address: 0x005A3AC0 (FUN_005A3AC0, unit ctor)
  */
-CAiNavigatorLand::CAiNavigatorLand(Unit* const unit)
+CAiNavigatorLand::CAiNavigatorLand(
+  Unit* const unit
+)
   : CAiNavigatorImpl(unit)
   , mPathNavigator(nullptr)
   , mDestinationEntity{}
@@ -182,7 +214,9 @@ CAiNavigatorLand::~CAiNavigatorLand()
  * Loads base navigator state, owned path-navigator pointer, destination-unit
  * weak link, and goal rectangle payload.
  */
-void CAiNavigatorLand::MemberDeserialize(gpg::ReadArchive* const archive)
+void CAiNavigatorLand::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -211,7 +245,9 @@ void CAiNavigatorLand::MemberDeserialize(gpg::ReadArchive* const archive)
  * Saves base navigator state, owned path-navigator pointer,
  * destination-unit weak link, and goal rectangle payload.
  */
-void CAiNavigatorLand::MemberSerialize(gpg::WriteArchive* const archive) const
+void CAiNavigatorLand::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -220,7 +256,9 @@ void CAiNavigatorLand::MemberSerialize(gpg::WriteArchive* const archive) const
   const gpg::RRef ownerRef{};
   archive->Write(gpg::RTypeOf<CAiNavigatorImpl>(), this, ownerRef);
 
-  WritePointerWithType(archive, mPathNavigator, gpg::RTypeOf<CAiPathNavigator>(), gpg::TrackedPointerState::Owned, ownerRef);
+  WritePointerWithType(
+    archive, mPathNavigator, gpg::RTypeOf<CAiPathNavigator>(), gpg::TrackedPointerState::Owned, ownerRef
+  );
   archive->Write(gpg::RTypeOf<WeakPtr<Entity>>(), &mDestinationEntity, ownerRef);
   archive->Write(gpg::RTypeOf<SAiNavigatorGoal>(), &mGoal, ownerRef);
 }
@@ -228,7 +266,9 @@ void CAiNavigatorLand::MemberSerialize(gpg::WriteArchive* const archive) const
 /**
  * Address: 0x005A3ED0 (FUN_005A3ED0)
  */
-void CAiNavigatorLand::SetGoal(const SAiNavigatorGoal& goal)
+void CAiNavigatorLand::SetGoal(
+  const SAiNavigatorGoal& goal
+)
 {
   if (mStatus == AINAVSTATUS_Thinking && GoalMatchForSetGoalDedup(goal, mGoal)) {
     return;
@@ -248,9 +288,11 @@ void CAiNavigatorLand::SetGoal(const SAiNavigatorGoal& goal)
     const Wm3::Vector3f center = COORDS_ToWorldPos(mUnit->SimulationRef->mMapData, cell, footprint);
     SCoordsVec2 placement{center.x, center.z};
     const int border = static_cast<int>(std::max(footprint.mSizeX, footprint.mSizeZ));
-    if (TryBuildStructureAt(
-          &placement, mUnit->GetBlueprint(), mUnit->SimulationRef, border, mUnit->ArmyRef->UseWholeMap(), false, false
-        )) {
+    if (
+      TryBuildStructureAt(
+        &placement, mUnit->GetBlueprint(), mUnit->SimulationRef, border, mUnit->ArmyRef->UseWholeMap(), false, false
+      )
+    ) {
       cell = PlacementToGoalCell(placement, footprint);
     }
 
@@ -266,7 +308,9 @@ void CAiNavigatorLand::SetGoal(const SAiNavigatorGoal& goal)
 /**
  * Address: 0x005A4180 (FUN_005A4180)
  */
-void CAiNavigatorLand::SetDestUnit(Entity* const destinationEntity)
+void CAiNavigatorLand::SetDestUnit(
+  Entity* const destinationEntity
+)
 {
   if (!destinationEntity) {
     mDestinationEntity.ResetFromObject(nullptr);
@@ -288,7 +332,9 @@ void CAiNavigatorLand::SetDestUnit(Entity* const destinationEntity)
 /**
  * Address: 0x005A4240 (FUN_005A4240)
  */
-void CAiNavigatorLand::SetSpeedThroughGoal(const bool enabled)
+void CAiNavigatorLand::SetSpeedThroughGoal(
+  const bool enabled
+)
 {
   if (!mUnit || !mUnit->AiSteering) {
     return;
@@ -337,7 +383,9 @@ bool CAiNavigatorLand::FollowingLeader() const
 /**
  * Address: 0x005A3D60 (FUN_005A3D60)
  */
-void CAiNavigatorLand::IgnoreFormation(const bool ignore)
+void CAiNavigatorLand::IgnoreFormation(
+  const bool ignore
+)
 {
   mIgnoreFormation = static_cast<std::uint8_t>(ignore);
 }
@@ -391,7 +439,10 @@ bool CAiNavigatorLand::AtGoal() const
 /**
  * Address: 0x005A3CD0 (FUN_005A3CD0)
  */
-bool CAiNavigatorLand::CanPathTo(Wm3::Vector3f* outTargetPos, const SAiNavigatorGoal& goal) const
+bool CAiNavigatorLand::CanPathTo(
+  Wm3::Vector3f* outTargetPos,
+  const SAiNavigatorGoal& goal
+) const
 {
   if (!mUnit) {
     return false;
@@ -520,7 +571,9 @@ int CAiNavigatorLand::Execute()
   return 1;
 }
 
-void CAiNavigatorLand::ApplyGoalAndStartPathing(const SAiNavigatorGoal& goal)
+void CAiNavigatorLand::ApplyGoalAndStartPathing(
+  const SAiNavigatorGoal& goal
+)
 {
   mGoal = goal;
 
@@ -542,7 +595,12 @@ namespace moho
   /**
    * Address: 0x005A4740 (FUN_005A4740)
    */
-  void CAiNavigatorLand::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CAiNavigatorLand::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CAiNavigatorLand()), 0u);
   }

@@ -21,7 +21,9 @@ namespace
   constexpr DWORD kSignalWaitMs = 2000;
   constexpr DWORD kQuietWaitMs = 150;
 
-  sockaddr_in Loopback(const std::uint16_t port)
+  sockaddr_in Loopback(
+    const std::uint16_t port
+  )
   {
     sockaddr_in address{};
     address.sin_family = AF_INET;
@@ -30,14 +32,19 @@ namespace
     return address;
   }
 
-  std::uint16_t LocalPort(const net::Socket socket)
+  std::uint16_t LocalPort(
+    const net::Socket socket
+  )
   {
     sockaddr_in address{};
     EXPECT_EQ(net::GetLocalAddress(socket, &address), 0);
     return ntohs(address.sin_port);
   }
 
-  bool Signalled(const net::EventHandle event, const DWORD timeoutMs)
+  bool Signalled(
+    const net::EventHandle event,
+    const DWORD timeoutMs
+  )
   {
     return ::WaitForSingleObject(event, timeoutMs) == WAIT_OBJECT_0;
   }
@@ -45,7 +52,10 @@ namespace
   /// A socket bound to 127.0.0.1 on a free port, closed at the end of the test.
   struct BoundSocket
   {
-    BoundSocket(const int type, const int protocol)
+    BoundSocket(
+      const int type,
+      const int protocol
+    )
       : socket(net::OpenSocket(AF_INET, type, protocol))
     {
       EXPECT_NE(socket, net::kInvalidSocket);
@@ -70,7 +80,10 @@ namespace
     {
       EXPECT_NE(event, nullptr);
     }
-    ~SocketEvent() { net::CloseSocketEvent(event); }
+    ~SocketEvent()
+    {
+      net::CloseSocketEvent(event);
+    }
     SocketEvent(const SocketEvent&) = delete;
     SocketEvent& operator=(const SocketEvent&) = delete;
 
@@ -78,7 +91,11 @@ namespace
   };
 
   /// Receives until a datagram or stream bytes arrive (the event said they would).
-  int RecvSome(const net::Socket socket, char* const buffer, const int length)
+  int RecvSome(
+    const net::Socket socket,
+    char* const buffer,
+    const int length
+  )
   {
     for (int attempt = 0; attempt < 200; ++attempt) {
       const int received = net::Recv(socket, buffer, length);
@@ -91,12 +108,18 @@ namespace
   }
 } // namespace
 
-TEST(PlatformNet, StartupSucceeds)
+TEST(
+  PlatformNet,
+  StartupSucceeds
+)
 {
   EXPECT_EQ(net::Startup(), 0);
 }
 
-TEST(PlatformNet, UdpReadEventSignalsWhenADatagramArrives)
+TEST(
+  PlatformNet,
+  UdpReadEventSignalsWhenADatagramArrives
+)
 {
   ASSERT_EQ(net::Startup(), 0);
   BoundSocket receiver{SOCK_DGRAM, IPPROTO_UDP};
@@ -136,7 +159,10 @@ TEST(PlatformNet, UdpReadEventSignalsWhenADatagramArrives)
   EXPECT_TRUE(Signalled(ready.event, kSignalWaitMs));
 }
 
-TEST(PlatformNet, UdpDatagramsLeftUnreadSignalAgainAfterARead)
+TEST(
+  PlatformNet,
+  UdpDatagramsLeftUnreadSignalAgainAfterARead
+)
 {
   ASSERT_EQ(net::Startup(), 0);
   BoundSocket receiver{SOCK_DGRAM, IPPROTO_UDP};
@@ -157,7 +183,10 @@ TEST(PlatformNet, UdpDatagramsLeftUnreadSignalAgainAfterARead)
   EXPECT_TRUE(Signalled(ready.event, kSignalWaitMs));
 }
 
-TEST(PlatformNet, UdpWriteEventSignalsOnceUntilASendWouldBlock)
+TEST(
+  PlatformNet,
+  UdpWriteEventSignalsOnceUntilASendWouldBlock
+)
 {
   ASSERT_EQ(net::Startup(), 0);
   BoundSocket socket{SOCK_DGRAM, IPPROTO_UDP};
@@ -168,7 +197,10 @@ TEST(PlatformNet, UdpWriteEventSignalsOnceUntilASendWouldBlock)
   EXPECT_FALSE(Signalled(ready.event, kQuietWaitMs)) << "write is reported once, as in Winsock";
 }
 
-TEST(PlatformNet, SelectSocketEventsMakesTheSocketNonBlocking)
+TEST(
+  PlatformNet,
+  SelectSocketEventsMakesTheSocketNonBlocking
+)
 {
   ASSERT_EQ(net::Startup(), 0);
   BoundSocket socket{SOCK_DGRAM, IPPROTO_UDP};
@@ -180,7 +212,10 @@ TEST(PlatformNet, SelectSocketEventsMakesTheSocketNonBlocking)
   EXPECT_EQ(net::LastError(), net::error::kWouldBlock);
 }
 
-TEST(PlatformNet, TcpListenConnectAcceptSendAndClose)
+TEST(
+  PlatformNet,
+  TcpListenConnectAcceptSendAndClose
+)
 {
   ASSERT_EQ(net::Startup(), 0);
   BoundSocket listener{SOCK_STREAM, IPPROTO_TCP};
@@ -262,7 +297,10 @@ TEST(PlatformNet, TcpListenConnectAcceptSendAndClose)
   EXPECT_EQ(net::CloseSocket(accepted), 0);
 }
 
-TEST(PlatformNet, TcpConnectToAClosedPortFails)
+TEST(
+  PlatformNet,
+  TcpConnectToAClosedPortFails
+)
 {
   ASSERT_EQ(net::Startup(), 0);
   // A port that was free a moment ago: bind, read it, close.
@@ -289,7 +327,10 @@ TEST(PlatformNet, TcpConnectToAClosedPortFails)
   net::CloseSocket(client);
 }
 
-TEST(PlatformNet, PollReadableSeesQueuedStreamBytes)
+TEST(
+  PlatformNet,
+  PollReadableSeesQueuedStreamBytes
+)
 {
   ASSERT_EQ(net::Startup(), 0);
   BoundSocket listener{SOCK_STREAM, IPPROTO_TCP};
@@ -311,7 +352,10 @@ TEST(PlatformNet, PollReadableSeesQueuedStreamBytes)
   net::CloseSocket(accepted);
 }
 
-TEST(PlatformNet, ClosingAnEventEndsItsSelections)
+TEST(
+  PlatformNet,
+  ClosingAnEventEndsItsSelections
+)
 {
   ASSERT_EQ(net::Startup(), 0);
   BoundSocket receiver{SOCK_DGRAM, IPPROTO_UDP};

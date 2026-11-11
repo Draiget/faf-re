@@ -28,7 +28,7 @@ namespace gpg::gal
   struct RayGeometryDesc
   {
     const char* name = "";
-    const float* positions = nullptr;  ///< x, y, z of each vertex, `positionStride` bytes apart
+    const float* positions = nullptr; ///< x, y, z of each vertex, `positionStride` bytes apart
     std::uint32_t positionStride = 12U;
     std::uint32_t vertexCount = 0U;
     const std::uint32_t* indices = nullptr; ///< three per triangle

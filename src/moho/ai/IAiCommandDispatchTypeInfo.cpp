@@ -85,9 +85,14 @@ namespace
   [[maybe_unused]] IAiCommandDispatchTypeInfoBootstrap gIAiCommandDispatchTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_IAiCommandDispatchTypeInfo_a4e299, moho::register_IAiCommandDispatchTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_IAiCommandDispatchTypeInfo_a4e299,
+  moho::register_IAiCommandDispatchTypeInfo
+)
 
-GPG_PREREGISTER_INIT(construct_IAiCommandDispatchTypeInfo_a4e299, construct_IAiCommandDispatchTypeInfo)
+GPG_PREREGISTER_INIT(
+  construct_IAiCommandDispatchTypeInfo_a4e299,
+  construct_IAiCommandDispatchTypeInfo
+)

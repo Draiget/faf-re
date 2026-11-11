@@ -6,13 +6,22 @@
 
 namespace
 {
-  TEST(ViewAids, SlopeIsTheSteepestEdgeInBands)
+  TEST(
+    ViewAids,
+    SlopeIsTheSteepestEdgeInBands
+  )
   {
     // 3 x 3 samples (2 x 2 cells), heights in words (128 a unit, the game's scale).
     const std::uint16_t heights[9] = {
-      0, 32, 64,  //
-      0, 32, 64,  //
-      0, 96, 200, //
+      0,
+      32,
+      64, //
+      0,
+      32,
+      64, //
+      0,
+      96,
+      200, //
     };
     const float scale = 1.0f / 128.0f;
     // Near cells: every edge rises 32 or 0 words: 0.25, not above the first band.
@@ -29,7 +38,10 @@ namespace
     EXPECT_EQ(bands[3], 3);
   }
 
-  TEST(ViewAids, DistanceInUnitsAndKilometres)
+  TEST(
+    ViewAids,
+    DistanceInUnitsAndKilometres
+  )
   {
     EXPECT_EQ(faf::editor::DistanceText(1024.0f), "1024.0 units, 20.00 km");
     EXPECT_EQ(faf::editor::DistanceText(25.6f), "25.6 units, 0.50 km");

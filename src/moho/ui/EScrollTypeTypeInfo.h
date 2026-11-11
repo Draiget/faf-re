@@ -52,7 +52,6 @@ namespace moho
 
   static_assert(sizeof(EScrollTypeTypeInfo) == 0x78, "EScrollTypeTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x007771B0 (FUN_007771B0, static-init lane)
    *

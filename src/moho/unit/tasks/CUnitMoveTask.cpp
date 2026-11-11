@@ -30,14 +30,19 @@
 namespace
 {
 
-  void ReadBoolIntoByteLane(gpg::ReadArchive* const archive, std::uint8_t& laneValue)
+  void ReadBoolIntoByteLane(
+    gpg::ReadArchive* const archive,
+    std::uint8_t& laneValue
+  )
   {
     bool value = false;
     archive->ReadBool(&value);
     laneValue = value ? 1u : 0u;
   }
 
-  [[nodiscard]] moho::Unit* ResolveAssignedTransportUnit(moho::Unit* const unit) noexcept
+  [[nodiscard]] moho::Unit* ResolveAssignedTransportUnit(
+    moho::Unit* const unit
+  ) noexcept
   {
     if (!unit) {
       return nullptr;
@@ -46,7 +51,9 @@ namespace
     return unit->AssignedTransportRef.GetObjectPtr();
   }
 
-  [[nodiscard]] bool IsZeroVector(const Wm3::Vector3f& value) noexcept
+  [[nodiscard]] bool IsZeroVector(
+    const Wm3::Vector3f& value
+  ) noexcept
   {
     return value.x == 0.0f && value.y == 0.0f && value.z == 0.0f;
   }
@@ -65,7 +72,10 @@ namespace
    * falls through to the plain "not loading, not refuelling" pair at
    * `0x0061842B..0x00618449`.
    */
-  [[nodiscard]] bool ShouldRecentreOnGoalCell(moho::Unit& unit, const moho::SNavGoal& moveGoal)
+  [[nodiscard]] bool ShouldRecentreOnGoalCell(
+    moho::Unit& unit,
+    const moho::SNavGoal& moveGoal
+  )
   {
     const moho::RUnitBlueprint* const blueprint = unit.GetBlueprint();
     if (blueprint == nullptr || !blueprint->Air.CanFly) {
@@ -76,8 +86,10 @@ namespace
       return false;
     }
 
-    if (unit.IsInCategory("TRANSPORTATION") && !unit.IsUnitState(moho::UNITSTATE_LandingOnPlatform) &&
-        !unit.IsUnitState(moho::UNITSTATE_Refueling)) {
+    if (
+      unit.IsInCategory("TRANSPORTATION") && !unit.IsUnitState(moho::UNITSTATE_LandingOnPlatform) &&
+      !unit.IsUnitState(moho::UNITSTATE_Refueling)
+    ) {
       return true;
     }
 
@@ -94,7 +106,9 @@ namespace
    * (next) command must be a known, instant command family. Lifts the binary's
    * raw `mCommandVec` triplet walk into typed size/index accessors.
    */
-  [[nodiscard]] bool ComputeNextCommandIsInstant(moho::CUnitCommandQueue* const commandQueue) noexcept
+  [[nodiscard]] bool ComputeNextCommandIsInstant(
+    moho::CUnitCommandQueue* const commandQueue
+  ) noexcept
   {
     if (moho::CommandIsInstant(commandQueue->mCommandType)) {
       return true;
@@ -112,7 +126,9 @@ namespace
     }
 
     const moho::EUnitCommandType nextType = nextCommand->mVarDat.mCmdType;
-    if (static_cast<std::uint32_t>(nextType) > static_cast<std::uint32_t>(moho::EUnitCommandType::UNITCOMMAND_DestroySelf)) {
+    if (
+      static_cast<std::uint32_t>(nextType) > static_cast<std::uint32_t>(moho::EUnitCommandType::UNITCOMMAND_DestroySelf)
+    ) {
       return false;
     }
 
@@ -131,45 +147,47 @@ namespace moho
    * Returns whether one command type is considered instant for move-task
    * chain decisions (no queued motion duration lane).
    */
-  bool CommandIsInstant(const EUnitCommandType commandType) noexcept
+  bool CommandIsInstant(
+    const EUnitCommandType commandType
+  ) noexcept
   {
     switch (commandType) {
-      case EUnitCommandType::UNITCOMMAND_None:
-      case EUnitCommandType::UNITCOMMAND_Stop:
-      case EUnitCommandType::UNITCOMMAND_Dive:
-      case EUnitCommandType::UNITCOMMAND_BuildMobile:
-      case EUnitCommandType::UNITCOMMAND_Nuke:
-      case EUnitCommandType::UNITCOMMAND_Tactical:
-      case EUnitCommandType::UNITCOMMAND_Teleport:
-      case EUnitCommandType::UNITCOMMAND_Reclaim:
-      case EUnitCommandType::UNITCOMMAND_Capture:
-      case EUnitCommandType::UNITCOMMAND_DetachFromTransport:
-      case EUnitCommandType::UNITCOMMAND_Upgrade:
-      case EUnitCommandType::UNITCOMMAND_KillSelf:
-      case EUnitCommandType::UNITCOMMAND_DestroySelf:
-        return true;
+    case EUnitCommandType::UNITCOMMAND_None:
+    case EUnitCommandType::UNITCOMMAND_Stop:
+    case EUnitCommandType::UNITCOMMAND_Dive:
+    case EUnitCommandType::UNITCOMMAND_BuildMobile:
+    case EUnitCommandType::UNITCOMMAND_Nuke:
+    case EUnitCommandType::UNITCOMMAND_Tactical:
+    case EUnitCommandType::UNITCOMMAND_Teleport:
+    case EUnitCommandType::UNITCOMMAND_Reclaim:
+    case EUnitCommandType::UNITCOMMAND_Capture:
+    case EUnitCommandType::UNITCOMMAND_DetachFromTransport:
+    case EUnitCommandType::UNITCOMMAND_Upgrade:
+    case EUnitCommandType::UNITCOMMAND_KillSelf:
+    case EUnitCommandType::UNITCOMMAND_DestroySelf:
+      return true;
 
-      case EUnitCommandType::UNITCOMMAND_Move:
-      case EUnitCommandType::UNITCOMMAND_FormMove:
-      case EUnitCommandType::UNITCOMMAND_BuildSiloTactical:
-      case EUnitCommandType::UNITCOMMAND_BuildSiloNuke:
-      case EUnitCommandType::UNITCOMMAND_BuildFactory:
-      case EUnitCommandType::UNITCOMMAND_BuildAssist:
-      case EUnitCommandType::UNITCOMMAND_Attack:
-      case EUnitCommandType::UNITCOMMAND_FormAttack:
-      case EUnitCommandType::UNITCOMMAND_Guard:
-      case EUnitCommandType::UNITCOMMAND_Patrol:
-      case EUnitCommandType::UNITCOMMAND_Ferry:
-      case EUnitCommandType::UNITCOMMAND_FormPatrol:
-      case EUnitCommandType::UNITCOMMAND_Repair:
-      case EUnitCommandType::UNITCOMMAND_TransportLoadUnits:
-      case EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits:
-      case EUnitCommandType::UNITCOMMAND_TransportUnloadUnits:
-      case EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits:
-      case EUnitCommandType::UNITCOMMAND_Script:
-      case EUnitCommandType::UNITCOMMAND_AssistCommander:
-      default:
-        return false;
+    case EUnitCommandType::UNITCOMMAND_Move:
+    case EUnitCommandType::UNITCOMMAND_FormMove:
+    case EUnitCommandType::UNITCOMMAND_BuildSiloTactical:
+    case EUnitCommandType::UNITCOMMAND_BuildSiloNuke:
+    case EUnitCommandType::UNITCOMMAND_BuildFactory:
+    case EUnitCommandType::UNITCOMMAND_BuildAssist:
+    case EUnitCommandType::UNITCOMMAND_Attack:
+    case EUnitCommandType::UNITCOMMAND_FormAttack:
+    case EUnitCommandType::UNITCOMMAND_Guard:
+    case EUnitCommandType::UNITCOMMAND_Patrol:
+    case EUnitCommandType::UNITCOMMAND_Ferry:
+    case EUnitCommandType::UNITCOMMAND_FormPatrol:
+    case EUnitCommandType::UNITCOMMAND_Repair:
+    case EUnitCommandType::UNITCOMMAND_TransportLoadUnits:
+    case EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits:
+    case EUnitCommandType::UNITCOMMAND_TransportUnloadUnits:
+    case EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits:
+    case EUnitCommandType::UNITCOMMAND_Script:
+    case EUnitCommandType::UNITCOMMAND_AssistCommander:
+    default:
+      return false;
     }
   }
 
@@ -252,8 +270,7 @@ namespace moho
     // (5) Trace teardown for the owning unit.
     if (mUnit != nullptr && mUnit->SimulationRef != nullptr) {
       mUnit->SimulationRef->Logf(
-        "  CUnitMoveTask::~CUnitMoveTask(), mUnit=0x%08x\n",
-        static_cast<std::uint32_t>(mUnit->id_)
+        "  CUnitMoveTask::~CUnitMoveTask(), mUnit=0x%08x\n", static_cast<std::uint32_t>(mUnit->id_)
       );
     }
 
@@ -285,8 +302,10 @@ namespace moho
     // formation still reports this unit as a member.
     if (CUnitCommand* const command = mCommandRef.GetObjectPtr(); command != nullptr) {
       CAiFormationInstance* const formation = command->mFormationInstance;
-      if (formation != nullptr && mUnit != nullptr && formation->Contains(mUnit, true) &&
-          command->mFormationInstance != nullptr) {
+      if (
+        formation != nullptr && mUnit != nullptr && formation->Contains(mUnit, true) &&
+        command->mFormationInstance != nullptr
+      ) {
         Listener<EFormationdStatus>::ListUnlink();
       }
     }
@@ -308,7 +327,9 @@ namespace moho
    * task payload, dispatch pointer, move goal, command weak link, and
    * command-lane state bytes read as booleans.
    */
-  void CUnitMoveTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitMoveTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -342,7 +363,9 @@ namespace moho
    * task payload, dispatch pointer, move goal, command weak link, and
    * command-lane state bytes emitted as booleans.
    */
-  void CUnitMoveTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitMoveTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -457,36 +480,36 @@ namespace moho
   )
   {
     switch (event) {
-      case AINAVEVENT_Failed:
-      case AINAVEVENT_Aborted:
-        if (mDispatchResult != nullptr) {
-          *mDispatchResult = static_cast<EAiResult>(2);
-        }
-        break;
+    case AINAVEVENT_Failed:
+    case AINAVEVENT_Aborted:
+      if (mDispatchResult != nullptr) {
+        *mDispatchResult = static_cast<EAiResult>(2);
+      }
+      break;
 
-      case AINAVEVENT_Succeeded:
-        if (mDispatchResult != nullptr) {
-          *mDispatchResult = static_cast<EAiResult>(1);
-        }
-        break;
+    case AINAVEVENT_Succeeded:
+      if (mDispatchResult != nullptr) {
+        *mDispatchResult = static_cast<EAiResult>(1);
+      }
+      break;
 
-      case AINAVEVENT_ResumeTask:
-        // 0x00618BCD `cmp byte ptr [ecx+0x5d], dl` / `je 0x618C15`. This entry
-        // is reached through the `Listener<EAiNavigatorEvent>` subobject, so
-        // `ecx` is `this + 0x34`: the store at 0x00618BDE, `mov [ecx+0x5c], dl`,
-        // is `mNextCmdIsInstant` (+0x90, static_assert-backed below), which
-        // pins the guard byte at +0x91 -- `mRequiresTransportCategoryCheck`,
-        // not `mTransportDispatchIssued` at +0x93.
-        if (mRequiresTransportCategoryCheck == 0u) {
-          return;
-        }
-        if (mDispatchResult != nullptr) {
-          *mDispatchResult = static_cast<EAiResult>(1);
-        }
-        break;
+    case AINAVEVENT_ResumeTask:
+      // 0x00618BCD `cmp byte ptr [ecx+0x5d], dl` / `je 0x618C15`. This entry
+      // is reached through the `Listener<EAiNavigatorEvent>` subobject, so
+      // `ecx` is `this + 0x34`: the store at 0x00618BDE, `mov [ecx+0x5c], dl`,
+      // is `mNextCmdIsInstant` (+0x90, static_assert-backed below), which
+      // pins the guard byte at +0x91 -- `mRequiresTransportCategoryCheck`,
+      // not `mTransportDispatchIssued` at +0x93.
+      if (mRequiresTransportCategoryCheck == 0u) {
+        return;
+      }
+      if (mDispatchResult != nullptr) {
+        *mDispatchResult = static_cast<EAiResult>(1);
+      }
+      break;
 
-      default:
-        break;
+    default:
+      break;
     }
 
     mNextCmdIsInstant = 0u;
@@ -510,7 +533,9 @@ namespace moho
    * Intentional no-op; `CUnitMoveTask` does not react to formation-status
    * events (unlike sibling command tasks such as `CUnitPatrolTask`).
    */
-  void CUnitMoveTask::OnEvent(const EFormationdStatus /*event*/)
+  void CUnitMoveTask::OnEvent(
+    const EFormationdStatus /*event*/
+  )
   {}
 
   /**
@@ -589,8 +614,10 @@ namespace moho
       // node (+0x44) into the formation's `Broadcaster<EFormationdStatus>`
       // base, which `IFormationInstance`'s RTTI puts at mdisp 8 -- so the
       // `+ 8` is the base upcast, exactly like the `+ 0x34` above.
-      if (CAiFormationInstance* const formation = command->mFormationInstance;
-          formation != nullptr && formation->Contains(mUnit, true)) {
+      if (
+        CAiFormationInstance* const formation = command->mFormationInstance;
+        formation != nullptr && formation->Contains(mUnit, true)
+      ) {
         formation->AddListener(this);
       }
 
@@ -653,8 +680,10 @@ namespace moho
     }
 
     if (mUnit->IsUnitState(UNITSTATE_Immobile)) {
-      if (const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
-          blueprint != nullptr && blueprint->AI.NeedUnpack && mUnit->AiAttacker != nullptr) {
+      if (
+        const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
+        blueprint != nullptr && blueprint->AI.NeedUnpack && mUnit->AiAttacker != nullptr
+      ) {
         CAiTarget stopTarget{};
         mUnit->AiAttacker->SetDesiredTarget(&stopTarget);
       }
@@ -718,7 +747,9 @@ namespace moho
    * simply re-derives the goal from the command's cell position. Both paths
    * push the rebuilt goal to the navigator.
    */
-  void CUnitMoveTask::OnEvent(const ECommandEvent /*event*/)
+  void CUnitMoveTask::OnEvent(
+    const ECommandEvent /*event*/
+  )
   {
     if (mMoveVariant != 0u) {
       return;
@@ -813,7 +844,10 @@ namespace gpg
    * Builds one typed reflection reference for `moho::CUnitMoveTask*`,
    * preserving dynamic-derived ownership and base-offset adjustment.
    */
-  gpg::RRef* RRef_CUnitMoveTask(gpg::RRef* const outRef, moho::CUnitMoveTask* const value)
+  gpg::RRef* RRef_CUnitMoveTask(
+    gpg::RRef* const outRef,
+    moho::CUnitMoveTask* const value
+  )
   {
     return gpg::WriteDerivedRef(outRef, value);
   }
@@ -825,7 +859,10 @@ namespace gpg
    * Wrapper lane that materializes one temporary `RRef_CUnitMoveTask` and
    * copies object/type fields into the destination reference record.
    */
-  gpg::RRef* AssignCUnitMoveTaskRef(gpg::RRef* const outRef, moho::CUnitMoveTask* const value)
+  gpg::RRef* AssignCUnitMoveTaskRef(
+    gpg::RRef* const outRef,
+    moho::CUnitMoveTask* const value
+  )
   {
     if (!outRef) {
       return nullptr;
@@ -898,9 +935,7 @@ namespace
     offsetof(CUnitMoveTaskSerializerHelper, mSaveCallback) == 0x10,
     "CUnitMoveTaskSerializerHelper::mSaveCallback offset must be 0x10"
   );
-  static_assert(
-    sizeof(CUnitMoveTaskSerializerHelper) == 0x14, "CUnitMoveTaskSerializerHelper size must be 0x14"
-  );
+  static_assert(sizeof(CUnitMoveTaskSerializerHelper) == 0x14, "CUnitMoveTaskSerializerHelper size must be 0x14");
 
   CUnitMoveTaskSerializerHelper gCUnitMoveTaskSerializer;
 

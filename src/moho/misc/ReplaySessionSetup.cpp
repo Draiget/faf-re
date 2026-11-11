@@ -50,7 +50,10 @@ namespace
    * Opens one local file stream for replay/network URI fallback according to
    * recovered GPGNet mode semantics.
    */
-  [[nodiscard]] std::unique_ptr<gpg::Stream> OpenGPGNet(const gpg::StrArg filename, const EGpgNetOpenMode mode)
+  [[nodiscard]] std::unique_ptr<gpg::Stream> OpenGPGNet(
+    const gpg::StrArg filename,
+    const EGpgNetOpenMode mode
+  )
   {
     switch (mode) {
     case EGpgNetOpenMode::Read: {
@@ -74,7 +77,9 @@ namespace
    */
   [[nodiscard]]
   std::unique_ptr<gpg::Stream> OpenGPGNetSocket(
-    const gpg::StrArg host, const fa::string& requestPath, const EGpgNetOpenMode mode
+    const gpg::StrArg host,
+    const fa::string& requestPath,
+    const EGpgNetOpenMode mode
   )
   {
     constexpr u_short kDefaultGpgNetPort = 15000;
@@ -120,7 +125,10 @@ namespace
    * for plain/drive-letter paths.
    */
   [[nodiscard]]
-  std::unique_ptr<gpg::Stream> OpenGPGNetURI(const gpg::StrArg uri, const EGpgNetOpenMode mode)
+  std::unique_ptr<gpg::Stream> OpenGPGNetURI(
+    const gpg::StrArg uri,
+    const EGpgNetOpenMode mode
+  )
   {
     fa::string scheme{};
     fa::string authority{};
@@ -167,7 +175,10 @@ namespace
   constexpr std::uint8_t kInvalidSourceIndex = 255u;
 } // namespace
 
-void moho::VCR_WriteReplayHeader(gpg::Stream& stream, const SWldSessionInfo& sessionInfo)
+void moho::VCR_WriteReplayHeader(
+  gpg::Stream& stream,
+  const SWldSessionInfo& sessionInfo
+)
 {
   constexpr char kReplayFormatBanner[] = "Replay v1.9\r\n";
   constexpr std::size_t kReplayFormatBannerBytes = sizeof(kReplayFormatBanner) - 1u;
@@ -175,7 +186,7 @@ void moho::VCR_WriteReplayHeader(gpg::Stream& stream, const SWldSessionInfo& ses
   constexpr std::uint8_t kReplayUnitSourceListEnd = 0xFFu;
 
   const LaunchInfoNew* const launchInfo = sessionInfo.mLaunchInfo->GetNew();
-// FAF addition: the build is the game version this session runs as (`FAF_BeginSession` ran
+  // FAF addition: the build is the game version this session runs as (`FAF_BeginSession` ran
   // before the sink was opened), so a replay always names the patches it was recorded with.
   stream.Write(gpg::STR_Printf("Supreme Commander v%1.2f.%4i", kReplayEngineVersion, FAF_GetSessionGameVersion()));
   stream.Write("\r\n");
@@ -213,8 +224,7 @@ void moho::VCR_WriteReplayHeader(gpg::Stream& stream, const SWldSessionInfo& ses
 
     const BVIntSet& unitSources = launchInfo->mArmyLaunchInfo[armyIndex].mUnitSources;
     const unsigned int endOfSet = unitSources.Max();
-    for (unsigned int source = unitSources.GetNext(~0u); source != endOfSet;
-         source = unitSources.GetNext(source)) {
+    for (unsigned int source = unitSources.GetNext(~0u); source != endOfSet; source = unitSources.GetNext(source)) {
       stream.Write(static_cast<std::uint8_t>(source));
     }
     stream.Write(kReplayUnitSourceListEnd);
@@ -223,11 +233,13 @@ void moho::VCR_WriteReplayHeader(gpg::Stream& stream, const SWldSessionInfo& ses
   stream.Write(launchInfo->mInitSeed);
 }
 
-std::unique_ptr<gpg::Stream> moho::VCR_OpenGPGNetURI(const gpg::StrArg uri, const EGpgNetOpenMode mode)
+std::unique_ptr<gpg::Stream> moho::VCR_OpenGPGNetURI(
+  const gpg::StrArg uri,
+  const EGpgNetOpenMode mode
+)
 {
   return OpenGPGNetURI(uri, mode);
 }
-
 
 namespace moho
 {
@@ -240,7 +252,8 @@ namespace moho
    * while its reader can still say so.
    */
   bool LaunchInfoStringsDecode(
-    const LaunchInfoBase& launchInfo, const fa::vector<fa::string>& armySetups
+    const LaunchInfoBase& launchInfo,
+    const fa::vector<fa::string>& armySetups
   )
   {
     LuaPlus::LuaState scratch(LuaPlus::LuaState::LIB_NONE);
@@ -291,15 +304,19 @@ namespace moho
   bool gVcrScanReplayLength = false;
   std::int32_t gVcrReplayBeats = 0;
 
-  std::int32_t VCR_ScanReplayBeats(gpg::Stream& stream)
+  std::int32_t VCR_ScanReplayBeats(
+    gpg::Stream& stream
+  )
   {
     std::int32_t beats = 0;
     try {
       const std::uint64_t start = stream.VirtTell(gpg::Stream::ModeReceive);
       CMessage message;
       while (message.Read(&stream)) {
-        if (message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance)
-            && message.GetMessageSize() >= static_cast<int>(sizeof(std::int32_t))) {
+        if (
+          message.GetType().raw() == static_cast<std::uint8_t>(ECmdStreamOp::CMDST_Advance) &&
+          message.GetMessageSize() >= static_cast<int>(sizeof(std::int32_t))
+        ) {
           CMessageStream input(message, CMessageStream::Access::kReadOnly);
           gpg::BinaryReader reader(&input);
           std::int32_t delta = 0;
@@ -330,8 +347,7 @@ namespace moho
    *
    * Engine addition: a refusal says why through `failureReason`.
    */
-  fa::auto_ptr<SWldSessionInfo>
-  VCR_SetupReplaySession(
+  fa::auto_ptr<SWldSessionInfo> VCR_SetupReplaySession(
     const gpg::StrArg filename,
     fa::string* const failureReason,
     std::unique_ptr<gpg::Stream>* const commandStream,
@@ -403,17 +419,18 @@ namespace moho
         // whose header names another engine version instead of refusing it, with
         // the patches of the nearest version this engine models.
         if (!CFG_GetArgOption("/noversioncheck", 0, nullptr)) {
-          return refuse(gpg::STR_Printf(
-            "It was recorded by \"%s\"; this game plays replays of FAF game versions %d to %d.",
-            replayVersion.c_str(),
-            kFafGameVersionOldestSupported,
-            kFafGameVersionLatest
-          ));
+          return refuse(
+            gpg::STR_Printf(
+              "It was recorded by \"%s\"; this game plays replays of FAF game versions %d to %d.",
+              replayVersion.c_str(),
+              kFafGameVersionOldestSupported,
+              kFafGameVersionLatest
+            )
+          );
         }
-        const int playedGameVersion =
-          (recordedGameVersion != 0 && recordedGameVersion < kFafGameVersionOldestSupported)
-            ? kFafGameVersionOldestSupported
-            : kFafGameVersionLatest;
+        const int playedGameVersion = (recordedGameVersion != 0 && recordedGameVersion < kFafGameVersionOldestSupported)
+          ? kFafGameVersionOldestSupported
+          : kFafGameVersionLatest;
         gpg::Warnf(
           "Replay %s was recorded by \"%s\", this engine plays FAF game versions %d..%d; playing it as %d anyway "
           "(/noversioncheck).",

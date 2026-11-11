@@ -16,13 +16,12 @@
 
 namespace
 {
-  void PromptSnapshotDirectory(fa::string& directory)
+  void PromptSnapshotDirectory(
+    fa::string& directory
+  )
   {
     wxDirDialog directoryDialog(
-      nullptr,
-      wxT("Dump snap shot data to"),
-      gpg::STR_Utf8ToWide(directory.c_str()).c_str(),
-      wxDD_NEW_DIR_BUTTON
+      nullptr, wxT("Dump snap shot data to"), gpg::STR_Utf8ToWide(directory.c_str()).c_str(), wxDD_NEW_DIR_BUTTON
     );
     if (directoryDialog.ShowModal() == wxID_OK) {
       directory.assign(gpg::STR_WideToUtf8(directoryDialog.GetPath().c_str()), 0, fa::string::npos);

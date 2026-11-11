@@ -393,7 +393,8 @@ namespace moho
    * Address: 0x00BCB8F0 (FUN_00BCB8F0, register_CAiBrainCreateResourceBuildingNearest_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_CAiBrainCreateResourceBuildingNearest_LuaFuncDef` to `func_CAiBrainCreateResourceBuildingNearest_LuaFuncDef`.
+   * Forwards `register_CAiBrainCreateResourceBuildingNearest_LuaFuncDef` to
+   * `func_CAiBrainCreateResourceBuildingNearest_LuaFuncDef`.
    */
   void register_CAiBrainCreateResourceBuildingNearest_LuaFuncDef()
   {
@@ -514,7 +515,8 @@ namespace moho
    * Address: 0x00BCB9A0 (FUN_00BCB9A0, register_CAiBrainGetNumPlatoonsTemplateNamed_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_CAiBrainGetNumPlatoonsTemplateNamed_LuaFuncDef` to `func_CAiBrainGetNumPlatoonsTemplateNamed_LuaFuncDef`.
+   * Forwards `register_CAiBrainGetNumPlatoonsTemplateNamed_LuaFuncDef` to
+   * `func_CAiBrainGetNumPlatoonsTemplateNamed_LuaFuncDef`.
    */
   CScrLuaInitForm* register_CAiBrainGetNumPlatoonsTemplateNamed_LuaFuncDef()
   {
@@ -558,7 +560,8 @@ namespace moho
    * Address: 0x00BCB9E0 (FUN_00BCB9E0, register_CAiBrainDisbandPlatoonUniquelyNamed_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_CAiBrainDisbandPlatoonUniquelyNamed_LuaFuncDef` to `func_CAiBrainDisbandPlatoonUniquelyNamed_LuaFuncDef`.
+   * Forwards `register_CAiBrainDisbandPlatoonUniquelyNamed_LuaFuncDef` to
+   * `func_CAiBrainDisbandPlatoonUniquelyNamed_LuaFuncDef`.
    */
   CScrLuaInitForm* register_CAiBrainDisbandPlatoonUniquelyNamed_LuaFuncDef()
   {
@@ -591,7 +594,8 @@ namespace moho
    * Address: 0x00BCBA10 (FUN_00BCBA10, register_CAiBrainGetPlatoonUniquelyNamed_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_CAiBrainGetPlatoonUniquelyNamed_LuaFuncDef` to `func_CAiBrainGetPlatoonUniquelyNamed_LuaFuncDef`.
+   * Forwards `register_CAiBrainGetPlatoonUniquelyNamed_LuaFuncDef` to
+   * `func_CAiBrainGetPlatoonUniquelyNamed_LuaFuncDef`.
    */
   CScrLuaInitForm* register_CAiBrainGetPlatoonUniquelyNamed_LuaFuncDef()
   {
@@ -624,7 +628,8 @@ namespace moho
    * Address: 0x00BCBA40 (FUN_00BCBA40, register_CAiBrainFindClosestArmyWithBase_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_CAiBrainFindClosestArmyWithBase_LuaFuncDef` to `func_CAiBrainFindClosestArmyWithBase_LuaFuncDef`.
+   * Forwards `register_CAiBrainFindClosestArmyWithBase_LuaFuncDef` to
+   * `func_CAiBrainFindClosestArmyWithBase_LuaFuncDef`.
    */
   CScrLuaInitForm* register_CAiBrainFindClosestArmyWithBase_LuaFuncDef()
   {
@@ -635,7 +640,8 @@ namespace moho
    * Address: 0x00BCBA50 (FUN_00BCBA50, register_CAiBrainSetUpAttackVectorsToArmy_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_CAiBrainSetUpAttackVectorsToArmy_LuaFuncDef` to `func_CAiBrainSetUpAttackVectorsToArmy_LuaFuncDef`.
+   * Forwards `register_CAiBrainSetUpAttackVectorsToArmy_LuaFuncDef` to
+   * `func_CAiBrainSetUpAttackVectorsToArmy_LuaFuncDef`.
    */
   CScrLuaInitForm* register_CAiBrainSetUpAttackVectorsToArmy_LuaFuncDef()
   {
@@ -767,7 +773,8 @@ namespace moho
    * Address: 0x00BCBB10 (FUN_00BCBB10, register_CAiBrainGetThreatBetweenPositions_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_CAiBrainGetThreatBetweenPositions_LuaFuncDef` to `func_CAiBrainGetThreatBetweenPositions_LuaFuncDef`.
+   * Forwards `register_CAiBrainGetThreatBetweenPositions_LuaFuncDef` to
+   * `func_CAiBrainGetThreatBetweenPositions_LuaFuncDef`.
    */
   CScrLuaInitForm* register_CAiBrainGetThreatBetweenPositions_LuaFuncDef()
   {
@@ -778,7 +785,8 @@ namespace moho
    * Address: 0x00BCBB20 (FUN_00BCBB20, register_CAiBrainGetHighestThreatPosition_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_CAiBrainGetHighestThreatPosition_LuaFuncDef` to `func_CAiBrainGetHighestThreatPosition_LuaFuncDef`.
+   * Forwards `register_CAiBrainGetHighestThreatPosition_LuaFuncDef` to
+   * `func_CAiBrainGetHighestThreatPosition_LuaFuncDef`.
    */
   CScrLuaInitForm* register_CAiBrainGetHighestThreatPosition_LuaFuncDef()
   {
@@ -789,7 +797,8 @@ namespace moho
    * Address: 0x00BCBB30 (FUN_00BCBB30, register_CAiBrainGetThreatsAroundPosition_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_CAiBrainGetThreatsAroundPosition_LuaFuncDef` to `func_CAiBrainGetThreatsAroundPosition_LuaFuncDef`.
+   * Forwards `register_CAiBrainGetThreatsAroundPosition_LuaFuncDef` to
+   * `func_CAiBrainGetThreatsAroundPosition_LuaFuncDef`.
    */
   CScrLuaInitForm* register_CAiBrainGetThreatsAroundPosition_LuaFuncDef()
   {

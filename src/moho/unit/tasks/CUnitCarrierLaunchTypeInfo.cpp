@@ -4,7 +4,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/unit/tasks/CUnitCarrierLaunch.h"
+#include "moho/unit/tasks/CUnitCarrierLaunch.h"
+
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -16,7 +17,9 @@ namespace
    * What it does:
    * Deletes one heap-owned `CUnitCarrierLaunch` instance.
    */
-  void DeleteCUnitCarrierLaunchOwned(void* const objectStorage)
+  void DeleteCUnitCarrierLaunchOwned(
+    void* const objectStorage
+  )
   {
     delete static_cast<moho::CUnitCarrierLaunch*>(objectStorage);
   }
@@ -27,7 +30,9 @@ namespace
    * What it does:
    * Executes one in-place `CUnitCarrierLaunch` destructor lane.
    */
-  void DestroyCUnitCarrierLaunchInPlace(void* const objectStorage)
+  void DestroyCUnitCarrierLaunchInPlace(
+    void* const objectStorage
+  )
   {
     gpg::DestructInStorage<moho::CUnitCarrierLaunch>(objectStorage);
   }
@@ -35,13 +40,15 @@ namespace
 
 namespace moho
 {
-    /**
+  /**
    * Address: 0x00607F20 (FUN_00607F20, Moho::CUnitCarrierLaunchTypeInfo::AddBase_CCommandTask)
    *
    * What it does:
    * Registers `CCommandTask` as this type's reflected base at offset 0.
    */
-  void CUnitCarrierLaunchTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void CUnitCarrierLaunchTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
@@ -50,9 +57,9 @@ namespace moho
     gpg::AddBaseIfPresent(typeInfo, sType, 0);
   }
 
-/**
+  /**
    * Address: 0x00607470 (FUN_00607470, preregister_CUnitCarrierLaunchTypeInfo)
- * Address: 0x00BF99F0 (FUN_00BF99F0, atexit destructor of the CUnitCarrierLaunchTypeInfo object)
+   * Address: 0x00BF99F0 (FUN_00BF99F0, atexit destructor of the CUnitCarrierLaunchTypeInfo object)
    *
    * What it does:
    * Constructs/preregisters the startup `CUnitCarrierLaunchTypeInfo`
@@ -106,7 +113,9 @@ namespace moho
    * Placement-constructs one `CUnitCarrierLaunch` in caller storage and
    * returns a typed reflection ref.
    */
-  gpg::RRef CUnitCarrierLaunchTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitCarrierLaunchTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = gpg::ConstructInStorage<CUnitCarrierLaunch>(objectStorage);
 
@@ -118,4 +127,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_CUnitCarrierLaunchTypeInfo_413aa3, moho::preregister_CUnitCarrierLaunchTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CUnitCarrierLaunchTypeInfo_413aa3,
+  moho::preregister_CUnitCarrierLaunchTypeInfo
+)

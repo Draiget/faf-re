@@ -17,27 +17,27 @@
  */
 
 #if defined(_WIN32)
-  #define FAFRE_PLATFORM_WINDOWS 1
+#define FAFRE_PLATFORM_WINDOWS 1
 #else
-  #define FAFRE_PLATFORM_WINDOWS 0
+#define FAFRE_PLATFORM_WINDOWS 0
 #endif
 
 #if defined(__linux__)
-  #define FAFRE_PLATFORM_LINUX 1
+#define FAFRE_PLATFORM_LINUX 1
 #else
-  #define FAFRE_PLATFORM_LINUX 0
+#define FAFRE_PLATFORM_LINUX 0
 #endif
 
 #if defined(__APPLE__) && defined(__MACH__)
-  #define FAFRE_PLATFORM_MACOS 1
+#define FAFRE_PLATFORM_MACOS 1
 #else
-  #define FAFRE_PLATFORM_MACOS 0
+#define FAFRE_PLATFORM_MACOS 0
 #endif
 
 #define FAFRE_PLATFORM_POSIX (FAFRE_PLATFORM_LINUX || FAFRE_PLATFORM_MACOS)
 
 #if (FAFRE_PLATFORM_WINDOWS + FAFRE_PLATFORM_LINUX + FAFRE_PLATFORM_MACOS) != 1
-  #error "platform/PlatformDefines.h: exactly one of Windows, Linux and macOS must be the target"
+#error "platform/PlatformDefines.h: exactly one of Windows, Linux and macOS must be the target"
 #endif
 
 /**
@@ -46,16 +46,16 @@
  * warning ("calling convention is not supported for this target"), so they are defined to nothing there.
  */
 #if !FAFRE_PLATFORM_WINDOWS
-  #ifndef __stdcall
-    #define __stdcall
-  #endif
-  #ifndef __fastcall
-    #define __fastcall
-  #endif
-  #ifndef __thiscall
-    #define __thiscall
-  #endif
-  #ifndef __cdecl
-    #define __cdecl
-  #endif
+#ifndef __stdcall
+#define __stdcall
+#endif
+#ifndef __fastcall
+#define __fastcall
+#endif
+#ifndef __thiscall
+#define __thiscall
+#endif
+#ifndef __cdecl
+#define __cdecl
+#endif
 #endif

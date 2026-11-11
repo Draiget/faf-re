@@ -24,7 +24,10 @@ namespace moho
  * Captures current thread id, stores Lua state/debug-frame pointers, and allocates one
  * auto-reset resume event.
  */
-moho::PausedMainThread::PausedMainThread(LuaPlus::LuaState* const luaState, lua_Debug* const debugFrame)
+moho::PausedMainThread::PausedMainThread(
+  LuaPlus::LuaState* const luaState,
+  lua_Debug* const debugFrame
+)
   : mResumeEvent(nullptr)
   , mThreadId(::GetCurrentThreadId())
   , mLuaState(luaState)
@@ -111,7 +114,9 @@ bool moho::PausedMainThread::Resume()
  * resume event.
  */
 moho::PausedChildThread::PausedChildThread(
-  const std::uint32_t pausedThreadId, LuaPlus::LuaState* const luaState, lua_Debug* const debugFrame
+  const std::uint32_t pausedThreadId,
+  LuaPlus::LuaState* const luaState,
+  lua_Debug* const debugFrame
 )
   : mResumeEvent(nullptr)
   , mThreadId(pausedThreadId)

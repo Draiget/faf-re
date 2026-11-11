@@ -30,7 +30,7 @@ namespace faf::remote::wire
     static constexpr std::size_t kMaxSetMembers = 64;
     static constexpr std::size_t kMaxTypeLength = 64;
 
-    std::array<float, 10> economy{};        // stored, income, reclaimed, last use requested, actual: energy, mass each
+    std::array<float, 10> economy{}; // stored, income, reclaimed, last use requested, actual: energy, mass each
     std::array<std::uint64_t, 2> maxStorage{}; // energy, mass
     std::uint8_t resourceSharing = 0;
     std::vector<std::uint32_t> neutrals;
@@ -59,14 +59,12 @@ namespace faf::remote::wire
   inline constexpr std::size_t kMaxArmyRecords = 32;
 
   /** Every record, each in full where it differs from `baseline` (null: all in full). False for a malformed record. */
-  [[nodiscard]] bool EncodeArmyLane(
-    const std::vector<SArmyRecord>& records, const std::vector<SArmyRecord>* baseline, BitWriter& writer
-  );
+  [[nodiscard]] bool
+  EncodeArmyLane(const std::vector<SArmyRecord>& records, const std::vector<SArmyRecord>* baseline, BitWriter& writer);
 
   /** Reads one lane against `baseline` (the records the encoder used). False for anything malformed. */
-  [[nodiscard]] bool DecodeArmyLane(
-    BitReader& reader, const std::vector<SArmyRecord>* baseline, std::vector<SArmyRecord>& out
-  );
+  [[nodiscard]] bool
+  DecodeArmyLane(BitReader& reader, const std::vector<SArmyRecord>* baseline, std::vector<SArmyRecord>& out);
 
   /** One grid of the lane: whose, which (0 vision, 1 water), its cell size, its cells. */
   struct SGridSlot
@@ -90,9 +88,8 @@ namespace faf::remote::wire
   void WriteGridSlotHeader(const SGridSlot& slot, BitWriter& writer);
   /** One slot of the lane, against the `baseline` its client holds (null: none). */
   [[nodiscard]] bool EncodeGridSlot(const SGridSlot& slot, const SGridBits* baseline, BitWriter& writer);
-  [[nodiscard]] bool EncodeGridLane(
-    const std::vector<SGridSlot>& grids, const std::vector<SGridSlot>& held, BitWriter& writer
-  );
+  [[nodiscard]] bool
+  EncodeGridLane(const std::vector<SGridSlot>& grids, const std::vector<SGridSlot>& held, BitWriter& writer);
 
   /** Reads one grid lane against `held` and replaces it with the grids sent. False for anything malformed. */
   [[nodiscard]] bool DecodeGridLane(BitReader& reader, std::vector<SGridSlot>& held);

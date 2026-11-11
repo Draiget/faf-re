@@ -50,7 +50,6 @@ namespace moho
     void AddEnums();
   };
 
-
   static_assert(sizeof(EFireStateTypeInfo) == 0x78, "EFireStateTypeInfo size must be 0x78");
 
   /**

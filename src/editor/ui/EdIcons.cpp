@@ -11,15 +11,25 @@ namespace faf::editor
     constexpr float kPi = 3.14159265f;
   }
 
-  void DrawEdIcon(ImDrawList* const draw, const EdIcon icon, const ImVec2 p, const float s, const ImU32 color)
+  void DrawEdIcon(
+    ImDrawList* const draw,
+    const EdIcon icon,
+    const ImVec2 p,
+    const float s,
+    const ImU32 color
+  )
   {
     // Redo is Undo mirrored.
     const bool mirror = icon == EdIcon::Redo;
-    const auto at = [&](const float x, const float y) { return ImVec2(p.x + (mirror ? 1.0f - x : x) * s, p.y + y * s); };
+    const auto at = [&](const float x, const float y) {
+      return ImVec2(p.x + (mirror ? 1.0f - x : x) * s, p.y + y * s);
+    };
     const float line = s * 0.09f;
     // A floppy disk in the square from (x0, y0), `k` of the icon wide.
     const auto floppy = [&](const float x0, const float y0, const float k) {
-      const auto f = [&](const float x, const float y) { return at(x0 + x * k, y0 + y * k); };
+      const auto f = [&](const float x, const float y) {
+        return at(x0 + x * k, y0 + y * k);
+      };
       draw->AddRect(f(0.1f, 0.1f), f(0.9f, 0.9f), color, s * 0.08f, 0, line);
       draw->AddRectFilled(f(0.3f, 0.1f), f(0.66f, 0.38f), color);
       draw->AddRect(f(0.26f, 0.56f), f(0.74f, 0.9f), color, 0.0f, 0, line);
@@ -64,7 +74,9 @@ namespace faf::editor
       draw->AddRect(at(0.05f, 0.05f), at(0.95f, 0.95f), color, 0.0f, 0, line * 0.6f);
       draw->AddRect(at(0.25f, 0.25f), at(0.75f, 0.75f), color, 0.0f, 0, line * 1.3f);
       for (const ImVec2 corner : {at(0.25f, 0.25f), at(0.75f, 0.25f), at(0.75f, 0.75f), at(0.25f, 0.75f)}) {
-        draw->AddRectFilled(ImVec2(corner.x - s * 0.08f, corner.y - s * 0.08f), ImVec2(corner.x + s * 0.08f, corner.y + s * 0.08f), color);
+        draw->AddRectFilled(
+          ImVec2(corner.x - s * 0.08f, corner.y - s * 0.08f), ImVec2(corner.x + s * 0.08f, corner.y + s * 0.08f), color
+        );
       }
       break;
     case EdIcon::Pin:
@@ -83,7 +95,9 @@ namespace faf::editor
     }
     case EdIcon::Folder: {
       // The back with its tab, and the open front over it.
-      const ImVec2 back[] = {at(0.06f, 0.84f), at(0.06f, 0.16f), at(0.38f, 0.16f), at(0.46f, 0.26f), at(0.82f, 0.26f), at(0.82f, 0.4f)};
+      const ImVec2 back[] = {
+        at(0.06f, 0.84f), at(0.06f, 0.16f), at(0.38f, 0.16f), at(0.46f, 0.26f), at(0.82f, 0.26f), at(0.82f, 0.4f)
+      };
       draw->AddPolyline(back, 6, color, 0, line);
       draw->AddQuadFilled(at(0.2f, 0.42f), at(0.98f, 0.42f), at(0.84f, 0.86f), at(0.06f, 0.86f), color);
       break;
@@ -157,15 +171,22 @@ namespace faf::editor
     }
   }
 
-  bool EdToolButton(const char* const id, const EdIcon icon, const char* const label, const bool toggle, const bool on,
-                    const EdSegment segment)
+  bool EdToolButton(
+    const char* const id,
+    const EdIcon icon,
+    const char* const label,
+    const bool toggle,
+    const bool on,
+    const EdSegment segment
+  )
   {
     const ImGuiStyle& style = ImGui::GetStyle();
     const float side = ImGui::GetFrameHeight();
     const float inset = side * 0.18f;
     const float iconSide = side - inset * 2.0f;
     const ImVec2 textSize = label != nullptr ? ImGui::CalcTextSize(label) : ImVec2(0.0f, 0.0f);
-    const float width = label != nullptr ? inset + iconSide + style.ItemInnerSpacing.x + textSize.x + style.FramePadding.x : side;
+    const float width =
+      label != nullptr ? inset + iconSide + style.ItemInnerSpacing.x + textSize.x + style.FramePadding.x : side;
     const ImVec2 at = ImGui::GetCursorScreenPos();
     const bool clicked = ImGui::InvisibleButton(id, ImVec2(width, side));
     const bool hovered = ImGui::IsItemHovered();
@@ -173,7 +194,9 @@ namespace faf::editor
 
     ImU32 fill = 0;
     if (toggle && on) {
-      const ImVec4 lit = held ? ImVec4(0.48f, 0.31f, 0.14f, 1.0f) : hovered ? ImVec4(0.66f, 0.44f, 0.20f, 1.0f) : ImVec4(0.55f, 0.36f, 0.16f, 1.0f);
+      const ImVec4 lit = held ? ImVec4(0.48f, 0.31f, 0.14f, 1.0f)
+        : hovered             ? ImVec4(0.66f, 0.44f, 0.20f, 1.0f)
+                              : ImVec4(0.55f, 0.36f, 0.16f, 1.0f);
       fill = ImGui::GetColorU32(lit);
     } else {
       fill = ImGui::GetColorU32(held ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
@@ -195,23 +218,40 @@ namespace faf::editor
     const ImU32 ink = toggle && !on ? ImGui::GetColorU32(ImGuiCol_TextDisabled) : ImGui::GetColorU32(ImGuiCol_Text);
     DrawEdIcon(draw, icon, ImVec2(at.x + inset, at.y + inset), iconSide, ink);
     if (label != nullptr) {
-      draw->AddText(ImVec2(at.x + inset + iconSide + style.ItemInnerSpacing.x, at.y + (side - textSize.y) * 0.5f),
-                    ImGui::GetColorU32(ImGuiCol_Text), label);
+      draw->AddText(
+        ImVec2(at.x + inset + iconSide + style.ItemInnerSpacing.x, at.y + (side - textSize.y) * 0.5f),
+        ImGui::GetColorU32(ImGuiCol_Text),
+        label
+      );
     }
     return clicked;
   }
 
-  bool IconToggle(const char* const id, const EdIcon icon, const bool on, const EdSegment segment)
+  bool IconToggle(
+    const char* const id,
+    const EdIcon icon,
+    const bool on,
+    const EdSegment segment
+  )
   {
     return EdToolButton(id, icon, nullptr, true, on, segment);
   }
 
-  float EdTextSegmentWidth(const char* const text, const float minWidth)
+  float EdTextSegmentWidth(
+    const char* const text,
+    const float minWidth
+  )
   {
     return std::max(minWidth, ImGui::CalcTextSize(text).x + ImGui::GetStyle().FramePadding.x * 2.0f);
   }
 
-  bool EdTextSegment(const char* const id, const char* const text, const EdSegment segment, const bool enabled, const float minWidth)
+  bool EdTextSegment(
+    const char* const id,
+    const char* const text,
+    const EdSegment segment,
+    const bool enabled,
+    const float minWidth
+  )
   {
     const ImGuiStyle& style = ImGui::GetStyle();
     const float side = ImGui::GetFrameHeight();
@@ -232,11 +272,23 @@ namespace faf::editor
     }
     ImDrawList* const draw = ImGui::GetWindowDrawList();
     const ImVec2 end(at.x + width, at.y + side);
-    draw->AddRectFilled(at, end, ImGui::GetColorU32(held ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button),
-                        style.FrameRounding, corners);
+    draw->AddRectFilled(
+      at,
+      end,
+      ImGui::GetColorU32(
+        held        ? ImGuiCol_ButtonActive
+          : hovered ? ImGuiCol_ButtonHovered
+                    : ImGuiCol_Button
+      ),
+      style.FrameRounding,
+      corners
+    );
     const ImVec2 textSize = ImGui::CalcTextSize(text);
-    draw->AddText(ImVec2(at.x + (width - textSize.x) * 0.5f, at.y + (side - textSize.y) * 0.5f),
-                  ImGui::GetColorU32(enabled ? ImGuiCol_Text : ImGuiCol_TextDisabled), text);
+    draw->AddText(
+      ImVec2(at.x + (width - textSize.x) * 0.5f, at.y + (side - textSize.y) * 0.5f),
+      ImGui::GetColorU32(enabled ? ImGuiCol_Text : ImGuiCol_TextDisabled),
+      text
+    );
     return clicked && enabled;
   }
 } // namespace faf::editor
