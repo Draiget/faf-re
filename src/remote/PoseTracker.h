@@ -97,6 +97,35 @@ namespace faf::remote
       std::span<const std::uint32_t> held, std::span<const std::uint32_t> heldBefore, bool fresh, wire::BitWriter& out
     ) const;
 
+    /**
+     * Plan WP8.2's check: a unit's bones as last sent (what every client in step with it holds), empty for none or an
+     * id that isn't a unit this beat. From any thread between `Refresh` calls.
+     */
+    [[nodiscard]] std::span<const wire::SPoseBone> SentPose(std::uint32_t id) const noexcept;
+
+    /** Plan WP8.2: a unit whose pose changes a client didn't get, and the beat since when. */
+    struct SOwedPose
+    {
+      std::uint32_t id = 0;
+      std::uint32_t since = 0;
+    };
+    /** Plan WP8.2: an owed unit this many beats old goes ahead of every camera-ordered one. */
+    static constexpr std::uint32_t kOwedMaxBeats = 20;
+
+    /**
+     * Plan WP8.2, research/WP8.2-pose-budget.md: `EncodeView` within `budgetBytes` a beat. `priority` has a key per
+     * `held` unit, lower first (the view's camera order). A unit left out becomes owed in `owed` (ascending ids,
+     * this client's, kept between beats); an owed unit goes whole when it goes, which brings its client back in step
+     * whatever it missed, and leaves `owed`. Order: units whose pose the client must drop, then owed units at least
+     * `kOwedMaxBeats` old (oldest first), then by `priority`; a unit that doesn't fit what's left is left out and
+     * the next tried (the lane's first goes even past the budget, so a big unit can't wait for good, and units the
+     * client must drop always go). `budgetBytes` 0: `EncodeView`, and `owed` emptied.
+     */
+    [[nodiscard]] bool EncodeViewBudgeted(
+      std::span<const std::uint32_t> held, std::span<const std::uint32_t> heldBefore, bool fresh, std::size_t budgetBytes,
+      std::span<const float> priority, std::uint32_t beat, std::vector<SOwedPose>& owed, wire::BitWriter& out
+    ) const;
+
     /** Units with a pose now (counted on asking); bones changed this beat. */
     [[nodiscard]] std::size_t PosedUnits() const noexcept;
     [[nodiscard]] std::size_t ChangedBones() const noexcept { return mChangedBones; }

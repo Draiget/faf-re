@@ -32,6 +32,8 @@ namespace faf::headless
     bool seats = false;         // the commands through the game server's seats (ReplaySeats.h)
     std::string seatsListen;    // with `seats`, Linux: the whole server's load: views and players over UDP at this address
     bool targetAudit = false;   // with `seatsListen`: how many recorded targets a server's view wouldn't have held
+    int poseBudgetKbps = 0;     // with `seatsListen`: the server's --pose-budget-kbps (plan WP8.2); 0 none
+    bool poseCheck = false;     // with `seatsListen`: every view's pose lane applied to a copy of its client's poses and compared
     bool oracleCheck = false;   // the visibility oracle against the sim's own publication (ReplayOracleCheck.h)
     std::string oracleDigestsPath; // with `oracleCheck`: per beat and army, the oracle's answers as a digest
     bool changeSetCheck = false; // the sync walk's change set against its packet (ReplayChangeSetCheck.h)

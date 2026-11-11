@@ -5,10 +5,12 @@
 #include <cstdio>
 #include <deque>
 #include <memory>
+#include <span>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
+#include "remote/FocusAndCameras.h"
 #include "remote/FrameBuilder.h"
 #include "remote/PoseTracker.h"
 #include "remote/ViewIdMap.h"
@@ -95,6 +97,11 @@ namespace faf::remote
      * `OnViewReady` or after `FinishViews`.
      */
     void HeldUnitIds(std::size_t army, std::vector<std::uint32_t>& out) const;
+    /**
+     * Plan WP8.2: for `ids` (ascending, as `HeldUnitIds` gives them) the pose order keys, lower first: by `cameras`
+     * (the view's client's, WP11.1) when it has any, else its own army's units first. Unknown ids last.
+     */
+    void HeldUnitKeys(std::size_t army, std::span<const std::uint32_t> ids, std::span<const SCameraReport> cameras, std::vector<float>& out) const;
     /** `CSharedUnitStats::SetReadEvery`'s default: a unit's stats at most 0.3 s late (server `--stats-every`). */
     static constexpr std::uint32_t kStatsEveryBeats = 4;
     /** `--stats-every <beats>` (server and headless view bench): 1 reads every unit's stats every beat. */

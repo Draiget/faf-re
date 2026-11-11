@@ -189,6 +189,9 @@ namespace
       "  --seats-listen <ip:port>  with --seats, Linux: and each seat's view over UDP to whoever joins as it, uid\n"
       "                            the source's index, token seat-<uid> (--view-pipeline: its threads)\n"
       "  --target-audit            with --seats-listen: how many recorded targets a server's view wouldn't have held\n"
+      "  --pose-budget-kbps <n>    with --seats-listen: each view's pose lane within n KB/s, as the server's (plan WP8.2)\n"
+      "  --pose-check              with --seats-listen: each view's pose lane applied to a copy of its client's poses,\n"
+      "                            every unit it isn't owed compared with the server's (plan WP8.2)\n"
       "  --oracle-check            the visibility oracle for the --focus army against what the sim publishes,\n"
       "                            every entity and beat (server-mode build)\n"
       "  --oracle-digests <file>  with --oracle-check: per beat, the oracle's answers for every army (unfocused)\n"
@@ -351,6 +354,8 @@ int HEADLESS_Main(int argc, char** argv)
   options.commandCheck = moho::CFG_GetArgOption("--command-check", 0, nullptr);
   options.seats = moho::CFG_GetArgOption("--seats", 0, nullptr);
   (void)ReadOption("--seats-listen", options.seatsListen);
+  (void)ReadIntOption("--pose-budget-kbps", options.poseBudgetKbps, bad);
+  options.poseCheck = moho::CFG_GetArgOption("--pose-check", 0, nullptr);
   options.targetAudit = moho::CFG_GetArgOption("--target-audit", 0, nullptr);
   options.oracleCheck = moho::CFG_GetArgOption("--oracle-check", 0, nullptr);
   if (ReadOption("--oracle-digests", options.oracleDigestsPath)) {

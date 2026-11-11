@@ -106,7 +106,7 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy] "
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--pose-budget-kbps <n>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy] "
     "[--checksum-period <beats>] [--digests <file>] [--state-digests <file>]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
@@ -1780,6 +1780,24 @@ namespace
         views->SetStatsEveryBeats(static_cast<std::uint32_t>(std::max(1, std::atoi(statsEvery.c_str()))));
       }
       views->SetPauseBook(pauseBook);
+      // Plan WP8.2: each view's pose lane within a budget, the units nearest its player's cameras first.
+      if (std::string poseBudget; ReadOption("--pose-budget-kbps", poseBudget)) {
+        const int kbps = std::max(0, std::atoi(poseBudget.c_str()));
+        views->SetPoseBudget(static_cast<std::size_t>(kbps) * 1024u / 10u); // a beat is a tenth of a second at speed 0
+        Say("Poses: within %d KB/s a view (%zu bytes a beat), nearest the player's cameras first", kbps, views->PoseBudget());
+      }
+      {
+        std::map<std::int32_t, std::size_t> uidArmies;
+        for (const auto& [army, uid] : armyUids) {
+          uidArmies[uid] = army;
+        }
+        faf::server::CServerViews* const cameraViews = views.get();
+        net->SetCameraSink([cameraViews, uidArmies](const std::int32_t uid, const std::vector<faf::remote::SCameraReport>& cameras) {
+          if (const auto found = uidArmies.find(uid); found != uidArmies.end()) {
+            cameraViews->SetCameras(found->second, cameras);
+          }
+        });
+      }
       views->Install();
       Say("Views: %s", teamViews ? (teamsLocked ? "one per team, and each player's own units" : "one per team (--team-views), with teams unlocked")
                        : perPlayerViews ? "one per player (--per-player-views)" : "one per player, as teams aren't locked (TeamLock)");
@@ -2396,6 +2414,10 @@ namespace
     if (views) {
       if (views->Failures() != 0u) {
         Say("WARNING: %llu view lanes didn't encode", static_cast<unsigned long long>(views->Failures()));
+      }
+      net->SetCameraSink({}); // plan WP8.2: no camera reaches the views from here on
+      if (views->PoseBudget() != 0u) {
+        Say("Poses: %zu units owed a pose across the views at the end", views->OwedPoses());
       }
       views->Uninstall();
       Say("%s", net->Intake().Report().c_str());

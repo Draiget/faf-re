@@ -145,6 +145,96 @@ namespace faf::remote
     );
   }
 
+  void CViewLanes::SetCameras(const std::size_t army, std::vector<SCameraReport> cameras)
+  {
+    const std::scoped_lock lock(mCamerasLock);
+    if (army >= mCameras.size()) {
+      mCameras.resize(army + 1u);
+    }
+    mCameras[army] = std::move(cameras);
+  }
+
+  void CViewLanes::CheckPoses(SClient& client, const wire::BitWriter& lane)
+  {
+    // Plan WP8.2's check. As a client applies the lane: a whole unit's bones replace what it held (none: it drops
+    // the unit), a change adds each bone's difference and takes its flags.
+    thread_local std::vector<wire::SUnitPose> units;
+    wire::BitReader reader(lane.Bytes());
+    if (!wire::DecodePoseLane(reader, units)) {
+      ++client.failures;
+      return;
+    }
+    for (const wire::SUnitPose& unit : units) {
+      if (unit.whole) {
+        if (unit.bones.empty()) {
+          client.poseCopy.erase(unit.id);
+        } else {
+          client.poseCopy[unit.id] = unit.bones;
+        }
+        continue;
+      }
+      const auto held = client.poseCopy.find(unit.id);
+      for (std::size_t i = 0; i < unit.indices.size(); ++i) {
+        if (held == client.poseCopy.end() || unit.indices[i] >= held->second.size()) {
+          mPoseCheckOrphanChanges.fetch_add(1u, std::memory_order_relaxed);
+          continue;
+        }
+        wire::SPoseBone& bone = held->second[unit.indices[i]];
+        const wire::SPoseBone& difference = unit.bones[i];
+        for (std::size_t c = 0; c < 3; ++c) {
+          bone.position[c] += difference.position[c];
+        }
+        for (std::size_t c = 0; c < 4; ++c) {
+          bone.rotation[c] += difference.rotation[c];
+        }
+        bone.visible = difference.visible;
+        bone.skipInterp = difference.skipInterp;
+      }
+    }
+    // The copy keeps only units the client still holds; every one it isn't owed must equal what the server sent.
+    std::uint64_t compared = 0;
+    std::uint64_t differ = 0;
+    for (auto it = client.poseCopy.begin(); it != client.poseCopy.end();) {
+      if (!std::binary_search(client.poseUnitsNext.begin(), client.poseUnitsNext.end(), it->first)) {
+        it = client.poseCopy.erase(it);
+      } else {
+        ++it;
+      }
+    }
+    std::size_t owedAt = 0;
+    for (const std::uint32_t id : client.poseUnitsNext) {
+      while (owedAt < client.owedPoses.size() && client.owedPoses[owedAt].id < id) {
+        ++owedAt;
+      }
+      if (owedAt < client.owedPoses.size() && client.owedPoses[owedAt].id == id) {
+        continue; // owed: the client may be behind until the unit goes whole
+      }
+      const std::span<const wire::SPoseBone> sent = Poses().SentPose(id);
+      const auto held = client.poseCopy.find(id);
+      const bool same = held == client.poseCopy.end() ? sent.empty()
+                                                       : std::equal(sent.begin(), sent.end(), held->second.begin(), held->second.end());
+      ++compared;
+      differ += same ? 0u : 1u;
+    }
+    mPoseCheckUnits.fetch_add(compared, std::memory_order_relaxed);
+    mPoseCheckDiffers.fetch_add(differ, std::memory_order_relaxed);
+  }
+
+  std::string CViewLanes::PoseCheckReport() const
+  {
+    return std::to_string(mPoseCheckUnits.load()) + " unit-beats compared, " + std::to_string(mPoseCheckDiffers.load()) + " differ, "
+         + std::to_string(mPoseCheckOrphanChanges.load()) + " changes to a unit the client held no pose of";
+  }
+
+  std::size_t CViewLanes::OwedPoses() const
+  {
+    std::size_t owed = 0;
+    for (const SClient& client : mClients) {
+      owed += client.owedPoses.size();
+    }
+    return owed;
+  }
+
   void CViewLanes::Send(const std::size_t army)
   {
     SClient& client = mClients[army];
@@ -231,11 +321,31 @@ namespace faf::remote
     }
     client.grids.swap(client.gridsNext);
 
-    // Pose lane (plan WP8.1): the bones of the units its client holds, against what it was sent.
+    // Pose lane (plan WP8.1): the bones of the units its client holds, against what it was sent; with a budget
+    // (WP8.2) the units nearest its cameras first, and the ones left out owed whole.
     wire::BitWriter poseWriter;
     if (PosesOn()) {
       HeldUnitIds(army, client.poseUnitsNext);
-      if (Poses().EncodeView(client.poseUnitsNext, client.poseUnits, fresh, poseWriter)) {
+      bool posesOk = true;
+      if (mPoseBudgetBytes != 0u) {
+        std::vector<SCameraReport> cameras;
+        {
+          const std::scoped_lock lock(mCamerasLock);
+          if (army < mCameras.size()) {
+            cameras = mCameras[army];
+          }
+        }
+        HeldUnitKeys(army, client.poseUnitsNext, cameras, client.poseKeys);
+        posesOk = Poses().EncodeViewBudgeted(
+          client.poseUnitsNext, client.poseUnits, fresh, mPoseBudgetBytes, client.poseKeys, client.poseBeat++, client.owedPoses, poseWriter
+        );
+      } else {
+        posesOk = Poses().EncodeView(client.poseUnitsNext, client.poseUnits, fresh, poseWriter);
+      }
+      if (posesOk && mPoseCheck) {
+        CheckPoses(client, poseWriter);
+      }
+      if (posesOk) {
         client.bytes += static_cast<std::uint32_t>(poseWriter.Bytes().size());
       } else {
         ++client.failures;

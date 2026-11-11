@@ -1,9 +1,12 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -106,6 +109,27 @@ namespace faf::remote
       (void)router;
     }
 
+  public:
+    /**
+     * Plan WP8.2: each view's pose lane within this many bytes a beat (research/WP8.2-pose-budget.md); 0, the
+     * default, sends every changed bone as before.
+     */
+    void SetPoseBudget(const std::size_t bytesPerBeat) noexcept { mPoseBudgetBytes = bytesPerBeat; }
+    [[nodiscard]] std::size_t PoseBudget() const noexcept { return mPoseBudgetBytes; }
+    /** Plan WP8.2: `army`'s client's cameras as it last reported them (WP11.1), from any thread. */
+    void SetCameras(std::size_t army, std::vector<SCameraReport> cameras);
+    /** Plan WP8.2: units a view owes a pose to, summed over the views, as of their last lanes. */
+    [[nodiscard]] std::size_t OwedPoses() const;
+    /**
+     * Plan WP8.2's check: each view's pose lane is decoded into a copy of what its client holds (a whole unit
+     * replaces its bones, a change adds to them), and every held unit it doesn't owe a pose is compared with the
+     * server's sent bones. For tests: it keeps every client's bones.
+     */
+    void EnablePoseCheck() noexcept { mPoseCheck = true; }
+    /** "N unit-beats compared, M differ, K changes to a unit the client held no pose of", with `EnablePoseCheck`. */
+    [[nodiscard]] std::string PoseCheckReport() const;
+
+  protected:
     /** The bytes of a view's lanes on the last beat. */
     [[nodiscard]] std::uint32_t ClientBytes(const std::size_t army) const { return mClients[army].bytes; }
     /** Lanes of a view that didn't encode since the last call. */
@@ -125,6 +149,10 @@ namespace faf::remote
       wire::BitWriter teamFrame;        // a team's view: this beat's frame, for its players' messages
       std::vector<std::uint32_t> poseUnits;     // the units it held last beat (`HeldUnitIds`), for the pose lane
       std::vector<std::uint32_t> poseUnitsNext;
+      std::vector<CPoseTracker::SOwedPose> owedPoses; // plan WP8.2: units whose pose changes it didn't get yet
+      std::vector<float> poseKeys;              // and this beat's order keys for `poseUnitsNext`
+      std::uint32_t poseBeat = 0;               // its pose lanes so far, the owed units' clock
+      std::unordered_map<std::uint32_t, std::vector<wire::SPoseBone>> poseCopy; // `EnablePoseCheck`: what it holds
       std::uint64_t teamHash = 0;       // and on a check's beat its hash
       bool fresh = false;               // `RequestFresh`
       std::uint32_t bytes = 0;          // this beat
@@ -147,6 +175,15 @@ namespace faf::remote
     void Send(std::size_t army);
 
     std::vector<SClient> mClients;
+    std::size_t mPoseBudgetBytes = 0;
+    bool mPoseCheck = false;
+    std::atomic<std::uint64_t> mPoseCheckUnits{0};
+    std::atomic<std::uint64_t> mPoseCheckDiffers{0};
+    std::atomic<std::uint64_t> mPoseCheckOrphanChanges{0};
+    /** `EnablePoseCheck`: `lane` (this beat's, encoded) applied to `client`'s copy, then compared. */
+    void CheckPoses(SClient& client, const wire::BitWriter& lane);
+    mutable std::mutex mCamerasLock;                     // `mCameras` is written by the network thread
+    std::vector<std::vector<SCameraReport>> mCameras;    // per army
     std::vector<SBeatGrid> mBeatGrids; // every army's grids, in army order; they keep their cells from beat to beat
     bool mLuaRouting = false;
     bool mLuaSeparately = false;

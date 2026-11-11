@@ -641,6 +641,12 @@ namespace faf::headless
         tables, *rules, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, *seatNet, std::move(players),
         static_cast<unsigned int>(std::max(options.viewPipelineThreads, 1)), options.viewTeams
       );
+      if (options.poseBudgetKbps > 0) {
+        seatViews->SetPoseBudget(static_cast<std::size_t>(options.poseBudgetKbps) * 1024u / 10u); // plan WP8.2, as the server's
+      }
+      if (options.poseCheck) {
+        seatViews->EnablePoseCheck();
+      }
       seatViews->Install();
     }
     std::unique_ptr<CReplayTargetAudit> targetAudit;
@@ -995,6 +1001,9 @@ namespace faf::headless
       );
       if (seatViews) {
         std::printf("[%s] %s\n[%s] %s\n", label, seatViews->LaneReport().c_str(), label, seatNet->Intake().Report().c_str());
+        if (options.poseCheck) {
+          std::printf("[%s] pose check: %s; %zu units owed at the end\n", label, seatViews->PoseCheckReport().c_str(), seatViews->OwedPoses());
+        }
       }
       if (targetAudit) {
         std::printf("[%s] %s\n", label, targetAudit->Summary().c_str());

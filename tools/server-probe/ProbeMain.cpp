@@ -254,6 +254,9 @@ namespace
     int focusArmy = 0;            // plan WP11.1: the army asked for with SetFocusArmy
     double focusArmyAt = -1.0;
     double camerasEvery = 0.0;    // plan WP11.1: a camera update this often (s); 0: none
+    float cameraX = 0.0f;         // plan WP8.2, --camera-at x,z,half-width: a real top-down camera (else a placeholder)
+    float cameraZ = 0.0f;
+    float cameraHalfWidth = 0.0f;
     int speedLimit = 0;           // plan WP10.7: reported as this player's game's sim-speed limit
     double speedLimitAt = -1.0;
   };
@@ -434,6 +437,11 @@ namespace
         out.focusArmyAt = Argument(value);
       } else if (name == "--cameras-every") {
         out.camerasEvery = Argument(value);
+      } else if (name == "--camera-at") {
+        if (std::sscanf(value, "%f,%f,%f", &out.cameraX, &out.cameraZ, &out.cameraHalfWidth) != 3 || out.cameraHalfWidth <= 0.0f) {
+          std::fprintf(stderr, "--camera-at takes x,z,half-width (world units), not %s\n", value);
+          return false;
+        }
       } else if (name == "--speed-limit") {
         out.speedLimit = std::atoi(value);
       } else if (name == "--speed-limit-at") {
@@ -957,7 +965,7 @@ int main(const int argc, char** const argv)
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
       "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--rate-every <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
-      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>] [--lobby-established-at <s>]] [--speed-limit <step> --speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s>] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--lua-keys] [--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua>]\n"
+      "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>] [--lobby-established-at <s>]] [--speed-limit <step> --speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s> [--camera-at <x,z,half-width>]] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--lua-keys] [--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua>]\n"
     );
     return 3;
   }
@@ -1300,7 +1308,18 @@ int main(const int argc, char** const argv)
     if (options.camerasEvery > 0.0 && elapsed >= nextCameraAt) {
       nextCameraAt = elapsed + options.camerasEvery;
       faf::remote::SCameraReport camera;
-      camera.viewProjection[0] = static_cast<float>(elapsed);
+      if (options.cameraHalfWidth > 0.0f) {
+        // Plan WP8.2: a top-down camera over (x, z), half-width wide, as row vectors (clip = (x, y, z, 1) * M, as
+        // GeomCamera3's): clip x from world x, clip y from world z, w 1, so a unit is on screen within the square.
+        const float scale = 1.0f / options.cameraHalfWidth;
+        camera.viewProjection[0] = scale;
+        camera.viewProjection[9] = scale;
+        camera.viewProjection[12] = -options.cameraX * scale;
+        camera.viewProjection[13] = -options.cameraZ * scale;
+        camera.viewProjection[15] = 1.0f;
+      } else {
+        camera.viewProjection[0] = static_cast<float>(elapsed);
+      }
       const std::vector<std::uint8_t> cameras = faf::remote::EncodeCameras(std::span<const faf::remote::SCameraReport>(&camera, 1u));
       camerasSent += link.SendReliable(cameras.data(), cameras.size()) ? 1u : 0u;
     }

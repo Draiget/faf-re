@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -190,6 +191,15 @@ namespace faf::server
      * them pick any (defeated, with `DefeatedPlayerView = "observe"`). Any thread.
      */
     void SetFocusRule(std::int32_t uid, int ownArmy);
+    /**
+     * Plan WP8.2: called on the network thread with a player's cameras each time it reports them (WP11.1), for the
+     * views' pose order. Any thread; an empty function stops it.
+     */
+    void SetCameraSink(std::function<void(std::int32_t uid, const std::vector<remote::SCameraReport>& cameras)> sink)
+    {
+      const std::scoped_lock lock(mCameraSinkLock);
+      mCameraSink = std::move(sink);
+    }
     void FreeFocus(std::int32_t uid);
     /** Plan WP17.2: lobby ready states that changed since the last call (uid, ready), in order. */
     [[nodiscard]] std::vector<std::pair<std::int32_t, bool>> TakeReadyChanges();
@@ -322,6 +332,8 @@ namespace faf::server
     std::uint64_t mBadMessages = 0;
     std::uint64_t mFocusRefused = 0;   // plan WP11.1
     std::uint64_t mCamerasDropped = 0; // plan WP11.1: camera updates past the bucket (eight a second, four at once)
+    std::mutex mCameraSinkLock;
+    std::function<void(std::int32_t, const std::vector<remote::SCameraReport>&)> mCameraSink; // plan WP8.2
     std::uint64_t mViewMismatches = 0;
     remote::wire::SRoster mRosterSent; // the last sent to everyone, without a local index
     bool mRosterSentEver = false;

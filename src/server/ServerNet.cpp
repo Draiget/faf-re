@@ -1030,6 +1030,12 @@ namespace faf::server
       }
       seat.cameraTokens -= 1.0;
       seat.cameras = std::move(cameras);
+      {
+        const std::scoped_lock lock(mCameraSinkLock);
+        if (mCameraSink) {
+          mCameraSink(uid, seat.cameras); // plan WP8.2: the views order its pose lane by them
+        }
+      }
       if (++seat.cameraUpdates == 1u) {
         Say(seat.name + "'s game sends its cameras");
       }

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <bit>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <iterator>
 #include <unordered_set>
@@ -632,6 +633,69 @@ namespace faf::remote
       mBuilders[teamSlot]->AppendUnitIds(out);
       std::inplace_merge(out.begin(), out.begin() + static_cast<std::ptrdiff_t>(own), out.end());
       out.erase(std::unique(out.begin(), out.end()), out.end());
+    }
+  }
+
+  void CViewFrames::HeldUnitKeys(
+    const std::size_t army, const std::span<const std::uint32_t> ids, const std::span<const SCameraReport> cameras,
+    std::vector<float>& out
+  ) const
+  {
+    // Plan WP8.2: a pose order key per unit, lower first. With cameras: a unit inside one of them (clip space) by its
+    // depth there (w); one outside by its distance past the screen's edge, after every unit inside. Without: the
+    // view's own army's units, then the rest, in id order (the sort is stable).
+    constexpr float kOutside = 1.0e6f;
+    out.assign(ids.size(), kOutside * 2.0f);
+    if (army >= mBuilders.size()) {
+      return;
+    }
+    const CViewFrameBuilder* const own = mBuilders[army].get();
+    const std::size_t teamSlot = TeamSlotOf(army);
+    const CViewFrameBuilder* const team =
+      TeamsOn() && teamSlot != army && !CutFromTeam(army) && teamSlot < mBuilders.size() ? mBuilders[teamSlot].get() : nullptr;
+    std::size_t ownCursor = 0;
+    std::size_t teamCursor = 0;
+    for (std::size_t i = 0; i < ids.size(); ++i) {
+      std::uint32_t slot = 0;
+      const wire::SEntityRecord* record = nullptr;
+      if (own->FindSlotFrom(ownCursor, ids[i], slot)) {
+        record = &own->RecordAt(slot);
+      } else if (team != nullptr && team->FindSlotFrom(teamCursor, ids[i], slot)) {
+        record = &team->RecordAt(slot);
+      }
+      if (record == nullptr) {
+        continue;
+      }
+      if (cameras.empty()) {
+        out[i] = record->army == static_cast<std::uint8_t>(army) ? 0.0f : 1.0f;
+        continue;
+      }
+      float p[3];
+      if (record->farPosition) {
+        p[0] = record->farValue[0];
+        p[1] = record->farValue[1];
+        p[2] = record->farValue[2];
+      } else {
+        p[0] = mCodec.position.x.Decode(record->position[0]);
+        p[1] = mCodec.position.y.Decode(record->position[1]);
+        p[2] = mCodec.position.z.Decode(record->position[2]);
+      }
+      float best = kOutside * 2.0f;
+      for (const SCameraReport& camera : cameras) {
+        const auto& m = camera.viewProjection; // row-major, row vectors: clip = (x, y, z, 1) * M (GeomCamera3.cpp)
+        float clip[4];
+        for (int j = 0; j < 4; ++j) {
+          clip[j] = p[0] * m[static_cast<std::size_t>(j)] + p[1] * m[static_cast<std::size_t>(4 + j)] + p[2] * m[static_cast<std::size_t>(8 + j)]
+                  + m[static_cast<std::size_t>(12 + j)];
+        }
+        if (clip[3] <= 0.0f) {
+          continue; // behind the camera
+        }
+        const float edge = std::max(std::abs(clip[0]), std::abs(clip[1])) / clip[3];
+        const float key = edge <= 1.0f ? clip[3] : kOutside + (edge - 1.0f) * clip[3];
+        best = std::min(best, key);
+      }
+      out[i] = best;
     }
   }
 
