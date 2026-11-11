@@ -18,6 +18,11 @@ or, for runs made elsewhere, compare files alone:
     python tools/server-i2/i2.py --compare <server digests> <other digests> [--compare ...]
 
 The exit code is 0 when every comparison found at least one common beat and no difference, 1 otherwise.
+
+As the post-game verification job (plan WPR.24): run it on a Windows machine with the server's out folder (replay,
+digests, result.json); the verdict goes into that result.json as "verification" ("verdict" pass or fail, the checksum
+period, when, and each comparison's common beats, differences and first differing beat), next to the game's results
+and stats, so whoever reads the result sees whether the game re-simulated the same. --result names another file.
 """
 
 import argparse
@@ -37,11 +42,15 @@ def read_digests(path):
     return digests
 
 
+SUMMARIES = []  # one per comparison, for --result
+
+
 def compare(label, ours_path, theirs_path):
     """Prints one line and returns True when the files share beats and agree on all of them."""
     if not os.path.isfile(ours_path) or not os.path.isfile(theirs_path):
         missing = ours_path if not os.path.isfile(ours_path) else theirs_path
         print(f"{label}: FAIL, no file {missing}")
+        SUMMARIES.append({"what": label, "pass": False, "error": "no file " + os.path.basename(missing)})
         return False
     ours = read_digests(ours_path)
     theirs = read_digests(theirs_path)
@@ -54,7 +63,29 @@ def compare(label, ours_path, theirs_path):
     first = f", first difference at beat {differ[0]}" if differ else ""
     print(f"{label}: {verdict}, {len(common)} common beats ({span}), {len(differ)} differ{first}; "
           f"only in the first file {only_ours}, only in the second {only_theirs}")
+    SUMMARIES.append({"what": label, "pass": verdict == "PASS", "common_beats": len(common), "differ": len(differ),
+                      "first_difference": differ[0] if differ else None})
     return verdict == "PASS"
+
+
+def write_verdict(result_path, passed, period):
+    """Plan WPR.24: the verdict into the server's result.json as "verification", the rest of the file kept."""
+    import datetime
+    import json
+    with open(result_path, encoding="utf-8") as handle:
+        result = json.load(handle)
+    result["verification"] = {
+        "verdict": "pass" if passed else "fail",
+        "checksum_period": period,
+        "checked_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "comparisons": SUMMARIES,
+    }
+    temporary = result_path + ".tmp"
+    with open(temporary, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(result, handle)
+        handle.write("\n")
+    os.replace(temporary, result_path)
+    print(f"verdict {result['verification']['verdict']} written to {result_path}")
 
 
 def main():
@@ -72,6 +103,8 @@ def main():
     parser.add_argument("--args", default="", help="more headless arguments, one string")
     parser.add_argument("--compare", nargs=2, action="append", default=[], metavar=("FIRST", "SECOND"),
                         help="only compare two digest files of the same kind")
+    parser.add_argument("--result", help="plan WPR.24: write the verdict into this result.json (the server's) as "
+                                         "\"verification\" (default with --server-dir: <server-dir>/result.json when it exists)")
     options = parser.parse_args()
 
     results = []
@@ -110,6 +143,11 @@ def main():
     if not results:
         parser.error("nothing to do: give --headless or --compare")
     print("I2 PASS" if all(results) else "I2 FAIL")
+    result_path = options.result
+    if result_path is None and options.server_dir and os.path.isfile(os.path.join(options.server_dir, "result.json")):
+        result_path = os.path.join(options.server_dir, "result.json")
+    if result_path:
+        write_verdict(result_path, all(results), options.period)
     return 0 if all(results) else 1
 
 
