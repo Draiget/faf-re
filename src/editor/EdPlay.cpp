@@ -23,8 +23,14 @@
 #include "moho/misc/CVirtualFileSystem.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/entity/UserEntity.h"
+#include "moho/misc/WeakPtr.h"
+#include "moho/render/RCamManager.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/STIMap.h"
+#include "moho/sim/UserArmy.h"
+#include "moho/unit/core/UserUnit.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -577,6 +583,7 @@ end
     stored.slot = setup.slot;
     stored.aiCount = setup.aiCount;
     stored.prebuilt = setup.prebuilt;
+    stored.quickStart = setup.quickStart;
     stored.mods = setup.mods;
     stored.slots.clear();
     for (const PlaySlot& slot : setup.slots) {
@@ -610,6 +617,7 @@ end
     setup.slot = stored.slot;
     setup.aiCount = stored.aiCount;
     setup.prebuilt = stored.prebuilt;
+    setup.quickStart = stored.quickStart;
     setup.mods = stored.mods;
     setup.slots.clear();
     for (std::size_t at = 0; at < stored.slots.size();) {
@@ -654,7 +662,8 @@ end
   }
 
   // play_setups.ini: a [last] section and a [map <key>] section per map that keeps its own setup,
-  // each with opponents=solo|ai, ai=<key>, faction=<key>|random, fog=0|1, slot=<n from 1>, aicount=<n, 0 all>, prebuilt=0|1.
+  // each with opponents=solo|ai, ai=<key>, faction=<key>|random, fog=0|1, slot=<n from 1>, aicount=<n, 0 all>, prebuilt=0|1,
+  // quickstart=0|1 (missing: on).
   void EdPlay::ReadSetups()
   {
     mMapSetups.clear();
@@ -707,6 +716,8 @@ end
         current->aiCount = std::max(0, std::atoi(value.c_str()));
       } else if (key == "prebuilt") {
         current->prebuilt = value == "1";
+      } else if (key == "quickstart") {
+        current->quickStart = value != "0";
       } else if (key == "slots") {
         current->slots = value;
       } else if (key == "victory") {
@@ -749,6 +760,7 @@ end
           << "slot=" << setup.slot + 1 << '\n'
           << "aicount=" << setup.aiCount << '\n'
           << "prebuilt=" << (setup.prebuilt ? 1 : 0) << '\n'
+          << "quickstart=" << (setup.quickStart ? 1 : 0) << '\n'
           << "mods=";
       for (std::size_t i = 0; i < setup.mods.size(); ++i) {
         out << (i > 0 ? "," : "") << setup.mods[i];
@@ -894,6 +906,10 @@ end
     mPlayerArmy = 0;
     mWholeMap = false;
     SetFogHidden(false);
+    // `/playnoquickstart` (test runs): FAF's own start, to compare against.
+    mQuickStartPending = mSetup.quickStart && !moho::CFG_GetArgOption("/playnoquickstart", 0, nullptr);
+    mQuickStartSimSent = false;
+    mQuickStartUntil = 0.0;
     if (memtrace::Running()) {
       mTracePlay = memtrace::NextPlay();
     }
@@ -1192,6 +1208,73 @@ end
     }
   }
 
+  void EdPlay::DriveQuickStart()
+  {
+    if (!mQuickStartPending) {
+      return;
+    }
+    const moho::EWldFrameAction action = moho::WLD_GetFrameAction();
+    if (action == moho::EWldFrameAction::Inactive || action == moho::EWldFrameAction::Exit) {
+      mQuickStartPending = false;
+      return;
+    }
+    if (action != moho::EWldFrameAction::Playing) {
+      return;
+    }
+    // The sim: FAF starts each commander hidden and calls its PlayCommanderWarpInEffect 3 s on (ScenarioUtilities'
+    // CommanderWarpDelay; then 2.1 s of effect before it shows and takes orders). That call is looked up on the unit
+    // when it comes, so a commander given its own does nothing then; it is shown now, as the effect's end leaves it
+    // (its WarpInEffect.HideBones hidden again), and takes orders. The sim's own Lua (SimLua, the editor's plays have
+    // cheats on), in short lines: the console's command line is cut past a few hundred characters.
+    if (!mQuickStartSimSent) {
+      mQuickStartSimSent = true;
+      if (!mSetup.prebuilt) { // with prebuilt units FAF has no warp-in
+        moho::CON_Execute("SimLua function __EdQuick(u) u.PlayCommanderWarpInEffect = function(s) s:SetBlockCommandQueue(false) end "
+                          "u:ShowBone(0, true) u:SetBlockCommandQueue(false) end");
+        moho::CON_Execute("SimLua function __EdQuickBones(u) local w = u.Blueprint.Display.WarpInEffect if w and w.HideBones then "
+                          "for _, b in pairs(w.HideBones) do u:HideBone(b, true) end end end");
+        moho::CON_Execute("SimLua local n = 0 for _, a in pairs(ArmyBrains) do for _, u in pairs(a:GetListOfUnits(categories.COMMAND, false)) do "
+                          "__EdQuick(u) __EdQuickBones(u) n = n + 1 end end LOG('editor: quick start: ' .. n .. ' commanders at tick ' .. GetGameTick())");
+      }
+    }
+    // The camera: over your commander now, not FAF's zoom to it a second in (its own zoom then stays where it is). The
+    // world camera framed on it as UIZoomTo (0x00867240) frames its units, from here: the game's own GetArmyAvatars
+    // called from the editor's Lua fails LuaPlus's same-state check when it fills its table. Tried each frame until
+    // your army has its commander, for up to 5 s (an observer has none).
+    const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    if (mQuickStartUntil <= 0.0) {
+      mQuickStartUntil = now + 5.0;
+    }
+    if (now >= mQuickStartUntil) {
+      mQuickStartPending = false;
+      return;
+    }
+    const moho::CWldSession* const session = moho::WLD_GetActiveSession();
+    moho::UserArmy* const army = session != nullptr ? session->GetFocusArmy() : nullptr;
+    moho::CameraImpl* const camera = moho::CAM_GetManager() != nullptr ? moho::CAM_GetManager()->GetCamera("WorldCamera") : nullptr;
+    if (army == nullptr || camera == nullptr) {
+      return;
+    }
+    for (const moho::WeakPtr<moho::UserUnit>& avatar : army->GetAvatars()) {
+      if (moho::UserUnit* const unit = avatar.GetObjectPtr(); unit != nullptr) {
+        const Wm3::Vec3f at = static_cast<moho::UserEntity*>(unit)->GetInterpolatedPosition(1.0f);
+        constexpr float kMargin = 20.0f; // UIZoomTo's
+        Wm3::AxisAlignedBox3f box{};
+        box.Min.x = at.x - kMargin;
+        box.Min.y = at.y - kMargin;
+        box.Min.z = at.z - kMargin;
+        box.Max.x = at.x + kMargin;
+        box.Max.y = at.y + kMargin;
+        box.Max.z = at.z + kMargin;
+        camera->TargetBox(box, 0.0f);
+        camera->TargetNothing();
+        mQuickStartPending = false;
+        gpg::Logf("editor: quick start: the camera over your commander at %.0f,%.0f", static_cast<double>(at.x), static_cast<double>(at.z));
+        return;
+      }
+    }
+  }
+
   void EdPlay::LogPhases()
   {
     const moho::EWldFrameAction action = moho::WLD_GetFrameAction();
@@ -1214,6 +1297,7 @@ end
   {
     LogPhases();
     DriveCommandLineRuns();
+    DriveQuickStart();
     const moho::EWldFrameAction action = moho::WLD_GetFrameAction();
     if ((mStopRequested && action != moho::EWldFrameAction::Inactive) || action == moho::EWldFrameAction::Exit) {
       gpg::Logf("editor: play ended (%s)", action == moho::EWldFrameAction::Exit ? "the session's exit" : "Stop");

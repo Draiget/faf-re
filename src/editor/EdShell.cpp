@@ -905,6 +905,12 @@ namespace faf::editor
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
       ImGui::SetTooltip("The game's Prebuilt Units option: each army starts with a small base");
     }
+    ImGui::SameLine();
+    ImGui::Checkbox("Quick start", &setup.quickStart);
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+      ImGui::SetTooltip("The commanders are there and take orders at once, without the game's warp-in\n"
+                        "(about 5 s), and the camera starts over yours. Off: the game's own start.");
+    }
     {
       static const char* const kVictoryKeys[5] = {"sandbox", "demoralization", "domination", "eradication", "decapitation"};
       static const char* const kVictoryNames[5] = {"Sandbox (no end)", "Assassination", "Supremacy", "Annihilation", "Decapitation"};

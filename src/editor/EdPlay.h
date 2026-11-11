@@ -62,6 +62,8 @@ namespace faf::editor
     int aiCount = 0;
     /** The game's "Prebuilt units" option: each army starts with a base. */
     bool prebuilt = false;
+    /** The commanders there at once, without FAF's warp-in (3 s hidden, then 2.1 s of effect), and the camera over yours. */
+    bool quickStart = true;
     /** The sim mods played with (uids); the chosen AI's own mod comes along anyway. */
     std::vector<std::string> mods;
     /** A custom setup, slot by slot (empty: the simple one above, your slot and the AI opponents). */
@@ -187,6 +189,7 @@ namespace faf::editor
       int slot = 0;
       int aiCount = 0;
       bool prebuilt = false;
+      bool quickStart = true;
       std::vector<std::string> mods;
       /** `you::0,ai:m28ai:2,empty::0`: role, AI key, team per slot. */
       std::string slots;
@@ -248,6 +251,11 @@ namespace faf::editor
     bool mAutoQuit = false;
     bool mAutoWholeMap = false;
     bool mAutoNoFog = false;
+    /** Quick start asked for this play: done once it is playing (the sim's commanders, then the camera). */
+    bool mQuickStartPending = false;
+    bool mQuickStartSimSent = false;
+    double mQuickStartUntil = 0.0;
+    void DriveQuickStart();
     int mAutoProfile = 0; // `/playprofile <n>`
     bool mAutoLogArmies = false; // `/playlogarmies` // `/playnofog`: Hide the fog once play starts
     float mAutoDelay = 0.0f;
