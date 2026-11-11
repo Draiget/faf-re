@@ -61,6 +61,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdEmitter.cpp
   view/EdParticlePreview.cpp
   ui/EdParticleEditor.cpp
+  ui/EdParticleBrowser.cpp
   ui/EdNodeCanvas.cpp
   ui/EdMaterialEditor.cpp
   tools/EdPathing.cpp

@@ -117,6 +117,7 @@ namespace faf::editor
       kMenuProperties = 1114,
       kMenuMaterialEditor = 1115,
       kMenuParticleEditor = 1116,
+      kMenuParticleBrowser = 1117,
       kMenuPanelsWhilePlaying = 1104,
       kMenuResetLayout = 1105,
       kMenuImGuiDemo = 1106,
@@ -847,6 +848,7 @@ namespace faf::editor
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuProperties, L"P&roperties");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuMaterialEditor, L"Mat&erial Editor");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuParticleEditor, L"Partic&le Editor");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuParticleBrowser, L"Particle &Browser");
       ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuFullHelp, L"&Full help text");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLog, L"&Log");
@@ -896,6 +898,7 @@ namespace faf::editor
       check(kMenuProperties, mShell->ShowProperties());
       check(kMenuMaterialEditor, mShell->ShowMaterialEditor());
       check(kMenuParticleEditor, mShell->ShowParticleEditor());
+      check(kMenuParticleBrowser, mShell->ShowParticleBrowser());
       check(kMenuFullHelp, FullHelpText());
       check(kMenuLog, mShell->ShowLog());
       check(kMenuPanelsWhilePlaying, mShell->PanelsWhilePlaying());
@@ -1008,6 +1011,9 @@ namespace faf::editor
         break;
       case kMenuParticleEditor:
         mShell->ShowParticleEditor() = !mShell->ShowParticleEditor();
+        break;
+      case kMenuParticleBrowser:
+        mShell->ShowParticleBrowser() = !mShell->ShowParticleBrowser();
         break;
       case kMenuScript:
         mShell->ShowScript() = !mShell->ShowScript();
@@ -1208,6 +1214,11 @@ namespace faf::editor
           if (moho::CFG_GetArgOption("/materialeditor", 0, nullptr)) {
             mShell->ShowMaterialEditor() = true;
           }
+          if (fa::vector<fa::string> filter; moho::CFG_GetArgOption("/particlebrowser", 1, &filter) && !filter.empty()) {
+            // `/particlebrowser <search>` (test runs): the browser open, its search set, the first match played.
+            mShell->ShowParticleBrowser() = true;
+            mShell->ParticleEditor().TestBrowse(filter[0].c_str());
+          }
           if (fa::vector<fa::string> kind; moho::CFG_GetArgOption("/particlenew", 1, &kind) && !kind.empty()) {
             mShell->ShowParticleEditor() = true;
             mShell->ParticleEditor().TestNew(kind[0].c_str());
@@ -1247,11 +1258,11 @@ namespace faf::editor
                                                      static_cast<float>(gViewRect.bottom - gViewRect.top));
             }
             // The editor opened or an effect did: the camera close to where it plays.
-            if (mShell->ShowParticleEditor() && mShell->ParticleEditor().TakeFrameAsk()) {
+            if ((mShell->ShowParticleEditor() || mShell->ShowParticleBrowser()) && mShell->ParticleEditor().TakeFrameAsk()) {
               mScene.FramePoint(x, z, 45.0f);
             }
           }
-          mShell->ParticleEditor().Frame(mShell->ShowParticleEditor() && mScene.Attached());
+          mShell->ParticleEditor().Frame((mShell->ShowParticleEditor() || mShell->ShowParticleBrowser()) && mScene.Attached());
         }
         mShell->Draw();
         // `/focuspanel <window>` (test runs): that panel in front, a while after the map opened (opening fronts Info).

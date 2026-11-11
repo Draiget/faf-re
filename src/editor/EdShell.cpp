@@ -227,6 +227,15 @@ namespace faf::editor
       if (mShowParticleEditor) {
         mParticleEditor.Draw(mShowParticleEditor);
       }
+      if (mShowParticleBrowser) {
+        mParticleEditor.DrawBrowserWindow(mShowParticleBrowser);
+      }
+      if (mParticleEditor.TakeOpenEditorAsk()) {
+        mShowParticleEditor = true;
+      }
+      if (mParticleEditor.TakeOpenBrowserAsk()) {
+        mShowParticleBrowser = true;
+      }
       if (mTools.TakeOpenArmies()) {
         mShowArmies = true;
         mFocusArmies = true;

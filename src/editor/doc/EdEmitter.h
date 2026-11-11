@@ -204,6 +204,17 @@ namespace faf::editor
   };
   const std::vector<FlatField>& FlatFields(const std::string& kind);
 
+  // ---- The particle browser's grouping, from the game's file names ----
+
+  /** The factions and kinds the browser filters by; index 0 is "all". */
+  inline constexpr const char* kEffectFactions[] = {"All factions", "Aeon", "Cybran", "UEF", "Seraphim", "Other"};
+  inline constexpr const char* kEffectKinds[] = {"All kinds", "Muzzle", "Hit", "Explosion", "Smoke", "Fire", "Trail", "Beam",
+                                                  "Water", "Shield", "Build", "Ambient", "Teleport", "Other"};
+  /** The faction a file's name starts with (aeon_, cybran_, uef_, seraphim_ or ser_): its index in kEffectFactions. */
+  int EffectFaction(const std::string& path);
+  /** What the effect is for, by the words in its name (first match in kEffectKinds' order): its index there. */
+  int EffectKind(const std::string& path);
+
   /** Reads a beam or trail file; false with `error` for anything else. */
   bool ParseFlatBlueprint(const std::string& text, FlatBlueprint& out, std::string& error);
   /** The file's text: `Kind {`, a key a line (four spaces, as the game's own), `}`. */

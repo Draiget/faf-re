@@ -505,6 +505,64 @@ namespace faf::editor
     return out;
   }
 
+  namespace
+  {
+    std::string BaseLower(const std::string& path)
+    {
+      std::string name = path.substr(path.find_last_of("/\\") + 1);
+      std::transform(name.begin(), name.end(), name.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      return name;
+    }
+  } // namespace
+
+  int EffectFaction(const std::string& path)
+  {
+    const std::string name = BaseLower(path);
+    const auto starts = [&](const char* prefix) { return name.rfind(prefix, 0) == 0; };
+    if (starts("aeon_")) {
+      return 1;
+    }
+    if (starts("cybran_")) {
+      return 2;
+    }
+    if (starts("uef_")) {
+      return 3;
+    }
+    if (starts("seraphim_") || starts("ser_")) {
+      return 4;
+    }
+    return 5;
+  }
+
+  int EffectKind(const std::string& path)
+  {
+    const std::string name = BaseLower(path);
+    // Words for each kind, tried in kEffectKinds' order (a muzzle's smoke is a muzzle effect).
+    static const std::vector<std::vector<const char*>> kWords = {
+      {},
+      {"muzzle", "launch", "flash"},
+      {"hit", "impact"},
+      {"explosion", "explode", "destruction", "death", "nuke", "boom"},
+      {"smoke", "dust", "cloud"},
+      {"fire", "flame", "burn", "lava"},
+      {"trail", "contrail", "polytrail"},
+      {"beam", "laser"},
+      {"water", "wake", "splash", "bubble", "sea", "ripple"},
+      {"shield"},
+      {"build", "reclaim", "capture", "repair"},
+      {"ambient", "glow", "steam", "light", "sparkle", "spark"},
+      {"teleport", "quantum", "gate", "warp"},
+    };
+    for (std::size_t kind = 1; kind < kWords.size(); ++kind) {
+      for (const char* word : kWords[kind]) {
+        if (name.find(word) != std::string::npos) {
+          return static_cast<int>(kind);
+        }
+      }
+    }
+    return static_cast<int>(std::size(kEffectKinds)) - 1;
+  }
+
   const EmitterCurveInfo& CurveInfo(const int curve)
   {
     return kCurves[curve < 0 || curve >= kEmitterCurveCount ? 0 : curve];

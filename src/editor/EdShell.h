@@ -49,6 +49,8 @@ namespace faf::editor
     [[nodiscard]] EdMaterialEditor& MaterialEditor() noexcept { return mMaterialEditor; }
     /** The particle editor (View > Particle Editor): the game's emitter blueprints, previewed live on the map. */
     bool& ShowParticleEditor() noexcept { return mShowParticleEditor; }
+    /** The Particle Browser (View > Particle Browser). */
+    bool& ShowParticleBrowser() noexcept { return mShowParticleBrowser; }
     [[nodiscard]] EdParticleEditor& ParticleEditor() noexcept { return mParticleEditor; }
     /** The Armies panel; the Markers tool's "Open the Armies panel" also brings it to the front. */
     bool& ShowArmies() noexcept { return mShowArmies; }
@@ -162,6 +164,7 @@ namespace faf::editor
     bool mShowLighting = false;
     bool mShowMaterialEditor = false;
     bool mShowParticleEditor = false;
+    bool mShowParticleBrowser = false;
     LightingState mLighting;
     LightingState mLightingBefore;
     bool mLightingEditing = false;

@@ -348,7 +348,10 @@ namespace faf::editor
         Changed();
         mPreview.Restart();
       }
-      if (ImGui::MenuItem("Open a game effect (emitter, beam, trail)...")) {
+      if (ImGui::MenuItem("Browse the game's effects...")) {
+        mOpenBrowserAsk = true;
+      }
+      if (ImGui::MenuItem("Open a game effect by name...")) {
         mOpenBrowser = true;
       }
       if (ImGui::MenuItem("Save", nullptr, false, true)) {

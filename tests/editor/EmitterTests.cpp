@@ -254,4 +254,15 @@ EmitterBlueprint {
     EXPECT_GT(beams, 50);
     EXPECT_GT(trails, 100);
   }
+  TEST(Emitter, TheBrowserGroupsByFactionAndKind)
+  {
+    EXPECT_STREQ(kEffectFactions[EffectFaction("/effects/emitters/aeon_light_displacement_missile_muzzleflash_01.bp")], "Aeon");
+    EXPECT_STREQ(kEffectFactions[EffectFaction("/effects/emitters/SER_contrail.bp")], "Seraphim");
+    EXPECT_STREQ(kEffectFactions[EffectFaction("/effects/emitters/destruction_damaged_smoke_01_emit.bp")], "Other");
+    EXPECT_STREQ(kEffectKinds[EffectKind("/effects/emitters/cannon_muzzle_smoke_01_emit.bp")], "Muzzle"); // before smoke
+    EXPECT_STREQ(kEffectKinds[EffectKind("/effects/emitters/destruction_damaged_smoke_01_emit.bp")], "Explosion");
+    EXPECT_STREQ(kEffectKinds[EffectKind("/effects/emitters/contrail_ser_ohw_polytrail_01_emit.bp")], "Trail");
+    EXPECT_STREQ(kEffectKinds[EffectKind("/effects/emitters/quantum_generator_beam_01_emit.bp")], "Beam");
+    EXPECT_STREQ(kEffectKinds[EffectKind("/effects/emitters/zzz_01.bp")], "Other");
+  }
 } // namespace
