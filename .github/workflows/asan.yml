@@ -10,7 +10,9 @@ name: AddressSanitizer
 on:
   push:
     branches: [master]
-    paths: ['src/**', 'tests/**', 'cmake/**', 'CMakeLists.txt', 'CMakePresets.json', '.github/workflows/asan.yml']
+    # The map editor isn't part of the Linux build; its frequent pushes would cancel every run.
+    paths: ['src/**', 'tests/**', 'cmake/**', 'CMakeLists.txt', 'CMakePresets.json', '.github/workflows/asan.yml',
+            '!src/editor/**', '!tests/editor/**']
   schedule:
     - cron: '30 1 * * *'
   workflow_dispatch:
