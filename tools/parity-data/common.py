@@ -122,7 +122,7 @@ def check_replay(raw, game_version):
         body = replay_body_info(data)
     except Exception as exc:
         return {}, "unreadable: %s" % str(exc)[:80], None
-    info = {"map": body["map"], "m28": None, "players": summary["players"]}
+    info = {"map": body["map"], "m28": None, "players": summary["players"], "matchmaker": body["matchmaker"]}
     if summary["mod"] != "faf":
         return info, "featured mod %s" % summary["mod"], None
     if body["version"] != "Supreme Commander v1.50.%d" % game_version:

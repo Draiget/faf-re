@@ -45,12 +45,16 @@ from replayfile import (HL_ENDED_RE, HL_LOADED_RE, HL_PROGRESS_RE, HL_SUMMARY_RE
 
 VAULT_LINE_RE = re.compile(r"^custom_vault_path = .*$", re.M)
 # FAF's init mounts the user's preferences folder at /preferences. Blueprints.lua loads a map's own
-# blueprints (*.bp in the map folder) only when Game.prefs names the map in PreGameData.CurrentMapDir,
-# which the live lobby writes; without it a map that ships blueprints desyncs at beat 0
-# (survival_cybran_wrath, 26830688). Each replay gets a prefs folder of its own.
+# blueprints (*.bp in the map folder) only when Game.prefs names the map in PreGameData.CurrentMapDir.
+# The custom lobby (lobby.lua) writes it and saves the prefs at launch; without it a map that ships
+# blueprints desyncs at beat 0 (survival_cybran_wrath, 26830688). The matchmaker's lobby never writes
+# it, so its games ran without the map's blueprints, and naming the map there desyncs (sandstorm.v0003
+# places 75 props from its own blueprints; with them every later prop id moves, issue #377). Each
+# replay gets a prefs folder of its own, written as the lobby that started the game left it.
 PREFS_MOUNT_RE = re.compile(r"^MountDirectory\(SHGetFolderPath\('LOCAL_APPDATA'\) \.\. "
                             r"'Gas Powered Games/Supreme Commander Forged Alliance', '/preferences'\)$", re.M)
 GAME_PREFS = "PreGameData = {\n    CurrentMapDir = '/maps/%s',\n    IconReplacements = { }\n}\n"
+MATCHMAKER_PREFS = "PreGameData = {\n    IconReplacements = { }\n}\n"
 PROGRESS_S = 30  # seconds between progress blocks in the job log
 # headless --oracle-check's summary (src/headless/ReplayOracleCheck.cpp, Summary)
 ORACLE_RE = re.compile(r"\] oracle check: focus -?\d+, (\d+) beats, (\d+) entity-beats differ"
@@ -167,7 +171,7 @@ class Shard:
         prefs = os.path.join(run, "prefs")
         os.makedirs(prefs)
         with open(os.path.join(prefs, "Game.prefs"), "w", encoding="utf-8", newline="\n") as f:
-            f.write(GAME_PREFS % info["map"])
+            f.write(MATCHMAKER_PREFS if info["matchmaker"] else GAME_PREFS % info["map"])
         init = os.path.join(self.args.pack, "bin", "init_%d.lua" % replay_id)
         vault = os.path.join(run, "vault").replace("\\", "/")
         text = VAULT_LINE_RE.sub(lambda m: "custom_vault_path = '%s'" % vault, self.init_text, count=1)
