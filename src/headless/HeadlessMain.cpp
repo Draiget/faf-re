@@ -163,6 +163,10 @@ namespace
       "  --lua-resync <b:v>        with --lua-routing: at beat b, view v gets a reconnect's resync\n"
       "  --focus-switch <b:a>      at beat b, the sim's focus moves to army a, as a lockstep client's does\n"
       "  --state-digests <file>    write \"beat digest\" of what the sim published, every beat\n"
+      "  --bot-obs <file>          with --focus: that army's view (fog of war as its UI shows it) and its player's\n"
+      "                            commands, one JSON line per sample (bot training data; docs/SWITCHES.md lists the\n"
+      "                            switches it can't be combined with)\n"
+      "  --bot-obs-every <beats>   with --bot-obs: one sample every <beats> (default 10, one second of game time)\n"
       "  --fpu-report              at beat 1, every thread's x87 control word and MXCSR (sampled)\n"
       "  --keyframe-every <beats>  save the sim between beats every <beats>, as a saved game; size, zlib size, md5, time\n"
       "  --keyframe-first <beat>   with --keyframe-every: the first save at this beat instead of at <beats>\n"
@@ -325,6 +329,10 @@ int HEADLESS_Main(int argc, char** argv)
   (void)ReadOption("--sync-writers", options.syncWritersPath);
   (void)ReadOption("--wire-stats", options.wireStatsPath);
   (void)ReadOption("--state-digests", options.stateDigestPath);
+  (void)ReadOption("--bot-obs", options.botObsPath);
+  if (ReadIntOption("--bot-obs-every", options.botObsEvery, bad) && options.botObsEvery < 1) {
+    bad = true;
+  }
   (void)ReadOption("--lane-sizes", options.laneSizesPath);
   (void)ReadOption("--blueprint-order", options.blueprintOrderPath);
   (void)ReadOption("--lua-pairs", options.luaPairsPath);
@@ -410,6 +418,21 @@ int HEADLESS_Main(int argc, char** argv)
   options.keepClientData = moho::CFG_GetArgOption("--keep-client-data", 0, nullptr);
   options.spy = moho::CFG_GetArgOption("--spy", 0, nullptr);
   options.inboundCheck = moho::CFG_GetArgOption("--inbound-check", 0, nullptr);
+  // --bot-obs: one army's view from the game's first beat, with the decoder's one message observer to itself.
+  // --command-check, --inbound-check and --target-audit use that observer too, and --seats adds decoders of its own
+  // on other threads; --focus-switch hands the view to another army; --resume-from, --seek and a rejoin start in
+  // the middle of the game.
+  if (!options.botObsPath.empty()
+      && (options.focusArmy < 0 || options.commandCheck || options.inboundCheck || options.targetAudit || options.seats
+          || !options.seatsListen.empty() || options.focusSwitchBeat >= 0 || !options.resumeFrom.empty()
+          || !seekPlan.empty() || options.rejoinSource >= 0 || liveRejoin)) {
+    std::printf(
+      "[%s] --bot-obs needs --focus on an army, and not --command-check, --inbound-check, --target-audit, --seats, "
+      "--focus-switch, --resume-from, --seek or a rejoin\n",
+      gLabel.c_str()
+    );
+    bad = true;
+  }
   if (options.inboundCheck && (!options.viewIds || options.commandCheck)) {
     std::printf("[%s] --inbound-check needs --view-frames and --view-ids, and not --command-check\n", gLabel.c_str());
     bad = true;
@@ -580,6 +603,9 @@ int HEADLESS_Main(int argc, char** argv)
   }
   if (!result.boneSummary.empty()) {
     std::printf("[%s] %s\n", label, result.boneSummary.c_str());
+  }
+  if (!result.botObsSummary.empty()) {
+    std::printf("[%s] %s\n", label, result.botObsSummary.c_str());
   }
   if (!result.keyframeSummary.empty()) {
     std::printf("[%s] %s\n", label, result.keyframeSummary.c_str());

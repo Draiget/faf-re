@@ -67,15 +67,13 @@ namespace moho
      */
     void ReceiveMessage(CMessage* message, CMessageDispatcher* dispatcher) override;
 
-#if FAF_SERVER_MODE
     /**
-     * Engine addition, server mode (plan WP11.1): a function every decoder calls with each
-     * message it receives, before decoding it, on the thread that decodes it. headless's
-     * command round trip uses it; null (the default) is none.
+     * Engine addition (plan WP11.1): a function every decoder calls with each message it
+     * receives, before decoding it, on the thread that decodes it. headless's command round
+     * trip (server mode) and `--bot-obs` (every build) use it; null (the default) is none.
      */
     using MessageObserver = void (*)(const CMessage& message, void* context);
     static void SetMessageObserver(MessageObserver observer, void* context) noexcept;
-#endif
 
   private:
     /**
