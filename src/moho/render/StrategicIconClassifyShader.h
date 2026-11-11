@@ -263,7 +263,15 @@ void ClassifyIconsCS(uint3 thread : SV_DispatchThreadID)
 
     // The hovered unit takes its hovered texture and goes to the one hovered slot, drawn last.
     bool hovered = index == Hovered;
-    bool selected = (SelectionBits[index >> 5] & (1u << (index & 31u))) != 0u;
+    // The selection array holds one word when nothing is selected: the index is clamped so the read
+    // stays inside it (D3D12 returns 0 for a read past the end; Vulkan leaves it undefined, and a
+    // software rasterizer faults), and a word past the end counts as unselected.
+    uint selectionWords;
+    uint selectionStride;
+    SelectionBits.GetDimensions(selectionWords, selectionStride);
+    uint selectionWord = index >> 5;
+    uint selectionBits = SelectionBits[min(selectionWord, selectionWords - 1u)];
+    bool selected = selectionWord < selectionWords && (selectionBits & (1u << (index & 31u))) != 0u;
     uint slots = hovered ? source.hoveredIconSlots : source.iconSlots;
     uint iconSlot = selected ? (slots >> 16) : (slots & 0xFFFFu);
     if (iconSlot == kNoSlot)
@@ -335,7 +343,12 @@ void CompactIconsCS(uint thread : SV_GroupIndex)
     // Inclusive scan over the threads (Hillis-Steele), all four runs at once.
     [unroll] for (uint stride = 1u; stride < 1024u; stride <<= 1)
     {
-        uint4 add = thread >= stride ? sOffsets[thread - stride] : uint4(0u, 0u, 0u, 0u);
+        // HLSL may evaluate both arms of ?:, so the index itself stays inside the array: a thread
+        // below the stride reads its own slot and adds nothing (a negative index faults on a
+        // software rasterizer, where a GPU returns junk the select then drops).
+        bool hasPrevious = thread >= stride;
+        uint4 previous = sOffsets[hasPrevious ? thread - stride : thread];
+        uint4 add = hasPrevious ? previous : uint4(0u, 0u, 0u, 0u);
         GroupMemoryBarrierWithGroupSync();
         sOffsets[thread] += add;
         GroupMemoryBarrierWithGroupSync();
@@ -362,7 +375,10 @@ void CompactIconsCS(uint thread : SV_GroupIndex)
         // The hovered slot after the four runs, then the DrawInstanced arguments: 24 vertices per
         // icon, one instance per record.
         uint total = totals.x + totals.y + totals.z + totals.w;
-        if (Hovered < Count && RunIn[Hovered] == kHoveredRun)
+        // Hovered is 0xFFFFFFFF with nothing hovered, and HLSL evaluates both sides of &&: the read
+        // is clamped into the buffer (Count is at least 1 here) so it never goes past its end.
+        uint hoveredRun = RunIn[min(Hovered, Count - 1u)];
+        if (Hovered < Count && hoveredRun == kHoveredRun)
         {
             Output[total] = StagedIn[Hovered];
             total += 1u;
