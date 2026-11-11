@@ -35,6 +35,19 @@ elseif(FAF_PGO_PROFILE)
   add_link_options(-flto=thin "-fprofile-use=${FAF_PGO_PROFILE}")
 endif()
 
+# AddressSanitizer (the linux-clang-x64-asan preset, the asan workflow): every target is built to stop
+# with a report at an out-of-bounds access, a use after free or a double free. Needs the sanitizer
+# runtime (package libclang-rt-18-dev). The x64 small-block pool hides blocks of 4 KB or less from
+# it, so an ASan build starts with the pool off (src/gpg/core/utils/Global.cpp).
+option(FAF_ASAN "Build with AddressSanitizer" OFF)
+if(FAF_ASAN)
+  if(FAF_PGO_GENERATE OR FAF_PGO_PROFILE)
+    message(FATAL_ERROR "FAF_ASAN builds without a profile: use the linux-clang-x64-asan preset.")
+  endif()
+  add_compile_options(-fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls)
+  add_link_options(-fsanitize=address)
+endif()
+
 if(NOT FAF_LINUX)
   message(FATAL_ERROR "cmake/FafLinux.cmake needs cmake/toolchains/linux-clang-x64.cmake.")
 endif()
