@@ -1854,6 +1854,12 @@ HRESULT SHGetFolderPathW(HWND, const int folder, HANDLE, DWORD, wchar_t* const p
   if (wide.size() >= MAX_PATH) {
     return E_FAIL;
   }
+  // Windows' known folders always exist, and callers create only their own subfolders below them
+  // (the replay and saved-game folders, one level at a time); a home folder here may have no
+  // ~/.local/share or ~/Documents (a fresh account, a container, a desktop whose documents folder
+  // has a translated name).
+  std::error_code created;
+  std::filesystem::create_directories(resolved, created);
   std::wmemcpy(path, wide.c_str(), wide.size() + 1);
   return S_OK;
 }
