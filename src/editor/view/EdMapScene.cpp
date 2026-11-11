@@ -408,10 +408,15 @@ namespace faf::editor
       }
     }
 
-    // The selected props, ringed in yellow.
+    // The selected props are outlined (UpdatePropHighlight); the ones past the outline cap, or while the props aren't
+    // shown, get a ring in yellow.
     if (!mSelection.empty() && mMap->mProps != nullptr) {
       constexpr std::uint32_t kSelectedColor = 0xF0FFE040u;
-      for (const int index : mSelection) {
+      for (std::size_t i = mProps.empty() ? 0 : kMaxOutlinedProps; i < mSelection.size(); ++i) {
+        const int index = mSelection[i];
+        if (index < 0 || static_cast<std::size_t>(index) >= mMap->mProps->mEntries.size()) {
+          continue;
+        }
         const Wm3::Vec3f& p = mMap->mProps->mEntries[static_cast<std::size_t>(index)].mTransform.pos_;
         for (int s = 0; s < 24; ++s) {
           const float a0 = 2.0f * kPi * static_cast<float>(s) / 24.0f;
@@ -736,13 +741,33 @@ namespace faf::editor
           mDecalSelection.clear();
           mSelection = {mTestHoverProp};
         }
+        if (mTestSelectNearest > 0) {
+          // `/selectprops <n>`: that prop and the n - 1 nearest others selected, alone.
+          std::vector<std::pair<float, int>> byDistance;
+          for (std::size_t i = 0; i < mMap->mProps->mEntries.size(); ++i) {
+            const Wm3::Vec3f p = mMap->mProps->mEntries[i].mTransform.pos_;
+            byDistance.emplace_back(std::hypot(p.x - at.x, p.z - at.z), static_cast<int>(i));
+          }
+          const std::size_t n = std::min(byDistance.size(), static_cast<std::size_t>(mTestSelectNearest));
+          std::partial_sort(byDistance.begin(), byDistance.begin() + static_cast<std::ptrdiff_t>(n), byDistance.end());
+          mMarkerSelection.clear();
+          mUnitSelection.clear();
+          mDecalSelection.clear();
+          mSelection.clear();
+          for (std::size_t i = 0; i < n; ++i) {
+            mSelection.push_back(byDistance[i].second);
+          }
+          gpg::Logf("editor: /selectprops: %zu props selected around prop %d", n, mTestHoverProp);
+        }
         mTargetX = at.x;
         mTargetZ = at.z;
         mDistance = 40.0f;
         ApplyCamera();
       }
       const Wm3::Vector2f screen = mCamera->Project(at);
-      mCursor = POINT{static_cast<LONG>(screen.x), static_cast<LONG>(screen.y)};
+      // With `/selectprops` the cursor stays clear of them, at the view's top left corner (nothing outlined for hover).
+      mCursor =
+        mTestSelectNearest > 0 ? POINT{20, 20} : POINT{static_cast<LONG>(screen.x), static_cast<LONG>(screen.y)};
     }
     // `/hovermarker` (test runs): the cursor on that marker, as a real mouse over it would be.
     if (!mTestHover.empty() && mCamera != nullptr) {
@@ -6559,29 +6584,97 @@ namespace faf::editor
 
   void EdMapScene::UpdatePropHighlight()
   {
-    // A prop's index changes when props are added or removed: the highlight is remade from the entry each time the
-    // wanted prop differs, or its entry moved.
-    const int wanted = mProps.empty() || mMap == nullptr || mMap->mProps == nullptr || mHoverPropWanted < 0 ||
-        static_cast<std::size_t>(mHoverPropWanted) >= mMap->mProps->mEntries.size()
-      ? -1
-      : mHoverPropWanted;
-    if (wanted < 0) {
-      // Hidden, not deleted: the cursor often leaves a prop and comes back to it; a mesh is remade only for another
-      // prop.
-      for (moho::MeshInstance* const instance : {mHighlight, mHighlightOver}) {
-        if (instance != nullptr) {
-          instance->isHidden = 1;
+    // The props to outline and their colour: the selected ones in the selection's yellow, the one under the cursor in
+    // the hover amber (over its selected colour: it shows what a click picks).
+    constexpr std::uint32_t kHoverOutline = 0xFFFFB040u;
+    constexpr std::uint32_t kSelectedOutline = 0xFFFFE040u;
+    std::vector<std::pair<int, std::uint32_t>> wanted;
+    if (!mProps.empty() && mMap != nullptr && mMap->mProps != nullptr) {
+      const std::size_t count = mMap->mProps->mEntries.size();
+      for (std::size_t i = 0; i < mSelection.size() && i < kMaxOutlinedProps; ++i) {
+        if (
+          mSelection[i] >= 0 && static_cast<std::size_t>(mSelection[i]) < count && mSelection[i] != mHoverPropWanted
+        ) {
+          wanted.emplace_back(mSelection[i], kSelectedOutline);
         }
       }
-      return;
+      if (mHoverPropWanted >= 0 && static_cast<std::size_t>(mHoverPropWanted) < count) {
+        wanted.emplace_back(mHoverPropWanted, kHoverOutline);
+      }
     }
-    const moho::CWldPropEntry& entry = mMap->mProps->mEntries[static_cast<std::size_t>(wanted)];
-    if (wanted != mHighlightProp || mHighlight == nullptr) {
-      DeletePropHighlight();
+    // A prop's index changes when props are added or removed: an outline is kept for its index while the entry there
+    // has the same blueprint (its place is read from the entry each frame), and remade otherwise.
+    std::vector<bool> used(mOutlines.size(), false);
+    std::size_t made = 0;
+    for (const auto& [prop, colour] : wanted) {
+      const moho::CWldPropEntry& entry = mMap->mProps->mEntries[static_cast<std::size_t>(prop)];
+      std::size_t at = mOutlines.size();
+      for (std::size_t i = 0; i < mOutlines.size(); ++i) {
+        if (!used[i] && mOutlines[i].prop == prop && mOutlines[i].blueprint == entry.mBlueprintPath.c_str()) {
+          at = i;
+          break;
+        }
+      }
+      if (at == mOutlines.size()) {
+        PropOutline outline;
+        if (!MakePropOutline(prop, outline)) {
+          continue;
+        }
+        mOutlines.push_back(outline);
+        used.push_back(false);
+        ++made;
+      }
+      used[at] = true;
+      PropOutline& outline = mOutlines[at];
+      outline.shell->SetColor(colour);
+      for (moho::MeshInstance* const instance : {outline.shell, outline.over}) {
+        if (instance != nullptr) {
+          instance->isHidden = 0;
+          instance->SetStance(entry.mTransform, entry.mTransform);
+        }
+      }
+    }
+    // Outlines not wanted now: hidden, the 8 newest kept for the cursor coming back, the rest deleted.
+    std::size_t spare = 0;
+    for (std::size_t i = mOutlines.size(); i-- > 0;) {
+      if (used[i]) {
+        continue;
+      }
+      if (spare < 8) {
+        ++spare;
+        for (moho::MeshInstance* const instance : {mOutlines[i].shell, mOutlines[i].over}) {
+          if (instance != nullptr) {
+            instance->isHidden = 1;
+          }
+        }
+        continue;
+      }
+      if (moho::MeshRenderer::GetInstance() != nullptr) {
+        delete mOutlines[i].shell;
+        delete mOutlines[i].over;
+      }
+      mOutlines.erase(mOutlines.begin() + static_cast<std::ptrdiff_t>(i));
+    }
+    if (made > 0) {
+      std::size_t shown = 0;
+      for (const bool u : used) {
+        shown += u ? 1 : 0;
+      }
+      gpg::Logf("editor: %zu props outlined (%zu selected, hover %d)", shown, mSelection.size(), mHoverPropWanted);
+    }
+  }
+
+  bool EdMapScene::MakePropOutline(
+    const int prop,
+    PropOutline& out
+  )
+  {
+    const moho::CWldPropEntry& entry = mMap->mProps->mEntries[static_cast<std::size_t>(prop)];
+    {
       moho::RRuleGameRules* const rules = Rules();
       moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
       if (rules == nullptr || renderer == nullptr) {
-        return;
+        return false;
       }
       moho::RResId id{};
       gpg::STR_CopyFilename(&id.name, &entry.mBlueprintPath);
@@ -6589,7 +6682,7 @@ namespace faf::editor
       moho::RMeshBlueprint* const mesh =
         blueprint != nullptr ? rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint) : nullptr;
       if (mesh == nullptr) {
-        return;
+        return false;
       }
       // The outline (WPE.57), two more instances of the prop's mesh with the editor's techniques appended to mesh.fx
       // (ren_EditorMeshOutline): EditorOutline, its front faces pushed out a few pixels' worth at any zoom in the
@@ -6600,7 +6693,7 @@ namespace faf::editor
       const moho::RMeshBlueprintLOD* const lod =
         mesh->mLods.begin() != mesh->mLods.end() ? mesh->mLods.begin() : nullptr;
       if (lod == nullptr) {
-        return;
+        return false;
       }
       // A swaying prop (UndulatingNormalMappedAlpha: the trees) gets the swaying shell and redraw, so they move with
       // it; its shell a hairline (each leaf card gets a rim; a wide rim on every card painted a tree group amber).
@@ -6623,39 +6716,35 @@ namespace faf::editor
         nullptr
       );
       const float scale = blueprint->Display.UniformScale;
-      mHighlight = renderer->CreateMeshInstance(
+      out.shell = renderer->CreateMeshInstance(
         0, static_cast<std::int32_t>(0xFFFFB040u), mesh, Wm3::Vec3f{scale, scale, scale}, false, hull
       );
-      mHighlightOver = renderer->CreateMeshInstance(0, -1, mesh, Wm3::Vec3f{scale, scale, scale}, false, over);
-      mHighlightProp = wanted;
-      if (mHighlight == nullptr) {
-        return;
+      if (out.shell == nullptr) {
+        return false;
       }
+      out.over = renderer->CreateMeshInstance(0, -1, mesh, Wm3::Vec3f{scale, scale, scale}, false, over);
+      out.prop = prop;
+      out.blueprint = entry.mBlueprintPath.c_str();
       gpg::Logf(
         "editor: prop %d outlined (%s, shader %s: %s)",
-        wanted,
+        prop,
         entry.mBlueprintPath.c_str(),
         shader.c_str(),
         shellTechnique
       );
-    }
-    for (moho::MeshInstance* const instance : {mHighlight, mHighlightOver}) {
-      if (instance != nullptr) {
-        instance->isHidden = 0;
-        instance->SetStance(entry.mTransform, entry.mTransform);
-      }
+      return true;
     }
   }
 
   void EdMapScene::DeletePropHighlight()
   {
     if (moho::MeshRenderer::GetInstance() != nullptr) {
-      delete mHighlight;
-      delete mHighlightOver;
+      for (const PropOutline& outline : mOutlines) {
+        delete outline.shell;
+        delete outline.over;
+      }
     }
-    mHighlight = nullptr;
-    mHighlightOver = nullptr;
-    mHighlightProp = -1;
+    mOutlines.clear();
   }
 
   void EdMapScene::DeleteProps()

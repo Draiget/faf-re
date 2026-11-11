@@ -3010,7 +3010,11 @@ namespace faf::editor
           fa::vector<fa::string> swap;
           const bool swapping = moho::CFG_GetArgOption("/propswap", 1, &swap) && !swap.empty();
           hoverPropArmed = index >= 0; // once, when the map's props are there to find it in
-          mScene.TestHoverProp(index, swapping);
+          // `/selectprops <n>` too: that prop and the nearest others selected (n in all), the cursor clear of them.
+          fa::vector<fa::string> select;
+          const int selectNearest =
+            moho::CFG_GetArgOption("/selectprops", 1, &select) && !select.empty() ? std::atoi(select[0].c_str()) : 0;
+          mScene.TestHoverProp(index, swapping, selectNearest);
           if (swapping) {
             mShell->TestPropSwap(swap[0].c_str());
           }

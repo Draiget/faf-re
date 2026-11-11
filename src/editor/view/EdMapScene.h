@@ -594,17 +594,27 @@ namespace faf::editor
     /** In front of a play: the session's map (given back to the renderer), and whether its interface was drawn. */
     /** The marker under the cursor (its helper drawn in the hover colour); empty for none. */
     std::string mHoverMarker;
-    /**
-     * The prop under the cursor (-1 none), seen while drawing, and its highlight: the prop's mesh again with the game's
-     * build-placement technique, made or moved each frame outside the draw (user ask 2026-11-11, WPE.54).
-     */
+    /** The prop under the cursor (-1 none), seen while drawing; outlined next frame outside the draw (WPE.54). */
     int mHoverPropWanted = -1;
-    int mHighlightProp = -1;
-    moho::MeshInstance* mHighlight = nullptr;
-    /** The prop drawn again over the outline's middle (EditorPropOver). */
-    moho::MeshInstance* mHighlightOver = nullptr;
+    /**
+     * One prop's outline (WPE.57): its mesh again as the outline shell (EditorOutline*, in the outline's colour) and as
+     * the prop redrawn over the shell's middle (EditorPropOver*). Kept for the prop it was made for while that prop's
+     * blueprint stays, hidden when not wanted (the cursor often comes back), recoloured between hover and selected.
+     */
+    struct PropOutline
+    {
+      int prop = -1;
+      std::string blueprint;
+      moho::MeshInstance* shell = nullptr;
+      moho::MeshInstance* over = nullptr;
+    };
+    /** The outlined props: the selected ones (user ask 2026-11-11, in place of a ring) and the one under the cursor. */
+    std::vector<PropOutline> mOutlines;
+    /** Selected props beyond this many keep a ring instead (a forest box-selected would add thousands of meshes). */
+    static constexpr std::size_t kMaxOutlinedProps = 256;
     void UpdatePropHighlight();
     void DeletePropHighlight();
+    bool MakePropOutline(int prop, PropOutline& out);
 
   public:
     /** Test runs (`/hovermarker <name>`): the cursor kept on that marker's place on the screen. */
@@ -617,13 +627,17 @@ namespace faf::editor
     /** Test runs (`/hoverprop <index>`): the cursor kept on that prop, the camera close over it. */
     void TestHoverProp(
       const int index,
-      const bool select = false
+      const bool select = false,
+      const int selectNearest = 0
     )
     {
       mTestHoverProp = index;
       mTestSelectHoverProp = select;
+      mTestSelectNearest = selectNearest;
     }
     bool mTestSelectHoverProp = false;
+    /** `/selectprops <n>` with `/hoverprop`: that prop and the nearest others selected (n in all), the cursor away. */
+    int mTestSelectNearest = 0;
     /** Test runs (`/propswapundo`): the props' newest edit undone, and the hovered prop's blueprint logged. */
     void TestUndoPropSwap();
     int mTestHoverProp = -1;
