@@ -2806,6 +2806,16 @@ namespace faf::editor
       }
     }
 
+    /** A corner's two arms (Free: the ground's X and Z). */
+    void GizmoPlaneAxes(const EdMapScene::GizmoPart part, Wm3::Vec3f& u, Wm3::Vec3f& v)
+    {
+      u = part == EdMapScene::GizmoPart::ZY ? Wm3::Vec3f{0.0f, 0.0f, 1.0f} : Wm3::Vec3f{1.0f, 0.0f, 0.0f};
+      v = part == EdMapScene::GizmoPart::Free ? Wm3::Vec3f{0.0f, 0.0f, 1.0f} : Wm3::Vec3f{0.0f, 1.0f, 0.0f};
+    }
+
+    /** How far out along its arms a corner reaches, as a share of the arms' length. */
+    constexpr float kGizmoCorner = 0.34f;
+
     /** The distance on screen from `p` to the segment a-b. */
     float SegmentDistance(const Wm3::Vector2f& p, const Wm3::Vector2f& a, const Wm3::Vector2f& b)
     {
@@ -2826,32 +2836,12 @@ namespace faf::editor
     const float length = GizmoLength();
     const Wm3::Vector2f cursor(static_cast<float>(at.x), static_cast<float>(at.y));
     const Wm3::Vector2f centre = mCamera->Project(origin);
-    if (std::hypot(cursor.x - centre.x, cursor.y - centre.y) < 12.0f) {
+    if (std::hypot(cursor.x - centre.x, cursor.y - centre.y) < 10.0f) {
       return GizmoPart::Free;
     }
-    // Inside the plane square between the X and Z arms (convex: the cursor on the same side of each edge).
-    {
-      const float p0 = length * 0.22f;
-      const float p1 = length * 0.42f;
-      const Wm3::Vector2f q[4] = {mCamera->Project(Wm3::Vec3f{origin.x + p0, origin.y, origin.z + p0}),
-                                  mCamera->Project(Wm3::Vec3f{origin.x + p1, origin.y, origin.z + p0}),
-                                  mCamera->Project(Wm3::Vec3f{origin.x + p1, origin.y, origin.z + p1}),
-                                  mCamera->Project(Wm3::Vec3f{origin.x + p0, origin.y, origin.z + p1})};
-      int positive = 0;
-      int negative = 0;
-      for (int i = 0; i < 4; ++i) {
-        const Wm3::Vector2f& e0 = q[i];
-        const Wm3::Vector2f& e1 = q[(i + 1) % 4];
-        const float cross = (e1.x - e0.x) * (cursor.y - e0.y) - (e1.y - e0.y) * (cursor.x - e0.x);
-        positive += cross > 0.0f ? 1 : 0;
-        negative += cross < 0.0f ? 1 : 0;
-      }
-      if (positive == 4 || negative == 4) {
-        return GizmoPart::Free;
-      }
-    }
+    // An arm right under the cursor wins over the corner beside it.
     GizmoPart best = GizmoPart::None;
-    float bestDistance = 9.0f;
+    float bestDistance = 6.0f;
     for (const GizmoPart part : {GizmoPart::X, GizmoPart::Y, GizmoPart::Z}) {
       const Wm3::Vec3f axis = GizmoAxis(part);
       const Wm3::Vector2f tip = mCamera->Project(Wm3::Vec3f{origin.x + axis.x * length, origin.y + axis.y * length, origin.z + axis.z * length});
@@ -2863,7 +2853,35 @@ namespace faf::editor
         best = part;
       }
     }
-    return best;
+    if (best != GizmoPart::None) {
+      return best;
+    }
+    // Inside a corner's square, from the middle out along its two arms (convex: the cursor on the same side of each edge).
+    // The ground's first, then the upright ones; one seen edge-on (no area on screen) is left out.
+    for (const GizmoPart part : {GizmoPart::Free, GizmoPart::XY, GizmoPart::ZY}) {
+      Wm3::Vec3f u;
+      Wm3::Vec3f v;
+      GizmoPlaneAxes(part, u, v);
+      const float a = length * kGizmoCorner;
+      const Wm3::Vector2f q[4] = {centre, mCamera->Project(Wm3::Vec3f{origin.x + u.x * a, origin.y + u.y * a, origin.z + u.z * a}),
+                                  mCamera->Project(Wm3::Vec3f{origin.x + (u.x + v.x) * a, origin.y + (u.y + v.y) * a, origin.z + (u.z + v.z) * a}),
+                                  mCamera->Project(Wm3::Vec3f{origin.x + v.x * a, origin.y + v.y * a, origin.z + v.z * a})};
+      int positive = 0;
+      int negative = 0;
+      float area = 0.0f;
+      for (int i = 0; i < 4; ++i) {
+        const Wm3::Vector2f& e0 = q[i];
+        const Wm3::Vector2f& e1 = q[(i + 1) % 4];
+        const float cross = (e1.x - e0.x) * (cursor.y - e0.y) - (e1.y - e0.y) * (cursor.x - e0.x);
+        positive += cross > 0.0f ? 1 : 0;
+        negative += cross < 0.0f ? 1 : 0;
+        area += e0.x * e1.y - e1.x * e0.y;
+      }
+      if (std::fabs(area) > 40.0f && (positive == 4 || negative == 4)) {
+        return part;
+      }
+    }
+    return GizmoPart::None;
   }
 
   void EdMapScene::DrawGizmo(moho::CD3DPrimBatcher& batcher)
@@ -2910,23 +2928,38 @@ namespace faf::editor
         batcher.DrawLine(vertex(tip, c), vertex(rim, c));
       }
     }
-    // The plane square between the X and Z arms (Blender's plane handle): a drag on it moves over the ground. Its sides
-    // along each arm in that arm's colour, so it reads as the right angle between them.
-    const bool planeHot = hot == GizmoPart::Free;
-    const float p0 = length * 0.22f;
-    const float p1 = length * 0.42f;
-    const Wm3::Vec3f q[4] = {{origin.x + p0, origin.y, origin.z + p0}, {origin.x + p1, origin.y, origin.z + p0},
-                             {origin.x + p1, origin.y, origin.z + p1}, {origin.x + p0, origin.y, origin.z + p1}};
-    const std::uint32_t fill = planeHot ? 0x90FFE040u : 0x50F0F0F0u;
-    moho::CD3DPrimBatcher::Vertex quad[4] = {vertex(q[0], fill), vertex(q[1], fill), vertex(q[2], fill), vertex(q[3], fill)};
-    batcher.DrawQuads(quad, 1);
-    const std::uint32_t xSide = planeHot ? kHot : 0xFFFF4848u;
-    const std::uint32_t zSide = planeHot ? kHot : 0xFF4880FFu;
-    batcher.DrawLine(vertex(q[0], xSide), vertex(q[1], xSide));
-    batcher.DrawLine(vertex(q[3], xSide), vertex(q[2], xSide));
-    batcher.DrawLine(vertex(q[0], zSide), vertex(q[3], zSide));
-    batcher.DrawLine(vertex(q[1], zSide), vertex(q[2], zSide));
+    // The corners between two arms (CryEngine's and Blender's plane handles): two lines, each leaving one arm at a third
+    // of its length in that arm's colour and meeting the other's, so the corner hangs on both arms; hovered or dragged,
+    // they turn yellow over a filled square. Free (X and Z) moves over the ground, XY and ZY up and down too.
+    const auto colorOf = [](const Wm3::Vec3f& axis) {
+      return axis.x > 0.5f ? 0xFFFF4848u : axis.y > 0.5f ? 0xFF48E048u : 0xFF4880FFu;
+    };
+    for (const GizmoPart part : {GizmoPart::Free, GizmoPart::XY, GizmoPart::ZY}) {
+      Wm3::Vec3f u;
+      Wm3::Vec3f v;
+      GizmoPlaneAxes(part, u, v);
+      const bool cornerHot = hot == part;
+      const float a = length * kGizmoCorner;
+      const Wm3::Vec3f onU = add(origin, u, a);
+      const Wm3::Vec3f onV = add(origin, v, a);
+      const Wm3::Vec3f corner = add(onU, v, a);
+      if (cornerHot) {
+        moho::CD3DPrimBatcher::Vertex quad[4] = {vertex(origin, 0x70FFE040u), vertex(onU, 0x70FFE040u), vertex(corner, 0x70FFE040u),
+                                                 vertex(onV, 0x70FFE040u)};
+        batcher.DrawQuads(quad, 1);
+      }
+      // Each line doubled a hair apart, so it reads as heavy as the arms' bundles.
+      const float n = length * 0.006f;
+      for (const float k : {-n, 0.0f, n}) {
+        const Wm3::Vec3f lift{(u.x + v.x) * k, (u.y + v.y) * k, (u.z + v.z) * k};
+        const std::uint32_t fromU = cornerHot ? kHot : colorOf(u);
+        const std::uint32_t fromV = cornerHot ? kHot : colorOf(v);
+        batcher.DrawLine(vertex(add(onU, lift, 1.0f), fromU), vertex(add(corner, lift, 1.0f), fromU));
+        batcher.DrawLine(vertex(add(onV, lift, 1.0f), fromV), vertex(add(corner, lift, 1.0f), fromV));
+      }
+    }
     // The free square, on the ground plane through the middle.
+    const bool planeHot = hot == GizmoPart::Free;
     const std::uint32_t free = planeHot ? kHot : 0xFFF0F0F0u;
     const float s = length * 0.08f;
     const Wm3::Vec3f corners[4] = {{origin.x - s, origin.y, origin.z - s}, {origin.x + s, origin.y, origin.z - s},
@@ -2947,7 +2980,7 @@ namespace faf::editor
       mGizmoGroundZ = mGizmoStart.z;
     }
     gpg::Logf("editor: move gizmo %s drag from %.2f, %.2f, %.2f",
-              part == GizmoPart::X ? "X" : part == GizmoPart::Y ? "Y" : part == GizmoPart::Z ? "Z" : "free",
+              part == GizmoPart::X ? "X" : part == GizmoPart::Y ? "Y" : part == GizmoPart::Z ? "Z" : part == GizmoPart::XY ? "XY" : part == GizmoPart::ZY ? "ZY" : "free",
               static_cast<double>(mGizmoStart.x), static_cast<double>(mGizmoStart.y), static_cast<double>(mGizmoStart.z));
   }
 
@@ -2960,6 +2993,29 @@ namespace faf::editor
         return Wm3::Vec3f{0.0f, 0.0f, 0.0f};
       }
       return Wm3::Vec3f{x - mGizmoGroundX, 0.0f, z - mGizmoGroundZ};
+    }
+    if (mGizmoDrag == GizmoPart::XY || mGizmoDrag == GizmoPart::ZY) {
+      // Both arms on screen at the drag's start: the cursor's move is s along one and t along the other (two equations).
+      Wm3::Vec3f u;
+      Wm3::Vec3f v;
+      GizmoPlaneAxes(mGizmoDrag, u, v);
+      const float L = mGizmoDragLength;
+      const Wm3::Vector2f o = mCamera->Project(mGizmoStart);
+      const Wm3::Vector2f pu = mCamera->Project(Wm3::Vec3f{mGizmoStart.x + u.x * L, mGizmoStart.y + u.y * L, mGizmoStart.z + u.z * L});
+      const Wm3::Vector2f pv = mCamera->Project(Wm3::Vec3f{mGizmoStart.x + v.x * L, mGizmoStart.y + v.y * L, mGizmoStart.z + v.z * L});
+      const float ax = pu.x - o.x;
+      const float ay = pu.y - o.y;
+      const float bx = pv.x - o.x;
+      const float by = pv.y - o.y;
+      const float det = ax * by - ay * bx;
+      if (std::fabs(det) < 4.0f) {
+        return Wm3::Vec3f{0.0f, 0.0f, 0.0f}; // the plane is seen edge-on: no usable direction
+      }
+      const float dx = static_cast<float>(at.x - mGizmoFrom.x);
+      const float dy = static_cast<float>(at.y - mGizmoFrom.y);
+      const float s = (dx * by - dy * bx) / det * L;
+      const float t = (ax * dy - ay * dx) / det * L;
+      return Wm3::Vec3f{u.x * s + v.x * t, u.y * s + v.y * t, u.z * s + v.z * t};
     }
     // The arm on screen at the drag's start; the cursor's move along it, in world units.
     const Wm3::Vec3f axis = GizmoAxis(mGizmoDrag);
@@ -3004,7 +3060,7 @@ namespace faf::editor
     const float ground = unit ? UnitRestHeight(x, z)
                               : mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(std::lround(x)), static_cast<std::int32_t>(std::lround(z)));
     float y = 0.0f;
-    if (mGizmoDrag == GizmoPart::Y) {
+    if (mGizmoDrag == GizmoPart::Y || mGizmoDrag == GizmoPart::XY || mGizmoDrag == GizmoPart::ZY) {
       y = std::max(start.y + move.y, ground);
     } else if (mTools != nullptr && mTools->KeepOnGround()) {
       y = ground;

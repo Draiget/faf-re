@@ -4,6 +4,7 @@
 #include "editor/view/EdParticlePreview.h"
 
 #include <filesystem>
+#include <utility>
 #include <string>
 #include <vector>
 
@@ -30,8 +31,10 @@ namespace faf::editor
     /** Emits the preview's particles for this frame (also while the window is closed: false stops it). */
     void Frame(bool showing);
 
-    /** Test runs (`/particlecollapse`): the window folded to its title bar, the preview still running. */
-    void TestCollapse() noexcept { mCollapse = true; }
+    /** The 3D view's width over its height, for the Preview pane's square crop of it. */
+    void SetViewAspect(const float aspect) noexcept { mViewAspect = aspect > 0.1f ? aspect : 1.0f; }
+    /** The camera should come close to the effect (it opened, or Frame was pressed); taken once. */
+    [[nodiscard]] bool TakeFrameAsk() noexcept { return std::exchange(mFrameAsk, false); }
     /** Test runs (`/particlenew beam|trail`): a new beam or trail. */
     void TestNew(const std::string& kind) { NewFlat(kind == "beam" ? "BeamBlueprint" : "TrailEmitterBlueprint"); }
     /** Test runs (`/particleopen <game path>`): opens a game emitter. */
@@ -76,6 +79,10 @@ namespace faf::editor
     std::vector<std::string> mParticleTextures;
     char mSaveName[96] = {};
     bool mOpenSave = false;
-    bool mCollapse = false;
+    /** The Preview pane: the middle of the 3D view, where the effect plays, magnified. */
+    void DrawPreviewPane();
+    float mViewAspect = 1.6f;
+    float mPreviewZoom = 0.22f; // half the crop's height, as a share of the view's
+    bool mFrameAsk = true;
   };
 } // namespace faf::editor

@@ -679,6 +679,15 @@ namespace faf::editor
     };
     /** The open map's size in game units (the larger side), for the slots' map-wide switch. */
     void SetMapSizeUnits(const float size) noexcept { mMapSizeUnits = size; }
+    /** A layer slot the user wants a texture made for with nodes (the Material Editor opens on it); taken once. */
+    [[nodiscard]] bool TakeMaterialAsk(int& slot) noexcept
+    {
+      if (mMaterialAsk < 0) {
+        return false;
+      }
+      slot = std::exchange(mMaterialAsk, -1);
+      return true;
+    }
     /** The open map's slots as the terrain has them, each frame. */
     void SetLayerSlots(std::vector<LayerSlot> slots) { mSlots = std::move(slots); }
     /** A slot the panel changed (its texture or size): the app applies it. */
@@ -966,6 +975,8 @@ namespace faf::editor
     void DrawTextureBrowser();
     int mBrowseSlot = -1;
     bool mBrowseOpen = false;
+    /** A layer slot to make a texture for in the Material Editor (its button here and in the texture browser). */
+    int mMaterialAsk = -1;
     char mBrowseFilter[64]{};
     std::vector<MaskRule> mRules;
     bool mRulesRequested = false;

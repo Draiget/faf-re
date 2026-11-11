@@ -1,6 +1,7 @@
 #include "editor/ui/EdParticleEditor.h"
 
 #include "editor/doc/EdMapFile.h"
+#include "editor/ui/EdImGuiRenderer.h"
 #include "imgui.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -175,6 +176,7 @@ namespace faf::editor
       mDirty = false;
       mPreview.SetFlat(mFlat);
       mPreview.Restart();
+      mFrameAsk = true;
       mStatus = "Opened " + path;
       return true;
     }
@@ -187,6 +189,7 @@ namespace faf::editor
     mSelectedKey = -1;
     mPreview.SetEmitter(mEmitter);
     mPreview.Restart();
+    mFrameAsk = true;
     mStatus = "Opened " + path;
     return true;
   }
@@ -217,27 +220,43 @@ namespace faf::editor
 
   void EdParticleEditor::Draw(bool& open)
   {
+    // Opened whole, over most of the editor, and never folded to its title bar (user report: it opened collapsed).
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.7f, viewport->WorkSize.y * 0.6f), ImGuiCond_FirstUseEver);
-    if (std::exchange(mCollapse, false)) {
-      ImGui::SetNextWindowCollapsed(true);
-    }
-    if (!ImGui::Begin("Particle Editor", &open, ImGuiWindowFlags_MenuBar)) {
+    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.85f, viewport->WorkSize.y * 0.8f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
+                            ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
+    if (!ImGui::Begin("Particle Editor", &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
       return;
     }
     DrawToolbar();
     if (mFlatMode) {
-      if (ImGui::BeginChild("##flat", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
-        DrawFlat();
+      // The preview large: about half the window (user ask: the left side bigger, to see the effect well).
+      const float previewWidth = std::max(ImGui::GetContentRegionAvail().x * 0.48f, 320.0f);
+      if (ImGui::BeginTable("##flatlayout2", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail())) {
+        ImGui::TableSetupColumn("preview", ImGuiTableColumnFlags_WidthFixed, previewWidth);
+        ImGui::TableSetupColumn("keys", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        DrawPreviewPane();
+        ImGui::TableSetColumnIndex(1);
+        if (ImGui::BeginChild("##flat", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+          DrawFlat();
+        }
+        ImGui::EndChild();
+        ImGui::EndTable();
       }
-      ImGui::EndChild();
-    } else if (ImGui::BeginTable("##layout", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail())) {
-      ImGui::TableSetupColumn("modules", ImGuiTableColumnFlags_WidthFixed, 230.0f);
+    } else if (const float previewWidth = std::max(ImGui::GetContentRegionAvail().x * 0.4f, 320.0f);
+               ImGui::BeginTable("##layout2", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail())) {
+      // The preview large: about two fifths of the window (user ask: the left side bigger, to see the effect well).
+      ImGui::TableSetupColumn("modules", ImGuiTableColumnFlags_WidthFixed, previewWidth);
       ImGui::TableSetupColumn("curve", ImGuiTableColumnFlags_WidthStretch);
       ImGui::TableSetupColumn("details", ImGuiTableColumnFlags_WidthFixed, 320.0f);
       ImGui::TableNextRow();
       ImGui::TableSetColumnIndex(0);
+      // Cascade's corner: the preview over the module stack.
+      DrawPreviewPane();
       if (ImGui::BeginChild("##modules", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
         DrawModules();
       }
@@ -274,6 +293,38 @@ namespace faf::editor
       ImGui::EndPopup();
     }
     ImGui::End();
+  }
+
+  void EdParticleEditor::DrawPreviewPane()
+  {
+    // The effect plays at the 3D view's centre (the camera's target): the pane shows a square around it, magnified,
+    // from the view's own picture, so it plays here even where this window covers the view. The wheel zooms the crop;
+    // Frame brings the camera close.
+    // As wide as the column; at most three fifths of its height (the curve list stays under it). The crop has the pane's shape.
+    const float width = std::max(ImGui::GetContentRegionAvail().x, 64.0f);
+    const float height = std::clamp(ImGui::GetContentRegionAvail().y * 0.6f, 64.0f, width);
+    const float halfV = std::clamp(mPreviewZoom, 0.03f, 0.5f);
+    const float halfU = std::min(halfV * (width / height) / mViewAspect, 0.5f);
+    const ImVec2 uv0(0.5f - halfU, 0.5f - halfV);
+    const ImVec2 uv1(0.5f + halfU, 0.5f + halfV);
+    ImGui::Image(ImTextureRef(static_cast<ImTextureID>(EdImGuiRenderer::kGameViewImage)), ImVec2(width, height), uv0, uv1);
+    if (ImGui::IsItemHovered()) {
+      const float wheel = ImGui::GetIO().MouseWheel;
+      if (wheel != 0.0f) {
+        mPreviewZoom = std::clamp(mPreviewZoom * (wheel > 0.0f ? 0.85f : 1.0f / 0.85f), 0.03f, 0.5f);
+      }
+      ImGui::SetTooltip("The effect, playing at the middle of the map's view. The wheel zooms; Frame brings the camera close.");
+    }
+    if (ImGui::Button("Frame")) {
+      mFrameAsk = true;
+    }
+    ImGui::SetItemTooltip("Brings the map's camera close to the effect");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(-1.0f);
+    float zoom = 1.0f / mPreviewZoom;
+    if (ImGui::SliderFloat("##zoom", &zoom, 2.0f, 30.0f, "zoom %.1fx")) {
+      mPreviewZoom = 1.0f / zoom;
+    }
   }
 
   void EdParticleEditor::DrawToolbar()

@@ -539,10 +539,6 @@ namespace faf::editor
       std::uint64_t mFramesRun = 0;
       /** The game's head copied for the panels (CopyGameView), and its image for the draw lists. */
       void CopyGameView();
-      [[nodiscard]] bool mViewStepsAsideForDialog() const
-      {
-        return mImGuiReady && ImGui::GetTopMostPopupModal() != nullptr;
-      }
       moho::ID3DDeviceResources::RenderTargetHandle mViewCopy;
       moho::ID3DRenderTarget::SurfaceHandle mViewSurface;
       std::uint32_t mViewCopyWidth = 0;
@@ -1246,6 +1242,14 @@ namespace faf::editor
             float z = 0.0f;
             mScene.ViewTarget(x, y, z);
             mShell->ParticleEditor().SetPlace(x, y, z);
+            if (gViewRect.bottom > gViewRect.top) {
+              mShell->ParticleEditor().SetViewAspect(static_cast<float>(gViewRect.right - gViewRect.left) /
+                                                     static_cast<float>(gViewRect.bottom - gViewRect.top));
+            }
+            // The editor opened or an effect did: the camera close to where it plays.
+            if (mShell->ShowParticleEditor() && mShell->ParticleEditor().TakeFrameAsk()) {
+              mScene.FramePoint(x, z, 45.0f);
+            }
           }
           mShell->ParticleEditor().Frame(mShell->ShowParticleEditor() && mScene.Attached());
         }
@@ -1267,9 +1271,6 @@ namespace faf::editor
             float z = 0.0f;
             mScene.ViewTarget(x, y, z);
             mScene.FramePoint(x, z, static_cast<float>(std::atof(distance[0].c_str())));
-          }
-          if (mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/particlecollapse", 0, nullptr)) {
-            mShell->ParticleEditor().TestCollapse();
           }
           if (fa::vector<fa::string> slot; mFocusPanelFrames == 80 && moho::CFG_GetArgOption("/materialapply", 1, &slot) && !slot.empty()) {
             mShell->MaterialEditor().TestApply(std::atoi(slot[0].c_str()));
@@ -1301,7 +1302,7 @@ namespace faf::editor
             (void)mScene.Redo();
           }
         }
-        if (gComposite && mViewImage != 0 && !mViewStepsAsideForDialog()) {
+        if (gComposite && mViewImage != 0) {
           const ImVec2 from(static_cast<float>(gViewRect.left), static_cast<float>(gViewRect.top));
           const ImVec2 to(static_cast<float>(gViewRect.right), static_cast<float>(gViewRect.bottom));
           ImGui::GetBackgroundDrawList()->AddImage(static_cast<ImTextureID>(EdImGuiRenderer::kGameViewImage), from, to);
@@ -2976,14 +2977,13 @@ namespace faf::editor
     void EditorApp::CopyGameView()
     {
       // The game's head holds the frame it drew last (CD3DDevice::Paint presents, then draws the next one), not yet
-      // presented: copied into a target the panels draw under themselves. Not while a dialog hides the view.
+      // presented: copied into a target the panels draw under themselves, also while a dialog is open (it doesn't hide it).
       mViewImage = 0;
       gViewSurface = nullptr;
       gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
       moho::CD3DDevice* const d3d = moho::D3D_GetDevice();
       const gpg::gal::DeviceContext* const context = device != nullptr ? device->GetDeviceContext() : nullptr;
-      if (!gComposite || d3d == nullptr || context == nullptr || context->GetHeadCount() < 1 || d3d->GetResources() == nullptr ||
-          (mImGuiReady && ImGui::GetTopMostPopupModal() != nullptr)) {
+      if (!gComposite || d3d == nullptr || context == nullptr || context->GetHeadCount() < 1 || d3d->GetResources() == nullptr) {
         return;
       }
       const gpg::gal::Head& game = context->GetHead(0);

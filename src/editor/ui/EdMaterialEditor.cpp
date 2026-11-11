@@ -305,6 +305,17 @@ namespace faf::editor
     return doc != nullptr ? doc->graph->Nodes().size() : 0U;
   }
 
+  void EdMaterialEditor::OpenForSlot(const int slot)
+  {
+    if (mDocs.empty()) {
+      NewGraph();
+    }
+    mTargetSlot = std::clamp(slot, 0, 9);
+    mLive = true;
+    mLiveStale = true;
+    mBringToFront = true;
+  }
+
   void EdMaterialEditor::SelectFirst(const std::string& type)
   {
     if (mDocs.empty()) {
@@ -507,7 +518,12 @@ namespace faf::editor
     ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
                             ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
     mFocused = false;
-    if (!ImGui::Begin("Material Editor", &open, ImGuiWindowFlags_MenuBar)) {
+    if (std::exchange(mBringToFront, false)) {
+      ImGui::SetNextWindowFocus();
+      ImGui::SetNextWindowCollapsed(false);
+    }
+    ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
+    if (!ImGui::Begin("Material Editor", &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
       return;
     }

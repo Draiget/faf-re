@@ -76,6 +76,9 @@ namespace faf::editor
     /** The window or one of its parts has the keyboard (the app's Ctrl+S / Ctrl+Z leave it alone). */
     [[nodiscard]] bool Focused() const noexcept { return mFocused; }
 
+    /** Opens on a layer slot: a new graph if none is open, the slot as the target, Live Update on, the window in front. */
+    void OpenForSlot(int slot);
+
     /** For test runs (`/materialeditor`): opens a new graph. */
     void NewGraph();
     /** Opens a graph file in a new tab (test runs: `/materialopen <file>`); false when it can't be read. */
@@ -169,6 +172,7 @@ namespace faf::editor
     Bake mBakeOut;
     bool mBakeReady = false;
     int mApplyAsk = -1;
+    bool mBringToFront = false;
   };
 
   /** A lit preview of a stratum's albedo and normal maps: `mode` 0 a sphere, 1 a 2 x 2 plane; BGRA rows. */

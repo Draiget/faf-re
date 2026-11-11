@@ -553,6 +553,10 @@ namespace faf::editor
   {
     if (ImGui::Begin(kToolsWindow, &mShowTools)) {
       mTools.Draw();
+      if (int slot = -1; mTools.TakeMaterialAsk(slot)) {
+        mShowMaterialEditor = true;
+        mMaterialEditor.OpenForSlot(slot);
+      }
     }
     ImGui::End();
   }

@@ -534,6 +534,11 @@ namespace faf::editor
       Note("Open a map to see its layers.");
       return;
     }
+    if (ImGui::Button("Make a texture with nodes...", ImVec2(-1.0f, 0.0f))) {
+      mMaterialAsk = std::clamp(mMaskLayer + 1, 1, 8);
+    }
+    ImGui::SetItemTooltip("The Material Editor (View > Material Editor), on the paint layer: textures built from nodes as in UE4, "
+                          "shown on the map as you edit");
     mLibrary.Pump(3);
     static const char* const kSlotNames[10] = {"Lower", "1", "2", "3", "4", "5", "6", "7", "8", "Upper"};
     const float thumb = ImGui::GetFrameHeight() * 1.6f;
@@ -694,7 +699,11 @@ namespace faf::editor
       mBrowseOpen = false;
       ImGui::OpenPopup(kTitle);
     }
-    ImGui::SetNextWindowSize(ImVec2(760.0f, 560.0f), ImGuiCond_FirstUseEver);
+    // Most of the editor's window each time it opens, centred: the textures large enough to tell apart (user report: it was small).
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.72f, viewport->WorkSize.y * 0.78f), ImGuiCond_Appearing);
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
+                            ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     if (!ImGui::BeginPopupModal(kTitle, nullptr)) {
       return;
     }
@@ -711,6 +720,13 @@ namespace faf::editor
       ImGui::CloseCurrentPopup();
     }
     ImGui::SameLine();
+    if (ImGui::Button("Make one with nodes...")) {
+      mMaterialAsk = mBrowseSlot;
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::SetItemTooltip("Opens the Material Editor on this layer: build its texture from nodes (noise, textures, blends) and see it on the map "
+                          "as you go; Apply writes it into the map");
+    ImGui::SameLine();
     if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
       ImGui::CloseCurrentPopup();
     }
@@ -719,7 +735,7 @@ namespace faf::editor
       c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
     if (ImGui::BeginChild("##grid", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
-      const float cell = 96.0f;
+      const float cell = 128.0f;
       const int columns = std::max(1, static_cast<int>(ImGui::GetContentRegionAvail().x / (cell + 8.0f)));
       int shown = 0;
       std::string biome;

@@ -136,7 +136,10 @@ namespace faf::editor
     void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
     /** An air path node grid `count` a side over the playable area (or the map), as one undo step; `replace` removes the air nodes there were. */
     void FillAirGrid(int count, bool replace);
-    /** The move gizmo's parts: an arrow per axis and the free square in its middle. */
+    /**
+     * The move gizmo's parts: an arrow per axis; the corner between two arms for a move in their plane (Free: X and Z,
+     * over the ground, also the square in the middle; XY and ZY: upright planes, so up and down too).
+     */
     enum class GizmoPart
     {
       None,
@@ -144,6 +147,8 @@ namespace faf::editor
       Y,
       Z,
       Free,
+      XY,
+      ZY,
     };
     /** What the Select tool picks: one kind of thing at a time, the kind last clicked. */
     enum class PickKind
@@ -480,8 +485,9 @@ namespace faf::editor
     [[nodiscard]] int PickMarker(float x, float z) const;
     /**
      * The move gizmo over the selection (markers with the Markers tool, props with the Select tool): arrows along X,
-     * Y (up) and Z, and a square in the middle for a free move over the ground. Dragging an arrow moves along it by
-     * the cursor's move projected on the arrow on screen.
+     * Y (up) and Z; between each two arms a corner joined to both (as CryEngine's and Blender's), for a move in their
+     * plane; a square in the middle for a free move over the ground. Dragging an arrow moves along it by the cursor's
+     * move projected on the arrow on screen; a corner, by the cursor's move split along its two arms on screen.
      */
     /** The selection's middle, where the gizmo stands; false when nothing it moves is selected. */
     [[nodiscard]] bool GizmoOrigin(Wm3::Vec3f& origin) const;
