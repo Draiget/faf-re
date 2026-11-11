@@ -75,6 +75,13 @@ namespace faf::editor
     bool ImportHeights(const std::filesystem::path& file, float scale, std::string& message);
     /** Writes the map's heights as a height image, `width` samples wide (0: the map's own size). */
     bool ExportHeights(const std::filesystem::path& file, int width, float scale, std::string& message);
+    /** The point the orbit camera looks at (on the ground): where the particle editor's preview emits. */
+    void ViewTarget(float& x, float& y, float& z) const noexcept
+    {
+      x = mTargetX;
+      y = mTargetY;
+      z = mTargetZ;
+    }
     /** The map's heights in game units for the material editor's map nodes (null without a map). */
     [[nodiscard]] std::shared_ptr<TerrainSource> TerrainHeights() const;
 

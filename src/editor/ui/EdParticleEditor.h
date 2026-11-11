@@ -1,0 +1,73 @@
+#pragma once
+
+#include "editor/doc/EdEmitter.h"
+#include "editor/view/EdParticlePreview.h"
+
+#include <filesystem>
+#include <string>
+#include <vector>
+
+namespace faf::editor
+{
+  /**
+   * The particle editor (View > Particle Editor), laid out as UE4's Cascade: the emitter's curves as a module stack
+   * grouped as retail's emitter editor groups them (Direction, Rate, Lifetime; Forces; Spacial; Size and Rotation;
+   * Animation and Selection), the selected curve's graph (keys dragged, added with a double-click, removed with a right
+   * click; the random spread drawn as a band), and Details (lifetime, repeat, blend mode, frames, switches, textures).
+   * It edits the game's emitter blueprints: any of the game's own opens as a start, and the result is saved as a .bp in
+   * the map's `effects` folder (a vault map), else in the editor's own folder. The preview emits live at the view's
+   * centre on the map (EdParticlePreview).
+   */
+  class EdParticleEditor
+  {
+  public:
+    void Draw(bool& open);
+
+    /** Where a vault map keeps its effects (`<map>`), empty without one: the editor's own folder then. */
+    void SetMapFolder(const std::filesystem::path& folder, const std::string& mapFolderName);
+    /** The point the preview emits at (the view's centre on the ground). */
+    void SetPlace(float x, float y, float z) { mPreview.SetPlace(x, y, z); }
+    /** Emits the preview's particles for this frame (also while the window is closed: false stops it). */
+    void Frame(bool showing);
+
+    /** Test runs (`/particlecollapse`): the window folded to its title bar, the preview still running. */
+    void TestCollapse() noexcept { mCollapse = true; }
+    /** Test runs (`/particleopen <game path>`): opens a game emitter. */
+    bool OpenGameEmitter(const std::string& path);
+
+  private:
+    void DrawToolbar();
+    void DrawModules();
+    void DrawCurve();
+    void DrawDetails();
+    void DrawBrowser();
+    void Changed();
+    bool Save(const std::filesystem::path& file);
+    [[nodiscard]] std::filesystem::path Folder() const;
+
+    EmitterBlueprint mEmitter = NewEmitter();
+    std::string mName = "new_emitter";
+    std::filesystem::path mPath;
+    bool mDirty = false;
+    int mCurve = kEmitRate;
+    int mDragKey = -1;
+    int mSelectedKey = -1;
+    bool mPlaying = true;
+    bool mLoop = true;
+    std::filesystem::path mMapFolder;
+    std::string mMapFolderName;
+    std::string mStatus;
+    EdParticlePreview mPreview;
+    bool mPreviewStarted = false;
+
+    // The game's emitters, for the browser.
+    std::vector<std::string> mGameEmitters;
+    bool mListed = false;
+    bool mOpenBrowser = false;
+    char mBrowserFilter[96] = {};
+    std::vector<std::string> mParticleTextures;
+    char mSaveName[96] = {};
+    bool mOpenSave = false;
+    bool mCollapse = false;
+  };
+} // namespace faf::editor

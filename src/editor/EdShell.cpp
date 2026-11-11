@@ -224,6 +224,9 @@ namespace faf::editor
       if (mShowMaterialEditor) {
         mMaterialEditor.Draw(mShowMaterialEditor);
       }
+      if (mShowParticleEditor) {
+        mParticleEditor.Draw(mShowParticleEditor);
+      }
       if (mTools.TakeOpenArmies()) {
         mShowArmies = true;
         mFocusArmies = true;

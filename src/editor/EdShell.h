@@ -11,6 +11,7 @@
 #include "editor/doc/EdSaveFile.h"
 #include "editor/ui/EdMapBrowser.h"
 #include "editor/ui/EdMaterialEditor.h"
+#include "editor/ui/EdParticleEditor.h"
 #include "imgui.h"
 
 namespace faf::editor
@@ -46,6 +47,9 @@ namespace faf::editor
     /** The material editor (View > Material Editor): node graphs that make terrain textures. */
     bool& ShowMaterialEditor() noexcept { return mShowMaterialEditor; }
     [[nodiscard]] EdMaterialEditor& MaterialEditor() noexcept { return mMaterialEditor; }
+    /** The particle editor (View > Particle Editor): the game's emitter blueprints, previewed live on the map. */
+    bool& ShowParticleEditor() noexcept { return mShowParticleEditor; }
+    [[nodiscard]] EdParticleEditor& ParticleEditor() noexcept { return mParticleEditor; }
     /** The Armies panel; the Markers tool's "Open the Armies panel" also brings it to the front. */
     bool& ShowArmies() noexcept { return mShowArmies; }
     /** The Properties panel: the selected marker, unit, prop or decal, by kind (ui/EdPropertiesPanel.cpp). */
@@ -157,6 +161,7 @@ namespace faf::editor
     char mNewChainName[128]{};
     bool mShowLighting = false;
     bool mShowMaterialEditor = false;
+    bool mShowParticleEditor = false;
     LightingState mLighting;
     LightingState mLightingBefore;
     bool mLightingEditing = false;
@@ -216,6 +221,7 @@ namespace faf::editor
     std::string mAdapter;
     EdTools mTools;
     EdMaterialEditor mMaterialEditor;
+    EdParticleEditor mParticleEditor;
     ImVec4 mGameView{0.0f, 0.0f, 0.0f, 0.0f};
     /** The document path the Info tab was last brought to the front for. */
     std::string mInfoShownFor;

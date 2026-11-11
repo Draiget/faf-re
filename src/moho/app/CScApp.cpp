@@ -1502,8 +1502,15 @@ void CScApp::Main()
   }
 
   moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
-  const std::int32_t gameTick = activeSession != nullptr ? activeSession->mGameTick : 0;
-  const float simDeltaSeconds = activeSession != nullptr ? activeSession->mTimeSinceLastTick : 0.0f;
+  std::int32_t gameTick = activeSession != nullptr ? activeSession->mGameTick : 0;
+  float simDeltaSeconds = activeSession != nullptr ? activeSession->mTimeSinceLastTick : 0.0f;
+  // Engine addition (moho::gAppIdleClock): the editor's clock between sessions, in ticks and the fraction of one.
+  static double idleTicks = 0.0;
+  if (activeSession == nullptr && moho::gAppIdleClock) {
+    idleTicks += static_cast<double>(frameSeconds) * 10.0;
+    gameTick = static_cast<std::int32_t>(idleTicks);
+    simDeltaSeconds = static_cast<float>(idleTicks - static_cast<double>(gameTick));
+  }
   if (!fastForwarding) {
     moho::CAM_GetManager()->Frame(simDeltaSeconds, frameSeconds);
   }
@@ -2194,6 +2201,7 @@ std::vector<gpg::gal::DeviceApi> moho::gAppRenderers;
 
 // Engine addition (the map editor, src/editor): false in the game. CScApp.h says what it does.
 bool moho::gAppWindowed = false;
+bool moho::gAppIdleClock = false;
 
 // Engine addition (the map editor, src/editor): null in the game. CScApp.h says what it does.
 void (*moho::gAppBeforeDeviceCreate)(gpg::gal::DeviceContext& context, void* frameWindow) = nullptr;

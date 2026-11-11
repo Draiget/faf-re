@@ -116,6 +116,7 @@ namespace faf::editor
       kMenuArmies = 1113,
       kMenuProperties = 1114,
       kMenuMaterialEditor = 1115,
+      kMenuParticleEditor = 1116,
       kMenuPanelsWhilePlaying = 1104,
       kMenuResetLayout = 1105,
       kMenuImGuiDemo = 1106,
@@ -849,6 +850,7 @@ namespace faf::editor
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuArmies, L"&Armies");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuProperties, L"P&roperties");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuMaterialEditor, L"Mat&erial Editor");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuParticleEditor, L"Partic&le Editor");
       ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuFullHelp, L"&Full help text");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLog, L"&Log");
@@ -897,6 +899,7 @@ namespace faf::editor
       check(kMenuArmies, mShell->ShowArmies());
       check(kMenuProperties, mShell->ShowProperties());
       check(kMenuMaterialEditor, mShell->ShowMaterialEditor());
+      check(kMenuParticleEditor, mShell->ShowParticleEditor());
       check(kMenuFullHelp, FullHelpText());
       check(kMenuLog, mShell->ShowLog());
       check(kMenuPanelsWhilePlaying, mShell->PanelsWhilePlaying());
@@ -1006,6 +1009,9 @@ namespace faf::editor
         break;
       case kMenuMaterialEditor:
         mShell->ShowMaterialEditor() = !mShell->ShowMaterialEditor();
+        break;
+      case kMenuParticleEditor:
+        mShell->ShowParticleEditor() = !mShell->ShowParticleEditor();
         break;
       case kMenuScript:
         mShell->ShowScript() = !mShell->ShowScript();
@@ -1206,6 +1212,11 @@ namespace faf::editor
           if (moho::CFG_GetArgOption("/materialeditor", 0, nullptr)) {
             mShell->ShowMaterialEditor() = true;
           }
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/particleopen", 1, &file) && !file.empty()) {
+            // `/particleopen <game path>` (test runs): the particle editor open on a game emitter.
+            mShell->ShowParticleEditor() = true;
+            (void)mShell->ParticleEditor().OpenGameEmitter(file[0].c_str());
+          }
           if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/materialopen", 1, &file) && !file.empty()) {
             mShell->ShowMaterialEditor() = true;
             (void)mShell->MaterialEditor().OpenFile(std::filesystem::path(file[0].c_str()));
@@ -1223,6 +1234,16 @@ namespace faf::editor
           const std::string folder = scmap.parent_path().lexically_normal().string();
           const bool inVault = !scmap.empty() && !vault.empty() && folder.size() > vault.size() && _strnicmp(folder.c_str(), vault.c_str(), vault.size()) == 0;
           mShell->MaterialEditor().SetMapFolder(inVault ? scmap.parent_path() : std::filesystem::path());
+          mShell->ParticleEditor().SetMapFolder(inVault ? scmap.parent_path() : std::filesystem::path(), inVault ? mDocument.FolderName() : std::string());
+          // The particle preview emits at the view's centre, on the ground, while its window shows (not during Play).
+          if (mScene.Attached()) {
+            float x = 0.0f;
+            float y = 0.0f;
+            float z = 0.0f;
+            mScene.ViewTarget(x, y, z);
+            mShell->ParticleEditor().SetPlace(x, y, z);
+          }
+          mShell->ParticleEditor().Frame(mShell->ShowParticleEditor() && mScene.Attached());
         }
         mShell->Draw();
         // `/focuspanel <window>` (test runs): that panel in front, a while after the map opened (opening fronts Info).
@@ -1234,6 +1255,17 @@ namespace faf::editor
           // `/materiallive <slot>` and `/materialapply <slot>` (test runs): the material editor's result into a slot.
           if (fa::vector<fa::string> slot; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/materiallive", 1, &slot) && !slot.empty()) {
             mShell->MaterialEditor().TestLive(std::atoi(slot[0].c_str()));
+          }
+          if (fa::vector<fa::string> distance; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/particleframe", 1, &distance) && !distance.empty()) {
+            // `/particleframe <distance>` (test runs): the view this close to its centre, where the particle preview emits.
+            float x = 0.0f;
+            float y = 0.0f;
+            float z = 0.0f;
+            mScene.ViewTarget(x, y, z);
+            mScene.FramePoint(x, z, static_cast<float>(std::atof(distance[0].c_str())));
+          }
+          if (mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/particlecollapse", 0, nullptr)) {
+            mShell->ParticleEditor().TestCollapse();
           }
           if (fa::vector<fa::string> slot; mFocusPanelFrames == 80 && moho::CFG_GetArgOption("/materialapply", 1, &slot) && !slot.empty()) {
             mShell->MaterialEditor().TestApply(std::atoi(slot[0].c_str()));
