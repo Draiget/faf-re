@@ -41,7 +41,13 @@ namespace faf::editor
 
     ImU32 PinColor(const PinType type)
     {
-      return type == PinType::Color ? IM_COL32(240, 170, 80, 255) : IM_COL32(190, 190, 190, 255);
+      switch (type) {
+      case PinType::Color: return IM_COL32(240, 170, 80, 255);
+      case PinType::Curve: return IM_COL32(110, 200, 120, 255);
+      case PinType::Emitter: return IM_COL32(240, 110, 90, 255);
+      case PinType::Texture: return IM_COL32(110, 160, 255, 255);
+      default: return IM_COL32(190, 190, 190, 255);
+      }
     }
 
     bool ContainsNoCase(const std::string& text, const char* filter)
@@ -474,7 +480,7 @@ namespace faf::editor
     if (pinHit.node != 0 && mDrag == Drag::None) {
       const GraphNode* node = graph.Find(pinHit.node);
       const PinDef& pin = pinHit.output ? node->type->outputs[static_cast<std::size_t>(pinHit.pin)] : node->type->inputs[static_cast<std::size_t>(pinHit.pin)];
-      ImGui::SetTooltip("%s (%s)%s", pin.name.c_str(), pin.type == PinType::Color ? "colour" : "grey",
+      ImGui::SetTooltip("%s (%s)%s", pin.name.c_str(), PinTypeName(pin.type),
                         pinHit.output ? "\nDrag to an input to link; Alt+click cuts its links" : "\nDrag from an output to link; Alt+click cuts it");
     }
     dl->PopClipRect();
@@ -501,12 +507,26 @@ namespace faf::editor
           const int id = graph.AddNode(type->name, std::round(x), std::round(y));
           if (id != 0 && mPopupPin.node != 0) {
             // The pin the palette came from links to the new node's first pin of the other side.
+            // The new node's first pin of a kind that fits (a curve to a curve, an image to an image).
             const GraphNode* made = graph.Find(id);
-            if (mPopupPin.output && !made->type->inputs.empty()) {
-              (void)graph.Link(mPopupPin.node, mPopupPin.pin, id, 0);
-            } else if (!mPopupPin.output && !made->type->outputs.empty()) {
-              (void)graph.Link(id, 0, mPopupPin.node, mPopupPin.pin);
-              graph.MoveNode(id, std::round(x - kNodeW), std::round(y));
+            const GraphNode* from = graph.Find(mPopupPin.node);
+            if (mPopupPin.output) {
+              const PinType type = from->type->outputs[static_cast<std::size_t>(mPopupPin.pin)].type;
+              for (std::size_t i = 0; i < made->type->inputs.size(); ++i) {
+                if (PinsCompatible(type, made->type->inputs[i].type)) {
+                  (void)graph.Link(mPopupPin.node, mPopupPin.pin, id, static_cast<int>(i));
+                  break;
+                }
+              }
+            } else {
+              const PinType type = from->type->inputs[static_cast<std::size_t>(mPopupPin.pin)].type;
+              for (std::size_t i = 0; i < made->type->outputs.size(); ++i) {
+                if (PinsCompatible(made->type->outputs[i].type, type)) {
+                  (void)graph.Link(id, static_cast<int>(i), mPopupPin.node, mPopupPin.pin);
+                  graph.MoveNode(id, std::round(x - kNodeW), std::round(y));
+                  break;
+                }
+              }
             }
           }
           Select(id);

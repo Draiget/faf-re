@@ -11,12 +11,22 @@ namespace faf::editor
   // A node graph's model, apart from its drawing (EdNodeCanvas) and from what its nodes compute (EdTextureGraph):
   // node types with typed pins and parameters, nodes, links, the order to evaluate them in, and the graph file.
 
-  /** What flows along a link. A grey image converts to a colour one (grey, opaque) and back (its luminance). */
+  /**
+   * What flows along a link. A grey image converts to a colour one (grey, opaque) and back (its luminance); the
+   * particle graph's kinds (a curve, an emitter, a texture) link only to their own kind.
+   */
   enum class PinType : std::uint8_t
   {
     Grey,
     Color,
+    Curve,
+    Emitter,
+    Texture,
   };
+  /** Whether an output of `from` may feed an input of `to`. */
+  [[nodiscard]] bool PinsCompatible(PinType from, PinType to) noexcept;
+  /** The kind's name for tooltips ("grey", "colour", "curve", ...). */
+  [[nodiscard]] const char* PinTypeName(PinType type) noexcept;
 
   struct PinDef
   {
@@ -103,6 +113,7 @@ namespace faf::editor
     BadPin,
     SameNode,
     Cycle,
+    WrongType,
   };
 
   class NodeGraph

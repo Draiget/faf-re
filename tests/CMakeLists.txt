@@ -352,6 +352,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/ShaderSlotTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdShaderSlots.cpp
   editor/NodeGraphTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdNodeGraph.cpp
   editor/EmitterTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdEmitter.cpp
+  editor/EffectGraphTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdEffectGraph.cpp
   editor/TextureGraphTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTextureGraph.cpp
   editor/PathingTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdPathing.cpp
   editor/PackageTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdPackage.cpp

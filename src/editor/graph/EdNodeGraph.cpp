@@ -45,6 +45,24 @@ namespace faf::editor
     }
   } // namespace
 
+  bool PinsCompatible(const PinType from, const PinType to) noexcept
+  {
+    const auto image = [](const PinType type) { return type == PinType::Grey || type == PinType::Color; };
+    return from == to || (image(from) && image(to));
+  }
+
+  const char* PinTypeName(const PinType type) noexcept
+  {
+    switch (type) {
+    case PinType::Grey: return "grey";
+    case PinType::Color: return "colour";
+    case PinType::Curve: return "curve";
+    case PinType::Emitter: return "emitter";
+    case PinType::Texture: return "texture";
+    }
+    return "?";
+  }
+
   const NodeType& NodeTypeRegistry::Add(NodeType type)
   {
     mTypes.push_back(std::make_unique<NodeType>(std::move(type)));
@@ -163,6 +181,9 @@ namespace faf::editor
     }
     if (fromNode == toNode) {
       return LinkResult::SameNode;
+    }
+    if (!PinsCompatible(from->type->outputs[static_cast<std::size_t>(fromPin)].type, to->type->inputs[static_cast<std::size_t>(toPin)].type)) {
+      return LinkResult::WrongType;
     }
     // A loop: `to` already feeds `from`.
     const std::vector<int> fedByTo = Downstream(toNode);
