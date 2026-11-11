@@ -255,6 +255,11 @@ namespace faf::editor
     double mAutoStartAt = -1.0;
     bool mAutoExitApp = false;
     bool mExitAppSent = false;
+    /** `/playterrainpoke` (test runs): done once a play, where, and when to read the height again. */
+    bool mPokeDone = false;
+    float mPokeX = 0.0f;
+    float mPokeZ = 0.0f;
+    double mPokeAt = 0.0;
     bool mQuitRequested = false;
     double mPlayingSince = -1.0;
   };

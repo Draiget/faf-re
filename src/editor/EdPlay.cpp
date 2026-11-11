@@ -24,6 +24,7 @@
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/STIMap.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
@@ -1134,6 +1135,37 @@ for i, a in armies do
 end
 )lua", state);
           }
+        }
+      } else if (fa::vector<fa::string> poke; !mPokeDone && now - mPlayingSince >= 1.5 && moho::CFG_GetArgOption("/playterrainpoke", 1, &poke) &&
+                                                !poke.empty()) {
+        // `/playterrainpoke x,z,size,height` (WPE.39, editing while the map plays): the rendered terrain's height at
+        // (x, z), the sim told to flatten a square there (SimLua FlattenMapRect, the sim's own Lua), and the rendered
+        // height again two seconds on: the sim's beat sync (SSyncData::mTerrainUpdate -> SyncTerrain) carries it over.
+        mPokeDone = true;
+        float x = 0.0f, z = 0.0f, size = 0.0f, height = 0.0f;
+        if (std::sscanf(poke[0].c_str(), "%f,%f,%f,%f", &x, &z, &size, &height) == 4) {
+          mPokeX = x;
+          mPokeZ = z;
+          mPokeAt = now + 2.0;
+          if (const moho::CWldSession* const session = moho::WLD_GetActiveSession(); session != nullptr && session->GetSTIMap() != nullptr) {
+            gpg::Logf("editor: terrain poke: rendered height at %.1f,%.1f before: %.2f", static_cast<double>(x), static_cast<double>(z),
+                      static_cast<double>(session->GetSTIMap()->mHeightField->GetElevation(x, z)));
+          }
+          char command[200];
+          (void)std::snprintf(command, sizeof(command), "SimLua FlattenMapRect(%g, %g, %g, %g, %g)", static_cast<double>(x - size * 0.5f),
+                              static_cast<double>(z - size * 0.5f), static_cast<double>(size), static_cast<double>(size), static_cast<double>(height));
+          moho::CON_Execute(command);
+          gpg::Logf("editor: terrain poke: %s", command);
+          // The sim's own height there, as the sim logs it (the rendered terrain follows only what the camera sees).
+          (void)std::snprintf(command, sizeof(command), "SimLua LOG('editor: terrain poke: the sim height now ', GetTerrainHeight(%g, %g))",
+                              static_cast<double>(x), static_cast<double>(z));
+          moho::CON_Execute(command);
+        }
+      } else if (mPokeAt > 0.0 && now >= mPokeAt) {
+        mPokeAt = 0.0;
+        if (const moho::CWldSession* const session = moho::WLD_GetActiveSession(); session != nullptr && session->GetSTIMap() != nullptr) {
+          gpg::Logf("editor: terrain poke: rendered height at %.1f,%.1f after: %.2f", static_cast<double>(mPokeX), static_cast<double>(mPokeZ),
+                    static_cast<double>(session->GetSTIMap()->mHeightField->GetElevation(mPokeX, mPokeZ)));
         }
       } else if (mAutoWholeMap && mWholeMap && now - mPlayingSince >= static_cast<double>(mAutoSeconds) * 0.5) {
         if (const moho::CWldSession* const session = moho::WLD_GetActiveSession()) {
