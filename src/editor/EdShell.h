@@ -170,7 +170,8 @@ namespace faf::editor
     /** A selected unit's group, what becomes of it in a game, its wreck's value, and the wreck switch (ui/EdUnitFatePanel.cpp). */
     void DrawUnitFate(const SelectionProperties& unit);
     /** The unit's "Spawns" choice: the start groups, or a group a lobby setting makes the script create. */
-    void DrawUnitSpawn(const SelectionProperties& unit, const UnitGroup& root, const std::string& current);
+    void DrawUnitSpawn(const SelectionProperties& unit, const UnitGroup& root, const std::string& current, bool civilian, const std::string& fateText,
+                       const std::vector<std::string>& lobbyLines);
     std::string mSpawnAsk;
     /** The Adaptive tool's panel: the files, the players' resources and the crazyrush lists (ui/EdAdaptivePanel.cpp). */
     void DrawAdaptivePanel();

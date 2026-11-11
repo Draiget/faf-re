@@ -21,7 +21,8 @@
 
 namespace faf::editor
 {
-  void EdShell::DrawUnitSpawn(const SelectionProperties& unit, const UnitGroup& root, const std::string& current)
+  void EdShell::DrawUnitSpawn(const SelectionProperties& unit, const UnitGroup& root, const std::string& current, const bool civilian,
+                              const std::string& fateText, const std::vector<std::string>& lobbyLines)
   {
     // "Spawns": where the unit is in a game, as a choice (user ask 2026-11-11: edit the adaptive groups, not only read
     // about them): from the start as a unit or a wreck, or in a group the map's script creates, with the lobby setting
@@ -72,22 +73,33 @@ namespace faf::editor
     const auto kind = [](const SpawnTarget& target) {
       return target.wreck && target.unit ? "wrecks or live units" : target.wreck ? "as wrecks" : "as live units";
     };
-    std::string preview = current == "INITIAL" ? "From the start, a live unit" : current == "WRECKAGE" ? "From the start, a wreck" : current;
+    // The sentence: when it appears, and as what.
+    std::string preview = current == "INITIAL"    ? std::string(civilian ? "From the start, as a live unit (unless Civilians is \"removed\")"
+                                                                         : "From the start, as a live unit")
+                          : current == "WRECKAGE" ? std::string("From the start, as a wreck")
+                          : current.empty()       ? std::string("Never: it's in no group")
+                                                  : "Never: nothing creates " + current;
+    bool never = current.empty() || (current != "INITIAL" && current != "WRECKAGE");
+    std::string optionKey;
     for (const SpawnTarget& target : targets) {
-      if (target.path.back() == current) {
-        preview = current + ": " + target.when;
+      if (target.path.back() != current) {
+        continue;
       }
-    }
-    if (current.empty()) {
-      preview = "(no group)";
+      const char* const as = target.wreck && target.unit ? " (wreck or unit)" : target.wreck ? " (wreck)" : " (unit)";
+      never = target.rule.Never();
+      preview = never ? "Never: " + target.when.substr(target.when.rfind("never: ", 0) == 0 ? 7 : 0)
+                      : target.when == "every game" ? std::string("In every game") + as
+                                                    : "When " + target.when + as;
+      optionKey = target.rule.keys.empty() ? std::string() : target.rule.keys.front();
     }
 
     const float labelWidth = ImGui::CalcTextSize("Location X").x + ImGui::GetStyle().ItemSpacing.x * 2.0f;
     ImGui::AlignTextToFramePadding();
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelWidth - ImGui::CalcTextSize("Spawns").x - ImGui::GetStyle().ItemSpacing.x);
-    ImGui::TextDisabled("Spawns");
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelWidth - ImGui::CalcTextSize("Appears").x - ImGui::GetStyle().ItemSpacing.x);
+    ImGui::TextDisabled("Appears");
     ImGui::SameLine(labelWidth + ImGui::GetStyle().WindowPadding.x);
-    ImGui::SetNextItemWidth(-1.0f);
+    const float optionWidth = optionKey.empty() ? 0.0f : ImGui::CalcTextSize("Option...").x + ImGui::GetStyle().FramePadding.x * 2.0f + ImGui::GetStyle().ItemSpacing.x;
+    ImGui::SetNextItemWidth(-optionWidth - 1.0f);
     const auto move = [&](const std::vector<std::string>& to) {
       EdTools::UnitGroupAsk ask;
       ask.army = unit.owner;
@@ -115,12 +127,31 @@ namespace faf::editor
         gpg::Warnf("editor: /unitspawn %s: not a group %s's units can spawn in", asked.c_str(), unit.owner.c_str());
       }
     }
-    if (ImGui::BeginCombo("##spawns", preview.c_str(), ImGuiComboFlags_HeightLarge)) {
+    if (never) {
+      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.95f, 0.75f, 0.30f, 1.0f));
+    }
+    const bool open = ImGui::BeginCombo("##spawns", preview.c_str(), ImGuiComboFlags_HeightLarge);
+    if (never) {
+      ImGui::PopStyleColor();
+    }
+    if (!open && ImGui::IsItemHovered()) {
+      ImGui::BeginTooltip();
+      ImGui::PushTextWrapPos(ImGui::GetFontSize() * 30.0f);
+      ImGui::TextUnformatted(fateText.c_str());
+      for (const std::string& line : lobbyLines) {
+        ImGui::TextUnformatted(line.c_str());
+      }
+      ImGui::TextDisabled("Click to change where %s %s in a game (Ctrl+Z undoes it)", names.size() == 1 ? "it" : "the selected units",
+                          names.size() == 1 ? "is" : "are");
+      ImGui::PopTextWrapPos();
+      ImGui::EndTooltip();
+    }
+    if (open) {
       ImGui::SeparatorText("Whatever the lobby options");
-      if (ImGui::Selectable("From the start, a live unit (INITIAL)", current == "INITIAL")) {
+      if (ImGui::Selectable("From the start, as a live unit (INITIAL)", current == "INITIAL")) {
         move({"INITIAL"});
       }
-      if (ImGui::Selectable("From the start, a wreck (WRECKAGE)", current == "WRECKAGE")) {
+      if (ImGui::Selectable("From the start, as a wreck (WRECKAGE)", current == "WRECKAGE")) {
         move({"WRECKAGE"});
       }
       ImGui::SeparatorText("When a lobby option asks for it");
@@ -129,7 +160,8 @@ namespace faf::editor
       }
       for (const SpawnTarget& target : targets) {
         const std::string& name = target.path.back();
-        std::string label = (target.optionsWith.empty() ? "" : "+ ") + name + (target.exists ? "" : " (new group)") + ": " + target.when + ", " + kind(target);
+        std::string label = (target.optionsWith.empty() ? "" : "+ ") + std::string(target.when == "every game" ? "In every game" : "When " + target.when) +
+                            ": " + name + (target.exists ? "" : " (new group)") + ", " + kind(target);
         ImGui::PushID(name.c_str());
         if (ImGui::Selectable(label.c_str(), name == current)) {
           move(target.path);
@@ -151,17 +183,12 @@ namespace faf::editor
       }
       ImGui::EndCombo();
     }
-    ImGui::SetItemTooltip("Where %s %s in a game: moves %s into the group (Ctrl+Z undoes it)", names.size() == 1 ? "this unit" : "these units",
-                          names.size() == 1 ? "is" : "are", names.size() == 1 ? "it" : ("the " + std::to_string(names.size()) + " selected").c_str());
-    // Its lobby option, edited where all of them are.
-    for (const SpawnTarget& target : targets) {
-      if (target.path.back() == current && !target.rule.keys.empty()) {
-        if (ImGui::Button(("Edit its lobby option \"" + target.rule.keys.front() + "\"...").c_str(), ImVec2(-1.0f, 0.0f))) {
-          OpenAdaptiveWindow(target.rule.keys.front());
-        }
-        ImGui::SetItemTooltip("The Adaptive Map window: the option's choices, what each puts on the map, its levels");
-        break;
+    if (!optionKey.empty()) {
+      ImGui::SameLine();
+      if (ImGui::Button("Option...")) {
+        OpenAdaptiveWindow(optionKey);
       }
+      ImGui::SetItemTooltip("The lobby option %s in the Adaptive Map window: its choices, what each puts on the map", optionKey.c_str());
     }
   }
 
@@ -215,29 +242,11 @@ namespace faf::editor
       lobbyLines = DescribeLobbyRule(rule, options);
       lobbyNever = rule.scriptNames && rule.Never();
     }
-    const ImVec4 warn(0.95f, 0.75f, 0.30f, 1.0f);
-    row("In a game");
-    ImGui::PushTextWrapPos(0.0f);
     const bool wreck = fate.kind == UnitFate::Kind::Wreck || fate.kind == UnitFate::Kind::ScriptWreck;
-    ImGui::TextColored(fate.kind == UnitFate::Kind::Never || (byScript && lobbyNever) ? warn : ImGui::GetStyleColorVec4(ImGuiCol_Text), "%s",
-                       fate.text.c_str());
-    ImGui::PopTextWrapPos();
-    if (byScript && !lobbyLines.empty()) {
-      row("Lobby");
-      ImGui::BeginGroup();
-      ImGui::PushTextWrapPos(0.0f);
-      for (const std::string& line : lobbyLines) {
-        if (lobbyNever) {
-          ImGui::TextColored(warn, "%s", line.c_str());
-        } else {
-          ImGui::TextUnformatted(line.c_str());
-        }
-      }
-      ImGui::PopTextWrapPos();
-      ImGui::EndGroup();
-      ImGui::SetItemTooltip("Read from the map's script (the if / for around its CreateArmyGroup) and its _options.lua: the values the "
-                            "lobby offers for each option the script reads there.");
-    }
+    (void)lobbyNever;
+    // When it appears in a game, as one line that is also the choice (user ask 2026-11-11: a shorter, editable view).
+    DrawUnitSpawn(unit, root, fate.kind == UnitFate::Kind::Unit ? "INITIAL" : fate.kind == UnitFate::Kind::Wreck ? "WRECKAGE" : fate.group, civilian,
+                  fate.text, byScript ? lobbyLines : std::vector<std::string>{});
 
     // The wreck's value, as Unit.lua's CreateWreckageProp makes it (under water: its ground below the map's water).
     const bool underwater = UnderWater(mDocument, unit.position[0], unit.position[2]);
@@ -254,40 +263,6 @@ namespace faf::editor
       }
     }
 
-    // "Wreck": whether it becomes one in a game, as the file has it (user: a checkbox with the real state). The editor
-    // changes it only between the start groups, WRECKAGE and INITIAL; for a group the map's script creates, the script's
-    // CreateArmyGroup(..., true) decides, so the box shows it and the button moves the unit to the start groups instead.
-    // Ctrl+Z undoes a move.
-    const auto ask = [&](const bool toWreck) {
-      EdTools::UnitWreckAsk change;
-      change.army = unit.owner;
-      change.names = {unit.name};
-      change.wreck = toWreck;
-      mTools.AskUnitWreck(std::move(change));
-    };
-    const bool startGroup = fate.kind == UnitFate::Kind::Unit || fate.kind == UnitFate::Kind::Wreck;
-    bool isWreck = wreck;
-    ImGui::BeginDisabled(!startGroup);
-    // Either way, as a lobby option picks: the box shows a mixed state.
-    ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, fate.kind == UnitFate::Kind::ScriptEither);
-    if (ImGui::Checkbox("Wreck", &isWreck) && startGroup) {
-      ask(isWreck);
-    }
-    ImGui::PopItemFlag();
-    ImGui::EndDisabled();
-    if (startGroup) {
-      ImGui::SetItemTooltip(isWreck ? "A wreck from the start: in %s's WRECKAGE group. Off: moves it to INITIAL, a live unit from the start."
-                                    : "A live unit from the start: in %s's INITIAL group. On: moves it to WRECKAGE, a wreck from the start.",
-                            unit.owner.c_str());
-    } else if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-      ImGui::SetTooltip(fate.kind == UnitFate::Kind::Never          ? "Never in a game: nothing creates %s."
-                        : fate.kind == UnitFate::Kind::ScriptEither ? "The map's script creates %s as wrecks or as live units, as a lobby "
-                                                                      "option picks: the script decides, not the group."
-                        : wreck ? "The map's script creates %s as wrecks (CreateArmyGroup(..., true)): the script decides, not the group."
-                                : "The map's script creates %s as live units: the script decides, not the group.",
-                        fate.group.empty() ? "its group" : fate.group.c_str());
-    }
-    DrawUnitSpawn(unit, root, fate.kind == UnitFate::Kind::Unit ? "INITIAL" : fate.kind == UnitFate::Kind::Wreck ? "WRECKAGE" : fate.group);
     HelpNote("A map's units are only data until something creates their group: the game makes each army's INITIAL group as "
              "units and its WRECKAGE group as wrecks when the game starts; any other group appears only if the map's "
              "script creates it (FAF's ScenarioUtilities.lua).");
