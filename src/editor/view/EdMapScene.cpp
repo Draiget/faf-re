@@ -2194,7 +2194,10 @@ namespace faf::editor
     if (mTools == nullptr || mMap == nullptr) {
       return 0;
     }
-    if (mTools->MarkersToolActive()) {
+    // The tool's own kind; the Select tool copies whichever kind is selected (it had only props, so a Shift+drag or a
+    // Ctrl+D of its markers, units or decals copied nothing).
+    const PickKind selected = mTools->SelectToolActive() ? SelectedKind() : PickKind::None;
+    if (mTools->MarkersToolActive() || selected == PickKind::Marker) {
       copied.kind = Clipboard::Kind::Markers;
       for (const SaveEntry& marker : SelectedMarkers()) {
         float x = 0.0f, y = 0.0f, z = 0.0f;
@@ -2203,7 +2206,7 @@ namespace faf::editor
           add(x, z);
         }
       }
-    } else if (mTools->SelectToolActive() && mMap->mProps != nullptr) {
+    } else if (selected == PickKind::Prop && mMap->mProps != nullptr) {
       copied.kind = Clipboard::Kind::Props;
       const auto& records = mDocument.FileRecords().props;
       for (const int index : mSelection) {
@@ -2216,7 +2219,7 @@ namespace faf::editor
         copied.props.emplace_back(entry, record);
         add(entry.mTransform.pos_.x, entry.mTransform.pos_.z);
       }
-    } else if (mTools->UnitsToolActive()) {
+    } else if (mTools->UnitsToolActive() || selected == PickKind::Unit) {
       copied.kind = Clipboard::Kind::Units;
       for (const SaveEntry& entry : mDocument.SaveData().Armies()) {
         UnitGroup group;
@@ -2233,7 +2236,7 @@ namespace faf::editor
           }
         }
       }
-    } else if (mTools->DecalsToolActive() && mDocument.Decals() != nullptr) {
+    } else if ((mTools->DecalsToolActive() || selected == PickKind::Decal) && mDocument.Decals() != nullptr) {
       copied.kind = Clipboard::Kind::Decals;
       for (const int index : mDecalSelection) {
         if (const moho::CWldTerrainDecal* const decal = FindDecal(*mDocument.Decals(), index); decal != nullptr) {
@@ -2252,6 +2255,23 @@ namespace faf::editor
     mClipboard = std::move(copied);
     gpg::Logf("editor: %zu copied", count);
     return count;
+  }
+
+  bool EdMapScene::CloneSelectionForDrag(const bool shift)
+  {
+    if (!shift) {
+      return false;
+    }
+    const Clipboard kept = mClipboard;
+    const std::size_t copied = CopySelection();
+    if (copied == 0) {
+      mClipboard = kept;
+      return false;
+    }
+    PasteAt(mClipboard.centre[0], mClipboard.centre[1]);
+    mClipboard = kept;
+    gpg::Logf("editor: Shift+drag: %zu copied in place, the copies move", copied);
+    return true;
   }
 
   void EdMapScene::PasteAt(const float x, const float z)
@@ -5399,6 +5419,8 @@ namespace faf::editor
         // The edges within reach of the cursor (a corner takes two).
         // The move gizmo first: a drag of the selected markers along an axis or freely.
         if (const GizmoPart part = PickGizmo(at); part != GizmoPart::None) {
+          // Shift on the gizmo: the copy moves (Shift on a marker itself deletes it, below).
+          (void)CloneSelectionForDrag((wParam & MK_SHIFT) != 0);
           BeginGizmoDrag(part, at);
           mDragMarkers = true;
           mMarkersMoved = false;
@@ -5488,6 +5510,7 @@ namespace faf::editor
           return true;
         }
         if (part != GizmoPart::None) {
+          (void)CloneSelectionForDrag((wParam & MK_SHIFT) != 0); // Shift on the gizmo: the copy moves
           BeginGizmoDrag(part, at);
         } else {
           const bool add = (wParam & MK_CONTROL) != 0;
@@ -5532,7 +5555,10 @@ namespace faf::editor
           return true;
         }
         const int hit = PickDecal(groundX, groundZ);
-        if ((wParam & MK_SHIFT) != 0) {
+        // Shift on the gizmo: the copy moves; Shift on a decal itself deletes it.
+        if ((wParam & MK_SHIFT) != 0 && !mTools->DecalPlaceMode() && !mTools->DecalPathMode() && PickGizmo(at) != GizmoPart::None) {
+          (void)CloneSelectionForDrag(true);
+        } else if ((wParam & MK_SHIFT) != 0) {
           if (hit >= 0) {
             mDecalSelection = {hit};
             DeleteSelectedDecals();
@@ -5592,6 +5618,7 @@ namespace faf::editor
         // The gizmo moves what is selected; else a click picks the nearest marker, unit, prop or decal (Ctrl adds or
         // takes one out; another kind starts a new selection), and a drag moves the selection.
         if (const GizmoPart part = PickGizmo(at); part != GizmoPart::None) {
+          (void)CloneSelectionForDrag((wParam & MK_SHIFT) != 0);
           BeginSelectionDrag(window, SelectedKind(), part, at, 0.0f, 0.0f);
           return true;
         }
@@ -5667,6 +5694,7 @@ namespace faf::editor
           break;
         }
         if (kept) {
+          (void)CloneSelectionForDrag((wParam & MK_SHIFT) != 0);
           BeginSelectionDrag(window, hit.kind, GizmoPart::None, at, groundX, groundZ);
         }
         return true;

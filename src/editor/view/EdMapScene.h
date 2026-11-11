@@ -394,6 +394,12 @@ namespace faf::editor
     Clipboard mClipboard;
     /** Copies the active tool's selection; returns how many. */
     std::size_t CopySelection();
+    /**
+     * Shift held as a move starts (user ask 2026-11-11): the selection is copied in place and the copy selected, so the
+     * move carries the copy and the original stays (the paste is its own undo step); the clipboard is kept as it was.
+     * True when it copied.
+     */
+    bool CloneSelectionForDrag(bool shift);
     /** Puts the clipboard down with its middle at (x, z), as one undo step, and selects what it put. */
     void PasteAt(float x, float z);
     POINT mBoxFrom{};
