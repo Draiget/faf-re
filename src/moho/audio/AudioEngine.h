@@ -792,9 +792,31 @@ namespace moho
    *
    * What it does:
    * Stores/restores per-engine "Global" category volume while applying
-   * process-wide mute transitions.
+   * process-wide mute transitions. Engine change: it is the minimized window's
+   * reason (kSndMuteMinimized) of SND_MuteFor, so it and the editor's own reason
+   * don't save each other's zero as the volume to restore.
    */
   void SND_Mute(bool doMute);
+
+  /** Engine addition: why the sound is muted; it is while any reason holds. */
+  constexpr std::uint32_t kSndMuteMinimized = 1u << 0;
+  /** The map editor: its window isn't the one in front. */
+  constexpr std::uint32_t kSndMuteUnfocused = 1u << 1;
+
+  /**
+   * Engine addition: sets or clears one mute reason. The "Global" volume is saved
+   * and silenced when the first reason starts, and given back when the last one ends.
+   */
+  void SND_MuteFor(std::uint32_t reason, bool doMute);
+
+  /** Engine addition: the mute reasons holding now (0: sound on); `SND_MuteFor` keeps them. */
+  [[nodiscard]] std::uint32_t SND_MuteReasons();
+
+  /**
+   * Engine addition: how many times `SND_MuteFor` has changed the engines' muted state (save-and-silence or give
+   * back), for tests: muting twice for two reasons must not save the first one's zero.
+   */
+  [[nodiscard]] std::uint32_t SND_MuteTransitions();
 
   static_assert(sizeof(AudioEngine) == sizeof(void*), "AudioEngine size must be pointer-sized");
 } // namespace moho

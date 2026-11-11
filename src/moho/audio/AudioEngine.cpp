@@ -2194,6 +2194,39 @@ namespace moho
    */
   void SND_Mute(const bool doMute)
   {
+    SND_MuteFor(kSndMuteMinimized, doMute);
+  }
+
+  namespace
+  {
+    std::uint32_t sMuteReasons = 0;
+    std::uint32_t sMuteTransitions = 0;
+  } // namespace
+
+  std::uint32_t SND_MuteReasons()
+  {
+    return sMuteReasons;
+  }
+
+  std::uint32_t SND_MuteTransitions()
+  {
+    return sMuteTransitions;
+  }
+
+  void SND_MuteFor(
+    const std::uint32_t reason,
+    const bool on
+  )
+  {
+    // The binary's SND_Mute body, run only when the muted state changes: with two reasons (minimized, the editor's
+    // unfocused window), muting twice would save the first mute's zero as the volume to give back.
+    const bool wasMuted = sMuteReasons != 0;
+    sMuteReasons = on ? (sMuteReasons | reason) : (sMuteReasons & ~reason);
+    const bool doMute = sMuteReasons != 0;
+    if (doMute == wasMuted) {
+      return;
+    }
+    ++sMuteTransitions;
     SoundConfiguration* configuration = GetSoundConfigurationSingletonB();
     if (configuration == nullptr) {
       return;
@@ -2371,7 +2404,12 @@ namespace moho
     // parameter object. Typed callback fields grow and align natively on x64.
     const int initializeResult = mImpl->mInstance->Initialize(&configuration->mRuntimeParams);
     if (initializeResult < 0) {
-      gpg::Warnf("SND: Error initializing audio engine.\n%s", func_SoundErrorCodeToMsg(initializeResult));
+      // The HRESULT too (engine addition): "Unknown XACT Error" alone doesn't say which.
+      gpg::Warnf(
+        "SND: Error initializing audio engine.\n%s (0x%08X)",
+        func_SoundErrorCodeToMsg(initializeResult),
+        static_cast<unsigned>(initializeResult)
+      );
       configuration->mNoSound = 1u;
       return;
     }

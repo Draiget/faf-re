@@ -53,6 +53,7 @@
 #include "moho/app/CScApp.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
+#include "moho/audio/AudioEngine.h"
 #include "moho/misc/CVirtualFileSystem.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -569,6 +570,30 @@ namespace faf::editor
       /** The style at the screen's DPI, before the user's UI scale; the scale in use on it. */
       ImGuiStyle mBaseStyle;
       float mUiScaleApplied = 1.0f;
+      bool mSoundFocused = true;
+
+      /**
+       * Sound only while the editor is the window in front (user ask 2026-11-11): its own windows and dialogs share its
+       * frame's root owner; any other window in front mutes it (moho::kSndMuteUnfocused, beside the game's own mute
+       * while minimized).
+       */
+      void KeepSoundToFocus()
+      {
+        const HWND frame = HandleOf(mGame.supcomFrame);
+        const HWND front = ::GetForegroundWindow();
+        const bool focused = frame != nullptr && front != nullptr &&
+          ::GetAncestor(front, GA_ROOTOWNER) == ::GetAncestor(frame, GA_ROOTOWNER);
+        if (focused == mSoundFocused) {
+          return;
+        }
+        mSoundFocused = focused;
+        moho::SND_MuteFor(moho::kSndMuteUnfocused, !focused);
+        gpg::Logf(
+          "editor: sound %s (the editor's window %s)",
+          focused ? "on" : "muted",
+          focused ? "is in front" : "isn't in front"
+        );
+      }
       double mPropSwapUndoAt = 0.0;
 
       /**
@@ -1689,6 +1714,7 @@ namespace faf::editor
       }
       mScene.Update(frameSeconds, playIdle, mShell->EditorViewInPlay() && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing);
       KeepViewState();
+      KeepSoundToFocus();
       mShell->Tools().SetModelsLoading(mScene.ModelsPending());
 
       if (mImGuiReady) {
