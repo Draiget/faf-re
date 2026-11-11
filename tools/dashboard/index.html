@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FAF server dashboard</title>
+  </head>
+  <body>
+    <header>
+      <h1>FAF server dashboard</h1>
+      <span id="connection" class="bad">not connected</span>
+    </header>
+    <main>
+      <section class="panel">
+        <h2>Server</h2>
+        <label>REST address <input id="url" type="url" spellcheck="false" /></label>
+        <label>Admin token <input id="token" type="password" autocomplete="off" /></label>
+        <button id="connect" type="button">Connect</button>
+      </section>
+      <section class="panel">
+        <h2>Lobby or game</h2>
+        <p id="phase">–</p>
+        <table>
+          <thead>
+            <tr><th>uid</th><th>name</th><th>state</th><th>ready</th><th>ping</th><th>slot</th></tr>
+          </thead>
+          <tbody id="seats"></tbody>
+        </table>
+      </section>
+      <section class="panel">
+        <h2>Control</h2>
+        <div class="row">
+          <button type="button" data-op="force_start">Start the game</button>
+          <button type="button" data-op="pause">Pause</button>
+          <button type="button" data-op="resume">Resume</button>
+        </div>
+        <div class="row">
+          <input id="options" placeholder="Key=Value,Key=Value" spellcheck="false" />
+          <button type="button" data-op="set_options">Set options</button>
+        </div>
+        <div class="row">
+          <input id="eject-uid" type="number" placeholder="uid" />
+          <input id="eject-reason" placeholder="reason" />
+          <button type="button" data-op="eject">Eject</button>
+        </div>
+        <div class="row">
+          <input id="address" placeholder="a.b.c.d" spellcheck="false" />
+          <button type="button" data-op="allow">Allow</button>
+          <button type="button" data-op="disallow">Disallow</button>
+        </div>
+        <div class="row">
+          <input id="results" placeholder="1=victory,2=defeat (optional)" spellcheck="false" />
+          <input id="end-reason" placeholder="reason" />
+          <button type="button" data-op="end">End the game</button>
+        </div>
+        <p id="answer">–</p>
+      </section>
+      <section class="panel wide">
+        <h2>Events <label class="inline"><input id="show-log" type="checkbox" /> console lines</label></h2>
+        <ol id="events"></ol>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
