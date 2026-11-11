@@ -1,5 +1,8 @@
 #include "editor/doc/EdGroupOptions.h"
 
+#include "editor/doc/EdAdaptiveTables.h"
+#include "editor/doc/EdUnitFate.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
@@ -955,10 +958,21 @@ namespace faf::editor
     return std::all_of(cases.begin(), cases.end(), [](const Case& c) { return c.made == Made::No; });
   }
 
+  namespace
+  {
+    GroupLobbyRule RuleOf(const Script& s, const std::vector<LobbyOptionInfo>& options, const std::string& group);
+  }
+
   GroupLobbyRule LobbyRuleOfGroup(const std::string& scriptText, const std::vector<LobbyOptionInfo>& options, const std::string& group)
   {
+    return RuleOf(ReadScript(scriptText), options, group);
+  }
+
+  namespace
+  {
+  GroupLobbyRule RuleOf(const Script& s, const std::vector<LobbyOptionInfo>& options, const std::string& group)
+  {
     GroupLobbyRule rule;
-    const Script s = ReadScript(scriptText);
     std::vector<const Creation*> naming;
     // The creations that can name it: 'Name' exactly, or 'Name_' .. something with the group's name starting so.
     for (const Creation& c : s.creations) {
@@ -1057,6 +1071,7 @@ namespace faf::editor
     }
     return rule;
   }
+  } // namespace
 
   std::vector<std::string> DescribeLobbyRule(const GroupLobbyRule& rule, const std::vector<LobbyOptionInfo>& options)
   {
@@ -1145,5 +1160,199 @@ namespace faf::editor
     }
     lines.push_back("  any other setting: not created");
     return lines;
+  }
+
+  std::string LobbyRuleWhen(const GroupLobbyRule& rule, const std::vector<LobbyOptionInfo>& options)
+  {
+    if (!rule.scriptNames) {
+      return "the script doesn't create it";
+    }
+    const GroupLobbyRule::Case* first = nullptr;
+    for (const GroupLobbyRule::Case& c : rule.cases) {
+      if (c.made == GroupLobbyRule::Made::Yes) {
+        first = &c;
+        break;
+      }
+      if (c.made == GroupLobbyRule::Made::Maybe && first == nullptr) {
+        first = &c;
+      }
+    }
+    if (first == nullptr) {
+      for (std::size_t k = 0; k < rule.keys.size(); ++k) {
+        if (rule.optionIndex[k] < 0) {
+          return "never: the lobby has no option " + rule.keys[k];
+        }
+      }
+      return "never: no lobby value creates it";
+    }
+    std::string settings;
+    for (std::size_t k = 0; k < rule.keys.size(); ++k) {
+      const int index = rule.optionIndex[k];
+      if (index < 0) {
+        continue;
+      }
+      const LobbyOptionInfo& option = options[static_cast<std::size_t>(index)];
+      settings += (settings.empty() ? "" : ", ") + (option.label.empty() ? option.key : option.label) + " = " +
+                  Quoted(option.values[static_cast<std::size_t>(first->picks[k])].text);
+    }
+    if (settings.empty()) {
+      settings = "every game";
+    }
+    return first->made == GroupLobbyRule::Made::Maybe ? settings + " (and the game: slots, factions)" : settings;
+  }
+
+  namespace
+  {
+    /** "Optional naval wreckage" from optional_naval_wreckage. */
+    std::string LabelOfKey(const std::string& key)
+    {
+      std::string label = key;
+      std::replace(label.begin(), label.end(), '_', ' ');
+      if (!label.empty()) {
+        label[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(label[0])));
+      }
+      return label;
+    }
+
+    /** An option's values have the keys 1, 2, ... in order (so values can be added after them). */
+    bool CountedKeys(const LobbyOptionInfo& option)
+    {
+      for (std::size_t v = 0; v < option.values.size(); ++v) {
+        if (!option.values[v].number || option.values[v].numberKey != static_cast<double>(v + 1)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    /**
+     * `_options.lua` with what makes `group` spawn: values added to its one option (up to three), or the option
+     * written when the lobby lacks it (disabled, then up to eight levels); empty when neither does it.
+     */
+    std::string OptionsThatMake(const Script& s, const std::string& optionsText, const std::vector<LobbyOptionInfo>& options,
+                                const GroupLobbyRule& rule, const std::string& group, std::string& change)
+    {
+      if (rule.keys.size() != 1) {
+        return {};
+      }
+      const std::string& key = rule.keys[0];
+      const auto creates = [&](const std::string& text) {
+        return !RuleOf(s, ParseLobbyOptions(text), group).Never();
+      };
+      if (const int index = rule.optionIndex[0]; index >= 0) {
+        const LobbyOptionInfo& option = options[static_cast<std::size_t>(index)];
+        if (!CountedKeys(option)) {
+          return {};
+        }
+        std::vector<std::pair<std::string, std::string>> values;
+        for (const LobbyOptionInfo::Value& value : option.values) {
+          values.emplace_back(value.text, value.help);
+        }
+        std::string added;
+        for (int more = 1; more <= 3; ++more) {
+          const std::string text = "level " + std::to_string(values.size());
+          values.emplace_back(text, "Also spawns " + group + ".");
+          added += (added.empty() ? "" : ", ") + Quoted(text);
+          const std::string with = WithLobbyOptionValues(optionsText, key, option.label.empty() ? LabelOfKey(key) : option.label, option.help, values);
+          if (creates(with)) {
+            change = "adds " + std::string(more == 1 ? "the value " : "the values ") + added + " to " +
+                     Quoted(option.label.empty() ? key : option.label);
+            return with;
+          }
+        }
+        return {};
+      }
+      // The lobby lacks the option: disabled, then levels until the group is made.
+      std::vector<std::pair<std::string, std::string>> values{{"disabled", "None of these groups."}};
+      for (int level = 1; level <= 8; ++level) {
+        values.emplace_back("level " + std::to_string(level), "Spawns level " + std::to_string(level) + ".");
+        const std::string with = WithLobbyOptionValues(optionsText, key, LabelOfKey(key), "Added by the map editor for the script's " + key + ".", values);
+        if (creates(with)) {
+          change = "adds the lobby option " + Quoted(LabelOfKey(key)) + " (" + key + ": disabled, level 1" +
+                   (level > 1 ? " to " + std::to_string(level) : std::string()) + ")";
+          return with;
+        }
+      }
+      return {};
+    }
+  } // namespace
+
+  std::vector<SpawnTarget> SpawnTargets(const std::string& script, const std::string& optionsText, const std::string& army,
+                                        const std::vector<std::vector<std::string>>& groupPaths)
+  {
+    const Script s = ReadScript(script);
+    const std::vector<LobbyOptionInfo> options = ParseLobbyOptions(optionsText);
+    // The names to offer, in the script's order, each once.
+    std::vector<std::string> names;
+    std::set<std::string> nexts; // a looped option's next level (offered only with what makes it spawn)
+    const auto add = [&](const std::string& name) {
+      if (std::find(names.begin(), names.end(), name) == names.end()) {
+        names.push_back(name);
+      }
+    };
+    for (const ScriptGroupCreation& creation : ScriptGroupCreations(script)) {
+      if (!creation.army.empty() && creation.army != army) {
+        continue;
+      }
+      if (!creation.prefix) {
+        add(creation.name);
+        continue;
+      }
+      // 'Name_' .. k: the levels there are and the ones a lobby value reaches, then the next one.
+      int highest = 0;
+      for (int k = 1; k <= 16; ++k) {
+        const std::string name = creation.name + std::to_string(k);
+        bool exists = false;
+        for (const std::vector<std::string>& path : groupPaths) {
+          exists = exists || (!path.empty() && path.back() == name);
+        }
+        if (exists || !RuleOf(s, options, name).Never()) {
+          add(name);
+          highest = k;
+        }
+      }
+      const std::string next = creation.name + std::to_string(std::max(highest, 1) + 1);
+      if (std::find(names.begin(), names.end(), next) == names.end()) {
+        add(next);
+        nexts.insert(next);
+      }
+    }
+    std::vector<SpawnTarget> targets;
+    for (const std::string& name : names) {
+      SpawnTarget target;
+      for (const std::vector<std::string>& path : groupPaths) {
+        if (!path.empty() && path.back() == name) {
+          target.path = path;
+          target.exists = true;
+          break;
+        }
+      }
+      if (!target.exists) {
+        target.path = {name};
+      }
+      target.rule = RuleOf(s, options, name);
+      if (!target.rule.scriptNames) {
+        continue;
+      }
+      std::vector<LobbyOptionInfo> shownOptions = options;
+      if (target.rule.Never()) {
+        target.optionsWith = OptionsThatMake(s, optionsText, options, target.rule, name, target.optionsChange);
+        if (!target.optionsWith.empty()) {
+          shownOptions = ParseLobbyOptions(target.optionsWith);
+          target.rule = RuleOf(s, shownOptions, name);
+        } else if (nexts.count(name) != 0) {
+          continue; // a next level nothing can make spawn: not offered
+        }
+      }
+      target.when = LobbyRuleWhen(target.rule, shownOptions);
+      for (const GroupLobbyRule::Case& c : target.rule.cases) {
+        if (c.made != GroupLobbyRule::Made::No) {
+          target.wreck = target.wreck || c.asWreck;
+          target.unit = target.unit || c.asUnit;
+        }
+      }
+      targets.push_back(std::move(target));
+    }
+    return targets;
   }
 } // namespace faf::editor

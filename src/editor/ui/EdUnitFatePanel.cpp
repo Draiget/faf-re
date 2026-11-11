@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -14,11 +15,146 @@
 #include "editor/doc/EdUnitWrecks.h"
 #include "editor/doc/EdUnits.h"
 #include "editor/ui/EdHelp.h"
+#include "gpg/core/utils/Logging.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 
 namespace faf::editor
 {
+  void EdShell::DrawUnitSpawn(const SelectionProperties& unit, const UnitGroup& root, const std::string& current)
+  {
+    // "Spawns": where the unit is in a game, as a choice (user ask 2026-11-11: edit the adaptive groups, not only read
+    // about them): from the start as a unit or a wreck, or in a group the map's script creates, with the lobby setting
+    // that brings it in. A group no setting makes yet comes with the _options.lua change that does (a value added to its
+    // option, or the option written), checked by reading the script again with it (doc/EdGroupOptions).
+    std::vector<std::vector<std::string>> groupPaths;
+    {
+      std::vector<std::string> at;
+      const std::function<void(const UnitGroup&)> walk = [&](const UnitGroup& group) {
+        for (const UnitGroup& child : group.groups) {
+          at.push_back(child.name);
+          groupPaths.push_back(at);
+          walk(child);
+          at.pop_back();
+        }
+      };
+      walk(root);
+    }
+    static std::string cachedKey;
+    static std::vector<SpawnTarget> targets;
+    std::string key = mDocument.Script() + '\x1f' + mDocument.OptionsText() + '\x1f' + unit.owner;
+    for (const std::vector<std::string>& groupPath : groupPaths) {
+      key += '\x1e';
+      for (const std::string& name : groupPath) {
+        key += name + '/';
+      }
+    }
+    if (key != cachedKey) {
+      cachedKey = std::move(key);
+      targets = SpawnTargets(mDocument.Script(), mDocument.OptionsText(), unit.owner, groupPaths);
+    }
+
+    // The units it applies to: the selection's units of this army when this one is among them, else this one.
+    std::vector<std::string> names;
+    bool inSelection = false;
+    for (const auto& [owner, name] : mTools.UnitSelection()) {
+      inSelection = inSelection || (owner == unit.owner && name == unit.name);
+    }
+    if (inSelection) {
+      for (const auto& [owner, name] : mTools.UnitSelection()) {
+        if (owner == unit.owner) {
+          names.push_back(name);
+        }
+      }
+    } else {
+      names.push_back(unit.name);
+    }
+    const auto kind = [](const SpawnTarget& target) {
+      return target.wreck && target.unit ? "wrecks or live units" : target.wreck ? "as wrecks" : "as live units";
+    };
+    std::string preview = current == "INITIAL" ? "From the start, a live unit" : current == "WRECKAGE" ? "From the start, a wreck" : current;
+    for (const SpawnTarget& target : targets) {
+      if (target.path.back() == current) {
+        preview = current + ": " + target.when;
+      }
+    }
+    if (current.empty()) {
+      preview = "(no group)";
+    }
+
+    const float labelWidth = ImGui::CalcTextSize("Location X").x + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+    ImGui::AlignTextToFramePadding();
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + labelWidth - ImGui::CalcTextSize("Spawns").x - ImGui::GetStyle().ItemSpacing.x);
+    ImGui::TextDisabled("Spawns");
+    ImGui::SameLine(labelWidth + ImGui::GetStyle().WindowPadding.x);
+    ImGui::SetNextItemWidth(-1.0f);
+    const auto move = [&](const std::vector<std::string>& to) {
+      EdTools::UnitGroupAsk ask;
+      ask.army = unit.owner;
+      ask.names = names;
+      ask.path = to;
+      mTools.AskUnitGroup(std::move(ask));
+    };
+    if (const std::string asked = std::exchange(mSpawnAsk, std::string()); !asked.empty()) {
+      bool found = asked == "INITIAL" || asked == "WRECKAGE";
+      if (found) {
+        move({asked});
+      }
+      for (const SpawnTarget& target : targets) {
+        if (!found && target.path.back() == asked) {
+          found = true;
+          move(target.path);
+          if (!target.optionsWith.empty()) {
+            mDocument.SetOptionsText(target.optionsWith);
+          }
+          gpg::Logf("editor: /unitspawn %s: %zu unit(s) moved; %s%s", asked.c_str(), names.size(), target.when.c_str(),
+                    target.optionsChange.empty() ? "" : ("; " + target.optionsChange).c_str());
+        }
+      }
+      if (!found) {
+        gpg::Warnf("editor: /unitspawn %s: not a group %s's units can spawn in", asked.c_str(), unit.owner.c_str());
+      }
+    }
+    if (ImGui::BeginCombo("##spawns", preview.c_str(), ImGuiComboFlags_HeightLarge)) {
+      ImGui::SeparatorText("Whatever the lobby options");
+      if (ImGui::Selectable("From the start, a live unit (INITIAL)", current == "INITIAL")) {
+        move({"INITIAL"});
+      }
+      if (ImGui::Selectable("From the start, a wreck (WRECKAGE)", current == "WRECKAGE")) {
+        move({"WRECKAGE"});
+      }
+      ImGui::SeparatorText("When a lobby option asks for it");
+      if (targets.empty()) {
+        ImGui::TextDisabled("The map's script creates no groups for %s.", unit.owner.c_str());
+      }
+      for (const SpawnTarget& target : targets) {
+        const std::string& name = target.path.back();
+        std::string label = (target.optionsWith.empty() ? "" : "+ ") + name + (target.exists ? "" : " (new group)") + ": " + target.when + ", " + kind(target);
+        ImGui::PushID(name.c_str());
+        if (ImGui::Selectable(label.c_str(), name == current)) {
+          move(target.path);
+          if (!target.optionsWith.empty()) {
+            mDocument.SetOptionsText(target.optionsWith);
+          }
+        }
+        if (ImGui::IsItemHovered()) {
+          ImGui::BeginTooltip();
+          for (const std::string& line : DescribeLobbyRule(target.rule, ParseLobbyOptions(target.optionsWith.empty() ? mDocument.OptionsText() : target.optionsWith))) {
+            ImGui::TextUnformatted(line.c_str());
+          }
+          if (!target.optionsWith.empty()) {
+            ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "Picking it %s in _options.lua (its own undo step).", target.optionsChange.c_str());
+          }
+          ImGui::EndTooltip();
+        }
+        ImGui::PopID();
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::SetItemTooltip("Where %s %s in a game: moves %s into the group (Ctrl+Z undoes it)", names.size() == 1 ? "this unit" : "these units",
+                          names.size() == 1 ? "is" : "are", names.size() == 1 ? "it" : ("the " + std::to_string(names.size()) + " selected").c_str());
+  }
+
   void EdShell::DrawUnitFate(const SelectionProperties& unit)
   {
     // The Properties panel's rows: labels right-aligned in a column as wide as "Location X".
@@ -141,15 +277,7 @@ namespace faf::editor
                                 : "The map's script creates %s as live units: the script decides, not the group.",
                         fate.group.empty() ? "its group" : fate.group.c_str());
     }
-    if (!startGroup) {
-      ImGui::SameLine();
-      if (ImGui::Button("Move to the start groups")) {
-        ask(wreck); // the same kind it is now, from the start whatever the lobby options
-      }
-      ImGui::SetItemTooltip("Moves it from %s to %s's %s group: %s from the start, whatever the lobby options. Ctrl+Z undoes it.",
-                            fate.group.empty() ? "(no group)" : fate.group.c_str(), unit.owner.c_str(), wreck ? "WRECKAGE" : "INITIAL",
-                            wreck ? "a wreck" : "a unit");
-    }
+    DrawUnitSpawn(unit, root, fate.kind == UnitFate::Kind::Unit ? "INITIAL" : fate.kind == UnitFate::Kind::Wreck ? "WRECKAGE" : fate.group);
     HelpNote("A map's units are only data until something creates their group: the game makes each army's INITIAL group as "
              "units and its WRECKAGE group as wrecks when the game starts; any other group appears only if the map's "
              "script creates it (FAF's ScenarioUtilities.lua).");

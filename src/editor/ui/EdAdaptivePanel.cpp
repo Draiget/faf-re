@@ -12,6 +12,7 @@
 #include "editor/EdShell.h"
 #include "editor/doc/EdAdaptiveTables.h"
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdGroupOptions.h"
 #include "editor/doc/EdUnitFate.h"
 #include "editor/doc/EdUnitWrecks.h"
 #include "editor/doc/EdUnits.h"
@@ -501,9 +502,19 @@ namespace faf::editor
           }
           ImGui::AlignTextToFramePadding();
           ImGui::Text("   %s", row.path.back().c_str());
-          ImGui::SetItemTooltip("%s", row.wreck && row.unit ? "Created as wrecks or as live units, as a lobby option picks."
-                                      : row.wreck           ? "Created as wrecks."
-                                                            : "Created as live units.");
+          if (ImGui::IsItemHovered()) {
+            // Which lobby setting makes the script create it (read from the script and _options.lua while hovered).
+            const std::vector<LobbyOptionInfo> lobby = ParseLobbyOptions(options);
+            ImGui::BeginTooltip();
+            ImGui::TextUnformatted(row.wreck && row.unit ? "Created as wrecks or as live units, as a lobby option picks."
+                                   : row.wreck           ? "Created as wrecks."
+                                                         : "Created as live units.");
+            for (const std::string& line : DescribeLobbyRule(LobbyRuleOfGroup(mDocument.Script(), lobby, row.path.back()), lobby)) {
+              ImGui::TextUnformatted(line.c_str());
+            }
+            ImGui::TextDisabled("A unit's Properties (Spawns) moves it into any group the script creates.");
+            ImGui::EndTooltip();
+          }
           ImGui::SameLine();
           if (row.wreck) {
             ImGui::TextDisabled("%zu units, %.0f mass%s", units.size(), mass, row.unit ? " or live" : " as wrecks");

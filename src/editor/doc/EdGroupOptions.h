@@ -68,4 +68,32 @@ namespace faf::editor
 
   /** The rule as lines for the Properties panel: which option, and what each of its values does to the group. */
   std::vector<std::string> DescribeLobbyRule(const GroupLobbyRule& rule, const std::vector<LobbyOptionInfo>& options);
+
+  /** The first lobby setting that creates the group, as `Wreckage = "T3 wreckage"`; "every game"; or why never. */
+  std::string LobbyRuleWhen(const GroupLobbyRule& rule, const std::vector<LobbyOptionInfo>& options);
+
+  /**
+   * A group a unit of `army` can be put in so that the script brings it into games (user ask 2026-11-11: edit the
+   * adaptive groups, not only read about them): each group the script creates for the army (the names it writes, and
+   * `'Name_' .. k` for each level an option reaches), the next level of a looped option, and groups whose option the
+   * lobby lacks. Where no lobby setting creates the group yet, `optionsWith` is `_options.lua` with the value (or the
+   * whole option) that does, kept only when reading the rule again with it shows the group created.
+   */
+  struct SpawnTarget
+  {
+    /** Its path in the army's tree (an existing group's own; a new one at the top). */
+    std::vector<std::string> path;
+    bool exists = false;
+    GroupLobbyRule rule;
+    /** LobbyRuleWhen, with `optionsWith` applied when there is one. */
+    std::string when;
+    bool wreck = false;
+    bool unit = false;
+    /** `_options.lua` with what makes it spawn added; empty when it already spawns with some setting. */
+    std::string optionsWith;
+    /** What `optionsWith` adds, in a few words. */
+    std::string optionsChange;
+  };
+  std::vector<SpawnTarget> SpawnTargets(const std::string& script, const std::string& optionsText, const std::string& army,
+                                        const std::vector<std::vector<std::string>>& groupPaths);
 } // namespace faf::editor

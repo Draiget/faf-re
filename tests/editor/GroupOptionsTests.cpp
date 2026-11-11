@@ -222,6 +222,56 @@ end
     EXPECT_FALSE(Rule("Spare").scriptNames);
   }
 
+  const faf::editor::SpawnTarget* Find(const std::vector<faf::editor::SpawnTarget>& targets, const std::string& name)
+  {
+    for (const auto& target : targets) {
+      if (target.path.back() == name) {
+        return &target;
+      }
+    }
+    return nullptr;
+  }
+
+  TEST(GroupOptions, SpawnTargets)
+  {
+    const auto targets = faf::editor::SpawnTargets(kScript, kOptions, "ARMY_17", {{"Optional_Wreckage_2"}, {"Base", "Civilian_Ruins"}});
+    // An existing level: where it is, and the value that makes it.
+    const auto* level2 = Find(targets, "Optional_Wreckage_2");
+    ASSERT_NE(level2, nullptr);
+    EXPECT_TRUE(level2->exists);
+    EXPECT_EQ(level2->when, "Wreckage = \"T3 wreckage\"");
+    EXPECT_TRUE(level2->wreck);
+    EXPECT_TRUE(level2->optionsWith.empty());
+    // The next level: a value added to the option, checked to make it.
+    const auto* level3 = Find(targets, "Optional_Wreckage_3");
+    ASSERT_NE(level3, nullptr);
+    EXPECT_FALSE(level3->exists);
+    EXPECT_EQ(level3->optionsChange, "adds the value \"level 2\" to \"Wreckage\"");
+    EXPECT_EQ(level3->when, "Wreckage = \"level 2\"");
+    const auto withLevel = faf::editor::ParseLobbyOptions(level3->optionsWith);
+    ASSERT_EQ(withLevel.size(), 4u);
+    ASSERT_EQ(withLevel[0].values.size(), 3u);
+    EXPECT_EQ(withLevel[0].values[1].text, "T3 wreckage"); // the values there keep their texts
+    EXPECT_EQ(withLevel[0].values[1].help, "Add T3 wreckage MID.");
+    // A looped option the lobby lacks: the option written.
+    const auto* naval = Find(targets, "Optional_Wreckage_Naval_2");
+    ASSERT_NE(naval, nullptr);
+    EXPECT_NE(naval->optionsChange.find("adds the lobby option \"Optional naval wreckage\""), std::string::npos);
+    EXPECT_EQ(faf::editor::ParseLobbyOptions(naval->optionsWith).size(), 5u);
+    // Names the script writes; a nested existing group keeps its path.
+    const auto* ruins = Find(targets, "Civilian_Ruins");
+    ASSERT_NE(ruins, nullptr);
+    EXPECT_EQ(ruins->path, (std::vector<std::string>{"Base", "Civilian_Ruins"}));
+    EXPECT_EQ(ruins->when, "Civilian Base = \"disabled\"");
+    EXPECT_EQ(Find(targets, "Optional_Civilian_Base_2")->when, "Civilian Base = \"wrecks\"");
+    EXPECT_EQ(Find(targets, "Jamming")->when, "Jamming = \"on\"");
+    EXPECT_EQ(Find(targets, "Outpost")->when, "every game");
+    EXPECT_EQ(Find(targets, "Optional_Wreckage_Back_Top_UEF_2")->when, "Faction reclaim = \"one\" (and the game: slots, factions)");
+    // Commented-out code offers nothing; another army gets none of ARMY_17's groups.
+    EXPECT_EQ(Find(targets, "Optional_Civilian_Commented"), nullptr);
+    EXPECT_TRUE(faf::editor::SpawnTargets(kScript, kOptions, "ARMY_1", {}).empty());
+  }
+
   // The real map, when its folder is given (FAF_DUALGAP_DIR: dualgap_adaptive.v0014).
   TEST(GroupOptions, DualGapAdaptive)
   {
@@ -253,6 +303,11 @@ end
     EXPECT_TRUE(faf::editor::LobbyRuleOfGroup(script, options, "Optional_Wreckage_Back_Top_UEF_2").Never());
     for (const std::string& line : faf::editor::DescribeLobbyRule(wreckage, options)) {
       std::printf("%s\n", line.c_str());
+    }
+    // What the Properties panel offers ARMY_17's units.
+    for (const auto& target : faf::editor::SpawnTargets(script, read("DualGap_Adaptive_options.lua"), "ARMY_17", {{"Optional_Wreckage_2"}})) {
+      std::printf("%s%s: %s%s%s\n", target.path.back().c_str(), target.exists ? "" : " (new)", target.when.c_str(),
+                  target.optionsChange.empty() ? "" : "; ", target.optionsChange.c_str());
     }
   }
 } // namespace

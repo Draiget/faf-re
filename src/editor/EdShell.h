@@ -78,6 +78,8 @@ namespace faf::editor
       mShowCheck = true;
       mRunCheck = true;
     }
+    /** Test runs (`/unitspawn <group>`): the selected unit's Spawns choice set to that group, as a pick in its list. */
+    void TestUnitSpawn(const std::string& group) { mSpawnAsk = group; }
     bool& ShowLog() noexcept { return mShowLog; }
     bool& ShowDemo() noexcept { return mShowDemo; }
     bool& PanelsWhilePlaying() noexcept { return mPanelsWhilePlaying; }
@@ -137,6 +139,9 @@ namespace faf::editor
     void DrawPropertiesPanel();
     /** A selected unit's group, what becomes of it in a game, its wreck's value, and the wreck switch (ui/EdUnitFatePanel.cpp). */
     void DrawUnitFate(const SelectionProperties& unit);
+    /** The unit's "Spawns" choice: the start groups, or a group a lobby setting makes the script create. */
+    void DrawUnitSpawn(const SelectionProperties& unit, const UnitGroup& root, const std::string& current);
+    std::string mSpawnAsk;
     /** The Adaptive tool's panel: armies, option groups, crazyrush lists and lobby options (ui/EdAdaptivePanel.cpp). */
     void DrawAdaptivePanel();
     /** View > Script on one of the map's Lua files (0 script, 1 lobby options, 2 adaptive tables). */

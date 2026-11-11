@@ -2053,6 +2053,10 @@ namespace faf::editor
             if (comma != std::string::npos) {
               mScene.SelectUnit(text.substr(0, comma), text.substr(comma + 1));
             }
+            // `/unitspawn <group>` (test runs): its Properties' Spawns choice set to that group.
+            if (fa::vector<fa::string> group; moho::CFG_GetArgOption("/unitspawn", 1, &group) && !group.empty()) {
+              mShell->TestUnitSpawn(group[0].c_str());
+            }
           }
         }
         tools.SetMarkerSelection(mScene.SelectedMarkers());
