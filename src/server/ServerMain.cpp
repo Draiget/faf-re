@@ -1040,6 +1040,9 @@ namespace
     std::string stateDigestPath;
     (void)ReadOption("--digests", digestPath);
     (void)ReadOption("--state-digests", stateDigestPath);
+    // Plan WP13.3: the same checksums live, as `checksum` control events, for a shadow verifier (tools/server-shadow)
+    // that re-simulates the game as a referee and compares them as they come.
+    const bool checksumEvents = moho::CFG_GetArgOption("--checksum-events", 0, nullptr);
     if (ReadOption("--checksum-period", text)) {
       const int period = std::atoi(text.c_str());
       if (period <= 0) {
@@ -2273,6 +2276,39 @@ namespace
               gPauseRequests = gPauseRequests + 1;
               control->Reply(request.id, {});
             }
+          } else if (request.op == "verifier") {
+            // Plan WP13.3: a shadow verifier's verdict (tools/server-shadow): `name`, `count` the beat, `results` ok,
+            // mismatch or stopped, `reason` the detail. A mismatch is the admin's alert: a console line and an event.
+            const std::string& verdict = request.results;
+            if (verdict != "ok" && verdict != "mismatch" && verdict != "stopped") {
+              control->Refuse(
+                request.id, "verifier takes results ok, mismatch or stopped, a beat as count, a name and a reason"
+              );
+            } else {
+              const std::string who = request.name.empty() ? std::string("a verifier") : request.name.substr(0, 64);
+              const std::string why = request.reason.substr(0, 300);
+              if (verdict == "mismatch") {
+                Say(
+                  "VERIFIER %s: MISMATCH at beat %lld: %s",
+                  who.c_str(),
+                  static_cast<long long>(request.count),
+                  why.c_str()
+                );
+              } else if (verdict == "stopped") {
+                Say(
+                  "Verifier %s stopped at beat %lld: %s",
+                  who.c_str(),
+                  static_cast<long long>(request.count),
+                  why.c_str()
+                );
+              }
+              controlEvent(
+                "verifier",
+                "\"name\":" + faf::server::JsonString(who) + ",\"verdict\":\"" + verdict +
+                  "\",\"beat\":" + std::to_string(request.count) + ",\"reason\":" + faf::server::JsonString(why)
+              );
+              control->Reply(request.id, {});
+            }
           } else if (request.op == "force_start") {
             control->Refuse(request.id, "the game has started");
           } else if (request.op == "approve_observer" || request.op == "refuse_observer") {
@@ -2499,12 +2535,20 @@ namespace
         lastBeatAt = SecondsSince(playStart);
         armyBoard.ReadPacket(*packet);
         // Plan WP16.1: as headless writes them (ReplayRunner), line for line.
-        if (digestFile && packet->mCurBeat >= 0) {
+        if ((digestFile || checksumEvents) && packet->mCurBeat >= 0) {
           if (const moho::Sim* const sim = simDriver->GetSimForReplayCheck(); sim != nullptr) {
             const gpg::MD5Digest& digest = sim->mSimHashes[static_cast<std::uint32_t>(packet->mCurBeat) & 0x7Fu];
             if (!IsZeroDigest(digest)) {
-              std::fprintf(digestFile.get(), "%d %s\n", packet->mCurBeat, digest.ToString().c_str());
-              ++digestsWritten;
+              if (digestFile) {
+                std::fprintf(digestFile.get(), "%d %s\n", packet->mCurBeat, digest.ToString().c_str());
+                ++digestsWritten;
+              }
+              if (checksumEvents) {
+                controlEvent(
+                  "checksum",
+                  "\"beat\":" + std::to_string(packet->mCurBeat) + ",\"md5\":\"" + digest.ToString().c_str() + "\""
+                );
+              }
             }
           }
         }

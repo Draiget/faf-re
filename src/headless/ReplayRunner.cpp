@@ -723,8 +723,10 @@ namespace faf::headless
       result.error = "cannot write " + options.stateDigestPath;
       return result;
     }
-    if (!options.digestPath.empty() && fopen_s(&digestFile, options.digestPath.c_str(), "w") != 0) {
-      digestFile = nullptr;
+    // A live game's replay (a server's observer stream, gpgnet://): its digests are read as they're written, so the
+    // file is opened shared (`fopen_s` denies other readers on Windows until it is closed).
+    const bool liveReplay = options.replayPath.rfind("gpgnet://", 0) == 0;
+    if (!options.digestPath.empty() && (digestFile = std::fopen(options.digestPath.c_str(), "w")) == nullptr) {
       result.error = "cannot write " + options.digestPath;
       return result;
     }
@@ -858,6 +860,9 @@ namespace faf::headless
             if (!IsZero(digest)) {
               std::fprintf(digestFile, "%d %s\n", packet->mCurBeat, digest.ToString().c_str());
               ++result.digestsWritten;
+              if (liveReplay) {
+                std::fflush(digestFile); // plan WP13.3: a shadow verifier reads them while the game goes on
+              }
             }
           }
         }
