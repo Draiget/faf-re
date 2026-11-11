@@ -32,6 +32,13 @@ namespace moho
    */
   extern bool gViewportLeaveKeepsFocus;
 
+  /**
+   * Engine addition: called at the start of each head's frame, right after the mesh thumbnails render and before the
+   * head's own target is bound again (so it may render into targets of its own). The map editor draws its particle
+   * editor's view there. Null in the game.
+   */
+  extern void (*gViewportBeforeFrame)(int head);
+
   class CD3DDepthStencil;
   class CD3DDynamicTextureSheet;
   class CD3DPrimBatcher;

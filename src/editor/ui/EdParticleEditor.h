@@ -3,6 +3,7 @@
 #include "editor/doc/EdEmitter.h"
 #include "editor/tools/EdTextureLibrary.h"
 #include "editor/view/EdParticlePreview.h"
+#include "editor/view/EdParticleViewport.h"
 
 #include <filesystem>
 #include <utility>
@@ -32,15 +33,11 @@ namespace faf::editor
 
     /** Where a vault map keeps its effects (`<map>`), empty without one: the editor's own folder then. */
     void SetMapFolder(const std::filesystem::path& folder, const std::string& mapFolderName);
-    /** The point the preview emits at (the view's centre on the ground). */
-    void SetPlace(float x, float y, float z) { mPreview.SetPlace(x, y, z); }
+    /** The particle view (its own 3D view of the effect alone), rendered by the app at the start of each frame. */
+    [[nodiscard]] EdParticleViewport& Viewport() noexcept { return mViewport; }
     /** Emits the preview's particles for this frame (also while the window is closed: false stops it). */
     void Frame(bool showing);
 
-    /** The 3D view's width over its height, for the Preview pane's square crop of it. */
-    void SetViewAspect(const float aspect) noexcept { mViewAspect = aspect > 0.1f ? aspect : 1.0f; }
-    /** The camera should come close to the effect (it opened, or Frame was pressed); taken once. */
-    [[nodiscard]] bool TakeFrameAsk() noexcept { return std::exchange(mFrameAsk, false); }
     /** Test runs (`/particlebrowser <search>`): the browser's search set, its first match played. */
     void TestBrowse(const std::string& search);
     /** Test runs (`/particlenew beam|trail`): a new beam or trail. */
@@ -89,8 +86,8 @@ namespace faf::editor
     bool mOpenSave = false;
     /** The Preview pane: the middle of the 3D view, where the effect plays, magnified. */
     void DrawPreviewPane();
-    float mViewAspect = 1.6f;
-    float mPreviewZoom = 0.22f; // half the crop's height, as a share of the view's
+    EdParticleViewport mViewport;
+    /** The view comes to the effect's size when one opens. */
     bool mFrameAsk = true;
 
     // The Particle Browser (ui/EdParticleBrowser.cpp).

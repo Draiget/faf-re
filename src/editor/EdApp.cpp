@@ -760,6 +760,20 @@ namespace faf::editor
       mShell->Tools().SetPropPictures([this](const std::string& blueprint) { return mPropThumbnails.Get(blueprint); });
       ReadOpenCommandLine();
       gEditorApp = this;
+      // The particle editor's own view renders at the start of the game head's frame (moho::gViewportBeforeFrame).
+      moho::gViewportBeforeFrame = [](const int head) {
+        if (head != 0 || gEditorApp == nullptr || gEditorApp->mShell == nullptr) {
+          return;
+        }
+        gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+        const gpg::gal::DeviceContext* const context = device != nullptr ? device->GetDeviceContext() : nullptr;
+        if (context == nullptr || context->GetHeadCount() < 1) {
+          return;
+        }
+        const gpg::gal::Head& game = context->GetHead(0);
+        gEditorApp->mShell->ParticleEditor().Viewport().Render(static_cast<int>(game.mWidth), static_cast<int>(game.mHeight),
+                                                                ImGui::GetCurrentContext() != nullptr ? ImGui::GetIO().DeltaTime : 0.016f);
+      };
       BuildMenu(frame);
       // The game view's ambient occlusion makes its GPU programs on first use, which the editor's own view never
       // is: made now, so the first Play's first frame doesn't wait for them (WPE.15).
@@ -1246,23 +1260,8 @@ namespace faf::editor
           const bool inVault = !scmap.empty() && !vault.empty() && folder.size() > vault.size() && _strnicmp(folder.c_str(), vault.c_str(), vault.size()) == 0;
           mShell->MaterialEditor().SetMapFolder(inVault ? scmap.parent_path() : std::filesystem::path());
           mShell->ParticleEditor().SetMapFolder(inVault ? scmap.parent_path() : std::filesystem::path(), inVault ? mDocument.FolderName() : std::string());
-          // The particle preview emits at the view's centre, on the ground, while its window shows (not during Play).
-          if (mScene.Attached()) {
-            float x = 0.0f;
-            float y = 0.0f;
-            float z = 0.0f;
-            mScene.ViewTarget(x, y, z);
-            mShell->ParticleEditor().SetPlace(x, y, z);
-            if (gViewRect.bottom > gViewRect.top) {
-              mShell->ParticleEditor().SetViewAspect(static_cast<float>(gViewRect.right - gViewRect.left) /
-                                                     static_cast<float>(gViewRect.bottom - gViewRect.top));
-            }
-            // The editor opened or an effect did: the camera close to where it plays.
-            if ((mShell->ShowParticleEditor() || mShell->ShowParticleBrowser()) && mShell->ParticleEditor().TakeFrameAsk()) {
-              mScene.FramePoint(x, z, 45.0f);
-            }
-          }
-          mShell->ParticleEditor().Frame((mShell->ShowParticleEditor() || mShell->ShowParticleBrowser()) && mScene.Attached());
+          // The particle editor's effect plays in its own view (EdParticleViewport) while its windows show.
+          mShell->ParticleEditor().Frame(mShell->ShowParticleEditor() || mShell->ShowParticleBrowser());
         }
         mShell->Draw();
         // `/focuspanel <window>` (test runs): that panel in front, a while after the map opened (opening fronts Info).

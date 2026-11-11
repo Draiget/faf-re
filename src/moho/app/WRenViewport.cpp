@@ -36,6 +36,7 @@ namespace
 
 
 bool moho::gViewportLeaveKeepsFocus = false;
+void (*moho::gViewportBeforeFrame)(int head) = nullptr;
 
 // ---------------------------------------------------------------------------
 // WRenViewport construction
@@ -2285,6 +2286,11 @@ void moho::WRenViewport::Render(const int head, fa::vector<SWorldViewInfo>& worl
   device->BeginScene();
 
   mThumbnailRenderer.ProcessPendingRequests();
+
+  // Engine addition (moho::gViewportBeforeFrame): the map editor's own offscreen views, before the head is bound.
+  if (moho::gViewportBeforeFrame != nullptr) {
+    moho::gViewportBeforeFrame(mHead);
+  }
 
   device->SetRenderTarget2(mHead, true, 0, 1.0f, 0);
 

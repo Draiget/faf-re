@@ -60,6 +60,7 @@ set(FAF_EDITOR_SOURCES
   graph/EdTextureBake.cpp
   doc/EdEmitter.cpp
   view/EdParticlePreview.cpp
+  view/EdParticleViewport.cpp
   ui/EdParticleEditor.cpp
   ui/EdParticleBrowser.cpp
   ui/EdNodeCanvas.cpp

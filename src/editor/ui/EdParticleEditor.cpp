@@ -2,6 +2,7 @@
 
 #include "editor/doc/EdMapFile.h"
 #include "editor/ui/EdImGuiRenderer.h"
+#include "editor/view/EdParticleViewport.h"
 #include "imgui.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -147,6 +148,11 @@ namespace faf::editor
       }
       mPreview.Restart();
       mPreviewStarted = true;
+    }
+    // It plays far off the map, where only the particle view looks.
+    mPreview.SetPlace(EdParticleViewport::kPlaceX, EdParticleViewport::kPlaceY + mViewport.Opts().height, EdParticleViewport::kPlaceZ);
+    if (std::exchange(mFrameAsk, false)) {
+      mViewport.Reset(mFlatMode ? 20.0f : 12.0f);
     }
     mPreview.SetPlaying(mPlaying);
     mPreview.SetLoop(mLoop);
@@ -297,33 +303,59 @@ namespace faf::editor
 
   void EdParticleEditor::DrawPreviewPane()
   {
-    // The effect plays at the 3D view's centre (the camera's target): the pane shows a square around it, magnified,
-    // from the view's own picture, so it plays here even where this window covers the view. The wheel zooms the crop;
-    // Frame brings the camera close.
-    // As wide as the column; at most three fifths of its height (the curve list stays under it). The crop has the pane's shape.
+    // The particle view: the effect alone, in its own 3D view (EdParticleViewport), not the map. A drag turns round it,
+    // the wheel comes closer; the options under it pick the ground, grid, background and height.
+    EdParticleViewport::Options& options = mViewport.Opts();
     const float width = std::max(ImGui::GetContentRegionAvail().x, 64.0f);
     const float height = std::clamp(ImGui::GetContentRegionAvail().y * 0.6f, 64.0f, width);
-    const float halfV = std::clamp(mPreviewZoom, 0.03f, 0.5f);
-    const float halfU = std::min(halfV * (width / height) / mViewAspect, 0.5f);
-    const ImVec2 uv0(0.5f - halfU, 0.5f - halfV);
-    const ImVec2 uv1(0.5f + halfU, 0.5f + halfV);
-    ImGui::Image(ImTextureRef(static_cast<ImTextureID>(EdImGuiRenderer::kGameViewImage)), ImVec2(width, height), uv0, uv1);
+    mViewport.SetSize(static_cast<int>(width), static_cast<int>(height));
+    mViewport.MarkShown();
+    if (const std::uint64_t image = mViewport.Image(); image != 0) {
+      ImGui::Image(ImTextureRef(static_cast<ImTextureID>(image)), ImVec2(width, height));
+    } else {
+      ImGui::Dummy(ImVec2(width, height));
+    }
+    ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
     if (ImGui::IsItemHovered()) {
-      const float wheel = ImGui::GetIO().MouseWheel;
-      if (wheel != 0.0f) {
-        mPreviewZoom = std::clamp(mPreviewZoom * (wheel > 0.0f ? 0.85f : 1.0f / 0.85f), 0.03f, 0.5f);
+      const ImGuiIO& io = ImGui::GetIO();
+      if (io.MouseWheel != 0.0f) {
+        mViewport.Zoom(io.MouseWheel);
       }
-      ImGui::SetTooltip("The effect, playing at the middle of the map's view. The wheel zooms; Frame brings the camera close.");
+      if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0f)) {
+        mViewport.Turn(io.MouseDelta.x, io.MouseDelta.y);
+      }
+      ImGui::SetTooltip("Drag to turn round the effect, the wheel to come closer");
     }
-    if (ImGui::Button("Frame")) {
-      mFrameAsk = true;
-    }
-    ImGui::SetItemTooltip("Brings the map's camera close to the effect");
+    static const char* const kBackgrounds[] = {"Night", "Grey", "Sky", "Black"};
+    ImGui::SetNextItemWidth(80.0f);
+    (void)ImGui::Combo("##bg", &options.background, kBackgrounds, 4);
+    ImGui::SetItemTooltip("The view's background");
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(-1.0f);
-    float zoom = 1.0f / mPreviewZoom;
-    if (ImGui::SliderFloat("##zoom", &zoom, 2.0f, 30.0f, "zoom %.1fx")) {
-      mPreviewZoom = 1.0f / zoom;
+    ImGui::Checkbox("Ground", &options.ground);
+    ImGui::SameLine();
+    ImGui::Checkbox("Grid", &options.grid);
+    ImGui::SetItemTooltip("A line every game unit, stronger every five; the emitter's spot in orange");
+    ImGui::SameLine();
+    ImGui::Checkbox("Turn", &options.turn);
+    ImGui::SetItemTooltip("The camera turns slowly round the effect");
+    ImGui::SetNextItemWidth(120.0f);
+    ImGui::SliderFloat("##height", &options.height, 0.0f, 30.0f, "above ground %.1f");
+    ImGui::SetItemTooltip("The emitter this high above the ground (most effects play on a unit, some way up)");
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Front")) {
+      mViewport.Look(3.14159265f, 0.15f);
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Side")) {
+      mViewport.Look(1.5707963f, 0.15f);
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Top")) {
+      mViewport.Look(3.14159265f, 1.55f);
+    }
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Reset")) {
+      mViewport.Reset(mFlatMode ? 20.0f : 12.0f);
     }
   }
 
