@@ -42,6 +42,11 @@
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/render/SimpleRenderWorldView.h"
 #include "moho/render/WRenViewport.h"
+
+namespace moho
+{
+  extern bool ren_Ui; // the game's interface drawn (console `ren_Ui`; RuntimeTuningGlobals.cpp)
+}
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
@@ -800,12 +805,20 @@ namespace faf::editor
     // The props first: their blueprints are the kept rules', which the next play takes.
     DeleteProps();
     moho::ED_SetHook(nullptr);
+    // In front of a play: the session's world views and interface drawn again.
+    if (mOverPlay) {
+      moho::gViewportOnlyView = nullptr;
+      moho::ren_Ui = mUiWas;
+      gpg::Logf("editor: the game's view again");
+    }
     if (moho::ren_Viewport != nullptr && mWorldView != nullptr) {
       moho::ren_Viewport->RemoveWorldView(mWorldView.get());
     }
     if (moho::sWldMap == mMap) {
-      moho::REN_SetWldMap(nullptr);
+      moho::REN_SetWldMap(mOverPlay ? mSessionMap : nullptr); // the play's map back, if one runs behind
     }
+    mOverPlay = false;
+    mSessionMap = nullptr;
     mWorldView.reset();
     // ~CameraImpl takes the camera out of the camera manager (as RenderPreviewImage relies on).
     delete mCamera;
@@ -1733,19 +1746,40 @@ namespace faf::editor
     mMap->mTerrainRes->NotifyMapChanges(changed.data(), changed.size());
   }
 
-  void EdMapScene::Update(const float frameSeconds, const bool playIdle)
+  void EdMapScene::Update(const float frameSeconds, const bool playIdle, const bool editorViewInPlay)
   {
+    // The editor's map shows between plays, and in front of a running play when its view is asked for (user ask
+    // 2026-11-11: switch between the editor's view and the game's while it plays).
     moho::CWldMap* const wanted =
-      playIdle && mDocument.GetState() == EdDocument::State::Open ? mDocument.Map() : nullptr;
+      (playIdle || editorViewInPlay) && mDocument.GetState() == EdDocument::State::Open ? mDocument.Map() : nullptr;
     if (mMap != nullptr && mMap != wanted) {
       Detach();
     }
-    // A play's session clears the renderer's map when it ends (0x00893BE6); attach once it has.
-    if (mMap == nullptr && wanted != nullptr && moho::sWldMap == nullptr) {
+    // A play's session clears the renderer's map when it ends (0x00893BE6); attach once it has. In front of a play the
+    // renderer's map is the session's: kept to give back, the session's world views and interface left undrawn.
+    if (mMap == nullptr && wanted != nullptr && (moho::sWldMap == nullptr || !playIdle)) {
+      moho::CWldMap* const sessionMap = playIdle ? nullptr : moho::sWldMap;
       Attach(*wanted);
+      if (mMap != nullptr && !playIdle) {
+        mSessionMap = sessionMap;
+        mOverPlay = true;
+        mUiWas = moho::ren_Ui;
+        moho::ren_Ui = false;
+        moho::gViewportOnlyView = mWorldView.get();
+        gpg::Logf("editor: the editor's view in front of the play (the game runs on behind it)");
+      }
     }
     if (mMap == nullptr) {
       return;
+    }
+    // The play ended while the editor's view was in front: its teardown cleared the renderer's map; this one's again.
+    if (mOverPlay && playIdle) {
+      mOverPlay = false;
+      mSessionMap = nullptr;
+      moho::gViewportOnlyView = nullptr;
+      moho::ren_Ui = mUiWas;
+      moho::REN_SetWldMap(mMap);
+      gpg::Logf("editor: the play ended behind the editor's view");
     }
     UpdateDeposits();
     UpdateEffects();

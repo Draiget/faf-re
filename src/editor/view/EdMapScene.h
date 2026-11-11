@@ -64,7 +64,9 @@ namespace faf::editor
     EdMapScene& operator=(const EdMapScene&) = delete;
 
     /** Each frame, after the play's frame logic: attaches, follows the window's size, or leaves. */
-    void Update(float frameSeconds, bool playIdle);
+    void Update(float frameSeconds, bool playIdle, bool editorViewInPlay = false);
+    /** The editor's view is in front of a running play (the session's views and interface wait). */
+    [[nodiscard]] bool OverPlay() const noexcept { return mOverPlay; }
 
     /** Leaves the viewport (the document is about to drop its map). */
     void Detach();
@@ -488,6 +490,10 @@ namespace faf::editor
     bool mUnitsCulled = false;
     /** Some units were hidden by the Adaptive Map window's lobby preview last frame (shown again when it ends). */
     bool mPreviewCulled = false;
+    /** In front of a play: the session's map (given back to the renderer), and whether its interface was drawn. */
+    bool mOverPlay = false;
+    moho::CWldMap* mSessionMap = nullptr;
+    bool mUiWas = true;
     std::size_t mPreviewCulledCount = 0;
     bool mDragMarkers = false;
     bool mMarkersMoved = false;

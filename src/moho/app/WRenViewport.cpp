@@ -37,6 +37,7 @@ namespace
 
 bool moho::gViewportLeaveKeepsFocus = false;
 void (*moho::gViewportBeforeFrame)(int head) = nullptr;
+moho::IRenderWorldView* moho::gViewportOnlyView = nullptr;
 
 // ---------------------------------------------------------------------------
 // WRenViewport construction
@@ -1553,8 +1554,21 @@ void moho::WRenViewport::D3DWindowOnDeviceRender()
   // binary open-codes both stores here; the recovered helper is byte-identical.
   moho::MeshInstance::SetCurrentInterpolant();
 
+  // Engine addition (moho::gViewportOnlyView): only that view drawn, the others kept registered (the map editor's
+  // own view in front of a play's session).
+  fa::vector<SWorldViewInfo> onlyView{};
+  if (moho::gViewportOnlyView != nullptr) {
+    for (const SWorldViewInfo& worldView : mWorldViews) {
+      if (worldView.mView == moho::gViewportOnlyView) {
+        onlyView.push_back(worldView);
+      }
+    }
+  }
+
   for (int head = 0; head < mNumHeads; ++head) {
-    if (moho::ren_OnlyFirstView && !mWorldViews.empty()) {
+    if (!onlyView.empty()) {
+      Render(head, onlyView);
+    } else if (moho::ren_OnlyFirstView && !mWorldViews.empty()) {
       // Debug mode: render only the first registered world view. The binary
       // copy-constructs a fresh one-element vector from the first entry for
       // the duration of the call rather than passing the live vector.

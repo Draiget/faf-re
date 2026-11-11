@@ -272,6 +272,8 @@ namespace faf::editor
 
     void OnMenuCommand(UINT command);
     bool OnViewportMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
+    void ToggleEditorViewInPlay();
+    [[nodiscard]] bool EditorViewOverPlay();
     void OnMenuOpening(HMENU menu);
     [[nodiscard]] bool SessionActive();
 
@@ -287,8 +289,20 @@ namespace faf::editor
         }
         return 0;
       }
+      // F6 while a play runs: the editor's view of the map or the game's.
+      if ((message == WM_KEYDOWN || message == WM_KEYUP) && wParam == VK_F6 && SessionActive()) {
+        if (message == WM_KEYDOWN && (lParam & (1 << 30)) == 0) {
+          ToggleEditorViewInPlay();
+        }
+        return 0;
+      }
       // Between plays the opened map's camera takes the mouse (EdMapScene).
       if (OnViewportMessage(window, message, wParam, lParam)) {
+        return 0;
+      }
+      // The editor's view in front of a play: what it doesn't take doesn't reach the game behind it either (a click
+      // there must not order the session's units).
+      if (EditorViewOverPlay() && ((message >= WM_MOUSEFIRST && message <= WM_MOUSELAST) || (message >= WM_KEYFIRST && message <= WM_KEYLAST))) {
         return 0;
       }
       return ::CallWindowProcW(gViewportProc, window, message, wParam, lParam);
@@ -464,6 +478,9 @@ namespace faf::editor
         return mScene.OnWindowMessage(window, message, wParam, lParam);
       }
       [[nodiscard]] bool SessionActive() const { return mPlay.Active(); }
+      /** F6 while a play runs: the editor's view in front of it, or the game's again. */
+      void ToggleEditorView() { mShell->EditorViewInPlay() = !mShell->EditorViewInPlay(); }
+      [[nodiscard]] bool EditorViewOverPlay() const { return mScene.OverPlay(); }
 
     private:
       void SetUpImGui();
@@ -1132,6 +1149,18 @@ namespace faf::editor
       return gEditorApp != nullptr && gEditorApp->HandleViewportMessage(window, message, wParam, lParam);
     }
 
+    void ToggleEditorViewInPlay()
+    {
+      if (gEditorApp != nullptr) {
+        gEditorApp->ToggleEditorView();
+      }
+    }
+
+    bool EditorViewOverPlay()
+    {
+      return gEditorApp != nullptr && gEditorApp->EditorViewOverPlay();
+    }
+
     void OnMenuCommand(const UINT command)
     {
       if (gEditorApp != nullptr) {
@@ -1169,7 +1198,41 @@ namespace faf::editor
       }
       ++mFramesRun;
       mLastFrame = now;
-      mScene.Update(frameSeconds, moho::WLD_GetFrameAction() == moho::EWldFrameAction::Inactive);
+      // The editor's view in front of a running play, when asked for (F6 / the toolbar); a new play starts in the game's.
+      const bool playIdle = moho::WLD_GetFrameAction() == moho::EWldFrameAction::Inactive;
+      if (playIdle) {
+        mShell->EditorViewInPlay() = false;
+      }
+      // `/playeditorview <on>,<off>` (test runs, with /play): the editor's view that many seconds into the play, the
+      // game's again at the second time (0: stays).
+      {
+        static double playingSince = -1.0;
+        static bool onDone = false;
+        static bool offDone = false;
+        const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing) {
+          if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/playeditorview", 1, &value) && !value.empty()) {
+            playingSince = playingSince < 0.0 ? now : playingSince;
+            double on = 0.0;
+            double off = 0.0;
+            (void)std::sscanf(value[0].c_str(), "%lf,%lf", &on, &off);
+            if (!onDone && now - playingSince >= on) {
+              onDone = true;
+              mShell->EditorViewInPlay() = true;
+            }
+            if (!offDone && off > 0.0 && now - playingSince >= off) {
+              offDone = true;
+              mShell->EditorViewInPlay() = false;
+            }
+          }
+        } else if (playIdle) {
+          // Armed again only once the play is over (a play's other phases aren't its end).
+          playingSince = -1.0;
+          onDone = false;
+          offDone = false;
+        }
+      }
+      mScene.Update(frameSeconds, playIdle, mShell->EditorViewInPlay() && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing);
       mShell->Tools().SetModelsLoading(mScene.ModelsPending());
 
       if (mImGuiReady) {

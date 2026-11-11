@@ -45,6 +45,8 @@ namespace faf::editor
     bool& ShowMarkers() noexcept { return mShowMarkers; }
     bool& ShowCheck() noexcept { return mShowCheck; }
     bool& ShowScript() noexcept { return mShowScript; }
+    /** While a play runs: the editor's view in front of it (true) or the game's (F6, the toolbar's switch). */
+    bool& EditorViewInPlay() noexcept { return mEditorViewInPlay; }
     /** The Adaptive Map window (View > Adaptive Map). */
     bool& ShowAdaptiveWindow() noexcept { return mShowAdaptiveWindow; }
     /** Test runs (`/adaptivepreview <key>=<choice index>,...[;<players>]`): the window's preview on with those picks. */
@@ -181,6 +183,7 @@ namespace faf::editor
                             const std::vector<std::string>& selectedMass, const std::vector<std::string>& selectedHydro,
                             const std::vector<std::string>& selectedUnits, const UnitGroup& army);
     bool mShowAdaptiveWindow = false;
+    bool mEditorViewInPlay = false;
     bool mFocusAdaptiveWindow = false;
     /** The option the window shows (its key; "#players" for the players' resources). */
     std::string mAdaptivePick;

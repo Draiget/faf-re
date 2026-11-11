@@ -211,14 +211,20 @@ namespace faf::editor
     // with a spinner and the time so far, so a map without its trees and wrecks isn't taken for finished (user report).
     {
       static double loadingSince = -1.0;
-      if (mTools.ModelsLoading() && !playing) {
+      if (mTools.ModelsLoading() && (!playing || mEditorViewInPlay)) {
         const double now = ImGui::GetTime();
         if (loadingSince < 0.0) {
           loadingSince = now;
         }
-        char text[160];
-        (void)std::snprintf(text, sizeof(text), "Loading models: trees, rocks, wrecks and units appear when the game's blueprints are ready (%.0f s)",
-                            now - loadingSince);
+        char text[200];
+        if (playing) {
+          // The editor's view in front of a play: the blueprints are the play's until it ends.
+          (void)std::snprintf(text, sizeof(text), "While the map plays, its props and placed units aren't drawn here (the play has the game's "
+                                                  "blueprints); the game's own units are. They come back when the play stops.");
+        } else {
+          (void)std::snprintf(text, sizeof(text), "Loading models: trees, rocks, wrecks and units appear when the game's blueprints are ready (%.0f s)",
+                              now - loadingSince);
+        }
         ImDrawList* const dl = ImGui::GetForegroundDrawList();
         const ImVec2 size = ImGui::CalcTextSize(text);
         const float pad = 8.0f;
@@ -234,7 +240,7 @@ namespace faf::editor
         dl->PathStroke(IM_COL32(240, 180, 70, 255), 0, 2.5f);
         dl->AddText(ImVec2(at.x + pad * 2.0f + spinner, at.y + pad), IM_COL32(235, 235, 235, 255), text);
       } else {
-        if (loadingSince >= 0.0) {
+        if (loadingSince >= 0.0 && !playing) {
           gpg::Logf("editor: the map's models were loading for %.1f s (the view said so)", ImGui::GetTime() - loadingSince);
         }
         loadingSince = -1.0;
@@ -418,6 +424,18 @@ namespace faf::editor
           }
           DrawPlaySetup();
           ImGui::EndPopup();
+        }
+        // While a play runs: the editor's view or the game's (F6); the game runs on behind the editor's.
+        if (playing) {
+          ImGui::SameLine();
+          const bool editorView = mEditorViewInPlay;
+          ImGui::PushStyleColor(ImGuiCol_Button, editorView ? ImVec4(0.75f, 0.50f, 0.15f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_Button));
+          if (ImGui::Button(editorView ? "Editor view  F6" : "Game view  F6", ImVec2(0.0f, buttonHeight))) {
+            mEditorViewInPlay = !mEditorViewInPlay;
+          }
+          ImGui::PopStyleColor();
+          tip(editorView ? "The editor's view of the map, the play running on behind it: F6 for the game's view"
+                         : "The game's view: F6 for the editor's view of the map (the play keeps running)");
         }
       }
       divider();

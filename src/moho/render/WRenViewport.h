@@ -39,6 +39,14 @@ namespace moho
    */
   extern void (*gViewportBeforeFrame)(int head);
 
+  class IRenderWorldView;
+  /**
+   * Engine addition: when set, the viewport draws this one of its world views and skips the others (they stay
+   * registered). The map editor sets it to its own view while a play runs behind it, so the editor's map shows and the
+   * session's world views wait. Null in the game.
+   */
+  extern IRenderWorldView* gViewportOnlyView;
+
   class CD3DDepthStencil;
   class CD3DDynamicTextureSheet;
   class CD3DPrimBatcher;
