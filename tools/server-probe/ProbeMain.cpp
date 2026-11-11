@@ -201,6 +201,7 @@ namespace
     double vanishAt = -1.0;
     double vanishFor = 0.0; // 0: for good
     double leaveAt = -1.0;
+    double rateEvery = 0.0; // > 0: every this many seconds, the view bytes of that interval as KB/s (plan WPR.7)
     double orderAt = -1.0;
     double attackBlipAt = -1.0;
     double forgeIdAt = -1.0;
@@ -389,6 +390,8 @@ namespace
         out.vanishFor = Argument(value);
       } else if (name == "--leave-at") {
         out.leaveAt = Argument(value);
+      } else if (name == "--rate-every") {
+        out.rateEvery = Argument(value);
       } else if (name == "--order-at") {
         out.orderAt = Argument(value);
       } else if (name == "--attack-blip-at") {
@@ -953,7 +956,7 @@ int main(const int argc, char** const argv)
   if (!ReadOptions(argc, argv, options)) {
     std::printf(
       "usage: faf_server_probe --server <ip:port> --uid <n> --token <t> [--seconds <s>] [--no-load] [--pause-at <s> [--pause-every <s>]] [--resume-at <s>] [--forge-at <s>] "
-      "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
+      "[--vanish-at <s> [--vanish-for <s>]] [--leave-at <s>] [--rate-every <s>] [--order-at <s>] [--attack-blip-at <s>] [--forge-id-at <s>] [--attack-hidden-at <s> --hidden-id <id>] [--fuzz-at <s> [--fuzz-count <n>]] "
       "[--flood-at <s>] [--break-alliance-at <s> --break-with <army>] [--save-views <file>] [--damage-at <s>] [--lobby-name <name> [--lobby-say-to <uid> --lobby-say-at <s>] [--lobby-launch <match.lua> --lobby-launch-at <s>] [--lobby-options <key=value,...> --lobby-options-at <s>] [--lobby-player-options <key=value,...> --lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> --lobby-assign-at <s>] [--lobby-eject-at <s>] [--lobby-established-at <s>]] [--speed-limit <step> --speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s>] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss <percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--lua-keys] [--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua>]\n"
     );
     return 3;
@@ -1035,12 +1038,26 @@ int main(const int argc, char** const argv)
     moho::ECmdStreamOp::CMDST_LuaSimCallback,
   };
 
+  // --rate-every: where the current interval started (time and view bytes so far) and when it ends.
+  double rateFromAt = 0.0;
+  std::uint64_t rateFromBytes = 0;
+  double rateNextAt = options.rateEvery;
   for (;;) {
     const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
     if (elapsed >= options.seconds) {
       break;
     }
     const auto nowUs = static_cast<std::uint64_t>(elapsed * 1e6);
+    // Plan WPR.7: the view bytes of each interval, for the peaks a whole-session mean hides (the connection a player
+    // needs is set by them). Counted from the first view, as the final KB/s is.
+    if (options.rateEvery > 0.0 && elapsed >= rateNextAt) {
+      const double span = elapsed - rateFromAt;
+      std::printf("probe %d: rate %.0f-%.0f s: %.1f KB/s\n", options.uid, rateFromAt, elapsed,
+                  span > 0.0 && views.views > 0 ? static_cast<double>(views.bytes - rateFromBytes) / 1024.0 / span : 0.0);
+      rateFromAt = elapsed;
+      rateFromBytes = views.bytes;
+      rateNextAt = elapsed + options.rateEvery;
+    }
 
     if (Due(returnAt, elapsed)) {
       vanished = false;
