@@ -1261,8 +1261,10 @@ namespace moho
     }
 
     if (moho::IsFactoryPreOrdersEnabled()) {
-      if (commandType == EUnitCommandType::UNITCOMMAND_BuildFactory
-          || commandType == EUnitCommandType::UNITCOMMAND_BuildMobile) {
+      if (
+        commandType == EUnitCommandType::UNITCOMMAND_BuildFactory ||
+        commandType == EUnitCommandType::UNITCOMMAND_BuildMobile
+      ) {
         if (!blueprint->mBlueprintId.empty()) {
           PlannedFactoryManager::Get().QueuePlannedFactoryOrders(
             blueprint->mBlueprintId.c_str(), repeatCount, clearQueue

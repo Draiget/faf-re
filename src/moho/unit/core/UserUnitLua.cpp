@@ -690,8 +690,10 @@ int moho::cfunc_UserUnitIsRepeatQueueL(
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
   bool repeat = userUnit ? userUnit->IsRepeatQueueEnabled() : false;
-  if (moho::IsFactoryPreOrdersEnabled() && userUnit != nullptr &&
-      moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit)) {
+  if (
+    moho::IsFactoryPreOrdersEnabled() && userUnit != nullptr &&
+    moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit)
+  ) {
     if (const auto* proxy = moho::PlannedFactoryManager::Get().FindByUserUnit(userUnit)) {
       repeat = proxy->mRepeatBuild;
     }
@@ -881,8 +883,10 @@ int moho::cfunc_UserUnitProcessInfoL(
     infoValue = "";
   }
 
-  if (moho::IsFactoryPreOrdersEnabled() && userUnit != nullptr &&
-      moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit)) {
+  if (
+    moho::IsFactoryPreOrdersEnabled() && userUnit != nullptr &&
+    moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit)
+  ) {
     if (std::strcmp(infoKey, "SetRepeatQueue") == 0) {
       const bool repeat = (std::strcmp(infoValue, "true") == 0);
       if (auto* proxy = moho::PlannedFactoryManager::Get().FindByUserUnit(userUnit)) {
@@ -2681,8 +2685,10 @@ void moho::RebuildFactoryQueueDisplaySnapshot(
   }
 
   UserUnit* const userUnit = factoryLink.GetObjectPtr();
-  if (userUnit != nullptr && moho::IsFactoryPreOrdersEnabled() &&
-      moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit)) {
+  if (
+    userUnit != nullptr && moho::IsFactoryPreOrdersEnabled() &&
+    moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit)
+  ) {
     if (const auto* proxy = moho::PlannedFactoryManager::Get().FindByUserUnit(userUnit)) {
       sCurrentBuildFactory = factoryLink;
       for (const auto& order : proxy->mPreOrders) {

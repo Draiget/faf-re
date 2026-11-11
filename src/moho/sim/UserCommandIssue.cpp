@@ -754,8 +754,10 @@ namespace moho
       auto& mgr = moho::PlannedFactoryManager::Get();
       const auto selectedProxies = mgr.GetSelectedProxies();
       if (!selectedProxies.empty()) {
-        if (data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile
-            || data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
+        if (
+          data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile ||
+          data.mCommandType == EUnitCommandType::UNITCOMMAND_BuildFactory
+        ) {
           if (!mgr.IsBufferingSuppressed() && data.mBlueprint != nullptr && !data.mBlueprint->mBlueprintId.empty()) {
             const std::string bpId = data.mBlueprint->mBlueprintId.c_str();
             mgr.QueuePlannedFactoryOrders(bpId, 1, clearQueue);
@@ -772,7 +774,6 @@ namespace moho
           }
         }
       }
-
     }
 
     gpg::fastvector<UserUnit*> realUnits;
@@ -815,11 +816,15 @@ namespace moho
           if (const UserUnit* asUnit = targetEntity->IsUserUnit()) {
             if (moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
               if (const auto* proxy = moho::PlannedFactoryManager::Get().FindByUserUnit(asUnit)) {
-                const bool isMoveCommand = (data.mCommandType == EUnitCommandType::UNITCOMMAND_Move ||
-                                            data.mCommandType == EUnitCommandType::UNITCOMMAND_AggressiveMove ||
-                                            data.mCommandType == EUnitCommandType::UNITCOMMAND_FormMove ||
-                                            data.mCommandType == EUnitCommandType::UNITCOMMAND_FormAggressiveMove);
-                if (!isMoveCommand && proxy->mBuilderEntityId != 0 && session->LookupEntityId(static_cast<EntId>(proxy->mBuilderEntityId)) != nullptr) {
+                const bool isMoveCommand =
+                  (data.mCommandType == EUnitCommandType::UNITCOMMAND_Move ||
+                   data.mCommandType == EUnitCommandType::UNITCOMMAND_AggressiveMove ||
+                   data.mCommandType == EUnitCommandType::UNITCOMMAND_FormMove ||
+                   data.mCommandType == EUnitCommandType::UNITCOMMAND_FormAggressiveMove);
+                if (
+                  !isMoveCommand && proxy->mBuilderEntityId != 0 &&
+                  session->LookupEntityId(static_cast<EntId>(proxy->mBuilderEntityId)) != nullptr
+                ) {
                   data.mTarget.mEnt = static_cast<std::int32_t>(proxy->mBuilderEntityId);
                 } else {
                   data.mTarget.mType = EAiTargetType::AITARGET_Ground;
@@ -963,10 +968,7 @@ namespace moho
           if (isFactory) {
             const Vector3f targetPos{data.mTarget.mPos.x, data.mTarget.mPos.y, data.mTarget.mPos.z};
             PlannedFactoryManager::Get().RegisterOrUpdatePlannedFactory(
-              unit->mParams.mEntityId,
-              cmdIndex,
-              data.mBlueprint,
-              targetPos
+              unit->mParams.mEntityId, cmdIndex, data.mBlueprint, targetPos
             );
           }
         }

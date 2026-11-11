@@ -827,7 +827,10 @@ UserUnit::UserUnit(
     }
   }
 
-  if ((mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched && !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)) {
+  if (
+    (mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched &&
+    !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)
+  ) {
     if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
       mPreOrdersDispatched = true;
     }
@@ -901,7 +904,9 @@ UserUnit::~UserUnit()
     }
   }
 
-  if (moho::IsFactoryPreOrdersEnabled() && mIsEngineer && !moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(this)) {
+  if (
+    moho::IsFactoryPreOrdersEnabled() && mIsEngineer && !moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(this)
+  ) {
     moho::PlannedFactoryManager::Get().RemoveByBuilder(mParams.mEntityId);
   }
 
@@ -1055,7 +1060,10 @@ bool UserUnit::UnitDataUpdateRunsLua(
 
 void UserUnit::FinishUnitDataLinks()
 {
-  if ((mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched && !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)) {
+  if (
+    (mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched &&
+    !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)
+  ) {
     if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
       mPreOrdersDispatched = true;
     }
@@ -1340,7 +1348,10 @@ void UserUnit::Tick(
     AdvanceUserCommandManagerBySeq(mFactoryManager, seqNo);
   }
 
-  if ((mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched && !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)) {
+  if (
+    (mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched &&
+    !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)
+  ) {
     if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
       mPreOrdersDispatched = true;
     }
@@ -1454,7 +1465,10 @@ void UserUnit::UpdateEntityData(
 {
   UserEntity::UpdateEntityData(variableData);
 
-  if ((mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched && !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)) {
+  if (
+    (mIsFactory || mFactoryManager != nullptr) && !mPreOrdersDispatched &&
+    !PlannedFactoryManager::Get().IsPlannedProxyUnit(this)
+  ) {
     if (PlannedFactoryManager::Get().DispatchPreOrdersForUnit(this)) {
       mPreOrdersDispatched = true;
     }

@@ -2572,14 +2572,15 @@ int moho::cfunc_CreateUnitAtMouseL(
   return 0;
 }
 
-
 // --- Planned Factory Pre-Orders Lua Binders ---
 
 namespace
 {
   constexpr const char* kGetPlannedFactoriesHelpText = "Get all active planned factories: GetPlannedFactories()";
-  constexpr const char* kGetPlannedFactoryAtHelpText = "Get planned factory under cursor: GetPlannedFactoryAt(view, screenX, screenY, [radius])";
-  constexpr const char* kGetPlannedFactoriesInRectHelpText = "Get planned factories in marquee: GetPlannedFactoriesInRect(view, minX, minY, maxX, maxY)";
+  constexpr const char* kGetPlannedFactoryAtHelpText =
+    "Get planned factory under cursor: GetPlannedFactoryAt(view, screenX, screenY, [radius])";
+  constexpr const char* kGetPlannedFactoriesInRectHelpText =
+    "Get planned factories in marquee: GetPlannedFactoriesInRect(view, minX, minY, maxX, maxY)";
   constexpr const char* kSelectPlannedFactoryHelpText = "SelectPlannedFactory(proxyId, [addToSelection])";
   constexpr const char* kClearPlannedFactorySelectionHelpText = "ClearPlannedFactorySelection()";
   constexpr const char* kGetSelectedPlannedFactoriesHelpText = "GetSelectedPlannedFactories()";
@@ -2587,14 +2588,15 @@ namespace
     "IssuePlannedFactoryBuildOrder([proxyIdOrList], blueprintId, [count], [clearQueue])";
   constexpr const char* kSetPlannedFactoryRallyPointHelpText =
     "SetPlannedFactoryRallyPoint([proxyIdOrList], x, y, z) or SetPlannedFactoryRallyPoint([proxyIdOrList], {x, y, z})";
-  constexpr const char* kSetPlannedFactoryRepeatHelpText =
-    "SetPlannedFactoryRepeat([proxyIdOrList], repeat)";
-  constexpr const char* kGetPlannedFactoryQueueHelpText =
-    "GetPlannedFactoryQueue(proxyId)";
+  constexpr const char* kSetPlannedFactoryRepeatHelpText = "SetPlannedFactoryRepeat([proxyIdOrList], repeat)";
+  constexpr const char* kGetPlannedFactoryQueueHelpText = "GetPlannedFactoryQueue(proxyId)";
   constexpr const char* kDecreasePlannedFactoryBuildCountHelpText =
     "DecreasePlannedFactoryBuildCount(proxyId, [orderIndex, count])";
 
-  std::vector<moho::PlannedUnitProxy*> ResolveTargetProxies(LuaPlus::LuaState* const state, const int argIndex)
+  std::vector<moho::PlannedUnitProxy*> ResolveTargetProxies(
+    LuaPlus::LuaState* const state,
+    const int argIndex
+  )
   {
     std::vector<moho::PlannedUnitProxy*> targets;
     lua_State* const rawState = state->m_state;
@@ -2649,7 +2651,10 @@ namespace
     return mgr.GetSelectedProxies();
   }
 
-  LuaPlus::LuaObject CreatePlannedProxyTable(LuaPlus::LuaState* const state, const moho::PlannedUnitProxy* const proxy)
+  LuaPlus::LuaObject CreatePlannedProxyTable(
+    LuaPlus::LuaState* const state,
+    const moho::PlannedUnitProxy* const proxy
+  )
   {
     LuaPlus::LuaObject obj(state);
     obj.AssignNewTable(state, 0, 5u);
@@ -2679,9 +2684,11 @@ namespace
 
     return obj;
   }
-}
+} // namespace
 
-int moho::cfunc_GetPlannedFactories(lua_State* const luaContext)
+int moho::cfunc_GetPlannedFactories(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetPlannedFactoriesL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2699,7 +2706,9 @@ moho::CScrLuaInitForm* moho::func_GetPlannedFactories_LuaFuncDef()
   return &binder;
 }
 
-int moho::cfunc_GetPlannedFactoriesL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetPlannedFactoriesL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -2729,7 +2738,9 @@ int moho::cfunc_GetPlannedFactoriesL(LuaPlus::LuaState* const state)
   return 1;
 }
 
-int moho::cfunc_GetPlannedFactoryAt(lua_State* const luaContext)
+int moho::cfunc_GetPlannedFactoryAt(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetPlannedFactoryAtL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2747,7 +2758,9 @@ moho::CScrLuaInitForm* moho::func_GetPlannedFactoryAt_LuaFuncDef()
   return &binder;
 }
 
-int moho::cfunc_GetPlannedFactoryAtL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetPlannedFactoryAtL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -2772,7 +2785,8 @@ int moho::cfunc_GetPlannedFactoryAtL(LuaPlus::LuaState* const state)
   const float screenY = static_cast<float>(lua_tonumber(rawState, 3));
   const float pickRadius = lua_gettop(rawState) >= 4 ? static_cast<float>(lua_tonumber(rawState, 4)) : 30.0f;
 
-  PlannedUnitProxy* const hit = PlannedFactoryManager::Instance().HitTestScreenPoint(worldView, screenX, screenY, pickRadius);
+  PlannedUnitProxy* const hit =
+    PlannedFactoryManager::Instance().HitTestScreenPoint(worldView, screenX, screenY, pickRadius);
   if (hit == nullptr) {
     lua_pushnil(rawState);
     return 1;
@@ -2783,7 +2797,9 @@ int moho::cfunc_GetPlannedFactoryAtL(LuaPlus::LuaState* const state)
   return 1;
 }
 
-int moho::cfunc_GetPlannedFactoriesInRect(lua_State* const luaContext)
+int moho::cfunc_GetPlannedFactoriesInRect(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetPlannedFactoriesInRectL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2801,7 +2817,9 @@ moho::CScrLuaInitForm* moho::func_GetPlannedFactoriesInRect_LuaFuncDef()
   return &binder;
 }
 
-int moho::cfunc_GetPlannedFactoriesInRectL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetPlannedFactoriesInRectL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -2845,7 +2863,9 @@ int moho::cfunc_GetPlannedFactoriesInRectL(LuaPlus::LuaState* const state)
   return 1;
 }
 
-int moho::cfunc_SelectPlannedFactory(lua_State* const luaContext)
+int moho::cfunc_SelectPlannedFactory(
+  lua_State* const luaContext
+)
 {
   return cfunc_SelectPlannedFactoryL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2863,7 +2883,9 @@ moho::CScrLuaInitForm* moho::func_SelectPlannedFactory_LuaFuncDef()
   return &binder;
 }
 
-int moho::cfunc_SelectPlannedFactoryL(LuaPlus::LuaState* const state)
+int moho::cfunc_SelectPlannedFactoryL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -2883,7 +2905,9 @@ int moho::cfunc_SelectPlannedFactoryL(LuaPlus::LuaState* const state)
   return 0;
 }
 
-int moho::cfunc_ClearPlannedFactorySelectionL(LuaPlus::LuaState* const state)
+int moho::cfunc_ClearPlannedFactorySelectionL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -2894,7 +2918,9 @@ int moho::cfunc_ClearPlannedFactorySelectionL(LuaPlus::LuaState* const state)
   return 0;
 }
 
-int moho::cfunc_ClearPlannedFactorySelection(lua_State* const luaContext)
+int moho::cfunc_ClearPlannedFactorySelection(
+  lua_State* const luaContext
+)
 {
   return cfunc_ClearPlannedFactorySelectionL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2912,7 +2938,9 @@ moho::CScrLuaInitForm* moho::func_ClearPlannedFactorySelection_LuaFuncDef()
   return &binder;
 }
 
-int moho::cfunc_GetSelectedPlannedFactories(lua_State* const luaContext)
+int moho::cfunc_GetSelectedPlannedFactories(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetSelectedPlannedFactoriesL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2930,7 +2958,9 @@ moho::CScrLuaInitForm* moho::func_GetSelectedPlannedFactories_LuaFuncDef()
   return &binder;
 }
 
-int moho::cfunc_GetSelectedPlannedFactoriesL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetSelectedPlannedFactoriesL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -2961,7 +2991,9 @@ int moho::cfunc_GetSelectedPlannedFactoriesL(LuaPlus::LuaState* const state)
 }
 
 // 1. IssuePlannedFactoryBuildOrder
-int moho::cfunc_IssuePlannedFactoryBuildOrder(lua_State* const luaContext)
+int moho::cfunc_IssuePlannedFactoryBuildOrder(
+  lua_State* const luaContext
+)
 {
   return cfunc_IssuePlannedFactoryBuildOrderL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2979,7 +3011,9 @@ moho::CScrLuaInitForm* moho::func_IssuePlannedFactoryBuildOrder_LuaFuncDef()
   return &binder;
 }
 
-int moho::cfunc_IssuePlannedFactoryBuildOrderL(LuaPlus::LuaState* const state)
+int moho::cfunc_IssuePlannedFactoryBuildOrderL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -3024,9 +3058,8 @@ int moho::cfunc_IssuePlannedFactoryBuildOrderL(LuaPlus::LuaState* const state)
     clearQueue = (lua_toboolean(rawState, clearArg) != 0);
   }
 
-  const auto targets = (targetArg > 0)
-    ? ResolveTargetProxies(state, targetArg)
-    : PlannedFactoryManager::Instance().GetSelectedProxies();
+  const auto targets =
+    (targetArg > 0) ? ResolveTargetProxies(state, targetArg) : PlannedFactoryManager::Instance().GetSelectedProxies();
 
   for (auto* const proxy : targets) {
     if (proxy != nullptr) {
@@ -3040,7 +3073,9 @@ int moho::cfunc_IssuePlannedFactoryBuildOrderL(LuaPlus::LuaState* const state)
 }
 
 // 2. SetPlannedFactoryRallyPoint
-int moho::cfunc_SetPlannedFactoryRallyPoint(lua_State* const luaContext)
+int moho::cfunc_SetPlannedFactoryRallyPoint(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetPlannedFactoryRallyPointL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3058,7 +3093,9 @@ moho::CScrLuaInitForm* moho::func_SetPlannedFactoryRallyPoint_LuaFuncDef()
   return &binder;
 }
 
-int moho::cfunc_SetPlannedFactoryRallyPointL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetPlannedFactoryRallyPointL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -3083,14 +3120,20 @@ int moho::cfunc_SetPlannedFactoryRallyPointL(LuaPlus::LuaState* const state)
       LuaPlus::LuaObject xObj = obj.GetByName("x");
       LuaPlus::LuaObject yObj = obj.GetByName("y");
       LuaPlus::LuaObject zObj = obj.GetByName("z");
-      if (xObj.IsNumber()) v.x = static_cast<float>(xObj.GetNumber());
-      else if (obj.GetByIndex(1).IsNumber()) v.x = static_cast<float>(obj.GetByIndex(1).GetNumber());
+      if (xObj.IsNumber())
+        v.x = static_cast<float>(xObj.GetNumber());
+      else if (obj.GetByIndex(1).IsNumber())
+        v.x = static_cast<float>(obj.GetByIndex(1).GetNumber());
 
-      if (yObj.IsNumber()) v.y = static_cast<float>(yObj.GetNumber());
-      else if (obj.GetByIndex(2).IsNumber()) v.y = static_cast<float>(obj.GetByIndex(2).GetNumber());
+      if (yObj.IsNumber())
+        v.y = static_cast<float>(yObj.GetNumber());
+      else if (obj.GetByIndex(2).IsNumber())
+        v.y = static_cast<float>(obj.GetByIndex(2).GetNumber());
 
-      if (zObj.IsNumber()) v.z = static_cast<float>(zObj.GetNumber());
-      else if (obj.GetByIndex(3).IsNumber()) v.z = static_cast<float>(obj.GetByIndex(3).GetNumber());
+      if (zObj.IsNumber())
+        v.z = static_cast<float>(zObj.GetNumber());
+      else if (obj.GetByIndex(3).IsNumber())
+        v.z = static_cast<float>(obj.GetByIndex(3).GetNumber());
     }
     return v;
   };
@@ -3099,7 +3142,10 @@ int moho::cfunc_SetPlannedFactoryRallyPointL(LuaPlus::LuaState* const state)
     targets = PlannedFactoryManager::Instance().GetSelectedProxies();
     rallyPos = readPosFromTable(LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 1)));
     posFound = true;
-  } else if (argCount == 3 && lua_type(rawState, 1) == LUA_TNUMBER && lua_type(rawState, 2) == LUA_TNUMBER && lua_type(rawState, 3) == LUA_TNUMBER) {
+  } else if (
+    argCount == 3 && lua_type(rawState, 1) == LUA_TNUMBER && lua_type(rawState, 2) == LUA_TNUMBER &&
+    lua_type(rawState, 3) == LUA_TNUMBER
+  ) {
     targets = PlannedFactoryManager::Instance().GetSelectedProxies();
     rallyPos.x = static_cast<float>(lua_tonumber(rawState, 1));
     rallyPos.y = static_cast<float>(lua_tonumber(rawState, 2));
@@ -3128,7 +3174,9 @@ int moho::cfunc_SetPlannedFactoryRallyPointL(LuaPlus::LuaState* const state)
 }
 
 // 3. SetPlannedFactoryRepeat
-int moho::cfunc_SetPlannedFactoryRepeat(lua_State* const luaContext)
+int moho::cfunc_SetPlannedFactoryRepeat(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetPlannedFactoryRepeatL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3146,7 +3194,9 @@ moho::CScrLuaInitForm* moho::func_SetPlannedFactoryRepeat_LuaFuncDef()
   return &binder;
 }
 
-int moho::cfunc_SetPlannedFactoryRepeatL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetPlannedFactoryRepeatL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -3181,7 +3231,9 @@ int moho::cfunc_SetPlannedFactoryRepeatL(LuaPlus::LuaState* const state)
 }
 
 // 4. GetPlannedFactoryQueue
-int moho::cfunc_GetPlannedFactoryQueue(lua_State* const luaContext)
+int moho::cfunc_GetPlannedFactoryQueue(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetPlannedFactoryQueueL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3199,7 +3251,9 @@ moho::CScrLuaInitForm* moho::func_GetPlannedFactoryQueue_LuaFuncDef()
   return &binder;
 }
 
-int moho::cfunc_GetPlannedFactoryQueueL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetPlannedFactoryQueueL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -3248,7 +3302,9 @@ int moho::cfunc_GetPlannedFactoryQueueL(LuaPlus::LuaState* const state)
 }
 
 // 5. DecreasePlannedFactoryBuildCount
-int moho::cfunc_DecreasePlannedFactoryBuildCount(lua_State* const luaContext)
+int moho::cfunc_DecreasePlannedFactoryBuildCount(
+  lua_State* const luaContext
+)
 {
   return cfunc_DecreasePlannedFactoryBuildCountL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3266,7 +3322,9 @@ moho::CScrLuaInitForm* moho::func_DecreasePlannedFactoryBuildCount_LuaFuncDef()
   return &binder;
 }
 
-int moho::cfunc_DecreasePlannedFactoryBuildCountL(LuaPlus::LuaState* const state)
+int moho::cfunc_DecreasePlannedFactoryBuildCountL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;

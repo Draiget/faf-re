@@ -398,8 +398,8 @@ namespace moho
       selectionBox.Center.x = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.x + selectionCenterOffset.x;
       selectionBox.Center.z = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.z + selectionCenterOffset.z;
     }
-    selectionBox.Center.y = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.y
-      + ren_SelectionHeightFudge + selectionCenterOffset.y;
+    selectionBox.Center.y = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.y + ren_SelectionHeightFudge +
+      selectionCenterOffset.y;
 
     Wm3::Vector3f boxVertices[8]{};
     selectionBox.ComputeVertices(boxVertices);
@@ -518,7 +518,10 @@ namespace moho
 
     const Wm3::Vector3f pos{proxy.mPosition.x, proxy.mPosition.y, proxy.mPosition.z};
     const float viewportPixelScale = ProjectViewportPixelScaleRow(camera->viewport, pos);
-    if (viewportPixelScale > 0.0f && ren_SelectBracketMinPixelSize > ((maxSelectionSize * bracketThickness) / viewportPixelScale)) {
+    if (
+      viewportPixelScale > 0.0f &&
+      ren_SelectBracketMinPixelSize > ((maxSelectionSize * bracketThickness) / viewportPixelScale)
+    ) {
       bracketThickness = (ren_SelectBracketMinPixelSize * viewportPixelScale) / maxSelectionSize;
     }
 
@@ -648,7 +651,6 @@ namespace moho
         batcher->Flush();
       }
     }
-
 
     // 0x007FD679..0x007FD7BC: the hovered unit gets its own army-coloured
     // brackets, but only when it is not already blinking and not already part

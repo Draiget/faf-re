@@ -111,8 +111,10 @@ namespace
   {
     for (auto it = selection.begin(); it != selection.end();) {
       auto* const userUnit = static_cast<moho::UserUnit*>(*it);
-      if (session.CanSelectUnit(userUnit) &&
-          (!moho::IsFactoryPreOrdersEnabled() || !moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit))) {
+      if (
+        session.CanSelectUnit(userUnit) &&
+        (!moho::IsFactoryPreOrdersEnabled() || !moho::PlannedFactoryManager::Get().IsPlannedProxyUnit(userUnit))
+      ) {
         ++it;
       } else {
         it = selection.Erase(it);
@@ -350,15 +352,20 @@ namespace moho
         if (mSess != nullptr && mSess->mCursorWorldState[0] != 0u) {
           const Vector3f cursorWorldPos{mSess->CursorWorldPos.x, mSess->CursorWorldPos.y, mSess->CursorWorldPos.z};
           for (const auto& proxy : pfm.GetAllProxies()) {
-            if (!proxy) continue;
+            if (!proxy)
+              continue;
             float halfX = 3.5f;
             float halfZ = 3.5f;
             if (const auto* rbp = dynamic_cast<const RUnitBlueprint*>(proxy->mBlueprint)) {
-              if (rbp->Physics.SkirtSizeX > 0.0f) halfX = rbp->Physics.SkirtSizeX * 0.5f;
-              if (rbp->Physics.SkirtSizeZ > 0.0f) halfZ = rbp->Physics.SkirtSizeZ * 0.5f;
+              if (rbp->Physics.SkirtSizeX > 0.0f)
+                halfX = rbp->Physics.SkirtSizeX * 0.5f;
+              if (rbp->Physics.SkirtSizeZ > 0.0f)
+                halfZ = rbp->Physics.SkirtSizeZ * 0.5f;
             }
-            if (std::abs(cursorWorldPos.x - proxy->mPosition.x) <= halfX &&
-                std::abs(cursorWorldPos.z - proxy->mPosition.z) <= halfZ) {
+            if (
+              std::abs(cursorWorldPos.x - proxy->mPosition.x) <= halfX &&
+              std::abs(cursorWorldPos.z - proxy->mPosition.z) <= halfZ
+            ) {
               hitProxy = proxy.get();
               break;
             }
@@ -373,15 +380,20 @@ namespace moho
             const Wm3::Vector2f screenPos(mouseX, mouseY);
             const Wm3::Vector3f surfacePos = mCam->CameraScreenToSurface(screenPos);
             for (const auto& proxy : pfm.GetAllProxies()) {
-              if (!proxy) continue;
+              if (!proxy)
+                continue;
               float halfX = 4.0f;
               float halfZ = 4.0f;
               if (const auto* rbp = dynamic_cast<const RUnitBlueprint*>(proxy->mBlueprint)) {
-                if (rbp->Physics.SkirtSizeX > 0.0f) halfX = rbp->Physics.SkirtSizeX * 0.5f;
-                if (rbp->Physics.SkirtSizeZ > 0.0f) halfZ = rbp->Physics.SkirtSizeZ * 0.5f;
+                if (rbp->Physics.SkirtSizeX > 0.0f)
+                  halfX = rbp->Physics.SkirtSizeX * 0.5f;
+                if (rbp->Physics.SkirtSizeZ > 0.0f)
+                  halfZ = rbp->Physics.SkirtSizeZ * 0.5f;
               }
-              if (std::abs(surfacePos.x - proxy->mPosition.x) <= halfX &&
-                  std::abs(surfacePos.z - proxy->mPosition.z) <= halfZ) {
+              if (
+                std::abs(surfacePos.x - proxy->mPosition.x) <= halfX &&
+                std::abs(surfacePos.z - proxy->mPosition.z) <= halfZ
+              ) {
                 hitProxy = proxy.get();
                 break;
               }

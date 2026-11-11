@@ -44,10 +44,13 @@ namespace moho
     Vector3f direction{Vector3f::ZERO};
 
     Ray3f() = default;
-    Ray3f(const Vector3f& orig, const Vector3f& dir)
-      : origin(orig), direction(dir)
-    {
-    }
+    Ray3f(
+      const Vector3f& orig,
+      const Vector3f& dir
+    )
+      : origin(orig)
+      , direction(dir)
+    {}
   };
 
   using Ray = Ray3f;
@@ -63,7 +66,9 @@ namespace moho
       std::string blueprintId{};
       std::int32_t count{1};
 
-      bool operator==(const PreOrder& other) const noexcept
+      bool operator==(
+        const PreOrder& other
+      ) const noexcept
       {
         return count == other.count && blueprintId == other.blueprintId;
       }
@@ -74,7 +79,9 @@ namespace moho
       std::uint32_t builderId{0};
       std::uint32_t cmdIndex{0};
 
-      bool operator==(const BuilderKey& other) const noexcept
+      bool operator==(
+        const BuilderKey& other
+      ) const noexcept
       {
         return builderId == other.builderId && cmdIndex == other.cmdIndex;
       }
@@ -112,11 +119,24 @@ namespace moho
     void SetRepeatBuild(bool repeat);
     void ToggleRepeatBuild();
 
-    void SetSelected(bool selected) noexcept { mIsSelected = selected; }
+    void SetSelected(
+      bool selected
+    ) noexcept
+    {
+      mIsSelected = selected;
+    }
     [[nodiscard]] bool IsSelected() const noexcept;
 
-    void SetBoundingRadius(float radius) noexcept { mBoundingRadius = radius; }
-    [[nodiscard]] float GetBoundingRadius() const noexcept { return mBoundingRadius; }
+    void SetBoundingRadius(
+      float radius
+    ) noexcept
+    {
+      mBoundingRadius = radius;
+    }
+    [[nodiscard]] float GetBoundingRadius() const noexcept
+    {
+      return mBoundingRadius;
+    }
 
     [[nodiscard]] bool HasBuilder(std::uint32_t builderId, std::uint32_t cmdIndex) const noexcept;
     void AddBuilder(std::uint32_t builderId, std::uint32_t cmdIndex);
@@ -142,7 +162,8 @@ namespace moho
       std::uint32_t builderId,
       std::uint32_t cmdIndex,
       const REntityBlueprint* bp,
-      const Vector3f& pos);
+      const Vector3f& pos
+    );
 
     [[nodiscard]] PlannedUnitProxy* FindByPosition(const Vector3f& pos, float tolerance = 1.0f);
     [[nodiscard]] const PlannedUnitProxy* FindByPosition(const Vector3f& pos, float tolerance = 1.0f) const;
@@ -176,13 +197,27 @@ namespace moho
     void SetSelectedPlannedFactoriesRallyPoint(const Vector3f& pos);
     void SetSelectedPlannedFactoriesRepeat(bool repeat);
 
-    void SetBufferingSuppressed(bool suppressed) noexcept { mBufferingSuppressed = suppressed; }
-    [[nodiscard]] bool IsBufferingSuppressed() const noexcept { return mBufferingSuppressed; }
+    void SetBufferingSuppressed(
+      bool suppressed
+    ) noexcept
+    {
+      mBufferingSuppressed = suppressed;
+    }
+    [[nodiscard]] bool IsBufferingSuppressed() const noexcept
+    {
+      return mBufferingSuppressed;
+    }
 
     struct ScopedBufferingSuppression
     {
-      ScopedBufferingSuppression() { PlannedFactoryManager::Get().SetBufferingSuppressed(true); }
-      ~ScopedBufferingSuppression() { PlannedFactoryManager::Get().SetBufferingSuppressed(false); }
+      ScopedBufferingSuppression()
+      {
+        PlannedFactoryManager::Get().SetBufferingSuppressed(true);
+      }
+      ~ScopedBufferingSuppression()
+      {
+        PlannedFactoryManager::Get().SetBufferingSuppressed(false);
+      }
     };
 
     // 3D Ray hit test
@@ -190,50 +225,37 @@ namespace moho
     [[nodiscard]] const PlannedUnitProxy* HitTestRay(const Ray3f& ray, float radius = 5.0f) const;
 
     // Screen point hit test (mouse pick)
-    [[nodiscard]] PlannedUnitProxy* HitTestScreenPoint(
-      const GeomCamera3* camera,
-      float screenX,
-      float screenY,
-      float pickRadius = 30.0f);
-    [[nodiscard]] const PlannedUnitProxy* HitTestScreenPoint(
-      const GeomCamera3* camera,
-      float screenX,
-      float screenY,
-      float pickRadius = 30.0f) const;
+    [[nodiscard]] PlannedUnitProxy*
+    HitTestScreenPoint(const GeomCamera3* camera, float screenX, float screenY, float pickRadius = 30.0f);
+    [[nodiscard]] const PlannedUnitProxy*
+    HitTestScreenPoint(const GeomCamera3* camera, float screenX, float screenY, float pickRadius = 30.0f) const;
 
-    [[nodiscard]] PlannedUnitProxy* HitTestScreenPoint(
-      const CUIWorldView* view,
-      float screenX,
-      float screenY,
-      float pickRadius = 30.0f);
+    [[nodiscard]] PlannedUnitProxy*
+    HitTestScreenPoint(const CUIWorldView* view, float screenX, float screenY, float pickRadius = 30.0f);
 
     // Screen rectangle hit test (drag box selection)
-    [[nodiscard]] std::vector<PlannedUnitProxy*> HitTestScreenRect(
-      const GeomCamera3* camera,
-      float minX,
-      float minY,
-      float maxX,
-      float maxY);
-    [[nodiscard]] std::vector<const PlannedUnitProxy*> HitTestScreenRect(
-      const GeomCamera3* camera,
-      float minX,
-      float minY,
-      float maxX,
-      float maxY) const;
+    [[nodiscard]] std::vector<PlannedUnitProxy*>
+    HitTestScreenRect(const GeomCamera3* camera, float minX, float minY, float maxX, float maxY);
+    [[nodiscard]] std::vector<const PlannedUnitProxy*>
+    HitTestScreenRect(const GeomCamera3* camera, float minX, float minY, float maxX, float maxY) const;
 
-    [[nodiscard]] std::vector<PlannedUnitProxy*> HitTestScreenRect(
-      const CUIWorldView* view,
-      float minX,
-      float minY,
-      float maxX,
-      float maxY);
+    [[nodiscard]] std::vector<PlannedUnitProxy*>
+    HitTestScreenRect(const CUIWorldView* view, float minX, float minY, float maxX, float maxY);
 
     [[nodiscard]] const std::vector<std::unique_ptr<PlannedUnitProxy>>& GetAllProxies() const noexcept;
 
     // Dispatch pre-orders to a newly constructed factory unit (progress > 0)
     using DispatchHook = std::function<void(UserUnit* unit, const PlannedUnitProxy& proxy)>;
-    void SetDispatchHook(DispatchHook hook) noexcept { mDispatchHook = std::move(hook); }
-    void ResetDispatchHook() noexcept { mDispatchHook = nullptr; }
+    void SetDispatchHook(
+      DispatchHook hook
+    ) noexcept
+    {
+      mDispatchHook = std::move(hook);
+    }
+    void ResetDispatchHook() noexcept
+    {
+      mDispatchHook = nullptr;
+    }
 
     bool DispatchPreOrdersForUnit(UserUnit* unit);
     bool DispatchPreOrdersForUnit(UserUnit* unit, const Vector3f& unitPos);
@@ -241,11 +263,16 @@ namespace moho
     bool OnUnitCreatedOrProgress(
       const Vector3f& pos,
       float progress,
-      const std::function<void(const std::vector<PlannedUnitProxy::PreOrder>&, const Vector3f&, bool)>& callback = nullptr,
-      float tolerance = 3.0f);
+      const std::function<void(const std::vector<PlannedUnitProxy::PreOrder>&, const Vector3f&, bool)>& callback =
+        nullptr,
+      float tolerance = 3.0f
+    );
 
     static PlannedFactoryManager& Instance();
-    static PlannedFactoryManager& Get() noexcept { return Instance(); }
+    static PlannedFactoryManager& Get() noexcept
+    {
+      return Instance();
+    }
 
   private:
     std::uint32_t mNextProxyId{1};
@@ -254,4 +281,4 @@ namespace moho
     bool mBufferingSuppressed{false};
     bool mIsMutating{false};
   };
-}
+} // namespace moho

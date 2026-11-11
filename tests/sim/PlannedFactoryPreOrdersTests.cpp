@@ -18,16 +18,22 @@ namespace moho
   extern bool ui_FactoryPreOrders;
   [[nodiscard]] bool IsFactoryPreOrdersEnabled();
   void SetFactoryPreOrdersEnabled(bool enabled);
-}
+} // namespace moho
 
-TEST(PlannedFactoryPreOrdersTest, DefaultIsDisabled)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  DefaultIsDisabled
+)
 {
   moho::SetFactoryPreOrdersEnabled(false);
   EXPECT_FALSE(moho::IsFactoryPreOrdersEnabled());
   EXPECT_FALSE(moho::ui_FactoryPreOrders);
 }
 
-TEST(PlannedFactoryPreOrdersTest, SetFactoryPreOrdersEnabledTogglesState)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  SetFactoryPreOrdersEnabledTogglesState
+)
 {
   moho::SetFactoryPreOrdersEnabled(false);
   EXPECT_FALSE(moho::IsFactoryPreOrdersEnabled());
@@ -38,7 +44,10 @@ TEST(PlannedFactoryPreOrdersTest, SetFactoryPreOrdersEnabledTogglesState)
   EXPECT_TRUE(moho::ui_FactoryPreOrders);
 }
 
-TEST(PlannedFactoryPreOrdersTest, ConCommandExecutionTogglesState)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  ConCommandExecutionTogglesState
+)
 {
   moho::CON_Execute("ui_FactoryPreOrders 0");
   EXPECT_FALSE(moho::IsFactoryPreOrdersEnabled());
@@ -49,7 +58,10 @@ TEST(PlannedFactoryPreOrdersTest, ConCommandExecutionTogglesState)
   EXPECT_TRUE(moho::ui_FactoryPreOrders);
 }
 
-TEST(PlannedFactoryPreOrdersTest, PlannedUnitProxyCreationAndOrderBuffering)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  PlannedUnitProxyCreationAndOrderBuffering
+)
 {
   moho::PlannedUnitProxy proxy;
   proxy.mProxyId = 42;
@@ -111,7 +123,10 @@ TEST(PlannedFactoryPreOrdersTest, PlannedUnitProxyCreationAndOrderBuffering)
   EXPECT_TRUE(proxy.mPreOrders.empty());
 }
 
-TEST(PlannedFactoryPreOrdersTest, RegisterAndUpdatePreservesOrdersOnDrag)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  RegisterAndUpdatePreservesOrdersOnDrag
+)
 {
   moho::PlannedFactoryManager mgr;
   moho::Vector3f pos1{100.0f, 20.0f, 100.0f};
@@ -144,7 +159,10 @@ TEST(PlannedFactoryPreOrdersTest, RegisterAndUpdatePreservesOrdersOnDrag)
   EXPECT_EQ(mgr.GetCount(), 1u);
 }
 
-TEST(PlannedFactoryPreOrdersTest, AssistingBuildersShareProxyAndCleanupOnDeath)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  AssistingBuildersShareProxyAndCleanupOnDeath
+)
 {
   moho::PlannedFactoryManager mgr;
   moho::Vector3f factoryPos{200.0f, 0.0f, 200.0f};
@@ -172,7 +190,10 @@ TEST(PlannedFactoryPreOrdersTest, AssistingBuildersShareProxyAndCleanupOnDeath)
   EXPECT_EQ(mgr.FindByBuilderAndIndex(20, 2), nullptr);
 }
 
-TEST(PlannedFactoryPreOrdersTest, RemoveByBuilderAndIndex)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  RemoveByBuilderAndIndex
+)
 {
   moho::PlannedFactoryManager mgr;
   mgr.RegisterOrUpdatePlannedFactory(30, 1, nullptr, {10.0f, 0.0f, 10.0f});
@@ -188,7 +209,10 @@ TEST(PlannedFactoryPreOrdersTest, RemoveByBuilderAndIndex)
   EXPECT_EQ(mgr.GetCount(), 0u);
 }
 
-TEST(PlannedFactoryPreOrdersTest, SpatialLookupAndRayHitTest)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  SpatialLookupAndRayHitTest
+)
 {
   moho::PlannedFactoryManager mgr;
   moho::Vector3f pos{100.0f, 0.0f, 100.0f};
@@ -214,7 +238,10 @@ TEST(PlannedFactoryPreOrdersTest, SpatialLookupAndRayHitTest)
   EXPECT_EQ(mgr.HitTestRay(awayRay, 5.0f), nullptr);
 }
 
-TEST(PlannedFactoryPreOrdersTest, ProxySelectionStateAndManagerSelectionTracking)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  ProxySelectionStateAndManagerSelectionTracking
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -264,7 +291,10 @@ TEST(PlannedFactoryPreOrdersTest, ProxySelectionStateAndManagerSelectionTracking
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, ScreenHitTestPointAndMarqueeRect)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  ScreenHitTestPointAndMarqueeRect
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -322,12 +352,17 @@ TEST(PlannedFactoryPreOrdersTest, ScreenHitTestPointAndMarqueeRect)
   EXPECT_TRUE(rectMiss.empty());
 
   // Null camera returns empty
-  EXPECT_TRUE(mgr.HitTestScreenRect(static_cast<const moho::GeomCamera3*>(nullptr), 0.0f, 0.0f, 1920.0f, 1080.0f).empty());
+  EXPECT_TRUE(
+    mgr.HitTestScreenRect(static_cast<const moho::GeomCamera3*>(nullptr), 0.0f, 0.0f, 1920.0f, 1080.0f).empty()
+  );
 
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, HitTestingGatedByConvar)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  HitTestingGatedByConvar
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -364,7 +399,10 @@ TEST(PlannedFactoryPreOrdersTest, HitTestingGatedByConvar)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, WorldViewNullSafetyAndBoundingRadius)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  WorldViewNullSafetyAndBoundingRadius
+)
 {
   auto& mgr = moho::PlannedFactoryManager::Get();
   mgr.ClearAll();
@@ -385,7 +423,10 @@ TEST(PlannedFactoryPreOrdersTest, WorldViewNullSafetyAndBoundingRadius)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, QueueOrdersDuplicateToAllSelectedProxies)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  QueueOrdersDuplicateToAllSelectedProxies
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -440,7 +481,10 @@ TEST(PlannedFactoryPreOrdersTest, QueueOrdersDuplicateToAllSelectedProxies)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, SetRallyPointAndRepeatToAllSelectedProxies)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  SetRallyPointAndRepeatToAllSelectedProxies
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -478,7 +522,10 @@ TEST(PlannedFactoryPreOrdersTest, SetRallyPointAndRepeatToAllSelectedProxies)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, QueueInspectionAndDecrement)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  QueueInspectionAndDecrement
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -513,7 +560,10 @@ TEST(PlannedFactoryPreOrdersTest, QueueInspectionAndDecrement)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, MixedSelectionDuplicationSimulation)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  MixedSelectionDuplicationSimulation
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -558,7 +608,10 @@ TEST(PlannedFactoryPreOrdersTest, MixedSelectionDuplicationSimulation)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, LuaBindersQueueRallyRepeatAndDecrease)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  LuaBindersQueueRallyRepeatAndDecrease
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -622,7 +675,10 @@ TEST(PlannedFactoryPreOrdersTest, LuaBindersQueueRallyRepeatAndDecrease)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, DispatchOnCreationProgressGreaterThanZero)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  DispatchOnCreationProgressGreaterThanZero
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -647,14 +703,15 @@ TEST(PlannedFactoryPreOrdersTest, DispatchOnCreationProgressGreaterThanZero)
     {200.0f, 0.0f, 200.0f},
     0.05f,
     [&](const std::vector<moho::PlannedUnitProxy::PreOrder>& orders, const moho::Vector3f& rally, bool repeat) {
-      dispatched = true;
-      ASSERT_EQ(orders.size(), 1u);
-      EXPECT_EQ(orders[0].blueprintId, "uel0201");
-      EXPECT_EQ(orders[0].count, 3);
-      EXPECT_FLOAT_EQ(rally.x, 250.0f);
-      EXPECT_FLOAT_EQ(rally.z, 250.0f);
-      EXPECT_TRUE(repeat);
-    }));
+    dispatched = true;
+    ASSERT_EQ(orders.size(), 1u);
+    EXPECT_EQ(orders[0].blueprintId, "uel0201");
+    EXPECT_EQ(orders[0].count, 3);
+    EXPECT_FLOAT_EQ(rally.x, 250.0f);
+    EXPECT_FLOAT_EQ(rally.z, 250.0f);
+    EXPECT_TRUE(repeat);
+  }
+  ));
 
   EXPECT_TRUE(dispatched);
   // Proxy has been retired
@@ -670,7 +727,10 @@ TEST(PlannedFactoryPreOrdersTest, DispatchOnCreationProgressGreaterThanZero)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersForUnitWithHookAndOnceOnlySuppression)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  DispatchPreOrdersForUnitWithHookAndOnceOnlySuppression
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -715,7 +775,10 @@ TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersForUnitWithHookAndOnceOnlySup
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersGatedByConvar)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  DispatchPreOrdersGatedByConvar
+)
 {
   auto& mgr = moho::PlannedFactoryManager::Get();
   mgr.ClearAll();
@@ -746,7 +809,10 @@ TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersGatedByConvar)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersToleranceAndPositionMiss)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  DispatchPreOrdersToleranceAndPositionMiss
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -772,7 +838,10 @@ TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersToleranceAndPositionMiss)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, BufferingSuppressionScopeDeDuplicatesOrders)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  BufferingSuppressionScopeDeDuplicatesOrders
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -793,7 +862,10 @@ TEST(PlannedFactoryPreOrdersTest, BufferingSuppressionScopeDeDuplicatesOrders)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, BuilderQueueRemovalAndDeathCleanup)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  BuilderQueueRemovalAndDeathCleanup
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -813,7 +885,10 @@ TEST(PlannedFactoryPreOrdersTest, BuilderQueueRemovalAndDeathCleanup)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, FindByPositionIgnoresElevationOffset)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  FindByPositionIgnoresElevationOffset
+)
 {
   moho::PlannedFactoryManager mgr;
   moho::Vector3f pos{100.0f, 15.0f, 200.0f};
@@ -829,7 +904,10 @@ TEST(PlannedFactoryPreOrdersTest, FindByPositionIgnoresElevationOffset)
   EXPECT_EQ(mgr.FindByPosition(queryPosFar, 1.0f), nullptr);
 }
 
-TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersMatchesWithinFoundationRadius)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  DispatchPreOrdersMatchesWithinFoundationRadius
+)
 {
   moho::PlannedFactoryManager mgr;
   moho::Vector3f pos{300.0f, 10.0f, 400.0f};
@@ -853,7 +931,10 @@ TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersMatchesWithinFoundationRadius
   EXPECT_EQ(mgr.GetCount(), 0u);
 }
 
-TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersZeroPositionHandling)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  DispatchPreOrdersZeroPositionHandling
+)
 {
   moho::PlannedFactoryManager mgr;
   moho::Vector3f pos{300.0f, 10.0f, 400.0f};
@@ -865,7 +946,10 @@ TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersZeroPositionHandling)
   EXPECT_EQ(mgr.GetCount(), 1u);
 }
 
-TEST(PlannedFactoryPreOrdersTest, ProxyEntityIdRangeClassification)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  ProxyEntityIdRangeClassification
+)
 {
   auto& mgr = moho::PlannedFactoryManager::Get();
   mgr.ClearAll();
@@ -925,7 +1009,10 @@ TEST(PlannedFactoryPreOrdersTest, ProxyEntityIdRangeClassification)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, ShiftClickOrderCoalescingAndSequencePreservation)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  ShiftClickOrderCoalescingAndSequencePreservation
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -984,7 +1071,10 @@ TEST(PlannedFactoryPreOrdersTest, ShiftClickOrderCoalescingAndSequencePreservati
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, ScopedBufferingSuppressionPreventsRebuffering)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  ScopedBufferingSuppressionPreventsRebuffering
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -1029,7 +1119,10 @@ TEST(PlannedFactoryPreOrdersTest, ScopedBufferingSuppressionPreventsRebuffering)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, MultiProxyBroadcastSelection)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  MultiProxyBroadcastSelection
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -1097,7 +1190,10 @@ TEST(PlannedFactoryPreOrdersTest, MultiProxyBroadcastSelection)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, ReplicatedCurTransformFallbackOnDispatch)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  ReplicatedCurTransformFallbackOnDispatch
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -1143,7 +1239,10 @@ TEST(PlannedFactoryPreOrdersTest, ReplicatedCurTransformFallbackOnDispatch)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, MultiBuilderAssistanceAndRetirementLifecycle)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  MultiBuilderAssistanceAndRetirementLifecycle
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -1197,7 +1296,10 @@ TEST(PlannedFactoryPreOrdersTest, MultiBuilderAssistanceAndRetirementLifecycle)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, PlannedUnitProxyRallyPointOrdersAndChaining)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  PlannedUnitProxyRallyPointOrdersAndChaining
+)
 {
   moho::PlannedUnitProxy proxy;
   proxy.mProxyId = 77;
@@ -1248,7 +1350,10 @@ TEST(PlannedFactoryPreOrdersTest, PlannedUnitProxyRallyPointOrdersAndChaining)
   EXPECT_FLOAT_EQ(proxy.mRallyPoint.x, 0.0f);
 }
 
-TEST(PlannedFactoryPreOrdersTest, PlannedFactoryRallyPointDispatchViaHook)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  PlannedFactoryRallyPointDispatchViaHook
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -1299,7 +1404,10 @@ TEST(PlannedFactoryPreOrdersTest, PlannedFactoryRallyPointDispatchViaHook)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, IssueFactoryCommandDirectProxyInterception)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  IssueFactoryCommandDirectProxyInterception
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -1367,7 +1475,10 @@ TEST(PlannedFactoryPreOrdersTest, IssueFactoryCommandDirectProxyInterception)
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, IssueFactoryCommandDisabledFeatureNoInterception)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  IssueFactoryCommandDisabledFeatureNoInterception
+)
 {
   moho::SetFactoryPreOrdersEnabled(false);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -1399,7 +1510,10 @@ TEST(PlannedFactoryPreOrdersTest, IssueFactoryCommandDisabledFeatureNoIntercepti
   mgr.ClearAll();
 }
 
-TEST(PlannedFactoryPreOrdersTest, PlannedProxyCommandHelperLifetimeNeverExpiresWhenDue)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  PlannedProxyCommandHelperLifetimeNeverExpiresWhenDue
+)
 {
   moho::SSTICommandConstantData constData{};
   constData.cmd = 101;
@@ -1416,7 +1530,10 @@ TEST(PlannedFactoryPreOrdersTest, PlannedProxyCommandHelperLifetimeNeverExpiresW
   delete helper;
 }
 
-TEST(PlannedFactoryPreOrdersTest, PlannedProxyFactoryQueuePrimaryLinksRetentionAcrossBeats)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  PlannedProxyFactoryQueuePrimaryLinksRetentionAcrossBeats
+)
 {
   moho::UserCommandQueue queue(nullptr);
   moho::SSTICommandConstantData constData{};
@@ -1453,7 +1570,10 @@ TEST(PlannedFactoryPreOrdersTest, PlannedProxyFactoryQueuePrimaryLinksRetentionA
   EXPECT_TRUE(queue.primaryLinks.empty());
 }
 
-TEST(PlannedFactoryPreOrdersTest, PlannedProxyMoveCommandTargetingGroundVsAssist)
+TEST(
+  PlannedFactoryPreOrdersTest,
+  PlannedProxyMoveCommandTargetingGroundVsAssist
+)
 {
   moho::SetFactoryPreOrdersEnabled(true);
   auto& mgr = moho::PlannedFactoryManager::Get();
@@ -1474,10 +1594,11 @@ TEST(PlannedFactoryPreOrdersTest, PlannedProxyMoveCommandTargetingGroundVsAssist
   moveCmd.mTarget.mType = moho::EAiTargetType::AITARGET_Entity;
   moveCmd.mTarget.mEnt = static_cast<std::int32_t>(proxyUnit->mParams.mEntityId);
 
-  const bool isMove = (moveCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_Move ||
-                       moveCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_AggressiveMove ||
-                       moveCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_FormMove ||
-                       moveCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_FormAggressiveMove);
+  const bool isMove =
+    (moveCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_Move ||
+     moveCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_AggressiveMove ||
+     moveCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_FormMove ||
+     moveCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_FormAggressiveMove);
   EXPECT_TRUE(isMove);
 
   if (!isMove && proxy->mBuilderEntityId != 0) {
@@ -1496,8 +1617,9 @@ TEST(PlannedFactoryPreOrdersTest, PlannedProxyMoveCommandTargetingGroundVsAssist
   guardCmd.mTarget.mType = moho::EAiTargetType::AITARGET_Entity;
   guardCmd.mTarget.mEnt = static_cast<std::int32_t>(proxyUnit->mParams.mEntityId);
 
-  const bool isGuardMove = (guardCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_Move ||
-                            guardCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_AggressiveMove);
+  const bool isGuardMove =
+    (guardCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_Move ||
+     guardCmd.mCommandType == moho::EUnitCommandType::UNITCOMMAND_AggressiveMove);
   EXPECT_FALSE(isGuardMove);
 
   if (!isGuardMove && proxy->mBuilderEntityId != 0) {

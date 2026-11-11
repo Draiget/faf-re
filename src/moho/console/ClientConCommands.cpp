@@ -4633,7 +4633,9 @@ namespace moho
     return ui_FactoryPreOrders;
   }
 
-  void SetFactoryPreOrdersEnabled(const bool enabled)
+  void SetFactoryPreOrdersEnabled(
+    const bool enabled
+  )
   {
     ui_FactoryPreOrders = enabled;
   }
@@ -4643,7 +4645,8 @@ namespace moho
 namespace
 {
   constexpr const char* kConsoleStartupUIFactoryPreOrdersDescription =
-    "Allow selecting planned factories under construction to queue production orders and set rally points ahead of time";
+    "Allow selecting planned factories under construction to queue production orders and set rally points ahead of "
+    "time";
 
   TConVar<bool> gTConVar_ui_FactoryPreOrders(
     "ui_FactoryPreOrders",

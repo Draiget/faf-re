@@ -2429,7 +2429,9 @@ namespace moho
         }
 
         // Planned factory proxies skip lifebars and strategic icons:
-        if (asUnit != nullptr && IsFactoryPreOrdersEnabled() && PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)) {
+        if (
+          asUnit != nullptr && IsFactoryPreOrdersEnabled() && PlannedFactoryManager::Get().IsPlannedProxyUnit(asUnit)
+        ) {
           return;
         }
 
@@ -3635,8 +3637,10 @@ namespace moho
     (void)primBatcher->Setup("TLifeBar");
 
     for (UnitIconData& lifebarIcon : aux.mLifebarIcons) {
-      if (lifebarIcon.mUnit == nullptr || lifebarIcon.mUnit->mVariableData.mIsDead != 0 ||
-          lifebarIcon.mUnit->mMarkedForDeletion != 0) {
+      if (
+        lifebarIcon.mUnit == nullptr || lifebarIcon.mUnit->mVariableData.mIsDead != 0 ||
+        lifebarIcon.mUnit->mMarkedForDeletion != 0
+      ) {
         continue;
       }
       if (IsFactoryPreOrdersEnabled()) {
