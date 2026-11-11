@@ -641,6 +641,22 @@ namespace faf::editor
         }
       }
     }
+    // `/hoverprop <index>` (test runs): the Select tool, the camera close over that prop once, and the cursor on it.
+    if (mTestHoverProp >= 0 && mCamera != nullptr && mMap->mProps != nullptr &&
+        static_cast<std::size_t>(mTestHoverProp) < mMap->mProps->mEntries.size()) {
+      const moho::CWldPropEntry& entry = mMap->mProps->mEntries[static_cast<std::size_t>(mTestHoverProp)];
+      const Wm3::Vec3f at = entry.mTransform.pos_;
+      if (!mTestHoverPropFramed) {
+        mTestHoverPropFramed = true;
+        mTools->SetTool(0);
+        mTargetX = at.x;
+        mTargetZ = at.z;
+        mDistance = 40.0f;
+        ApplyCamera();
+      }
+      const Wm3::Vector2f screen = mCamera->Project(at);
+      mCursor = POINT{static_cast<LONG>(screen.x), static_cast<LONG>(screen.y)};
+    }
     // `/hovermarker` (test runs): the cursor on that marker, as a real mouse over it would be.
     if (!mTestHover.empty() && mCamera != nullptr) {
       if (mTestHover == "near" && !mMarkerSelection.empty()) {
@@ -673,6 +689,7 @@ namespace faf::editor
     }
     // The marker under the cursor, drawn in the hover colour next frame (the Select and Markers tools).
     std::string hoverMarker;
+    int hoverProp = -1;
     if (mTools->MarkersToolActive() && !mDragMarkers && mGizmoDrag == GizmoPart::None && PickGizmo(mCursor) == GizmoPart::None) {
       float mx = 0.0f;
       float mz = 0.0f;
@@ -692,6 +709,8 @@ namespace faf::editor
       float radius = 0.0f;
       const PickHit hover = PickAnything(mCursor);
       constexpr std::uint32_t kHover = 0xE0FFFFFFu;
+      // A prop: its own shape lit over it (UpdatePropHighlight, made next frame outside the draw), no ring.
+      hoverProp = hover.kind == PickKind::Prop ? hover.index : -1;
       const moho::CWldTerrainDecal* const hoverDecal =
         hover.kind == PickKind::Decal && mDocument.Decals() != nullptr ? FindDecal(*mDocument.Decals(), hover.index) : nullptr;
       if (hover.kind == PickKind::Marker) {
@@ -714,7 +733,7 @@ namespace faf::editor
                               groundVertex(cx[side] + (cx[next] - cx[side]) * t1, cz[side] + (cz[next] - cz[side]) * t1, kHover, 0.8f));
           }
         }
-      } else if (PickPlace(hover, hx, hz, radius)) {
+      } else if (hover.kind != PickKind::Prop && PickPlace(hover, hx, hz, radius)) {
         for (int s = 0; s < 32; ++s) {
           const float a0 = 2.0f * kPi * static_cast<float>(s) / 32.0f;
           const float a1 = 2.0f * kPi * static_cast<float>(s + 1) / 32.0f;
@@ -727,6 +746,7 @@ namespace faf::editor
       gpg::Logf("editor: /hovermarker: the cursor is over marker %s", hoverMarker.c_str());
     }
     mHoverMarker = std::move(hoverMarker);
+    mHoverPropWanted = hoverProp;
     // The play's selected units (in front of a play): a red ring each, and where a drag puts them.
     {
       std::vector<EdTools::ViewRing> live;
@@ -2035,6 +2055,7 @@ namespace faf::editor
       }
     }
     UpdatePropPreview();
+    UpdatePropHighlight();
     MoveWithKeys(frameSeconds);
     if (mPainting) {
       PaintStroke(frameSeconds);
@@ -5555,8 +5576,66 @@ namespace faf::editor
     }
   }
 
+  void EdMapScene::UpdatePropHighlight()
+  {
+    // A prop's index changes when props are added or removed: the highlight is remade from the entry each time the
+    // wanted prop differs, or its entry moved.
+    const int wanted = mProps.empty() || mMap == nullptr || mMap->mProps == nullptr ||
+                           mHoverPropWanted < 0 || static_cast<std::size_t>(mHoverPropWanted) >= mMap->mProps->mEntries.size()
+                         ? -1
+                         : mHoverPropWanted;
+    if (wanted < 0) {
+      // Hidden, not deleted: the cursor often leaves a prop and comes back to it; a mesh is remade only for another prop.
+      if (mHighlight != nullptr) {
+        mHighlight->isHidden = 1;
+      }
+      return;
+    }
+    const moho::CWldPropEntry& entry = mMap->mProps->mEntries[static_cast<std::size_t>(wanted)];
+    if (wanted != mHighlightProp || mHighlight == nullptr) {
+      DeletePropHighlight();
+      moho::RRuleGameRules* const rules = Rules();
+      moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
+      if (rules == nullptr || renderer == nullptr) {
+        return;
+      }
+      moho::RResId id{};
+      gpg::STR_CopyFilename(&id.name, &entry.mBlueprintPath);
+      moho::RPropBlueprint* const blueprint = rules->GetPropBlueprint(id);
+      moho::RMeshBlueprint* const mesh = blueprint != nullptr ? rules->GetMeshBlueprint(blueprint->Display.MeshBlueprint) : nullptr;
+      if (mesh == nullptr) {
+        return;
+      }
+      // The prop's own mesh again, a little larger, with the game's build-placement technique (UnitPlace in mesh.fx:
+      // its vertices pushed out along their normals, lit, in the instance's colour at a fifth opacity): a lit shell over
+      // the prop, its rim showing round the edge. Every renderer has it, as the game's build ghost draws with it.
+      static const boost::shared_ptr<moho::MeshMaterial> kHighlight =
+        moho::MeshMaterial::Create(fa::string("UnitPlace"), fa::string(), fa::string(), fa::string(), fa::string(), fa::string(), nullptr);
+      const float scale = blueprint->Display.UniformScale * 1.04f;
+      mHighlight = renderer->CreateMeshInstance(0, static_cast<std::int32_t>(0xFFFFB040u), mesh, Wm3::Vec3f{scale, scale, scale}, false, kHighlight);
+      mHighlightProp = wanted;
+      if (mHighlight == nullptr) {
+        return;
+      }
+      mHighlight->isHidden = 0;
+      gpg::Logf("editor: prop %d highlighted (%s)", wanted, entry.mBlueprintPath.c_str());
+    }
+    mHighlight->isHidden = 0;
+    mHighlight->SetStance(entry.mTransform, entry.mTransform);
+  }
+
+  void EdMapScene::DeletePropHighlight()
+  {
+    if (mHighlight != nullptr && moho::MeshRenderer::GetInstance() != nullptr) {
+      delete mHighlight;
+    }
+    mHighlight = nullptr;
+    mHighlightProp = -1;
+  }
+
   void EdMapScene::DeleteProps()
   {
+    DeletePropHighlight();
     DeletePropPreview();
     DeleteUnits();
     DeleteDeposits();

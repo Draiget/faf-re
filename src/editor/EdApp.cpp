@@ -2501,6 +2501,19 @@ namespace faf::editor
             tools.SetGridStep(static_cast<float>(std::atof(step[0].c_str())));
           }
         }
+        // `/hoverprop <index or part of a blueprint path>` (test runs): the Select tool's cursor kept on that prop (WPE.54).
+        if (fa::vector<fa::string> prop; moho::CFG_GetArgOption("/hoverprop", 1, &prop) && !prop.empty()) {
+          const std::string wanted = prop[0].c_str();
+          int index = std::isdigit(static_cast<unsigned char>(wanted.front())) != 0 ? std::atoi(wanted.c_str()) : -1;
+          if (const moho::CWldMap* const map = mDocument.Map(); index < 0 && map != nullptr && map->mProps != nullptr) {
+            for (std::size_t i = 0; i < map->mProps->mEntries.size() && index < 0; ++i) {
+              if (std::string(map->mProps->mEntries[i].mBlueprintPath.c_str()).find(wanted) != std::string::npos) {
+                index = static_cast<int>(i);
+              }
+            }
+          }
+          mScene.TestHoverProp(index);
+        }
         if (fa::vector<fa::string> hover; !mFrameMarkerArg.empty() && moho::CFG_GetArgOption("/hovermarker", 1, &hover) && !hover.empty()) {
           // `/hovermarker <name>` (test runs, with /framemarker): the cursor kept on that marker ("Mass+08" for "Mass 08").
           std::string name = hover[0].c_str();

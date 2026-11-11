@@ -511,10 +511,23 @@ namespace faf::editor
     /** In front of a play: the session's map (given back to the renderer), and whether its interface was drawn. */
     /** The marker under the cursor (its helper drawn in the hover colour); empty for none. */
     std::string mHoverMarker;
+    /**
+     * The prop under the cursor (-1 none), seen while drawing, and its highlight: the prop's mesh again with the game's
+     * build-placement technique, made or moved each frame outside the draw (user ask 2026-11-11, WPE.54).
+     */
+    int mHoverPropWanted = -1;
+    int mHighlightProp = -1;
+    moho::MeshInstance* mHighlight = nullptr;
+    void UpdatePropHighlight();
+    void DeletePropHighlight();
 
   public:
     /** Test runs (`/hovermarker <name>`): the cursor kept on that marker's place on the screen. */
     void TestHoverMarker(std::string name) { mTestHover = std::move(name); }
+    /** Test runs (`/hoverprop <index>`): the cursor kept on that prop, the camera close over it. */
+    void TestHoverProp(const int index) { mTestHoverProp = index; }
+    int mTestHoverProp = -1;
+    bool mTestHoverPropFramed = false;
 
   private:
     std::string mTestHover;
