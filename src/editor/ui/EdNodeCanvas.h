@@ -8,6 +8,7 @@
 #include <string>
 
 struct ImVec2;
+struct ImDrawList;
 
 namespace faf::editor
 {
@@ -27,6 +28,12 @@ namespace faf::editor
     using WarningFn = std::function<std::string(const GraphNode&)>;
 
     void SetThumbnails(ThumbnailFn fn) { mThumbnail = std::move(fn); }
+    /** Which node types keep the square under their pins (default: those with an output). */
+    using HasSquareFn = std::function<bool(const NodeType&)>;
+    void SetHasSquare(HasSquareFn fn) { mHasSquare = std::move(fn); }
+    /** Draws a node's own picture into the square (a curve's plot); true when it drew (else the thumbnail shows). */
+    using DrawSquareFn = std::function<bool(const GraphNode&, ImDrawList*, float x0, float y0, float x1, float y1)>;
+    void SetDrawSquare(DrawSquareFn fn) { mDrawSquare = std::move(fn); }
     void SetWarnings(WarningFn fn) { mWarning = std::move(fn); }
 
     /** Draws into the rest of the current window; true while the graph changed this frame. */
@@ -63,6 +70,8 @@ namespace faf::editor
     void Frame(const NodeGraph& graph, bool selectionOnly);
 
     ThumbnailFn mThumbnail;
+    HasSquareFn mHasSquare;
+    DrawSquareFn mDrawSquare;
     WarningFn mWarning;
     std::set<int> mSelection;
     float mPanX = 40.0f;

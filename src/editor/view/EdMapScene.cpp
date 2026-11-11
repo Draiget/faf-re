@@ -3974,33 +3974,42 @@ namespace faf::editor
       seen.insert(marker.name);
       const std::string effect = ValueString(marker.Get("effect"));
       EffectDecoration& decoration = mEffects[marker.name];
-      if (!decoration.preview || decoration.effect != effect) {
+      if (decoration.effect != effect || (decoration.previews.empty() && !effect.empty())) {
         decoration.effect = effect;
-        decoration.preview = std::make_unique<EdParticlePreview>();
-        std::string text;
-        EmitterBlueprint emitter;
-        FlatBlueprint flat;
-        std::string error;
-        if (effect.empty() || !ReadGameFile(effect, text)) {
-          decoration.preview.reset();
-          continue;
+        decoration.previews.clear();
+        // Each path (';' between: the emitters an effect plays together) a preview of its own.
+        std::size_t at = 0;
+        while (at < effect.size()) {
+          const std::size_t semicolon = effect.find(';', at);
+          const std::string path = effect.substr(at, semicolon == std::string::npos ? std::string::npos : semicolon - at);
+          at = semicolon == std::string::npos ? effect.size() : semicolon + 1;
+          std::string text;
+          EmitterBlueprint emitter;
+          FlatBlueprint flat;
+          std::string error;
+          if (path.empty() || !ReadGameFile(path, text)) {
+            continue;
+          }
+          auto preview = std::make_unique<EdParticlePreview>();
+          if (ParseEmitter(text, emitter, error)) {
+            preview->SetEmitter(emitter);
+          } else if (ParseFlatBlueprint(text, flat, error)) {
+            preview->SetFlat(flat);
+          } else {
+            continue;
+          }
+          preview->Restart();
+          decoration.previews.push_back(std::move(preview));
         }
-        if (ParseEmitter(text, emitter, error)) {
-          decoration.preview->SetEmitter(emitter);
-        } else if (ParseFlatBlueprint(text, flat, error)) {
-          decoration.preview->SetFlat(flat);
-        } else {
-          decoration.preview.reset();
-          continue;
-        }
-        decoration.preview->Restart();
         moho::gAppIdleClock = true; // the renderer's clock between sessions, so the particles age
       }
       const std::vector<double> height = ValueNumbers(marker.Get("height"));
       const std::vector<double> scale = ValueNumbers(marker.Get("scale"));
-      decoration.preview->SetPlace(x, y + (height.empty() ? 0.0f : static_cast<float>(height[0])), z);
-      decoration.preview->SetScale(scale.empty() || scale[0] <= 0.0 ? 1.0f : static_cast<float>(scale[0]));
-      decoration.preview->Frame();
+      for (const auto& preview : decoration.previews) {
+        preview->SetPlace(x, y + (height.empty() ? 0.0f : static_cast<float>(height[0])), z);
+        preview->SetScale(scale.empty() || scale[0] <= 0.0 ? 1.0f : static_cast<float>(scale[0]));
+        preview->Frame();
+      }
     }
     for (auto it = mEffects.begin(); it != mEffects.end();) {
       it = seen.count(it->first) == 0 ? mEffects.erase(it) : std::next(it);

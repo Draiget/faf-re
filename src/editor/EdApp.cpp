@@ -1233,6 +1233,11 @@ namespace faf::editor
             mShell->ShowParticleBrowser() = true;
             mShell->ParticleEditor().TestBrowse(filter[0].c_str());
           }
+          if (fa::vector<fa::string> name; moho::CFG_GetArgOption("/particletemplate", 1, &name) && !name.empty()) {
+            // `/particletemplate <name>` (test runs): one of FAF's effect templates opened as a graph.
+            mShell->ShowParticleEditor() = true;
+            (void)mShell->ParticleEditor().TestTemplate(name[0].c_str());
+          }
           if (fa::vector<fa::string> kind; moho::CFG_GetArgOption("/particlenew", 1, &kind) && !kind.empty()) {
             mShell->ShowParticleEditor() = true;
             mShell->ParticleEditor().TestNew(kind[0].c_str());

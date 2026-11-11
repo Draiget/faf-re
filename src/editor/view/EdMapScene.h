@@ -604,8 +604,8 @@ namespace faf::editor
     /** The Effect markers' effects, playing where they stand (by marker name; remade when the effect changes). */
     struct EffectDecoration
     {
-      std::string effect;
-      std::unique_ptr<EdParticlePreview> preview;
+      std::string effect; // the marker's paths, ';' between (an effect of several emitters)
+      std::vector<std::unique_ptr<EdParticlePreview>> previews;
     };
     std::map<std::string, EffectDecoration> mEffects;
     void UpdateEffects();

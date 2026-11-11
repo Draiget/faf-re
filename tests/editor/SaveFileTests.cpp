@@ -367,7 +367,8 @@ Scenario = {
     // The call right after InitializeArmies, the function at the end.
     EXPECT_NE(on.find("    ScenarioUtils.InitializeArmies()\n    MapEditorEffects()"), std::string::npos);
     EXPECT_NE(on.find("function MapEditorEffects()"), std::string::npos);
-    EXPECT_NE(on.find("CreateEmitterAtEntity(entity, -1, marker.effect)"), std::string::npos);
+    EXPECT_NE(on.find("for path in string.gfind(marker.effect, '[^;]+') do"), std::string::npos);
+    EXPECT_NE(on.find("CreateEmitterAtEntity(entity, -1, path)"), std::string::npos);
     // On again: the same text (one block, one call).
     EXPECT_EQ(faf::editor::WithScriptEffects(on, true), on);
     // Off: the script as it was.

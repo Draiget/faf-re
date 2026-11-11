@@ -1,11 +1,14 @@
 #pragma once
 
 #include "editor/doc/EdEmitter.h"
+#include "editor/graph/EdEffectGraph.h"
+#include "editor/ui/EdNodeCanvas.h"
 #include "editor/tools/EdTextureLibrary.h"
 #include "editor/view/EdParticlePreview.h"
 #include "editor/view/EdParticleViewport.h"
 
 #include <filesystem>
+#include <memory>
 #include <utility>
 #include <string>
 #include <vector>
@@ -13,13 +16,11 @@
 namespace faf::editor
 {
   /**
-   * The particle editor (View > Particle Editor), laid out as UE4's Cascade: the emitter's curves as a module stack
-   * grouped as retail's emitter editor groups them (Direction, Rate, Lifetime; Forces; Spacial; Size and Rotation;
-   * Animation and Selection), the selected curve's graph (keys dragged, added with a double-click, removed with a right
-   * click; the random spread drawn as a band), and Details (lifetime, repeat, blend mode, frames, switches, textures).
-   * It edits the game's emitter blueprints: any of the game's own opens as a start, and the result is saved as a .bp in
-   * the map's `effects` folder (a vault map), else in the editor's own folder. The preview emits live at the view's
-   * centre on the map (EdParticlePreview).
+   * The particle editor (View > Particle Editor), a node graph as the material editor is (user ask 2026-11-11): an
+   * effect's emitters as Emitter nodes fed by curve and texture nodes (ui/EdParticleGraph.cpp, graph/EdEffectGraph),
+   * Details for the selected node (a Curve's keys on a graph), a palette; any game emitter or FAF effect template opens
+   * as a graph, Save writes each emitter's .bp and the graph into the map's `effects/emitters` folder (a vault map),
+   * else the editor's own folder. Beams and trails open as their keys. Every emitter plays in the particle view.
    */
   class EdParticleEditor
   {
@@ -55,12 +56,13 @@ namespace faf::editor
     void TestNew(const std::string& kind) { NewFlat(kind == "beam" ? "BeamBlueprint" : "TrailEmitterBlueprint"); }
     /** Test runs (`/particleopen <game path>`): opens a game emitter. */
     bool OpenGameEmitter(const std::string& path);
+    /** Opens one of FAF's effect templates (its emitters played together) as a graph. */
+    bool OpenTemplate(const EffectTemplate& effect);
+    /** Test runs (`/particletemplate <name>`): opens that template. */
+    bool TestTemplate(const std::string& name);
 
   private:
     void DrawToolbar();
-    void DrawModules();
-    void DrawCurve();
-    void DrawDetails();
     /** A beam's or trail's keys (they have no curves). */
     void DrawFlat();
     void NewFlat(const char* kind);
@@ -78,9 +80,6 @@ namespace faf::editor
     std::string mName = "new_emitter";
     std::filesystem::path mPath;
     bool mDirty = false;
-    int mCurve = kEmitRate;
-    int mDragKey = -1;
-    int mSelectedKey = -1;
     bool mPlaying = true;
     bool mLoop = true;
     std::filesystem::path mMapFolder;
@@ -102,6 +101,38 @@ namespace faf::editor
     EdParticleViewport mViewport;
     /** The view comes to the effect's size when one opens. */
     bool mFrameAsk = true;
+
+    // The node graph (ui/EdParticleGraph.cpp): the effect's emitters as nodes, a preview per emitter.
+    void SetGraph(const std::string& effectName, const std::vector<std::pair<std::string, EmitterBlueprint>>& emitters, const std::string& gamePaths);
+    /** The emitters again from the graph when it changed (the previews follow). */
+    void SyncGraph();
+    void DrawGraphMode();
+    void DrawNodeDetails();
+    void DrawGraphPalette();
+    /** A curve's keys edited on a graph (drag, double-click adds, right-click removes); true when they changed. */
+    bool DrawCurveKeys(std::vector<EmitterKey>& keys, float& range, const EmitterCurveInfo* info);
+    void GraphSnapshot();
+    void GraphUndo(bool redo);
+    bool SaveGraph(const std::string& effectName);
+    void ListTemplates();
+    std::unique_ptr<NodeGraph> mGraph;
+    EdNodeCanvas mCanvas;
+    std::string mEffectName = "new_effect";
+    std::uint64_t mGraphBuilt = ~std::uint64_t{0};
+    std::uint64_t mGraphClean = 0; // the graph's changes when opened or saved
+    std::vector<std::pair<std::string, EmitterBlueprint>> mFxEmitters;
+    std::vector<std::unique_ptr<EdParticlePreview>> mFx;
+    std::vector<std::string> mGraphUndo;
+    std::size_t mGraphUndoAt = 0;
+    std::uint64_t mGraphSnap = 0;
+    /** The open effect's paths in the game's files (';' between), as opened or as saved; empty for a new one. */
+    std::string mEffectPaths;
+    int mKeyDrag = -1;
+    int mKeySelected = -1;
+    char mPaletteFilter[64] = {};
+    std::vector<EffectTemplate> mTemplates;
+    bool mTemplatesListed = false;
+    bool mBrowseTemplates = false;
 
     // The Particle Browser (ui/EdParticleBrowser.cpp).
     struct EffectInfo

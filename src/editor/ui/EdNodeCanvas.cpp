@@ -24,9 +24,12 @@ namespace faf::editor
       return std::max(type.inputs.size(), type.outputs.size());
     }
 
+    /** The drawing canvas's rule for the square under the pins (set while it draws). */
+    const std::function<bool(const NodeType&)>* gHasSquare = nullptr;
+
     bool HasThumbnail(const NodeType& type)
     {
-      return !type.outputs.empty();
+      return gHasSquare != nullptr && *gHasSquare ? (*gHasSquare)(type) : !type.outputs.empty();
     }
 
     float NodeHeight(const NodeType& type)
@@ -125,6 +128,7 @@ namespace faf::editor
   bool EdNodeCanvas::Draw(NodeGraph& graph)
   {
     const std::uint64_t changesBefore = graph.Changes();
+    gHasSquare = &mHasSquare;
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 size = ImGui::GetContentRegionAvail();
     if (size.x < 10.0f || size.y < 10.0f) {
@@ -456,11 +460,13 @@ namespace faf::editor
                       type.outputs[i].name.c_str());
         }
       }
-      if (HasThumbnail(type) && mThumbnail) {
-        if (const std::uint64_t image = mThumbnail(node); image != 0) {
-          const float top = node.y + kHeader + 6.0f + static_cast<float>(Rows(type)) * kRow + 4.0f;
-          const ImVec2 ta = toScreen(node.x + (kNodeW - kThumb) * 0.5f, top);
-          const ImVec2 tb = toScreen(node.x + (kNodeW + kThumb) * 0.5f, top + kThumb);
+      if (HasThumbnail(type)) {
+        const float top = node.y + kHeader + 6.0f + static_cast<float>(Rows(type)) * kRow + 4.0f;
+        const ImVec2 ta = toScreen(node.x + (kNodeW - kThumb) * 0.5f, top);
+        const ImVec2 tb = toScreen(node.x + (kNodeW + kThumb) * 0.5f, top + kThumb);
+        if (mDrawSquare && mDrawSquare(node, dl, ta.x, ta.y, tb.x, tb.y)) {
+          dl->AddRect(ta, tb, IM_COL32(10, 10, 10, 255));
+        } else if (const std::uint64_t image = mThumbnail ? mThumbnail(node) : 0; image != 0) {
           dl->AddImage(static_cast<ImTextureID>(image), ta, tb);
           dl->AddRect(ta, tb, IM_COL32(10, 10, 10, 255));
         }
