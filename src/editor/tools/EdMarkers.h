@@ -49,6 +49,31 @@ namespace faf::editor
   bool MarkerPosition(const SaveEntry& marker, float& x, float& y, float& z);
   /** A marker's colour as ARGB (from `color`, else grey). */
   std::uint32_t MarkerColor(const SaveEntry& marker);
+
+  /**
+   * One marker property's value as `_save.lua` writes it, by kind (user ask 2026-11-11: typed fields, not raw Lua):
+   * `STRING( 'x' )`, `FLOAT( 1.5 )`, `BOOLEAN( true )`, `VECTOR3( 1, 2, 3 )`; anything else stays raw text.
+   */
+  struct MarkerValue
+  {
+    enum class Kind
+    {
+      Raw,
+      String,
+      Float,
+      Bool,
+      Vector3,
+    };
+    Kind kind = Kind::Raw;
+    std::string text; // String: the string; Raw: the whole text
+    float number[3] = {0.0f, 0.0f, 0.0f};
+    bool flag = false;
+  };
+  MarkerValue ParseMarkerValue(const std::string& text);
+  std::string WriteMarkerValue(const MarkerValue& value);
+  /** A colour string as the game's markers keep them (`'ff800080'`: alpha, red, green, blue in hex); false when not one. */
+  bool MarkerColourText(const std::string& text, float rgba[4]);
+  std::string MarkerColourOf(const float rgba[4]);
   /** A marker's `type` string. */
   std::string MarkerTypeOf(const SaveEntry& marker);
   /** A path node's neighbours (`adjacentTo`, names split on spaces). */

@@ -135,4 +135,41 @@ namespace
     const std::vector<std::string> back = faf::editor::MarkerLinks(grid[0]);
     EXPECT_NE(std::find(back.begin(), back.end(), grid[17].name), back.end());
   }
+
+  TEST(Markers, TypedValuesReadAndWriteBack)
+  {
+    using faf::editor::MarkerValue;
+    const MarkerValue colour = faf::editor::ParseMarkerValue("STRING( 'ff800080' )");
+    ASSERT_EQ(colour.kind, MarkerValue::Kind::String);
+    EXPECT_EQ(colour.text, "ff800080");
+    float rgba[4] = {};
+    ASSERT_TRUE(faf::editor::MarkerColourText(colour.text, rgba));
+    EXPECT_NEAR(rgba[3], 1.0f, 1e-6f);           // alpha first
+    EXPECT_NEAR(rgba[0], 128.0f / 255.0f, 1e-6f); // then red
+    EXPECT_NEAR(rgba[1], 0.0f, 1e-6f);
+    EXPECT_NEAR(rgba[2], 128.0f / 255.0f, 1e-6f);
+    EXPECT_EQ(faf::editor::MarkerColourOf(rgba), "ff800080");
+    EXPECT_FALSE(faf::editor::MarkerColourText("Blank Marker", rgba));
+
+    const MarkerValue position = faf::editor::ParseMarkerValue("VECTOR3( 672.5, 18.6797, 346.5 )");
+    ASSERT_EQ(position.kind, MarkerValue::Kind::Vector3);
+    EXPECT_FLOAT_EQ(position.number[1], 18.6797f);
+    EXPECT_EQ(faf::editor::WriteMarkerValue(position), "VECTOR3( 672.5, 18.6797, 346.5 )");
+
+    const MarkerValue amount = faf::editor::ParseMarkerValue("FLOAT( 100.000000 )");
+    ASSERT_EQ(amount.kind, MarkerValue::Kind::Float);
+    EXPECT_EQ(faf::editor::WriteMarkerValue(amount), "FLOAT( 100.000000 )");
+
+    const MarkerValue hint = faf::editor::ParseMarkerValue("BOOLEAN( true )");
+    ASSERT_EQ(hint.kind, MarkerValue::Kind::Bool);
+    EXPECT_TRUE(hint.flag);
+    EXPECT_EQ(faf::editor::WriteMarkerValue(hint), "BOOLEAN( true )");
+
+    const MarkerValue type = faf::editor::ParseMarkerValue("STRING( 'Blank Marker' )");
+    EXPECT_EQ(faf::editor::WriteMarkerValue(type), "STRING( 'Blank Marker' )");
+    // Anything else is kept as written.
+    const MarkerValue other = faf::editor::ParseMarkerValue("{ 'a', 'b' }");
+    EXPECT_EQ(other.kind, MarkerValue::Kind::Raw);
+    EXPECT_EQ(faf::editor::WriteMarkerValue(other), "{ 'a', 'b' }");
+  }
 } // namespace

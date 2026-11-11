@@ -1128,6 +1128,9 @@ namespace faf::editor
     std::string mMarkerEditKey;
     std::string mMarkerEditValue;
     char mMarkerEditBuffer[256]{};
+    /** A typed marker field's own copy while it is held (a number, a vector, a colour). */
+    MarkerValue mMarkerTyped;
+    float mMarkerTypedColour[4] = {0.0f, 0.0f, 0.0f, 1.0f};
     std::string mMarkerEditing;
     std::optional<std::array<int, 4>> mArea;
     int mMapWidth = 0;

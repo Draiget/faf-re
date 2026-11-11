@@ -1851,22 +1851,129 @@ namespace faf::editor
       ImGui::TextUnformatted(count);
     } else {
       const SaveEntry& marker = mMarkerSelection.front();
-      // The name, then each property's value as the save writes it; Enter applies a change.
-      const auto field = [&](const std::string& key, const std::string& value) {
+      // The labels' column: as wide as the longest key ("orientation"), so the badges never sit on a name.
+      float labelColumn = ImGui::CalcTextSize("name").x;
+      for (const auto& [key, value] : marker.properties) {
+        labelColumn = std::max(labelColumn, ImGui::CalcTextSize(key.c_str()).x);
+      }
+      labelColumn += ImGui::GetStyle().WindowPadding.x + ImGui::GetStyle().ItemSpacing.x * 2.0f;
+      // A small badge of the value's kind beside its name.
+      const auto badge = [](const char* const kind, const ImU32 colour) {
+        const ImVec2 size = ImGui::CalcTextSize(kind);
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const float h = ImGui::GetFrameHeight();
+        ImDrawList* const dl = ImGui::GetWindowDrawList();
+        const ImVec2 a(at.x, at.y + (h - size.y) * 0.5f - 1.0f);
+        dl->AddRectFilled(a, ImVec2(a.x + size.x + 8.0f, a.y + size.y + 2.0f), (colour & 0x00FFFFFFu) | 0x55000000u, 3.0f);
+        dl->AddText(ImVec2(a.x + 4.0f, a.y + 1.0f), colour, kind);
+        ImGui::Dummy(ImVec2(size.x + 8.0f, h));
+      };
+      // Each property by its kind (user ask 2026-11-11: typed fields, not raw Lua): text, a number, a vector, a switch,
+      // a colour; anything else as the save writes it. Text applies on Enter, the others when let go: one undo step each.
+      const auto typedField = [&](const std::string& key, const std::string& raw) {
+        const MarkerValue parsed = ParseMarkerValue(raw);
+        float rgba[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        const bool colour = parsed.kind == MarkerValue::Kind::String && (key == "color" || key == "colour") && MarkerColourText(parsed.text, rgba);
+        const char* const kind = colour                                       ? "color"
+                                 : parsed.kind == MarkerValue::Kind::String  ? "str"
+                                 : parsed.kind == MarkerValue::Kind::Float   ? "num"
+                                 : parsed.kind == MarkerValue::Kind::Bool    ? "bool"
+                                 : parsed.kind == MarkerValue::Kind::Vector3 ? "vec3"
+                                                                             : "lua";
+        const ImU32 kindColour = colour                                       ? IM_COL32(230, 120, 200, 255)
+                                 : parsed.kind == MarkerValue::Kind::String  ? IM_COL32(206, 145, 120, 255)
+                                 : parsed.kind == MarkerValue::Kind::Float   ? IM_COL32(181, 206, 168, 255)
+                                 : parsed.kind == MarkerValue::Kind::Bool    ? IM_COL32(86, 156, 214, 255)
+                                 : parsed.kind == MarkerValue::Kind::Vector3 ? IM_COL32(78, 201, 176, 255)
+                                                                             : IM_COL32(160, 160, 160, 255);
+        if (parsed.kind == MarkerValue::Kind::Raw || (parsed.kind == MarkerValue::Kind::String && !colour)) {
+          return false; // text: the text field below
+        }
         ImGui::PushID(key.c_str());
+        ImGui::AlignTextToFramePadding();
         ImGui::TextDisabled("%s", key.c_str());
-        ImGui::SameLine(90.0f);
+        ImGui::SetItemTooltip("%s", MarkerFieldUse(key));
+        ImGui::SameLine(labelColumn);
+        badge(kind, kindColour);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-1.0f);
+        const std::string id = marker.name + "/" + key;
+        const auto commit = [&](const MarkerValue& changed) {
+          mMarkerEditName = marker.name;
+          mMarkerEditKey = key;
+          mMarkerEditValue = WriteMarkerValue(changed);
+          mMarkerEditing.clear();
+        };
+        // While held, the field's own copy; the save's value again once let go.
+        if (mMarkerEditing != id) {
+          mMarkerTyped = parsed;
+          if (colour) {
+            std::copy(rgba, rgba + 4, mMarkerTypedColour);
+          }
+        }
+        bool edited = false;
+        if (colour) {
+          edited = ImGui::ColorEdit4("##value", mMarkerTypedColour, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf);
+        } else if (parsed.kind == MarkerValue::Kind::Float) {
+          edited = ImGui::DragFloat("##value", &mMarkerTyped.number[0], 0.1f, 0.0f, 0.0f, "%.3f");
+        } else if (parsed.kind == MarkerValue::Kind::Vector3) {
+          edited = ImGui::DragFloat3("##value", mMarkerTyped.number, 0.1f, 0.0f, 0.0f, "%.2f");
+        } else if (parsed.kind == MarkerValue::Kind::Bool) {
+          if (ImGui::Checkbox("##value", &mMarkerTyped.flag)) {
+            commit(mMarkerTyped);
+          }
+        }
+        if (edited || ImGui::IsItemActive()) {
+          mMarkerEditing = id;
+        }
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+          MarkerValue changed = mMarkerTyped;
+          if (colour) {
+            changed.text = MarkerColourOf(mMarkerTypedColour);
+          }
+          commit(changed);
+        } else if (!ImGui::IsItemActive() && mMarkerEditing == id && !edited) {
+          mMarkerEditing.clear();
+        }
+        ImGui::PopID();
+        return true;
+      };
+      // The name, then each property; text ones as text (Enter applies a change).
+      const auto field = [&](const std::string& key, const std::string& value) {
+        if (key != "name" && typedField(key, value)) {
+          return;
+        }
+        const bool isString = key != "name" && ParseMarkerValue(value).kind == MarkerValue::Kind::String;
+        const std::string shown = isString ? ParseMarkerValue(value).text : value;
+        ImGui::PushID(key.c_str());
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextDisabled("%s", key.c_str());
+        if (key != "name") {
+          ImGui::SetItemTooltip("%s", MarkerFieldUse(key));
+        }
+        ImGui::SameLine(labelColumn);
+        badge(key == "name" ? "name" : isString ? "str" : "lua", key == "name" ? IM_COL32(220, 220, 170, 255)
+                                                                 : isString       ? IM_COL32(206, 145, 120, 255)
+                                                                                  : IM_COL32(160, 160, 160, 255));
+        ImGui::SameLine();
         const std::string id = marker.name + "/" + key;
         if (mMarkerEditing != id) {
-          (void)std::snprintf(mMarkerEditBuffer, sizeof(mMarkerEditBuffer), "%s", value.c_str());
+          (void)std::snprintf(mMarkerEditBuffer, sizeof(mMarkerEditBuffer), "%s", shown.c_str());
         }
         ImGui::SetNextItemWidth(-1.0f);
         char buffer[256];
-        (void)std::snprintf(buffer, sizeof(buffer), "%s", mMarkerEditing == id ? mMarkerEditBuffer : value.c_str());
+        (void)std::snprintf(buffer, sizeof(buffer), "%s", mMarkerEditing == id ? mMarkerEditBuffer : shown.c_str());
         if (ImGui::InputText("##value", buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
           mMarkerEditName = marker.name;
           mMarkerEditKey = key;
-          mMarkerEditValue = buffer;
+          if (isString) {
+            MarkerValue text;
+            text.kind = MarkerValue::Kind::String;
+            text.text = buffer;
+            mMarkerEditValue = WriteMarkerValue(text);
+          } else {
+            mMarkerEditValue = buffer;
+          }
           mMarkerEditing.clear();
         } else if (ImGui::IsItemActive()) {
           mMarkerEditing = id;

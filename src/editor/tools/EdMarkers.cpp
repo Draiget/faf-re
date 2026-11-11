@@ -1,6 +1,7 @@
 #include "editor/tools/EdMarkers.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -216,6 +217,103 @@ namespace faf::editor
       return 0xFF808080u;
     }
     return static_cast<std::uint32_t>(std::strtoul(hex.c_str(), nullptr, 16)) | 0xFF000000u;
+  }
+
+  MarkerValue ParseMarkerValue(const std::string& text)
+  {
+    MarkerValue value;
+    value.kind = MarkerValue::Kind::Raw;
+    value.text = text;
+    // KIND( inside ): the kind's word, then what's between the parentheses.
+    const std::size_t open = text.find('(');
+    const std::size_t close = text.rfind(')');
+    if (open == std::string::npos || close == std::string::npos || close < open) {
+      return value;
+    }
+    std::string word = text.substr(0, open);
+    word.erase(std::remove_if(word.begin(), word.end(), [](const unsigned char c) { return std::isspace(c) != 0; }), word.end());
+    std::string inside = text.substr(open + 1, close - open - 1);
+    const auto trim = [](std::string s) {
+      const std::size_t a = s.find_first_not_of(" \t");
+      const std::size_t b = s.find_last_not_of(" \t");
+      return a == std::string::npos ? std::string() : s.substr(a, b - a + 1);
+    };
+    inside = trim(inside);
+    if (word == "STRING" && inside.size() >= 2 && (inside.front() == '\'' || inside.front() == '"') && inside.back() == inside.front()) {
+      value.kind = MarkerValue::Kind::String;
+      value.text = inside.substr(1, inside.size() - 2);
+    } else if (word == "FLOAT") {
+      char* end = nullptr;
+      value.number[0] = std::strtof(inside.c_str(), &end);
+      if (end != nullptr && end != inside.c_str()) {
+        value.kind = MarkerValue::Kind::Float;
+      }
+    } else if (word == "BOOLEAN" && (inside == "true" || inside == "false")) {
+      value.kind = MarkerValue::Kind::Bool;
+      value.flag = inside == "true";
+    } else if (word == "VECTOR3") {
+      // Three numbers, commas between.
+      const char* at = inside.c_str();
+      float numbers[3] = {0.0f, 0.0f, 0.0f};
+      int read = 0;
+      for (; read < 3; ++read) {
+        char* end = nullptr;
+        numbers[read] = std::strtof(at, &end);
+        if (end == at) {
+          break;
+        }
+        at = end;
+        while (*at == ' ' || *at == ',') {
+          ++at;
+        }
+      }
+      if (read == 3) {
+        value.kind = MarkerValue::Kind::Vector3;
+        std::copy(numbers, numbers + 3, value.number);
+      }
+    }
+    return value;
+  }
+
+  std::string WriteMarkerValue(const MarkerValue& value)
+  {
+    char text[160];
+    switch (value.kind) {
+      case MarkerValue::Kind::String:
+        return "STRING( '" + value.text + "' )";
+      case MarkerValue::Kind::Float:
+        (void)std::snprintf(text, sizeof(text), "FLOAT( %.6f )", static_cast<double>(value.number[0]));
+        return text;
+      case MarkerValue::Kind::Bool:
+        return value.flag ? "BOOLEAN( true )" : "BOOLEAN( false )";
+      case MarkerValue::Kind::Vector3:
+        (void)std::snprintf(text, sizeof(text), "VECTOR3( %g, %g, %g )", static_cast<double>(value.number[0]), static_cast<double>(value.number[1]),
+                            static_cast<double>(value.number[2]));
+        return text;
+      default:
+        return value.text;
+    }
+  }
+
+  bool MarkerColourText(const std::string& text, float rgba[4])
+  {
+    if (text.size() != 8 || text.find_first_not_of("0123456789abcdefABCDEF") != std::string::npos) {
+      return false;
+    }
+    const auto byte = [&](const std::size_t at) { return static_cast<float>(std::strtoul(text.substr(at, 2).c_str(), nullptr, 16)) / 255.0f; };
+    rgba[3] = byte(0); // alpha first, as the game's markers write it
+    rgba[0] = byte(2);
+    rgba[1] = byte(4);
+    rgba[2] = byte(6);
+    return true;
+  }
+
+  std::string MarkerColourOf(const float rgba[4])
+  {
+    const auto byte = [](const float v) { return static_cast<unsigned>(std::lround(std::clamp(v, 0.0f, 1.0f) * 255.0f)); };
+    char text[16];
+    (void)std::snprintf(text, sizeof(text), "%02x%02x%02x%02x", byte(rgba[3]), byte(rgba[0]), byte(rgba[1]), byte(rgba[2]));
+    return text;
   }
 
   std::string MarkerTypeOf(const SaveEntry& marker)
