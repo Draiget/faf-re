@@ -14,11 +14,11 @@ namespace moho
   void SetFactoryPreOrdersEnabled(bool enabled);
 }
 
-TEST(PlannedFactoryPreOrdersTest, DefaultIsEnabled)
+TEST(PlannedFactoryPreOrdersTest, DefaultIsDisabled)
 {
-  moho::SetFactoryPreOrdersEnabled(true);
-  EXPECT_TRUE(moho::IsFactoryPreOrdersEnabled());
-  EXPECT_TRUE(moho::ui_FactoryPreOrders);
+  moho::SetFactoryPreOrdersEnabled(false);
+  EXPECT_FALSE(moho::IsFactoryPreOrdersEnabled());
+  EXPECT_FALSE(moho::ui_FactoryPreOrders);
 }
 
 TEST(PlannedFactoryPreOrdersTest, SetFactoryPreOrdersEnabledTogglesState)

@@ -4361,10 +4361,10 @@ namespace moho
 
   /**
    * Engine addition: planned factory ghost selection and pre-orders switch.
-   * Default: true (1). Allows selecting planned factories under construction
+   * Default: false (0). Allows selecting planned factories under construction
    * to queue production orders, set rally points, and toggle repeat build ahead of time.
    */
-  bool ui_FactoryPreOrders = true;
+  bool ui_FactoryPreOrders = false;
 
   bool IsFactoryPreOrdersEnabled()
   {
