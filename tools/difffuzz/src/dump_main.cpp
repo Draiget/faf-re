@@ -416,12 +416,47 @@ namespace
     if (!ReadDump(produced, actual)) {
       return -1;
     }
+    // cpu_variants.txt next to the golden file: "target block inputs outputs <CPU and why>" lines, outputs another CPU
+    // gives for the same inputs (an x87 transcendental rounding its last bit another way), as retail would there.
+    std::multimap<std::string, std::string> variants;
+    {
+      std::string path = goldenPath;
+      const std::size_t slash = path.find_last_of("/\\");
+      path = (slash == std::string::npos ? std::string{} : path.substr(0, slash + 1)) + "cpu_variants.txt";
+      if (std::FILE* const file = std::fopen(path.c_str(), "rb"); file != nullptr) {
+        std::map<std::string, std::string> lines;
+        char buffer[512];
+        while (std::fgets(buffer, sizeof(buffer), file) != nullptr) {
+          std::string line = buffer;
+          while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) {
+            line.pop_back();
+          }
+          const std::size_t first = line.find(' ');
+          const std::size_t second = first == std::string::npos ? first : line.find(' ', first + 1);
+          if (!line.empty() && line[0] != '#' && second != std::string::npos) {
+            variants.emplace(line.substr(0, second), line.substr(second + 1));
+          }
+        }
+        std::fclose(file);
+      }
+    }
     int bad = 0;
     for (const auto& [key, hashes] : actual) {
       const auto it = expected.find(key);
+      const auto [variantFirst, variantLast] = variants.equal_range(key);
+      std::string variantNote;
+      for (auto variant = variantFirst; variant != variantLast; ++variant) {
+        // "inputs outputs note": the same 33 characters as a dump line's hashes, then the note.
+        if (variant->second.size() >= hashes.size() && variant->second.compare(0, hashes.size(), hashes) == 0 &&
+            (variant->second.size() == hashes.size() || variant->second[hashes.size()] == ' ')) {
+          variantNote = variant->second.size() > hashes.size() ? variant->second.substr(hashes.size() + 1) : "(no note)";
+        }
+      }
       if (it == expected.end()) {
         std::printf("MISSING %s: not in %s (iterations past the golden file's, or a new target)\n", key.c_str(), goldenPath);
         ++bad;
+      } else if (it->second != hashes && !variantNote.empty() && it->second.substr(0, 16) == hashes.substr(0, 16)) {
+        std::printf("VARIANT %s: outputs as cpu_variants.txt lists them for %s (this CPU: %s)\n", key.c_str(), variantNote.c_str(), CpuName().c_str());
       } else if (it->second != hashes) {
         const bool inputs = it->second.substr(0, 16) != hashes.substr(0, 16);
         std::printf(
