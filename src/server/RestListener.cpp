@@ -238,6 +238,12 @@ namespace faf::server
         return;
       }
       op = "status";
+    } else if (path == "/api/v1/armies") {
+      if (method != "GET") {
+        Respond(connection, 405, "{\"ok\":false,\"error\":\"armies is GET\"}");
+        return;
+      }
+      op = "armies"; // plan WP17.15: each army's economy, units, commander and score during the game
     } else if (path == "/api/v1/events") {
       if (method != "GET") {
         Respond(connection, 405, "{\"ok\":false,\"error\":\"events is GET\"}");
