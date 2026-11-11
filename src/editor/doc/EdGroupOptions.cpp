@@ -1162,6 +1162,52 @@ namespace faf::editor
     return lines;
   }
 
+  std::vector<ScriptGroupLoop> ScriptGroupLoops(const std::string& script)
+  {
+    std::vector<ScriptGroupLoop> loops;
+    const Script s = ReadScript(script);
+    const std::vector<Tok>& t = s.toks;
+    for (const Creation& c : s.creations) {
+      // 'Name_' .. w, w a numeric for's variable whose end is an option.
+      if (c.name.e != c.name.b + 3 || t[c.name.b].k != Tok::K::Str || !IsOp(t[c.name.b + 1], "..") || t[c.name.b + 2].k != Tok::K::Name) {
+        continue;
+      }
+      for (const Frame& f : c.site.frames) {
+        if (f.kind != Frame::Kind::NumFor || f.var != t[c.name.b + 2].s) {
+          continue;
+        }
+        ScriptGroupLoop loop;
+        loop.prefix = t[c.name.b].s;
+        if (f.to.e == f.to.b + 1 && t[f.to.b].k == Tok::K::Name) {
+          if (const auto key = s.varKeys.find(t[f.to.b].s); key != s.varKeys.end()) {
+            loop.key = key->second;
+          }
+        } else if (f.to.e == f.to.b + 5 && IsName(t[f.to.b], "ScenarioInfo") && IsName(t[f.to.b + 2], "Options")) {
+          loop.key = t[f.to.b + 4].s;
+        }
+        if (loop.key.empty()) {
+          continue;
+        }
+        loop.from = f.from.e == f.from.b + 1 && t[f.from.b].k == Tok::K::Num ? static_cast<int>(t[f.from.b].n) : 1;
+        loop.wreck = c.wreck.e == c.wreck.b + 1 && IsName(t[c.wreck.b], "true");
+        // The army, when the creation writes it.
+        for (std::size_t i = c.name.b; i > 0; --i) {
+          if (IsOp(t[i], "(")) {
+            if (t[i + 1].k == Tok::K::Str) {
+              loop.army = t[i + 1].s;
+            }
+            break;
+          }
+        }
+        const bool known = std::any_of(loops.begin(), loops.end(), [&](const ScriptGroupLoop& l) { return l.prefix == loop.prefix && l.key == loop.key; });
+        if (!known) {
+          loops.push_back(std::move(loop));
+        }
+      }
+    }
+    return loops;
+  }
+
   std::string LobbyRuleWhen(const GroupLobbyRule& rule, const std::vector<LobbyOptionInfo>& options)
   {
     if (!rule.scriptNames) {

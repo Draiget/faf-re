@@ -153,6 +153,16 @@ namespace faf::editor
     }
     ImGui::SetItemTooltip("Where %s %s in a game: moves %s into the group (Ctrl+Z undoes it)", names.size() == 1 ? "this unit" : "these units",
                           names.size() == 1 ? "is" : "are", names.size() == 1 ? "it" : ("the " + std::to_string(names.size()) + " selected").c_str());
+    // Its lobby option, edited where all of them are.
+    for (const SpawnTarget& target : targets) {
+      if (target.path.back() == current && !target.rule.keys.empty()) {
+        if (ImGui::Button(("Edit its lobby option \"" + target.rule.keys.front() + "\"...").c_str(), ImVec2(-1.0f, 0.0f))) {
+          OpenAdaptiveWindow(target.rule.keys.front());
+        }
+        ImGui::SetItemTooltip("The Adaptive Map window: the option's choices, what each puts on the map, its levels");
+        break;
+      }
+    }
   }
 
   void EdShell::DrawUnitFate(const SelectionProperties& unit)

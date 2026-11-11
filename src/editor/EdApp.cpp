@@ -118,6 +118,7 @@ namespace faf::editor
       kMenuMaterialEditor = 1115,
       kMenuParticleEditor = 1116,
       kMenuParticleBrowser = 1117,
+      kMenuAdaptiveWindow = 1118,
       kMenuPanelsWhilePlaying = 1104,
       kMenuResetLayout = 1105,
       kMenuImGuiDemo = 1106,
@@ -863,6 +864,7 @@ namespace faf::editor
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuMaterialEditor, L"Mat&erial Editor");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuParticleEditor, L"Partic&le Editor");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuParticleBrowser, L"Particle &Browser");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuAdaptiveWindow, L"&Adaptive Map");
       ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuFullHelp, L"&Full help text");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLog, L"&Log");
@@ -913,6 +915,7 @@ namespace faf::editor
       check(kMenuMaterialEditor, mShell->ShowMaterialEditor());
       check(kMenuParticleEditor, mShell->ShowParticleEditor());
       check(kMenuParticleBrowser, mShell->ShowParticleBrowser());
+      check(kMenuAdaptiveWindow, mShell->ShowAdaptiveWindow());
       check(kMenuFullHelp, FullHelpText());
       check(kMenuLog, mShell->ShowLog());
       check(kMenuPanelsWhilePlaying, mShell->PanelsWhilePlaying());
@@ -1028,6 +1031,9 @@ namespace faf::editor
         break;
       case kMenuParticleBrowser:
         mShell->ShowParticleBrowser() = !mShell->ShowParticleBrowser();
+        break;
+      case kMenuAdaptiveWindow:
+        mShell->ShowAdaptiveWindow() = !mShell->ShowAdaptiveWindow();
         break;
       case kMenuScript:
         mShell->ShowScript() = !mShell->ShowScript();
@@ -1286,6 +1292,10 @@ namespace faf::editor
             // `/particleswitch <game path>` (test runs): the open effect taken as edited, then another opened (it asks first).
             mShell->ShowParticleEditor() = true;
             mShell->ParticleEditor().TestOpenEdited(file[0].c_str());
+          }
+          if (fa::vector<fa::string> key; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/adaptivewindow", 1, &key) && !key.empty()) {
+            // `/adaptivewindow <option key>` (test runs): the Adaptive Map window on that option.
+            mShell->OpenAdaptiveWindow(key[0].c_str());
           }
           if (mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/texturepicker", 0, nullptr)) {
             // `/texturepicker` (test runs): the particle editor's next texture input opens its browser.
@@ -2797,6 +2807,11 @@ namespace faf::editor
         if (EdTools::UnitGroupAsk group; tools.TakeUnitGroup(group) && mDocument.GetState() == EdDocument::State::Open) {
           if (group.select) {
             mScene.SelectUnits(std::move(group.units));
+          } else if (group.removeGroup) {
+            mScene.ChangeUnitGroups(group.army, EdTools::GroupAsk::Remove, group.path, "");
+            for (const std::vector<std::string>& path : group.morePaths) {
+              mScene.ChangeUnitGroups(group.army, EdTools::GroupAsk::Remove, path, "");
+            }
           } else {
             (void)mScene.MoveUnitsToGroup(group.army, group.names, group.path);
             mUnitTreeFrames = 0;

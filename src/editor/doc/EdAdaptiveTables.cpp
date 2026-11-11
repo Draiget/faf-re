@@ -503,6 +503,38 @@ namespace faf::editor
     return text.substr(0, before) + (needComma ? "," : "") + "\n\n" + entry + text.substr(span.close);
   }
 
+  std::string WithLobbyOptionWritten(const std::string& text, const std::string& key, const std::string& label, const std::string& help,
+                                     const int defaultIndex, const std::vector<LobbyValueText>& values)
+  {
+    const OptionSpan span = FindOptionSpan(text, key);
+    const auto quoted = [](const std::string& s) {
+      std::string out;
+      for (const char c : s) {
+        out += c == '"' ? std::string("\\\"") : c == '\\' ? std::string("\\\\") : std::string(1, c);
+      }
+      return out;
+    };
+    const int count = static_cast<int>(values.size());
+    std::string entry = "{\n    default = " + std::to_string(defaultIndex >= 1 && defaultIndex <= count ? defaultIndex : 1) + ",\n    label = \"" +
+                        quoted(label) + "\",\n    help = \"" + quoted(help) + "\",\n    key = '" + key + "',\n    pref = '" + key + "',\n    values = {\n";
+    for (const LobbyValueText& value : values) {
+      entry += "        { text = \"" + quoted(value.text) + "\", help = \"" + quoted(value.help) + "\", key = " + value.key + ", },\n";
+    }
+    entry += "    },\n},\n";
+    if (span.from != std::string::npos) {
+      return text.substr(0, span.from) + entry + text.substr(span.to);
+    }
+    if (span.close == std::string::npos) {
+      return (text.empty() ? std::string() : text + "\n") + "options = {\n\n" + entry + "\n}\n";
+    }
+    std::size_t before = span.close;
+    while (before > 0 && std::isspace(static_cast<unsigned char>(text[before - 1])) != 0) {
+      --before;
+    }
+    const bool needComma = before > 0 && text[before - 1] == '}';
+    return text.substr(0, before) + (needComma ? "," : "") + "\n\n" + entry + text.substr(span.close);
+  }
+
   std::string WithoutLobbyOption(const std::string& text, const std::string& key)
   {
     const OptionSpan span = FindOptionSpan(text, key);

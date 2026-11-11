@@ -68,6 +68,8 @@ set(FAF_EDITOR_SOURCES
   ui/EdParticleGraph.cpp
   ui/EdTexturePicker.cpp
   ui/EdCodeEditor.cpp
+  ui/EdAdaptiveWindow.cpp
+  doc/EdAdaptiveModel.cpp
   doc/EdLuaSyntax.cpp
   ui/EdNodeCanvas.cpp
   ui/EdMaterialEditor.cpp

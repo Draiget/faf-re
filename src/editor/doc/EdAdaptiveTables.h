@@ -87,6 +87,19 @@ namespace faf::editor
    */
   std::string WithLobbyOptionValues(const std::string& text, const std::string& key, const std::string& label, const std::string& help,
                                     const std::vector<std::pair<std::string, std::string>>& values);
+  /** One value of a lobby option as written: its key as a Lua literal (`2`, `'on'`), its text and help. */
+  struct LobbyValueText
+  {
+    std::string key;
+    std::string text;
+    std::string help;
+  };
+  /**
+   * The text with option `key` written whole: label, help, `default` (an index into the values from 1, as FAF's lobby
+   * reads it) and the values with their own keys; replaced where it is, else added at the end of `options`.
+   */
+  std::string WithLobbyOptionWritten(const std::string& text, const std::string& key, const std::string& label, const std::string& help,
+                                     int defaultIndex, const std::vector<LobbyValueText>& values);
   /** The text without option `key` (unchanged when it has none). */
   std::string WithoutLobbyOption(const std::string& text, const std::string& key);
 } // namespace faf::editor

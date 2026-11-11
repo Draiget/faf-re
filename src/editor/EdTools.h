@@ -304,6 +304,9 @@ namespace faf::editor
     struct UnitGroupAsk
     {
       bool select = false;
+      /** Remove the group at `path` of `army` (and those at `morePaths`) with their units instead of moving into it. */
+      bool removeGroup = false;
+      std::vector<std::vector<std::string>> morePaths;
       std::vector<std::pair<std::string, std::string>> units;
       std::string army;
       std::vector<std::string> names;

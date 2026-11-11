@@ -69,6 +69,20 @@ namespace faf::editor
   /** The rule as lines for the Properties panel: which option, and what each of its values does to the group. */
   std::vector<std::string> DescribeLobbyRule(const GroupLobbyRule& rule, const std::vector<LobbyOptionInfo>& options);
 
+  /**
+   * A level loop in a map's script: `for w = 2, optional_wreckage do CreateArmyGroup('ARMY_17', 'Optional_Wreckage_' .. w,
+   * true) end`: the lobby option's value v creates the groups `<prefix>from` .. `<prefix>v`.
+   */
+  struct ScriptGroupLoop
+  {
+    std::string prefix;
+    std::string army; // as written; empty when made at run time
+    std::string key;  // the option the loop's end reads
+    int from = 2;
+    bool wreck = false;
+  };
+  std::vector<ScriptGroupLoop> ScriptGroupLoops(const std::string& script);
+
   /** The first lobby setting that creates the group, as `Wreckage = "T3 wreckage"`; "every game"; or why never. */
   std::string LobbyRuleWhen(const GroupLobbyRule& rule, const std::vector<LobbyOptionInfo>& options);
 

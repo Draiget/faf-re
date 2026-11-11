@@ -4,6 +4,7 @@
 #include <utility>
 
 #include "editor/EdTools.h"
+#include "editor/doc/EdAdaptiveModel.h"
 #include "editor/tools/EdChecks.h"
 #include "editor/doc/EdLighting.h"
 #include "editor/doc/EdNewMap.h"
@@ -43,6 +44,17 @@ namespace faf::editor
     bool& ShowMarkers() noexcept { return mShowMarkers; }
     bool& ShowCheck() noexcept { return mShowCheck; }
     bool& ShowScript() noexcept { return mShowScript; }
+    /** The Adaptive Map window (View > Adaptive Map). */
+    bool& ShowAdaptiveWindow() noexcept { return mShowAdaptiveWindow; }
+    /** Shows it with an option picked (test runs: `/adaptivewindow <key>`). */
+    void OpenAdaptiveWindow(const std::string& key)
+    {
+      mShowAdaptiveWindow = true;
+      mFocusAdaptiveWindow = true;
+      if (!key.empty()) {
+        mAdaptivePick = key;
+      }
+    }
     bool& ShowLighting() noexcept { return mShowLighting; }
     /** The material editor (View > Material Editor): node graphs that make terrain textures. */
     bool& ShowMaterialEditor() noexcept { return mShowMaterialEditor; }
@@ -142,8 +154,17 @@ namespace faf::editor
     /** The unit's "Spawns" choice: the start groups, or a group a lobby setting makes the script create. */
     void DrawUnitSpawn(const SelectionProperties& unit, const UnitGroup& root, const std::string& current);
     std::string mSpawnAsk;
-    /** The Adaptive tool's panel: armies, option groups, crazyrush lists and lobby options (ui/EdAdaptivePanel.cpp). */
+    /** The Adaptive tool's panel: the files, the players' resources and the crazyrush lists (ui/EdAdaptivePanel.cpp). */
     void DrawAdaptivePanel();
+    /** The Adaptive Map window: the lobby's options, each with its choices and what they put on the map (ui/EdAdaptiveWindow.cpp). */
+    void DrawAdaptiveWindow();
+    void DrawAdaptiveOption(const AdaptiveOption& option, const std::vector<LobbyOptionInfo>& lobby, const AdaptiveTables& tables,
+                            const std::vector<std::string>& selectedMass, const std::vector<std::string>& selectedHydro,
+                            const std::vector<std::string>& selectedUnits, const UnitGroup& army);
+    bool mShowAdaptiveWindow = false;
+    bool mFocusAdaptiveWindow = false;
+    /** The option the window shows (its key; "#players" for the players' resources). */
+    std::string mAdaptivePick;
     /** View > Script on one of the map's Lua files (0 script, 1 lobby options, 2 adaptive tables). */
     void ShowLuaFile(int file)
     {
