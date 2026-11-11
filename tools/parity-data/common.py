@@ -134,6 +134,11 @@ def check_replay(raw, game_version):
             return info, "sim mod %s" % mod["name"], None
     if not body["map"]:
         return info, "map path %s" % body["scmap"], None
+    # The content server has no generated maps. corpus.py skips them by the header's mapname, which
+    # can name another map than the one played (27989110: header adaptive_pillars_of_sand.v0001,
+    # replay neroxis_map_generator_1.22.2_...), so the map download failed with 404 every night.
+    if body["map"].startswith("neroxis_map_generator"):
+        return info, "generated map %s" % body["map"], None
     try:
         info["beats"] = replay_beats(data)
     except (ValueError, IndexError):
